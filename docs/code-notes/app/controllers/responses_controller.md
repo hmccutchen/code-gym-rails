@@ -59,8 +59,8 @@ refused with a 409 rather than saved in part.
 
 ## `#save_answers_under_lock`
 
-Locks the exercise, then the response: the order `RegenerateExerciseJob`
-takes, so the two serialize instead of deadlocking.
+Takes both locks through `DailyExercise#with_response_locked`. A response
+created here is new to this transaction, so it is locked after creating it.
 
 A refused submit raises `ActiveRecord::Rollback` instead of returning
 `:failed` early. `#persisted_response_for` has already created the row by
@@ -122,10 +122,11 @@ Returns nil because callers read a falsy value as "already handled", and
 The section is checked against the problem set. Without that, a crafted param
 could write arbitrary keys into the jsonb columns.
 
-## `#claim_review!`
+## `#review`
 
-One `UPDATE ... WHERE` claims the row atomically, so a second click backs off
-instead of making a second provider call.
+The claim makes a second click back off instead of making a second provider
+call. Every exit releases it with its own token, so a review that overran its
+window can't clear the claim of the one that took over.
 
 ## `#clear_stale_generation_error!`
 

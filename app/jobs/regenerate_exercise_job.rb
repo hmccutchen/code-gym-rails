@@ -19,19 +19,12 @@ class RegenerateExerciseJob < ApplicationJob
     claim = exercise.regenerating_since
     generated = AiService.for(user).generate_unjudged_exercise(user, language: exercise.language)
 
-    kept_for = nil
-    ActiveRecord::Base.transaction do
+    kept_for = exercise.with_response_locked do |existing|
       # Re-read the claim under the lock: carry_forward or a later click can take it during the provider call.
-      exercise.lock!
-      if exercise.regenerating_since != claim
-        kept_for = :superseded
-        raise ActiveRecord::Rollback
-      end
-      # Not #lock!, which raises if #start_over deleted the row; #reviewing? also counts, as #review holds no lock mid-call.
-      existing = DailyResponse.lock.find_by(daily_exercise_id: exercise.id)
-      kept_for = :reviewed if existing&.reviewed?
-      kept_for = :reviewing if kept_for.nil? && existing&.reviewing?
-      raise ActiveRecord::Rollback if kept_for
+      next :superseded if exercise.regenerating_since != claim
+
+      blocker = existing&.replace_blocker
+      next blocker if blocker
 
       existing&.destroy
       exercise.update!(
@@ -42,6 +35,7 @@ class RegenerateExerciseJob < ApplicationJob
         regenerated_at:     Time.current,
         regenerating_since: nil
       )
+      nil
     end
 
     return keep_superseded_set(user) if kept_for == :superseded
@@ -66,18 +60,14 @@ class RegenerateExerciseJob < ApplicationJob
 
   def keep_reviewed_set(user, exercise, kept_for, claim)
     Rails.logger.info("Kept today's set (#{kept_for}) for user #{user.id} on #{Date.current}; discarded the regenerated one")
-    release_own_claim(exercise, claim)
+    exercise.release_regenerating!(claim)
     user.record_generation_message!(KEPT_SET_MESSAGES.fetch(kept_for))
-  end
-
-  def release_own_claim(exercise, claim)
-    DailyExercise.where(id: exercise.id, regenerating_since: claim).update_all(regenerating_since: nil)
   end
 
   # regenerated_at stays untouched so a failed attempt doesn't use up the day's one regeneration.
   def release(user, exercise, claim, error)
     Rails.logger.error("Failed to regenerate exercise for user #{user.id}: #{error.message}")
-    release_own_claim(exercise, claim) if exercise
+    exercise&.release_regenerating!(claim)
     yield
   end
 end

@@ -678,6 +678,37 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
+  describe "#replace_blocker" do
+    def response_with(**attributes)
+      user = User.create!(email: "blocker-#{SecureRandom.hex(3)}@example.com", name: "B")
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      )
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {}, **attributes)
+    end
+
+    it "is nil for a draft no review has touched" do
+      expect(response_with.replace_blocker).to be_nil
+    end
+
+    it "is :reviewed once a review is stored, even while a claim is held" do
+      response = response_with(ai_review: { "code_review" => { "rating" => "solid" } }, reviewing_since: 10.seconds.ago)
+
+      expect(response.replace_blocker).to eq(:reviewed)
+    end
+
+    it "is :reviewing while a fresh claim is held" do
+      expect(response_with(reviewing_since: 10.seconds.ago).replace_blocker).to eq(:reviewing)
+    end
+
+    it "is nil once an unfinished claim has gone stale" do
+      stale = (DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago
+
+      expect(response_with(reviewing_since: stale).replace_blocker).to be_nil
+    end
+  end
+
   describe "#section_reviewed?" do
     it "is true only for a section with a Hash entry in ai_review" do
       user = User.create!(email: "sr_test@example.com", name: "SR")

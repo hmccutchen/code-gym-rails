@@ -6,6 +6,6 @@ The action carries a held set forward before it checks whether today has a set. 
 
 It clears today's earlier generation failure before enqueuing, so `/dashboard/status` doesn't report "failed" while the retry runs.
 
-## `#claim_regeneration!`
+## `#regenerate`
 
-One `UPDATE ... WHERE` claims the regeneration atomically and enforces the once-per-day gate (`regenerated_at` is nil). A claim older than `DailyExercise::REGENERATION_STALE_AFTER` can be taken again.
+The claim passes `regenerated_at: nil`, the once-per-day gate. When the job can't be enqueued, the action releases its own claim, so nobody waits behind a spinner that never clears.

@@ -204,6 +204,49 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
+  describe "#with_response_locked" do
+    let(:user) { User.create!(email: "locked-#{SecureRandom.hex(3)}@example.com", name: "L") }
+    let(:exercise) do
+      DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                            problem_set: { "code_review" => { "question" => "q" } })
+    end
+
+    it "yields nil when the day has no response" do
+      expect { |block| exercise.with_response_locked(&block) }.to yield_with_args(nil)
+    end
+
+    it "yields the response as committed, not as a copy loaded earlier" do
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+      exercise.daily_response
+      DailyResponse.where(daily_exercise_id: exercise.id).update_all(submitted_at: Time.current)
+
+      exercise.with_response_locked { |response| expect(response).to be_submitted }
+    end
+
+    it "yields nil when the response was deleted after the exercise loaded it" do
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+      exercise.daily_response
+      DailyResponse.where(daily_exercise_id: exercise.id).delete_all
+
+      expect { |block| exercise.with_response_locked(&block) }.to yield_with_args(nil)
+    end
+
+    it "locks the exercise before the response" do
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+      locks = []
+      allow(exercise).to receive(:lock!).and_wrap_original { |original, *args| locks << :exercise; original.call(*args) }
+      allow(DailyResponse).to receive(:lock).and_wrap_original { |original, *args| locks << :response; original.call(*args) }
+
+      exercise.with_response_locked { }
+
+      expect(locks).to eq(%i[exercise response])
+    end
+
+    it "returns the block's value" do
+      expect(exercise.with_response_locked { :done }).to eq(:done)
+    end
+  end
+
   describe "#regenerating?" do
     let(:user) { User.create!(email: "regen-model@example.com", name: "Regen") }
 

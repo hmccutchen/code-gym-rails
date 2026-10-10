@@ -34,13 +34,13 @@ class ResponsesController < ApplicationController
     missing = @response.section_keys - Array(@response.ai_review&.keys)
     return redirect_to review_anchor, notice: t("flash.responses.already_reviewed") if missing.empty?
 
-    unless claim_review!
-      return redirect_to root_path, alert: t("flash.responses.review_already_running")
-    end
+    claim = @response.claim_reviewing!
+    return redirect_to root_path, alert: t("flash.responses.review_already_running") unless claim
 
+    @response.reload
     missing = @response.section_keys - Array(@response.ai_review&.keys)
     if missing.empty?
-      release_review_claim!
+      @response.release_reviewing!(claim)
       return redirect_to review_anchor, notice: t("flash.responses.already_reviewed")
     end
 
@@ -62,7 +62,7 @@ class ResponsesController < ApplicationController
                                           .merge(failures.transform_values { |r| stored_review_failure(r) })
       @response.save!
     end
-    release_review_claim!
+    @response.release_reviewing!(claim)
     clear_stale_generation_error! if successes.any?
     log_review_diagnostics(@response, successes.keys) if successes.any?
 
@@ -77,15 +77,16 @@ class ResponsesController < ApplicationController
   rescue ActiveRecord::RecordNotFound
     redirect_to root_path, alert: t("flash.responses.set_cleared_during_review")
   rescue AiService::Error => e
-    release_review_claim!
+    @response.release_reviewing!(claim) if claim
     redirect_to root_path, alert: provider_failure_text(e, :review).full
   end
 
   # DELETE /responses/:id/start_over
   def start_over
-    return redirect_to root_path, alert: t("flash.responses.start_over_after_review") if @response.reviewed?
+    blocker = @response.replace_blocker
+    return redirect_to root_path, alert: t("flash.responses.start_over_after_review") if blocker == :reviewed
     return redirect_to root_path, alert: t("flash.responses.start_over_not_today") unless @response.date == Date.current
-    return redirect_to root_path, alert: t("flash.responses.start_over_while_reviewing") if @response.reviewing?
+    return redirect_to root_path, alert: t("flash.responses.start_over_while_reviewing") if blocker == :reviewing
 
     @response.destroy
     redirect_to root_path, notice: t("flash.responses.answers_cleared")
@@ -243,12 +244,10 @@ class ResponsesController < ApplicationController
   end
 
   def save_answers_under_lock(exercise)
-    ActiveRecord::Base.transaction do
-      exercise.lock!
+    exercise.with_response_locked do |locked|
       next :stale if stale_answer_sections(exercise).any?
 
-      @response = persisted_response_for(exercise)
-      @response.lock!
+      @response = locked || persisted_response_for(exercise).lock!
       newly_submitted = false
       unless @response.submitted?
         assign_draft_response(exercise)
@@ -426,18 +425,6 @@ class ResponsesController < ApplicationController
 
   def render_section_error(message)
     render json: { status: "error", error: message }, status: :unprocessable_content
-  end
-
-  def claim_review!
-    claimed = DailyResponse.where(id: @response.id)
-                           .where("reviewing_since IS NULL OR reviewing_since < ?", DailyResponse::REVIEW_CLAIM_STALE_AFTER.ago)
-                           .update_all(reviewing_since: Time.current) == 1
-    @response.reload if claimed
-    claimed
-  end
-
-  def release_review_claim!
-    @response.update_column(:reviewing_since, nil)
   end
 
   def clear_stale_generation_error!

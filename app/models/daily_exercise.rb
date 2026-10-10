@@ -8,6 +8,9 @@ class DailyExercise < ApplicationRecord
   # Must exceed AiService::GENERATION_READ_TIMEOUT plus job pickup, or a healthy job looks abandoned.
   REGENERATION_STALE_AFTER = 6.minutes
 
+  include Claimable
+  claim :regenerating, column: :regenerating_since, stale_after: REGENERATION_STALE_AFTER
+
   validates :date, :problem_set, :generated_at, presence: true
   validates :date, uniqueness: { scope: :user_id }
   validates :language, inclusion: { in: LANGUAGES }
@@ -43,9 +46,6 @@ class DailyExercise < ApplicationRecord
     ExerciseSection.fixed_sections_share?(problem_set, plan_notes["shared_concept"])
   end
 
-  def regenerating?
-    regenerating_since.present? && regenerating_since > REGENERATION_STALE_AFTER.ago
-  end
 
   # Checked on the value's shape: a provider can emit a third key holding null or a string beside the real one.
   def third_key
@@ -60,5 +60,12 @@ class DailyExercise < ApplicationRecord
   # The single authority for section counts; never problem_set.keys, which can hold unrendered alternates.
   def active_section_keys
     ExerciseSection.resolved_keys(problem_set)
+  end
+
+  def with_response_locked
+    transaction do
+      lock!
+      yield DailyResponse.lock.find_by(daily_exercise_id: id)
+    end
   end
 end
