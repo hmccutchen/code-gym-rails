@@ -1,4 +1,4 @@
-# GET/POST /trial/start for a signed-out visitor; GET/POST /trial for a signed-in account with no key.
+# /trial/start serves a signed-out visitor; /trial serves a signed-in account with no key.
 class TrialsController < ApplicationController
   include LoginCodeRequests
 
@@ -18,12 +18,14 @@ class TrialsController < ApplicationController
              with: -> { redemption_limited },
              store: RATE_LIMIT_STORE, name: "redemptions_by_ip", only: %i[create start]
 
+  # GET /trial/start
   def new
     return redirect_to trial_path if logged_in?
 
     @providers = TrialMode.providers
   end
 
+  # POST /trial/start
   def start
     return redirect_to trial_path if logged_in?
 
@@ -49,6 +51,7 @@ class TrialsController < ApplicationController
     @status = TrialStatus.for(current_user) if current_user.on_trial?
   end
 
+  # POST /trial
   def create
     return redirect_to setup_path, alert: t("trials.has_own_key") if current_user.api_key_present?
     return redirect_to trial_path, alert: t("trials.consent_needed") unless params[:consent] == "1"

@@ -4,6 +4,7 @@ class ProfileController < ApplicationController
 
   skip_before_action :require_provider
 
+  # PATCH /profile
   def update
     return render_invalid_daily_section_count if invalid_daily_section_count?
     return render_invalid_weight    if invalid_section_kind_weights?

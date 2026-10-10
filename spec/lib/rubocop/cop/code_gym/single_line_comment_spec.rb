@@ -29,7 +29,15 @@ RSpec.describe RuboCop::Cop::CodeGym::SingleLineComment, :config do
     RUBY
   end
 
-  it "accepts trailing comments on consecutive code lines" do
+it "accepts an own-line comment that starts a new comment for the next line" do
+  expect_no_offenses(<<~RUBY)
+    x = 1 # one
+    # Why y is two.
+    y = 2
+  RUBY
+end
+
+it "accepts trailing comments on consecutive code lines" do
     expect_no_offenses(<<~RUBY)
       first = 1 # one
       second = 2 # two

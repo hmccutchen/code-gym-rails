@@ -28,7 +28,32 @@ RSpec.describe RuboCop::Cop::CodeGym::CommentLimit, :config do
     RUBY
   end
 
-  it "does not count magic comments, directives or heredoc lines" do
+it "does not count a bare route annotation" do
+  expect_no_offenses(<<~RUBY)
+    # One.
+    # POST /responses/:id/review
+    first
+    # PATCH /account/toggle_generation
+    second
+    # Two.
+    third
+  RUBY
+end
+
+it "counts a route annotation that carries prose" do
+  expect_offense(<<~RUBY)
+    # One.
+    first
+    # Two.
+    second
+    # POST /review, chained from submit.
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This file has 3 comments; the limit is 2. Move the reasoning into docs.
+    third
+  RUBY
+end
+
+it "does not count magic comments
+, directives or heredoc lines" do
     expect_no_offenses(<<~'RUBY')
       # frozen_string_literal: true
       # rubocop:disable Style/Foo

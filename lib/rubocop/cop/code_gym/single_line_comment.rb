@@ -21,7 +21,8 @@ module RuboCop
         end
 
         def continues?(previous, current)
-          current.loc.line == previous.loc.last_line + 1 && own_line?(current)
+          current.loc.line == last_line_of(previous) + 1 && own_line?(current) &&
+            (own_line?(previous) || current.loc.column == previous.loc.column)
         end
 
         def multi_line?(block)

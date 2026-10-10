@@ -1219,7 +1219,7 @@ class AiService
     end
   end
 
-  # Abstract: returns { text:, input_tokens:, output_tokens: }; `history` is prior turns and `prompt` the new user turn.
+  # Abstract: returns text, token and cache counts, model, truncated, refusal and http_status; history holds prior turns.
   def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
     raise NotImplementedError, "#{self.class} must implement #call"
   end

@@ -17,7 +17,7 @@ module RuboCop
         private
 
         def code_follows?(comment)
-          next_line = processed_source.lines[comment.loc.last_line]
+          next_line = processed_source.lines.drop(last_line_of(comment)).find { |line| !directive?(line) }
           !next_line.nil? && !next_line.strip.empty? && !next_line.lstrip.start_with?("#")
         end
       end

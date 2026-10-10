@@ -14,8 +14,16 @@ module RuboCop
           processed_source.lines[comment.loc.line - 1][0...comment.loc.column].strip.empty?
         end
 
+        def last_line_of(comment)
+          comment.loc.line + comment.text.chomp.count("\n")
+        end
+
         def tooling?(comment)
-          shebang?(comment) || MagicComment.parse(comment.text).any? || comment.text.match?(DirectiveComment::DIRECTIVE_COMMENT_REGEXP)
+          shebang?(comment) || MagicComment.parse(comment.text).any? || directive?(comment.text)
+        end
+
+        def directive?(text)
+          text.strip.match?(DirectiveComment::DIRECTIVE_COMMENT_REGEXP)
         end
 
         def shebang?(comment)

@@ -17,7 +17,7 @@ class DailyPlan
 
   SCENARIO_FLAVOR_WEIGHTS = { everyday: 0.5, general: 0.5 }.freeze
 
-  # Derived from ConceptBucket; a fourth kind without a special bucket resolves to nil and fails the fetch below.
+  # Derived from ConceptBucket: a fourth kind needs a special bucket there, or its entry here is nil.
   FOURTH_BUCKET_FOR = ExerciseSection.fourths
     .to_h { |kind| [ kind.key.to_sym, ConceptBucket.for(kind.key, nil) ] }
     .freeze

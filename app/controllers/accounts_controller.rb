@@ -2,8 +2,10 @@ class AccountsController < ApplicationController
   # The log-out and delete buttons live here, so a keyless user must not be redirected to /setup.
   skip_before_action :require_provider
 
+  # GET /account
   def show; end
 
+  # DELETE /account
   def destroy
     current_user.anonymize!
     reset_session

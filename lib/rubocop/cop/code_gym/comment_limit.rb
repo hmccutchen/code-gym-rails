@@ -8,8 +8,10 @@ module RuboCop
 
         MSG = "This file has %<count>d comments; the limit is %<max>d. Move the reasoning into docs.".freeze
 
+        ROUTE_ANNOTATION = %r{\A# (GET|POST|PUT|PATCH|DELETE)(/(GET|POST|PUT|PATCH|DELETE))* /\S*\z}
+
         def on_new_investigation
-          comments = prose_comments
+          comments = prose_comments.reject { |comment| comment.text.match?(ROUTE_ANNOTATION) }
           return if comments.size <= max
 
           comments.drop(max).each { |comment| add_offense(comment, message: format(MSG, count: comments.size, max: max)) }

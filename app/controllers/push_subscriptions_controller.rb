@@ -13,6 +13,7 @@ class PushSubscriptionsController < ApplicationController
     notify.windows.com
   ].freeze
 
+  # POST /push_subscription
   def create
     return head :not_found unless WebPushCredentials.configured?
     return head :unprocessable_content unless valid_subscription?
@@ -41,6 +42,7 @@ class PushSubscriptionsController < ApplicationController
     redirect_to account_path, notice: t("flash.push_subscriptions.settings_saved")
   end
 
+  # DELETE /push_subscription
   def destroy
     User.transaction do
       current_user.push_subscriptions.destroy_all

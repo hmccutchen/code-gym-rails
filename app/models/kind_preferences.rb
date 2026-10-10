@@ -1,4 +1,4 @@
-# Invalid stored multipliers read as the default; a zero or negative would corrupt WeightedRoll.
+# A bad stored multiplier reads as the default: a zero makes a kind unpickable, a negative skews every other share.
 class KindPreferences
   MULTIPLIERS        = [ 0.25, 0.5, 1.0, 2.0, 4.0 ].freeze
   DEFAULT_MULTIPLIER = 1.0

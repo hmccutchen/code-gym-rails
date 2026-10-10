@@ -13,8 +13,9 @@ All changes are made on a feature/dev branch, never directly on `main`. Create (
 ### Comment rules — never ignored
 
 These rules hold in every file, in every change, with no exceptions for a
-deadline or a "temporary" comment. RuboCop enforces the first three, so CI
-fails when one is broken.
+deadline or a "temporary" comment. RuboCop enforces the first three in Ruby
+files, so CI fails when one is broken there. Nothing checks ERB, JavaScript,
+CSS, YAML or Python comments mechanically yet; review holds them to the rules.
 
 - **Each comment is attached to the code it comments on.** It sits on the line
   directly above that code, or at the end of the same line. No blank line, no
@@ -23,11 +24,14 @@ fails when one is broken.
 - **Each comment is one line** (`CodeGym/SingleLineComment`).
 - **A file holds at most 5 comments in total**, trailing comments included
   (`CodeGym/CommentLimit`). Magic comments, shebangs and `rubocop:`
-  directives are tooling and don't count.
+  directives are tooling and don't count, and neither does a bare route
+  annotation (`# POST /responses/:id/review`, nothing else on the line), so
+  every non-RESTful action keeps its path.
 - **Code is self-documenting.** Names carry the meaning. If a block needs a
   comment to be followed, extract it into a named method instead.
-- **Comments discuss the code in front of them**, never a design, a history,
-  or code somewhere else.
+- **Comments discuss the code in front of them.** Naming another place that
+  has to change with this line is part of that; the design or history behind
+  it belongs in the documentation.
 - **Business decisions live in the documentation:** this file, or a doc under
   `docs/`. The reasoning behind one file's code lives in
   `docs/code-notes/`, at the file's own path with `.md` in place of `.rb`
@@ -40,7 +44,8 @@ break. Never restate *what* the code does. A comment that would go stale the
 next time the line changes shouldn't be written. One that already has gone
 stale is worse than either kind — fix it or delete it, don't leave it.
 
-**Some comments must survive a cleanup**, within the five a file may hold. The
+**Some comments must survive a cleanup**, within the five a file may hold
+(route annotations don't count toward it). The
 rule above cuts restatement, not explanation, and a few categories read as
 obvious while carrying something the code genuinely doesn't say. Keep: a
 non-RESTful route (`# GET /login` above `SessionsController#new` — the path

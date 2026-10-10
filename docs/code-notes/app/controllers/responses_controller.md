@@ -1,13 +1,5 @@
 # app/controllers/responses_controller.rb
 
-## Routes
-
-Two member routes have no path comment in the source, because the file's five
-comments go to the less derivable routes:
-
-- `POST /responses/:id/email_review` → `#email_review`
-- `POST /responses/:id/follow_ups` → `#follow_ups`
-
 ## `MAX_DUCK_TURNS_PER_SECTION`
 
 Double `DailyResponse::MAX_FOLLOW_UPS_PER_SECTION`, because a duck thread is a

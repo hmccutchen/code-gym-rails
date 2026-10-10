@@ -19,7 +19,7 @@ module CodeGymRails
   class Application < Rails::Application
     config.load_defaults 8.0
 
-    # config/environments requires lib/boot directly, where autoloading raises, so Zeitwerk must not manage it.
+    # boot is required before autoloading works; rubocop holds RuboCop:: cops that Zeitwerk would name Rubocop::.
     config.autoload_lib(ignore: %w[assets tasks boot rubocop])
 
     config.generators.system_tests = nil

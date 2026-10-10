@@ -91,6 +91,7 @@ class ResponsesController < ApplicationController
     redirect_to root_path, notice: t("flash.responses.answers_cleared")
   end
 
+  # POST /responses/:id/email_review
   def email_review
     return redirect_to root_path, alert: t("flash.responses.no_review_to_email") unless @response.fully_reviewed?
 
@@ -132,6 +133,7 @@ class ResponsesController < ApplicationController
     render_provider_failure(e, :alternate)
   end
 
+  # POST /responses/:id/follow_ups
   def follow_ups
     question = UserText.clean(params[:question], limit: UserText::MAX_QUESTION_LENGTH).strip
     return render_section_error(t("errors.responses.question_blank")) if question.blank?

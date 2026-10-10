@@ -143,8 +143,9 @@ future reader would otherwise break.
 
 The comment rules in CLAUDE.md's Code Style section are never waived: each
 comment is one line, attached to the code directly below it (or trailing it),
-and a file holds at most 5. RuboCop enforces those three. Business decisions
-belong in CLAUDE.md or `docs/` (a file's own notes in `docs/code-notes/`),
+and a file holds at most 5. RuboCop enforces those three in Ruby files only;
+for ERB, JavaScript, CSS, YAML and Python, the review is the check. Business
+decisions belong in CLAUDE.md or `docs/` (a file's own notes in `docs/code-notes/`),
 never in a comment.
 
 Some comments read as obvious but carry something real and must survive: a
