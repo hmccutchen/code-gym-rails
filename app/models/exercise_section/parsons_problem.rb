@@ -71,8 +71,9 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     # cannot account for is refused rather than stored: taking it at its word
     # would accept the positional form the tokens exist to withhold, and
     # "order:0,1,2" counted off the blocks on screen is the whole answer. A
-    # refusal drops the section from the payload, so the draft already stored
-    # survives a page loaded before this shipped and the reload sends tokens.
+    # refusal drops the section from the payload, which the caller reads as a
+    # page out of date; the draft already stored is untouched either way,
+    # since nothing a refusal returns ever reaches the record.
     def decode_answer(value, exercise: nil, key: nil, section_data: nil)
       count = Array(section_data&.dig("blocks")).size
       text  = value.to_s

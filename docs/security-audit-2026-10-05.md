@@ -413,8 +413,12 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
   `decode_answer` hook, which returns nil for an order it cannot fully
   resolve; the section is then dropped, and `ResponsesController#create`
   refuses the whole write with 409 rather than reporting a save that stored
-  nothing. A page loaded before the change posts positions, so it is refused
-  and reloads. The stale check and the save run in one transaction that
+  nothing — every other answer in that post was written against the questions
+  the replaced set held, and section keys survive a regeneration, so storing
+  them would file an answer under a question nobody read. A page loaded
+  before the change posts positions and has no handler for the 409, so it is
+  refused and asks the reader to refresh; a page loaded after it reloads on
+  its own. The stale check and the save run in one transaction that
   locks the exercise first and the response second, which is
   `RegenerateExerciseJob`'s order, so a regeneration cannot commit between
   the two. Storage, grading, replay and history are unchanged.

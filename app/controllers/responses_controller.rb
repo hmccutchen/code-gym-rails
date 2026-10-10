@@ -330,9 +330,20 @@ class ResponsesController < ApplicationController
   # tokens change when the problem is regenerated or the signing secret
   # rotates. Nothing is written for a refusal, so the alternative to saying so
   # is a 200 for a save that dropped the section, with the engineer's
-  # rearrangement lost behind a reported success. The page reloads instead and
-  # comes back speaking the current tokens; the work already stored is intact,
-  # since the refusal never reached the record.
+  # rearrangement lost behind a reported success.
+  #
+  # The whole payload goes, not just the refused section: tokens this page
+  # cannot account for mean the problem set was replaced under it, so every
+  # other answer in the same post was written against questions this row no
+  # longer holds. Section keys survive a regeneration, so storing them would
+  # file an answer under a question nobody read — the failure the exercise
+  # lock below exists to prevent, arriving through a different door. The work
+  # already stored is intact, since the refusal never reached the record.
+  #
+  # A page loaded before this shipped posts positional orders and has no
+  # handler for the 409, so it cannot reload itself; flash.responses.stale_answers
+  # asks for a refresh rather than announcing one, which is the recovery both
+  # that page and the current one can actually perform.
   def stale_answer_sections(exercise)
     submitted = response_params[:answers]&.slice(*exercise.active_section_keys)
     return [] if submitted.blank?

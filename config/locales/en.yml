@@ -180,7 +180,7 @@ en:
       turned_off: "Daily reminders turned off."
     responses:
       not_submitted: "Submit your answers first."
-      stale_answers: "This page is out of date — reloading it. Your saved work is still there."
+      stale_answers: "This page is out of date. Refresh it to see the current set — your saved work is still there."
       already_reviewed: "Already reviewed."
       review_already_running: "A review is already being generated for this — check back in a moment."
       review_ready: "Review ready!"

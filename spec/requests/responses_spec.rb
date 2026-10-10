@@ -192,6 +192,22 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.find_by(user: user, daily_exercise: exercise)).to be_nil
     end
 
+    # A page loaded before block tokens shipped posts positions and has no
+    # handler for the 409, so it cannot reload itself. The message it shows is
+    # the only recovery it has, and announcing a reload would describe
+    # something that never happens on exactly the page that needs it.
+    it "asks a page that cannot reload itself to refresh rather than announcing one" do
+      create_exercise("parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] })
+
+      post responses_path,
+           params: { response: { answers: { "parsons_problem" => "order:0,1,2" } } },
+           as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["errors"].first).to include("Refresh")
+      expect(response.parsed_body["errors"].first).not_to match(/reloading/i)
+    end
+
     # The check and the save have to see one problem set. RegenerateExerciseJob
     # takes the exercise lock before it writes, so reading problem_set before
     # that lock let a replacement commit in between: the tokens validated
