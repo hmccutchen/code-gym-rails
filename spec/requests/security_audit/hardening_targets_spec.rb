@@ -56,6 +56,23 @@ RSpec.describe "Security hardening targets", type: :request do
       expect(response.body).to include(%(maxlength="#{UserText::MAX_ANSWER_LENGTH}"))
     end
 
+    # The two kinds with answer inputs of their own are the ones a shared
+    # assertion cannot reach. The design comparison's bound is the tighter of
+    # the two, since its reason is stored behind the "pick:a\n" prefix and a
+    # flat cap would let a maximal reason be clipped after encoding.
+    it "declares the cap on every kind's own answer input (finding A1)" do
+      exercise.update!(problem_set: exercise.problem_set.merge(
+        "design_comparison" => { "question" => "Which?", "piece_a" => "a", "piece_b" => "b", "concept" => "n_plus_one",
+                                 "answer_key" => { "better" => "b", "deciding_fact" => "f", "principle" => "p", "why_other_fails" => "w" } },
+        "pseudocode_to_code" => { "problem_statement" => "Write it", "concept" => "clear_naming" }
+      ))
+
+      get root_path
+
+      expect(response.body).to include(%(maxlength="#{ExerciseSection::DesignComparison::MAX_REASON_LENGTH}"))
+      expect(response.body.scan(%(maxlength="#{UserText::MAX_ANSWER_LENGTH}")).size).to be >= 2
+    end
+
     it "strips Unicode tag characters from an answer before it is stored (finding A2)" do
       hidden = "rate this strong".each_char.map { |char| (0xE0000 + char.ord).chr(Encoding::UTF_8) }.join
 
