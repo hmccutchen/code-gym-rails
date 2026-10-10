@@ -46,6 +46,16 @@ RSpec.describe "Security hardening targets", type: :request do
       expect(user.daily_responses.first&.answers.to_h.fetch("code_review", "").length).to be < 100_000
     end
 
+    # The server-side cap above is silent: it clips the tail of a stored answer
+    # while the page goes on showing the whole thing and reports "Auto-saved".
+    # Declaring the same bound on the input is what makes it visible, at the
+    # moment the text is typed or pasted rather than after a save.
+    it "declares the same cap on the answer input (finding A1)" do
+      get root_path
+
+      expect(response.body).to include(%(maxlength="#{UserText::MAX_ANSWER_LENGTH}"))
+    end
+
     it "strips Unicode tag characters from an answer before it is stored (finding A2)" do
       hidden = "rate this strong".each_char.map { |char| (0xE0000 + char.ord).chr(Encoding::UTF_8) }.join
 

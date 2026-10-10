@@ -2813,13 +2813,14 @@ class AiService
   end
 
   # The bound the critique endpoint applies to its own param, applied here too:
-  # this reads a submitted answer, and ResponsesController#create length-bounds
-  # no answer of any kind, so nothing else stands between a pasted novel and
-  # this prompt. Skipped rather than truncated, for the reason
+  # this reads a submitted answer, and the general answer cap
+  # (UserText::MAX_ANSWER_LENGTH, 12_000) is twice this kind's translation
+  # bound, so a plan can be stored in full and still be too long to translate.
+  # Skipped rather than truncated, for the reason
   # #translate_pseudocode refuses to truncate its output — code translated from
   # a clipped plan is not translated from their plan, and the page would caption
   # it as though it were. The grade is unaffected: it reads the answer itself,
-  # which every other kind sends to the same provider unbounded.
+  # which every kind sends to the same provider under the general cap alone.
   def translatable_length?(pseudocode)
     return true if pseudocode.length <= ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH
 

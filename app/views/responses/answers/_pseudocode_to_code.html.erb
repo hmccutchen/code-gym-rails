@@ -11,6 +11,7 @@
 <% else %>
   <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>"
             placeholder="<%= t("sections.#{key}.placeholder") %>" data-field="<%= key %>"
+            maxlength="<%= UserText::MAX_ANSWER_LENGTH %>"
             <%= tag.attributes(answer_scaffold_labels_attr(response, key)) %>><%= answer_starting_value(response, key) %></textarea>
 <% end %>
 

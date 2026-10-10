@@ -1328,6 +1328,16 @@ RSpec.describe "Responses", type: :request do
       expect(r.reload.review_follow_ups.find_by(role: :user).content.length).to eq(UserText::MAX_QUESTION_LENGTH)
     end
 
+    it "hands back the accepted question, so the transcript shows what was asked" do
+      r = reviewed_response_for(user)
+      stub_answer
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "a" * 5_000 }
+
+      expect(response.parsed_body["question"]).to eq("a" * UserText::MAX_QUESTION_LENGTH)
+    end
+
     it "creates the user turn and the assistant turn, in order" do
       r = reviewed_response_for(user)
       stub_answer

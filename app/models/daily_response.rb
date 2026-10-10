@@ -252,7 +252,9 @@ class DailyResponse < ApplicationRecord
   # intact; #answered? decides whether it counts.
   #
   # UserText runs first, so what is stored, shown and quoted into every later
-  # prompt is the same cleaned, bounded string.
+  # prompt is the same cleaned, bounded string. Every typed answer input
+  # carries MAX_ANSWER_LENGTH as its own maxlength, so the cap is declared
+  # where the text is written rather than discovered after a save.
   def self.normalize_answers(answers, exercise)
     answers.to_h.each_with_object({}) do |(section, value), normalized|
       cleaned = UserText.clean(value, limit: UserText::MAX_ANSWER_LENGTH)

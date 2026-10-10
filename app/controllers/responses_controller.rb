@@ -247,7 +247,11 @@ class ResponsesController < ApplicationController
     if capped
       render_section_error(t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
     else
-      render json: { status: "ok", answer: answer, remaining: remaining }
+      # `question` is the cleaned, bounded string — the one the provider
+      # answered and the one stored. The client renders this rather than the
+      # text in its own box, so a question past UserText::MAX_QUESTION_LENGTH
+      # cannot leave the transcript claiming an answer to words nobody sent.
+      render json: { status: "ok", question: question, answer: answer, remaining: remaining }
     end
   rescue AiService::Error => e
     render_provider_failure(e, :follow_up)

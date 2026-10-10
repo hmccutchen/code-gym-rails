@@ -21,6 +21,13 @@ class ExerciseSection::DesignComparison < ExerciseSection
   PICK_PREFIX = "pick:".freeze
   PIECES = %w[a b].freeze
 
+  # The reason is typed, then encoded behind "pick:a\n" before it is stored, so
+  # its own bound is the shared answer cap less the longest prefix that can sit
+  # in front of it. Derived rather than written out: a change to either the
+  # cap or the encoding would otherwise leave the browser offering a reason the
+  # boundary would quietly clip.
+  MAX_REASON_LENGTH = UserText::MAX_ANSWER_LENGTH - (PICK_PREFIX.length + 2)
+
   # Even odds, and no "must differ from the stored order" rule like the
   # Parsons scramble has: with two pieces that rule would always swap, which
   # gives the answer away.

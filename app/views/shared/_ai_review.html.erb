@@ -170,7 +170,7 @@
         const data = await CodeGymServerMessage.read(res);
         if (!res.ok || res.redirected || !data) throw CodeGymServerMessage.failure(res, data, FOLLOW_UP_FAILED);
 
-        addTurn("user", question);
+        addTurn("user", data.question);
         addTurn("assistant", data.answer);
         input.value = "";
         status.textContent = "";
