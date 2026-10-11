@@ -131,35 +131,38 @@ export default class extends Controller {
   }
 
   applyServerState(current) {
-    const weights = current.section_kind_weights || {}
     const excluded = current.excluded_section_kinds || []
-
-    this.rowTargets.forEach((row) => {
-      const kind = row.dataset.kind
-      const slider = this.sliderFor(row)
-      const box = this.excludeBoxFor(row)
-      const stop = Object.prototype.hasOwnProperty.call(weights, kind) ? weights[kind] : this.defaultStopValue
-      const index = this.stopsValue.indexOf(stop)
-
-      slider.value = index === -1 ? this.stopsValue.indexOf(this.defaultStopValue) : index
-      this.showStop(slider, row.querySelector("output"))
-      box.checked = excluded.indexOf(kind) !== -1
-      slider.disabled = box.checked
-    })
-
+    const weights = current.section_kind_weights || {}
     const levels = current.section_kind_levels || {}
     const lockedKinds = current.locked_section_kinds || []
-    this.difficultyTargets.forEach((box) => {
-      const kind = box.dataset.kind
-      const level = Object.prototype.hasOwnProperty.call(levels, kind) ? levels[kind] : ""
-      box.querySelectorAll("input[type=radio]").forEach((radio) => { radio.checked = radio.value === level })
-      box.querySelector(".mix-lock-box").checked = lockedKinds.indexOf(kind) !== -1
-      this.setDifficultyDisabled(box, excluded.indexOf(kind) !== -1)
-    })
 
+    this.rowTargets.forEach((row) => this.applyRowState(row, weights, excluded))
+    this.difficultyTargets.forEach((box) => this.applyDifficultyState(box, levels, lockedKinds, excluded))
     this.lockLastInGroup()
     this.versionValue = current.section_kind_preferences_version
     this.applyLadderPreparation(current.ladder_preparation)
+  }
+
+  applyRowState(row, weights, excluded) {
+    const kind = row.dataset.kind
+    const slider = this.sliderFor(row)
+    const box = this.excludeBoxFor(row)
+    const stop = Object.prototype.hasOwnProperty.call(weights, kind) ? weights[kind] : this.defaultStopValue
+    const index = this.stopsValue.indexOf(stop)
+
+    slider.value = index === -1 ? this.stopsValue.indexOf(this.defaultStopValue) : index
+    this.showStop(slider, row.querySelector("output"))
+    box.checked = excluded.indexOf(kind) !== -1
+    slider.disabled = box.checked
+  }
+
+  applyDifficultyState(box, levels, lockedKinds, excluded) {
+    const kind = box.dataset.kind
+    const level = Object.prototype.hasOwnProperty.call(levels, kind) ? levels[kind] : ""
+
+    box.querySelectorAll("input[type=radio]").forEach((radio) => { radio.checked = radio.value === level })
+    box.querySelector(".mix-lock-box").checked = lockedKinds.indexOf(kind) !== -1
+    this.setDifficultyDisabled(box, excluded.indexOf(kind) !== -1)
   }
 
   persist() {

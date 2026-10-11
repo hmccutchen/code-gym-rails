@@ -18,7 +18,8 @@ export default class extends Controller {
     submitLabel: String,
     generatingReview: String,
     submitFailed: String,
-    reviewStartFailed: String
+    reviewStartFailed: String,
+    controlsNotReady: String
   }
 
   connect() {
@@ -165,32 +166,18 @@ export default class extends Controller {
   async submit(event) {
     event.preventDefault()
     if (this.formTarget.inert) return
-    clearTimeout(this.saveTimer)
-    this.saveTimer = null
-
-    this.formTarget.inert = true
-    this.submitButtonTarget.disabled = true
-    this.submitButtonTarget.classList.add("btn-loading")
-    this.submitButtonTarget.textContent = this.submittingValue
+    this.lockForSubmit()
 
     // A kind whose answer only reaches the hidden field through its own controller would otherwise submit the stale one.
     await window.CodeGymBootstrap?.ready
+    if (!this.formControllersConnected()) {
+      saveStatus.report("submit", this.controlsNotReadyValue)
+      return this.unlock()
+    }
 
     const result = await request.send("POST", this.formTarget.action, this.payload({ submit: "1" }), { fallback: this.submitFailedValue })
-    const reviewUrl = result.ok ? result.data?.review_url : null
     if (result.ok) saveStatus.clear("submit")
-
-    if (reviewUrl) {
-      this.submitButtonTarget.textContent = this.generatingReviewValue
-      this.reviewRequested = true
-      try { this.requestReview(reviewUrl); return } catch (_) { this.reviewRequested = false }
-    }
-    // Stays inert behind the reload: restoring the form would queue an autosave of the refused payload.
-    if (result.ok || result.status === 409) {
-      saveStatus.carry("answers", result.ok ? this.reviewStartFailedValue : this.staleReloadedValue)
-      window.location.reload()
-      return
-    }
+    if (this.startReview(result) || this.reloadAfterSubmit(result)) return
 
     const refused = result.status === 422 && Boolean(result.data?.submit_blocker)
     if (refused) {
@@ -199,12 +186,53 @@ export default class extends Controller {
     } else {
       saveStatus.report("submit", result.message)
     }
+    this.unlock()
+    if (refused) this.nudgeTarget.focus()
+  }
 
+  formControllersConnected() {
+    return [...this.formTarget.querySelectorAll("[data-controller]")].every((element) =>
+      element.dataset.controller.split(/\s+/).filter(Boolean).every((identifier) =>
+        this.application.getControllerForElementAndIdentifier(element, identifier)))
+  }
+
+  lockForSubmit() {
+    clearTimeout(this.saveTimer)
+    this.saveTimer = null
+    this.formTarget.inert = true
+    this.submitButtonTarget.disabled = true
+    this.submitButtonTarget.classList.add("btn-loading")
+    this.submitButtonTarget.textContent = this.submittingValue
+  }
+
+  startReview(result) {
+    const reviewUrl = result.ok ? result.data?.review_url : null
+    if (!reviewUrl) return false
+    this.submitButtonTarget.textContent = this.generatingReviewValue
+    this.reviewRequested = true
+    try {
+      this.requestReview(reviewUrl)
+      return true
+    } catch (_) {
+      this.reviewRequested = false
+      return false
+    }
+  }
+
+  // Stays inert behind the reload: restoring the form would queue an autosave of the refused payload.
+  reloadAfterSubmit(result) {
+    const stale = result.status === 409
+    if (!result.ok && !stale) return false
+    saveStatus.carry("answers", result.ok ? this.reviewStartFailedValue : this.staleReloadedValue)
+    window.location.reload()
+    return true
+  }
+
+  unlock() {
     this.formTarget.inert = false
     this.submitButtonTarget.classList.remove("btn-loading")
     this.submitButtonTarget.textContent = this.submitLabelValue
     this.submitButtonTarget.disabled = false
     this.autoSave()
-    if (refused) this.nudgeTarget.focus()
   }
 }
