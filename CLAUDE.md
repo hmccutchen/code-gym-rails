@@ -192,6 +192,35 @@ decisions, not defaults that drifted into place:
   a new group adds another. Don't enumerate the groups here — the constants
   live in `ConceptVocabulary` and each group's guidance method in `AiService`,
   and a count kept in this file has already gone stale once.
+- **Provider calls as callables** — a module that orchestrates provider calls
+  takes them as a `Provider` struct of callables, with a `providers:` factory
+  that returns a fresh one for each thread (`JudgedGeneration::Provider`,
+  `ReviewGrading::Provider`, built by `AiService#judged_generation_provider`
+  and `#review_grading_provider`). `AiService` keeps the prompts and the calls;
+  the module keeps the orchestration and the policy, and its specs drive it
+  with lambdas. Threads start through `CallerZoneThread.start`, and
+  `spec/conventions/app_source_spec.rb` fails on any other `Thread.new` and on
+  `send(:...)` anywhere in `app/`.
+- **Outcomes at the HTTP edge** — domain work an action triggers returns a
+  value naming what happened (`ResponseReview::Outcome`, like
+  `ProblemSetIngest::Result`), and the action only maps it to a redirect and a
+  message, raising on a status it doesn't handle. Behavior specs drive the
+  module; the request spec keeps one example per outcome.
+- **Claims and lock order** — a timestamp column held as a lease on a paid
+  call is declared with `Claimable` (`claim :name, column:, stale_after:`),
+  released only with the token `#claim_<name>!` returned, and checked again
+  under the row lock before anything is written, since a claim that went
+  stale may now belong to another caller. Anything that locks an exercise and
+  its response goes through `DailyExercise#with_response_locked`.
+- **Browser copies of server rules** — when a page needs a rule the server
+  owns, the browser's copy lives in one `window.CodeGym*` object from a shared
+  partial, with every constant rendered from Ruby, and a parity spec runs one
+  table of cases through the browser copy and the Ruby path production uses,
+  cleaning included (`window.CodeGymAnswerRules`,
+  `spec/system/answer_rules_parity_spec.rb`).
+- **Domain data stays off provider classes** — lists and tables the domain
+  owns live in a module of their own (`ConceptVocabulary`), and `AiService`
+  reads them; it keeps only what is about talking to a provider.
 
 **Deviating from an established in-repo pattern requires stating why in the PR
 description.** Deviation is allowed — patterns outlive their reasons sometimes
@@ -2016,7 +2045,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   the correct order and every move already saves. The kind's control supplies
   `data-answer-complete`, initially computed by the server and updated on
   interaction; the shared browser gate reads that state without knowing the
-  kind. Prose controls still share the server's threshold and scaffold labels.
+  kind. The browser's copies of the prose, design comparison, submit-gate and
+  section-status rules live in one place, `window.CodeGymAnswerRules`
+  (`shared/_answer_rules`), with every constant rendered in from Ruby, and
+  `spec/system/answer_rules_parity_spec.rb` runs one table of cases through
+  each rule on both sides.
   Progress, hint gating, history, mastery and generation all ask the same
   completion authority.
 
@@ -2027,7 +2060,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   cannot hide the other blocks the engineer arranged; it does not count as
   completed work. Calibration mismatch notes require completion.
 - **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so reloading offers the scaffold again without storing its labels as the user's work. Other draft text remains intact; grading and read-only displays use `answer_for` as described above.
-- **One finish action**: each section's difficulty rating autosaves on click, which enables the Submit button — disabled, with a visible nudge, until at least one section is answered and every answered section is rated (`DailyResponse#submit_blocker`, restated by the inline script against the live form). Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. Draft ratings are set-only: `#create` accepts only valid enum values and preserves ratings while answers are edited or cleared. At submission it slices ratings to `answered_sections`, so a cleared, too-short, or scaffold-only answer leaves no self-assessment behind. Partial answer payloads merge into the draft before this slice; omitted answers remain unchanged, and explicit empty strings clear them. The form stays inert during submission and the review handoff, keeping its visible answers and ratings at the submitted snapshot; a failed submission restores editing and recomputes the gate. The progress label reports answers only; the nudge and button report readiness. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script. `#create` still refuses a submit that `submit_blocker` would block, with a 422 carrying the nudge's sentence and nothing saved, not even the draft the request carried. The button already prevents one, but a request from outside the page can still send it, and accepting it would bill a review of every section, freeze the day and count it toward the streak.
+- **One finish action**: each section's difficulty rating autosaves on click, which enables the Submit button — disabled, with a visible nudge, until at least one section is answered and every answered section is rated (`DailyResponse#submit_blocker`, whose browser copy is `CodeGymAnswerRules.submitBlocker`, checked against the live form). Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. Draft ratings are set-only: `#create` accepts only valid enum values and preserves ratings while answers are edited or cleared. At submission it slices ratings to `answered_sections`, so a cleared, too-short, or scaffold-only answer leaves no self-assessment behind. Partial answer payloads merge into the draft before this slice; omitted answers remain unchanged, and explicit empty strings clear them. The form stays inert during submission and the review handoff, keeping its visible answers and ratings at the submitted snapshot; a failed submission restores editing and recomputes the gate. The progress label reports answers only; the nudge and button report readiness. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script. `#create` still refuses a submit that `submit_blocker` would block, with a 422 carrying the nudge's sentence and nothing saved, not even the draft the request carried. The button already prevents one, but a request from outside the page can still send it, and accepting it would bill a review of every section, freeze the day and count it toward the streak.
   A refused or dropped submission restarts the draft autosave it canceled, so
   the last edit survives without another keystroke. If submission succeeds but
   the browser cannot start the review POST, the page explains that the answers
@@ -2050,8 +2083,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   folding is available whatever the section's state. The summary carries
   the label, as an `<h2>` so VoiceOver's heading rotor reaches each section
   (never give the summary `role="button"`, which would erase it), and a
-  status line (`SectionStatusHelper#section_status`, mirrored
-  by the dashboard script's `refreshStatus`): a check and the self-rating
+  status line (`SectionStatusHelper#section_status`, whose browser copy is
+  `CodeGymAnswerRules.sectionStatus`): a check and the self-rating
   once answered and rated, "in progress" once answered, blank otherwise. One
   automatic reopen: editing the answer of a folded, rated section opens it,
   since a fold claims the section is settled and a stale rating must never
@@ -3178,6 +3211,7 @@ always pull in the full suite — is stated once, in
 - `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
 - `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
+- `app/views/shared/_answer_rules.html.erb` — defines `window.CodeGymAnswerRules`, the browser's copy of the answer, submit-gate and section-status rules; rendered at the top of `dashboard/_exercise`, and held to the Ruby rules by `spec/system/answer_rules_parity_spec.rb`
 - `app/views/shared/_server_message.html.erb` — defines `window.CodeGymServerMessage`: what a page script may show when a request fails, the app's own sentence or the page's fallback
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
@@ -3233,6 +3267,7 @@ always pull in the full suite — is stated once, in
   against a rendered attribute a request spec never executes, so a mismatch
   between that label and the raw concept key was invisible to request specs
   and only caught here.
+- `spec/conventions/app_source_spec.rb` — parses `app/` with Prism and fails on `Thread.new` outside `CallerZoneThread` (or a named exemption with its reason and exact thread count) and on `send(:...)`
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway

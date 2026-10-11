@@ -29,8 +29,7 @@
               maxlength="<%= ExerciseSection::DesignComparison::MAX_REASON_LENGTH %>"
               placeholder="<%= t("sections.#{key}.placeholder") %>"><%= reason %></textarea>
     <%# HTML drops the newline after the tag, as with Rails' text_area; without it a reason with no pick loses its "\n". %>
-    <textarea name="response[answers][<%= key %>]" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>"
-              data-min-reason="<%= ExerciseSection::DesignComparison::MIN_REASON_LENGTH %>" hidden><%= "\n" %><%= response.answers[key] %></textarea>
+    <textarea name="response[answers][<%= key %>]" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>" hidden><%= "\n" %><%= response.answers[key] %></textarea>
   </div>
 <% end %>
 <% unless submitted || @design_comparison_script_emitted %>
@@ -41,15 +40,14 @@
       document.querySelectorAll("[data-comparison-answer]").forEach(area => {
         const field  = area.querySelector("textarea[data-field]");
         const reason = area.querySelector("textarea[data-comparison-reason]");
-        const prefix = <%= ExerciseSection::DesignComparison::PICK_PREFIX.to_json.html_safe %>;
+        const rules  = window.CodeGymAnswerRules;
 
-        // Matches DesignComparison.encode_answer and .answered?; a reason with no pick keeps its line so a reload shows it.
+        // Matches DesignComparison.encode_answer; a reason with no pick keeps its line so a reload shows it.
         function compose() {
           const pick = area.querySelector("input[type=radio]:checked")?.value;
-          const text = reason.value.trim();
-          field.value = pick || text ? `${pick ? prefix + pick : ""}\n${reason.value}` : "";
-          // Code points, as the server counts: an emoji is one, not two.
-          field.dataset.answerComplete = String(Boolean(pick) && [...text].length >= Number(field.dataset.minReason));
+          const text = rules.strip(reason.value);
+          field.value = pick || text ? `${pick ? rules.PICK_PREFIX + pick : ""}\n${reason.value}` : "";
+          field.dataset.answerComplete = String(rules.comparisonAnswered(pick, reason.value));
           field.dispatchEvent(new Event("input", { bubbles: true }));
         }
 

@@ -541,6 +541,50 @@
     <div class="progress-label" id="progress-label">0 of 3 answered</div>
   </div>
 
+  <script>
+window.CodeGymAnswerRules = (() => {
+  const MIN_LENGTH = 10;
+  const MIN_REASON = 40;
+  const PIECES = ["a","b"];
+  // Ruby's String#strip: ASCII whitespace and NUL only, where String.prototype.trim also drops Unicode spaces.
+  const strip = text => text.replace(/^[\0\t\n\v\f\r ]+|[\0\t\n\v\f\r ]+$/g, "");
+  const length = text => [...text].length;
+  const STRIPPED = new RegExp("[\udb40\udc00-\udb40\udc7f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\u200b\u200c\u2060-\u2064\ufeff\u0000-\b\u000b\f\u000e-\u001f-\u009f]", "gu");
+  const clean = text => text.normalize("NFC").replace(STRIPPED, "");
+
+  function substantive(text, labels) {
+    if (!labels.length) return strip(text);
+    return strip(text.split("\n").filter(line => !labels.includes(strip(line))).join("\n"));
+  }
+
+  return {
+    PARSONS_PREFIX: "order:",
+    PICK_PREFIX: "pick:",
+
+    strip,
+
+    proseAnswered(text, labels) {
+      return length(substantive(clean(text), labels)) > MIN_LENGTH;
+    },
+
+    comparisonAnswered(pick, reason) {
+      return PIECES.includes(pick) && length(strip(clean(reason))) >= MIN_REASON;
+    },
+
+    submitBlocker(answeredSections, ratings) {
+      if (answeredSections.length === 0) return "unanswered";
+      if (answeredSections.some(section => !ratings[section])) return "unrated";
+      return null;
+    },
+
+    sectionStatus(answered, ratingLabel, inProgress) {
+      if (!answered) return "";
+      return ratingLabel ? `✓ ${ratingLabel}` : inProgress;
+    }
+  };
+})();
+</script>
+
   <form id="gym-form" data-turbo="false" action="/responses" accept-charset="UTF-8" method="post">
       <details class="section" open data-section-fold="code_review">
   <summary class="section-label"><h2 class="section-title">  1 — Code Review
@@ -557,7 +601,7 @@
 
   
 
-    <textarea name="response[answers][code_review]" class="answer" placeholder="What&#39;s the issue and how would you fix it?" maxlength="12000" data-field="code_review" ></textarea>
+    <textarea name="response[answers][code_review]" class="answer" placeholder="What&#39;s the issue and how would you fix it?" maxlength="12000" data-field="code_review" data-prose-answer data-answer-complete="false" ></textarea>
 
 
     <div class="rating-row" data-rating-for="code_review" role="group"
@@ -602,7 +646,7 @@
 
   
 
-    <textarea name="response[answers][pattern]" class="answer" placeholder="Your answer…" maxlength="12000" data-field="pattern" data-scaffold-labels="[&quot;Your approach:&quot;,&quot;Interface — how would this be called:&quot;,&quot;What would be easy to get wrong or worth testing:&quot;]">Your approach:
+    <textarea name="response[answers][pattern]" class="answer" placeholder="Your answer…" maxlength="12000" data-field="pattern" data-prose-answer data-answer-complete="false" data-scaffold-labels="[&quot;Your approach:&quot;,&quot;Interface — how would this be called:&quot;,&quot;What would be easy to get wrong or worth testing:&quot;]">Your approach:
 
 
 Interface — how would this be called:
@@ -653,7 +697,7 @@ What would be easy to get wrong or worth testing:
 
   
 
-    <textarea name="response[answers][challenge]" class="answer code-answer" placeholder="# Your implementation…" maxlength="12000" data-field="challenge" ></textarea>
+    <textarea name="response[answers][challenge]" class="answer code-answer" placeholder="# Your implementation…" maxlength="12000" data-field="challenge" data-prose-answer data-answer-complete="false" ></textarea>
 
 
     <div class="rating-row" data-rating-for="challenge" role="group"
@@ -709,12 +753,10 @@ What would be easy to get wrong or worth testing:
 
     const STALE_RELOADED = "The set changed, so that last change wasn't saved. This is the current set — your saved work is still there.";
 
-    // Client half of DailyResponse#submit_blocker; change both together.
+    const rules = window.CodeGymAnswerRules;
+
     function submitBlocker() {
-      const answeredFields = [...textareas].filter(answered).map(t => t.dataset.field);
-      if (answeredFields.length === 0) return "unanswered";
-      if (answeredFields.some(section => !ratings[section])) return "unrated";
-      return null;
+      return rules.submitBlocker([...textareas].filter(answered).map(t => t.dataset.field), ratings);
     }
 
     function refreshSubmit() {
@@ -724,17 +766,13 @@ What would be easy to get wrong or worth testing:
       if (blocker) ratingNudge.textContent = ratingNudge.dataset[blocker];
     }
 
-    const ANSWER_MIN_LENGTH = 10;
-
-    function substantive(textarea) {
-      const labels = JSON.parse(textarea.dataset.scaffoldLabels || "[]");
-      if (!labels.length) return textarea.value.trim();
-      return textarea.value.split("\n").filter(line => !labels.includes(line.trim())).join("\n").trim();
+    function answered(textarea) {
+      return textarea.dataset.answerComplete === "true";
     }
 
-    function answered(textarea) {
-      if (textarea.dataset.answerComplete !== undefined) return textarea.dataset.answerComplete === "true";
-      return [...substantive(textarea)].length > ANSWER_MIN_LENGTH;
+    function markProse(textarea) {
+      const labels = JSON.parse(textarea.dataset.scaffoldLabels || "[]");
+      textarea.dataset.answerComplete = String(rules.proseAnswered(textarea.value, labels));
     }
 
     const ANSWERED_COUNT = "%{answered} of %{total} answered";
@@ -790,8 +828,7 @@ What would be easy to get wrong or worth testing:
       const status = form.querySelector(`.section-status[data-status-for="${section}"]`);
       const t = form.querySelector(`textarea[data-field="${section}"]`);
       if (!status || !t) return;
-      if (!answered(t)) status.textContent = "";
-      else status.textContent = ratings[section] ? `✓ ${RATING_LABELS[ratings[section]]}` : IN_PROGRESS;
+      status.textContent = rules.sectionStatus(answered(t), RATING_LABELS[ratings[section]], IN_PROGRESS);
     }
 
     function reopenIfRated(section) {
@@ -801,6 +838,7 @@ What would be easy to get wrong or worth testing:
 
     textareas.forEach(t => {
       t.addEventListener("input", () => {
+        if ("proseAnswer" in t.dataset) markProse(t);
         reopenIfRated(t.dataset.field);
         updateProgress(); refreshSubmit(); refreshStatus(t.dataset.field); autoSave();
       });
@@ -899,6 +937,8 @@ What would be easy to get wrong or worth testing:
       if (event.persisted && reviewRequested) window.location.reload();
     });
 
+    textareas.forEach(t => { if ("proseAnswer" in t.dataset) markProse(t); });
+    sectionFields.forEach(refreshStatus);
     updateProgress();
     refreshSubmit();
   })();

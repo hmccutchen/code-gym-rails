@@ -53,6 +53,7 @@
     <div class="progress-label" id="progress-label"><%= t("dashboard.exercise.answered_count", answered: 0, total: exercise.active_section_keys.size) %></div>
   </div>
 
+  <%= render "shared/answer_rules" %>
   <%= form_with url: responses_path, method: :post, id: "gym-form", data: { turbo: false } do |f| %>
     <%= render "responses/sections", exercise: exercise, response: response, submitted: false %>
 
@@ -94,12 +95,10 @@
 
     const STALE_RELOADED = <%= t("dashboard.exercise.stale_reloaded").to_json.html_safe %>;
 
-    // Client half of DailyResponse#submit_blocker; change both together.
+    const rules = window.CodeGymAnswerRules;
+
     function submitBlocker() {
-      const answeredFields = [...textareas].filter(answered).map(t => t.dataset.field);
-      if (answeredFields.length === 0) return "unanswered";
-      if (answeredFields.some(section => !ratings[section])) return "unrated";
-      return null;
+      return rules.submitBlocker([...textareas].filter(answered).map(t => t.dataset.field), ratings);
     }
 
     function refreshSubmit() {
@@ -109,17 +108,13 @@
       if (blocker) ratingNudge.textContent = ratingNudge.dataset[blocker];
     }
 
-    const ANSWER_MIN_LENGTH = <%= DailyResponse::ANSWER_MIN_LENGTH %>;
-
-    function substantive(textarea) {
-      const labels = JSON.parse(textarea.dataset.scaffoldLabels || "[]");
-      if (!labels.length) return textarea.value.trim();
-      return textarea.value.split("\n").filter(line => !labels.includes(line.trim())).join("\n").trim();
+    function answered(textarea) {
+      return textarea.dataset.answerComplete === "true";
     }
 
-    function answered(textarea) {
-      if (textarea.dataset.answerComplete !== undefined) return textarea.dataset.answerComplete === "true";
-      return [...substantive(textarea)].length > ANSWER_MIN_LENGTH;
+    function markProse(textarea) {
+      const labels = JSON.parse(textarea.dataset.scaffoldLabels || "[]");
+      textarea.dataset.answerComplete = String(rules.proseAnswered(textarea.value, labels));
     }
 
     const ANSWERED_COUNT = <%= t("dashboard.exercise.answered_count").to_json.html_safe %>;
@@ -175,8 +170,7 @@
       const status = form.querySelector(`.section-status[data-status-for="${section}"]`);
       const t = form.querySelector(`textarea[data-field="${section}"]`);
       if (!status || !t) return;
-      if (!answered(t)) status.textContent = "";
-      else status.textContent = ratings[section] ? `✓ ${RATING_LABELS[ratings[section]]}` : IN_PROGRESS;
+      status.textContent = rules.sectionStatus(answered(t), RATING_LABELS[ratings[section]], IN_PROGRESS);
     }
 
     function reopenIfRated(section) {
@@ -186,6 +180,7 @@
 
     textareas.forEach(t => {
       t.addEventListener("input", () => {
+        if ("proseAnswer" in t.dataset) markProse(t);
         reopenIfRated(t.dataset.field);
         updateProgress(); refreshSubmit(); refreshStatus(t.dataset.field); autoSave();
       });
@@ -284,6 +279,8 @@
       if (event.persisted && reviewRequested) window.location.reload();
     });
 
+    textareas.forEach(t => { if ("proseAnswer" in t.dataset) markProse(t); });
+    sectionFields.forEach(refreshStatus);
     updateProgress();
     refreshSubmit();
   })();
