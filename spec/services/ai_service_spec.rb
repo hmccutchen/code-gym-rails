@@ -2887,6 +2887,66 @@ RSpec.describe AiService do
       [ exercise, response ]
     end
 
+    it "tags an infrastructure failure rather than losing the sections that graded" do
+      exercise, response = exercise_and_response
+      starved_class = Class.new(AiService) do
+        def initialize(_api_key = nil, canned_text: "{}")
+          @canned_text = canned_text
+        end
+
+        private
+
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
+          raise ActiveRecord::ConnectionTimeoutError, "could not obtain a connection" if prompt.include?('"pattern"')
+
+          { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
+        end
+
+        def build_connection = nil
+      end
+      svc = starved_class.new(canned_text: { "rating" => "solid" }.to_json)
+
+      results = nil
+      expect { results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern]) }
+        .not_to raise_error
+
+      expect(results["code_review"][:ok]).to be(true)
+      expect(results["pattern"]).to include(ok: false, error_code: "other")
+    end
+
+    it "lets a programming error through rather than dressing it up as a retryable failure" do
+      exercise, response = exercise_and_response
+      buggy_class = Class.new(AiService) do
+        def initialize(_api_key = nil) = nil
+
+        private
+
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
+          nil.this_method_does_not_exist
+        end
+
+        def build_connection = nil
+      end
+
+      was_reporting = Thread.report_on_exception
+      Thread.report_on_exception = false
+
+      expect { buggy_class.new.review_sections(user, exercise, response, sections: %w[code_review]) }
+        .to raise_error(NoMethodError)
+    ensure
+      Thread.report_on_exception = was_reporting
+    end
+
+    it "grades every section, the difficulty assessment and translation on fresh services, never this one" do
+      exercise, response = exercise_and_response
+      svc = FakeService.new("fake-test-key")
+      allow(svc).to receive(:fresh_service).and_call_original
+
+      svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
+
+      expect(svc).to have_received(:fresh_service).exactly(4).times
+    end
+
     it "returns an ok: true result per requested section on success" do
       exercise, response = exercise_and_response
       review = { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }

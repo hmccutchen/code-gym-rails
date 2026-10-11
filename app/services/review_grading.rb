@@ -25,7 +25,7 @@ class ReviewGrading
     provider   = @providers.call
     translate_before_grading(provider)
 
-    context = provider.day_context.call(@exercise, @response)
+    context = provider.day_context.call(@coach, @exercise, @response)
     threads = @sections.map { |section| CallerZoneThread.start { grade_section(section, context) } }
 
     results = threads.map(&:value).to_h

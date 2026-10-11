@@ -480,7 +480,7 @@ class AiService
   def review_grading_provider
     ReviewGrading::Provider.new(
       grade: method(:grade_review), judge_prose: method(:judge_review_prose), assess_difficulty: method(:assess_difficulty),
-      translate: method(:translate_pseudocode), day_context: method(:review_day_context),
+      translate: method(:translate_pseudocode), day_context: method(:build_review_day_context),
       provider_key: self.class.provider_key, judges_prose: self.class.judges_review_prose?
     )
   end
@@ -1648,9 +1648,6 @@ class AiService
       .except(ReviewProseVerdict::ORIGINAL_KEY, "rubric").merge("rubric" => RUBRIC_VERSION)
   end
 
-  def review_day_context(exercise, daily_response)
-    build_review_day_context(config_for(exercise.language)[:coach], exercise, daily_response)
-  end
 
   def assess_difficulty(user, exercise, sections:)
     result = call_and_log(
