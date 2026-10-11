@@ -131,7 +131,6 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     end
   end
 
-  # Readiness gives up after its timeout, so a controller that never arrives would post its stale hidden field.
   it "refuses to submit while a controller inside the form never connected" do
     reason = "Piece A keeps the retry bounded, which the stated requirement asks for here."
 
