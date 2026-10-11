@@ -285,7 +285,7 @@ User interacts:
        the same click — the dashboard posts the review URL #create hands back —
        which lands back on the submitted-state dashboard either way, with the
        finished review rendered in place when it completed.
-  └→ ResponsesController#review      → AiService#review_response → ai_review saved,
+  └→ ResponsesController#review      → ResponseReview → AiService#review_sections → ai_review saved,
        then redirects to the dashboard, whose submitted state renders the
        finished review in place — every exit from the action lands there, so
        the page never changes under the user based on how the review went; the
@@ -2113,7 +2113,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   records its `ApiUsage` row, which is honest accounting for a call the
   provider already billed. Any failure in it is swallowed — `StandardError`
   wide, not just `AiService::Error`, because `Thread#value` re-raises past
-  `ResponsesController#review`'s rescues, and a note must never cost the
+  `ResponseReview#call`'s rescues, and a note must never cost the
   engineer the review itself. Stored at
   `ai_review[section]["difficulty"]` — no migration, and no pre-answer surface
   can reach it even in principle, since `ai_review` does not exist until a
@@ -2598,8 +2598,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   lock. Two first-visits landing together both read nothing and both try to
   stamp; the loser's write violates the index, and `.claim_feature` rescues
   `RecordNotUnique` by re-reading the winner's pick, so both visitors see one
-  concept. Deliberately lighter than the `with_lock` the cost-bearing paths
-  take (`User#resume_generation!`, `ResponsesController#review`) — this picks a
+  concept. Deliberately lighter than the row locks the cost-bearing paths
+  take (`User#resume_generation!`, `ResponseReview`) — this picks a
   row to *read*, so losing costs a re-read rather than a duplicated provider
   call. The stamp sits in a SAVEPOINT (`requires_new: true`) for the same
   reason `PushSubscription.upsert` and `User#carry_forward` do: without one the
@@ -3155,7 +3155,8 @@ always pull in the full suite — is stated once, in
 - `spec/fixtures/review_judge/` — stored reviews that `ModelComparison#review_prose_fixtures` reads to compare candidates for the prose judge
 - `spec/fixtures/judge/` — stored sections, each stating the verdict it expects (`reject`, `keep_or_edit`, or `keep`, which an edit does not satisfy), that `ModelComparison#judge_fixtures` reads to compare judge models. The broken ones include the Ruby `Thread` and frame-rate `code_review`s, the incidents this feature exists for; the hard-but-sound ones make a candidate's false rejections as visible as its detections. Six `design_comparison_*` fixtures cover a surface tell, a missing deciding fact, a junior section with two defensible pieces, a principal tradeoff, and junior and senior sections to keep; six more, `design_comparison_proportionality_*`, carry a concept no vocabulary holds yet, two per rung (see `docs/proportionality-concept-2026-10-07.md`). The ones a judge should keep carry `expected_better`, which the blind-solve report compares against
 - `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation; persists failure state for the dashboard's status-polling to observe
-- `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints
+- `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints; `#review` maps a `ResponseReview` outcome to a redirect and a message
+- `app/services/response_review.rb` — `ResponseReview`: applies a review to a submitted response (claim, provider call for the missing sections, stored results and failures, mastery, the review's diagnostics) and returns an `Outcome` whose status says what happened. Knows nothing about HTTP
 - `app/views/responses/_sections.html.erb` / `_section.html.erb` (+ `bodies/`, `answers/`) — the one loop over `DailyExercise#active_section_keys` and the one wrapper every section renders through, in both the answer-form and read-only states. Only the body and the answer area vary per kind, and each kind names its own partial for those (`ExerciseSection.body_partial` / `.answer_partial`), so adding a ninth kind is a body partial, an answer partial if it needs one, two `sections.<key>` locale strings, and whichever facets differ from the defaults — never a new branch in a template.
 - `app/views/responses/_answered_sections.html.erb` — read-only render of a submitted day; shared by the dashboard's submitted state and every history entry. Its styles live in the layout's `<style>`, not a per-page block, precisely because it renders on both.
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate

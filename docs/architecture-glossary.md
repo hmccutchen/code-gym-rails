@@ -15,3 +15,9 @@ The closed concept lists and the questions asked of them
 The claim on a paid provider call that a review or a regeneration holds while
 it runs (`app/models/concerns/claimable.rb`). Its reasoning is in
 `docs/code-notes/app/models/concerns/claimable.md`.
+
+## ResponseReview
+
+Applying a review to a submitted response, from taking the claim to recording
+mastery (`app/services/response_review.rb`). Its reasoning is in
+`docs/code-notes/app/services/response_review.md`.

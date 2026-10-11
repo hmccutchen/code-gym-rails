@@ -699,7 +699,7 @@ RSpec.describe "Responses", type: :request do
       expect(response.body).to include("The extra query hides behind an association read.")
     end
 
-    it "saves the ai_review from the user's configured provider" do
+    it "lands on the review with a ready notice once every section is reviewed" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
       allow(fake_service).to receive(:review_sections).and_return(
@@ -712,8 +712,7 @@ RSpec.describe "Responses", type: :request do
       post review_response_path(daily_response)
 
       expect(response).to redirect_to(root_path(anchor: "ai-review"))
-      expect(daily_response.reload.ai_review.keys).to match_array(%w[code_review pattern challenge])
-      expect(daily_response.review_provider).to eq("anthropic")
+      expect(flash[:notice]).to eq("Review ready!")
     end
 
     it "keeps naming the provider that wrote a review after the user switches" do
@@ -735,79 +734,7 @@ RSpec.describe "Responses", type: :request do
       expect(summaries).to eq([ I18n.t("review.history_summary", provider: "Claude") ])
     end
 
-    it "logs the AI rating paired with the user's self-rating for each reviewed section" do
-      daily_response = create_submitted_response
-      daily_response.update!(section_ratings: { "code_review" => "right_level", "pattern" => "too_hard" })
-      fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return(
-        "code_review" => { ok: true, review: { "rating" => "solid" } },
-        "pattern"     => { ok: true, review: { "rating" => "beginner" } },
-        "challenge"   => { ok: true, review: { "rating" => "solid" } }
-      )
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-
-      logged = nil
-      allow(Rails.logger).to receive(:info) do |msg|
-        logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
-      end
-
-      post review_response_path(daily_response)
-
-      expect(logged).not_to be_nil
-      payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
-
-      expect(payload["event"]).to eq("review")
-      expect(payload["user_id"]).to eq(user.id)
-      expect(payload["date"]).to eq(daily_response.date.to_s)
-      expect(payload["sections"]).to eq(
-        "code_review" => { "ai_rating" => "solid",    "self_rating" => "right_level" },
-        "pattern"     => { "ai_rating" => "beginner", "self_rating" => "too_hard" },
-        "challenge"   => { "ai_rating" => "solid",    "self_rating" => nil }
-      )
-    end
-
-    it "logs the generation exercise's date, not the response's own save-time date, when they differ" do
-      exercise = DailyExercise.create!(
-        user: user, date: Date.current - 1,
-        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } },
-        generated_at: Time.current
-      )
-      daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
-      fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return(
-        "code_review" => { ok: true, review: { "rating" => "solid" } }
-      )
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-
-      logged = nil
-      allow(Rails.logger).to receive(:info) do |msg|
-        logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
-      end
-
-      post review_response_path(daily_response)
-
-      payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
-      expect(payload["date"]).to eq(exercise.date.to_s)
-      expect(payload["date"]).not_to eq(daily_response.date.to_s)
-    end
-
-    it "does not log when every section fails" do
-      daily_response = create_submitted_response
-      fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return(
-        "code_review" => { ok: false, error_code: "rate_limit", message: "slow down" },
-        "pattern"     => { ok: false, error_code: "rate_limit", message: "slow down" },
-        "challenge"   => { ok: false, error_code: "rate_limit", message: "slow down" }
-      )
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-
-      expect(Rails.logger).not_to receive(:info).with(/\[difficulty_diagnostics\]/)
-
-      post review_response_path(daily_response)
-    end
-
-    it "abandons the review without writing mastery state if the response is destroyed mid-flight" do
+    it "says nothing was saved when the set is cleared while the review runs" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
       allow(fake_service).to receive(:review_sections) do
@@ -820,11 +747,10 @@ RSpec.describe "Responses", type: :request do
       end
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
-      expect { post review_response_path(daily_response) }.not_to change(ConceptMastery, :count)
+      post review_response_path(daily_response)
 
       expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to eq("This set was cleared while the review was running — nothing was saved.")
-      expect(DailyResponse.exists?(daily_response.id)).to be false
     end
 
     it "lands on the dashboard even for an entry far back in history" do
@@ -869,7 +795,20 @@ RSpec.describe "Responses", type: :request do
       expect(daily_response.review_errors["code_review"]).not_to have_key("message")
     end
 
-    it "stores the provider the section's call went to and keeps naming it after a switch" do
+    it "explains a provider error raised before any section came back, without its message" do
+      daily_response = create_submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections).and_raise(AiService::Error, "boom")
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(daily_response)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("Claude sent back something Code Gym couldn't use, so the review didn't run. Your answers are saved. " \
+                                  "Try again. If it keeps happening, tell the person who runs Code Gym.")
+    end
+
+    it "names the provider the section's call went to, on the redirect and the dashboard" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
       allow(fake_service).to receive(:review_sections)
@@ -879,7 +818,6 @@ RSpec.describe "Responses", type: :request do
       post review_response_path(daily_response)
 
       expect(flash[:alert]).to start_with("GPT is limiting requests right now, so the review didn't run.")
-      expect(daily_response.reload.review_errors["code_review"]).to include("provider" => "openai", "retry_after" => 30)
 
       get root_path
       expect(response.body).to include(ERB::Util.html_escape("GPT is limiting requests right now, so the review didn't run."))
@@ -917,7 +855,29 @@ RSpec.describe "Responses", type: :request do
       expect(response.body).not_to include(ERB::Util.html_escape("so the review didn't run"))
     end
 
-    it "keeps the time each section failed, not the time the review finished, which can be a day later" do
+    it "lands on the review with a count of the sections reviewed after a partial review" do
+      exercise = create_exercise(
+        "code_review" => { "question" => "q", "snippet" => "s" },
+        "pattern"     => { "title" => "t", "question" => "q" },
+        "challenge"   => { "question" => "q" }
+      )
+      resp = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                   answers: { "code_review" => "a" * 20, "pattern" => "a" * 20, "challenge" => "a" * 20 },
+                                   submitted_at: Time.current)
+      fake_service = instance_double(ClaudeService, review_sections: {
+        "code_review" => { ok: true, review: { "rating" => "solid" } },
+        "pattern"     => { ok: true, review: { "rating" => "developing" } },
+        "challenge"   => { ok: false, error_code: "rate_limit", failure: "short_rate_limit", retry_after: 20 }
+      })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(resp)
+
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
+      expect(flash[:notice]).to eq("2 of 3 sections reviewed. Claude is limiting requests right now, so the others weren't reviewed. Try again in about a minute.")
+    end
+
+    it "says the limit has reset when the section failed before the reset" do
       daily_response = create_submitted_response
       failed_at = Time.utc(2026, 10, 7, 6, 59, 30)
       fake_service = instance_double(ClaudeService)
@@ -930,60 +890,16 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(daily_response)
 
-      expect(daily_response.reload.review_errors["code_review"]["at"]).to eq(failed_at.iso8601)
       expect(flash[:alert]).to include("The limit has reset since then")
     ensure
       travel_back
     end
-  end
-
-  describe "POST /responses/:id/review mastery write" do
-    let(:section) { { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } } }
-
-    def submitted_response
-      exercise = create_exercise(section)
-      user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
-        answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
-        section_ratings: { "code_review" => "too_hard" },
-        concept_tags: { "code_review" => "n_plus_one" })
-    end
-
-    before do
-      fake = instance_double(ClaudeService, review_sections: {
-        "code_review" => { ok: true, review: { "rating" => "developing", "correct" => "ok",
-                           "missed" => "", "better_questions" => "", "next_step" => "", "improved_code" => "" } }
-      })
-      allow(AiService).to receive(:for).and_return(fake)
-    end
-
-    it "writes ConceptMastery state in the same transaction as the review" do
-      resp = submitted_response
-      post review_response_path(resp)
-
-      expect(resp.reload.ai_review).to be_present
-      expect(user.concept_masteries.find_by(concept: "n_plus_one", language: "ruby_rails")).to be_present
-    end
-
-    it "rolls back the review if the mastery write fails" do
-      resp = submitted_response
-      allow(ConceptMastery).to receive(:record_review!).and_raise(ActiveRecord::RecordInvalid.new(ConceptMastery.new))
-
-      post review_response_path(resp)
-
-      expect(resp.reload.ai_review).to be_nil
-    end
-  end
-
-  describe "POST /responses/:id/review concurrent-claim guard" do
-    def submitted_response(reviewing_since: nil)
-      exercise = create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
-                            reviewing_since: reviewing_since)
-    end
 
     it "refuses to start a second review while one is already in flight" do
-      resp = submitted_response(reviewing_since: Time.current)
+      exercise = create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
+      resp = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                   answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
+                                   reviewing_since: Time.current)
       expect(AiService).not_to receive(:for)
 
       post review_response_path(resp)
@@ -992,250 +908,6 @@ RSpec.describe "Responses", type: :request do
       expect(flash[:alert]).to eq("A review is already being generated for this — check back in a moment.")
       expect(resp.reload.ai_review).to be_nil
       expect(resp.reviewing_since).to be_present
-    end
-
-    it "reclaims the review after the in-flight marker goes stale" do
-      resp = submitted_response(reviewing_since: (DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago)
-      fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: true, review: { "rating" => "solid" } })
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-
-      post review_response_path(resp)
-
-      expect(response).to redirect_to(root_path(anchor: "ai-review"))
-      expect(resp.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
-      expect(resp.reviewing_since).to be_nil
-    end
-
-    it "clears the claim on success so a stray marker never lingers" do
-      resp = submitted_response
-      fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: true, review: { "rating" => "solid" } })
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-
-      post review_response_path(resp)
-
-      expect(resp.reload.reviewing_since).to be_nil
-    end
-
-    it "clears the claim when the provider raises, so an immediate retry can proceed" do
-      resp = submitted_response
-      fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "other", failure: "other" })
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-
-      post review_response_path(resp)
-
-      expect(resp.reload.reviewing_since).to be_nil
-    end
-
-    it "releases its own claim when storing the review raises, so a retry need not wait for it to go stale" do
-      resp = submitted_response
-      fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: true, review: { "rating" => "solid" } })
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-      allow(ConceptMastery).to receive(:record_review!).and_raise(ActiveRecord::RecordInvalid.new(resp))
-
-      begin
-        post review_response_path(resp)
-      rescue ActiveRecord::RecordInvalid
-        nil
-      end
-
-      expect(resp.reload.reviewing_since).to be_nil
-      expect(resp.ai_review).to be_nil
-    end
-
-    context "when another review takes the claim over during the provider call" do
-      let(:takeover) { 1.second.from_now.floor(6) }
-
-      def take_over(resp)
-        DailyResponse.where(id: resp.id).update_all(reviewing_since: takeover)
-      end
-
-      it "leaves the new claim in place when this review finishes" do
-        resp = submitted_response
-        fake_service = instance_double(ClaudeService)
-        allow(fake_service).to receive(:review_sections) do
-          take_over(resp)
-          { "code_review" => { ok: true, review: { "rating" => "solid" } } }
-        end
-        allow(AiService).to receive(:for).with(user).and_return(fake_service)
-
-        post review_response_path(resp)
-
-        expect(resp.reload.reviewing_since).to eq(takeover)
-      end
-
-      it "discards its results rather than writing a review the new claim will write again" do
-        resp = submitted_response
-        fake_service = instance_double(ClaudeService)
-        allow(fake_service).to receive(:review_sections) do
-          take_over(resp)
-          { "code_review" => { ok: true, review: { "rating" => "solid" } } }
-        end
-        allow(AiService).to receive(:for).with(user).and_return(fake_service)
-        allow(ConceptMastery).to receive(:record_review!)
-
-        post review_response_path(resp)
-
-        expect(resp.reload.ai_review).to be_nil
-        expect(ConceptMastery).not_to have_received(:record_review!)
-        expect(response).to redirect_to(root_path)
-        expect(flash[:alert]).to eq("A review is already being generated for this — check back in a moment.")
-      end
-
-      it "leaves the new claim in place when the provider raises" do
-        resp = submitted_response
-        fake_service = instance_double(ClaudeService)
-        allow(fake_service).to receive(:review_sections) do
-          take_over(resp)
-          raise AiService::Error, "boom"
-        end
-        allow(AiService).to receive(:for).with(user).and_return(fake_service)
-
-        post review_response_path(resp)
-
-        expect(resp.reload.reviewing_since).to eq(takeover)
-      end
-    end
-  end
-
-  describe "POST /responses/:id/review and a stale generation failure" do
-    def submitted_response
-      exercise = create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
-    end
-
-    def stub_review(result)
-      fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return("code_review" => result)
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    end
-
-    it "clears today's regeneration failure once a section is reviewed, since a review closes off regeneration" do
-      resp = submitted_response
-      user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
-      stub_review({ ok: true, review: { "rating" => "solid" } })
-
-      post review_response_path(resp)
-
-      expect(user.reload.last_generation_error).to be_nil
-      expect(user.last_generation_error_date).to be_nil
-    end
-
-    it "leaves it standing when no section could be reviewed" do
-      resp = submitted_response
-      user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
-      stub_review({ ok: false, error_code: "other", failure: "outage" })
-
-      post review_response_path(resp)
-
-      expect(user.reload.last_generation_error).to eq("boom")
-    end
-
-    it "leaves an earlier day's failure alone" do
-      resp = submitted_response
-      user.update!(last_generation_error_date: Date.current - 1, last_generation_error: "yesterday")
-      stub_review({ ok: true, review: { "rating" => "solid" } })
-
-      post review_response_path(resp)
-
-      expect(user.reload.last_generation_error).to eq("yesterday")
-    end
-  end
-
-  describe "POST /responses/:id/review partial success and retry" do
-    def submitted_response
-      exercise = DailyExercise.create!(
-        user: user, date: Date.current, generated_at: Time.current,
-        problem_set: {
-          "code_review" => { "question" => "q", "snippet" => "s" },
-          "pattern"     => { "title" => "t", "question" => "q" },
-          "challenge"   => { "question" => "q" }
-        }
-      )
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "a" * 20, "pattern" => "a" * 20, "challenge" => "a" * 20 },
-                            submitted_at: Time.current)
-    end
-
-    it "saves succeeded sections and records the failure reason for the rest, redirecting to the dashboard" do
-      resp = submitted_response
-      fake_service = instance_double(ClaudeService, review_sections: {
-        "code_review" => { ok: true, review: { "rating" => "solid" } },
-        "pattern"     => { ok: true, review: { "rating" => "developing" } },
-        "challenge"   => { ok: false, error_code: "rate_limit", failure: "short_rate_limit", retry_after: 20 }
-      })
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-
-      post review_response_path(resp)
-
-      expect(response).to redirect_to(root_path(anchor: "ai-review"))
-      expect(flash[:notice]).to eq("2 of 3 sections reviewed. Claude is limiting requests right now, so the others weren't reviewed. Try again in about a minute.")
-      resp.reload
-      expect(resp.ai_review.keys).to match_array(%w[code_review pattern])
-      expect(resp.review_errors.keys).to eq([ "challenge" ])
-      expect(resp.review_errors["challenge"]).to include("kind" => "short_rate_limit", "retry_after" => 20, "at" => be_present)
-      expect(resp.review_errors["challenge"]).not_to have_key("message")
-      expect(resp).not_to be_fully_reviewed
-      expect(resp).to be_reviewed
-    end
-
-    it "only re-requests the still-missing section on retry, and clears its error once it succeeds" do
-      resp = submitted_response
-      resp.update!(
-        ai_review: { "code_review" => { "rating" => "solid" }, "pattern" => { "rating" => "developing" } },
-        review_errors: { "challenge" => { "code" => "rate_limit", "message" => "rate limited" } }
-      )
-      fake_service = instance_double(ClaudeService)
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-      expect(fake_service).to receive(:review_sections)
-        .with(user, resp.daily_exercise, resp, sections: %w[challenge])
-        .and_return("challenge" => { ok: true, review: { "rating" => "strong" } })
-
-      post review_response_path(resp)
-
-      expect(response).to redirect_to(root_path(anchor: "ai-review"))
-      expect(flash[:notice]).to eq("Review ready!")
-      resp.reload
-      expect(resp).to be_fully_reviewed
-      expect(resp.review_errors).to eq({})
-    end
-
-    it "does not re-decrement a paused concept's cooldown on a retry that completes the review" do
-      exercise = DailyExercise.create!(
-        user: user, date: Date.current, generated_at: Time.current,
-        problem_set: {
-          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
-          "pattern"     => { "title" => "t", "question" => "q" },
-          "challenge"   => { "question" => "q" }
-        }
-      )
-      resp = DailyResponse.create!(
-        user: user, daily_exercise: exercise, date: Date.current,
-        answers: { "code_review" => "a" * 20, "pattern" => "a" * 20, "challenge" => "a" * 20 },
-        submitted_at: Time.current, concept_tags: { "code_review" => "n_plus_one" }
-      )
-      paused = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
-
-      fake_service = instance_double(ClaudeService, review_sections: {
-        "code_review" => { ok: true, review: { "rating" => "solid" } },
-        "pattern"     => { ok: true, review: { "rating" => "solid" } },
-        "challenge"   => { ok: false, error_code: "other", failure: "other" }
-      })
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-      post review_response_path(resp)
-      expect(paused.reload.cooldown_remaining).to eq(1)
-
-      retry_service = instance_double(ClaudeService, review_sections: {
-        "challenge" => { ok: true, review: { "rating" => "solid" } }
-      })
-      allow(AiService).to receive(:for).with(user).and_return(retry_service)
-      post review_response_path(resp)
-
-      expect(paused.reload.cooldown_remaining).to eq(1)
     end
   end
 
