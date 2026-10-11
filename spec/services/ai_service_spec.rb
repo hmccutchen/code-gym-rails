@@ -2946,87 +2946,6 @@ RSpec.describe AiService do
       )
     end
 
-    it "tags an infrastructure failure rather than losing the sections that graded" do
-      exercise, response = exercise_and_response
-      starved_class = Class.new(AiService) do
-        def initialize(_api_key = nil, canned_text: "{}")
-          @canned_text = canned_text
-        end
-
-        private
-
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-          raise ActiveRecord::ConnectionTimeoutError, "could not obtain a connection" if prompt.include?('"pattern"')
-
-          { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
-        end
-
-        def build_connection = nil
-      end
-      svc = starved_class.new(canned_text: { "rating" => "solid" }.to_json)
-
-      results = nil
-      expect { results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern]) }
-        .not_to raise_error
-
-      expect(results["code_review"][:ok]).to be(true)
-      expect(results["pattern"]).to include(ok: false, error_code: "other")
-    end
-
-    it "lets a programming error through rather than dressing it up as a retryable failure" do
-      exercise, response = exercise_and_response
-      buggy_class = Class.new(AiService) do
-        def initialize(_api_key = nil) = nil
-
-        private
-
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-          nil.this_method_does_not_exist
-        end
-
-        def build_connection = nil
-      end
-
-      was_reporting = Thread.report_on_exception
-      Thread.report_on_exception = false
-
-      expect { buggy_class.new.review_sections(user, exercise, response, sections: %w[code_review]) }
-        .to raise_error(NoMethodError)
-    ensure
-      Thread.report_on_exception = was_reporting
-    end
-
-    it "tags a failed section without affecting a successful one" do
-      exercise, response = exercise_and_response
-
-      failing_class = Class.new(AiService) do
-        def initialize(_api_key = nil, canned_text: "{}")
-          @canned_text = canned_text
-          @calls = 0
-        end
-
-        private
-
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-          @calls += 1
-          raise AiService::RateLimitError, "rate limited" if prompt.include?('"pattern"')
-          { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
-        end
-
-        def build_connection = nil
-      end
-      svc = failing_class.new(canned_text: { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }.to_json)
-
-      freeze_time do
-        results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
-
-        expect(results["code_review"][:ok]).to be(true)
-        expect(results["pattern"]).to eq(ok: false, error_code: "rate_limit", failure: "short_rate_limit",
-                                         provider: failing_class.provider_key, quota_id: nil, retry_after: nil,
-                                         failed_at: Time.current)
-      end
-    end
-
     it "keeps the graded sections when usage logging cannot check out a connection" do
       exercise, response = exercise_and_response
       review = { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }
@@ -3071,39 +2990,6 @@ RSpec.describe AiService do
       probing_class.new.review_sections(user, exercise, response, sections: %w[code_review])
 
       expect(probing_class.held_connection_during_call).to be_nil
-    end
-
-    it "maps AuthenticationError to its error code" do
-      exercise, response = exercise_and_response
-
-      auth_failing = Class.new(AiService) do
-        private
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false) = raise(AiService::AuthenticationError, "bad key")
-        def build_connection = nil
-      end.new("fake_key")
-
-      results = auth_failing.review_sections(user, exercise, response, sections: %w[code_review])
-      expect(results["code_review"][:error_code]).to eq("authentication")
-    end
-
-    it "replaces the grader's rating with the kind's computed one" do
-      exercise = DailyExercise.create!(
-        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
-        problem_set: {
-          "code_review"     => { "question" => "q", "snippet" => "s" },
-          "pattern"         => { "title" => "t", "question" => "q" },
-          "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] }
-        }
-      )
-      response = DailyResponse.create!(
-        user: user, daily_exercise: exercise, date: Date.current,
-        answers: { "parsons_problem" => "order:0,1,2,3,4" }, submitted_at: Time.current
-      )
-      svc = double_class.new(canned_text: { "rating" => "beginner" }.to_json)
-
-      results = svc.review_sections(user, exercise, response, sections: %w[parsons_problem])
-
-      expect(results["parsons_problem"][:review]["rating"]).to eq("strong")
     end
   end
 
@@ -4491,25 +4377,6 @@ RSpec.describe AiService do
       DailyResponse::DIFFICULTY_LEVELS.each { |level| expect(prompt).to include(level) }
     end
 
-    it "merges an assessment into each successfully graded section" do
-      exercise, response = loaded_day
-      svc = assessing_class.new(
-        review: { "rating" => "solid" },
-        difficulty: {
-          "code_review" => { "level" => "demanding", "reason" => "The n+1 hides inside an association call." },
-          "pattern"     => { "level" => "straightforward", "reason" => "One thing to notice." },
-          "challenge"   => { "level" => "moderate", "reason" => "Not asked about today." }
-        }
-      )
-
-      results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
-
-      expect(results["code_review"][:review]["difficulty"])
-        .to eq("level" => "demanding", "reason" => "The n+1 hides inside an association call.")
-      expect(results["pattern"][:review]["difficulty"]).to eq("level" => "straightforward", "reason" => "One thing to notice.")
-      expect(results.keys).to match_array(%w[code_review pattern])
-    end
-
     it "bills the assessment separately from the grading calls" do
       exercise, response = loaded_day
       svc = assessing_class.new(review: { "rating" => "solid" },
@@ -4519,17 +4386,6 @@ RSpec.describe AiService do
         svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
       }.to change { ApiUsage.where(purpose: "assess_difficulty").count }.by(1)
         .and change { ApiUsage.where(purpose: "review_response").count }.by(2)
-    end
-
-    it "leaves the grades intact when the assessment fails outright" do
-      exercise, response = loaded_day
-      svc = assessing_class.new(review: { "rating" => "solid" }, difficulty: :raise)
-
-      results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
-
-      expect(results["code_review"][:ok]).to be(true)
-      expect(results["code_review"][:review]).not_to have_key("difficulty")
-      expect(results["pattern"][:ok]).to be(true)
     end
 
     it "drops a level it has no way to render and a reason of the wrong type" do
@@ -4546,26 +4402,6 @@ RSpec.describe AiService do
 
       expect(results["code_review"][:review]).not_to have_key("difficulty")
       expect(results["pattern"][:review]["difficulty"]).to eq("level" => "moderate", "reason" => "")
-    end
-
-    it "keeps the grades when the assessment raises something outside the AiService hierarchy" do
-      exercise, response = loaded_day
-      exploding_class = Class.new(assessing_class) do
-        private
-
-        def assess_difficulty(_user, _exercise, sections:)
-          raise JSON::ParserError, "unexpected token"
-        end
-      end
-      svc = exploding_class.new(review: { "rating" => "solid" })
-
-      results = nil
-      expect { results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern]) }
-        .not_to raise_error
-
-      expect(results["code_review"][:ok]).to be(true)
-      expect(results["pattern"][:ok]).to be(true)
-      expect(results["code_review"][:review]).not_to have_key("difficulty")
     end
 
     it "caps the assessment's output, which is also what disables thinking" do
@@ -4610,27 +4446,6 @@ RSpec.describe AiService do
       prompt = difficulty_prompt(exercise)
 
       expect(prompt).to include("#{DailyResponse::MAX_DIFFICULTY_REASON_LENGTH} characters")
-    end
-
-    it "leaves without the note rather than letting a hung assessment hold the review" do
-      exercise, response = loaded_day
-      gate = Queue.new
-      hanging_class = Class.new(assessing_class) do
-        define_method(:assess_difficulty) { |_user, _exercise, sections:| gate.pop }
-        private :assess_difficulty
-      end
-      svc = hanging_class.new(review: { "rating" => "solid" })
-
-      stub_const("AiService::DIFFICULTY_ASSESSMENT_GRACE_SECONDS", 0.05)
-
-      results = Timeout.timeout(10) do
-        svc.review_sections(user, exercise, response, sections: %w[code_review])
-      end
-
-      expect(results["code_review"][:ok]).to be(true)
-      expect(results["code_review"][:review]).not_to have_key("difficulty")
-    ensure
-      gate << {}
     end
 
     it "has guidance for exactly the levels it can offer" do
@@ -5840,152 +5655,6 @@ RSpec.describe AiService, "REVIEW_PROSE_JUDGE_SYSTEM_PROMPT" do
   end
 end
 
-RSpec.describe AiService, "judging graded reviews" do
-  let(:user) { User.create!(email: "graded@example.com", name: "G", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
-  let(:exercise) do
-    DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
-                          problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys)
-  end
-  let(:response) do
-    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                          answers: { "code_review" => "The query runs once per row, so preload it." }, submitted_at: Time.current)
-  end
-  let(:logged) { StringIO.new }
-  let(:grade) { FakeService::REVIEW_SECTION.deep_stringify_keys.merge("missed" => [ "SENTINEL-G one.", "SENTINEL-G two." ]) }
-  let(:stamped) { grade.merge("rubric" => AiService::RUBRIC_VERSION) }
-  let(:graded_prose) { grade.slice(*DailyResponse::AI_REVIEW_FIELDS.keys, "essential_gaps") }
-
-  around do |example|
-    original_logger = Rails.logger
-    original_switch = ENV["REVIEW_PROSE_JUDGE"]
-    Rails.logger = ActiveSupport::Logger.new(logged)
-    example.run
-  ensure
-    Rails.logger = original_logger
-    ENV["REVIEW_PROSE_JUDGE"] = original_switch
-  end
-
-  # `judge_reply` is a String, or an exception to raise.
-  def graded(judge_reply: { "status" => "keep" }.to_json, grader: grade, provider: FakeService)
-    judge_calls = 0
-    svc = provider.new("key")
-    allow(provider).to receive(:new).and_return(svc)
-    allow(svc).to receive(:call).and_wrap_original do |_m, system:, **|
-      if system == AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT
-        judge_calls += 1
-        raise judge_reply if judge_reply.is_a?(Exception)
-        { text: judge_reply, input_tokens: 1, output_tokens: 1 }
-      else
-        { text: grader.to_json, input_tokens: 1, output_tokens: 1 }
-      end
-    end
-    context = svc.send(:build_review_day_context, "Rails", exercise, response)
-    _, result = svc.send(:grade_section, user, exercise, response, "code_review", context)
-    [ result, judge_calls ]
-  end
-
-  it "keeps an unparseable grade out of the log and the section's error" do
-    svc = FakeService.new("key")
-    allow(FakeService).to receive(:new).and_return(svc)
-    allow(svc).to receive(:call).and_return(text: "SENTINEL-GRADE is not json", input_tokens: 1, output_tokens: 1)
-    allow(Rails.logger).to receive(:error)
-
-    context = svc.send(:build_review_day_context, "Rails", exercise, response)
-    _, result = svc.send(:grade_section, user, exercise, response, "code_review", context)
-
-    expect(result[:ok]).to be(false)
-    expect(result.values.join).not_to include("SENTINEL")
-    expect(Rails.logger).not_to have_received(:error).with(/SENTINEL/)
-  end
-
-  def edit_reply
-    { "status" => "edit", "issues" => [ { "type" => "verbosity", "evidence" => "SENTINEL-G two." } ],
-      "fields" => { "missed" => [ { "from" => [ 0, 1 ], "text" => "One query per row." } ] } }.to_json
-  end
-
-  context "with the switch off" do
-    it "makes no judge call and returns the grade as returned" do
-      result, calls = graded
-      expect(calls).to eq(0)
-      expect(result).to eq(ok: true, review: stamped)
-    end
-
-    it "removes a provider-supplied graded_prose" do
-      result, = graded(grader: grade.merge("graded_prose" => { "missed" => "forged" }))
-      expect(result[:review]).to eq(stamped)
-    end
-  end
-
-  context "with the switch on" do
-    before { ENV["REVIEW_PROSE_JUDGE"] = "1" }
-
-    it "applies an edit, keeps the rating, and stores the grader's prose" do
-      result, calls = graded(judge_reply: edit_reply)
-      expect(calls).to eq(1)
-      expect(result[:ok]).to be(true)
-      expect(result[:review]["missed"]).to eq([ "One query per row." ])
-      expect(result[:review]["rating"]).to eq(grade["rating"])
-      expect(result[:review]["graded_prose"]).to eq(graded_prose)
-      expect(result[:review]).not_to have_key("essential_gaps")
-      expect(logged.string).to match(/\[review_judge\] user=#{user.id} section=code_review status=edit issues=verbosity merges=\{"missed":\[\[0,1\]\]\}/)
-    end
-
-    it "keeps the gap positions in place when the edit left missed alone" do
-      next_step_only = { "status" => "edit", "issues" => [ { "type" => "verbosity", "evidence" => "Review the referenced" } ],
-                         "fields" => { "next_step" => "Reread the concept." } }.to_json
-      result, = graded(judge_reply: next_step_only)
-
-      expect(result[:review]["next_step"]).to eq("Reread the concept.")
-      expect(result[:review]["essential_gaps"]).to eq(grade["essential_gaps"])
-      expect(result[:review]["graded_prose"]).not_to have_key("essential_gaps")
-    end
-
-    it "keeps the sanitized grade on keep, dropping a forged graded_prose" do
-      result, = graded(grader: grade.merge("graded_prose" => { "missed" => "forged" }))
-      expect(result[:review]).to eq(stamped)
-    end
-
-    it "replaces a forged graded_prose with its own on edit" do
-      result, = graded(judge_reply: edit_reply, grader: grade.merge("graded_prose" => { "missed" => "forged" }))
-      expect(result[:review]["graded_prose"]).to eq(graded_prose)
-    end
-
-    {
-      "plain prose" => [ "SENTINEL-G The review looks fine to me.", "invalid_json" ],
-      "malformed JSON" => [ "{\"status\": \"edit\", SENTINEL-G", "invalid_json" ],
-      "a JSON array" => [ "[\"SENTINEL-G\"]", "invalid_json" ],
-      "a JSON string" => [ "\"ok\"", "invalid_json" ],
-      "an unexpected error" => [ ArgumentError.new("SENTINEL-G boom"), "other" ],
-      "a verdict the boundary refuses" => [ { "status" => "edit", "issues" => [], "fields" => {} }.to_json, "invalid_output" ],
-      "a timeout" => [ AiService::TimeoutError.new("SENTINEL-G slow"), "timeout" ],
-      "a refusal" => [ AiService::RefusalError.new("SENTINEL-G declined"), "refusal" ],
-      "a truncated reply" => [ AiService::TruncatedResponseError.new("SENTINEL-G cut off"), "truncated" ],
-      "a rate limit" => [ AiService::RateLimitError.new("SENTINEL-G busy"), "rate_limit" ]
-    }.each do |name, (reply, reason)|
-      it "falls back to the sanitized grade on #{name}, logging a code and no review text" do
-        result, = graded(judge_reply: reply, grader: grade.merge("graded_prose" => "forged"))
-        expect(result).to eq(ok: true, review: stamped)
-        expect(logged.string).to include("[review_judge_fallback] user=#{user.id} section=code_review reason=#{reason}")
-        expect(logged.string).not_to include("SENTINEL-G")
-      end
-    end
-
-    it "stores an array and keeps the original string when the grader's missed is a string" do
-      reply = { "status" => "edit", "issues" => [ { "type" => "verbosity", "evidence" => "SENTINEL-G" } ],
-                "fields" => { "missed" => [ { "from" => [ 0 ], "text" => "Rewritten." } ] } }.to_json
-      result, = graded(judge_reply: reply, grader: grade.merge("missed" => "One long missed string."))
-      expect(result[:review]["missed"]).to eq([ "Rewritten." ])
-      expect(result[:review]["graded_prose"]["missed"]).to eq("One long missed string.")
-    end
-
-    it "never judges for a provider that does not judge" do
-      result, calls = graded(provider: GeminiService)
-      expect(calls).to eq(0)
-      expect(result[:review]).to eq(stamped)
-    end
-  end
-end
-
 RSpec.describe AiService, ".judge_fallback_reason" do
   {
     JudgeVerdict::Invalid.new("x")                     => "invalid_output",
@@ -6104,97 +5773,6 @@ end
 it "tells the grader a problem simpler than its level is graded on what it asks" do
   expect(AiService::RATING_RUBRIC).to include("graded on what it actually asks")
 end
-
-  describe "the essential-gap check on each graded section" do
-    let(:logged) { StringIO.new }
-    let(:saved_exercise) do
-      DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
-                            problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys)
-    end
-    let(:saved_response) do
-      DailyResponse.create!(user: user, daily_exercise: saved_exercise, date: Date.current,
-                            answers: { "code_review" => "The query runs once per row, so preload it." }, submitted_at: Time.current)
-    end
-
-    around do |example|
-      original = Rails.logger
-      Rails.logger = ActiveSupport::Logger.new(logged)
-      example.run
-    ensure
-      Rails.logger = original
-    end
-
-    def graded(review, section: "code_review")
-      allow(service).to receive(:call).and_return(text: review.to_json, input_tokens: 1, output_tokens: 1)
-      allow(FakeService).to receive(:new).and_return(service)
-      context = service.send(:build_review_day_context, "Rails", saved_exercise, saved_response)
-      service.send(:grade_section, user, saved_exercise, saved_response, section, context).last
-    end
-
-    let(:base) { { "rating" => "solid", "correct" => [], "missed" => [ "SECRET-M polish note." ], "better_questions" => [], "next_step" => "x", "improved_code" => "" } }
-
-    it "logs agreement and keeps the checked positions" do
-      result = graded(base.merge("essential_gaps" => []))
-
-      expect(result[:review]["essential_gaps"]).to eq([])
-      expect(logged.string).to include("[rubric_check] user=#{user.id} section=code_review rating=solid essential=0 missed=1 agrees=true")
-    end
-
-    it "logs a solid rating that lists an essential gap, and leaves the rating alone" do
-      result = graded(base.merge("essential_gaps" => [ 0 ]))
-
-      expect(result[:review]["rating"]).to eq("solid")
-      expect(logged.string).to include("rating=solid essential=1 missed=1 agrees=false")
-    end
-
-    it "drops positions it cannot read rather than storing them, and logs that it could not check" do
-      result = graded(base.merge("essential_gaps" => [ 7 ]))
-
-      expect(result[:review]).not_to have_key("essential_gaps")
-      expect(logged.string).to include("rating=solid essential=unknown missed=1 agrees=unknown")
-    end
-
-    it "never logs review text" do
-      graded(base.merge("essential_gaps" => []))
-
-      expect(logged.string).not_to include("SECRET-M")
-    end
-
-    it "logs a rating outside the vocabulary as invalid rather than echoing it" do
-      graded(base.merge("rating" => "SECRET-M excellent", "essential_gaps" => []))
-
-      expect(logged.string).to include("rating=invalid")
-      expect(logged.string).not_to include("SECRET-M")
-    end
-
-it "stamps the rubric version on every graded review, replacing any copy the provider sent" do
-  result = graded(base.merge("essential_gaps" => [], "rubric" => 99))
-
-  expect(result[:review]["rubric"]).to eq(AiService::RUBRIC_VERSION)
-end
-
-it "stamps a computed rating too, since the same prompt graded its prose" do
-  result = graded(base.merge("essential_gaps" => []), section: "parsons_problem")
-
-  expect(result[:review]["rubric"]).to eq(AiService::RUBRIC_VERSION)
-end
-
-it "checks the grader's own rating when a parsons section has no blocks to compute from" do
-  saved_exercise.problem_set["parsons_problem"].delete("blocks")
-  saved_exercise.save!
-
-  graded(base.merge("essential_gaps" => []), section: "parsons_problem")
-
-  expect(logged.string).to include("[rubric_check] user=#{user.id} section=parsons_problem rating=solid")
-end
-
-    it "skips a kind whose rating is computed, dropping any positions the grader sent" do
-      result = graded(base.merge("essential_gaps" => [ 0 ]), section: "parsons_problem")
-
-      expect(logged.string).not_to include("[rubric_check]")
-      expect(result[:review]).not_to have_key("essential_gaps")
-    end
-  end
 end
 
 RSpec.describe AiService, "the shared concept" do

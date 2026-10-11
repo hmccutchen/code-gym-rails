@@ -54,7 +54,7 @@ RSpec.describe "Provider failures as users see them", type: :request do
 
   before { allow_any_instance_of(Faraday::Retry::Middleware).to receive(:sleep) }
 
-  # Every GeminiService instance, including grade_section's per-thread copies, gets this connection.
+  # Every GeminiService instance, including the review fan-out's per-thread copies, gets this connection.
   def stub_gemini(failure)
     requests = 0
     conn = Faraday.new do |f|

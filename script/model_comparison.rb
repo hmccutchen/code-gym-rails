@@ -571,9 +571,10 @@ class ModelComparison
   end
 
   def graded_review(service, response, exercise, section)
-    coach   = service.send(:config_for, exercise.language)[:coach]
-    context = service.send(:build_review_day_context, coach, exercise, response)
-    _, result = service.send(:grade_section, response.user, exercise, response, section, context)
+    provider = service.review_grading_provider
+    coach    = service.send(:config_for, exercise.language)[:coach]
+    _, result = ReviewGrading.grade_section(section, context: provider.day_context.call(exercise, response), user: response.user,
+                                            exercise: exercise, response: response, coach: coach, provider: provider)
 
     result[:ok] ? result[:review] : "#{result[:error_code]}: #{result[:message]}"
   end

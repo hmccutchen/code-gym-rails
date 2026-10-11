@@ -2204,7 +2204,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   refusing would also discard a sound rewrite of another field. An edit left
   with nothing after that reads as `keep`. Grade, rating and every other
   field are protected because only the prose fields can be named. On a `keep` or a fallback the
-  grade is stored as the provider returned it, and `grade_section` strips any
+  grade is stored as the provider returned it, and `AiService#grade_review` strips any
   `graded_prose` key the provider sent, since `graded_prose` is server-owned:
   an edit stores the grader's original prose there, exactly as returned, as
   the audit record.
@@ -2216,10 +2216,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   reading rewrites rather than a check passing — see the activation gate
   below for the bar that was set.
 
-  **Placement and failure.** `AiService#judged_review` runs inside each
+  **Placement and failure.** `ReviewGrading#judged_review` runs inside each
   section's grading thread, after grading and the Parsons rating override, and
   has its own rescue. It rescues `StandardError`, not just `AiService::Error`,
-  because `Thread#value` re-raises whatever `grade_section`'s narrower rescue
+  because `Thread#value` re-raises whatever `ReviewGrading#grade_section`'s narrower rescue
   misses, and no judge failure may cost the engineer the review. A failure
   returns the grade unchanged and logs `[review_judge_fallback]` with a fixed
   reason code from `AiService.judge_fallback_reason`, the table the section
@@ -3156,6 +3156,8 @@ always pull in the full suite — is stated once, in
 - `spec/fixtures/judge/` — stored sections, each stating the verdict it expects (`reject`, `keep_or_edit`, or `keep`, which an edit does not satisfy), that `ModelComparison#judge_fixtures` reads to compare judge models. The broken ones include the Ruby `Thread` and frame-rate `code_review`s, the incidents this feature exists for; the hard-but-sound ones make a candidate's false rejections as visible as its detections. Six `design_comparison_*` fixtures cover a surface tell, a missing deciding fact, a junior section with two defensible pieces, a principal tradeoff, and junior and senior sections to keep; six more, `design_comparison_proportionality_*`, carry a concept no vocabulary holds yet, two per rung (see `docs/proportionality-concept-2026-10-07.md`). The ones a judge should keep carry `expected_better`, which the blind-solve report compares against
 - `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation; persists failure state for the dashboard's status-polling to observe
 - `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints; `#review` maps a `ResponseReview` outcome to a redirect and a message
+- `app/services/review_grading.rb` — `ReviewGrading`: the review fan-out, a thread per section plus the difficulty assessment beside them, and every per-section rule (Parsons' computed rating, the rubric check, the prose judge's switch and fallback, the essential-gap positions). Reaches the provider only through `ReviewGrading::Provider`, callables `AiService#review_grading_provider` builds, so its specs need no provider subclass
+- `app/services/caller_zone_thread.rb` — `CallerZoneThread.start`: a thread that runs in the caller's `Time.zone`, shared by `ReviewGrading` and `JudgedGeneration`
 - `app/services/response_review.rb` — `ResponseReview`: applies a review to a submitted response (claim, provider call for the missing sections, stored results and failures, mastery, the review's diagnostics) and returns an `Outcome` whose status says what happened. Knows nothing about HTTP
 - `app/views/responses/_sections.html.erb` / `_section.html.erb` (+ `bodies/`, `answers/`) — the one loop over `DailyExercise#active_section_keys` and the one wrapper every section renders through, in both the answer-form and read-only states. Only the body and the answer area vary per kind, and each kind names its own partial for those (`ExerciseSection.body_partial` / `.answer_partial`), so adding a ninth kind is a body partial, an answer partial if it needs one, two `sections.<key>` locale strings, and whichever facets differ from the defaults — never a new branch in a template.
 - `app/views/responses/_answered_sections.html.erb` — read-only render of a submitted day; shared by the dashboard's submitted state and every history entry. Its styles live in the layout's `<style>`, not a per-page block, precisely because it renders on both.
