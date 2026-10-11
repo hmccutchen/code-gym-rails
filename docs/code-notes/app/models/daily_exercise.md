@@ -12,8 +12,9 @@ loaded association, so a response deleted by `#start_over` after the
 exercise was loaded comes back as nil rather than raising, and one submitted
 in the meantime comes back as committed.
 
-It selects the response dated with the exercise, as `#current_response` does
-for a read without a lock; `#dated_response` is the one query both use. `daily_exercise_id` is not
-unique, and legacy carry-forward data can leave an older response on the same
-exercise; locking that one would let `RegenerateExerciseJob` miss today's
-reviewed response and replace the set under it.
+It finds the response by exercise alone. A unique index on
+`daily_responses.daily_exercise_id` means an exercise has at most one
+response, so the plain `has_one :daily_response` reads the same row. Before
+that index nothing stopped a second row on the same exercise, and locking the
+wrong one could let `RegenerateExerciseJob` miss a reviewed response and
+replace the set under it.

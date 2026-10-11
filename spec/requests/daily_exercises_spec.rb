@@ -46,26 +46,6 @@ RSpec.describe "DailyExercises", type: :request do
       expect(exercise.problem_set).to eq("code_review" => { "question" => "old" })
     end
 
-    it "refuses for today's reviewed response even when an older unreviewed one also points at the exercise" do
-      exercise = create_exercise
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.yesterday, answers: {})
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
-                            answers: { "code_review" => "a" * 20 }, ai_review: { "code_review" => { "rating" => "developing" } })
-
-      expect { post regenerate_path }.not_to have_enqueued_job(RegenerateExerciseJob)
-
-      expect(flash[:alert]).to include("already been reviewed")
-    end
-
-    it "allows a regeneration when only an older response on the exercise was reviewed" do
-      exercise = create_exercise
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.yesterday, submitted_at: 1.day.ago,
-                            answers: { "code_review" => "a" * 20 }, ai_review: { "code_review" => { "rating" => "developing" } })
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
-
-      expect { post regenerate_path }.to have_enqueued_job(RegenerateExerciseJob)
-    end
-
     it "refuses while a review is actively being generated" do
       exercise = create_exercise
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
