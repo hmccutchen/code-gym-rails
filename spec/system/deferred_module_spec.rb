@@ -3,13 +3,14 @@ require "rails_helper"
 # with_csrf: the submit action reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 RSpec.describe "Interaction before the deferred modules run", type: :system, with_csrf: true do
   let(:user) { create_fake_provider_user }
-  let(:stalled) { { modules: false } }
+  let(:stalled) { { modules: false, controller: nil } }
   let(:errors) { [] }
 
   before do
     allow_any_instance_of(Propshaft::Server).to receive(:call).and_wrap_original do |original, env|
-      module_asset = env["PATH_INFO"].to_s.include?("code_gym/")
-      sleep 3 if stalled[:modules] && module_asset
+      path = env["PATH_INFO"].to_s
+      module_asset = path.include?("code_gym/") || path.include?("_controller")
+      sleep 3 if (stalled[:modules] && path.include?("code_gym/")) || (stalled[:controller] && path.include?(stalled[:controller]))
       status, headers, body = original.call(env)
       headers["cache-control"] = "no-store" if module_asset
       [ status, headers, body ]
@@ -31,9 +32,10 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     end
   end
 
+  # Monotonic, not Time.current: these examples run inside travel_to, where a frozen clock never passes a deadline.
   def wait_for(timeout = 10)
-    deadline = Time.current + timeout
-    sleep 0.1 until yield || Time.current > deadline
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+    sleep 0.1 until yield || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
   end
 
   it "drops a Submit click made while the modules are still loading rather than posting the day" do
@@ -89,6 +91,45 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
           })()
         JS
         expect(pending).to be(true)
+      end
+
+      wait_for { user.daily_responses.reload.first&.answers&.dig("code_review") == answer }
+      expect(user.daily_responses.sole.answers["code_review"]).to eq(answer)
+      expect(errors).to be_empty
+    end
+  end
+
+  it "keeps an edit pending until the controller that owns it has connected" do
+    answer = "An answer typed while that section's own controller was still loading, long enough to count."
+
+    travel_to(a_weekday) do
+      watch_page_errors
+      visit_with_todays_set(user)
+      expect(page).to have_content(/Code Review/i, wait: 10)
+
+      url = page.current_url
+      stalled[:controller] = "answer_form_controller"
+
+      page.driver.with_playwright_page do |pw|
+        pw.goto(url, waitUntil: "commit")
+        unpending_before_connect = pw.evaluate(<<~JS)
+          (async () => {
+            const box = document.querySelector('textarea[data-field="code_review"]');
+            box.value = #{answer.to_json};
+            box.dispatchEvent(new Event("input", { bubbles: true }));
+
+            const connected = () => !!(window.Stimulus && window.Stimulus.getControllerForElementAndIdentifier(
+              document.querySelector('[data-controller~="answer-form"]'), "answer-form"));
+
+            while (!connected()) {
+              if (!window.CodeGymSaveStatus.pending()) return true;
+              await new Promise((resume) => setTimeout(resume, 20));
+            }
+
+            return false;
+          })()
+        JS
+        expect(unpending_before_connect).to be(false)
       end
 
       wait_for { user.daily_responses.reload.first&.answers&.dig("code_review") == answer }

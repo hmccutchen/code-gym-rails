@@ -77,10 +77,21 @@ registers that flag through its own `watch`, which means `pending()` answers
 true straight away and the real `save_status` inherits the same probe at flush.
 
 Two halves finish the job, and neither belongs here. `application.js` settles
-the recorder only after `application.start()` resolves, so controllers have
-already connected and taken over; settling in `flush()` would open a gap
-between the globals being assigned and Stimulus connecting, in which the edit
-is pending to nobody.
+the recorder only once every controller on the page has connected and taken
+over; settling in `flush()` would open a gap between the globals being assigned
+and Stimulus connecting, in which the edit is pending to nobody.
+
+`application.start()` resolving is not that moment.
+`eagerLoadControllersFrom` fires one dynamic `import()` per controller and
+awaits none of them, so start resolves while any number of controllers are
+still loading — settling there cleared the flag and unbound the recorder with
+the controller that owned the edited field not yet connected, and a
+pull-to-refresh in that window reloaded over the edit. So `application.js`
+waits for `application.getControllerForElementAndIdentifier` to answer for
+every identifier named by a `[data-controller]` element on the page, and
+exposes the result as `window.CodeGymBootstrap.ready`. A controller whose
+module never arrives would hold the edit pending for the rest of the page's
+life, so the wait gives up after ten seconds and settles anyway.
 
 Settling removes the two listeners as well as clearing the flag. Leaving them
 bound would set `dirty` again on the next keystroke with nothing left to clear
