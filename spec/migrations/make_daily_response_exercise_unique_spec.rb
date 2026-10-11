@@ -48,25 +48,19 @@ RSpec.describe MakeDailyResponseExerciseUnique do
     expect(DailyResponse.where(daily_exercise_id: exercise.id)).to eq([ newest ])
   end
 
-  it "keeps a submitted extra response and stops before adding the index" do
-    submitted = response(Date.current - 3, submitted_at: 3.days.ago)
-    response(Date.current)
-
-    expect { described_class.new.up }.to raise_error(ActiveRecord::MigrationError, /daily_exercise_id #{exercise.id}/)
-    expect(DailyResponse.exists?(submitted.id)).to be true
-    expect(unique_index?).to be false
-  end
-
-  it "keeps an extra draft that has follow-ups and stops before adding the index" do
-    discussed = response(Date.current - 3)
+  it "deletes a submitted extra and its follow-ups too" do
+    extra = response(Date.current - 3, submitted_at: 3.days.ago)
     connection.execute(<<~SQL)
       INSERT INTO review_follow_ups (daily_response_id, section, role, content, created_at, updated_at)
-      VALUES (#{discussed.id}, 'code_review', 0, 'q', now(), now())
+      VALUES (#{extra.id}, 'code_review', 0, 'q', now(), now())
     SQL
-    response(Date.current)
+    current = response(Date.current)
 
-    expect { described_class.new.up }.to raise_error(ActiveRecord::MigrationError)
-    expect(DailyResponse.exists?(discussed.id)).to be true
+    described_class.new.up
+
+    expect(DailyResponse.where(daily_exercise_id: exercise.id)).to eq([ current ])
+    expect(ReviewFollowUp.where(daily_response_id: extra.id)).to be_empty
+    expect(unique_index?).to be true
   end
 
   it "leaves an exercise with one response alone" do
