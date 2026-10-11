@@ -21,6 +21,7 @@
     "@hotwired/stimulus": "/assets/stimulus.min-4b1e420e.js",
     "@hotwired/stimulus-loading": "/assets/stimulus-loading-1fc53fe7.js",
     "controllers/application": "/assets/controllers/application-3affb389.js",
+    "controllers/duck_thread_controller": "/assets/controllers/duck_thread_controller-cb4ca1f7.js",
     "controllers": "/assets/controllers/index-ee64e1f1.js",
     "code_gym/request": "/assets/code_gym/request-3b03ef19.js",
     "code_gym/save_status": "/assets/code_gym/save_status-0f07ed8f.js"
@@ -30,6 +31,7 @@
 <link rel="modulepreload" href="/assets/stimulus.min-4b1e420e.js">
 <link rel="modulepreload" href="/assets/stimulus-loading-1fc53fe7.js">
 <link rel="modulepreload" href="/assets/controllers/application-3affb389.js">
+<link rel="modulepreload" href="/assets/controllers/duck_thread_controller-cb4ca1f7.js">
 <link rel="modulepreload" href="/assets/controllers/index-ee64e1f1.js">
 <link rel="modulepreload" href="/assets/code_gym/request-3b03ef19.js">
 <link rel="modulepreload" href="/assets/code_gym/save_status-0f07ed8f.js">
@@ -617,21 +619,30 @@
         <button type="button" class="rating-btn" aria-pressed="false"
                 data-rating-for="code_review" data-rating="too_hard">Too hard</button>
     </div>
-    <div class="duck-thread" data-duck-thread data-section="code_review">
-  <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-code_review">🦆 Stuck? Talk it through</button>
-  <div class="duck-body" id="duck-body-code_review" hidden>
-    <div class="duck-turns" aria-live="polite"></div>
+    <div class="duck-thread"
+     data-controller="duck-thread"
+     data-duck-thread-section-value="code_review"
+     data-duck-thread-url-value="/responses/duck_thread"
+     data-duck-thread-max-turns-value="6"
+     data-duck-thread-explain-message-value="Explain what this exercise is asking, in plain language."
+     data-duck-thread-send-failed-text-value="Couldn&#39;t send that — try again"
+     data-duck-thread-thinking-text-value="Thinking…"
+     data-duck-thread-capped-text-value="You&#39;ve used all 6 messages for this section — clear the conversation to keep going."
+     data-duck-thread-user-speaker-value="You"
+     data-duck-thread-assistant-speaker-value="Duck">
+  <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-code_review" data-duck-thread-target="toggle" data-action="duck-thread#toggle">🦆 Stuck? Talk it through</button>
+  <div class="duck-body" id="duck-body-code_review" hidden data-duck-thread-target="body">
+    <div class="duck-turns" aria-live="polite" data-duck-thread-target="turns"></div>
     <div class="duck-form">
       <label class="visually-hidden" for="duck-input-code_review">What are you stuck on?</label>
-      <input type="text" class="duck-input" id="duck-input-code_review" placeholder="What are you stuck on?">
-      <button type="button" class="btn btn-ghost btn-sm duck-send">Ask</button>
-      <button type="button" class="btn btn-ghost btn-sm duck-explain" data-message="Explain what this exercise is asking, in plain language.">Explain this simply</button>
-      <button type="button" class="btn btn-ghost btn-sm duck-clear">Clear</button>
+      <input type="text" class="duck-input" id="duck-input-code_review" placeholder="What are you stuck on?" data-duck-thread-target="input" data-action="keydown.enter->duck-thread#send:prevent">
+      <button type="button" class="btn btn-ghost btn-sm duck-send" data-duck-thread-target="send" data-action="duck-thread#send">Ask</button>
+      <button type="button" class="btn btn-ghost btn-sm duck-explain" data-duck-thread-target="explain" data-action="duck-thread#explain">Explain this simply</button>
+      <button type="button" class="btn btn-ghost btn-sm duck-clear" data-action="duck-thread#clear">Clear</button>
     </div>
-    <span class="duck-status" aria-live="polite"></span>
+    <span class="duck-status" aria-live="polite" data-duck-thread-target="status"></span>
   </div>
 </div>
-
 
 </details>
 
@@ -669,21 +680,30 @@ What would be easy to get wrong or worth testing:
         <button type="button" class="rating-btn" aria-pressed="false"
                 data-rating-for="pattern" data-rating="too_hard">Too hard</button>
     </div>
-    <div class="duck-thread" data-duck-thread data-section="pattern">
-  <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-pattern">🦆 Stuck? Talk it through</button>
-  <div class="duck-body" id="duck-body-pattern" hidden>
-    <div class="duck-turns" aria-live="polite"></div>
+    <div class="duck-thread"
+     data-controller="duck-thread"
+     data-duck-thread-section-value="pattern"
+     data-duck-thread-url-value="/responses/duck_thread"
+     data-duck-thread-max-turns-value="6"
+     data-duck-thread-explain-message-value="Explain what this exercise is asking, in plain language."
+     data-duck-thread-send-failed-text-value="Couldn&#39;t send that — try again"
+     data-duck-thread-thinking-text-value="Thinking…"
+     data-duck-thread-capped-text-value="You&#39;ve used all 6 messages for this section — clear the conversation to keep going."
+     data-duck-thread-user-speaker-value="You"
+     data-duck-thread-assistant-speaker-value="Duck">
+  <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-pattern" data-duck-thread-target="toggle" data-action="duck-thread#toggle">🦆 Stuck? Talk it through</button>
+  <div class="duck-body" id="duck-body-pattern" hidden data-duck-thread-target="body">
+    <div class="duck-turns" aria-live="polite" data-duck-thread-target="turns"></div>
     <div class="duck-form">
       <label class="visually-hidden" for="duck-input-pattern">What are you stuck on?</label>
-      <input type="text" class="duck-input" id="duck-input-pattern" placeholder="What are you stuck on?">
-      <button type="button" class="btn btn-ghost btn-sm duck-send">Ask</button>
-      <button type="button" class="btn btn-ghost btn-sm duck-explain" data-message="Explain what this exercise is asking, in plain language.">Explain this simply</button>
-      <button type="button" class="btn btn-ghost btn-sm duck-clear">Clear</button>
+      <input type="text" class="duck-input" id="duck-input-pattern" placeholder="What are you stuck on?" data-duck-thread-target="input" data-action="keydown.enter->duck-thread#send:prevent">
+      <button type="button" class="btn btn-ghost btn-sm duck-send" data-duck-thread-target="send" data-action="duck-thread#send">Ask</button>
+      <button type="button" class="btn btn-ghost btn-sm duck-explain" data-duck-thread-target="explain" data-action="duck-thread#explain">Explain this simply</button>
+      <button type="button" class="btn btn-ghost btn-sm duck-clear" data-action="duck-thread#clear">Clear</button>
     </div>
-    <span class="duck-status" aria-live="polite"></span>
+    <span class="duck-status" aria-live="polite" data-duck-thread-target="status"></span>
   </div>
 </div>
-
 
 </details>
 
@@ -713,21 +733,30 @@ What would be easy to get wrong or worth testing:
         <button type="button" class="rating-btn" aria-pressed="false"
                 data-rating-for="challenge" data-rating="too_hard">Too hard</button>
     </div>
-    <div class="duck-thread" data-duck-thread data-section="challenge">
-  <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-challenge">🦆 Stuck? Talk it through</button>
-  <div class="duck-body" id="duck-body-challenge" hidden>
-    <div class="duck-turns" aria-live="polite"></div>
+    <div class="duck-thread"
+     data-controller="duck-thread"
+     data-duck-thread-section-value="challenge"
+     data-duck-thread-url-value="/responses/duck_thread"
+     data-duck-thread-max-turns-value="6"
+     data-duck-thread-explain-message-value="Explain what this exercise is asking, in plain language."
+     data-duck-thread-send-failed-text-value="Couldn&#39;t send that — try again"
+     data-duck-thread-thinking-text-value="Thinking…"
+     data-duck-thread-capped-text-value="You&#39;ve used all 6 messages for this section — clear the conversation to keep going."
+     data-duck-thread-user-speaker-value="You"
+     data-duck-thread-assistant-speaker-value="Duck">
+  <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-challenge" data-duck-thread-target="toggle" data-action="duck-thread#toggle">🦆 Stuck? Talk it through</button>
+  <div class="duck-body" id="duck-body-challenge" hidden data-duck-thread-target="body">
+    <div class="duck-turns" aria-live="polite" data-duck-thread-target="turns"></div>
     <div class="duck-form">
       <label class="visually-hidden" for="duck-input-challenge">What are you stuck on?</label>
-      <input type="text" class="duck-input" id="duck-input-challenge" placeholder="What are you stuck on?">
-      <button type="button" class="btn btn-ghost btn-sm duck-send">Ask</button>
-      <button type="button" class="btn btn-ghost btn-sm duck-explain" data-message="Explain what this exercise is asking, in plain language.">Explain this simply</button>
-      <button type="button" class="btn btn-ghost btn-sm duck-clear">Clear</button>
+      <input type="text" class="duck-input" id="duck-input-challenge" placeholder="What are you stuck on?" data-duck-thread-target="input" data-action="keydown.enter->duck-thread#send:prevent">
+      <button type="button" class="btn btn-ghost btn-sm duck-send" data-duck-thread-target="send" data-action="duck-thread#send">Ask</button>
+      <button type="button" class="btn btn-ghost btn-sm duck-explain" data-duck-thread-target="explain" data-action="duck-thread#explain">Explain this simply</button>
+      <button type="button" class="btn btn-ghost btn-sm duck-clear" data-action="duck-thread#clear">Clear</button>
     </div>
-    <span class="duck-status" aria-live="polite"></span>
+    <span class="duck-status" aria-live="polite" data-duck-thread-target="status"></span>
   </div>
 </div>
-
 
 </details>
 
@@ -1230,113 +1259,6 @@ What would be easy to get wrong or worth testing:
   })();
 </script>
 
-      <script>
-(() => {
-  const MAX_TURNS = 6;
-  const DUCK_URL = "/responses/duck_thread";
-  const SEND_FAILED = "Couldn't send that — try again";
-
-  const SPEAKER = { user: "You", assistant: "Duck" };
-
-  const renderTurns = (box) => {
-    const list = box.querySelector(".duck-turns");
-    list.replaceChildren();
-    box.duckThread.forEach((turn) => {
-      const p = document.createElement("p");
-      p.className = "duck-turn duck-" + turn.role;
-
-      // Without this the speaker shows only as CSS colour, which assistive tech never receives.
-      const who = document.createElement("span");
-      who.className = "visually-hidden";
-      who.textContent = (SPEAKER[turn.role] || turn.role) + ": ";
-      p.appendChild(who);
-      p.appendChild(document.createTextNode(turn.content));
-
-      list.appendChild(p);
-    });
-  };
-
-  const userTurnCount = (box) => box.duckThread.filter((t) => t.role === "user").length;
-
-  // Writes the status only when capped: clearing it here, in sendMessage's finally, would wipe every error message.
-  const refreshCap = (box) => {
-    const input = box.querySelector(".duck-input");
-    const send = box.querySelector(".duck-send");
-    const explain = box.querySelector(".duck-explain");
-    const status = box.querySelector(".duck-status");
-    const capped = userTurnCount(box) >= MAX_TURNS;
-    input.disabled = capped;
-    send.disabled = capped;
-    explain.disabled = capped;
-    if (capped) {
-      status.textContent =
-        "You've used all 6 messages for this section — clear the conversation to keep going.";
-    }
-  };
-
-  document.querySelectorAll("[data-duck-thread]:not([data-duck-wired])").forEach((box) => {
-    box.dataset.duckWired = "1";
-    box.duckThread = [];
-
-    const toggle = box.querySelector(".duck-toggle");
-    const body   = box.querySelector(".duck-body");
-    const input  = box.querySelector(".duck-input");
-    const send    = box.querySelector(".duck-send");
-    const explain = box.querySelector(".duck-explain");
-    const clear  = box.querySelector(".duck-clear");
-    const status = box.querySelector(".duck-status");
-
-    toggle.addEventListener("click", () => {
-      body.hidden = !body.hidden;
-      toggle.setAttribute("aria-expanded", String(!body.hidden));
-    });
-
-    box.duckGeneration = 0;
-
-    const sendMessage = async (explicitMessage) => {
-      const message = explicitMessage || input.value.trim();
-      if (!message || send.disabled) return;
-
-      const priorThread = box.duckThread.slice();
-      const generation = box.duckGeneration;
-      input.disabled = true;
-      send.disabled = true;
-      explain.disabled = true;
-      status.textContent = "Thinking…";
-
-      const result = await CodeGymRequest.send("POST", DUCK_URL,
-        { section: box.dataset.section, message: message, thread: priorThread }, { fallback: SEND_FAILED });
-      // Clear ran while this was in flight; dropping the reply keeps a cleared thread cleared.
-      if (generation !== box.duckGeneration) return;
-
-      if (result.ok && result.data) {
-        box.duckThread.push({ role: "user", content: message }, { role: "assistant", content: result.data.answer });
-        renderTurns(box);
-        if (!explicitMessage) input.value = "";
-        status.textContent = "";
-      } else {
-        status.textContent = result.message || SEND_FAILED;
-      }
-      refreshCap(box);
-    };
-
-    send.addEventListener("click", () => sendMessage());
-    explain.addEventListener("click", () => sendMessage(explain.dataset.message));
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") { event.preventDefault(); sendMessage(); }
-    });
-
-    clear.addEventListener("click", () => {
-      box.duckGeneration += 1;
-      box.duckThread = [];
-      // input.value is left alone: after a failed send it holds text to retry, and Clear names the conversation.
-      status.textContent = "";
-      renderTurns(box);
-      refreshCap(box);
-    });
-  });
-})();
-    </script>
-
+  
 </body>
 </html>

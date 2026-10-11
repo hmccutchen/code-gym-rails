@@ -6,7 +6,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     visit_with_todays_set(user)
     expect(page).to have_content(/Code Review/i, wait: 10)
 
-    duck = first("[data-duck-thread][data-section='code_review']")
+    duck = first(".duck-thread[data-duck-thread-section-value='code_review']")
     duck.find(".duck-toggle").click
     duck
   end
@@ -42,6 +42,20 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       expect(duck).to have_content(/used all #{ResponsesController::MAX_DUCK_TURNS_PER_SECTION} messages/i, wait: 10)
       expect(duck.find(".duck-send")).to be_disabled
       expect(duck.find(".duck-input")).to be_disabled
+    end
+  end
+
+  it "sends on Enter without the form navigating away" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+      duck.find(".duck-input").fill_in(with: "why is this slow?")
+      duck.find(".duck-input").send_keys(:enter)
+
+      expect(duck).to have_selector(".duck-turn.duck-user", text: "why is this slow?", wait: 10)
+      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(page).to have_current_path(root_path)
     end
   end
 
@@ -175,7 +189,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       expect(page).to have_content("Review ready!", wait: 10)
 
       expect(page).to have_content("✓ Submitted")
-      expect(page).to have_no_css("[data-duck-thread]")
+      expect(page).to have_no_css(".duck-thread")
     end
   end
 end

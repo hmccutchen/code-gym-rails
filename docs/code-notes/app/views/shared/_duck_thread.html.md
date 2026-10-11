@@ -20,34 +20,25 @@ explanation does not depend on knowing how to phrase a request for one. It
 goes through the same endpoint as any other turn and counts against the same
 cap.
 
-## Script emitted once per page
+## One instance per section
 
-The partial can render once for each section on the page, so the script is
-emitted once into the layout's shared `:page_scripts` region rather than
-inline, with the same reasoning and guard pattern as `shared/_ai_review`'s
-script. The `[data-duck-thread]:not([data-duck-wired])` guard lets the single
-copy wire every instance, whichever render emitted it.
+The partial can render once for each section on the page, and each render is
+its own `duck-thread` controller instance with its own thread. Stimulus
+connects every element carrying the controller, so there is no once-per-page
+script to emit and no already-wired guard to keep. That guard, and the
+`:page_scripts` region the script used to be emitted into, are gone.
 
-## Speaker label
+## Everything the controller needs is on the element
 
-Each turn carries a visually hidden speaker label. Otherwise the speaker shows
-only through CSS colour, which assistive tech, and anyone not perceiving
-colour, never receives. Hiding it visually leaves the styled transcript
-unchanged.
+A controller is an ES module, so it cannot read a translation or a route
+helper. Every server-side string the thread shows — the failure sentence, the
+thinking line, the cap line, both speaker labels — and the endpoint, the turn
+cap and the Explain button's fixed message are rendered as Stimulus values on
+the wrapper. The repetition per section is the cost of the values being read
+where they are used rather than from a global.
 
-## refreshCap
+## Selecting one thread
 
-`refreshCap` runs after every send attempt, successful or not, and after
-Clear. It is the single place that decides whether the input stays usable, so
-the in-flight lock set before a fetch and the cap reached after one always end
-in the same resting state.
-
-It writes the status only when the cap is reached. It used to clear the status
-otherwise, and because it runs in `sendMessage`'s `finally`, that wiped every
-error message right after the `catch` set it, so failures were silent. Callers
-that want the status cleared clear it themselves.
-
-## sendMessage
-
-An explicit message, the Explain button's, bypasses the input entirely. An
-empty input box is the normal case for it, not a reason to do nothing.
+The wrapper no longer carries `data-duck-thread` or `data-section`: the
+controller name and its section value say both. A browser spec picks one
+thread out with `.duck-thread[data-duck-thread-section-value='…']`.

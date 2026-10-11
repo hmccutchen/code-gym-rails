@@ -143,7 +143,7 @@ RSpec.describe "section rendering", type: :request do
               expect(response.body).to include(%(name="response[answers][#{key}]"))
               expect(response.body).to include(%(data-rating-for="#{key}"))
               expect(response.body).to include(%(data-hint-for="#{key}"))
-              expect(response.body).to include(%(data-section="#{key}"))
+              expect(response.body).to include(%(data-duck-thread-section-value="#{key}"))
               expect(response.body).to include(PAYLOADS.fetch(key)["teaching_note"])
             end
           end
@@ -169,7 +169,7 @@ RSpec.describe "section rendering", type: :request do
             keys.each do |key|
               expect(response.body).not_to include(%(name="response[answers][#{key}]"))
               expect(response.body).not_to include(%(data-rating-for="#{key}"))
-              expect(response.body).not_to include(%(data-section="#{key}"))
+              expect(response.body).not_to include(%(data-duck-thread-section-value="#{key}"))
             end
           end
         end
