@@ -74,3 +74,16 @@ the click landed before that controller connected. So `submit()` awaits
 `CodeGymBootstrap.ready`, which resolves once every controller on the page
 has connected and the early-edit recorder has been settled. The click is
 deferred, never dropped.
+
+`ready` is not proof that they connected, though. It gives up after a timeout
+(`app/javascript/application.js`) so that an early edit cannot stay pending
+for the life of the page, and a module that fails to load or takes longer than
+that would then leave its hidden field stale. So once `ready` settles,
+`submit()` checks every controller inside the form itself. If any is missing,
+it posts nothing, shows `dashboard.exercise.controls_not_ready` in the save
+banner and gives the form back. The check covers every controller in the form,
+not only the ones that write a hidden field, because a module that never
+arrived means the page needs a reload either way. A later click submits once
+the module has connected. `spec/system/deferred_module_spec.rb` answers the
+missing comparison module with a 404 and expects the stale pick to stay
+unsubmitted.

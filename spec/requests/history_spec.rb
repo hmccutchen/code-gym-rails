@@ -238,7 +238,7 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      expect(response.body.scan('data-controller="follow-ups"').size).to be > 1
+      expect(response.body.scan('data-controller="follow-ups"').size).to eq(3)
       expect(response.body.scan(%(data-controller="glossary code-lines mermaid")).size).to eq(1)
     end
 

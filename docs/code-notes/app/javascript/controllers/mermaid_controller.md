@@ -31,6 +31,13 @@ diagram is removed.
 If the CDN cannot be reached there is no renderer for any of them, so each
 container is removed rather than left showing raw diagram source.
 
+## The import is pinned exactly
+
+The version is pinned, not `@11`, so a Mermaid release cannot change behavior
+without a deliberate bump. SRI and CSP hardening for this CDN import is a known
+gap, deferred to its own PR, because enabling a CSP interacts with every
+inline script in the app.
+
 ## Known limit
 
 `connect` returns when no container is present, so a diagram inserted into the

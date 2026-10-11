@@ -217,6 +217,15 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(response.body).to include(%(data-push-enable-vapid-key-value="public"))
     end
 
+    it "renders the enable button disabled until its controller connects" do
+      configure_vapid
+      login_as(user)
+
+      get account_path
+
+      expect(Nokogiri::HTML(response.body).at_css("#push-enable")["disabled"]).not_to be_nil
+    end
+
     # fetch resolves for a 4xx and follows a logged-out redirect to a 200, so both must count as failure.
     it "treats a rejected or redirected enrolment as a failure, not a success" do
       configure_vapid

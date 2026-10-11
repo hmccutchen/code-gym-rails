@@ -18,10 +18,13 @@ export default class extends Controller {
     failedText: String
   }
 
+  // The button renders disabled: a click before connect would be lost, and the permission request cannot be replayed.
   connect() {
-    if (push.supported()) return
+    if (push.supported()) {
+      this.buttonTarget.disabled = false
+      return
+    }
 
-    this.buttonTarget.disabled = true
     this.say(this.isApplePortable ? this.homeScreenOnlyTextValue : this.unsupportedTextValue)
   }
 

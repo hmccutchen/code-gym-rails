@@ -2,8 +2,9 @@
 
 ## What it owns
 
-The Account page's inline name field: the save on blur, the confirmation or
-error line, and reverting the field when a save is refused.
+The name field in the global navigation bar, on every signed-in page: the
+save on blur, the confirmation or error line, and reverting the field when a
+save is refused.
 
 ## It saves through the queue, not a bare request
 

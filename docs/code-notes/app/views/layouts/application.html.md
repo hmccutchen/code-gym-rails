@@ -336,115 +336,28 @@ win. The light palette's `media` attribute is
 `DisplayPreferences#light_palette_media`, the same value the brand logo's
 `<source>` and the light `theme-color` carry.
 
-## Name editor script
+## Page behavior
 
-The autosave is an inline script because the conversion to Stimulus
-controllers (#357) has not reached it yet; the answer autosave in
-`dashboard/_exercise` follows the same convention for now. Copy still
-comes from I18n, and the CSRF token comes from the meta tag.
+Every behavior this layout used to carry as an inline script is now a
+Stimulus controller, mounted by a `data-controller` attribute: `nav-menu`,
+`name-editor`, `time-zone` and `loading-form`, plus `glossary code-lines
+mermaid` on `<body>`. Each controller's reasoning lives in its own note under
+`docs/code-notes/app/javascript/controllers/`, so it is not restated here. No
+view renders into `:page_scripts` any more; the `yield` is an empty slot.
 
-## Time-zone detection script
-
-It is one-shot: the script renders only while the user's zone is unset, so it
-never overwrites a later manual choice. It posts the browser's IANA zone.
-
-## Nav menu toggle script
-
-The panel's collapsed state is CSS, so above the breakpoint the button is
-gone and `data-open` means nothing. Nothing in the script has to undo itself
-on a resize.
-
-## Loading-form script
-
-This gives loading feedback for plain form POSTs. Turbo JS is not loaded, so
-`button_to` forms are full-page submissions and Turbo attributes
-(`turbo_confirm`, `turbo_submits_with`) are inert; any feedback or
-confirmation must be wired here. A form opts in with `data-loading-form`.
-`data-confirm-message` gates submission behind a native confirm, and
-`data-loading-label` is the in-flight button label.
-
-`button_to`, with Rails 8's `button_to_generates_button_tag` default, renders a
-`<button>` rather than an `<input>`. The two need different properties for
-their label, so the script reads and writes whichever is present.
-
-Disabling the button is deferred a tick, because disabling it synchronously
-inside the submit handler can cancel the submission in some browsers.
-
-A bfcache Back-restore would bring the page back mid-loading, with the button
-dead until a manual reload. The review button handles the same hazard. The
-`pageshow` handler resets the button to idle.
-
-## Glossary tooltip script
-
-Hover reveals the definition on desktop through CSS alone, gated to real-hover
-pointers. Tap toggles it on touch, since hover has no equivalent there.
-Enter and Space toggle it the same way for keyboard users, matching the
-`tabindex="0"` the terms render with and the `:focus-visible` reveal rule. One
-delegated listener per event type handles every `.gloss-term` on the page,
-whichever partial rendered it, matching the loading-form script's delegation.
-It is cheap and unconditional: there is no CDN fetch, so it needs no
-presence-gated dedup partial the way Mermaid does.
-
-`:focus-visible` and `:hover` reveal the panel through CSS alone, without ever
-toggling `.gloss-open`, so those paths have to be measured too. The width cap
-bounds the panel but does not keep it on screen.
-
-## Script partials and `:page_scripts`
-
-`:page_scripts` collects per-page scripts that would otherwise be duplicated
-once per rendered partial instance (for example `shared/_ai_review` and
-`shared/_mermaid_diagram` on /history). Those partials emit into this region
-exactly once per request, however many times they render.
-
-`shared/_push_script` defines `window.CodeGymPush` and, for a user who has
-reminders on, re-subscribes this browser on launch. It renders ahead of
-`:page_scripts` on purpose, because the Account page's enable button binds
-against the global defined there.
+## The two shared modules
 
 `javascript_importmap_tags` in `<head>` loads `code_gym/request` and
-`code_gym/save_status`, which `application.js` also puts on `window` for the
-inline page scripts still to be converted. Module scripts are deferred, so
-they run after the document is parsed and before `DOMContentLoaded`, which is
-*later* than any inline classic script. An inline script that reaches either
-global before its own first user event therefore has to wait for
-`DOMContentLoaded`.
-
-Four shapes reach a global before the modules run. A top-level call does (the
-one-shot time-zone detection higher up this file). So does a timer started at parse time
-(`dashboard/_generating`'s first poll). So does an async chain started at
-parse time, even though no global is read on the first line:
-`shared/_push_script`'s re-subscribe reaches `window.CodeGymRequest` only
-after the service worker is ready, which is usually but not always slower than
-a module fetch, and its failure is swallowed on purpose. Those three wait for
-`DOMContentLoaded` at the call site.
-
-The two `CodeGymSaveStatus.watch` registrations in `dashboard/_exercise` and
-`api_keys/edit` are also top-level calls, but they must not wait. Each probe
-reports a delayed save the page is holding, and pull-to-refresh reloads once
-`pending()` is false, so a probe registered at `DOMContentLoaded` would leave an
-edit made while the modules load uncounted and let a pull reload over it. The
-bootstrap below records a probe synchronously, so both register at parse time.
-
-The fourth is a handler bound at parse time and fired by a user, and an
-earlier version of this note had it wrong: it said a click cannot land before
-the page has rendered, which confuses rendering with the modules executing.
-The browser paints and accepts input while it is still parsing, and a deferred
-module runs only after parsing ends, so a gesture in that window reaches an
-undefined global. On the dashboard that strands the day: the submit handler
-calls `preventDefault`, sets the form `inert` and disables the button before
-awaiting `CodeGymRequest.send`, so the `ReferenceError` skips the restore
-block and leaves no native submission behind.
-`spec/system/deferred_module_spec.rb` holds that window open and drives it.
-
-`code_gym_bootstrap.js` is what covers it, loaded as a blocking classic asset
-immediately before the importmap tags, so it runs during parse. It installs
-stubs on both globals that queue each call and hand back a promise;
-`application.js` calls `CodeGymBootstrap.flush()` after assigning the real
-modules, which replays the queue in order. One file covers every call site,
-which matters because #357's step 3 deletes those sites anyway; the file goes
-with them, once `data-action` makes the race impossible rather than handled.
-`docs/code-notes/app/assets/javascripts/code_gym_bootstrap.md` has the stub's
-surface and the reasoning behind it.
+`code_gym/save_status`, and `application.js` also puts both on `window`,
+because the system specs drive them from `execute_script`, which cannot import
+a module. Module scripts are deferred, so they run after parsing ends. No
+inline script reaches either global now, and controllers bind through
+Stimulus's own lifecycle, so the gap that remains between a painted page and a
+connected controller is an edit made before connect.
+`code_gym_bootstrap.js`, a blocking classic asset loaded just before the
+importmap tags, publishes both names at parse time and records such an edit;
+`docs/code-notes/app/assets/javascripts/code_gym_bootstrap.md` has the
+details.
 
 The two sentences those modules show are rendered onto `<body>` as data
 attributes, because a module cannot read a translation.

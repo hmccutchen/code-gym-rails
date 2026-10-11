@@ -10,6 +10,7 @@ RSpec.describe "The nav name editor", type: :system do
   it "keeps text typed while a save is in flight" do
     visit_as(user)
     expect(page).to have_css("#nav-name-input", visible: :all)
+    wait_for_js
 
     result = run(<<~JS)
       const original = window.fetch;

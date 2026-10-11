@@ -20,7 +20,7 @@
            t("dashboard.exercise.regenerate_confirm_with_progress") :
            t("dashboard.exercise.regenerate_confirm") %>
       <%= button_to t("dashboard.exercise.regenerate"), regenerate_path, method: :post,
-            class: "btn btn-ghost btn-sm",
+            class: "btn btn-ghost btn-sm", disabled: true,
             form: { data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore",
                             loading_form_label_value: t("dashboard.generating_label"),
                             loading_form_confirm_message_value: confirm_msg } } %>
@@ -29,7 +29,7 @@
 
   <% if response.persisted? && !response.reviewed? %>
     <%= button_to t("dashboard.exercise.start_over"), start_over_response_path(response), method: :delete,
-          class: "btn btn-ghost btn-sm",
+          class: "btn btn-ghost btn-sm", disabled: true,
           form: { data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore",
                           loading_form_label_value: t("dashboard.exercise.starting_over"),
                           loading_form_confirm_message_value: t("dashboard.exercise.start_over_confirm") } } %>
@@ -60,7 +60,8 @@
        data-answer-form-submit-label-value="<%= t("dashboard.exercise.submit") %>"
        data-answer-form-generating-review-value="<%= t("review.generating_label") %>"
        data-answer-form-submit-failed-value="<%= t("dashboard.exercise.submit_failed") %>"
-       data-answer-form-review-start-failed-value="<%= t("dashboard.exercise.review_start_failed") %>">
+       data-answer-form-review-start-failed-value="<%= t("dashboard.exercise.review_start_failed") %>"
+       data-answer-form-controls-not-ready-value="<%= t("dashboard.exercise.controls_not_ready") %>">
     <div class="progress-sticky">
       <div class="progress-bar">
         <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill" style="width:0%"></div>
