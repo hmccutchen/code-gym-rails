@@ -576,7 +576,13 @@ class ModelComparison
     _, result = ReviewGrading.grade_section(section, context: provider.day_context.call(coach, exercise, response), user: response.user,
                                             exercise: exercise, response: response, coach: coach, provider: provider)
 
-    result[:ok] ? result[:review] : "#{result[:error_code]}: #{result[:message]}"
+    result[:ok] ? result[:review] : failed_grade(result)
+  end
+
+  def failed_grade(result)
+    kind    = [ result[:failure], ("from #{result[:provider]}" if result[:provider]) ].compact.join(" ")
+    details = [ kind, ("quota #{result[:quota_id]}" if result[:quota_id]), ("retry after #{result[:retry_after]}s" if result[:retry_after]) ]
+    "#{result[:error_code]}: #{details.compact.join(", ")}"
   end
 
   def review_heading(response, section)
