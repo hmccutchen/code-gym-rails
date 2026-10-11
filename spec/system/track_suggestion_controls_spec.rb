@@ -36,6 +36,20 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     expect(user.track_proposals_answered).to eq(1)
   end
 
+  it "reports no failed save when Apply moves the last junior kind up and ends the track" do
+    user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels.transform_values { "senior" }.merge("code_review" => "junior"))
+    [ 2, 1, 0 ].each { |ago| reviewed_day(Date.current - ago) }
+    visit_as(user)
+    expect(page).to have_css("#track-proposal", text: "Move Code Review up to senior?")
+
+    within("#track-proposal") { click_button "Apply" }
+
+    expect(page).to have_css("#track-proposal", text: "Done. Your next sets use the new level.")
+    wait_for_saves
+    expect(user.reload.learning_track).to eq("none")
+    expect(page).to have_css("#save-status", visible: :hidden)
+  end
+
   it "counts a dismissed proposal" do
     own_proposal(answered: 0)
 

@@ -106,13 +106,14 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       expect(user.reload.track_proposals_answered).to eq(2)
     end
 
-    it "is not found for an account off the track" do
+    it "counts nothing for an account off the track, without refusing" do
       user = create_user_with_key
       login_as(user)
 
       post learning_track_answer_path, params: {}.to_json, headers: json
 
-      expect(response).to have_http_status(:not_found)
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)).to eq("answered" => 0)
       expect(user.reload.track_proposals_answered).to eq(0)
     end
   end
