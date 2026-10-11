@@ -138,7 +138,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     end
   end
 
-  it "counts a slider moved while the modules are still loading as pending, then saves it" do
+  it "holds a slider save made while the modules are still loading, then replays it" do
     watch_page_errors
     visit_as(user)
     visit setup_path
@@ -154,6 +154,13 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
         })()
       JS
       expect(pending).to be(true)
+
+      held_by_stub = pw.evaluate(<<~JS)
+        new Promise((resolve) => setTimeout(() => resolve(
+          window.CodeGymBootstrap.ready === undefined && window.CodeGymSaveStatus.queued("exercise_mix")
+        ), 1000))
+      JS
+      expect(held_by_stub).to be(true)
     end
 
     wait_for { user.reload.section_kind_weights == { "challenge" => 0.25 } }

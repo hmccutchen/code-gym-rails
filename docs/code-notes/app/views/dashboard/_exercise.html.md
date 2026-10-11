@@ -30,8 +30,9 @@ through fetch.
 `data-controller="answer-form"` wraps the progress bar and the form, since the
 two sit beside each other in the markup;
 `docs/code-notes/app/javascript/controllers/answer_form_controller.md` covers
-why the form is a target, why the submit button starts disabled, and why the
-input, change and rating listeners are delegated actions. The IIFE the inline
+why the form is a target, why the submit button is `type="button"` rather
+than a submit button, and why the input, change and rating listeners are
+delegated actions. The IIFE the inline
 script needed is gone with it.
 
 ## staleReloaded
