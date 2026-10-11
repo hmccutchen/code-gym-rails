@@ -116,10 +116,31 @@ compared with its `defaultValue` and a checkbox or radio with its
 states and the group lock before saving, since none of that ran while the
 modules were loading.
 
+`comparison_answer_controller` and `name_editor_controller` follow the same
+rule. The name field is the one that showed the race is not confined to a
+stalled asset: its controller used to read `value` on connect, so a name typed
+and blurred in the ordinary load gap was captured as the already-saved value
+and never sent. Reading `defaultValue` instead makes the typed name a
+difference the controller saves.
+
 A controller with no such check leaves its field unsaved until the user touches
 it again, which is the pre-#357 behaviour for every control that had no inline
 listener, so this is a per-controller decision rather than something the
 bootstrap can do for everyone.
+
+## The data-js-ready marker
+
+`application.js` sets `data-js-ready` on `<html>` in the same `then` that
+settles the recorder, after `application.start()` resolves. Controllers connect
+during `start()`, so a connect-time save is queued before the early flag
+clears, and the attribute appearing means both have happened.
+
+It exists because `visit` returns on the document's `load` event, which can
+precede Stimulus connecting. A spec that drove a converted control straight
+after `visit` was racing that gap, and won or lost depending on what ran
+before it. `wait_for_js` in `spec/support/system_test_helper.rb` waits on the
+attribute, which is the same shape as the existing `data-parsons-wired` and
+`data-sortable-done` markers. Nothing in the app reads it.
 
 ## Why this shape
 
@@ -143,8 +164,12 @@ activation untouched.
 The stub surface is transitional. #357's step 3 converts the last inline page
 script to a Stimulus controller, at which point `data-action` binds through
 Stimulus's own lifecycle and nothing reaches the globals during parse any more.
-The two `window.*` aliases in `application.js` go at the same time, and the
-stubs go with them.
+The two `window.*` aliases in `application.js` stay, though, which reverses
+what step 3 planned: about fifteen system specs drive the modules through
+those names inside `execute_script` and `wait_for_function`, which run in a
+classic context that cannot import an ES module. The stubs stay with them,
+since the bootstrap publishes both names at parse time and the modules have to
+take the same names over at flush.
 
 The early-edit recorder stays. It is not about inline scripts at all — it is
 about the gap between a parsed page and a loaded module, which no amount of

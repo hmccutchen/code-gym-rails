@@ -213,6 +213,29 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(errors).to be_empty
   end
 
+  # A name typed and blurred before the controller connects is only saved if connect adopts it.
+  it "adopts a name typed into the nav while the modules are still loading" do
+    watch_page_errors
+    visit_as(user)
+    visit setup_path
+    expect(page).to have_css("#nav-name-input", visible: :all)
+
+    reload_with_modules_stalled do |pw|
+      pw.evaluate(<<~JS)
+        (() => {
+          const input = document.getElementById("nav-name-input");
+          input.value = "Typed Early";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("blur"));
+        })()
+      JS
+    end
+
+    wait_for(20) { user.reload.name == "Typed Early" }
+    expect(user.reload.name).to eq("Typed Early")
+    expect(errors).to be_empty
+  end
+
   # The pick and the reason only reach the stored answer through the controller, so an early edit must be adopted.
   it "adopts a design comparison picked and explained while the modules are still loading" do
     reason = "Piece A keeps the retry bounded, which the stated requirement asks for."

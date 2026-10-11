@@ -54,11 +54,13 @@ RSpec.describe "Per-user timezone", type: :request do
   end
 
   describe "auto-detect + manual override UI" do
-    it "renders the detect-once script only when the zone is blank" do
+    it "mounts the detect-once controller only when the zone is blank" do
       blank = create_user_with_key(email: "blank@example.com", name: "Blank", time_zone: nil)
       login_as(blank)
       get root_path
-      expect(response.body).to include("resolvedOptions().timeZone")
+      expect(response.body).to include(%(data-controller="time-zone"))
+      expect(Rails.root.join("app/javascript/controllers/time_zone_controller.js").read)
+        .to include("resolvedOptions().timeZone")
     end
 
     it "does not render the detect script once a zone is set" do

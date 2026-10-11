@@ -471,9 +471,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     it "wires the loading-form contract with the confirm message" do
       create_exercise
       get root_path
-      expect(response.body).to include('data-loading-form="true"')
-      expect(response.body).to include('data-loading-label="Generating…"')
-      expect(response.body).to include("data-confirm-message")
+      expect(response.body).to include('data-controller="loading-form"')
+      expect(response.body).to include('data-loading-form-label-value="Generating…"')
+      expect(response.body).to include("data-loading-form-confirm-message-value")
     end
   end
 
@@ -511,8 +511,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).to include('id="nav-name-input"')
       expect(response.body).to include('value="Editable"')
-      expect(response.body).to include('CodeGymSaveStatus.queue("name", "PATCH", "' + profile_path + '"')
-      expect(response.body).to include('addEventListener("blur"')
+      expect(response.body).to include('data-controller="name-editor"')
+      expect(response.body).to include(%(data-name-editor-url-value="#{profile_path}"))
+      expect(response.body).to include("blur->name-editor#save")
     end
   end
 
@@ -595,8 +596,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       it "wires the weekend generate button as a loading form" do
         get root_path
-        expect(response.body).to include('data-loading-form="true"')
-        expect(response.body).to include('data-loading-label="Generating…"')
+        expect(response.body).to include('data-controller="loading-form"')
+        expect(response.body).to include('data-loading-form-label-value="Generating…"')
       end
     end
 
@@ -725,7 +726,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).to match(/<form[^>]*action="#{generate_path}"/)
       expect(response.body).to include(">Try again<")
-      expect(response.body).to include('data-loading-form="true"')
+      expect(response.body).to include('data-controller="loading-form"')
     end
   end
 
@@ -791,7 +792,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       get root_path
 
       expect(response.body).to include("This didn&#39;t quite land — try a different explanation")
-      expect(response.body).to include(%(data-url="#{explain_differently_concept_reference_path(reference)}"))
+      expect(response.body).to include(%(data-concept-alternates-url-value="#{explain_differently_concept_reference_path(reference)}"))
     end
 
     it "renders that control as a non-submitting button, since it sits inside #gym-form" do
@@ -1387,8 +1388,10 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("🗺️ Structure diagram")
       expect(response.body).to include("mermaid-diagram")
       expect(response.body).to include("flowchart TD")
-      expect(response.body).to include("mermaid@11.17.2")
-      expect(response.body).to match(/securityLevel:\s*["']strict["']/)
+      expect(response.body).to include("mermaid")
+      source = Rails.root.join("app/javascript/controllers/mermaid_controller.js").read
+      expect(source).to include("mermaid@11.17.2")
+      expect(source).to match(/securityLevel:\s*["']strict["']/)
 
       expect(response.body).to include('data-owns-details="1"')
     end
@@ -1405,7 +1408,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body.scan("🗺️ Structure diagram").size).to eq(3)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
-      expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
+      expect(response.body.scan(%(data-controller="glossary code-lines mermaid")).size).to eq(1)
     end
 
     it "renders no disclosure or script for a stored diagram MermaidSource refuses, as rows from before ingest checks can hold" do
@@ -1429,7 +1432,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).not_to include('class="mermaid-diagram"')
       expect(response.body).not_to include("🗺️ Structure diagram")
-      expect(response.body).not_to include("mermaid@11.17.2")
     end
 
     it "still shows every section's diagram, each collapsed, on a submitted day, where the questions are still on screen" do
@@ -1446,7 +1448,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("graph LR")
       expect(response.body.scan("🗺️ Structure diagram").size).to eq(3)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
-      expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
+      expect(response.body.scan(%(data-controller="glossary code-lines mermaid")).size).to eq(1)
     end
 
     it "renders collapsible code_review/pattern diagrams alongside architecture's non-collapsible one on the same page" do
@@ -1466,7 +1468,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       # Architecture's diagram is collapsible: false, so its tradeoffs summary is its only wrapper.
       expect(response.body.scan("🗺️ Structure diagram").size).to eq(2)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
-      expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
+      expect(response.body.scan(%(data-controller="glossary code-lines mermaid")).size).to eq(1)
     end
   end
 end

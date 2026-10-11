@@ -6,6 +6,7 @@ RSpec.describe "The shared request module", type: :system do
   before do
     visit_as(user)
     visit setup_path
+    wait_for_js
   end
 
   def run(script)

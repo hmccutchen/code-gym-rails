@@ -31,11 +31,14 @@ function controllersConnected() {
   })
 }
 
-// Aliases for the inline page scripts still to be converted; each goes once its last caller does.
+// The bootstrap publishes these two names at parse time, so the modules have to take the same names over.
 window.CodeGymRequest = request
 window.CodeGymSaveStatus = saveStatus
 window.CodeGymBootstrap.flush()
 // Stimulus imports each controller on its own, so start() resolving says nothing about any of them having connected.
 window.CodeGymBootstrap.ready = application.start()
   .then(controllersConnected)
-  .then(() => window.CodeGymBootstrap.settleEarlyEdits())
+  .then(() => {
+    window.CodeGymBootstrap.settleEarlyEdits()
+    document.documentElement.dataset.jsReady = "true"
+  })

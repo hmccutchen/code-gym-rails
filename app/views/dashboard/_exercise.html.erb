@@ -21,16 +21,18 @@
            t("dashboard.exercise.regenerate_confirm") %>
       <%= button_to t("dashboard.exercise.regenerate"), regenerate_path, method: :post,
             class: "btn btn-ghost btn-sm",
-            form: { data: { loading_form: true, loading_label: t("dashboard.generating_label"),
-                            confirm_message: confirm_msg } } %>
+            form: { data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore",
+                            loading_form_label_value: t("dashboard.generating_label"),
+                            loading_form_confirm_message_value: confirm_msg } } %>
     <% end %>
   </div>
 
   <% if response.persisted? && !response.reviewed? %>
     <%= button_to t("dashboard.exercise.start_over"), start_over_response_path(response), method: :delete,
           class: "btn btn-ghost btn-sm",
-          form: { data: { loading_form: true, loading_label: t("dashboard.exercise.starting_over"),
-                          confirm_message: t("dashboard.exercise.start_over_confirm") } } %>
+          form: { data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore",
+                          loading_form_label_value: t("dashboard.exercise.starting_over"),
+                          loading_form_confirm_message_value: t("dashboard.exercise.start_over_confirm") } } %>
   <% end %>
 </div>
 

@@ -225,7 +225,7 @@ its own in landscape.
 `CodeHighlight` renders each line as a `.code-line` and sets `--indent` to its
 leading columns. The first line starts at column 0 and keeps its own spaces; a
 wrapped continuation starts two columns past that indentation.
-`shared/_code_lines_script` marks a block that wraps, and its alignment padding
+`code_lines_controller` marks a block that wraps, and its alignment padding
 then shows as one space while the rest stays in the text, so a copy keeps the
 original line.
 
