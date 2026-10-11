@@ -18,7 +18,8 @@ export default class extends Controller {
     submitLabel: String,
     generatingReview: String,
     submitFailed: String,
-    reviewStartFailed: String
+    reviewStartFailed: String,
+    controlsNotReady: String
   }
 
   connect() {
@@ -175,6 +176,10 @@ export default class extends Controller {
 
     // A kind whose answer only reaches the hidden field through its own controller would otherwise submit the stale one.
     await window.CodeGymBootstrap?.ready
+    if (!this.formControllersConnected()) {
+      saveStatus.report("submit", this.controlsNotReadyValue)
+      return this.unlock()
+    }
 
     const result = await request.send("POST", this.formTarget.action, this.payload({ submit: "1" }), { fallback: this.submitFailedValue })
     const reviewUrl = result.ok ? result.data?.review_url : null
@@ -200,11 +205,21 @@ export default class extends Controller {
       saveStatus.report("submit", result.message)
     }
 
+    this.unlock()
+    if (refused) this.nudgeTarget.focus()
+  }
+
+  formControllersConnected() {
+    return [...this.formTarget.querySelectorAll("[data-controller]")].every((element) =>
+      element.dataset.controller.split(/\s+/).filter(Boolean).every((identifier) =>
+        this.application.getControllerForElementAndIdentifier(element, identifier)))
+  }
+
+  unlock() {
     this.formTarget.inert = false
     this.submitButtonTarget.classList.remove("btn-loading")
     this.submitButtonTarget.textContent = this.submitLabelValue
     this.submitButtonTarget.disabled = false
     this.autoSave()
-    if (refused) this.nudgeTarget.focus()
   }
 }

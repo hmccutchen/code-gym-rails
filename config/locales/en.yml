@@ -351,6 +351,7 @@ en:
       submit_failed: "Couldn't submit your answers — please try again."
       stale_reloaded: "The set changed, so that last change wasn't saved. This is the current set — your saved work is still there."
       review_start_failed: "Your answers were saved, but the review couldn't start. Start it again with the button below your answers."
+      controls_not_ready: "Part of this page didn't finish loading, so your answers weren't submitted. Reload the page and submit again."
   learn:
     preparing_limited: "You've started several write-ups in the last hour. Try again later."
     title: "Learn"

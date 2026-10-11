@@ -992,9 +992,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   Parsons stores `"order:…"`. The kind owns `parse_answer`, `encode_answer`
   and `answered?`: a valid pick and a reason of at least
   `MIN_REASON_LENGTH` (40) characters. The form is a radio fieldset and a
-  labelled textarea; an inline script in
-  `responses/answers/_design_comparison` writes them into the hidden
-  `data-field` textarea, which saves like any other answer; the server's
+  labelled textarea; the `comparison-answer` Stimulus controller writes
+  them into the hidden `data-field` textarea, which saves like any other answer; the server's
   reply says whether it counts, as for every kind. `review_context` decodes the
   answer ("Picked: B. Reason: …") and hands the grader the key; the grading
   note names the main point and essential pieces, caps a matching pick with
