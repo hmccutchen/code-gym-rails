@@ -98,6 +98,45 @@ RSpec.describe "PWA", type: :request do
     end
   end
 
+  describe "the bottom tab bar" do
+    let(:layout) { Rails.root.join("app/views/layouts/application.html.erb").read }
+    let(:standalone_block) { layout[/@media \(display-mode: standalone\) \{(.*?)\n    \}/m, 1] }
+
+    it "is shown only from inside the app's one standalone-mode media query" do
+      expect(standalone_block).to include("body .tab-bar { display: flex; }")
+      expect(layout.scan(/^\s*[^{}\n]*\.tab-bar \{[^}]*display: (\w+)/).flatten).to eq(%w[flex none])
+    end
+
+    it "replaces the collapsed menu while it shows" do
+      expect(standalone_block).to include("body nav .nav-toggle, body nav .nav-links, body nav .nav-links[data-open] { display: none; }")
+    end
+
+    it "lets the page reach under the home indicator, so the bar can pad itself clear of it" do
+      get login_path
+
+      expect(response.body).to include("viewport-fit=cover")
+      expect(layout).to include("env(safe-area-inset-bottom)")
+    end
+
+    it "keeps the page column clear of a landscape notch, which viewport-fit=cover lets content reach" do
+      ViewStyles.rules(layout).select { |rule| rule.selectors == [ ".container" ] }.each do |rule|
+        padding = [ rule.declaration("padding"), rule.declaration("padding-inline") ].compact.join(" ")
+        expect(padding).to include("env(safe-area-inset-left)").and include("env(safe-area-inset-right)")
+      end
+    end
+  end
+
+  describe "section slot accents" do
+    let(:rules) { ViewStyles.rules(Rails.root.join("app/views/layouts/application.html.erb").read) }
+
+    it "colors only the exercise sections, never the dashboard panels and admin cards that share .section" do
+      plain = rules.select { |rule| rule.selectors.include?(".section") }
+
+      expect(plain.map(&:declarations).join).not_to include("slot-accent")
+      expect(rules.find { |rule| rule.selectors == [ ".section[data-slot]" ] }.declaration("--slot-accent")).to eq("var(--slot-1)")
+    end
+  end
+
   describe "the pull-to-refresh indicator" do
     let(:layout) { Rails.root.join("app/views/layouts/application.html.erb").read }
     let(:standalone_block) { layout[/@media \(display-mode: standalone\) \{(.*?)\n    \}/m, 1] }

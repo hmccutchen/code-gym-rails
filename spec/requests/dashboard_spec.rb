@@ -1503,7 +1503,7 @@ RSpec.describe "Dashboard section folding", type: :request do
     get root_path
 
     expect(response.body).not_to include('<details class="section"')
-    expect(response.body).to include('<div class="section">')
+    expect(response.body).to include('<div class="section" data-slot="1">')
   end
 end
 

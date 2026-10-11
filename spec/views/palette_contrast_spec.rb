@@ -103,6 +103,19 @@ RSpec.describe "palette contrast" do
       end
     end
 
+    it "keeps every section slot's accent at 4.5:1 or more, since it colors the label and the toggles" do
+      %w[slot-1 slot-2 slot-3 slot-4].each do |name|
+        result = ratios(vars.fetch(name), "surface" => vars["surface"], "code" => code_background)
+        expect(result.values).to all(be >= 4.5), "#{name}: #{result.inspect}"
+      end
+    end
+
+    it "keeps nav link text at 4.5:1 or more on the raised pill that marks the current page" do
+      %w[muted text].each do |name|
+        expect(contrast(vars[name], vars.fetch("surface-raised"))).to be >= 4.5
+      end
+    end
+
     it "keeps --muted visibly dimmer than body text" do
       expect(contrast(vars["text"], vars["muted"])).to be >= 1.5
     end
