@@ -48,6 +48,10 @@ the browser and the server can't disagree about what counts, and the rules
 aren't published to the page. The cost is that progress, the hint lock, the
 status lines and the nudge follow the latest save, not each keystroke.
 
+The status lines come as text, `section_statuses`, rendered by
+`SectionStatusHelper#section_status`, so the page holds no copy of the status
+rule either; it only puts each string where it belongs.
+
 A reply is applied only when no newer save is waiting (`saveTimer === null`,
 and no save queued behind it), so a reply to an older draft can't flip the page
 back while the engineer is still typing. That includes a rating's checkmark:

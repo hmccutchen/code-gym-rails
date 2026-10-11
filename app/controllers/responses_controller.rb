@@ -255,7 +255,10 @@ class ResponsesController < ApplicationController
     end
   end
 
-  def submit_state = { answered_sections: @response.answered_sections, submit_blocker: @response.submit_blocker }
+  def submit_state
+    { answered_sections: @response.answered_sections, submit_blocker: @response.submit_blocker,
+      section_statuses: @response.section_keys.index_with { |key| helpers.section_status(@response, key) } }
+  end
 
   def render_save_result(saved)
     respond_to do |format|

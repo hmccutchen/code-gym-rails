@@ -45,7 +45,7 @@
       function syncHiddenField(list) {
         const ids = [...list.querySelectorAll(".parsons-block")].map(li => li.dataset.blockId);
         const textarea = list.parentElement.querySelector('textarea[data-field="parsons_problem"]');
-        textarea.value = "order:" + ids.join(",");
+        textarea.value = <%= ExerciseSection::ParsonsProblem::ANSWER_PREFIX.to_json.html_safe %> + ids.join(",");
         textarea.dispatchEvent(new Event("input", { bubbles: true }));
         textarea.dispatchEvent(new Event("change", { bubbles: true }));
       }

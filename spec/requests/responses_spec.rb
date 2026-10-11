@@ -529,11 +529,13 @@ RSpec.describe "Responses", type: :request do
     it "reports on every autosave which sections count and what still blocks submitting" do
       post responses_path, params: { response: { answers: { code_review: "A substantive answer", pattern: "short" } } }, as: :json
 
-      expect(response.parsed_body).to include("answered_sections" => [ "code_review" ], "submit_blocker" => "unrated")
+      expect(response.parsed_body).to include("answered_sections" => [ "code_review" ], "submit_blocker" => "unrated",
+                                              "section_statuses" => { "code_review" => "in progress", "pattern" => "" })
 
       post responses_path, params: { response: { section_ratings: { code_review: "right_level" } } }, as: :json
 
-      expect(response.parsed_body).to include("answered_sections" => [ "code_review" ], "submit_blocker" => nil)
+      expect(response.parsed_body).to include("answered_sections" => [ "code_review" ], "submit_blocker" => nil,
+                                              "section_statuses" => { "code_review" => "✓ just right", "pattern" => "" })
     end
 
     it "refuses a submit that answers nothing, saving nothing and enqueuing nothing" do
@@ -542,8 +544,8 @@ RSpec.describe "Responses", type: :request do
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.parsed_body).to eq("status" => "error", "errors" => [ "Answer at least one section to finish up." ],
-                                         "answered_sections" => [], "submit_blocker" => "unanswered")
+      expect(response.parsed_body).to include("status" => "error", "errors" => [ "Answer at least one section to finish up." ],
+                                              "answered_sections" => [], "submit_blocker" => "unanswered")
       expect(user.daily_responses).to be_empty
     end
 

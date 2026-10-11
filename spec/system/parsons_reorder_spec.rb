@@ -170,6 +170,22 @@ RSpec.describe "Parsons reorder controls", type: :system do
     end
   end
 
+  it "saves a move at once, without waiting out the typing delay", with_csrf: true do
+    travel_to(weekday) do
+      visit_seeded_dashboard(cdn: :loaded)
+      page.execute_script(<<~JS)
+        const originalSetTimeout = window.setTimeout;
+        window.setTimeout = (callback, delay, ...rest) => delay === 800 ? 0 : originalSetTimeout(callback, delay, ...rest);
+      JS
+
+      find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(%i[control down])
+
+      Timeout.timeout(10) do
+        sleep 0.05 until user.daily_responses.reload.first&.answers&.dig("parsons_problem") == "order:0,2,1"
+      end
+    end
+  end
+
   it "reloads when a save is refused because the problem changed under the page" do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)
