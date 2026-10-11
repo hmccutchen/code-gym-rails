@@ -2016,7 +2016,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   the correct order and every move already saves. The kind's control supplies
   `data-answer-complete`, initially computed by the server and updated on
   interaction; the shared browser gate reads that state without knowing the
-  kind. Prose controls still share the server's threshold and scaffold labels.
+  kind. The browser's copies of the prose, design comparison, submit-gate and
+  section-status rules live in one place, `window.CodeGymAnswerRules`
+  (`shared/_answer_rules`), with every constant rendered in from Ruby, and
+  `spec/system/answer_rules_parity_spec.rb` runs one table of cases through
+  each rule on both sides.
   Progress, hint gating, history, mastery and generation all ask the same
   completion authority.
 
@@ -3178,6 +3182,7 @@ always pull in the full suite — is stated once, in
 - `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
 - `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
+- `app/views/shared/_answer_rules.html.erb` — defines `window.CodeGymAnswerRules`, the browser's copy of the answer, submit-gate and section-status rules; rendered at the top of `dashboard/_exercise`, and held to the Ruby rules by `spec/system/answer_rules_parity_spec.rb`
 - `app/views/shared/_server_message.html.erb` — defines `window.CodeGymServerMessage`: what a page script may show when a request fails, the app's own sentence or the page's fallback
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives

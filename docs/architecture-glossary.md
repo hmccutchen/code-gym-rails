@@ -27,3 +27,9 @@ mastery (`app/services/response_review.rb`). Its reasoning is in
 The review fan-out and the rules applied to each graded section
 (`app/services/review_grading.rb`). Its reasoning is in
 `docs/code-notes/app/services/review_grading.md`.
+
+## CodeGymAnswerRules
+
+The browser's copy of the answer, submit-gate and section-status rules
+(`app/views/shared/_answer_rules.html.erb`), held to the Ruby rules by a parity
+spec. Its reasoning is in `docs/code-notes/app/views/shared/_answer_rules.html.md`.

@@ -41,10 +41,13 @@ own.
 
 ## Answer completion
 
-Non-prose controls supply their own completion state through
-`data-answer-complete`. Prose shares the server's threshold
-(`DailyResponse::ANSWER_MIN_LENGTH`) and scaffold labels instead of restating
-either.
+Every control supplies its completion state through `data-answer-complete`,
+and this script reads nothing else. Prose fields carry `data-prose-answer`; on
+load and on each input the script sets their flag from
+`CodeGymAnswerRules.proseAnswered`, so a value the browser restores on back
+navigation still counts. The submit gate and the section status line come
+from the same rules object, which `spec/system/answer_rules_parity_spec.rb`
+holds to the Ruby rules.
 
 ## autoSave
 
