@@ -392,9 +392,11 @@
     .section-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--slot-accent, var(--accent-text)); margin-bottom: .95rem; }
     details.section > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
     details.section > summary::-webkit-details-marker { display: none; }
-    details.section > summary::before, details.ref summary::before, details.hint summary::before { content: ""; display: inline-block; flex-shrink: 0; width: .45rem; height: .45rem; margin-inline: .1rem .5rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-25%) rotate(45deg); transition: transform .2s; }
+    details.section > summary::before, details.ref summary::before, details.hint summary::before,
+    details.review summary::before, details.answers summary::before, details.progress-group summary::before { content: ""; display: inline-block; flex-shrink: 0; width: .45rem; height: .45rem; margin-inline: .1rem .5rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-25%) rotate(45deg); transition: transform .2s; }
     details.section > summary::before { align-self: center; margin-inline-end: .15rem; }
-    details.section:not([open]) > summary::before, details.ref:not([open]) summary::before, details.hint:not([open]) summary::before { transform: rotate(-45deg); }
+    details.section:not([open]) > summary::before, details.ref:not([open]) summary::before, details.hint:not([open]) summary::before,
+    details.review:not([open]) summary::before, details.answers:not([open]) summary::before, details.progress-group:not([open]) summary::before { transform: rotate(-45deg); }
     details.section:not([open]) > summary { margin-bottom: 0; }
     details.section > summary { padding-block: 12.5px; margin-top: -12.5px; margin-bottom: calc(.95rem - 12.5px); }
     details.section:not([open]) > summary { margin-bottom: -12.5px; }
@@ -477,7 +479,7 @@
     .submitted-badge { display: inline-block; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: .2rem .6rem; font-size: .8rem; font-weight: 600; }
     .answer-display { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .9rem; white-space: pre-wrap; overflow-wrap: anywhere; }
     .review-section { margin-top: 1.5rem; }
-    .history-pill { border: 1px solid var(--border); border-radius: 4px; padding: .15rem .5rem; font-size: .85rem; color: var(--muted); }
+    .history-pill { border: 1px solid var(--border); border-radius: 999px; padding: .15rem .5rem; font-size: .85rem; color: var(--muted); }
 
     .name-editor-input {
       background: transparent;
@@ -516,11 +518,10 @@
     .progress-legend dt { display: inline; font-weight: 600; color: var(--text); }
     .progress-legend dd { display: inline; margin: 0 0 0 .3rem; }
     .progress-note { font-size: .8rem; color: var(--muted); margin-bottom: 1.5rem; }
-    details.progress-group { border: 1px solid var(--border); border-radius: 6px; padding: .6rem .9rem; margin-bottom: .6rem; }
+    details.progress-group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .6rem .9rem; margin-bottom: .6rem; }
     details.progress-group summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
     details.progress-group summary::-webkit-details-marker { display: none; }
-    details.progress-group summary::before { content: "▶"; color: var(--accent-text); font-size: .8rem; }
-    details.progress-group[open] summary::before { content: "▼"; }
+    details.progress-group summary::before { color: var(--accent-text); margin-inline-end: 0; }
     .progress-group-name { font-weight: 600; min-width: 9rem; }
     .rung-principal_engineer, .rung-developing_principal_engineer { --rung: #7c6af7; }
     .rung-senior, .rung-developing_senior { --rung: #22c55e; }
@@ -579,7 +580,8 @@
     @media (prefers-reduced-motion: reduce) {
       .spinner, .btn-loading::before, .pull-refresh.is-refreshing .spinner { animation: none; }
       .pull-refresh.is-settling, .pull-settling { transition: none; }
-      nav .nav-links a, .btn, details.section > summary::before, details.ref summary::before, details.hint summary::before { transition: none; }
+      nav .nav-links a, .btn, details.section > summary::before, details.ref summary::before, details.hint summary::before,
+      details.review summary::before, details.answers summary::before, details.progress-group summary::before { transition: none; }
       .btn:not(:disabled):active, .rating-btn:active { transform: none; }
     }
   </style>
