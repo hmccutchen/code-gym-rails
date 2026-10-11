@@ -679,6 +679,7 @@ en:
     menu: "Menu"
     skip_to_content: "Skip to content"
     history: "History"
+    settings: "Settings"
     account: "Account"
   review_mailer:
     send_review:
@@ -698,7 +699,6 @@ en:
     show:
       title: "Account"
       log_out: "Log out"
-      settings: "Settings"
       paused: "Automatic generation is paused (since %{date})."
       resume: "Resume automatic generation"
       active: "Automatic generation is active."

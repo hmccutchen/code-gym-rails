@@ -111,7 +111,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_130000) do
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.string "review_provider"
-    t.index ["daily_exercise_id"], name: "index_daily_responses_on_daily_exercise_id"
+    t.index ["daily_exercise_id"], name: "index_daily_responses_on_daily_exercise_id", unique: true
     t.index ["user_id", "date"], name: "index_daily_responses_on_user_id_and_date", unique: true
     t.index ["user_id"], name: "index_daily_responses_on_user_id"
   end

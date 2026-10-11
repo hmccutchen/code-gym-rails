@@ -13,7 +13,16 @@ RSpec.describe "Accounts", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("dev@example.com")
       expect(response.body).to include("Log out")
-      expect(response.body).to include(setup_path)
+    end
+
+    it "reaches Settings from the nav, not from the Account page itself" do
+      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+
+      get account_path
+
+      page = Nokogiri::HTML(response.body)
+      expect(page.css("nav .nav-links a").map { |link| [ link.text, link["href"] ] }).to include([ "Settings", setup_path ])
+      expect(page.css("main a[href='#{setup_path}']")).to be_empty
     end
 
     # Without that skip a keyless user is bounced to /setup and cannot log out.

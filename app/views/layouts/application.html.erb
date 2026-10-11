@@ -79,7 +79,7 @@
     nav .name-editor { display: flex; align-items: center; min-width: 0; }
     nav .nav-toggle { display: none; }
 
-    @container (max-width: 37.5em) {
+    @container (max-width: 40em) {
       nav .nav-toggle {
         display: flex; flex-direction: column; justify-content: center; gap: 4px;
         width: 44px; height: 44px; padding: 0 11px; flex-shrink: 0;
@@ -477,6 +477,7 @@
         <%= link_to t("learn.title"), learn_path %>
         <%= link_to t("progress.title"), progress_path %>
         <%= link_to t("nav.history"), history_path %>
+        <%= link_to t("nav.settings"), setup_path %>
         <%= link_to t("nav.account"), account_path %>
       </div>
       <script>

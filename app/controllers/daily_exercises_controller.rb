@@ -31,7 +31,7 @@ class DailyExercisesController < ApplicationController
     exercise = current_user.daily_exercises.for_date.first
     return redirect_to root_path, alert: t("flash.daily_exercises.nothing_to_regenerate") unless exercise
 
-    blocker = exercise.current_response&.replace_blocker
+    blocker = exercise.daily_response&.replace_blocker
     return redirect_to root_path, alert: t(REGENERATION_BLOCKED.fetch(blocker)) if blocker
 
     claim = exercise.claim_regenerating!(regenerated_at: nil)

@@ -62,4 +62,25 @@ RSpec.describe "Mobile nav menu", type: :system do
     expect(page).to have_link("History", visible: :visible)
     expect(page).to have_no_css("#nav-toggle", visible: :visible)
   end
+
+  [ "100", "140" ].each do |text_size|
+    it "fits every link in the row just above the width where it collapses, at #{text_size}% text" do
+      user = create_fake_provider_user
+      user.update!(display_preferences: { "text_size" => text_size })
+      visit_as(user)
+      visit learn_path
+
+      narrowest_row = (320..1400).step(10).find { |width|
+        page.current_window.resize_to(width, 800)
+        page.has_no_css?("#nav-toggle", visible: :visible, wait: 0)
+      }
+      page.current_window.resize_to(narrowest_row, 800)
+
+      expect(page).to have_link("Settings", visible: :visible)
+      overflow = page.evaluate_script(<<~JS)
+        [document.querySelector("nav .inner"), document.documentElement].map(el => el.scrollWidth - el.clientWidth)
+      JS
+      expect(overflow).to eq([ 0, 0 ])
+    end
+  end
 end
