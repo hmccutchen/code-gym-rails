@@ -4,8 +4,10 @@ The policy that makes the Stimulus convention enforceable. Before it, "put page
 behavior in a controller" was a habit a reviewer had to catch; now an inline
 `<script>`, `on*` handler or `javascript:` URL is dead code in the browser,
 and `spec/conventions/app_views_spec.rb` fails on one before it ever ships.
-The handler check matches a list of DOM event names rather than any `on…`
-word, so a helper option such as `only:` is not mistaken for one.
+The handler check matches any `on…` attribute or helper key, since the policy
+refuses every inline handler whatever its event, and it skips the few Ruby
+option words that start the same way (`only:`, `once:`, `one:`, `online`,
+`onboarding`) so a helper option is not mistaken for one.
 
 ## `script-src`
 

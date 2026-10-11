@@ -6,8 +6,7 @@ RSpec.describe "Conventions held over app/views" do
   def relative(path) = Pathname(path).relative_path_from(Rails.root).to_s
 
   def inline_handler
-    event = "on(?:click|dblclick|change|input|submit|reset|load|error|focus|blur|scroll|resize|toggle|drop|" \
-            "key[a-z]+|mouse[a-z]+|pointer[a-z]+|touch[a-z]+|drag[a-z]*|beforeunload|unload)"
+    event = "on(?!(?:ly|ce|e|line|boarding)\\b)[a-z]+"
     /(?<![\w-])#{event}(?:\s*=|"?:)\s*["']|["']\s*javascript:/i
   end
 
@@ -46,7 +45,10 @@ RSpec.describe "Conventions held over app/views" do
     expect(%(button_tag "Go", onclick: "go()")).to match(inline_handler)
     expect(%(tag.div "data-x": 1, "onchange": "go()")).to match(inline_handler)
     expect(%(<a href="javascript:void(0)">)).to match(inline_handler)
+    expect(%(<div onanimationend="go()">)).to match(inline_handler)
+    expect(%(tag.div onwheel: "go()")).to match(inline_handler)
     expect(%(render "x", only: "y")).not_to match(inline_handler)
+    expect(%(link_to "x", path, once: "y")).not_to match(inline_handler)
     expect(%(<div data-action="click->x#go">)).not_to match(inline_handler)
   end
 end
