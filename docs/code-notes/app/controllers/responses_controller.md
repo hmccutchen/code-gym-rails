@@ -17,28 +17,6 @@ Derived from the caps rather than set as a flat number. A flat byte limit
 rejected honest threads written in multi-byte characters, and it fell behind
 when the reply token cap was raised.
 
-## `#review`
-
-The claim makes a second click back off instead of making a second provider
-call. The action releases it with its own token on every exit that still owns
-it, an unexpected error included, so a review that overran its window can't
-clear the claim of the one that took over.
-
-## `#store_review`
-
-Re-checks the claim under the response lock before writing anything. A review
-that overran its window may find another review has taken the claim over; it
-then writes neither grades nor mastery and leaves the claim alone, because the
-review that now holds it will grade the same sections. Without the check both
-would record mastery for the same answers.
-
-The missing sections are counted again after the row is reloaded under the claim:
-another request may have finished the last section between the first check
-and the claim.
-
-The response is locked before the results are written, because `#start_over`
-or `RegenerateExerciseJob` can destroy the row during the provider call.
-
 ## `#explain_differently`
 
 Synchronous: the caller posts through `fetch` and appends the reply in place.
@@ -137,39 +115,10 @@ Returns nil because callers read a falsy value as "already handled", and
 The section is checked against the problem set. Without that, a crafted param
 could write arbitrary keys into the jsonb columns.
 
-## `#clear_stale_generation_error!`
-
-A reviewed day can't be regenerated, so an earlier regeneration error would
-otherwise ask for a retry that is impossible.
-
-## `#log_review_diagnostics`
-
-Pairs the AI and self ratings per section, to read beside
-`AiService#log_difficulty_diagnostics`. Remove it once that question is
-settled.
-
-It logs `daily_exercise.date` rather than `response.date`, because the
-response's date can fall a day after the generation event it correlates with.
-
-## `#log_pseudocode_review_diagnostics`
-
-The counterpart to `AiService#log_pseudocode_critique`. It logs counts and
-flags only, never pseudocode or critique text.
-
-## `#graded_missed`
-
-The prose judge may have merged the stored missed points, so this reads the
-grader's originals under `graded_prose` when they exist.
-
 ## `#review_failure_text`
 
 A fan-out usually fails every section the same way. When it doesn't, the most
 common failure kind is the one worth explaining.
-
-## `#stored_review_failure`
-
-Uses the section's own failure time, since the review as a whole waits for its
-slowest section.
 
 ## `#exercise_concept_tags`
 

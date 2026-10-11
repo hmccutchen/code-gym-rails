@@ -29,49 +29,18 @@ class ResponsesController < ApplicationController
 
   # POST /responses/:id/review
   def review
-    return redirect_to root_path, alert: t("flash.responses.not_submitted") unless @response.submitted?
+    outcome = ResponseReview.new(@response, user: current_user).call
 
-    missing = @response.section_keys - Array(@response.ai_review&.keys)
-    return redirect_to review_anchor, notice: t("flash.responses.already_reviewed") if missing.empty?
-
-    claim = @response.claim_reviewing!
-    return redirect_to root_path, alert: t("flash.responses.review_already_running") unless claim
-
-    @response.reload
-    missing = @response.section_keys - Array(@response.ai_review&.keys)
-    if missing.empty?
-      @response.release_reviewing!(claim)
-      return redirect_to review_anchor, notice: t("flash.responses.already_reviewed")
+    case outcome.status
+    when :not_submitted    then redirect_to root_path, alert: t("flash.responses.not_submitted")
+    when :already_reviewed then redirect_to review_anchor, notice: t("flash.responses.already_reviewed")
+    when :busy             then redirect_to root_path, alert: t("flash.responses.review_already_running")
+    when :set_cleared      then redirect_to root_path, alert: t("flash.responses.set_cleared_during_review")
+    when :provider_error   then redirect_to root_path, alert: provider_failure_text(outcome.error, :review).full
+    when :ready            then redirect_to review_anchor, notice: t("flash.responses.review_ready")
+    when :partial          then redirect_to review_anchor, notice: partial_review_notice(outcome)
+    when :failed           then redirect_to root_path, alert: review_failure_text(outcome.failures, :review).full
     end
-
-    first_batch = @response.ai_review.blank?
-    results = AiService.for(current_user).review_sections(current_user, @response.daily_exercise, @response, sections: missing)
-    successes = results.select { |_, r| r[:ok] }
-    failures  = results.reject { |_, r| r[:ok] }
-
-    unless store_review(claim, successes, failures, first_batch: first_batch)
-      return redirect_to root_path, alert: t("flash.responses.review_already_running")
-    end
-    @response.release_reviewing!(claim)
-    clear_stale_generation_error! if successes.any?
-    log_review_diagnostics(@response, successes.keys) if successes.any?
-
-    if failures.empty?
-      redirect_to review_anchor, notice: t("flash.responses.review_ready")
-    elsif successes.any?
-      redirect_to review_anchor, notice: t("flash.responses.review_partial", reviewed: successes.size, total: missing.size,
-                                             reason: review_failure_text(failures, :review_partial).brief)
-    else
-      redirect_to root_path, alert: review_failure_text(failures, :review).full
-    end
-  rescue ActiveRecord::RecordNotFound
-    redirect_to root_path, alert: t("flash.responses.set_cleared_during_review")
-  rescue AiService::Error => e
-    @response.release_reviewing!(claim) if claim
-    redirect_to root_path, alert: provider_failure_text(e, :review).full
-  rescue StandardError
-    @response.release_reviewing!(claim) if claim
-    raise
   end
 
   # DELETE /responses/:id/start_over
@@ -420,43 +389,9 @@ class ResponsesController < ApplicationController
     render json: { status: "error", error: message }, status: :unprocessable_content
   end
 
-  def clear_stale_generation_error!
-    current_user.clear_stale_generation_error!
-  end
-
-  def log_review_diagnostics(response, sections)
-    payload = {
-      event: "review",
-      user_id: response.user_id,
-      date: response.daily_exercise.date.to_s,
-      sections: sections.index_with { |section|
-        { ai_rating: response.ai_rating_for(section), self_rating: response.self_rating_for(section) }
-      }
-    }
-
-    Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
-    log_pseudocode_review_diagnostics(response, sections)
-  end
-
-  def log_pseudocode_review_diagnostics(response, sections)
-    section = ExerciseSection::PseudocodeToCode.key
-    return unless sections.include?(section)
-
-    critiqued = response.critiqued?(section)
-    gaps      = ExerciseSection::PseudocodeToCode.normalize_critique(response.pseudocode_round(section)["critique"]).size
-    missed    = DailyResponse.review_points(graded_missed(response.ai_review&.dig(section))).size
-
-    Rails.logger.info(
-      "[pseudocode] user=#{response.user_id} date=#{response.daily_exercise.date} phase=review " \
-      "critiqued=#{critiqued} gaps=#{gaps} missed=#{missed} " \
-      "disagreement=#{critiqued && gaps.zero? && missed.positive?}"
-    )
-  end
-
-  def graded_missed(review)
-    return nil unless review.is_a?(Hash)
-
-    review.dig(ReviewProseVerdict::ORIGINAL_KEY, "missed") || review["missed"]
+  def partial_review_notice(outcome)
+    t("flash.responses.review_partial", reviewed: outcome.successes.size, total: outcome.missing.size,
+                                        reason: review_failure_text(outcome.failures, :review_partial).brief)
   end
 
   def review_failure_text(failures, surface)
@@ -465,28 +400,6 @@ class ResponsesController < ApplicationController
     ProviderFailureText.new(kind, provider: example[:provider] || current_user.provider, surface: surface,
                             failed_at: example[:failed_at] || Time.current, zone: current_user.effective_time_zone,
                             retry_after: example[:retry_after], variant: ProviderFailureText.variant_for(current_user))
-  end
-
-  def store_review(claim, successes, failures, first_batch:)
-    ActiveRecord::Base.transaction do
-      @response.lock!
-      next false unless @response.reviewing_since == claim
-
-      if successes.any?
-        @response.ai_review = (@response.ai_review || {}).merge(successes.transform_values { |r| r[:review] })
-        @response.review_provider = current_user.provider
-        ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_batch)
-      end
-      @response.review_errors = @response.review_errors
-                                          .except(*successes.keys)
-                                          .merge(failures.transform_values { |r| stored_review_failure(r) })
-      @response.save!
-    end
-  end
-
-  def stored_review_failure(result)
-    { "kind" => result[:failure], "provider" => result[:provider], "quota_id" => result[:quota_id],
-      "retry_after" => result[:retry_after], "at" => (result[:failed_at] || Time.current).iso8601 }.compact
   end
 
   def response_params
