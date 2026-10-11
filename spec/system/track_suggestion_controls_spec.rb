@@ -138,7 +138,8 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     visit setup_path
     fail_requests_to(profile_path)
 
-    uncheck "Suggest level changes"
+    # Not uncheck: the failed save can put the box back before Playwright confirms the click changed it.
+    find_field("Suggest level changes").click
     wait_for_saves
 
     expect(page).to have_checked_field("Suggest level changes")
