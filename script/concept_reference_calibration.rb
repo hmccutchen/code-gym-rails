@@ -41,7 +41,7 @@ class ConceptReferenceCalibration
     BUCKETS.flat_map do |bucket|
       vocabulary = ConceptBucket.vocabulary_for(bucket)
       picks      = vocabulary.first(CONCEPTS_PER_BUCKET)
-      tradeoff   = ((vocabulary & AiService::TRADEOFF_CONCEPTS) - picks).first
+      tradeoff   = ((vocabulary & ConceptVocabulary::TRADEOFF_CONCEPTS) - picks).first
       (picks + [ tradeoff ].compact).map { |concept| [ bucket, concept ] }
     end
   end

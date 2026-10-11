@@ -2,16 +2,7 @@
 class ConceptGroup
   CORE = "core".freeze
 
-  # A concept in two groups takes the first match, so the lookup stays total if the constants ever overlap.
-  NAMED = [
-    [ "data_modeling",      AiService::DATA_MODELING_CONCEPTS ],
-    [ "domain_modeling",    AiService::DOMAIN_MODELING_CONCEPTS ],
-    [ "silent_correctness", AiService::SILENT_CORRECTNESS_CONCEPTS ],
-    [ "meta_skill",         AiService::META_SKILL_CONCEPTS ],
-    [ "code_smell",         AiService::CODE_SMELL_CONCEPTS ],
-    [ "oo_design",          AiService::OO_DESIGN_CONCEPTS ],
-    [ "module_design",      AiService::MODULE_DESIGN_CONCEPTS ]
-  ].freeze
+  NAMED = ConceptVocabulary::GROUPS.map { |key, concepts| [ key.to_s, concepts ] }.freeze
 
   ORDER = ([ CORE ] + NAMED.map(&:first)).freeze
 

@@ -36,7 +36,7 @@ RSpec.describe DailyPlan do
     it "releases the fourth slot after a skipped due check and leaves a not-yet-due repeat unchanged" do
       user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
-      first, second = AiService::PLAN_REVIEW_CONCEPTS.first(2)
+      first, second = ConceptVocabulary::PLAN_REVIEW_CONCEPTS.first(2)
       held = user.concept_masteries.create!(concept: first, language: "plan_review",
         mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 20)
       other = user.concept_masteries.create!(concept: second, language: "plan_review",
@@ -89,7 +89,7 @@ RSpec.describe DailyPlan do
     end
 
     it "sees a high-ratio concept whose due date sorts it past a fixed 20-row fetch (issue #93)" do
-      (AiService::RAILS_CONCEPTS - %w[memoization]).first(20).each do |concept|
+      (ConceptVocabulary::RAILS_CONCEPTS - %w[memoization]).first(20).each do |concept|
         user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :standard,
                                        mastered_at: 6.months.ago, retention_interval_days: 90,
                                        next_retention_check_on: Date.current - 40)

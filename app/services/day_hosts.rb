@@ -17,6 +17,6 @@ class DayHosts
   private
 
   def vocabulary(kind)
-    @vocabularies[kind] ||= ProblemSetIngest.selectable_vocabulary_for(kind.key, @language, mode: @mode).to_set
+    @vocabularies[kind] ||= ConceptVocabulary.selectable_for_section(kind.key, @language, mode: @mode).to_set
   end
 end

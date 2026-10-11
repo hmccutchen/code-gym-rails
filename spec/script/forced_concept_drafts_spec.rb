@@ -44,19 +44,19 @@ RSpec.describe ForcedConceptDrafts do
     forced = described_class.new(concept)
 
     forced.with_concept do
-      expect(ProblemSetIngest.vocabulary_for(kind.key, "ruby_rails")).to include(concept)
-      expect(ProblemSetIngest.selectable_vocabulary_for(kind.key, "ruby_rails", rung: "junior")).to include(concept)
-      expect(ProblemSetIngest.selectable_vocabulary_for("code_review", "ruby_rails", mode: :application_code)).not_to include(concept)
+      expect(ConceptVocabulary.for_section(kind.key, "ruby_rails")).to include(concept)
+      expect(ConceptVocabulary.selectable_for_section(kind.key, "ruby_rails", rung: "junior")).to include(concept)
+      expect(ConceptVocabulary.selectable_for_section("code_review", "ruby_rails", mode: :application_code)).not_to include(concept)
     end
 
-    expect(ProblemSetIngest.vocabulary_for(kind.key, "ruby_rails")).not_to include(concept)
+    expect(ConceptVocabulary.for_section(kind.key, "ruby_rails")).not_to include(concept)
     expect(kind.hosted_concepts).not_to include(concept)
   end
 
   it "puts everything back when the block raises" do
     expect { described_class.new(concept).with_concept { raise "boom" } }.to raise_error("boom")
 
-    expect(ProblemSetIngest.vocabulary_for(kind.key, "ruby_rails")).not_to include(concept)
+    expect(ConceptVocabulary.for_section(kind.key, "ruby_rails")).not_to include(concept)
     expect(kind.hosted_concepts).not_to include(concept)
   end
 
@@ -77,7 +77,7 @@ RSpec.describe ForcedConceptDrafts do
       expect(out.string).to include("=== judge_concept: #{route[:model]}", "blind solve, #{route[:model]}:")
     end
     expect(out.string).not_to include("better", "answer_key", "deciding_fact")
-    expect(ProblemSetIngest.vocabulary_for(kind.key, "ruby_rails")).not_to include(concept)
+    expect(ConceptVocabulary.for_section(kind.key, "ruby_rails")).not_to include(concept)
   end
 
   it "judge_concept plans the drafts on the user's own day" do

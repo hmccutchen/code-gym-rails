@@ -33,6 +33,6 @@ class ConceptBucket
 
   # Raises on a miss rather than returning [], which a caller would read as "nothing is due".
   def self.vocabulary_for(bucket)
-    AiService::LANGUAGE_CONFIG.fetch(bucket).fetch(:concepts)
+    ConceptVocabulary.for_language(bucket)
   end
 end

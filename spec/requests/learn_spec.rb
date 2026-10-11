@@ -11,15 +11,15 @@ RSpec.describe "Learn", type: :request do
       get learn_path
 
       expect(response).to have_http_status(:ok)
-      AiService::RAILS_CONCEPTS.each { |concept| expect(response.body).to include(concept) }
+      ConceptVocabulary::RAILS_CONCEPTS.each { |concept| expect(response.body).to include(concept) }
     end
 
     it "lists every language-independent bucket's concepts" do
       user.update!(language: "ruby_rails")
       get learn_path
 
-      (AiService::ARCHITECTURE_CONCEPTS + AiService::PLAN_REVIEW_CONCEPTS +
-       AiService::AMBIGUITY_HUNT_CONCEPTS + AiService::PSEUDOCODE_TO_CODE_CONCEPTS).each do |concept|
+      (ConceptVocabulary::ARCHITECTURE_CONCEPTS + ConceptVocabulary::PLAN_REVIEW_CONCEPTS +
+       ConceptVocabulary::AMBIGUITY_HUNT_CONCEPTS + ConceptVocabulary::PSEUDOCODE_TO_CODE_CONCEPTS).each do |concept|
         expect(response.body).to include(concept)
       end
     end
@@ -188,7 +188,7 @@ RSpec.describe "Learn", type: :request do
 
   describe "heading coverage" do
     it "has a locale string for every bucket a user can browse" do
-      (AiService::LANGUAGE_CONFIG.keys).each do |bucket|
+      ConceptVocabulary.languages.each do |bucket|
         expect { I18n.t("learn.buckets.#{bucket}", raise: true) }.not_to raise_error
       end
     end
@@ -634,7 +634,7 @@ RSpec.describe "Learn", type: :request do
 
     it "enqueues only what remains after a partial run" do
       user.update!(section_kind_levels: { "security_review" => "senior" })
-      vocabulary = ProblemSetIngest.selectable_vocabulary_for("security_review", "ruby_rails")
+      vocabulary = ConceptVocabulary.selectable_for_section("security_review", "ruby_rails")
       ConceptReference.create!(concept: vocabulary.first, language: "ruby_rails",
                                ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
 

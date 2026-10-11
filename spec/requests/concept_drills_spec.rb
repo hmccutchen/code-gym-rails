@@ -78,7 +78,7 @@ RSpec.describe "Concept drills", type: :request do
       post learn_group_drill_path(bucket: "ruby_rails", group: "module_design")
 
       expect(response).to redirect_to(learn_path(anchor: "learn-group-ruby_rails-module_design"))
-      expect(AiService::MODULE_DESIGN_CONCEPTS.map { |c| row(c).drill_group }).to all(eq("module_design"))
+      expect(ConceptVocabulary::MODULE_DESIGN_CONCEPTS.map { |c| row(c).drill_group }).to all(eq("module_design"))
 
       delete learn_group_drill_path(bucket: "ruby_rails", group: "module_design")
 

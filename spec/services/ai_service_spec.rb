@@ -498,85 +498,6 @@ RSpec.describe AiService do
     end
   end
 
-  describe "RAILS_CONCEPTS" do
-    it "is a frozen 44-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(44)
-      expect(AiService::RAILS_CONCEPTS).to be_frozen
-      expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
-    end
-
-    it "includes the two Rails security concepts chosen for real depth" do
-      expect(AiService::RAILS_CONCEPTS).to include("mass_assignment_protection", "sql_injection_prevention")
-    end
-
-    it "includes the two test-analysis concepts added for code_review's occasional test-file variant" do
-      expect(AiService::RAILS_CONCEPTS).to include("over_mocking", "testing_implementation_not_behavior")
-    end
-
-    it "excludes secure_secrets_handling and dependency_vulnerability_management as poor fits for this app's format" do
-      expect(AiService::RAILS_CONCEPTS).not_to include("secure_secrets_handling", "dependency_vulnerability_management")
-    end
-  end
-
-  describe "JS_CONCEPTS" do
-    it "is a frozen 46-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(46)
-      expect(AiService::JS_CONCEPTS).to be_frozen
-      expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
-    end
-
-    it "includes the two JS security concepts chosen for real depth" do
-      expect(AiService::JS_CONCEPTS).to include("xss_prevention", "insecure_client_storage")
-    end
-
-    it "includes the two test-analysis concepts added for code_review's occasional test-file variant" do
-      expect(AiService::JS_CONCEPTS).to include("over_mocking", "testing_implementation_not_behavior")
-    end
-  end
-
-  describe "CODE_SMELL_CONCEPTS" do
-    it "names smells rather than the remedies the vocabularies already carry" do
-      expect(AiService::CODE_SMELL_CONCEPTS)
-        .to contain_exactly("god_object", "primitive_obsession", "shotgun_surgery", "feature_envy")
-      expect(AiService::CODE_SMELL_CONCEPTS).to be_frozen
-    end
-
-    it "is reachable from both language vocabularies" do
-      expect(AiService::RAILS_CONCEPTS).to include(*AiService::CODE_SMELL_CONCEPTS)
-      expect(AiService::JS_CONCEPTS).to include(*AiService::CODE_SMELL_CONCEPTS)
-    end
-  end
-
-  describe "OO_DESIGN_CONCEPTS" do
-    it "names the three principles that survived the depth and relevance filters" do
-      expect(AiService::OO_DESIGN_CONCEPTS)
-        .to contain_exactly("open_closed", "dependency_inversion", "composition_over_inheritance")
-      expect(AiService::OO_DESIGN_CONCEPTS).to be_frozen
-    end
-
-    it "is reachable from both language vocabularies" do
-      expect(AiService::RAILS_CONCEPTS).to include(*AiService::OO_DESIGN_CONCEPTS)
-      expect(AiService::JS_CONCEPTS).to include(*AiService::OO_DESIGN_CONCEPTS)
-    end
-
-    it "omits the candidates that duplicated an existing concept or failed the relevance filter" do
-      expect(AiService::RAILS_CONCEPTS).not_to include(
-        "single_responsibility", "program_to_interface", "encapsulate_what_varies",
-        "liskov_substitution", "interface_segregation"
-      )
-      expect(AiService::JS_CONCEPTS).not_to include(
-        "single_responsibility", "program_to_interface", "encapsulate_what_varies",
-        "liskov_substitution", "interface_segregation"
-      )
-    end
-
-    it "stays out of the language-agnostic vocabularies, so its references show real code" do
-      AiService::LANGUAGE_AGNOSTIC_VOCABULARIES.each do |vocabulary|
-        expect(vocabulary).not_to include(*AiService::OO_DESIGN_CONCEPTS)
-      end
-    end
-  end
-
   describe "#code_smell_naming_guidance" do
     let(:user) { User.create!(email: "smells@example.com", name: "Smells") }
     let(:service) { FakeService.new("fake-key") }
@@ -584,7 +505,7 @@ RSpec.describe AiService do
     it "names the group from the constant and asks for recognition, not a patch" do
       guidance = service.send(:code_smell_naming_guidance)
 
-      expect(guidance).to include(*AiService::CODE_SMELL_CONCEPTS)
+      expect(guidance).to include(*ConceptVocabulary::CODE_SMELL_CONCEPTS)
       expect(guidance).to match(/naming and locating/i)
     end
 
@@ -608,7 +529,7 @@ RSpec.describe AiService do
     let(:service) { FakeService.new("fake-key") }
 
     it "names the group from the constant" do
-      expect(service.send(:oo_design_violation_guidance)).to include(*AiService::OO_DESIGN_CONCEPTS)
+      expect(service.send(:oo_design_violation_guidance)).to include(*ConceptVocabulary::OO_DESIGN_CONCEPTS)
     end
 
     it "requires one findable violation the section can be graded against" do
@@ -633,7 +554,7 @@ RSpec.describe AiService do
       clause = service.send(:oo_design_violation_guidance)[/on a test-file code_review.*?(?=The challenge section)/m]
 
       expect(clause).to be_present
-      AiService::OO_DESIGN_CONCEPTS.each do |concept|
+      ConceptVocabulary::OO_DESIGN_CONCEPTS.each do |concept|
         expect(clause).to include(concept), "no test-file idiom for #{concept}"
       end
     end
@@ -650,38 +571,12 @@ RSpec.describe AiService do
     end
   end
 
-  describe "MODULE_DESIGN_CONCEPTS" do
-    it "names the three module-design shapes that survived the overlap filter" do
-      expect(AiService::MODULE_DESIGN_CONCEPTS)
-        .to contain_exactly("shallow_module", "pass_through_method", "temporal_decomposition")
-      expect(AiService::MODULE_DESIGN_CONCEPTS).to be_frozen
-    end
-
-    it "is reachable from both language vocabularies" do
-      expect(AiService::RAILS_CONCEPTS).to include(*AiService::MODULE_DESIGN_CONCEPTS)
-      expect(AiService::JS_CONCEPTS).to include(*AiService::MODULE_DESIGN_CONCEPTS)
-    end
-
-    it "omits the candidates that duplicated an existing concept" do
-      %w[information_leakage special_general_mixture].each do |cut|
-        expect(AiService::RAILS_CONCEPTS).not_to include(cut)
-        expect(AiService::JS_CONCEPTS).not_to include(cut)
-      end
-    end
-
-    it "stays out of the language-agnostic vocabularies, so its references show real code" do
-      AiService::LANGUAGE_AGNOSTIC_VOCABULARIES.each do |vocabulary|
-        expect(vocabulary).not_to include(*AiService::MODULE_DESIGN_CONCEPTS)
-      end
-    end
-  end
-
   describe "#module_design_depth_guidance" do
     let(:user) { User.create!(email: "modules@example.com", name: "Modules") }
     let(:service) { FakeService.new("fake-key") }
 
     it "names the group from the constant" do
-      expect(service.send(:module_design_depth_guidance)).to include(*AiService::MODULE_DESIGN_CONCEPTS)
+      expect(service.send(:module_design_depth_guidance)).to include(*ConceptVocabulary::MODULE_DESIGN_CONCEPTS)
     end
 
     it "requires one findable instance the section can be graded against" do
@@ -714,43 +609,12 @@ RSpec.describe AiService do
     end
   end
 
-  describe "SILENT_CORRECTNESS_CONCEPTS" do
-    it "names the four invariant defects that survived the overlap filter" do
-      expect(AiService::SILENT_CORRECTNESS_CONCEPTS)
-        .to contain_exactly("allocation_rounding", "semantic_input_validation",
-                            "cache_key_completeness", "deterministic_ordering")
-      expect(AiService::SILENT_CORRECTNESS_CONCEPTS).to be_frozen
-    end
-
-    it "is reachable from both language vocabularies" do
-      expect(AiService::RAILS_CONCEPTS).to include(*AiService::SILENT_CORRECTNESS_CONCEPTS)
-      expect(AiService::JS_CONCEPTS).to include(*AiService::SILENT_CORRECTNESS_CONCEPTS)
-    end
-
-    it "stays out of the language-agnostic vocabularies, so its references show real code" do
-      AiService::LANGUAGE_AGNOSTIC_VOCABULARIES.each do |vocabulary|
-        expect(vocabulary).not_to include(*AiService::SILENT_CORRECTNESS_CONCEPTS)
-      end
-    end
-
-    it "stays off the anti-shape list, so its reference keeps the remedy lens" do
-      expect(AiService::ANTI_SHAPE_CONCEPTS).not_to include(*AiService::SILENT_CORRECTNESS_CONCEPTS)
-    end
-
-    it "shares no entry with the fourth-slot or architecture vocabularies" do
-      [ AiService::ARCHITECTURE_CONCEPTS, AiService::PLAN_REVIEW_CONCEPTS,
-        AiService::AMBIGUITY_HUNT_CONCEPTS, AiService::PSEUDOCODE_TO_CODE_CONCEPTS ].each do |vocabulary|
-        expect(vocabulary & AiService::SILENT_CORRECTNESS_CONCEPTS).to be_empty
-      end
-    end
-  end
-
   describe "#silent_correctness_guidance" do
     let(:user) { User.create!(email: "invariants@example.com", name: "Invariants") }
     let(:service) { FakeService.new("fake-key") }
 
     it "names the group from the constant" do
-      expect(service.send(:silent_correctness_guidance)).to include(*AiService::SILENT_CORRECTNESS_CONCEPTS)
+      expect(service.send(:silent_correctness_guidance)).to include(*ConceptVocabulary::SILENT_CORRECTNESS_CONCEPTS)
     end
 
     it "requires code that runs clean and still answers wrongly" do
@@ -806,49 +670,49 @@ RSpec.describe AiService do
 
   describe "DOMAIN_MODELING_CONCEPTS" do
     it "names the two model-level concepts the four-book audit found uncovered" do
-      expect(AiService::DOMAIN_MODELING_CONCEPTS)
+      expect(ConceptVocabulary::DOMAIN_MODELING_CONCEPTS)
         .to contain_exactly("ubiquitous_language", "aggregate_boundaries")
-      expect(AiService::DOMAIN_MODELING_CONCEPTS).to be_frozen
+      expect(ConceptVocabulary::DOMAIN_MODELING_CONCEPTS).to be_frozen
     end
 
     it "is reachable from both language vocabularies" do
-      expect(AiService::RAILS_CONCEPTS).to include(*AiService::DOMAIN_MODELING_CONCEPTS)
-      expect(AiService::JS_CONCEPTS).to include(*AiService::DOMAIN_MODELING_CONCEPTS)
+      expect(ConceptVocabulary::RAILS_CONCEPTS).to include(*ConceptVocabulary::DOMAIN_MODELING_CONCEPTS)
+      expect(ConceptVocabulary::JS_CONCEPTS).to include(*ConceptVocabulary::DOMAIN_MODELING_CONCEPTS)
     end
 
     it "stays out of the language-agnostic vocabularies, so its references show real code" do
-      AiService::LANGUAGE_AGNOSTIC_VOCABULARIES.each do |vocabulary|
-        expect(vocabulary).not_to include(*AiService::DOMAIN_MODELING_CONCEPTS)
+      ConceptVocabulary::LANGUAGE_AGNOSTIC_VOCABULARIES.each do |vocabulary|
+        expect(vocabulary).not_to include(*ConceptVocabulary::DOMAIN_MODELING_CONCEPTS)
       end
     end
 
     it "stays off the anti-shape list, so its reference keeps the remedy lens" do
-      expect(AiService::ANTI_SHAPE_CONCEPTS).not_to include(*AiService::DOMAIN_MODELING_CONCEPTS)
+      expect(ConceptVocabulary::ANTI_SHAPE_CONCEPTS).not_to include(*ConceptVocabulary::DOMAIN_MODELING_CONCEPTS)
     end
 
     it "takes the failure-mode contrast rather than the tradeoff one" do
-      expect(AiService::TRADEOFF_CONCEPTS).not_to include(*AiService::DOMAIN_MODELING_CONCEPTS)
+      expect(ConceptVocabulary::TRADEOFF_CONCEPTS).not_to include(*ConceptVocabulary::DOMAIN_MODELING_CONCEPTS)
 
-      config = service.send(:config_for, "ruby_rails")
-      AiService::DOMAIN_MODELING_CONCEPTS.each do |concept|
-        prompt = service.send(:build_concept_reference_prompt, concept, config)
+      language = "ruby_rails"
+      ConceptVocabulary::DOMAIN_MODELING_CONCEPTS.each do |concept|
+        prompt = service.send(:build_concept_reference_prompt, concept, language)
 
         expect(prompt).to include("corrected version"), "#{concept} got the tradeoff contrast"
       end
     end
 
     it "shares no entry with the fourth-slot or architecture vocabularies" do
-      [ AiService::ARCHITECTURE_CONCEPTS, AiService::PLAN_REVIEW_CONCEPTS,
-        AiService::AMBIGUITY_HUNT_CONCEPTS, AiService::PSEUDOCODE_TO_CODE_CONCEPTS ].each do |vocabulary|
-        expect(vocabulary & AiService::DOMAIN_MODELING_CONCEPTS).to be_empty
+      [ ConceptVocabulary::ARCHITECTURE_CONCEPTS, ConceptVocabulary::PLAN_REVIEW_CONCEPTS,
+        ConceptVocabulary::AMBIGUITY_HUNT_CONCEPTS, ConceptVocabulary::PSEUDOCODE_TO_CODE_CONCEPTS ].each do |vocabulary|
+        expect(vocabulary & ConceptVocabulary::DOMAIN_MODELING_CONCEPTS).to be_empty
       end
     end
 
     it "shares no entry with the other shared language-vocabulary groups" do
-      [ AiService::DATA_MODELING_CONCEPTS, AiService::META_SKILL_CONCEPTS,
-        AiService::CODE_SMELL_CONCEPTS, AiService::OO_DESIGN_CONCEPTS,
-        AiService::MODULE_DESIGN_CONCEPTS, AiService::SILENT_CORRECTNESS_CONCEPTS ].each do |vocabulary|
-        expect(vocabulary & AiService::DOMAIN_MODELING_CONCEPTS).to be_empty
+      [ ConceptVocabulary::DATA_MODELING_CONCEPTS, ConceptVocabulary::META_SKILL_CONCEPTS,
+        ConceptVocabulary::CODE_SMELL_CONCEPTS, ConceptVocabulary::OO_DESIGN_CONCEPTS,
+        ConceptVocabulary::MODULE_DESIGN_CONCEPTS, ConceptVocabulary::SILENT_CORRECTNESS_CONCEPTS ].each do |vocabulary|
+        expect(vocabulary & ConceptVocabulary::DOMAIN_MODELING_CONCEPTS).to be_empty
       end
     end
   end
@@ -858,7 +722,7 @@ RSpec.describe AiService do
     let(:service) { FakeService.new("fake-key") }
 
     it "names the group from the constant" do
-      expect(service.send(:domain_modeling_guidance)).to include(*AiService::DOMAIN_MODELING_CONCEPTS)
+      expect(service.send(:domain_modeling_guidance)).to include(*ConceptVocabulary::DOMAIN_MODELING_CONCEPTS)
     end
 
     it "requires one specific findable instance rather than a topic to discuss" do
@@ -903,75 +767,40 @@ RSpec.describe AiService do
     end
   end
 
-  describe "TYPESCRIPT_FLAVORED_CONCEPTS" do
-    it "is a frozen 4-entry subset of JS_CONCEPTS" do
-      expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS.size).to eq(4)
-      expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS).to be_frozen
-      expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS - AiService::JS_CONCEPTS).to be_empty
-      expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS).to contain_exactly(
-        "generics", "type_guards_narrowing", "union_intersection_types", "mapped_conditional_types"
-      )
-    end
+  it "has prompt wording for exactly the languages ConceptVocabulary has lists for" do
+    expect(AiService::LANGUAGE_PROMPTS.keys).to match_array(ConceptVocabulary.languages)
   end
 
-  describe "DATA_MODELING_CONCEPTS" do
-    it "holds the five data-modeling concepts" do
-      expect(AiService::DATA_MODELING_CONCEPTS).to eq(%w[
-        missing_index wrong_cardinality missing_constraint
-        denormalization_tradeoffs unsafe_migration
-      ])
-    end
-
-    it "is frozen" do
-      expect(AiService::DATA_MODELING_CONCEPTS).to be_frozen
-    end
-
-    it "overlaps no other closed vocabulary" do
-      [ AiService::ARCHITECTURE_CONCEPTS, AiService::PLAN_REVIEW_CONCEPTS,
-        AiService::AMBIGUITY_HUNT_CONCEPTS, AiService::RAILS_SECURITY_CONCEPTS,
-        AiService::JS_SECURITY_CONCEPTS ].each do |other|
-        expect(AiService::DATA_MODELING_CONCEPTS & other).to be_empty
-      end
-    end
-
-    it "is folded into both language vocabularies, which stay frozen" do
-      expect(AiService::RAILS_CONCEPTS).to include(*AiService::DATA_MODELING_CONCEPTS)
-      expect(AiService::JS_CONCEPTS).to include(*AiService::DATA_MODELING_CONCEPTS)
-      expect(AiService::RAILS_CONCEPTS).to be_frozen
-      expect(AiService::JS_CONCEPTS).to be_frozen
-    end
-  end
-
-  describe "schema_artifact in LANGUAGE_CONFIG" do
+  describe "schema_artifact in LANGUAGE_PROMPTS" do
     it "names a per-language artifact for the two real languages" do
-      expect(AiService::LANGUAGE_CONFIG["ruby_rails"][:schema_artifact]).to eq("a Rails migration")
-      expect(AiService::LANGUAGE_CONFIG["javascript"][:schema_artifact])
+      expect(AiService::LANGUAGE_PROMPTS["ruby_rails"][:schema_artifact]).to eq("a Rails migration")
+      expect(AiService::LANGUAGE_PROMPTS["javascript"][:schema_artifact])
         .to eq("a Prisma schema change, with the migration it generates")
     end
 
     it "is absent for the pseudo-language buckets" do
       %w[architecture plan_review ambiguity_hunt].each do |bucket|
-        expect(AiService::LANGUAGE_CONFIG[bucket][:schema_artifact]).to be_nil
+        expect(AiService::LANGUAGE_PROMPTS[bucket][:schema_artifact]).to be_nil
       end
     end
   end
 
   describe "ARCHITECTURE_CONCEPTS" do
     it "is a frozen 15-entry language-independent vocabulary" do
-      expect(AiService::ARCHITECTURE_CONCEPTS.size).to eq(15)
-      expect(AiService::ARCHITECTURE_CONCEPTS).to be_frozen
-      expect(AiService::ARCHITECTURE_CONCEPTS).to include("service_boundaries", "failure_mode_design", "idempotency_at_scale")
+      expect(ConceptVocabulary::ARCHITECTURE_CONCEPTS.size).to eq(15)
+      expect(ConceptVocabulary::ARCHITECTURE_CONCEPTS).to be_frozen
+      expect(ConceptVocabulary::ARCHITECTURE_CONCEPTS).to include("service_boundaries", "failure_mode_design", "idempotency_at_scale")
     end
 
     it "is not mixed into any per-language generation vocabulary" do
-      expect(AiService::RAILS_CONCEPTS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
-      expect(AiService::JS_CONCEPTS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
+      expect(ConceptVocabulary::RAILS_CONCEPTS & ConceptVocabulary::ARCHITECTURE_CONCEPTS).to be_empty
+      expect(ConceptVocabulary::JS_CONCEPTS & ConceptVocabulary::ARCHITECTURE_CONCEPTS).to be_empty
     end
 
     it "carries the two complexity causes that duplicate no existing entry" do
-      expect(AiService::COMPLEXITY_CAUSE_CONCEPTS).to contain_exactly("cognitive_load", "unknown_unknowns")
-      expect(AiService::ARCHITECTURE_CONCEPTS).to include(*AiService::COMPLEXITY_CAUSE_CONCEPTS)
-      expect(AiService::ARCHITECTURE_CONCEPTS).not_to include("change_amplification")
+      expect(ConceptVocabulary::COMPLEXITY_CAUSE_CONCEPTS).to contain_exactly("cognitive_load", "unknown_unknowns")
+      expect(ConceptVocabulary::ARCHITECTURE_CONCEPTS).to include(*ConceptVocabulary::COMPLEXITY_CAUSE_CONCEPTS)
+      expect(ConceptVocabulary::ARCHITECTURE_CONCEPTS).not_to include("change_amplification")
     end
   end
 
@@ -988,9 +817,9 @@ RSpec.describe AiService do
     end
 
     it "is never mixed into any tracked concept vocabulary" do
-      expect(AiService::SCENARIO_DOMAINS & AiService::RAILS_CONCEPTS).to be_empty
-      expect(AiService::SCENARIO_DOMAINS & AiService::JS_CONCEPTS).to be_empty
-      expect(AiService::SCENARIO_DOMAINS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
+      expect(AiService::SCENARIO_DOMAINS & ConceptVocabulary::RAILS_CONCEPTS).to be_empty
+      expect(AiService::SCENARIO_DOMAINS & ConceptVocabulary::JS_CONCEPTS).to be_empty
+      expect(AiService::SCENARIO_DOMAINS & ConceptVocabulary::ARCHITECTURE_CONCEPTS).to be_empty
     end
   end
 
@@ -1001,8 +830,8 @@ RSpec.describe AiService do
       expect(pool).to be_frozen
       expect(pool).not_to be_empty
       expect(pool & AiService::SCENARIO_DOMAINS).to be_empty
-      [ AiService::RAILS_CONCEPTS, AiService::JS_CONCEPTS, AiService::ARCHITECTURE_CONCEPTS,
-        AiService::PLAN_REVIEW_CONCEPTS, AiService::AMBIGUITY_HUNT_CONCEPTS ].each do |vocabulary|
+      [ ConceptVocabulary::RAILS_CONCEPTS, ConceptVocabulary::JS_CONCEPTS, ConceptVocabulary::ARCHITECTURE_CONCEPTS,
+        ConceptVocabulary::PLAN_REVIEW_CONCEPTS, ConceptVocabulary::AMBIGUITY_HUNT_CONCEPTS ].each do |vocabulary|
         expect(pool & vocabulary).to be_empty
       end
     end
@@ -1024,15 +853,15 @@ RSpec.describe AiService do
 
   describe "#build_concept_reference_prompt (architecture)" do
     it "frames code_example as language-agnostic pseudocode for the architecture config" do
-      config = service.send(:config_for, "architecture")
-      prompt = service.send(:build_concept_reference_prompt, "service_boundaries", config)
+      language = "architecture"
+      prompt = service.send(:build_concept_reference_prompt, "service_boundaries", language)
       expect(prompt).to include("software architecture")
       expect(prompt.downcase).to include("pseudocode")
     end
 
     it "asks for the lesson's sections, from ConceptLesson, under the plain-language standard" do
-      config = service.send(:config_for, "ruby_rails")
-      prompt = service.send(:build_concept_reference_prompt, "idempotency", config)
+      language = "ruby_rails"
+      prompt = service.send(:build_concept_reference_prompt, "idempotency", language)
 
       expect(prompt).to include(%("lesson": #{JSON.generate(ConceptLesson.schema)}))
       expect(prompt).to include("under about #{ConceptLesson::WORD_TARGET} words")
@@ -1041,33 +870,33 @@ RSpec.describe AiService do
     end
 
     it "asks a tradeoff concept's lesson for options and what each costs" do
-      concept = AiService::TRADEOFF_CONCEPTS.first
-      config = service.send(:config_for, (DailyExercise::LANGUAGES + ConceptBucket::LANGUAGE_INDEPENDENT).find { |bucket| ConceptBucket.vocabulary_for(bucket).include?(concept) })
-      prompt = service.send(:build_concept_reference_prompt, concept, config)
+      concept = ConceptVocabulary::TRADEOFF_CONCEPTS.first
+      language = (DailyExercise::LANGUAGES + ConceptBucket::LANGUAGE_INDEPENDENT).find { |bucket| ConceptBucket.vocabulary_for(bucket).include?(concept) }
+      prompt = service.send(:build_concept_reference_prompt, concept, language)
 
       expect(prompt).to include("options a team can choose between")
       expect(prompt).not_to include("small habits or fixes")
     end
 
     it "still frames code_example as annotated language code for a normal language config" do
-      config = service.send(:config_for, "ruby_rails")
-      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", config)
+      language = "ruby_rails"
+      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", language)
       expect(prompt).to include("annotated Ruby/Rails code")
     end
 
     it "reframes senior_lens for a code smell, which is never a thing to reach for" do
-      config = service.send(:config_for, "ruby_rails")
-      prompt = service.send(:build_concept_reference_prompt, "god_object", config)
+      language = "ruby_rails"
+      prompt = service.send(:build_concept_reference_prompt, "god_object", language)
 
       expect(prompt).to include("how to catch it early")
       expect(prompt).not_to include("when to reach for it")
     end
 
     it "reframes senior_lens for a module-design shape, which is never a thing to reach for" do
-      config = service.send(:config_for, "ruby_rails")
+      language = "ruby_rails"
 
-      AiService::MODULE_DESIGN_CONCEPTS.each do |concept|
-        prompt = service.send(:build_concept_reference_prompt, concept, config)
+      ConceptVocabulary::MODULE_DESIGN_CONCEPTS.each do |concept|
+        prompt = service.send(:build_concept_reference_prompt, concept, language)
 
         expect(prompt).to include("how to catch it early"), "#{concept} got the remedy lens"
         expect(prompt).not_to include("when to reach for it")
@@ -1075,17 +904,17 @@ RSpec.describe AiService do
     end
 
     it "keeps the remedy framing for a design principle, which is a thing to reach for" do
-      config = service.send(:config_for, "ruby_rails")
-      prompt = service.send(:build_concept_reference_prompt, "open_closed", config)
+      language = "ruby_rails"
+      prompt = service.send(:build_concept_reference_prompt, "open_closed", language)
 
       expect(prompt).to include("when to reach for it")
     end
 
     it "reframes senior_lens for an architecture-level cause of complexity" do
-      config = service.send(:config_for, "architecture")
+      language = "architecture"
 
-      AiService::COMPLEXITY_CAUSE_CONCEPTS.each do |concept|
-        prompt = service.send(:build_concept_reference_prompt, concept, config)
+      ConceptVocabulary::COMPLEXITY_CAUSE_CONCEPTS.each do |concept|
+        prompt = service.send(:build_concept_reference_prompt, concept, language)
 
         expect(prompt).to include("how to catch it early"), "#{concept} got the remedy lens"
         expect(prompt).not_to include("when to reach for it")
@@ -1093,15 +922,15 @@ RSpec.describe AiService do
     end
 
     it "keeps the remedy framing for an architecture concept that names a decision" do
-      config = service.send(:config_for, "architecture")
-      prompt = service.send(:build_concept_reference_prompt, "caching_strategy", config)
+      language = "architecture"
+      prompt = service.send(:build_concept_reference_prompt, "caching_strategy", language)
 
       expect(prompt).to include("when to reach for it")
     end
 
     it "keeps the remedy framing for a concept that names a technique" do
-      config = service.send(:config_for, "javascript")
-      prompt = service.send(:build_concept_reference_prompt, "state_lifting", config)
+      language = "javascript"
+      prompt = service.send(:build_concept_reference_prompt, "state_lifting", language)
 
       expect(prompt).to include("when to reach for it")
     end
@@ -1109,8 +938,8 @@ RSpec.describe AiService do
 
   describe "#build_concept_reference_prompt (worked-example contrast)" do
     it "asks a defect-shaped concept for a failure-mode/corrected pair of the same scenario" do
-      config = service.send(:config_for, "ruby_rails")
-      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", config)
+      language = "ruby_rails"
+      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", language)
 
       expect(prompt).to include("two short")
       expect(prompt).to include("failure mode")
@@ -1118,26 +947,26 @@ RSpec.describe AiService do
     end
 
     it "requires the pair to be stated as a mechanism rather than an association" do
-      config = service.send(:config_for, "ruby_rails")
-      prompt = service.send(:build_concept_reference_prompt, "shallow_module", config)
+      language = "ruby_rails"
+      prompt = service.send(:build_concept_reference_prompt, "shallow_module", language)
 
       expect(prompt).to include("X causes Y")
       expect(prompt).to include("never merely that they are associated")
     end
 
     it "asks a tradeoff-shaped concept for two legitimate options, neither corrected" do
-      config = service.send(:config_for, "architecture")
-      prompt = service.send(:build_concept_reference_prompt, "caching_strategy", config)
+      language = "architecture"
+      prompt = service.send(:build_concept_reference_prompt, "caching_strategy", language)
 
       expect(prompt).to include("NEITHER is the corrected version")
       expect(prompt).not_to include("failure mode")
     end
 
     it "keeps the defect framing for an architecture concept that names a cause of complexity" do
-      config = service.send(:config_for, "architecture")
+      language = "architecture"
 
-      AiService::COMPLEXITY_CAUSE_CONCEPTS.each do |concept|
-        prompt = service.send(:build_concept_reference_prompt, concept, config)
+      ConceptVocabulary::COMPLEXITY_CAUSE_CONCEPTS.each do |concept|
+        prompt = service.send(:build_concept_reference_prompt, concept, language)
 
         expect(prompt).to include("corrected version"), "#{concept} got the tradeoff contrast"
         expect(prompt).not_to include("NEITHER is the corrected version")
@@ -1146,75 +975,42 @@ RSpec.describe AiService do
 
     it "gives a tradeoff-shaped data-modeling concept the tradeoff contrast in both languages" do
       %w[ruby_rails javascript].each do |language|
-        config = service.send(:config_for, language)
-        prompt = service.send(:build_concept_reference_prompt, "denormalization_tradeoffs", config)
+        prompt = service.send(:build_concept_reference_prompt, "denormalization_tradeoffs", language)
 
         expect(prompt).to include("NEITHER is the corrected version"), "#{language} got the defect contrast"
       end
     end
 
     it "keeps the defect contrast for the data-modeling concepts that name a flaw" do
-      config = service.send(:config_for, "ruby_rails")
+      language = "ruby_rails"
 
-      (AiService::DATA_MODELING_CONCEPTS - AiService::TRADEOFF_CONCEPTS).each do |concept|
-        prompt = service.send(:build_concept_reference_prompt, concept, config)
+      (ConceptVocabulary::DATA_MODELING_CONCEPTS - ConceptVocabulary::TRADEOFF_CONCEPTS).each do |concept|
+        prompt = service.send(:build_concept_reference_prompt, concept, language)
 
         expect(prompt).to include("corrected version"), "#{concept} got the tradeoff contrast"
       end
     end
 
     it "asks for the pair in pseudocode on a language-agnostic config and in real code otherwise" do
-      agnostic = service.send(:build_concept_reference_prompt, "service_boundaries", service.send(:config_for, "architecture"))
-      language = service.send(:build_concept_reference_prompt, "n_plus_one", service.send(:config_for, "ruby_rails"))
+      agnostic = service.send(:build_concept_reference_prompt, "service_boundaries", "architecture")
+      language = service.send(:build_concept_reference_prompt, "n_plus_one", "ruby_rails")
 
       expect(agnostic).to include("two short pseudocode fragments")
       expect(language).to include("two short Ruby/Rails fragments")
     end
 
     it "still states a bound on the worked example's length" do
-      config = service.send(:config_for, "ruby_rails")
-      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", config)
+      language = "ruby_rails"
+      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", language)
 
       expect(prompt).to include("At most the two fragments plus four sentences of prose")
     end
   end
 
-  describe "TRADEOFF_CONCEPTS" do
-    it "excludes the architecture concepts that name a cause of complexity rather than a decision" do
-      expect(AiService::TRADEOFF_CONCEPTS & AiService::COMPLEXITY_CAUSE_CONCEPTS).to be_empty
-    end
-
-    it "is disjoint from every anti-shape concept" do
-      expect(AiService::TRADEOFF_CONCEPTS & AiService::ANTI_SHAPE_CONCEPTS).to be_empty
-    end
-
-    it "names only concepts that exist in a tracked vocabulary" do
-      tracked = AiService::RAILS_CONCEPTS + AiService::JS_CONCEPTS + AiService::ARCHITECTURE_CONCEPTS
-      expect(AiService::TRADEOFF_CONCEPTS - tracked).to be_empty
-    end
-
-    it "holds every architecture concept to a deliberate classification" do
-      unclassified =
-        AiService::ARCHITECTURE_CONCEPTS - AiService::TRADEOFF_CONCEPTS - AiService::COMPLEXITY_CAUSE_CONCEPTS
-
-      expect(unclassified).to be_empty
-    end
-  end
-
-  describe "LANGUAGE_CONFIG for the fourth-slot pseudo-language buckets" do
-    it "resolves plan_review and ambiguity_hunt via config_for, like architecture" do
-      plan_review_config    = service.send(:config_for, "plan_review")
-      ambiguity_hunt_config = service.send(:config_for, "ambiguity_hunt")
-
-      expect(plan_review_config[:concepts]).to eq(AiService::PLAN_REVIEW_CONCEPTS)
-      expect(ambiguity_hunt_config[:concepts]).to eq(AiService::AMBIGUITY_HUNT_CONCEPTS)
-    end
-
+  describe "the fourth-slot pseudo-language buckets" do
     it "frames code_example as language-agnostic pseudocode for both fourth-slot configs" do
-      plan_review_prompt = service.send(:build_concept_reference_prompt, "scope_creep",
-                                        service.send(:config_for, "plan_review"))
-      ambiguity_prompt    = service.send(:build_concept_reference_prompt, "missing_success_criteria",
-                                        service.send(:config_for, "ambiguity_hunt"))
+      plan_review_prompt = service.send(:build_concept_reference_prompt, "scope_creep", "plan_review")
+      ambiguity_prompt    = service.send(:build_concept_reference_prompt, "missing_success_criteria", "ambiguity_hunt")
 
       expect(plan_review_prompt.downcase).to include("pseudocode")
       expect(ambiguity_prompt.downcase).to include("pseudocode")
@@ -1393,7 +1189,7 @@ RSpec.describe AiService do
     it "names every data-modeling concept in that line" do
       prompt = service.send(:build_exercise_prompt, user, "javascript")
       expect(prompt).to include(
-        "The data-modeling concepts (#{AiService::DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section"
+        "The data-modeling concepts (#{ConceptVocabulary::DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section"
       )
     end
 
@@ -1437,7 +1233,7 @@ RSpec.describe AiService do
                             concept_tags: { "code_review" => "n_plus_one" })
 
       prompt = service.send(:build_exercise_prompt, user)
-      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
+      expect(prompt).to include(ConceptVocabulary::RAILS_CONCEPTS.join(", "))
       expect(prompt).to include("Mastery loop")
       expect(prompt).to include("code_review→n_plus_one (self: too_hard, ai: unreviewed)")
       expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one (standard)")
@@ -1494,14 +1290,14 @@ RSpec.describe AiService do
 
     it "uses the JS/React vocabulary and JavaScript/React labeling when language is javascript" do
       prompt = service.send(:build_exercise_prompt, user, "javascript")
-      expect(prompt).to include(AiService::JS_CONCEPTS.join(", "))
+      expect(prompt).to include(ConceptVocabulary::JS_CONCEPTS.join(", "))
       expect(prompt).to include("JavaScript/React code")
-      expect(prompt).not_to include(AiService::RAILS_CONCEPTS.join(", "))
+      expect(prompt).not_to include(ConceptVocabulary::RAILS_CONCEPTS.join(", "))
     end
 
     it "defaults to ruby_rails vocabulary when no language is given" do
       prompt = service.send(:build_exercise_prompt, user)
-      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
+      expect(prompt).to include(ConceptVocabulary::RAILS_CONCEPTS.join(", "))
     end
 
     it "instructs varying the concrete business-domain scenario across sessions" do
@@ -1512,7 +1308,7 @@ RSpec.describe AiService do
     it "hands each rolled kind the vocabulary ingest will hold it to" do
       %i[architecture security_review challenge parsons_problem].each do |third|
         prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: third)
-        expect(prompt).to include(ProblemSetIngest.vocabulary_for(third.to_s, "ruby_rails").join(", "))
+        expect(prompt).to include(ConceptVocabulary.for_section(third.to_s, "ruby_rails").join(", "))
       end
     end
 
@@ -1536,7 +1332,7 @@ RSpec.describe AiService do
     it "includes TypeScript-syntax guidance keyed off the TS-flavored concepts when language is javascript" do
       prompt = service.send(:build_exercise_prompt, user, "javascript")
       expect(prompt).to include("TypeScript syntax")
-      expect(prompt).to include(AiService::TYPESCRIPT_FLAVORED_CONCEPTS.join(", "))
+      expect(prompt).to include(ConceptVocabulary::TYPESCRIPT_FLAVORED_CONCEPTS.join(", "))
     end
 
     it "omits TypeScript-syntax guidance for ruby_rails" do
@@ -1897,7 +1693,7 @@ RSpec.describe AiService do
       it "loads each targeted kind's rungs for the day's mode and merges them by level" do
         ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
                                  ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
-        schema_concept = AiService::DATA_MODELING_CONCEPTS.first
+        schema_concept = ConceptVocabulary::DATA_MODELING_CONCEPTS.first
         ConceptReference.create!(concept: schema_concept, language: "ruby_rails",
                                  ladder_junior: "j2", ladder_senior: "s2", ladder_principal_engineer: "p2")
         kinds = ExerciseSection.for_plan(third: :challenge, fourth: nil)
@@ -1917,7 +1713,7 @@ RSpec.describe AiService do
           placed = kinds.zip(levels)
           difficulty = KindDifficulty.new(levels: placed.to_h { |kind, level| [ kind.key, level ] }, locked: kinds.map(&:key))
           ladders = placed.each_with_object({}) do |(kind, level), acc|
-            vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode, rung: level)
+            vocabulary = ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: level)
             (acc[level] ||= {}).merge!(vocabulary.index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
           end
 
@@ -1961,7 +1757,7 @@ RSpec.describe AiService do
         levels = { "code_review" => "junior", "design_comparison" => "senior",
                    "challenge" => "principal_engineer", "pseudocode_to_code" => "junior" }
         ladders = kinds.each_with_object({}) do |kind, acc|
-          vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, "javascript", mode: :application_code)
+          vocabulary = ConceptVocabulary.selectable_for_section(kind.key, "javascript", mode: :application_code)
           (acc[levels.fetch(kind.key)] ||= {}).merge!(vocabulary.index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
         end
         difficulty = KindDifficulty.new(levels: levels, locked: [ "code_review" ])
@@ -2218,6 +2014,15 @@ RSpec.describe AiService do
 
   describe "#generate_exercise" do
     before { user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS) }
+
+    it "refuses an unsupported language with AiService::Error before planning, so the jobs record the failure" do
+      allow(DailyPlan).to receive(:for).and_call_original
+      svc = double_class.new(canned_text: "{}")
+
+      expect { svc.generate_exercise(user, language: "mixed") }
+        .to raise_error(AiService::Error, /Unsupported generation language/)
+      expect(DailyPlan).not_to have_received(:for)
+    end
 
     it "shuffles parsons_problem blocks into a non-identity display_order" do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :parsons_problem, fourth: :plan_review)
@@ -2662,7 +2467,7 @@ RSpec.describe AiService do
       set = full_problem_set("challenge" => { "concept" => "n_plus_one" })
 
       payload = diagnostics_payload(double_class.new(canned_text: set.to_json))
-      vocabulary = ProblemSetIngest.selectable_vocabulary_for("challenge", "ruby_rails", mode: :application_code)
+      vocabulary = ConceptVocabulary.selectable_for_section("challenge", "ruby_rails", mode: :application_code)
 
       expect(payload["requested"]["kind_difficulty"]).to eq(
         "challenge" => { "level" => "principal_engineer", "locked" => true,
@@ -4525,14 +4330,14 @@ RSpec.describe AiService do
 
       expect(prompt).to include(AiService::RECOGNITION_GUIDE_SCOPE)
       expect(prompt).to include(RecognitionGuide.subject_for("module_design"))
-      AiService::MODULE_DESIGN_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
+      ConceptVocabulary::MODULE_DESIGN_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
     end
 
     it "reads a language-independent bucket's concepts and focus" do
       prompt = prompt_for("plan_review")
 
-      expect(prompt).to include(AiService::LANGUAGE_CONFIG["plan_review"][:focus])
-      AiService::PLAN_REVIEW_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
+      expect(prompt).to include(AiService::LANGUAGE_PROMPTS["plan_review"][:focus])
+      ConceptVocabulary::PLAN_REVIEW_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
     end
 
     it "frames the tradeoff concepts a group holds as choices, and no others" do
@@ -4541,7 +4346,7 @@ RSpec.describe AiService do
 
       expect(architecture).to include("choices between two defensible options")
       expect(architecture[/Some of these \((.*?)\)/, 1].split(", "))
-        .to match_array(AiService::ARCHITECTURE_CONCEPTS & AiService::TRADEOFF_CONCEPTS)
+        .to match_array(ConceptVocabulary::ARCHITECTURE_CONCEPTS & ConceptVocabulary::TRADEOFF_CONCEPTS)
       expect(data_modeling[/Some of these \((.*?)\)/, 1]).to eq("denormalization_tradeoffs")
       expect(prompt_for("code_smell")).not_to include("choices between two defensible options")
     end
