@@ -61,10 +61,16 @@ class DailyExercise < ApplicationRecord
     ExerciseSection.resolved_keys(problem_set)
   end
 
+  def current_response = dated_response.first
+
   def with_response_locked
     transaction do
       lock!
-      yield DailyResponse.lock.find_by(daily_exercise_id: id, date: date)
+      yield dated_response.lock.first
     end
   end
+
+  private
+
+  def dated_response = DailyResponse.where(daily_exercise_id: id, date: date)
 end

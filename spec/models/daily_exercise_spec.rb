@@ -240,13 +240,12 @@ RSpec.describe DailyExercise, type: :model do
 
     it "locks the exercise before the response" do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
-      locks = []
-      allow(exercise).to receive(:lock!).and_wrap_original { |original, *args| locks << :exercise; original.call(*args) }
-      allow(DailyResponse).to receive(:lock).and_wrap_original { |original, *args| locks << :response; original.call(*args) }
+      locked_tables = []
+      record = ->(*, payload) { locked_tables << payload[:sql][/FROM "(\w+)"/, 1] if payload[:sql].include?("FOR UPDATE") }
 
-      exercise.with_response_locked { }
+      ActiveSupport::Notifications.subscribed(record, "sql.active_record") { exercise.with_response_locked { } }
 
-      expect(locks).to eq(%i[exercise response])
+      expect(locked_tables).to eq(%w[daily_exercises daily_responses])
     end
 
     it "returns the block's value" do
