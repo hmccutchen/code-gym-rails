@@ -99,6 +99,37 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     end
   end
 
+  it "submits the design comparison pick made while its own controller was still loading" do
+    reason = "Piece B bounds the retry, which the stated requirement is what decides it here."
+
+    travel_to(a_weekday) do
+      watch_page_errors
+      visit_with_todays_set(user)
+      expect(page).to have_css(%([data-comparison-answer="design_comparison"]), wait: 10)
+      fill_in_answer("design_comparison", reason)
+      rate_section("design_comparison")
+      wait_for { user.daily_responses.reload.first&.answers&.dig("design_comparison").to_s.start_with?("pick:a") }
+
+      url = page.current_url
+      stalled[:controller] = "comparison_answer_controller"
+
+      page.driver.with_playwright_page do |pw|
+        pw.goto(url, waitUntil: "commit")
+        pw.evaluate(<<~JS)
+          (() => {
+            const box = document.querySelector('[data-comparison-answer="design_comparison"]');
+            box.querySelectorAll('input[type="radio"]')[1].click();
+          })()
+        JS
+        pw.evaluate("[...document.querySelectorAll('button')].find((b) => /Submit answers/i.test(b.textContent)).click()")
+      end
+
+      wait_for(20) { user.daily_responses.reload.first&.submitted? }
+      expect(user.daily_responses.sole.answers["design_comparison"]).to eq("pick:b\n#{reason}")
+      expect(errors).to be_empty
+    end
+  end
+
   it "keeps an edit pending until the controller that owns it has connected" do
     answer = "An answer typed while that section's own controller was still loading, long enough to count."
 

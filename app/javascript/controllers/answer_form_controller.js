@@ -173,6 +173,9 @@ export default class extends Controller {
     this.submitButtonTarget.classList.add("btn-loading")
     this.submitButtonTarget.textContent = this.submittingValue
 
+    // A kind whose answer only reaches the hidden field through its own controller would otherwise submit the stale one.
+    await window.CodeGymBootstrap?.ready
+
     const result = await request.send("POST", this.formTarget.action, this.payload({ submit: "1" }), { fallback: this.submitFailedValue })
     const reviewUrl = result.ok ? result.data?.review_url : null
     if (result.ok) saveStatus.clear("submit")

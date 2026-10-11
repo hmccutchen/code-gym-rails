@@ -64,3 +64,13 @@ picture.
 answer, and expects it saved. Without the `defaultValue` check the example
 still passes eventually but takes four minutes rather than five seconds, which
 is the measure of how long the answer sits unsaved.
+
+## Submit waits for the page's controllers
+
+Submit is always clickable, and the payload reads each section's hidden
+field. A kind whose answer only reaches that field through its own controller
+— the design comparison's pick and reason — would post the previous answer if
+the click landed before that controller connected. So `submit()` awaits
+`CodeGymBootstrap.ready`, which resolves once every controller on the page
+has connected and the early-edit recorder has been settled. The click is
+deferred, never dropped.
