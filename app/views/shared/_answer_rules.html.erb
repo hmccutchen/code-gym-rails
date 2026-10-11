@@ -1,0 +1,40 @@
+<%# Rendered ahead of the answer form, whose inline scripts read it. Notes: docs/code-notes/app/views/shared/_answer_rules.html.md %>
+<script>
+window.CodeGymAnswerRules = (() => {
+  const MIN_LENGTH = <%= DailyResponse::ANSWER_MIN_LENGTH %>;
+  const MIN_REASON = <%= ExerciseSection::DesignComparison::MIN_REASON_LENGTH %>;
+  const PIECES = <%= ExerciseSection::DesignComparison::PIECES.to_json.html_safe %>;
+  // Ruby's String#strip: ASCII whitespace and NUL only, where String.prototype.trim also drops Unicode spaces.
+  const strip = text => text.replace(/^[\0\t\n\v\f\r ]+|[\0\t\n\v\f\r ]+$/g, "");
+  const length = text => [...text].length;
+
+  function substantive(text, labels) {
+    if (!labels.length) return strip(text);
+    return strip(text.split("\n").filter(line => !labels.includes(strip(line))).join("\n"));
+  }
+
+  return {
+    PARSONS_PREFIX: <%= ExerciseSection::ParsonsProblem::ANSWER_PREFIX.to_json.html_safe %>,
+    PICK_PREFIX: <%= ExerciseSection::DesignComparison::PICK_PREFIX.to_json.html_safe %>,
+
+    proseAnswered(text, labels) {
+      return length(substantive(text, labels)) > MIN_LENGTH;
+    },
+
+    comparisonAnswered(pick, reason) {
+      return PIECES.includes(pick) && length(strip(reason)) >= MIN_REASON;
+    },
+
+    submitBlocker(answeredSections, ratings) {
+      if (answeredSections.length === 0) return "unanswered";
+      if (answeredSections.some(section => !ratings[section])) return "unrated";
+      return null;
+    },
+
+    sectionStatus(answered, ratingLabel, inProgress) {
+      if (!answered) return "";
+      return ratingLabel ? `✓ ${ratingLabel}` : inProgress;
+    }
+  };
+})();
+</script>

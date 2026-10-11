@@ -45,7 +45,7 @@
       function syncHiddenField(list) {
         const ids = [...list.querySelectorAll(".parsons-block")].map(li => li.dataset.blockId);
         const textarea = list.parentElement.querySelector('textarea[data-field="parsons_problem"]');
-        textarea.value = "order:" + ids.join(",");
+        textarea.value = window.CodeGymAnswerRules.PARSONS_PREFIX + ids.join(",");
         textarea.dataset.answerComplete = String(ids.length > 0);
         textarea.dispatchEvent(new Event("input", { bubbles: true }));
       }
