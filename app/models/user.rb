@@ -233,6 +233,10 @@ class User < ApplicationRecord
 
   def on_learning_track? = learning_track == LearningTrack::ON
 
+  def suggests_track_moves? = on_learning_track? && track_suggestions?
+
+  def applies_track_proposals_in_place? = track_proposals_answered < LearningTrack::IN_PLACE_ANSWERS
+
   def skill_level
     stored = super
     LEGACY_SKILL_LEVELS.fetch(stored, stored)
