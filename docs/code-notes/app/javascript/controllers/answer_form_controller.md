@@ -44,3 +44,23 @@ Input, change and rating clicks are Stimulus actions on the form rather than
 listeners bound per element. The Parsons and design-comparison answer scripts
 write their hidden textarea and dispatch a bubbling `input` event, which is
 what makes delegation equivalent to the per-textarea binding it replaces.
+
+## An answer typed before the controller connected
+
+The modules are deferred, so a user can type into a textarea while the page is
+still only parsed HTML. No `input` event survives to `connect()`, so without a
+check the answer would sit in the field unsaved until the user touched it
+again.
+
+`connect()` therefore compares each textarea's `value` with its
+`defaultValue`. A textarea's `defaultValue` is its server-rendered content
+exactly, so any difference means someone typed in the gap, and the controller
+schedules a save the same way an `input` event would. `code_gym_bootstrap.js`
+covers the other half — it keeps `pending()` true across that gap so
+pull-to-refresh cannot reload over the edit — and its code note has the whole
+picture.
+
+`spec/system/deferred_module_spec.rb` stalls the module assets, types an
+answer, and expects it saved. Without the `defaultValue` check the example
+still passes eventually but takes four minutes rather than five seconds, which
+is the measure of how long the answer sits unsaved.

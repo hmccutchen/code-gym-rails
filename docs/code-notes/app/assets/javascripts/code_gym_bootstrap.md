@@ -57,6 +57,46 @@ return value.
 `flush()` drains the queue in call order, so a page script's own sequencing
 survives.
 
+## The early-edit recorder
+
+The stubs above cover a page script that *calls* one of the globals. An edit
+typed before the modules arrive calls nothing at all, and that is the commoner
+case: the HTML parses, the user starts typing, the module lands a couple of
+hundred milliseconds later.
+
+Before #357 the dashboard's inline script bound its own `input` listener and
+registered `watch(() => saveTimer !== null)` during parse, so a keystroke in
+that window was already pending work. A Stimulus controller registers both in
+`connect()`, which runs only once the modules have loaded, so the keystroke
+fell into a hole: pull-to-refresh saw nothing pending and could reload over it,
+and no later `input` event existed to schedule the save.
+
+So the bootstrap listens for `input` and `change` on `document` in the capture
+phase and sets `early.dirty` when the event came from inside a form. It
+registers that flag through its own `watch`, which means `pending()` answers
+true straight away and the real `save_status` inherits the same probe at flush.
+
+Two halves finish the job, and neither belongs here. `application.js` settles
+the recorder only after `application.start()` resolves, so controllers have
+already connected and taken over; settling in `flush()` would open a gap
+between the globals being assigned and Stimulus connecting, in which the edit
+is pending to nobody.
+
+Settling removes the two listeners as well as clearing the flag. Leaving them
+bound would set `dirty` again on the next keystroke with nothing left to clear
+it, so `pending()` would answer true for the rest of the page's life and every
+caller that waits on it — pull-to-refresh, the save queue's drain — would wait
+forever. And a controller that owns an edited field schedules the save itself on
+connect — `answer_form_controller` compares each textarea's `value` with its
+`defaultValue`, which is exactly the server-rendered content, so a difference
+means the user typed. Without that the answer is not saved promptly; the spec
+below takes four minutes instead of five seconds.
+
+A controller with no such check leaves its field unsaved until the user touches
+it again, which is the pre-#357 behaviour for every control that had no inline
+listener, so this is a per-controller decision rather than something the
+bootstrap can do for everyone.
+
 ## Why this shape
 
 A per-call-site `DOMContentLoaded` gate was the alternative and is worse here.
@@ -76,10 +116,16 @@ activation untouched.
 
 ## Its lifetime
 
-This file is transitional. #357's step 3 converts the last inline page script
-to a Stimulus controller, at which point `data-action` binds through Stimulus's
-own lifecycle and the window this covers stops existing. The two `window.*`
-aliases in `application.js` go at the same time, and this file goes with them.
+The stub surface is transitional. #357's step 3 converts the last inline page
+script to a Stimulus controller, at which point `data-action` binds through
+Stimulus's own lifecycle and nothing reaches the globals during parse any more.
+The two `window.*` aliases in `application.js` go at the same time, and the
+stubs go with them.
+
+The early-edit recorder stays. It is not about inline scripts at all — it is
+about the gap between a parsed page and a loaded module, which no amount of
+converting views removes. Step 4 shrinks this file to that recorder rather than
+deleting it.
 
 ## What holds it
 
