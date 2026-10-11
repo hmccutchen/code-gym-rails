@@ -75,7 +75,7 @@ module JavascriptReadyHelper
     expect(page).to have_css("html[data-js-ready]", visible: :all)
   end
 
-  NAVIGATED_AWAY = /Execution context was destroyed|Cannot find context|Target closed/
+  NAVIGATED_AWAY = /Execution context was destroyed|Cannot find context/
 
   def wait_for_js_condition(expression, timeout: Capybara.default_max_wait_time)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout

@@ -220,9 +220,11 @@ decisions, not defaults that drifted into place:
 - **Page behavior is a Stimulus controller** — a view carries markup and
   `data-action` attributes, never a `<script>` tag or an `on*` handler.
   `config/initializers/content_security_policy.rb` enforces it: a script runs
-  only from this origin, from `cdn.jsdelivr.net`, or under the nonce
-  `javascript_importmap_tags` puts on its own tags, so an inline tag is dead
-  code. `spec/conventions/app_views_spec.rb` fails on one before CSP has to.
+  only from this origin, from the two `cdn.jsdelivr.net` package directories
+  the mermaid and Parsons controllers import, or under the nonce
+  `javascript_importmap_tags` puts on its own tags, so an inline tag or
+  handler is dead code. `spec/conventions/app_views_spec.rb` fails on either
+  before CSP has to.
 - **One way to send a request** — a page script sends through
   `CodeGymRequest.send`, and a save that must not overlap another goes
   through `CodeGymSaveStatus.queue`, never a hand-built `fetch` or its own
@@ -273,7 +275,7 @@ advisory signal; it is not evidence that anything was verified.
 - **Rails 8.1.4** + PostgreSQL
 - **Solid Queue** — background jobs + recurring hourly cron, gated per user to 8am weekdays for generation and to early afternoon for reminder nudges (no Redis needed)
 - **Solid Cable / ActionCable** — mounted but unused; the dashboard learns generation is done by polling `GET /dashboard/status`, since this app's layout never loads Turbo JS
-- **Stimulus and importmap** — every page script is a controller under `app/javascript/controllers`, bound with `data-action`; `app/assets/javascripts/code_gym_bootstrap.js` is the one blocking classic script, so an inline tag that runs at parse time still finds `window.CodeGymRequest` and `window.CodeGymSaveStatus`
+- **Stimulus and importmap** — every page script is a controller under `app/javascript/controllers`, bound with `data-action`; `app/assets/javascripts/code_gym_bootstrap.js` is the one blocking classic script, whose stubs answer for `window.CodeGymRequest` and `window.CodeGymSaveStatus` and record an edit typed before the modules load
 - **Faraday** — provider API calls (not the official SDKs)
 - **Rouge** — server-side syntax highlighting for every code block (`CodeHighlight`)
 - **RuboCop and Prettier** — re-indent provider-written exercise code once, at ingest (`CodeFormat`); Prettier runs in Node from `vendor/prettier`
@@ -3325,8 +3327,8 @@ always pull in the full suite — is stated once, in
   against a rendered attribute a request spec never executes, so a mismatch
   between that label and the raw concept key was invisible to request specs
   and only caught here.
-- `config/initializers/content_security_policy.rb` — the policy that makes the Stimulus convention enforceable: `script-src` is this origin, `cdn.jsdelivr.net` (mermaid and SortableJS) and a per-request nonce, and `style-src` keeps `'unsafe-inline'`, since the views still carry `style=` attributes
-- `spec/conventions/app_views_spec.rb` — fails on an inline `<script>` in any view, so the convention breaks a build rather than a page
+- `config/initializers/content_security_policy.rb` — the policy that makes the Stimulus convention enforceable: `script-src` is this origin, the mermaid and SortableJS package directories on `cdn.jsdelivr.net`, and a per-request nonce, and `style-src` keeps `'unsafe-inline'`, since the views still carry `style=` attributes
+- `spec/conventions/app_views_spec.rb` — fails on an inline `<script>`, `on*` handler or `javascript:` URL in any view, so the convention breaks a build rather than a page
 - `spec/conventions/app_source_spec.rb` — parses `app/` with Prism and fails on `Thread.new` outside `CallerZoneThread` (or a named exemption with its reason and exact thread count) and on `send(:...)`
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)

@@ -12,3 +12,7 @@ about three times in a hundred navigations before this.
 Only the navigation messages are swallowed. A `ReferenceError` in the
 expression itself still raises on the first ask, so a typo in a condition
 fails fast instead of timing out.
+
+`Target closed` is not one of them. It means the page, context or browser
+is gone, and asking the same page again cannot bring it back, so swallowing
+it would turn a crash into an unrelated timeout ten seconds later.

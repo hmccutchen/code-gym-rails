@@ -5,12 +5,22 @@ RSpec.describe "Conventions held over app/views" do
 
   def relative(path) = Pathname(path).relative_path_from(Rails.root).to_s
 
-  it "keeps every page script in a Stimulus controller rather than an inline tag" do
-    offenders = view_files.flat_map do |path|
+  def inline_handler
+    event = "on(?:click|dblclick|change|input|submit|reset|load|error|focus|blur|scroll|resize|toggle|drop|" \
+            "key[a-z]+|mouse[a-z]+|pointer[a-z]+|touch[a-z]+|drag[a-z]*|beforeunload|unload)"
+    /(?<![\w-])#{event}(?:\s*=|"?:)\s*["']|["']\s*javascript:/i
+  end
+
+  def offending_lines(pattern)
+    view_files.flat_map do |path|
       File.readlines(path).filter_map.with_index(1) do |line, number|
-        "#{relative(path)}:#{number}" if line.match?(/<script\b/i)
+        "#{relative(path)}:#{number}" if line.match?(pattern)
       end
     end
+  end
+
+  it "keeps every page script in a Stimulus controller rather than an inline tag" do
+    offenders = offending_lines(/<script\b/i)
 
     expect(offenders).to be_empty, <<~MESSAGE
       Inline <script> in a view: #{offenders.join(', ')}.
@@ -18,5 +28,25 @@ RSpec.describe "Conventions held over app/views" do
       nonce the importmap tags carry, so an inline tag never runs. Put the
       behaviour in app/javascript/controllers and bind it with data-action.
     MESSAGE
+  end
+
+  it "binds behaviour with data-action rather than an inline event handler or javascript: URL" do
+    offenders = offending_lines(inline_handler)
+
+    expect(offenders).to be_empty, <<~MESSAGE
+      Inline handler in a view: #{offenders.join(', ')}.
+      The content security policy refuses an on* attribute and a javascript:
+      URL the same way it refuses an inline <script>. Bind the behaviour with
+      data-action to a Stimulus controller.
+    MESSAGE
+  end
+
+  it "recognises the handler shapes it guards against" do
+    expect(%(<button onclick="go()">)).to match(inline_handler)
+    expect(%(button_tag "Go", onclick: "go()")).to match(inline_handler)
+    expect(%(tag.div "data-x": 1, "onchange": "go()")).to match(inline_handler)
+    expect(%(<a href="javascript:void(0)">)).to match(inline_handler)
+    expect(%(render "x", only: "y")).not_to match(inline_handler)
+    expect(%(<div data-action="click->x#go">)).not_to match(inline_handler)
   end
 end

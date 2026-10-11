@@ -252,8 +252,10 @@ over it lets two paid calls apply the same work.
 
 **Does the diff add an inline `<script>` or an `on*` attribute to a view?**
 BLOCKING. `config/initializers/content_security_policy.rb` allows a script
-only from this origin, from `cdn.jsdelivr.net`, or under the nonce the
-importmap tags carry, so an inline tag never runs. Behavior goes in a Stimulus
+only from this origin, from the mermaid and SortableJS package directories on
+`cdn.jsdelivr.net`, or under the nonce the importmap tags carry, so an inline
+tag or handler never runs, and `spec/conventions/app_views_spec.rb` fails on
+either. Behavior goes in a Stimulus
 controller and binds with `data-action`.
 
 **Does a script build its own request?** BLOCKING. Page scripts send through

@@ -30,4 +30,15 @@ RSpec.describe "wait_for_js_condition", type: :system do
 
     expect { wait_for_js_condition("nope", timeout: 5) }.to raise_error(Playwright::Error, /ReferenceError/)
   end
+
+  it "re-raises a closed target rather than polling a page that is gone" do
+    visit_as(user)
+    wait_for_js
+
+    page.driver.with_playwright_page do |pw|
+      allow(pw).to receive(:evaluate).and_raise(Playwright::Error.new(message: "Target closed"))
+    end
+
+    expect { wait_for_js_condition("true", timeout: 5) }.to raise_error(Playwright::Error, /Target closed/)
+  end
 end
