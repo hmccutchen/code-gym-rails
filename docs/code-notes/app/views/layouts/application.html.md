@@ -339,9 +339,8 @@ win. The light palette's `media` attribute is
 ## Name editor script
 
 The autosave is an inline script because the conversion to Stimulus
-controllers (#357) has not reached it yet; the answer autosave in
-`dashboard/_exercise` follows the same convention for now. Copy still
-comes from I18n, and the CSRF token comes from the meta tag.
+controllers (#357) has not reached it yet. Copy still comes from I18n, and the
+CSRF token comes from the meta tag.
 
 ## Time-zone detection script
 
@@ -409,31 +408,34 @@ they run after the document is parsed and before `DOMContentLoaded`, which is
 global before its own first user event therefore has to wait for
 `DOMContentLoaded`.
 
-Four shapes reach a global before the modules run. A top-level call does (the
-one-shot time-zone detection higher up this file). So does a timer started at parse time
-(`dashboard/_generating`'s first poll). So does an async chain started at
-parse time, even though no global is read on the first line:
+Three shapes reach a global before the modules run. A top-level call does
+(the one-shot time-zone detection higher up this file). So does an async chain
+started at parse time, even though no global is read on the first line:
 `shared/_push_script`'s re-subscribe reaches `window.CodeGymRequest` only
 after the service worker is ready, which is usually but not always slower than
-a module fetch, and its failure is swallowed on purpose. Those three wait for
+a module fetch, and its failure is swallowed on purpose. Those two wait for
 `DOMContentLoaded` at the call site.
 
-The two `CodeGymSaveStatus.watch` registrations in `dashboard/_exercise` and
-`api_keys/edit` are also top-level calls, but they must not wait. Each probe
-reports a delayed save the page is holding, and pull-to-refresh reloads once
-`pending()` is false, so a probe registered at `DOMContentLoaded` would leave an
-edit made while the modules load uncounted and let a pull reload over it. The
-bootstrap below records a probe synchronously, so both register at parse time.
+The `CodeGymSaveStatus.watch` registration in `api_keys/edit` is also a
+top-level call, but it must not wait. Its probe reports a delayed save the
+page is holding, and pull-to-refresh reloads once `pending()` is false, so a
+probe registered at `DOMContentLoaded` would leave an edit made while the
+modules load uncounted and let a pull reload over it. The bootstrap below
+records a probe synchronously, so it registers at parse time. The dashboard's
+answer form registers its probe in `answer_form_controller`'s `connect()`
+instead, and the bootstrap's early-edit recorder counts an edit made before
+that.
 
-The fourth is a handler bound at parse time and fired by a user, and an
+The third is a handler bound at parse time and fired by a user, and an
 earlier version of this note had it wrong: it said a click cannot land before
 the page has rendered, which confuses rendering with the modules executing.
 The browser paints and accepts input while it is still parsing, and a deferred
 module runs only after parsing ends, so a gesture in that window reaches an
-undefined global. On the dashboard that strands the day: the submit handler
-calls `preventDefault`, sets the form `inert` and disables the button before
-awaiting `CodeGymRequest.send`, so the `ReferenceError` skips the restore
-block and leaves no native submission behind.
+undefined global. The name editor above saves on blur through
+`CodeGymSaveStatus.queue`, and Setup's controls save the same way on change,
+so either can fire in that window. The dashboard's Submit button no longer
+can: it is `type="button"`, so a click before `answer_form_controller`
+connects does nothing at all, and that controller's code note explains why.
 `spec/system/deferred_module_spec.rb` holds that window open and drives it.
 
 `code_gym_bootstrap.js` is what covers it, loaded as a blocking classic asset
@@ -441,7 +443,7 @@ immediately before the importmap tags, so it runs during parse. It installs
 stubs on both globals that queue each call and hand back a promise;
 `application.js` calls `CodeGymBootstrap.flush()` after assigning the real
 modules, which replays the queue in order. One file covers every call site,
-which matters because #357's step 3 deletes those sites anyway; the file goes
+which matters because #357's step 3 deletes those sites anyway; the stubs go
 with them, once `data-action` makes the race impossible rather than handled.
 `docs/code-notes/app/assets/javascripts/code_gym_bootstrap.md` has the stub's
 surface and the reasoning behind it.
