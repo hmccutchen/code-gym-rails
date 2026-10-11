@@ -72,9 +72,16 @@ fell into a hole: pull-to-refresh saw nothing pending and could reload over it,
 and no later `input` event existed to schedule the save.
 
 So the bootstrap listens for `input` and `change` on `document` in the capture
-phase and sets `early.dirty` when the event came from inside a form. It
-registers that flag through its own `watch`, which means `pending()` answers
-true straight away and the real `save_status` inherits the same probe at flush.
+phase and sets `early.dirty` when the event came from inside a
+`[data-controller]` region. It registers that flag through its own `watch`,
+which means `pending()` answers true straight away and the real `save_status`
+inherits the same probe at flush.
+
+That selector rather than `form` is what makes the flag match who can clear
+it. Setup's Exercise mix autosaves a slider that sits in no form at all, so a
+form gate recorded nothing there, while a control outside every controlled
+region has nobody to adopt it on connect and would hold `pending()` true until
+settling.
 
 Two halves finish the job, and neither belongs here. `application.js` settles
 the recorder only once every controller on the page has connected and taken
@@ -102,6 +109,12 @@ connect — `answer_form_controller` compares each textarea's `value` with its
 `defaultValue`, which is exactly the server-rendered content, so a difference
 means the user typed. Without that the answer is not saved promptly; the spec
 below takes four minutes instead of five seconds.
+
+`exercise_mix_controller` does the same in its own terms: a range input is
+compared with its `defaultValue` and a checkbox or radio with its
+`defaultChecked`, and a difference re-syncs the slider label, the disabled
+states and the group lock before saving, since none of that ran while the
+modules were loading.
 
 A controller with no such check leaves its field unsaved until the user touches
 it again, which is the pre-#357 behaviour for every control that had no inline

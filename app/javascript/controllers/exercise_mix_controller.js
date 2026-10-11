@@ -21,6 +21,26 @@ export default class extends Controller {
     this.probe = () => this.pending !== null
     saveStatus.watch(this.probe)
     this.lockLastInGroup()
+    if (this.editedBeforeConnect()) this.adoptEarlyEdit()
+  }
+
+  editedBeforeConnect() {
+    return Array.from(this.element.querySelectorAll("input")).some((input) =>
+      input.type === "range" ? input.value !== input.defaultValue : input.checked !== input.defaultChecked
+    )
+  }
+
+  adoptEarlyEdit() {
+    this.rowTargets.forEach((row) => {
+      const excluded = this.excludeBoxFor(row).checked
+      const slider = this.sliderFor(row)
+      this.showStop(slider, row.querySelector("output"))
+      slider.disabled = excluded
+      this.setDifficultyDisabled(this.difficultyFor(row.dataset.kind), excluded)
+    })
+    this.difficultyTargets.forEach((box) => this.syncDifficulty(box))
+    this.lockLastInGroup()
+    this.save()
   }
 
   disconnect() {

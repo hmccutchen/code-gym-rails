@@ -43,3 +43,18 @@ A slot whose eligible kinds are all excluded has nothing to schedule, so the
 last unexcluded checkbox in each rotating group is disabled and the group's
 note is unhidden. The server validates this too; the client rule exists so
 the user never posts a refused state.
+
+## An edit made before the modules load
+
+The controls here are server-rendered and the controller binds nothing until
+`connect()`, which waits on the deferred module graph. `code_gym_bootstrap`
+records that an edit happened so `pending()` is honest, but only the controller
+can act on it, so `connect()` asks `editedBeforeConnect()` whether any input
+differs from what the server rendered — `value` against `defaultValue` for a
+range, `checked` against `defaultChecked` for a box or radio.
+
+When one does, `adoptEarlyEdit()` runs the work the missing listeners would
+have done — the slider's `aria-valuetext` and output label, the slider's
+disabled state, each difficulty group's enablement and the last-in-group lock —
+and then saves. Without it the change sits unsaved until the user touches a
+control again.
