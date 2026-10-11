@@ -46,7 +46,6 @@ class DailyExercise < ApplicationRecord
     ExerciseSection.fixed_sections_share?(problem_set, plan_notes["shared_concept"])
   end
 
-
   # Checked on the value's shape: a provider can emit a third key holding null or a string beside the real one.
   def third_key
     ExerciseSection.resolved_key(problem_set, ExerciseSection.thirds) || "challenge"

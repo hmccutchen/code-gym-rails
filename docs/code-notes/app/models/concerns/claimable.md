@@ -13,9 +13,10 @@ One `UPDATE ... WHERE` takes the claim, so two clicks or a click and a worker
 can't both win. Extra conditions narrow it further: regeneration passes
 `regenerated_at: nil`, the once-a-day gate.
 
-The token is the timestamp written, rounded to microseconds. Postgres stores
-microseconds, so an unrounded Ruby time would never equal the stored value
-and the owner could never release its own claim.
+The token is the timestamp written, rounded to microseconds, the precision
+Postgres stores. SQL comparisons would match either way, but a token compared
+in Ruby with a value read back from the database, such as a worker's claim
+against the row it reloads, only equals it once both are rounded the same.
 
 ## `#release_claim`
 

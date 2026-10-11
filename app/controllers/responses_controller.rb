@@ -247,7 +247,7 @@ class ResponsesController < ApplicationController
     exercise.with_response_locked do |locked|
       next :stale if stale_answer_sections(exercise).any?
 
-      @response = locked || persisted_response_for(exercise).lock!
+      @response = locked&.date == Date.current ? locked : persisted_response_for(exercise).lock!
       newly_submitted = false
       unless @response.submitted?
         assign_draft_response(exercise)

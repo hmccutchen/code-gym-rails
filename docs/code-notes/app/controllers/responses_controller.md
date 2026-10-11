@@ -19,7 +19,11 @@ when the reply token cap was raised.
 
 ## `#review`
 
-The missing sections are counted again after the claim reloads the row:
+The claim makes a second click back off instead of making a second provider
+call. Every exit releases it with its own token, so a review that overran its
+window can't clear the claim of the one that took over.
+
+The missing sections are counted again after the row is reloaded under the claim:
 another request may have finished the last section between the first check
 and the claim.
 
@@ -59,8 +63,10 @@ refused with a 409 rather than saved in part.
 
 ## `#save_answers_under_lock`
 
-Takes both locks through `DailyExercise#with_response_locked`. A response
-created here is new to this transaction, so it is locked after creating it.
+Takes both locks through `DailyExercise#with_response_locked`. Only a
+response dated today is saved to; an older row on the same exercise, which
+only legacy carry-forward data holds, is left alone and today's is found or
+created, then locked.
 
 A refused submit raises `ActiveRecord::Rollback` instead of returning
 `:failed` early. `#persisted_response_for` has already created the row by
@@ -121,12 +127,6 @@ Returns nil because callers read a falsy value as "already handled", and
 
 The section is checked against the problem set. Without that, a crafted param
 could write arbitrary keys into the jsonb columns.
-
-## `#review`
-
-The claim makes a second click back off instead of making a second provider
-call. Every exit releases it with its own token, so a review that overran its
-window can't clear the claim of the one that took over.
 
 ## `#clear_stale_generation_error!`
 

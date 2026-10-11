@@ -40,7 +40,7 @@ RSpec.describe "Responses", type: :request do
       expect(saved_response.answers["pattern"]).to eq("")
     end
 
-    it "reloads a stale draft under the lock before accepting an autosave" do
+    it "honors a submit that committed before the autosave took its locks" do
       saved_response.update!(submitted_at: nil)
       allow_any_instance_of(DailyExercise).to receive(:with_response_locked).and_wrap_original do |method, *args, &block|
         DailyResponse.find(saved_response.id).update!(submitted_at: Time.current)
@@ -91,6 +91,15 @@ RSpec.describe "Responses", type: :request do
       expect(response.parsed_body["submitted"]).to be(true)
       expect(user.daily_responses.sole.answers).to eq("code_review" => "Submitted elsewhere")
     end
+    it "saves to today's response even when the exercise also holds one dated another day" do
+      old = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.yesterday,
+                                  answers: { "code_review" => "Yesterday's answer" })
+
+      post responses_path, params: { response: { answers: { code_review: "Today's autosave" } } }, as: :json
+
+      expect(old.reload.answers).to eq("code_review" => "Yesterday's answer")
+      expect(user.daily_responses.find_by!(date: Date.current).answers["code_review"]).to eq("Today's autosave")
+    end
   end
 
   describe "partial submission finalization" do
@@ -124,7 +133,7 @@ RSpec.describe "Responses", type: :request do
       expect(saved.reload.attributes.slice(*evidence.keys)).to eq(evidence)
     end
 
-    it "keeps finalized ratings pruned when a submit wins after an autosave has loaded its draft" do
+    it "keeps finalized ratings pruned when a submit commits before an autosave takes its locks" do
       allow_any_instance_of(DailyExercise).to receive(:with_response_locked).and_wrap_original do |method, *args, &block|
         user.daily_responses.sole.update!(
           answers: { "code_review" => "An answer to keep", "pattern" => "" },
