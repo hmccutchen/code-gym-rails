@@ -29,8 +29,9 @@ The value is a literal rather than derived from the review chain's timeouts, bec
 What stops start over and regeneration from destroying this response. A
 stored review has already moved `ConceptMastery`, which nothing can undo. A
 fresh review claim blocks too, since `#review` holds no lock during the
-provider call. A stale claim does not block: the review it belonged to has
-stopped.
+provider call. A stale claim does not block, because the claim is treated as
+abandoned. Its provider call may still be running; if it finishes, it finds
+the claim gone and writes nothing (`ResponsesController#store_review`).
 
 ## `#merge_pseudocode_round!`
 

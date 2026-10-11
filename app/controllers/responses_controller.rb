@@ -49,18 +49,8 @@ class ResponsesController < ApplicationController
     successes = results.select { |_, r| r[:ok] }
     failures  = results.reject { |_, r| r[:ok] }
 
-    ActiveRecord::Base.transaction do
-      @response.lock!
-
-      if successes.any?
-        @response.ai_review = (@response.ai_review || {}).merge(successes.transform_values { |r| r[:review] })
-        @response.review_provider = current_user.provider
-        ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_batch)
-      end
-      @response.review_errors = @response.review_errors
-                                          .except(*successes.keys)
-                                          .merge(failures.transform_values { |r| stored_review_failure(r) })
-      @response.save!
+    unless store_review(claim, successes, failures, first_batch: first_batch)
+      return redirect_to root_path, alert: t("flash.responses.review_already_running")
     end
     @response.release_reviewing!(claim)
     clear_stale_generation_error! if successes.any?
@@ -79,6 +69,9 @@ class ResponsesController < ApplicationController
   rescue AiService::Error => e
     @response.release_reviewing!(claim) if claim
     redirect_to root_path, alert: provider_failure_text(e, :review).full
+  rescue StandardError
+    @response.release_reviewing!(claim) if claim
+    raise
   end
 
   # DELETE /responses/:id/start_over
@@ -472,6 +465,23 @@ class ResponsesController < ApplicationController
     ProviderFailureText.new(kind, provider: example[:provider] || current_user.provider, surface: surface,
                             failed_at: example[:failed_at] || Time.current, zone: current_user.effective_time_zone,
                             retry_after: example[:retry_after], variant: ProviderFailureText.variant_for(current_user))
+  end
+
+  def store_review(claim, successes, failures, first_batch:)
+    ActiveRecord::Base.transaction do
+      @response.lock!
+      next false unless @response.reviewing_since == claim
+
+      if successes.any?
+        @response.ai_review = (@response.ai_review || {}).merge(successes.transform_values { |r| r[:review] })
+        @response.review_provider = current_user.provider
+        ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_batch)
+      end
+      @response.review_errors = @response.review_errors
+                                          .except(*successes.keys)
+                                          .merge(failures.transform_values { |r| stored_review_failure(r) })
+      @response.save!
+    end
   end
 
   def stored_review_failure(result)

@@ -1029,6 +1029,23 @@ RSpec.describe "Responses", type: :request do
       expect(resp.reload.reviewing_since).to be_nil
     end
 
+    it "releases its own claim when storing the review raises, so a retry need not wait for it to go stale" do
+      resp = submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: true, review: { "rating" => "solid" } })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+      allow(ConceptMastery).to receive(:record_review!).and_raise(ActiveRecord::RecordInvalid.new(resp))
+
+      begin
+        post review_response_path(resp)
+      rescue ActiveRecord::RecordInvalid
+        nil
+      end
+
+      expect(resp.reload.reviewing_since).to be_nil
+      expect(resp.ai_review).to be_nil
+    end
+
     context "when another review takes the claim over during the provider call" do
       let(:takeover) { 1.second.from_now.floor(6) }
 
@@ -1048,6 +1065,24 @@ RSpec.describe "Responses", type: :request do
         post review_response_path(resp)
 
         expect(resp.reload.reviewing_since).to eq(takeover)
+      end
+
+      it "discards its results rather than writing a review the new claim will write again" do
+        resp = submitted_response
+        fake_service = instance_double(ClaudeService)
+        allow(fake_service).to receive(:review_sections) do
+          take_over(resp)
+          { "code_review" => { ok: true, review: { "rating" => "solid" } } }
+        end
+        allow(AiService).to receive(:for).with(user).and_return(fake_service)
+        allow(ConceptMastery).to receive(:record_review!)
+
+        post review_response_path(resp)
+
+        expect(resp.reload.ai_review).to be_nil
+        expect(ConceptMastery).not_to have_received(:record_review!)
+        expect(response).to redirect_to(root_path)
+        expect(flash[:alert]).to eq("A review is already being generated for this — check back in a moment.")
       end
 
       it "leaves the new claim in place when the provider raises" do

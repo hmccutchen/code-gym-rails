@@ -20,8 +20,17 @@ when the reply token cap was raised.
 ## `#review`
 
 The claim makes a second click back off instead of making a second provider
-call. Every exit releases it with its own token, so a review that overran its
-window can't clear the claim of the one that took over.
+call. The action releases it with its own token on every exit that still owns
+it, an unexpected error included, so a review that overran its window can't
+clear the claim of the one that took over.
+
+## `#store_review`
+
+Re-checks the claim under the response lock before writing anything. A review
+that overran its window may find another review has taken the claim over; it
+then writes neither grades nor mastery and leaves the claim alone, because the
+review that now holds it will grade the same sections. Without the check both
+would record mastery for the same answers.
 
 The missing sections are counted again after the row is reloaded under the claim:
 another request may have finished the last section between the first check
