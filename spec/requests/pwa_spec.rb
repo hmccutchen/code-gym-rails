@@ -117,6 +117,24 @@ RSpec.describe "PWA", type: :request do
       expect(response.body).to include("viewport-fit=cover")
       expect(layout).to include("env(safe-area-inset-bottom)")
     end
+
+    it "keeps the page column clear of a landscape notch, which viewport-fit=cover lets content reach" do
+      ViewStyles.rules(layout).select { |rule| rule.selectors == [ ".container" ] }.each do |rule|
+        padding = [ rule.declaration("padding"), rule.declaration("padding-inline") ].compact.join(" ")
+        expect(padding).to include("env(safe-area-inset-left)").and include("env(safe-area-inset-right)")
+      end
+    end
+  end
+
+  describe "section slot accents" do
+    let(:rules) { ViewStyles.rules(Rails.root.join("app/views/layouts/application.html.erb").read) }
+
+    it "colors only the exercise sections, never the dashboard panels and admin cards that share .section" do
+      plain = rules.select { |rule| rule.selectors.include?(".section") }
+
+      expect(plain.map(&:declarations).join).not_to include("slot-accent")
+      expect(rules.find { |rule| rule.selectors == [ ".section[data-slot]" ] }.declaration("--slot-accent")).to eq("var(--slot-1)")
+    end
   end
 
   describe "the pull-to-refresh indicator" do

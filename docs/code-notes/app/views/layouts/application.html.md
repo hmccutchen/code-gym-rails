@@ -106,7 +106,10 @@ larger text size cannot push six tabs past a phone's width.
 
 A desktop window gets a wider column and more side padding, so the page reads
 as a web app rather than a phone layout centred in a large window. The
-`-1.5rem` coupling below applies only under 600px, where this rule never runs.
+`-1.5rem` coupling below applies only under 600px, where this rule never runs. Both widths take the larger of their padding and the side safe-area
+insets, because `viewport-fit=cover` lets a landscape phone draw the column
+under its notch. A portrait phone reports no side inset, so the `-1.5rem`
+coupling still matches.
 
 ## `nav .inner`
 
@@ -272,7 +275,9 @@ stays where it was and the target grows into the space around it.
 `data-slot` is the section's position in `responses/_sections`, never its
 kind, so a color says "the second section today" and adding a kind needs no
 color. The stripe is an inset shadow rather than a top border, so it costs no
-space and a folded section's label stays where it was.
+space and a folded section's label stays where it was. The accent and the stripe sit on
+`.section[data-slot]` only: the dashboard's generating, failed and paused
+panels and the admin card share `.section` and are not exercise slots.
 
 ## `.section` below 600px
 

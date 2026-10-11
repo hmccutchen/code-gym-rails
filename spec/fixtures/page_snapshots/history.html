@@ -247,9 +247,9 @@
     input[type="range"]:focus-visible::-moz-range-thumb { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
     input[type="range"]:focus-visible { outline: none; }
 
-    .container { max-width: 800px; margin: 0 auto; padding: 0 1.5rem; }
+    .container { max-width: 800px; margin: 0 auto; padding: 0 max(1.5rem, env(safe-area-inset-right)) 0 max(1.5rem, env(safe-area-inset-left)); }
     @media (min-width: 1024px) {
-      .container { max-width: 920px; padding-inline: 2rem; }
+      .container { max-width: 920px; padding-inline: max(2rem, env(safe-area-inset-left)) max(2rem, env(safe-area-inset-right)); }
     }
 
     nav { position: relative; z-index: 20; container-type: inline-size; background: var(--nav-bg); border-bottom: 1px solid var(--border); padding: .4rem 0; padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); margin-bottom: 2rem; -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
@@ -384,7 +384,8 @@
     #main-content:focus { outline: none; }
     .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 
-    .section { --slot-accent: var(--slot-1); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: inset 0 3px 0 var(--slot-accent), var(--shadow); padding: 1.5rem; margin-bottom: 1.5rem; }
+    .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; margin-bottom: 1.5rem; }
+    .section[data-slot] { --slot-accent: var(--slot-1); box-shadow: inset 0 3px 0 var(--slot-accent), var(--shadow); }
     .section[data-slot="2"] { --slot-accent: var(--slot-2); }
     .section[data-slot="3"] { --slot-accent: var(--slot-3); }
     .section[data-slot="4"] { --slot-accent: var(--slot-4); }
@@ -413,8 +414,9 @@
         border-radius: 0;
         border-left: none;
         border-right: none;
-        box-shadow: inset 0 3px 0 var(--slot-accent);
+        box-shadow: none;
       }
+      .section[data-slot] { box-shadow: inset 0 3px 0 var(--slot-accent); }
     }
 
     .parsons-list { list-style: none; margin: 0 0 1.25rem; padding: 0; }
