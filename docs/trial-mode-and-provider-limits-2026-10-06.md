@@ -368,7 +368,7 @@ the caught error's message, which for a dropped connection is the browser's
 "Failed to fetch", for an HTML error page a JSON parse error, and for an
 unhandled exception Rails' "Internal Server Error" or a bare status code.
 Every page script now sends through `window.CodeGymRequest.send`
-(`shared/_request`), which never throws and resolves with `{ok, status, data,
+(`app/javascript/code_gym/request.js`), which never throws and resolves with `{ok, status, data,
 message, signedOut}`. Its `message` decides what a script may show: the
 `error` of a reply whose `status` is a string, which every error the app writes
 through `JsonErrors#render_json_error` carries, one session-expired sentence
