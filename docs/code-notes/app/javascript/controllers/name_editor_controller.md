@@ -34,3 +34,11 @@ Clearing the field and leaving it restores the last saved name without a
 request. The server refuses a blank name anyway; reverting locally keeps the
 page from showing an error for something the user can only have meant as a
 clear.
+
+## A save never writes over text typed after it
+
+The field stays editable while a save is out, and a save that lands replaces
+the field with the name the server returned. Someone who typed `Alice`,
+blurred, and kept typing saw the field snap back to `Alice` when the first
+save answered. So `save()` records the text it posted and writes the server's
+answer back only while the field still holds it.

@@ -213,6 +213,27 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(errors).to be_empty
   end
 
+  it "refuses the account delete until its confirmation is loaded" do
+    watch_page_errors
+    visit_as(user)
+    visit account_path
+    expect(page).to have_css("#delete-account-form button", visible: :all)
+
+    url = page.current_url
+    stalled[:controller] = "loading_form_controller"
+
+    page.driver.with_playwright_page do |pw|
+      pw.goto(url, waitUntil: "commit")
+      pw.evaluate(%(document.querySelector("#delete-account-form button").click()))
+      expect(pw.evaluate(%(document.querySelector("#delete-account-form button").disabled))).to be(true)
+    end
+
+    sleep 1
+    expect(user.reload.anonymized_at).to be_nil
+    wait_for(20) { !page.driver.with_playwright_page { |pw| pw.evaluate(%(document.querySelector("#delete-account-form button").disabled)) } }
+    expect(errors).to be_empty
+  end
+
   # A name typed and blurred before the controller connects is only saved if connect adopts it.
   it "adopts a name typed into the nav while the modules are still loading" do
     watch_page_errors

@@ -25,3 +25,15 @@ it" wording want.
 Back-navigating to a page restored from the back/forward cache brings the
 disabled button back exactly as it was left, which would otherwise be a dead
 form.
+
+## The account delete renders disabled
+
+The delete confirmation lives in `submit()`, and this controller arrives with
+the rest of the page's JavaScript. A click landing before it connected
+submitted the form with no confirmation at all, and the account was
+anonymized — the one irreversible action in the app. So `accounts/show`
+renders that button `disabled` and `connect()` enables it. Awaiting readiness
+would not do: there is no safe way to replay an unconfirmed delete.
+
+The cost is that account deletion needs JavaScript. Every other control on
+the page already does.

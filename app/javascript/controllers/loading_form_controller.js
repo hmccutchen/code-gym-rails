@@ -10,6 +10,8 @@ export default class extends Controller {
 
     this.isButtonTag = this.button.tagName === "BUTTON"
     this.originalLabel = this.isButtonTag ? this.button.textContent : this.button.value
+    // A form whose confirmation lives here renders its button disabled, so it cannot submit unconfirmed before this.
+    this.button.disabled = false
   }
 
   submit(event) {

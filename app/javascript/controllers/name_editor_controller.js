@@ -23,17 +23,20 @@ export default class extends Controller {
     if (name === this.lastSaved) return
     if (name === "") return (this.inputTarget.value = this.lastSaved)
 
+    let sent = null
     const { ok, data } = await saveStatus.queue("name", "PATCH", this.urlValue,
-      () => ({ user: { name: this.inputTarget.value.trim() || name } }), { latest: true, quiet: true })
+      () => { sent = this.inputTarget.value.trim() || name; return { user: { name: sent } } }, { latest: true, quiet: true })
     const saved = ok && typeof data?.name === "string"
     if (saved) this.lastSaved = data.name
     if (saveStatus.queued("name")) return
 
+    // The field stays editable while the request is out, so only the text this save posted may be written over.
+    const unchanged = sent !== null && this.inputTarget.value.trim() === sent
     if (saved) {
-      this.inputTarget.value = data.name
+      if (unchanged) this.inputTarget.value = data.name
       this.flash(this.savedTextValue)
     } else {
-      this.inputTarget.value = this.lastSaved
+      if (unchanged) this.inputTarget.value = this.lastSaved
       this.flash(this.errorTextValue)
     }
   }
