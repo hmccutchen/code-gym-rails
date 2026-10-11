@@ -97,12 +97,14 @@ the logo after every trip home.
 The image's alt text names the link, which is why the wordmark beside it is
 hidden from screen readers.
 
-## `@container (max-width: 37.5em)`
+## `@container (max-width: 40em)`
 
-Below this width the row cannot hold the brand and four destinations at once,
-so the destinations fold behind the button and the brand stays on one line.
-The width is in em against the nav's own text, so a larger text size moves the
-fold out with it: 37.5em is 600px at the default size.
+Below this width the row cannot hold the brand and the five destinations at
+once, so the destinations fold behind the button and the brand stays on one
+line. The width is in em against the nav's own text, so a larger text size
+moves the fold out with it: 40em is 640px at the default size. It was 37.5em
+until Settings joined the row, which overflowed it by 22px at the default text
+size.
 
 ## `nav .nav-toggle`
 
