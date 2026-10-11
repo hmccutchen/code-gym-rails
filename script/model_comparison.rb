@@ -390,7 +390,7 @@ class ModelComparison
             cache_read: usage.sum { |row| row[:cache_read] }, cache_write: usage.sum { |row| row[:cache_write] })
   end
 
-  # A subclass per route, because the review fan-out builds fresh instances with `self.class.new`.
+  # A subclass per route: it turns the prose judge off through the class method review_grading_provider reads.
   def pinned_service(route, usage)
     lock = Mutex.new
 
@@ -573,7 +573,7 @@ class ModelComparison
   def graded_review(service, response, exercise, section)
     provider = service.review_grading_provider
     coach    = service.send(:config_for, exercise.language)[:coach]
-    _, result = ReviewGrading.grade_section(section, context: provider.day_context.call(exercise, response), user: response.user,
+    _, result = ReviewGrading.grade_section(section, context: provider.day_context.call(coach, exercise, response), user: response.user,
                                             exercise: exercise, response: response, coach: coach, provider: provider)
 
     result[:ok] ? result[:review] : "#{result[:error_code]}: #{result[:message]}"

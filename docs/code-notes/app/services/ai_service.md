@@ -170,7 +170,10 @@ for that case stays in this class (`SYNC_GENERATION_READ_TIMEOUT`).
 ## `#review_grading_provider`
 
 Hands `ReviewGrading` the provider calls and prompts it needs as callables, the
-way `#judged_generation_provider` does for `JudgedGeneration`. The fan-out and
+way `#judged_generation_provider` does for `JudgedGeneration`. It is public,
+unlike that sibling, because `ReviewGrading`'s specs and
+`script/model_comparison.rb` build a provider from a service they hold; the
+struct carries bound methods and two flags, never a key. The fan-out and
 every per-section rule live there; this class keeps the prompts and the calls.
 
 ## `#generate_concept_reference`
