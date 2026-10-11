@@ -19,6 +19,15 @@ RSpec.describe ConceptVocabulary do
         .to all(be true)
       expect(%w[ruby_rails javascript].map { |language| described_class.language_agnostic?(language) }).to all(be false)
     end
+
+    it "agrees with ConceptBucket and with which vocabularies carry no security list" do
+      with_security, without_security = described_class::LANGUAGES.partition { |_, entry| entry.key?(:security_concepts) }.map { |entries| entries.map(&:first) }
+
+      expect(with_security).to match_array(DailyExercise::LANGUAGES)
+      expect(without_security).to match_array(ConceptBucket::LANGUAGE_INDEPENDENT)
+      expect(described_class.languages.select { |language| described_class.language_agnostic?(language) })
+        .to match_array(ConceptBucket::LANGUAGE_INDEPENDENT)
+    end
   end
 
   it "resolves every registered kind in both languages" do

@@ -103,8 +103,7 @@ module ConceptVocabulary
     "pseudocode_to_code" => { concepts: PSEUDOCODE_TO_CODE_CONCEPTS }
   }.freeze
 
-  LANGUAGE_AGNOSTIC_VOCABULARIES = [ ARCHITECTURE_CONCEPTS, PLAN_REVIEW_CONCEPTS,
-                                     AMBIGUITY_HUNT_CONCEPTS, PSEUDOCODE_TO_CODE_CONCEPTS ].freeze
+  LANGUAGE_AGNOSTIC_VOCABULARIES = ConceptBucket::LANGUAGE_INDEPENDENT.map { |bucket| LANGUAGES.fetch(bucket).fetch(:concepts) }.freeze
 
   # Order is the Learn index's display order, and a concept in two groups takes the first.
   GROUPS = {
