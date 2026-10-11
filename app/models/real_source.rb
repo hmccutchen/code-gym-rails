@@ -225,7 +225,7 @@ class RealSource
     Method.new("app/models/daily_response.rb", "improved_code_visible?"),
     Method.new("app/jobs/generate_daily_exercises_job.rb", "generate_if_due"),
     Method.new("app/jobs/send_push_reminder_job.rb", "stage_for"),
-    Method.new("app/controllers/daily_exercises_controller.rb", "claim_regeneration!")
+    Method.new("app/models/concerns/claimable.rb", "take_claim")
   ].freeze
 
   SCHEMA_REVIEW = [

@@ -57,13 +57,18 @@ class DailyResponse < ApplicationRecord
 
   REVIEW_CLAIM_STALE_AFTER = 12.minutes
 
+  include Claimable
+  claim :reviewing, column: :reviewing_since, stale_after: REVIEW_CLAIM_STALE_AFTER
+
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
 
   def review_provider_label = AiProvider.label(review_provider.presence || user.provider)
 
-  def reviewing?
-    reviewing_since.present? && reviewing_since > REVIEW_CLAIM_STALE_AFTER.ago
+  def replace_blocker
+    return :reviewed if reviewed?
+
+    :reviewing if reviewing?
   end
 
   def fully_reviewed?

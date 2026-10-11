@@ -24,6 +24,15 @@ Older reviews stored a single string instead of a list, so a non-array value is 
 
 The value is a literal rather than derived from the review chain's timeouts, because deriving it would couple load order between this model and `AiService`. `ai_service_spec` checks that it outlasts the longest review chain.
 
+## `#replace_blocker`
+
+What stops start over and regeneration from destroying this response. A
+stored review has already moved `ConceptMastery`, which nothing can undo. A
+fresh review claim blocks too, since `#review` holds no lock during the
+provider call. A stale claim does not block, because the claim is treated as
+abandoned. Its provider call may still be running; if it finishes, it finds
+the claim gone and writes nothing (`ResponsesController#store_review`).
+
 ## `#merge_pseudocode_round!`
 
 Nil values are dropped from the merged round. That lets a caller clear a claim in the same merge that records its result.

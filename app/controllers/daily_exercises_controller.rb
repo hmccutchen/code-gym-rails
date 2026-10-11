@@ -1,4 +1,9 @@
 class DailyExercisesController < ApplicationController
+  REGENERATION_BLOCKED = {
+    reviewed:  "flash.daily_exercises.already_reviewed",
+    reviewing: "flash.daily_exercises.review_in_progress"
+  }.freeze
+
   GENERATE_PER_HOUR = 3
 
   rate_limit to: GENERATE_PER_HOUR, within: 1.hour, by: -> { current_user.id },
@@ -26,18 +31,11 @@ class DailyExercisesController < ApplicationController
     exercise = current_user.daily_exercises.for_date.first
     return redirect_to root_path, alert: t("flash.daily_exercises.nothing_to_regenerate") unless exercise
 
-    # Named daily_response: a local named `response` shadows the controller's response object.
-    daily_response = exercise.daily_response
-    if daily_response&.reviewed?
-      return redirect_to root_path, alert: t("flash.daily_exercises.already_reviewed")
-    end
-    if daily_response&.reviewing?
-      return redirect_to root_path, alert: t("flash.daily_exercises.review_in_progress")
-    end
+    blocker = exercise.current_response&.replace_blocker
+    return redirect_to root_path, alert: t(REGENERATION_BLOCKED.fetch(blocker)) if blocker
 
-    unless claim_regeneration!(exercise)
-      return redirect_to root_path, alert: t("flash.daily_exercises.already_regenerated")
-    end
+    claim = exercise.claim_regenerating!(regenerated_at: nil)
+    return redirect_to root_path, alert: t("flash.daily_exercises.already_regenerated") unless claim
 
     current_user.clear_generation_failure!
     # The claim is committed, so release it on an enqueue failure or the user waits behind a spinner nobody clears.
@@ -45,7 +43,7 @@ class DailyExercisesController < ApplicationController
       RegenerateExerciseJob.perform_later(user_id: current_user.id)
     rescue StandardError => e
       Rails.logger.error("Failed to enqueue RegenerateExerciseJob for user #{current_user.id}: #{e.class}: #{e.message}")
-      release_regeneration!(exercise)
+      exercise.release_regenerating!(claim)
       return redirect_to root_path, alert: t("flash.daily_exercises.regeneration_not_started")
     end
 
@@ -57,18 +55,5 @@ class DailyExercisesController < ApplicationController
   def trial_ended_text(surface)
     ProviderFailureText.new("trial_ended", provider: current_user.provider, surface: surface, failed_at: Time.current,
                             zone: current_user.effective_time_zone).full
-  end
-
-  def claim_regeneration!(exercise)
-    current_user.daily_exercises
-                .where(id: exercise.id, regenerated_at: nil)
-                .where("regenerating_since IS NULL OR regenerating_since < ?",
-                       DailyExercise::REGENERATION_STALE_AFTER.ago)
-                .update_all(regenerating_since: Time.current) == 1
-  end
-
-  # Through the relation: the loaded record still thinks regenerating_since is nil, so assigning nil would dirty nothing.
-  def release_regeneration!(exercise)
-    current_user.daily_exercises.where(id: exercise.id).update_all(regenerating_since: nil)
   end
 end

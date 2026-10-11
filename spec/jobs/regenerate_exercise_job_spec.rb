@@ -191,6 +191,21 @@ RSpec.describe RegenerateExerciseJob, type: :job do
   end
 
   # A review can land after the controller's check; destroying it would orphan ConceptMastery's movement.
+  it "keeps today's reviewed response when an older unreviewed one also points at the exercise" do
+    exercise = claimed_exercise
+    older = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.yesterday, answers: {})
+    reviewed = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                     submitted_at: Time.current, answers: { "code_review" => "a" * 20 },
+                                     ai_review: { "code_review" => { "rating" => "developing" } })
+    stub_provider({ "code_review" => { "question" => "new" } })
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(DailyResponse.exists?(reviewed.id)).to be true
+    expect(DailyResponse.exists?(older.id)).to be true
+    expect(exercise.reload.problem_set).to eq("code_review" => { "question" => "old" })
+  end
+
   it "keeps a response reviewed after the click, and the set that review describes" do
     exercise = claimed_exercise
     reviewed = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,

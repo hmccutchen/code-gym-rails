@@ -40,12 +40,11 @@ RSpec.describe "Responses", type: :request do
       expect(saved_response.answers["pattern"]).to eq("")
     end
 
-    it "reloads a stale draft under the lock before accepting an autosave" do
+    it "honors a submit that committed before the autosave took its locks" do
       saved_response.update!(submitted_at: nil)
-      allow_any_instance_of(ResponsesController).to receive(:persisted_response_for).and_wrap_original do |method, *args|
-        draft = method.call(*args)
-        DailyResponse.find(draft.id).update!(submitted_at: Time.current)
-        draft
+      allow_any_instance_of(DailyExercise).to receive(:with_response_locked).and_wrap_original do |method, *args, &block|
+        DailyResponse.find(saved_response.id).update!(submitted_at: Time.current)
+        method.call(*args, &block)
       end
 
       post responses_path, params: stale_payload, as: :json
@@ -72,6 +71,34 @@ RSpec.describe "Responses", type: :request do
       expect(user.concept_masteries.reload.map(&:attributes)).to eq(evidence)
       expect(user.recent_performance.first[:answered_sections]).to eq([ "code_review" ])
       expect(user.concepts_needing_reinforcement).to be_empty
+    end
+  end
+
+  describe "the first save of a day" do
+    let!(:exercise) do
+      create_exercise("code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" })
+    end
+
+    it "reloads a response another request created and submitted before taking its lock" do
+      allow_any_instance_of(ResponsesController).to receive(:persisted_response_for).and_wrap_original do |method, *args|
+        draft = method.call(*args)
+        DailyResponse.find(draft.id).update!(answers: { "code_review" => "Submitted elsewhere" }, submitted_at: Time.current)
+        draft
+      end
+
+      post responses_path, params: { response: { answers: { code_review: "A late autosave" } } }, as: :json
+
+      expect(response.parsed_body["submitted"]).to be(true)
+      expect(user.daily_responses.sole.answers).to eq("code_review" => "Submitted elsewhere")
+    end
+    it "saves to today's response even when the exercise also holds one dated another day" do
+      old = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.yesterday,
+                                  answers: { "code_review" => "Yesterday's answer" })
+
+      post responses_path, params: { response: { answers: { code_review: "Today's autosave" } } }, as: :json
+
+      expect(old.reload.answers).to eq("code_review" => "Yesterday's answer")
+      expect(user.daily_responses.find_by!(date: Date.current).answers["code_review"]).to eq("Today's autosave")
     end
   end
 
@@ -106,13 +133,12 @@ RSpec.describe "Responses", type: :request do
       expect(saved.reload.attributes.slice(*evidence.keys)).to eq(evidence)
     end
 
-    it "keeps finalized ratings pruned when a submit wins after an autosave has loaded its draft" do
-      allow_any_instance_of(ResponsesController).to receive(:persisted_response_for).and_wrap_original do |method, *args|
-        draft = method.call(*args)
-        DailyResponse.find(draft.id).update!(
+    it "keeps finalized ratings pruned when a submit commits before an autosave takes its locks" do
+      allow_any_instance_of(DailyExercise).to receive(:with_response_locked).and_wrap_original do |method, *args, &block|
+        user.daily_responses.sole.update!(
           answers: { "code_review" => "An answer to keep", "pattern" => "" },
           section_ratings: { "code_review" => "right_level" }, submitted_at: Time.current)
-        draft
+        method.call(*args, &block)
       end
 
       post responses_path, params: draft_payload, as: :json
@@ -1001,6 +1027,77 @@ RSpec.describe "Responses", type: :request do
       post review_response_path(resp)
 
       expect(resp.reload.reviewing_since).to be_nil
+    end
+
+    it "releases its own claim when storing the review raises, so a retry need not wait for it to go stale" do
+      resp = submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: true, review: { "rating" => "solid" } })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+      allow(ConceptMastery).to receive(:record_review!).and_raise(ActiveRecord::RecordInvalid.new(resp))
+
+      begin
+        post review_response_path(resp)
+      rescue ActiveRecord::RecordInvalid
+        nil
+      end
+
+      expect(resp.reload.reviewing_since).to be_nil
+      expect(resp.ai_review).to be_nil
+    end
+
+    context "when another review takes the claim over during the provider call" do
+      let(:takeover) { 1.second.from_now.floor(6) }
+
+      def take_over(resp)
+        DailyResponse.where(id: resp.id).update_all(reviewing_since: takeover)
+      end
+
+      it "leaves the new claim in place when this review finishes" do
+        resp = submitted_response
+        fake_service = instance_double(ClaudeService)
+        allow(fake_service).to receive(:review_sections) do
+          take_over(resp)
+          { "code_review" => { ok: true, review: { "rating" => "solid" } } }
+        end
+        allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+        post review_response_path(resp)
+
+        expect(resp.reload.reviewing_since).to eq(takeover)
+      end
+
+      it "discards its results rather than writing a review the new claim will write again" do
+        resp = submitted_response
+        fake_service = instance_double(ClaudeService)
+        allow(fake_service).to receive(:review_sections) do
+          take_over(resp)
+          { "code_review" => { ok: true, review: { "rating" => "solid" } } }
+        end
+        allow(AiService).to receive(:for).with(user).and_return(fake_service)
+        allow(ConceptMastery).to receive(:record_review!)
+
+        post review_response_path(resp)
+
+        expect(resp.reload.ai_review).to be_nil
+        expect(ConceptMastery).not_to have_received(:record_review!)
+        expect(response).to redirect_to(root_path)
+        expect(flash[:alert]).to eq("A review is already being generated for this — check back in a moment.")
+      end
+
+      it "leaves the new claim in place when the provider raises" do
+        resp = submitted_response
+        fake_service = instance_double(ClaudeService)
+        allow(fake_service).to receive(:review_sections) do
+          take_over(resp)
+          raise AiService::Error, "boom"
+        end
+        allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+        post review_response_path(resp)
+
+        expect(resp.reload.reviewing_since).to eq(takeover)
+      end
     end
   end
 

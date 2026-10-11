@@ -2,8 +2,9 @@
 
 ## `#regenerate`
 
-A superseded claim rolls the transaction back before the response row is read
-or locked. Nothing on that path depends on the response.
+The superseded check runs under both locks, before anything is written. A
+superseded or blocked set writes nothing, so the transaction ends without a
+rollback.
 
 ## `KEPT_SET_MESSAGES`
 

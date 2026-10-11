@@ -412,16 +412,15 @@ class User < ApplicationRecord
 
   def carry_forward(held)
     transaction(requires_new: true) do
-      # Exercise, then response: RegenerateExerciseJob's lock order, so the two can't deadlock.
-      held.lock!
-      response = held.daily_response&.lock!
-      # Re-checked under the lock, since a submit can commit after #held_exercise read it.
-      next nil if response&.submitted?
+      held.with_response_locked do |response|
+        # Re-checked under the lock, since a submit can commit after #held_exercise read it.
+        next nil if response&.submitted?
 
-      held.update!(date: Date.current, regenerated_at: nil, regenerating_since: nil)
-      response&.update!(date: Date.current)
-      clear_stale_generation_error!
-      held
+        held.update!(date: Date.current, regenerated_at: nil, regenerating_since: nil)
+        response&.update!(date: Date.current)
+        clear_stale_generation_error!
+        held
+      end
     end
   rescue ActiveRecord::RecordNotUnique
     nil

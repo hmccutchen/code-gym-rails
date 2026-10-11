@@ -204,6 +204,55 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
+  describe "#with_response_locked" do
+    let(:user) { User.create!(email: "locked-#{SecureRandom.hex(3)}@example.com", name: "L") }
+    let(:exercise) do
+      DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                            problem_set: { "code_review" => { "question" => "q" } })
+    end
+
+    it "yields the response dated with the exercise when an older one also points at it" do
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.yesterday, answers: {})
+      current = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+
+      expect { |block| exercise.with_response_locked(&block) }.to yield_with_args(current)
+    end
+
+    it "yields nil when the day has no response" do
+      expect { |block| exercise.with_response_locked(&block) }.to yield_with_args(nil)
+    end
+
+    it "yields the response as committed, not as a copy loaded earlier" do
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+      exercise.daily_response
+      DailyResponse.where(daily_exercise_id: exercise.id).update_all(submitted_at: Time.current)
+
+      exercise.with_response_locked { |response| expect(response).to be_submitted }
+    end
+
+    it "yields nil when the response was deleted after the exercise loaded it" do
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+      exercise.daily_response
+      DailyResponse.where(daily_exercise_id: exercise.id).delete_all
+
+      expect { |block| exercise.with_response_locked(&block) }.to yield_with_args(nil)
+    end
+
+    it "locks the exercise before the response" do
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+      locked_tables = []
+      record = ->(*, payload) { locked_tables << payload[:sql][/FROM "(\w+)"/, 1] if payload[:sql].include?("FOR UPDATE") }
+
+      ActiveSupport::Notifications.subscribed(record, "sql.active_record") { exercise.with_response_locked { } }
+
+      expect(locked_tables).to eq(%w[daily_exercises daily_responses])
+    end
+
+    it "returns the block's value" do
+      expect(exercise.with_response_locked { :done }).to eq(:done)
+    end
+  end
+
   describe "#regenerating?" do
     let(:user) { User.create!(email: "regen-model@example.com", name: "Regen") }
 

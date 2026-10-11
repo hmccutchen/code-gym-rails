@@ -19,7 +19,20 @@ when the reply token cap was raised.
 
 ## `#review`
 
-The missing sections are counted again after the claim reloads the row:
+The claim makes a second click back off instead of making a second provider
+call. The action releases it with its own token on every exit that still owns
+it, an unexpected error included, so a review that overran its window can't
+clear the claim of the one that took over.
+
+## `#store_review`
+
+Re-checks the claim under the response lock before writing anything. A review
+that overran its window may find another review has taken the claim over; it
+then writes neither grades nor mastery and leaves the claim alone, because the
+review that now holds it will grade the same sections. Without the check both
+would record mastery for the same answers.
+
+The missing sections are counted again after the row is reloaded under the claim:
 another request may have finished the last section between the first check
 and the claim.
 
@@ -59,8 +72,10 @@ refused with a 409 rather than saved in part.
 
 ## `#save_answers_under_lock`
 
-Locks the exercise, then the response: the order `RegenerateExerciseJob`
-takes, so the two serialize instead of deadlocking.
+Takes both locks through `DailyExercise#with_response_locked`, which yields
+only the response dated with today's exercise. An older row on the same
+exercise, which only legacy carry-forward data holds, is left alone, and
+today's is found or created, then locked.
 
 A refused submit raises `ActiveRecord::Rollback` instead of returning
 `:failed` early. `#persisted_response_for` has already created the row by
@@ -121,11 +136,6 @@ Returns nil because callers read a falsy value as "already handled", and
 
 The section is checked against the problem set. Without that, a crafted param
 could write arbitrary keys into the jsonb columns.
-
-## `#claim_review!`
-
-One `UPDATE ... WHERE` claims the row atomically, so a second click backs off
-instead of making a second provider call.
 
 ## `#clear_stale_generation_error!`
 
