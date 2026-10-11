@@ -61,6 +61,5 @@ pull-to-refresh cannot reload over the edit — and its code note has the whole
 picture.
 
 `spec/system/deferred_module_spec.rb` stalls the module assets, types an
-answer, and expects it saved. Without the `defaultValue` check the example
-still passes eventually but takes four minutes rather than five seconds, which
-is the measure of how long the answer sits unsaved.
+answer, and expects it saved. Without the `defaultValue` check no save is ever
+scheduled, so the example times out.
