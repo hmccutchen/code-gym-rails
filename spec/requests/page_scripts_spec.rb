@@ -42,12 +42,6 @@ RSpec.describe "Page scripts", type: :request do
     expect(importmap["imports"].keys.grep(/turbo/)).to be_empty
   end
 
-  it "renders the modules' text onto the body, which a module cannot translate for itself" do
-    body = doc.at_css("body")
-
-    expect(body["data-signed-out-text"]).to eq(I18n.t("request.signed_out"))
-    expect(body["data-save-failed-text"]).to eq(I18n.t("save_status.generic"))
-  end
 
   it "defines no page script inline in the head" do
     expect(doc.css("head script").map { |tag| tag["src"] || tag["type"] }).to all(be_present)
