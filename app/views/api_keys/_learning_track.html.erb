@@ -17,6 +17,7 @@
     const suggestions = document.getElementById("track-suggestions");
     let suggestionSaves = Promise.resolve();
     let queuedSuggestionSaves = 0;
+    let savedSuggestions = suggestions.checked;
     document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => queuedSuggestionSaves > 0));
     suggestions.addEventListener("change", () => {
       const wanted = suggestions.checked;
@@ -25,7 +26,8 @@
         const result = await window.CodeGymSaveStatus.save("PATCH", box.dataset.profileUrl,
           { user: { track_suggestions: wanted } }, "track_suggestions");
         queuedSuggestionSaves--;
-        if ((!result || !result.ok) && queuedSuggestionSaves === 0) suggestions.checked = !wanted;
+        if (result && result.ok) savedSuggestions = wanted;
+        if (queuedSuggestionSaves === 0) suggestions.checked = savedSuggestions;
       });
     });
     button.addEventListener("click", async () => {

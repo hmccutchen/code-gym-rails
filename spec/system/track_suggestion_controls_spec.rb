@@ -102,6 +102,29 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     expect(user.reload.track_suggestions).to be(true)
   end
 
+  it "returns the switch to the stored value when several quick saves all fail" do
+    user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
+    visit_as(user)
+    visit setup_path
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      const held = [];
+      const failure = () => new Response(JSON.stringify({ errors: ["nope"] }), { status: 500, headers: { "Content-Type": "application/json" } });
+      window.releaseFailures = () => { window.fetch = () => Promise.resolve(failure()); held.forEach((resolve) => resolve(failure())); };
+      window.fetch = (url, options) => url.endsWith(#{profile_path.to_json})
+        ? new Promise((resolve) => held.push(resolve))
+        : originalFetch(url, options);
+    JS
+
+    uncheck "Suggest level changes"
+    check "Suggest level changes"
+    page.execute_script("window.releaseFailures()")
+    wait_for_saves
+
+    expect(page).to have_checked_field("Suggest level changes")
+    expect(user.reload.track_suggestions).to be(true)
+  end
+
   it "turns suggestions off and on from Setup" do
     user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
     visit_as(user)
