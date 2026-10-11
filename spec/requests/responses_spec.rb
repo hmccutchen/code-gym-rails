@@ -91,15 +91,6 @@ RSpec.describe "Responses", type: :request do
       expect(response.parsed_body["submitted"]).to be(true)
       expect(user.daily_responses.sole.answers).to eq("code_review" => "Submitted elsewhere")
     end
-    it "saves to today's response even when the exercise also holds one dated another day" do
-      old = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.yesterday,
-                                  answers: { "code_review" => "Yesterday's answer" })
-
-      post responses_path, params: { response: { answers: { code_review: "Today's autosave" } } }, as: :json
-
-      expect(old.reload.answers).to eq("code_review" => "Yesterday's answer")
-      expect(user.daily_responses.find_by!(date: Date.current).answers["code_review"]).to eq("Today's autosave")
-    end
   end
 
   describe "partial submission finalization" do

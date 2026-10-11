@@ -1,6 +1,16 @@
 require "rails_helper"
 
 RSpec.describe DailyResponse, type: :model do
+  it "refuses a second response for the same exercise, whatever its date" do
+    user = User.create!(email: "one-response@example.com", name: "O")
+    exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: { "code_review" => { "question" => "q" } })
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+
+    expect { DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.yesterday, answers: {}) }
+      .to raise_error(ActiveRecord::RecordNotUnique)
+  end
+
   describe "#review_provider_label" do
     let(:user) { User.create!(email: "label@example.com", name: "L", provider: "openai", api_keys: { "openai" => "sk-proj-x" }) }
 
@@ -106,6 +116,10 @@ RSpec.describe DailyResponse, type: :model do
         "challenge"   => { "question" => "challenge-q" }
       }
     )
+  end
+
+  let(:next_exercise) do
+    user.daily_exercises.create!(date: Date.current + 1, generated_at: Time.current, problem_set: exercise.problem_set)
   end
 
   describe "#answered_sections" do
@@ -449,7 +463,7 @@ RSpec.describe DailyResponse, type: :model do
         daily_exercise: exercise, date: Date.current, answers: {},
         ai_review: { "code_review" => { "rating" => "developing" }, "pattern" => { "rating" => "strong" } }
       )
-      unreviewed = user.daily_responses.create!(daily_exercise: exercise, date: Date.current + 1, answers: {})
+      unreviewed = user.daily_responses.create!(daily_exercise: next_exercise, date: Date.current + 1, answers: {})
 
       expect(reviewed.ai_rating_for("code_review")).to eq("developing")
       expect(reviewed.ai_rating_favorable?("code_review")).to be(false)
@@ -494,7 +508,7 @@ RSpec.describe DailyResponse, type: :model do
         daily_exercise: exercise, date: Date.current, answers: {},
         ai_review: { "code_review" => { "rating" => "solid" } }
       )
-      unreviewed = user.daily_responses.create!(daily_exercise: exercise, date: Date.current + 1, answers: {})
+      unreviewed = user.daily_responses.create!(daily_exercise: next_exercise, date: Date.current + 1, answers: {})
 
       expect(reviewed.difficulty_for("code_review")).to be_nil
       expect(reviewed.difficulty_for("pattern")).to be_nil
@@ -529,7 +543,7 @@ RSpec.describe DailyResponse, type: :model do
   describe "#self_rating_label" do
     it "matches the feedback form's copy and is nil when unrated" do
       right_level = user.daily_responses.create!(daily_exercise: exercise, date: Date.current, answers: {}, section_ratings: { "code_review" => "right_level" })
-      unrated     = user.daily_responses.create!(daily_exercise: exercise, date: Date.current + 1, answers: {})
+      unrated     = user.daily_responses.create!(daily_exercise: next_exercise, date: Date.current + 1, answers: {})
 
       expect(right_level.self_rating_label("code_review")).to eq("just right")
       expect(unrated.self_rating_label("code_review")).to be_nil
