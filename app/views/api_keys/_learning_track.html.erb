@@ -15,20 +15,13 @@
     const box = document.getElementById("learning-track");
     const button = document.getElementById("leave-learning-track");
     const suggestions = document.getElementById("track-suggestions");
-    let suggestionSaves = Promise.resolve();
-    let queuedSuggestionSaves = 0;
     let savedSuggestions = suggestions.checked;
-    document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => queuedSuggestionSaves > 0));
-    suggestions.addEventListener("change", () => {
+    suggestions.addEventListener("change", async () => {
       const wanted = suggestions.checked;
-      queuedSuggestionSaves++;
-      suggestionSaves = suggestionSaves.then(async () => {
-        const result = await window.CodeGymSaveStatus.save("PATCH", box.dataset.profileUrl,
-          { user: { track_suggestions: wanted } }, "track_suggestions");
-        queuedSuggestionSaves--;
-        if (result && result.ok) savedSuggestions = wanted;
-        if (queuedSuggestionSaves === 0) suggestions.checked = savedSuggestions;
-      });
+      const result = await CodeGymSaveStatus.queue("track_suggestions", "PATCH", box.dataset.profileUrl,
+        { user: { track_suggestions: wanted } });
+      if (result.ok) savedSuggestions = wanted;
+      if (!CodeGymSaveStatus.queued("track_suggestions")) suggestions.checked = savedSuggestions;
     });
     button.addEventListener("click", async () => {
       button.disabled = true;

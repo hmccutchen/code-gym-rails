@@ -47,7 +47,7 @@ RSpec.describe "PATCH /profile skill_level", type: :request do
       patch_profile(skill_level: value, name: "Not saved")
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.parsed_body).to eq("errors" => [ "Skill level must be one of #{User::SKILL_LEVELS.join(', ')}" ])
+      expect(response.parsed_body).to eq("status" => "error", "error" => "Skill level must be one of #{User::SKILL_LEVELS.join(', ')}")
       expect(user.reload.attributes).to eq(original)
     end
   end

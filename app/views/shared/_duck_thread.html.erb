@@ -91,30 +91,20 @@
       explain.disabled = true;
       status.textContent = <%= t("duck.thinking").to_json.html_safe %>;
 
-      try {
-        const res = await fetch(DUCK_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-          },
-          body: JSON.stringify({ section: box.dataset.section, message: message, thread: priorThread })
-        });
-        const data = await CodeGymServerMessage.read(res);
-        // Clear ran while this was in flight; dropping the reply keeps a cleared thread cleared.
-        if (generation !== box.duckGeneration) return;
-        if (!res.ok || res.redirected || !data) throw CodeGymServerMessage.failure(res, data, SEND_FAILED);
+      const result = await CodeGymRequest.send("POST", DUCK_URL,
+        { section: box.dataset.section, message: message, thread: priorThread }, { fallback: SEND_FAILED });
+      // Clear ran while this was in flight; dropping the reply keeps a cleared thread cleared.
+      if (generation !== box.duckGeneration) return;
 
-        box.duckThread.push({ role: "user", content: message }, { role: "assistant", content: data.answer });
+      if (result.ok && result.data) {
+        box.duckThread.push({ role: "user", content: message }, { role: "assistant", content: result.data.answer });
         renderTurns(box);
         if (!explicitMessage) input.value = "";
         status.textContent = "";
-      } catch (e) {
-        if (generation !== box.duckGeneration) return;
-        status.textContent = CodeGymServerMessage.message(e, SEND_FAILED);
-      } finally {
-        if (generation === box.duckGeneration) refreshCap(box);
+      } else {
+        status.textContent = result.message || SEND_FAILED;
       }
+      refreshCap(box);
     };
 
     send.addEventListener("click", () => sendMessage());

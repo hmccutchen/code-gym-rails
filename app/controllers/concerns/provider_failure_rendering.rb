@@ -12,6 +12,6 @@ module ProviderFailureRendering
 
   def render_provider_failure(error, surface)
     text = provider_failure_text(error, surface)
-    render json: { status: "error", error: text.brief, failure: text.kind }, status: :service_unavailable
+    render_json_error(text.brief, status: :service_unavailable, failure: text.kind)
   end
 end

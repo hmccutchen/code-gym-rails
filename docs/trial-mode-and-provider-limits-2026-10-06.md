@@ -367,12 +367,17 @@ The page scripts that call those endpoints had their own leak: each showed
 the caught error's message, which for a dropped connection is the browser's
 "Failed to fetch", for an HTML error page a JSON parse error, and for an
 unhandled exception Rails' "Internal Server Error" or a bare status code.
-`window.CodeGymServerMessage` (`shared/_server_message`) now decides what a
-script may show: the `error` of a reply whose `status` is `"error"`, a
-session-expired sentence when fetch followed a redirect, and otherwise the
-page's own fallback wording. The thinking partner, review alternates and
-follow-ups, concept alternates, the pseudocode critique, Learn's write-up
-button and push enrolment all read it.
+Every page script now sends through `window.CodeGymRequest.send`
+(`shared/_request`), which never throws and resolves with `{ok, status, data,
+message, signedOut}`. Its `message` decides what a script may show: the
+`error` of a reply whose `status` is a string, which every error the app writes
+through `JsonErrors#render_json_error` carries, one session-expired sentence
+when fetch followed a redirect, and otherwise the caller's fallback wording.
+The thinking partner, review alternates and follow-ups, concept alternates,
+the pseudocode critique, Learn's write-up button, push enrolment and the
+dashboard's submit all read it, and `CodeGymSaveStatus` builds the save banner
+on it. (This passage first described `window.CodeGymServerMessage`, which
+`CodeGymRequest` replaced.)
 
 Reset times come from `ResetClock.reset_at(kind, provider:, failed_at:,
 retry_after:)` and are rendered in the user's `effective_time_zone`:

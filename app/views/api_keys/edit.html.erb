@@ -203,45 +203,28 @@
   <script>
     (function () {
       // Key per control: all controls PATCH one path, and a shared key lets one success clear another's warning.
-      const save = (payload, key) =>
-        window.CodeGymSaveStatus.save("PATCH", "<%= profile_path %>", { user: payload }, key);
+      const queueSave = (key, payload) =>
+        CodeGymSaveStatus.queue(key, "PATCH", "<%= profile_path %>", typeof payload === "function" ? () => ({ user: payload() }) : { user: payload });
 
       const tz = document.getElementById("tz-select");
-      if (tz) tz.addEventListener("change", () => save({ time_zone: tz.value }, "time_zone"));
+      if (tz) tz.addEventListener("change", () => queueSave("time_zone", { time_zone: tz.value }));
 
       const dailySections = document.getElementById("daily-sections");
       if (dailySections) {
-        let sectionSaves = Promise.resolve();
-        let queuedSectionSaves = 0;
-        document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => queuedSectionSaves > 0));
-
         dailySections.addEventListener("change", (event) => {
-          const count = event.target.value;
-          queuedSectionSaves++;
-          sectionSaves = sectionSaves.then(async () => {
-            await save({ daily_section_count: count }, "daily_section_count");
-            queuedSectionSaves--;
-          });
+          queueSave("daily_section_count", { daily_section_count: event.target.value });
         });
       }
 
       const skill = document.getElementById("skill-level");
       if (skill) {
-        let skillSaves = Promise.resolve();
-        let queuedSkillSaves = 0;
-        document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => queuedSkillSaves > 0));
-
-        skill.addEventListener("change", () => {
+        skill.addEventListener("change", async () => {
           const level = skill.value;
-          queuedSkillSaves++;
-          skillSaves = skillSaves.then(async () => {
-            const result = await save({ skill_level: level }, "skill_level");
-            queuedSkillSaves--;
-            if (!result || !result.ok) return;
-            const levelLabel = Array.from(skill.options).find((option) => option.value === level).textContent;
-            document.querySelectorAll("[data-skill-level-label]").forEach((label) => {
-              label.textContent = skill.dataset.labelTemplate.replace("__LEVEL__", levelLabel);
-            });
+          const result = await queueSave("skill_level", { skill_level: level });
+          if (!result.ok) return;
+          const levelLabel = Array.from(skill.options).find((option) => option.value === level).textContent;
+          document.querySelectorAll("[data-skill-level-label]").forEach((label) => {
+            label.textContent = skill.dataset.labelTemplate.replace("__LEVEL__", levelLabel);
           });
         });
       }
@@ -362,15 +345,16 @@
         };
 
         let pending = null;
-        let queuedSaves = 0;
         let editRevision = 0;
         const persistMix = () => {
-          const payload = Object.assign(state(), { section_kind_preferences_version: version });
-          const revision = editRevision;
+          let revision;
+          const payload = () => {
+            revision = editRevision;
+            return Object.assign(state(), { section_kind_preferences_version: version });
+          };
 
-          return save(payload, "exercise_mix").then((result) => {
-            if (!result) return false;
-
+          // Queued in order: a parallel save would post the version the one in flight is about to move, and 409 against itself.
+          return queueSave("exercise_mix", payload).then((result) => {
             const reported = result.data && result.data.section_kind_preferences_version;
             if (result.ok && typeof reported === "number") version = reported;
             if (result.status === 409 && result.data && result.data.current) {
@@ -386,20 +370,15 @@
           });
         };
 
-        // Chained: a parallel save would post the version the one in flight is about to move, and 409 against itself.
-        let inFlight = Promise.resolve();
-        // After load: this inline script runs before the layout defines CodeGymSaveStatus.
-        document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => pending !== null || queuedSaves > 0));
+        CodeGymSaveStatus.watch(() => pending !== null);
         const saveMix = () => {
           editRevision++;
           prepareButton.disabled = true;
           clearTimeout(pending);
           pending = setTimeout(() => {
             pending = null;
-            queuedSaves++;
-            inFlight = inFlight.then(persistMix).then((savedLatest) => {
-              queuedSaves--;
-              prepareButton.disabled = !savedLatest || pending !== null || queuedSaves > 0;
+            persistMix().then((savedLatest) => {
+              prepareButton.disabled = !savedLatest || pending !== null || CodeGymSaveStatus.queued("exercise_mix");
             });
           }, 400);
         };

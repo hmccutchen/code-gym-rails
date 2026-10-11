@@ -19,6 +19,6 @@ module ProviderCallLimits
   private
 
   def provider_calls_limited
-    render json: { status: "error", error: t("errors.provider_calls_limited") }, status: :too_many_requests
+    render_json_error(t("errors.provider_calls_limited"), status: :too_many_requests)
   end
 end

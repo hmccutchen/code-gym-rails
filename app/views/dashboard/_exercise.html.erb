@@ -148,27 +148,24 @@
     }
 
     let saveTimer = null;
-    let saving = false;
-    let saveAgain = false;
-    document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => saveTimer !== null || saveAgain));
+    CodeGymSaveStatus.watch(() => saveTimer !== null);
 
     function sendSave() {
       clearTimeout(saveTimer);
       saveTimer = null;
       if (form.inert) return;
-      if (saving) { saveAgain = true; return; }
-      saving = true;
-      window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, status, data }) => {
-        saving = false;
-        if (!ok && status === 409 && data?.status === "stale") {
-          window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
-          window.location.reload();
-          return;
-        }
-        if (ok && data?.submitted && !form.inert && !reviewRequested) return window.location.reload();
-        if (saveAgain) { saveAgain = false; return sendSave(); }
-        if (ok && saveTimer === null && !form.inert) applyServerState(data);
-      });
+      CodeGymSaveStatus.queue("answers", "POST", form.action, () => (form.inert ? null : payload()), { latest: true })
+        .then(({ ok, status, data, skipped }) => {
+          if (skipped) return;
+          if (ok) CodeGymSaveStatus.clear("submit");
+          if (!ok && status === 409 && data?.status === "stale") {
+            CodeGymSaveStatus.carry("answers", STALE_RELOADED);
+            window.location.reload();
+            return;
+          }
+          if (ok && data?.submitted && !form.inert && !reviewRequested) return window.location.reload();
+          if (ok && saveTimer === null && !CodeGymSaveStatus.queued("answers") && !form.inert) applyServerState(data);
+        });
     }
 
     function autoSave() {
@@ -205,6 +202,8 @@
     });
 
     const GENERATING_REVIEW = <%= t("review.generating_label").to_json.html_safe %>;
+    const SUBMIT_FAILED = <%= t("dashboard.exercise.submit_failed").to_json.html_safe %>;
+    const REVIEW_START_FAILED = <%= t("dashboard.exercise.review_start_failed").to_json.html_safe %>;
     let reviewRequested = false;
 
     function requestReview(url) {
@@ -214,7 +213,7 @@
       const token = document.createElement("input");
       token.type = "hidden";
       token.name = "authenticity_token";
-      token.value = document.querySelector('meta[name="csrf-token"]').content;
+      token.value = document.querySelector('meta[name="csrf-token"]')?.content ?? "";
       reviewForm.appendChild(token);
       document.body.appendChild(reviewForm);
       reviewForm.submit();
@@ -231,56 +230,36 @@
       submitButton.classList.add("btn-loading");
       submitButton.textContent = <%= t("dashboard.exercise.submitting").to_json.html_safe %>;
 
-      let submissionSaved = false;
-      let reloading = false;
-      let refused = false;
-      try {
-        const res = await fetch(form.action, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-          },
-          body: JSON.stringify(payload({ submit: "1" }))
-        });
+      const result = await CodeGymRequest.send("POST", form.action, payload({ submit: "1" }), { fallback: SUBMIT_FAILED });
+      const reviewUrl = result.ok ? result.data?.review_url : null;
+      if (result.ok) CodeGymSaveStatus.clear("submit");
 
-        if (res.ok) {
-          const data = await res.json();
-          submissionSaved = true;
-          submitButton.textContent = GENERATING_REVIEW;
-          requestReview(data.review_url);
-          reviewRequested = true;
-        } else {
-          // Stays inert behind the reload: restoring the form would queue an autosave of the refused payload.
-          if (res.status === 409) {
-            window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
-            reloading = true;
-            window.location.reload();
-            return;
-          }
-          const data = await res.json().catch(() => null);
-          refused = res.status === 422 && Boolean(data?.submit_blocker);
-          if (refused) applyServerState(data);
-          else alert(<%= t("dashboard.exercise.submit_failed").to_json.html_safe %>);
-        }
-      } catch (error) {
-        if (submissionSaved) {
-          alert(<%= t("dashboard.exercise.review_start_failed").to_json.html_safe %>);
-          window.location.reload();
-        } else {
-          alert(<%= t("dashboard.exercise.submit_failed").to_json.html_safe %>);
-        }
-      } finally {
-        if (!reviewRequested && !submissionSaved && !reloading) {
-          form.inert = false;
-          submitButton.classList.remove("btn-loading");
-          submitButton.textContent = <%= t("dashboard.exercise.submit").to_json.html_safe %>;
-          submitButton.disabled = false;
-          autoSave();
-          if (refused) ratingNudge.focus();
-        }
+      if (reviewUrl) {
+        submitButton.textContent = GENERATING_REVIEW;
+        reviewRequested = true;
+        try { requestReview(reviewUrl); return; } catch (_) { reviewRequested = false; }
       }
+      // Stays inert behind the reload: restoring the form would queue an autosave of the refused payload.
+      if (result.ok || result.status === 409) {
+        CodeGymSaveStatus.carry("answers", result.ok ? REVIEW_START_FAILED : STALE_RELOADED);
+        window.location.reload();
+        return;
+      }
+
+      const refused = result.status === 422 && Boolean(result.data?.submit_blocker);
+      if (refused) {
+        CodeGymSaveStatus.clear("submit");
+        applyServerState(result.data);
+      } else {
+        CodeGymSaveStatus.report("submit", result.message);
+      }
+
+      form.inert = false;
+      submitButton.classList.remove("btn-loading");
+      submitButton.textContent = <%= t("dashboard.exercise.submit").to_json.html_safe %>;
+      submitButton.disabled = false;
+      autoSave();
+      if (refused) ratingNudge.focus();
     });
 
     // Safari bfcaches this no-store page anyway (every iOS home-screen launch), so reload a stale submitted form.

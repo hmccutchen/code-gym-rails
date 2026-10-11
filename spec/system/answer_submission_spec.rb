@@ -106,7 +106,8 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
         wait_for_saved_answer(user, "code_review", original)
         page.execute_script(<<~JS)
           const originalFetch = window.fetch;
-          window.alert = () => {};
+          window.alerts = [];
+          window.alert = (message) => window.alerts.push(message);
           window.submitRequests = 0;
           window.fetch = (url, options) => {
             if (options?.body && JSON.parse(options.body).response?.submit === "1") {
@@ -133,7 +134,10 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
         page.execute_script("window.finishSubmit()")
         expect(page).to have_no_selector("#gym-form[inert]")
         expect(page).to have_button("Submit answers", disabled: false)
+        expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.submit_failed"))
+        expect(page.evaluate_script("window.alerts")).to eq([])
         wait_for_saved_answer(user, "code_review", final)
+        expect(page).to have_no_css("#save-status", visible: true)
         expect(user.daily_responses.reload.sole).not_to be_submitted
         visit root_path
         expect(find('textarea[data-field="code_review"]').value).to eq(final)
@@ -156,7 +160,6 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       fill_in_answer("pattern", "")
       page.execute_script(<<~JS)
         const originalFetch = window.fetch;
-        window.alert = () => {};
         window.fetch = async (url, options) => {
           const response = await originalFetch(url, options);
           if (options?.body && JSON.parse(options.body).response?.submit === "1") {
@@ -187,7 +190,6 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       fill_in_answer("code_review", "The answer that will be submitted before navigation fails.")
       rate_section("code_review")
       page.execute_script(<<~JS)
-        window.alert = message => sessionStorage.setItem("handoffFailure", message);
         HTMLFormElement.prototype.submit = function () {
           throw new DOMException("Automatic form navigation was refused", "SecurityError");
         };
@@ -198,7 +200,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       expect(page).to have_content("✓ Submitted", wait: 10)
       expect(page).to have_no_selector("#gym-form")
       expect(page).to have_selector("form.review-form")
-      expect(page.evaluate_script('sessionStorage.getItem("handoffFailure")')).to include("Your answers were saved")
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.review_start_failed"))
       expect(user.daily_responses.reload.sole).to have_attributes(submitted?: true, reviewed?: false)
       expect(user.daily_responses.sole.answers["code_review"]).to eq("The answer that will be submitted before navigation fails.")
       within("form.review-form") { find('button[type="submit"]').click }
@@ -346,9 +348,9 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
   def hold_response_requests
     page.execute_script(<<~JS)
       const originalFetch = window.fetch;
-      const originalSave = window.CodeGymSaveStatus.save;
-      window.CodeGymSaveStatus.save = (...args) => originalSave(...args).then(result => {
-        document.querySelector("#gym-form").dataset.autosaveReturned = String(result.data?.submitted);
+      const originalQueue = window.CodeGymSaveStatus.queue;
+      window.CodeGymSaveStatus.queue = (...args) => originalQueue(...args).then(result => {
+        if (!result.skipped) document.querySelector("#gym-form").dataset.autosaveReturned = String(result.data?.submitted);
         return result;
       });
       window.fetch = (url, options) => {

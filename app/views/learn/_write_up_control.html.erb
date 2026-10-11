@@ -17,28 +17,26 @@
 
     const INTERVAL_MS = <%= (poll_interval_s * 1000).to_i %>;
     const MAX_ATTEMPTS = <%= (AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT) / poll_interval_s).ceil %>;
+    const FAILED = "<%= j t("learn.write_guide_failed") %>";
     let attempts = 0;
 
-    function poll() {
+    async function poll() {
       attempts++;
       if (attempts > MAX_ATTEMPTS) {
-        status.textContent = "<%= j t("learn.write_guide_failed") %>";
+        status.textContent = FAILED;
         return;
       }
 
-      fetch(box.dataset.statusUrl, { headers: { "Accept": "application/json" } })
-        .then((response) => response.json())
-        .then((data) => {
-          if (data.ready) return window.location.reload();
-          if (data.rewritten) return window.location.assign(window.location.pathname + "?<%= awaiting %>=missing");
-          if (data.failed) {
-            status.textContent = data.message;
-            button.disabled = false;
-            return;
-          }
-          setTimeout(poll, INTERVAL_MS);
-        })
-        .catch(() => setTimeout(poll, INTERVAL_MS));
+      const { ok, data } = await CodeGymRequest.get(box.dataset.statusUrl);
+      if (!ok || !data) return setTimeout(poll, INTERVAL_MS);
+      if (data.ready) return window.location.reload();
+      if (data.rewritten) return window.location.assign(window.location.pathname + "?<%= awaiting %>=missing");
+      if (data.failed) {
+        status.textContent = data.message;
+        button.disabled = false;
+        return;
+      }
+      setTimeout(poll, INTERVAL_MS);
     }
 
     button.addEventListener("click", async () => {
@@ -46,23 +44,11 @@
       button.disabled = true;
       status.textContent = "<%= j t("learn.writing_guide") %>";
 
-      try {
-        const response = await fetch(box.dataset.url, {
-          method: "POST",
-          headers: {
-            "Accept": "application/json",
-            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-          }
-        });
-        if (response.ok && !response.redirected) return poll();
+      const result = await CodeGymRequest.send("POST", box.dataset.url, undefined, { fallback: FAILED });
+      if (result.ok) return poll();
 
-        const data = await CodeGymServerMessage.read(response);
-        button.disabled = false;
-        status.textContent = CodeGymServerMessage.failure(response, data, "<%= j t("learn.write_guide_failed") %>").message;
-      } catch {
-        button.disabled = false;
-        status.textContent = "<%= j t("learn.write_guide_failed") %>";
-      }
+      button.disabled = false;
+      status.textContent = result.message;
     });
   })();
 </script>

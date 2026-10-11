@@ -57,19 +57,11 @@
       }
     };
 
-    // One save at a time: each carries the whole object, so parallel saves could land out of order.
-    let inFlight = Promise.resolve();
-    let queued = 0;
-    // After load: this inline script runs before the layout defines CodeGymSaveStatus.
-    document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => queued > 0));
-
+    // Queued in order: each save carries the whole object, so parallel saves could land out of order.
     box.addEventListener("change", () => {
       apply(chosen());
-      queued++;
-      inFlight = inFlight
-        .then(() => window.CodeGymSaveStatus.save("PATCH", "<%= profile_path %>",
-                                                  { user: { display_preferences: chosen() } }, "display_preferences"))
-        .then(() => { queued--; });
+      CodeGymSaveStatus.queue("display_preferences", "PATCH", "<%= profile_path %>",
+                              () => ({ user: { display_preferences: chosen() } }));
     });
   })();
 </script>

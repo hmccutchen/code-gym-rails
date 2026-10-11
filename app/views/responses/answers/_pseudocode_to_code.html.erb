@@ -66,18 +66,10 @@
         critiqueBtn.disabled = true;
         status.textContent = WORKING;
 
-        try {
-          const res = await fetch("<%= pseudocode_critique_responses_path %>", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-            },
-            body: JSON.stringify({ section: section, pseudocode: textarea.value })
-          });
-          const data = await CodeGymServerMessage.read(res);
-          if (!res.ok || res.redirected || !data) throw CodeGymServerMessage.failure(res, data, CRITIQUE_FAILED);
-
+        const result = await CodeGymRequest.send("POST", "<%= pseudocode_critique_responses_path %>",
+          { section: section, pseudocode: textarea.value }, { fallback: CRITIQUE_FAILED });
+        const data = result.data;
+        if (result.ok && data && (!data.gaps_found || Array.isArray(data.gaps))) {
           critiqueOut.replaceChildren();
           const label = document.createElement("p");
           label.className = "pseudocode-critique-label";
@@ -96,8 +88,8 @@
             critiqueOut.append(label, ul);
           }
           status.textContent = "";
-        } catch (e) {
-          status.textContent = CodeGymServerMessage.message(e, CRITIQUE_FAILED);
+        } else {
+          status.textContent = result.message || CRITIQUE_FAILED;
           critiqueBtn.disabled = false;
         }
       });

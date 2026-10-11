@@ -217,6 +217,11 @@ decisions, not defaults that drifted into place:
   answer onto the page and sends it again in every reply, and the script only
   displays the latest one (`answered_sections` and `submit_blocker` on the
   dashboard form and in each autosave reply).
+- **One way to send a request** — a page script sends through
+  `CodeGymRequest.send`, and a save that must not overlap another goes
+  through `CodeGymSaveStatus.queue`, never a hand-built `fetch` or its own
+  promise chain. The server answers every error with `render_json_error`, so
+  the browser has one rule for what a failure may show.
 - **Domain data stays off provider classes** — lists and tables the domain
   owns live in a module of their own (`ConceptVocabulary`), and `AiService`
   reads them; it keeps only what is about talking to a provider.
@@ -1682,14 +1687,18 @@ concept-specific difficulty descriptions for future generation, not a new set.
   reject with the browser's text ("Failed to fetch"), land on an HTML error
   page whose parse error names a token, or come back as the JSON Rails writes
   for an unhandled exception, whose `error` is a status phrase and whose
-  `status` is a number. `shared/_server_message` defines
-  `window.CodeGymServerMessage`, the one rule every script that calls a JSON
-  endpoint uses: it shows an `error` only when `status` is `"error"`, which
-  every reply the app writes carries, says the session expired when fetch
-  followed a redirect, and otherwise shows the page's own fallback wording.
-  A caught error's message is shown only when the helper made it.
-  `spec/system/server_message_spec.rb` drives each of those replies through
-  the thinking partner. The sign-up form's refused address gets
+  `status` is a number. Every JSON error the app writes goes through
+  `JsonErrors#render_json_error`, as `{status: "error", error: "…"}` plus any
+  keys the caller needs (a stale save says `"stale"`), so the string status
+  is what marks a reply as the app's own. Every page script sends through
+  `window.CodeGymRequest.send` (`shared/_request`), which reads the CSRF
+  token safely, never throws, and returns `{ok, status, data, message,
+  signedOut}`. Its `message` is the reply's `error` when `status` is a
+  string, "your session expired" when fetch followed a redirect, and the
+  caller's fallback otherwise, so no script decides on its own what a failure
+  may show. `spec/system/server_message_spec.rb` drives each of those replies
+  through the thinking partner, and `spec/system/request_module_spec.rb` holds
+  the module itself. The sign-up form's refused address gets
   `sessions.email_not_accepted` rather than the validation exception.
 
   **Rendered when read, not when written.** A failed generation stores its
@@ -2843,10 +2852,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   block displays it, so that media query stays the one standalone test and a
   browser tab keeps its native pull. The action is a full reload, and it
   waits for `CodeGymSaveStatus.pending()` to clear first: that counts
-  requests on the wire plus the delayed saves the dashboard and /setup
-  register through `watch()`, since both hold an edit for a moment before
-  sending it. Their scripts are inline in the page body, which runs before the
-  layout defines `CodeGymSaveStatus`, so they register on `DOMContentLoaded`.
+  requests on the wire, saves waiting in `CodeGymSaveStatus.queue`, and the
+  delayed saves the dashboard and /setup register through `watch()`, since
+  both hold an edit for a moment before sending it. The layout defines
+  `CodeGymRequest` and `CodeGymSaveStatus` in `<head>`, so page scripts call
+  them as they run.
   A save still pending after ten seconds cancels the pull rather than
   reloading over it. The gesture also refuses to start while a text field has
   focus, while any form is `inert` (the dashboard's submission and review
@@ -3247,7 +3257,9 @@ always pull in the full suite — is stated once, in
 - `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
 - `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
-- `app/views/shared/_server_message.html.erb` — defines `window.CodeGymServerMessage`: what a page script may show when a request fails, the app's own sentence or the page's fallback
+- `app/views/shared/_request.html.erb` — defines `window.CodeGymRequest`, rendered in `<head>`: the one way a page script sends a request, and what it may show when one fails
+- `app/views/shared/_save_status.html.erb` / `_save_status_banner.html.erb` — `window.CodeGymSaveStatus`, rendered in `<head>`: the save banner's failures by control, the per-control save queue (in order, or collapsing to the latest), and `pending()`; the banner markup sits in `<body>`
+- `app/controllers/concerns/json_errors.rb` — `render_json_error`: the one shape of a JSON error reply
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
 - `app/views/pwa/service-worker.js` — shows the notification. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing

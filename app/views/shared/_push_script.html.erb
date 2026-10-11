@@ -12,9 +12,10 @@
              "PushManager" in window
     }
 
-    function csrfToken() {
-      const tag = document.querySelector("meta[name='csrf-token']")
-      return tag ? tag.content : ""
+    function failure(text) {
+      const error = new Error(text)
+      error.readable = true
+      return error
     }
 
     function applicationServerKey(base64) {
@@ -28,19 +29,14 @@
     function register(subscription) {
       const json = subscription.toJSON()
 
-      return fetch(REGISTER_PATH, {
-        method: "POST",
-        redirect: "error",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
-        body: JSON.stringify({
-          endpoint: json.endpoint,
-          p256dh: json.keys.p256dh,
-          auth: json.keys.auth
-        })
-      }).then(function (response) {
-        if (!response.ok) throw CodeGymServerMessage.error(<%= t("push.register_failed").to_json.html_safe %>)
+      return window.CodeGymRequest.send("POST", REGISTER_PATH, {
+        endpoint: json.endpoint,
+        p256dh: json.keys.p256dh,
+        auth: json.keys.auth
+      }, { fallback: <%= t("push.register_failed").to_json.html_safe %> }).then(function (result) {
+        if (!result.ok) throw failure(result.message)
 
-        return response
+        return result
       })
     }
 
@@ -59,7 +55,7 @@
         })
     }
 
-    return { supported: supported, subscribeAndRegister: subscribeAndRegister }
+    return { supported: supported, subscribeAndRegister: subscribeAndRegister, failure: failure }
   })();
 
 <% if current_user.push_reminders_enabled? %>

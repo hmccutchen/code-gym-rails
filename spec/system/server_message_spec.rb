@@ -79,7 +79,7 @@ RSpec.describe "Failed requests on the page", type: :system, with_csrf: true do
       duck.find(".duck-input").fill_in(with: "Why does this loop twice?")
       duck.find(".duck-send").click
 
-      expect(duck).to have_content(I18n.t("server_message.signed_out"), wait: 10)
+      expect(duck).to have_content(I18n.t("request.signed_out"), wait: 10)
     end
   end
 end

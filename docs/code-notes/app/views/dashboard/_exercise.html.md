@@ -71,14 +71,16 @@ within one round trip at the moments someone is likely to press Submit next.
 The `change` listener only acts on answer controls: the duck's box sits inside
 this form, and its `change` would otherwise save a draft.
 
-Only one save is on the wire at a time (`saving`). Each save carries every
-answer, and the server writes whichever request takes the response lock last,
-so two overlapping saves could land out of order and put older answers over
-newer ones. A save asked for while one is in flight sets `saveAgain`, and when
-the first reply arrives one more save goes out with the answers as they are
-then. Several requests in that window collapse into that one save. The queued
-save counts as pending for `CodeGymSaveStatus.watch`, so pull-to-refresh waits
-for it.
+Saves go through `CodeGymSaveStatus.queue("answers", …, { latest: true })`, so
+only one is on the wire at a time. Each save carries every answer, and the
+server writes whichever request takes the response lock last, so two
+overlapping saves could land out of order and put older answers over newer
+ones. Saves asked for while one is in flight collapse into one, sent when the
+first reply arrives with the answers as they are then (the body is a function
+for that reason, and it returns `null` once the form is inert, which drops the
+save). A reply is applied only when nothing is queued behind it
+(`CodeGymSaveStatus.queued`). The queue counts toward `pending()` itself, so
+pull-to-refresh waits for it.
 
 A 409 with status `stale` means the server refused the answer's encoding (see
 `ResponsesController#stale_answer_sections`) and stored nothing, so the page
@@ -91,7 +93,7 @@ happened by the time anyone reads it.
 
 ## Submit and review
 
-Submit goes through fetch with the page's CSRF meta tag. On success it chains
+Submit goes through `CodeGymRequest.send`. On success it chains
 straight into the review, which the user asks for every time anyway. The
 review is a real form POST to the URL the server returned, so `#review`'s
 redirects and flashes land exactly as they do from the manual button in
@@ -104,7 +106,15 @@ the submission is saved and confirmed before the review is requested.
 Submit is never disabled. When the day isn't ready, `#create` answers with a
 422 carrying `submit_blocker`; the page shows that blocker's sentence in the
 nudge and moves focus to it once the form is editable again, so a screen
-reader hears why nothing happened. Any other failure keeps the generic alert.
+reader hears why nothing happened. Any other failure shows in the save banner
+under its own `submit` key, with the server's sentence when it wrote one, and
+the form becomes editable again. The next successful save of the answers, or a
+refusal the nudge explains, clears it, so a failure that has since been
+overtaken does not sit beside the nudge. There is no `alert()`: a blocking dialog
+stops the page and is announced less reliably than the banner's live region.
+If the submission was stored but the review could not start, the page carries
+`review_start_failed` to the reload, where the submitted state offers the
+review button.
 
 A 409 on submit is the same refusal the autosave handles, on the path that
 matters more: nothing was submitted, so reloading is what lets the next press

@@ -16,7 +16,7 @@ RSpec.describe "Learn write-up after the session expired", type: :system, with_c
     JS
     click_button I18n.t("learn.write_guide")
 
-    expect(page).to have_css(".learn-status", text: I18n.t("server_message.signed_out"))
+    expect(page).to have_css(".learn-status", text: I18n.t("request.signed_out"))
     expect(page).to have_button(I18n.t("learn.write_guide"), disabled: false)
   end
 end

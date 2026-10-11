@@ -13,7 +13,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
 
   def expect_track_refused
     expect(response).to have_http_status(:unprocessable_content)
-    expect(response.parsed_body).to eq("errors" => [ "That learning track change isn't available." ])
+    expect(response.parsed_body).to eq("status" => "error", "error" => "That learning track change isn't available.")
   end
 
   context "on first run" do

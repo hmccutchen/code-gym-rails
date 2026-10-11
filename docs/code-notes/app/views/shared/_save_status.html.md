@@ -19,16 +19,18 @@ The layout's one-shot time-zone detection deliberately does not report here.
 Nothing the user did triggers it, so a banner would name a failure they took no
 action to cause, and it runs again on the next page load anyway.
 
-The layout renders this partial ahead of `yield :page_scripts`, the same way it
-renders `shared/_push_script`, so a page's own script can rely on
-`window.CodeGymSaveStatus` existing by the time it runs.
+The layout renders this script in `<head>`, after `shared/_request`, so every
+page script can call it as it runs; nothing registers on `DOMContentLoaded` to
+reach it. The banner markup is `shared/_save_status_banner`, rendered in
+`<body>`, so `render()` looks the elements up when it runs and waits for
+`DOMContentLoaded` if a carried message arrives before they exist.
 
 ## `#save-status-announcer`
 
 The visible banner is toggled with `hidden`, and screen readers often stay
 silent about a live region that appears with its text already in it. This copy
 is always in the page, so a failed save is always announced, and assertively
-(`role="alert"`), including when only a follow-up bookkeeping request failed.
+(`role="alert"`), since the engineer's work did not reach the server.
 
 ## `failures`
 
@@ -49,37 +51,55 @@ These count work the page shows but the server has not stored yet: a request on
 the wire, or a delayed save a page registered through `watch()`.
 Pull-to-refresh waits on `pending()` so a reload cannot drop an edit mid-save.
 
-## `csrf()`
+## `queue()` and `queued()`
 
-The lookup is optional-chained for the same reason `api_keys/edit`'s script is:
-with forgery protection off, Rails renders no csrf meta tag at all, and a throw
-here would stop the save silently, which is the failure this file exists to
-surface.
+A control whose saves must not overlap queues them under its key. Without
+`latest`, every save goes out in order, which Setup's controls need: the
+exercise mix's next save carries the version the one before it moved to. With
+`latest`, saves asked for while one is in flight collapse into a single save,
+which the dashboard needs, since each of its saves carries every answer. A body
+given as a function is read when the save is sent, so it carries the state as
+it is then; returning `null` drops that save. The next save is sent a task
+later, not a microtask, so the reply's own handlers have updated whatever the
+next body is built from (the mix's version, again). Waiting saves count toward
+`pending()`.
+
+`quiet` keeps a queued save's failures out of the banner. The nav name editor
+shows its own "couldn't save" line beside the field, and the layout's one-shot
+time-zone detection is something the user never asked for, so neither should
+raise the banner. Both still queue, under `name` and `time_zone`, so an older
+write can't land after a newer one; Setup's time-zone select shares the
+`time_zone` key with the detection.
+
+## `report()` and `clear()`
+
+A failure that is not a save, such as a refused submission, still belongs in
+the banner, so callers can report one under its own key.
 
 ## `save()`
+
+The optional fifth argument, `failureMessage`, replaces the wording for every
+failure: a dropped connection, a refusal and a session redirect. The track
+proposal uses it for its separate answer-count request: the choice was saved,
+the count could not be updated, and the user need not repeat the choice. Keys,
+pending requests and out-of-order replies work the same way with or without
+it.
 
 `save` resolves with `{ ok, status, data }`, so a caller able to act on a
 particular refusal can. Callers that cannot simply ignore it; the failure has
 already been reported either way.
-
-The optional fifth argument, `failureMessage`, replaces the default wording
-for network failures, HTTP refusals and session redirects. The track proposal
-uses an app-owned, localized sentence for its separate answer-count request:
-the choice was saved, the count could not be updated, and the user need not
-repeat the choice. This changes only the message; failure keys, pending
-requests and stale-response handling still work the same way.
 
 `fetch` follows redirects, so a request made after the session expired arrives
 as the login page: status 200 and `ok` true, for a save that stored nothing.
 Neither endpoint redirects on success, so a redirect can only mean the write
 did not happen.
 
-A failure can answer with an HTML error page rather than JSON, and parsing that
-throws, hence the inner catch. Without an override, only a message the server
-actually wrote is shown; anything else falls back to `GENERIC`, which is why
-the rejection path ignores its own error. A dropped connection rejects with a browser string
-("Failed to fetch"), which is a developer's sentence and not one to show an
-engineer.
+The request itself goes through `CodeGymRequest.send`, which reads the CSRF
+token safely, parses JSON only when it can, and decides what the banner may
+say: the server's sentence when the reply is the app's own, the module's one
+signed-out sentence after a redirect, and `GENERIC` otherwise. A body function
+that throws drops its save rather than stalling the key's queue. A dropped connection's
+browser string ("Failed to fetch") is never shown.
 
 ## `CARRIED` and `carry()`
 

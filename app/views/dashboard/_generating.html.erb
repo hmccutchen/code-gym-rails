@@ -18,15 +18,10 @@
   async function poll() {
     attempts += 1;
 
-    try {
-      const res = await fetch(statusUrl, { headers: { "Accept": "application/json" } });
-      const data = await res.json();
-      if (data.status === "ready" || data.status === "failed") {
-        window.location.reload();
-        return;
-      }
-    } catch {
-      // Transient network hiccup — keep polling rather than giving up early.
+    const { data } = await CodeGymRequest.get(statusUrl);
+    if (data?.status === "ready" || data?.status === "failed") {
+      window.location.reload();
+      return;
     }
 
     if (attempts >= MAX_ATTEMPTS) {

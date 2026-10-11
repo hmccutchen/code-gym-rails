@@ -126,7 +126,7 @@ RSpec.describe "Save status", type: :system do
     user.anonymize!
     find("#weight-challenge").set(0)
 
-    expect(page).to have_css("#save-status", text: /signed out/i, wait: 5)
+    expect(page).to have_css("#save-status", exact_text: I18n.t("request.signed_out"), wait: 5)
   end
 
   # These three controls PATCH the same path, so an unkeyed status would let one control's success hide another's warning.
