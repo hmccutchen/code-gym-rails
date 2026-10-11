@@ -46,11 +46,14 @@ RSpec.describe "Page scripts", type: :request do
     expect(doc.css("head script").map { |tag| tag["src"] || tag["type"] }).to all(be_present)
   end
 
-  it "waits for DOMContentLoaded before starting the generating poll, since it reaches a deferred module" do
+  it "starts the generating poll from a controller the module registers, not from inline script" do
     travel_to(Date.new(2026, 7, 13)) do
       get root_path
+      page = Nokogiri::HTML(response.body)
 
-      expect(response.body).to match(/DOMContentLoaded.{0,80}setTimeout\(poll/m)
+      poller = page.at_css("[data-controller~='generating']")
+      expect(poller["data-generating-url-value"]).to eq(dashboard_status_path)
+      expect(page.css("script:not([src]):not([type])").to_s).not_to include(dashboard_status_path)
     end
   end
 end

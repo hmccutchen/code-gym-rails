@@ -1,6 +1,6 @@
 require "rails_helper"
 
-# with_csrf: the submit script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
+# with_csrf: the submit action reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 RSpec.describe "Interaction before the deferred modules run", type: :system, with_csrf: true do
   let(:user) { create_fake_provider_user }
   let(:stalled) { { modules: false } }
@@ -36,7 +36,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     sleep 0.1 until yield || Time.current > deadline
   end
 
-  it "holds a Submit click made while the modules are still loading, then completes it" do
+  it "drops a Submit click made while the modules are still loading rather than posting the day" do
     travel_to(a_weekday) do
       watch_page_errors
       visit_with_todays_set(user)
@@ -47,13 +47,27 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       expect_ready_to_submit
 
       reload_with_modules_stalled do |pw|
+        expect(pw.evaluate("document.querySelector('#gym-form') !== null")).to be(true)
         pw.evaluate("[...document.querySelectorAll('button')].find((b) => /Submit answers/i.test(b.textContent)).click()")
       end
 
+      expect(user.daily_responses.sole).not_to be_submitted
+
+      stalled[:modules] = false
+      Timeout.timeout(20) { sleep 0.1 until answer_form_connected? }
+      click_button "Submit answers"
+
       expect(page).to have_content("Review ready!", wait: 20)
-      expect(user.daily_responses.sole).to be_submitted
+      expect(user.daily_responses.sole.reload).to be_submitted
       expect(errors).to be_empty
     end
+  end
+
+  def answer_form_connected?
+    page.evaluate_script(<<~JS)
+      !!(window.Stimulus && window.Stimulus.getControllerForElementAndIdentifier(
+        document.querySelector('[data-controller~="answer-form"]'), "answer-form"))
+    JS
   end
 
   # Pull-to-refresh reloads once pending() is false, so a typed answer must count before the modules arrive.
