@@ -108,7 +108,9 @@ Submit is never disabled. When the day isn't ready, `#create` answers with a
 nudge and moves focus to it once the form is editable again, so a screen
 reader hears why nothing happened. Any other failure shows in the save banner
 under its own `submit` key, with the server's sentence when it wrote one, and
-the form becomes editable again. There is no `alert()`: a blocking dialog
+the form becomes editable again. The next successful save of the answers, or a
+refusal the nudge explains, clears it, so a failure that has since been
+overtaken does not sit beside the nudge. There is no `alert()`: a blocking dialog
 stops the page and is announced less reliably than the banner's live region.
 If the submission was stored but the review could not start, the page carries
 `review_start_failed` to the reload, where the submitted state offers the

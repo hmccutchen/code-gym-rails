@@ -23,8 +23,9 @@ a status check.
   number, so its status phrase is never shown.
 - The signed-out sentence, when fetch followed a redirect. A JSON endpoint only
   redirects to the login page after the session expires, so a 200 that arrived
-  through a redirect stored nothing. A caller can pass its own sentence
-  (`signedOut`), as the save banner does.
+  through a redirect stored nothing. Every caller shows the same sentence for
+  this, the save banner included, so one expired session never reads two ways
+  on one page.
 - Otherwise the caller's `fallback`: an HTML error page, an unreadable body or
   a dropped connection all show the page's own wording.
 

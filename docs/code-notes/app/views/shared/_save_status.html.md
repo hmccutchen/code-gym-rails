@@ -89,8 +89,9 @@ did not happen.
 
 The request itself goes through `CodeGymRequest.send`, which reads the CSRF
 token safely, parses JSON only when it can, and decides what the banner may
-say: the server's sentence when the reply is the app's own, the signed-out
-sentence after a redirect, and `GENERIC` otherwise. A dropped connection's
+say: the server's sentence when the reply is the app's own, the module's one
+signed-out sentence after a redirect, and `GENERIC` otherwise. A body function
+that throws drops its save rather than stalling the key's queue. A dropped connection's
 browser string ("Failed to fetch") is never shown.
 
 ## `CARRIED` and `carry()`

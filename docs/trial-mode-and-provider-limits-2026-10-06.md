@@ -367,7 +367,7 @@ The page scripts that call those endpoints had their own leak: each showed
 the caught error's message, which for a dropped connection is the browser's
 "Failed to fetch", for an HTML error page a JSON parse error, and for an
 unhandled exception Rails' "Internal Server Error" or a bare status code.
-`window.CodeGymServerMessage` (`shared/_server_message`) now decides what a
+`window.CodeGymServerMessage` (`shared/_server_message`, since replaced by `window.CodeGymRequest` in `shared/_request`) now decides what a
 script may show: the `error` of a reply whose `status` is `"error"`, a
 session-expired sentence when fetch followed a redirect, and otherwise the
 page's own fallback wording. The thinking partner, review alternates and

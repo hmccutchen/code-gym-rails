@@ -157,6 +157,7 @@
       CodeGymSaveStatus.queue("answers", "POST", form.action, () => (form.inert ? null : payload()), { latest: true })
         .then(({ ok, status, data, skipped }) => {
           if (skipped) return;
+          if (ok) CodeGymSaveStatus.clear("submit");
           if (!ok && status === 409 && data?.status === "stale") {
             CodeGymSaveStatus.carry("answers", STALE_RELOADED);
             window.location.reload();
@@ -246,8 +247,12 @@
       }
 
       const refused = result.status === 422 && Boolean(result.data?.submit_blocker);
-      if (refused) applyServerState(result.data);
-      else CodeGymSaveStatus.report("submit", result.message);
+      if (refused) {
+        CodeGymSaveStatus.clear("submit");
+        applyServerState(result.data);
+      } else {
+        CodeGymSaveStatus.report("submit", result.message);
+      }
 
       form.inert = false;
       submitButton.classList.remove("btn-loading");

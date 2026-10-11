@@ -355,6 +355,7 @@
             return Object.assign(state(), { section_kind_preferences_version: version });
           };
 
+          // Queued in order: a parallel save would post the version the one in flight is about to move, and 409 against itself.
           return queueSave("exercise_mix", payload).then((result) => {
             const reported = result.data && result.data.section_kind_preferences_version;
             if (result.ok && typeof reported === "number") version = reported;
@@ -371,7 +372,6 @@
           });
         };
 
-        // Queued in order: a parallel save would post the version the one in flight is about to move, and 409 against itself.
         CodeGymSaveStatus.watch(() => pending !== null);
         const saveMix = () => {
           editRevision++;

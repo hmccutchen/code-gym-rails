@@ -460,7 +460,6 @@ en:
     setup_link: "Change the mix"
   save_status:
     generic: "Couldn't save your last change. It hasn't reached the server — check your connection and try again."
-    signed_out: "Couldn't save your last change — you've been signed out. Reload the page and sign in again."
   daily_sections:
     legend: "Daily sections"
     automatic: "Automatic"
@@ -650,8 +649,8 @@ en:
     alternate_added: "A different explanation was added above."
     alternate_added_last: "A different explanation was added above — that was the last one."
     alternate_failed: "Couldn't generate that — try again"
-  server_message:
-    signed_out: "Your session expired — reload the page and try again."
+  request:
+    signed_out: "Your session expired, so that didn't go through. Reload the page and sign in again."
   diagram:
     summary: "🗺️ Structure diagram"
   push:

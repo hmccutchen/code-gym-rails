@@ -15,7 +15,7 @@
   
     <script>
   window.CodeGymRequest = (function () {
-    const SIGNED_OUT = "Your session expired — reload the page and try again.";
+    const SIGNED_OUT = "Your session expired, so that didn't go through. Reload the page and sign in again.";
 
     function csrf() {
       return document.querySelector('meta[name="csrf-token"]')?.content ?? "";
@@ -48,7 +48,7 @@
 
       // The only redirect a JSON endpoint gives is to the login page after the session expires.
       if (response.redirected) {
-        return { ok: false, status: response.status, data: null, message: options?.signedOut ?? SIGNED_OUT, signedOut: true };
+        return { ok: false, status: response.status, data: null, message: SIGNED_OUT, signedOut: true };
       }
 
       const data = await read(response);
@@ -63,7 +63,6 @@
     <script>
   window.CodeGymSaveStatus = (function () {
     const GENERIC = "Couldn't save your last change. It hasn't reached the server — check your connection and try again.";
-    const SIGNED_OUT = "Couldn't save your last change — you've been signed out. Reload the page and sign in again.";
 
     const failures = new Map();
     const issued = new Map();
@@ -122,7 +121,7 @@
       issued.set(key, ticket);
 
       requests++;
-      return window.CodeGymRequest.send(method, url, body, { fallback: GENERIC, signedOut: SIGNED_OUT }).then((result) => {
+      return window.CodeGymRequest.send(method, url, body, { fallback: GENERIC }).then((result) => {
         if (issued.get(key) !== ticket) return { ok: false };
         if (result.ok) clear(key);
         else report(key, result.message);
@@ -150,7 +149,8 @@
       if (line.busy || line.waiting.length === 0) return;
       line.busy = true;
       const next = line.waiting.shift();
-      const body = typeof next.body === "function" ? next.body() : next.body;
+      let body = null;
+      try { body = typeof next.body === "function" ? next.body() : next.body; } catch (_) { body = null; }
       const result = body === null ? { ok: false, skipped: true } : await save(next.method, next.url, body, key);
       line.busy = false;
       next.resolvers.forEach((resolve) => resolve(result));
@@ -164,7 +164,7 @@
       try {
         sessionStorage.setItem(CARRIED, JSON.stringify({ key: key, message: message, path: location.pathname }));
       } catch (_) {
-        return;
+        // Private browsing can refuse the write; the reloaded page then just shows no message.
       }
     }
 

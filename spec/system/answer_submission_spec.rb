@@ -137,6 +137,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
         expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.submit_failed"))
         expect(page.evaluate_script("window.alerts")).to eq([])
         wait_for_saved_answer(user, "code_review", final)
+        expect(page).to have_no_css("#save-status", visible: true)
         expect(user.daily_responses.reload.sole).not_to be_submitted
         visit root_path
         expect(find('textarea[data-field="code_review"]').value).to eq(final)

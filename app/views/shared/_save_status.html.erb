@@ -2,7 +2,6 @@
 <script>
   window.CodeGymSaveStatus = (function () {
     const GENERIC = <%= t("save_status.generic").to_json.html_safe %>;
-    const SIGNED_OUT = <%= t("save_status.signed_out").to_json.html_safe %>;
 
     const failures = new Map();
     const issued = new Map();
@@ -61,7 +60,7 @@
       issued.set(key, ticket);
 
       requests++;
-      return window.CodeGymRequest.send(method, url, body, { fallback: GENERIC, signedOut: SIGNED_OUT }).then((result) => {
+      return window.CodeGymRequest.send(method, url, body, { fallback: GENERIC }).then((result) => {
         if (issued.get(key) !== ticket) return { ok: false };
         if (result.ok) clear(key);
         else report(key, failureMessage || result.message);
@@ -89,7 +88,8 @@
       if (line.busy || line.waiting.length === 0) return;
       line.busy = true;
       const next = line.waiting.shift();
-      const body = typeof next.body === "function" ? next.body() : next.body;
+      let body = null;
+      try { body = typeof next.body === "function" ? next.body() : next.body; } catch (_) { body = null; }
       const result = body === null ? { ok: false, skipped: true } : await save(next.method, next.url, body, key);
       line.busy = false;
       next.resolvers.forEach((resolve) => resolve(result));
@@ -103,7 +103,7 @@
       try {
         sessionStorage.setItem(CARRIED, JSON.stringify({ key: key, message: message, path: location.pathname }));
       } catch (_) {
-        return;
+        // Private browsing can refuse the write; the reloaded page then just shows no message.
       }
     }
 

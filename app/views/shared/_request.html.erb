@@ -1,7 +1,7 @@
 <%# Rendered in <head>, so every page script can call it as it runs. %>
 <script>
   window.CodeGymRequest = (function () {
-    const SIGNED_OUT = <%= t("server_message.signed_out").to_json.html_safe %>;
+    const SIGNED_OUT = <%= t("request.signed_out").to_json.html_safe %>;
 
     function csrf() {
       return document.querySelector('meta[name="csrf-token"]')?.content ?? "";
@@ -34,7 +34,7 @@
 
       // The only redirect a JSON endpoint gives is to the login page after the session expires.
       if (response.redirected) {
-        return { ok: false, status: response.status, data: null, message: options?.signedOut ?? SIGNED_OUT, signedOut: true };
+        return { ok: false, status: response.status, data: null, message: SIGNED_OUT, signedOut: true };
       }
 
       const data = await read(response);
