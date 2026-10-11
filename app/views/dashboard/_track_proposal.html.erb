@@ -1,6 +1,6 @@
 <%# One learning track proposal. Local: proposal (TrackGraduation::Proposal). %>
 <% name = ->(key) { t("sections.#{key}.name") } %>
-<% in_place = current_user.applies_track_proposals_in_place? %>
+<% in_place = current_user.applies_track_proposals_in_place? || (proposal.steps.map(&:kind) & current_user.excluded_section_kinds).any? %>
 <%= tag.div id: "track-proposal", class: "mix-note track-proposal",
       data: { levels: current_user.section_kind_levels.to_json,
               version: current_user.section_kind_preferences_version,
@@ -35,7 +35,7 @@
     <button type="button" class="btn btn-primary btn-sm" data-apply><%= t("learning_track.proposal.apply") %></button>
   <% else %>
     <%= link_to t("learning_track.proposal.change_in_setup"),
-                setup_path(suggested: proposal.steps.map(&:kind), anchor: "exercise-mix"),
+                setup_path(suggested: proposal.steps.map(&:kind), suggested_level: proposal.steps.first.to, anchor: "exercise-mix"),
                 class: "btn btn-primary btn-sm", data: { change_in_setup: true } %>
   <% end %>
   <button type="button" class="btn btn-ghost btn-sm" data-not-now><%= t("learning_track.proposal.not_now") %></button>
@@ -58,6 +58,8 @@
     const setBusy = (busy) => {
       box.querySelectorAll("button").forEach((button) => { button.disabled = busy; });
       if (apply) apply.disabled = busy || listed().length === 0;
+      const setupLink = box.querySelector("[data-change-in-setup]");
+      if (setupLink) setupLink.inert = busy;
     };
 
     // The buttons that had focus are gone, so the confirmation takes it and a screen reader reads it out.

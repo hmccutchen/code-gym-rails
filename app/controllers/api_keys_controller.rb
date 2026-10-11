@@ -3,7 +3,7 @@ class ApiKeysController < ApplicationController
 
   skip_before_action :require_provider
 
-  helper_method :suggested_kinds
+  helper_method :suggested_kinds, :suggested_level
 
   # GET /setup
   def edit
@@ -31,8 +31,12 @@ class ApiKeysController < ApplicationController
 
   private
 
+  def suggested_level
+    params[:suggested_level] if LearningTrack::LEVELS.include?(params[:suggested_level])
+  end
+
   def suggested_kinds
-    return [] unless current_user.on_learning_track?
+    return [] unless current_user.on_learning_track? && suggested_level
 
     ExerciseSection.keys & Array(params[:suggested]).grep(String)
   end

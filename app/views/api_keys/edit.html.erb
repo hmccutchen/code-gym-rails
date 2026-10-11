@@ -123,8 +123,9 @@
     <summary><%= t("exercise_mix.summary") %></summary>
     <% if suggested_kinds.any? %>
       <style>.mix-difficulty.mix-suggested { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }</style>
-      <p class="mix-note" role="status"><%= t("learning_track.setup.suggested",
-                                            kinds: suggested_kinds.map { |key| t("sections.#{key}.name") }.to_sentence) %></p>
+      <p class="mix-note" id="mix-suggested-note"><%= t("learning_track.setup.suggested",
+                                                     kinds: suggested_kinds.map { |key| t("sections.#{key}.name") }.to_sentence,
+                                                     level: t("exercise_mix.levels.#{suggested_level}")) %></p>
     <% end %>
     <p class="hint"><%= t("exercise_mix.intro") %></p>
 

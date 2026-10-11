@@ -31,7 +31,7 @@ en:
       leave_hint: "Your current difficulty settings stay as they are. You can't rejoin the track afterwards."
       suggestions_label: "Suggest level changes"
       suggestions_hint: "When this is off, the dashboard stops suggesting level changes. You can still change levels yourself in Exercise mix, and turn this back on at any time."
-      suggested: "Code Gym suggested a level change for %{kinds}. Change their difficulty below."
+      suggested: "Code Gym suggested moving %{kinds} to %{level}. Change their difficulty below."
       left: "You've left the junior track. Your difficulty settings stay as they are."
       key_guide:
         title: "Getting an API key"

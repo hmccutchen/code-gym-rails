@@ -51,7 +51,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       expect(proposal.at_css("[data-not-now]")).to be_present
       link = proposal.at_css("[data-change-in-setup]")
       expect(link.text).to eq("Change it in Setup")
-      expect(link["href"]).to eq(setup_path(suggested: [ "code_review" ], anchor: "exercise-mix"))
+      expect(link["href"]).to eq(setup_path(suggested: [ "code_review" ], suggested_level: "senior", anchor: "exercise-mix"))
     end
 
     it "offers no keep-at-junior buttons on a bundle that goes to Setup" do
@@ -64,6 +64,21 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
       expect(proposal.css("[data-step]")).not_to be_empty
       expect(proposal.css("[data-remove-step]")).to be_empty
+    end
+
+    # An excluded kind's difficulty is disabled on Setup, so sending the user there would leave nothing to change.
+    it "keeps applying in place when a proposed kind is excluded" do
+      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS,
+                        section_kind_levels: LearningTrack.preset_levels.merge("code_review" => "senior"),
+                        excluded_section_kinds: [ "security_review" ])
+      reviewed_day(user, Date.current)
+      login_as(user)
+
+      get root_path
+
+      expect(proposal.css("[data-kind]").map { |step| step["data-kind"] }).to include("security_review")
+      expect(proposal.at_css("[data-apply]")).to be_present
+      expect(proposal.at_css("[data-change-in-setup]")).to be_nil
     end
 
     it "shows nothing while suggestions are off, and the same proposal once they are back on" do
@@ -145,27 +160,40 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       user = track_user
       login_as(user)
 
-      get setup_path(suggested: %w[code_review pattern])
+      get setup_path(suggested: %w[code_review pattern], suggested_level: "junior")
 
       expect(page_html.at_css("#exercise-mix")["open"]).not_to be_nil
-      expect(page_html.at_css("#exercise-mix").text).to include("Code Gym suggested a level change for Code Review and Pattern of the Month.")
-      expect(page_html.css(".mix-difficulty.mix-suggested").map { |field| field["data-kind"] }).to match_array(%w[code_review pattern])
+      expect(page_html.at_css("#mix-suggested-note").text).to eq("Code Gym suggested moving Code Review and Pattern of the Month to Junior. Change their difficulty below.")
+      marked = page_html.css(".mix-difficulty.mix-suggested")
+      expect(marked.map { |field| field["data-kind"] }).to match_array(%w[code_review pattern])
+      expect(marked.map { |field| field["aria-describedby"] }.uniq).to eq([ "mix-suggested-note" ])
     end
 
     it "ignores kinds that are not registered" do
       user = track_user
       login_as(user)
 
-      get setup_path(suggested: [ "nope", { "a" => 1 } ])
+      get setup_path(suggested: [ "nope", { "a" => 1 } ], suggested_level: "senior")
 
       expect(page_html.at_css("#exercise-mix")["open"]).to be_nil
       expect(page_html.css(".mix-suggested")).to be_empty
     end
 
+    [ nil, "principal_engineer", "x" ].each do |level|
+      it "marks nothing when the suggested level is #{level.inspect}" do
+        login_as(track_user)
+
+        get setup_path(suggested: [ "code_review" ], suggested_level: level)
+
+        expect(page_html.at_css("#exercise-mix")["open"]).to be_nil
+        expect(page_html.css(".mix-suggested")).to be_empty
+      end
+    end
+
     it "marks nothing for an account off the track" do
       login_as(create_user_with_key)
 
-      get setup_path(suggested: [ "code_review" ])
+      get setup_path(suggested: [ "code_review" ], suggested_level: "senior")
 
       expect(page_html.at_css("#exercise-mix")["open"]).to be_nil
       expect(page_html.css(".mix-suggested")).to be_empty

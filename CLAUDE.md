@@ -494,10 +494,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   succeeded, so a lost count is possible and costs nothing. Below
   `LearningTrack::IN_PLACE_ANSWERS` (3) a proposal applies in place. From then
   on its main button links to Setup's Exercise mix with the proposed kinds
-  marked (`?suggested[]=`), and the user changes the level there, so they
-  learn where the control lives. Not now still dismisses in place, and a
-  bundle sent to Setup has no Keep at junior buttons, since the choice is made
-  there. The threshold is a starting value, not a measured one.
+  marked and the level named (`?suggested[]=…&suggested_level=…`), and the
+  user changes the level there, so they learn where the control lives. Not
+  now still dismisses in place, and a bundle sent to Setup has no Keep at
+  junior buttons, since the choice is made there. A proposal naming an
+  excluded kind keeps applying in place, because Setup disables an excluded
+  kind's difficulty and the user would have nothing to change. The threshold
+  is a starting value, not a measured one.
 
   **Suggestions can be turned off and back on.** Every proposal links to the
   "Suggest level changes" switch on Setup, `users.track_suggestions` (default
