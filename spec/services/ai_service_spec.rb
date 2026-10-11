@@ -1692,10 +1692,10 @@ RSpec.describe AiService do
     describe "#ladders_for" do
       it "loads each targeted kind's rungs for the day's mode and merges them by level" do
         ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
-                                 ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+                                 ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
         schema_concept = ConceptVocabulary::DATA_MODELING_CONCEPTS.first
         ConceptReference.create!(concept: schema_concept, language: "ruby_rails",
-                                 ladder_junior: "j2", ladder_senior: "s2", ladder_principal_engineer: "p2")
+                                 ladder_junior: "j2", ladder_mid_level: "m", ladder_senior: "s2", ladder_principal_engineer: "p2")
         kinds = ExerciseSection.for_plan(third: :challenge, fourth: nil)
         difficulty = KindDifficulty.new(levels: { "code_review" => "senior", "challenge" => "senior" }, locked: [])
 
@@ -2463,7 +2463,7 @@ RSpec.describe AiService do
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       user.update!(section_kind_levels: { "challenge" => "principal_engineer" }, locked_section_kinds: [ "challenge" ])
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
-                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+                               ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
       set = full_problem_set("challenge" => { "concept" => "n_plus_one" })
 
       payload = diagnostics_payload(double_class.new(canned_text: set.to_json))
@@ -4536,7 +4536,7 @@ RSpec.describe AiService do
         "tagline" => "t", "explanation" => "e", "code_example" => "c", "senior_lens" => "s",
         "guide_plain_language" => "plain", "guide_worked_example" => "worked",
         "guide_pitfalls" => "pitfalls",
-        "ladder_junior" => "j", "ladder_senior" => "s", "ladder_principal_engineer" => "p"
+        "ladder_junior" => "j", "ladder_mid_level" => "m", "ladder_senior" => "s", "ladder_principal_engineer" => "p"
       }
     end
 
@@ -4668,7 +4668,7 @@ RSpec.describe AiService do
       reference = ConceptReference.create!(
         concept: "caching", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
-        ladder_junior: "JUNIOR_MARKER", ladder_senior: "SENIOR_MARKER", ladder_principal_engineer: "PRINCIPAL_MARKER"
+        ladder_junior: "JUNIOR_MARKER", ladder_mid_level: "m", ladder_senior: "SENIOR_MARKER", ladder_principal_engineer: "PRINCIPAL_MARKER"
       )
       service = double_class.new(canned_text: "Another angle.")
       service.explain_concept_differently(user, reference)

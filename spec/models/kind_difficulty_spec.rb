@@ -68,6 +68,10 @@ RSpec.describe KindDifficulty do
   end
 
   describe "LEVELS" do
+    it "climbs junior, mid-level, senior, principal engineer" do
+      expect(described_class::LEVELS).to eq(%w[junior mid_level senior principal_engineer])
+    end
+
     # Skill levels are these levels; the rating scales stay apart from both.
     it "shares no value with either rating scale" do
       [ DailyResponse::DIFFICULTY_LEVELS, ConceptMastery::AI_RATING_RANK.keys ].each do |scale|

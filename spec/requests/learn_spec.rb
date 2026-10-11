@@ -300,7 +300,7 @@ RSpec.describe "Learn", type: :request do
       end
 
       before do
-        full_reference.update!(ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "q", lesson: lesson)
+        full_reference.update!(ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "q", lesson: lesson)
         get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
       end
 
@@ -328,7 +328,7 @@ RSpec.describe "Learn", type: :request do
 
     describe "the lesson control" do
       let!(:written) do
-        full_reference.tap { |row| row.update!(ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "q") }
+        full_reference.tap { |row| row.update!(ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "q") }
       end
 
       it "offers the lesson on a guided row without one, polling for the version it saw" do
@@ -421,7 +421,7 @@ RSpec.describe "Learn", type: :request do
     end
 
     let(:guide)  { { guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x" } }
-    let(:ladder) { { ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "q" } }
+    let(:ladder) { { ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "q" } }
 
     def status(**params)
       get learn_concept_status_path(bucket: "ruby_rails", concept: "n_plus_one", **params)
@@ -487,7 +487,7 @@ RSpec.describe "Learn", type: :request do
       expect(response.parsed_body).to eq("ready" => false, "rewritten" => true)
     end
 
-    [ {}, { ladder_junior: "j", ladder_senior: "s" } ].each do |partial_ladder|
+    [ {}, { ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s" } ].each do |partial_ladder|
       it "reports a completed rewrite with unchanged prose and #{partial_ladder.size} ladder rungs" do
         row = reference(**guide)
         version = row.generation_version
@@ -636,7 +636,7 @@ RSpec.describe "Learn", type: :request do
       user.update!(section_kind_levels: { "security_review" => "senior" })
       vocabulary = ConceptVocabulary.selectable_for_section("security_review", "ruby_rails")
       ConceptReference.create!(concept: vocabulary.first, language: "ruby_rails",
-                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+                               ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
 
       expect {
         post prepare_learn_ladders_path

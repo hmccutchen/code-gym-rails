@@ -221,7 +221,7 @@ RSpec.describe ConceptReference do
                                  guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x" }.merge(attrs))
     end
 
-    let(:full_ladder) { { ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p" } }
+    let(:full_ladder) { { ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p" } }
 
     it "names one migrated column per level" do
       expect(AiService::CONCEPT_LADDER_FIELDS).to eq(KindDifficulty::LEVELS.map { |level| "ladder_#{level}" })

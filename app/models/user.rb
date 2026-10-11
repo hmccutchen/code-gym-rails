@@ -15,10 +15,6 @@ class User < ApplicationRecord
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
   SKILL_LEVELS = KindDifficulty::LEVELS
 
-  LEGACY_SKILL_LEVELS = {
-    "beginner" => "junior", "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer"
-  }.freeze
-
   DEFAULT_TIME_ZONE = "America/New_York".freeze
 
   DAILY_SECTION_COUNTS = (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
@@ -232,11 +228,6 @@ class User < ApplicationRecord
   end
 
   def on_learning_track? = learning_track == LearningTrack::ON
-
-  def skill_level
-    stored = super
-    LEGACY_SKILL_LEVELS.fetch(stored, stored)
-  end
 
   def first_run?
     persisted? && learning_track.nil? && !daily_exercises.exists?

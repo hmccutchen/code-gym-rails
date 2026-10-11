@@ -441,6 +441,7 @@ en:
       not_offered: "every section that could show it is excluded in your exercise mix."
     rungs:
       junior: "junior"
+      mid_level: "mid-level"
       senior: "senior"
       principal_engineer: "principal"
     developing_toward: "developing toward %{rung}"
@@ -475,6 +476,7 @@ en:
     level_default: "Your skill level (%{skill_level})"
     levels:
       junior: "Junior"
+      mid_level: "Mid-level"
       senior: "Senior"
       principal_engineer: "Principal engineer"
     lock_label: "Lock at this level"

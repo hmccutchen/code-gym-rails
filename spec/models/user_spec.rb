@@ -866,26 +866,12 @@ RSpec.describe User, type: :model do
   end
 
   describe "#skill_level" do
-    it "reads each stored value from before skill levels took the difficulty levels' names as its new name" do
-      user = create_user
-
-      { "beginner" => "junior", "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer" }.each do |stored, read|
-        user.update_column(:skill_level, stored)
-        expect(user.reload.skill_level).to eq(read)
-      end
-    end
-
-    it "reads a new account, which the database still defaults to developing, as junior" do
+    it "starts a new account at junior" do
       expect(create_user.reload.skill_level).to eq("junior")
     end
 
-    it "leaves the stored value alone when another column is saved" do
-      user = create_user
-      user.update_column(:skill_level, "solid")
-
-      user.reload.update!(name: "Renamed")
-
-      expect(User.where(id: user.id).pick(:skill_level)).to eq("solid")
+    it "accepts mid-level" do
+      expect(create_user.update(skill_level: "mid_level")).to be(true)
     end
   end
 

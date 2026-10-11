@@ -333,7 +333,8 @@
     details.progress-group[open] summary::before { content: "▼"; }
     .progress-group-name { font-weight: 600; min-width: 9rem; }
     .rung-principal_engineer, .rung-developing_principal_engineer { --rung: #7c6af7; }
-    .rung-senior, .rung-developing_senior { --rung: #4ade80; }
+    .rung-senior, .rung-developing_senior { --rung: #22c55e; }
+    .rung-mid_level, .rung-developing_mid_level { --rung: #4ade80; }
     .rung-junior, .rung-developing_junior { --rung: #86efac; }
     .rung-not_yet, .rung-not_offered { --rung: transparent; }
     .rung-bar { display: flex; flex: 1 1 8rem; height: .55rem; border-radius: 999px; overflow: hidden; background: var(--border); }
@@ -376,7 +377,7 @@
                    box-shadow: 0 4px 16px rgba(0, 0, 0, .4); }
   </style>
     <link rel="stylesheet" href="/assets/display-ae71633a.css" />
-    <link rel="stylesheet" href="/assets/display_light-aee77cf0.css" media="not all" data-light-palette-media="true" />
+    <link rel="stylesheet" href="/assets/display_light-db0b6022.css" media="not all" data-light-palette-media="true" />
 </head>
 <body>
     <div id="background-pattern" aria-hidden="true"></div>
@@ -588,6 +589,7 @@
   <div class="form-field">
     <label for="skill-level">Skill level</label>
     <select name="skill_level" id="skill-level" data-label-template="Your skill level (__LEVEL__)"><option selected="selected" value="junior">Junior</option>
+<option value="mid_level">Mid-level</option>
 <option value="senior">Senior</option>
 <option value="principal_engineer">Principal engineer</option></select>
     <p class="hint">How hard your sections start out, unless you&#39;ve set a difficulty for that section in the Exercise mix below. Junior suits early-career developers and career changers. Your ratings still nudge each day&#39;s set up or down.</p>
@@ -624,6 +626,10 @@
       Junior
     </label>
     <label>
+      <input type="radio" name="level-code_review" value="mid_level"  >
+      Mid-level
+    </label>
+    <label>
       <input type="radio" name="level-code_review" value="senior"  >
       Senior
     </label>
@@ -653,6 +659,10 @@
     <label>
       <input type="radio" name="level-design_comparison" value="junior"  >
       Junior
+    </label>
+    <label>
+      <input type="radio" name="level-design_comparison" value="mid_level"  >
+      Mid-level
     </label>
     <label>
       <input type="radio" name="level-design_comparison" value="senior"  >
@@ -687,6 +697,10 @@
     <label>
       <input type="radio" name="level-pattern" value="junior"  >
       Junior
+    </label>
+    <label>
+      <input type="radio" name="level-pattern" value="mid_level"  >
+      Mid-level
     </label>
     <label>
       <input type="radio" name="level-pattern" value="senior"  >
@@ -733,6 +747,10 @@
       Junior
     </label>
     <label>
+      <input type="radio" name="level-architecture" value="mid_level"  >
+      Mid-level
+    </label>
+    <label>
       <input type="radio" name="level-architecture" value="senior"  >
       Senior
     </label>
@@ -770,6 +788,10 @@
     <label>
       <input type="radio" name="level-security_review" value="junior"  >
       Junior
+    </label>
+    <label>
+      <input type="radio" name="level-security_review" value="mid_level"  >
+      Mid-level
     </label>
     <label>
       <input type="radio" name="level-security_review" value="senior"  >
@@ -811,6 +833,10 @@
       Junior
     </label>
     <label>
+      <input type="radio" name="level-challenge" value="mid_level"  >
+      Mid-level
+    </label>
+    <label>
       <input type="radio" name="level-challenge" value="senior"  >
       Senior
     </label>
@@ -848,6 +874,10 @@
     <label>
       <input type="radio" name="level-parsons_problem" value="junior"  >
       Junior
+    </label>
+    <label>
+      <input type="radio" name="level-parsons_problem" value="mid_level"  >
+      Mid-level
     </label>
     <label>
       <input type="radio" name="level-parsons_problem" value="senior"  >
@@ -895,6 +925,10 @@
       Junior
     </label>
     <label>
+      <input type="radio" name="level-plan_review" value="mid_level"  >
+      Mid-level
+    </label>
+    <label>
       <input type="radio" name="level-plan_review" value="senior"  >
       Senior
     </label>
@@ -934,6 +968,10 @@
       Junior
     </label>
     <label>
+      <input type="radio" name="level-ambiguity_hunt" value="mid_level"  >
+      Mid-level
+    </label>
+    <label>
       <input type="radio" name="level-ambiguity_hunt" value="senior"  >
       Senior
     </label>
@@ -971,6 +1009,10 @@
     <label>
       <input type="radio" name="level-pseudocode_to_code" value="junior"  >
       Junior
+    </label>
+    <label>
+      <input type="radio" name="level-pseudocode_to_code" value="mid_level"  >
+      Mid-level
     </label>
     <label>
       <input type="radio" name="level-pseudocode_to_code" value="senior"  >

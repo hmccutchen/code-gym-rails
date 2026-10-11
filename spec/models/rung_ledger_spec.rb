@@ -50,7 +50,7 @@ RSpec.describe RungLedger do
       )
 
       expect(led.held("n_plus_one", "ruby_rails")).to eq("junior")
-      expect(led.developing_toward("n_plus_one", "ruby_rails")).to eq("senior")
+      expect(led.developing_toward("n_plus_one", "ruby_rails")).to eq("mid_level")
     end
 
     it "is nil with nothing attempted above the held rung, or nothing attempted at all" do

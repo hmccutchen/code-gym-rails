@@ -373,9 +373,9 @@ below) now also carries `guide_plain_language`, `guide_worked_example`,
 indexed). `ConceptReference#guide?` — all three guide fields present — is the
 single authority for "does this row carry a guide"; `featured_on` is the Monday
 of the week the row was the featured concept, and nil means it never has been. It also
-carries `ladder_junior`, `ladder_senior`, `ladder_principal_engineer` (all
-nullable text), and `ConceptReference#ladder?` — all three ladder fields
-present, derived from the field list the same way `#guide?` is — is the
+carries `ladder_junior`, `ladder_mid_level`, `ladder_senior`,
+`ladder_principal_engineer` (all nullable text), and `ConceptReference#ladder?`
+— every ladder field present, one per rung in `KindDifficulty::LEVELS`, derived from the field list the same way `#guide?` is — is the
 authority for "does this row carry the difficulty ladder"; `#complete?` is
 `guide? && ladder?`. It also carries `lesson` (nullable jsonb): the short
 lesson the Learn page shows, in `ConceptLesson`'s shape. `#lesson?` says
@@ -922,9 +922,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   behavior, retries and failures included, and differ on one design
   principle, the tagged concept. The engineer picks the piece the stated
   system should use and says which stated fact decides it. The rung sets
-  where that fact sits: in the question at junior, in the system description
-  at senior, and in a scenario where both pieces carry a real cost at
-  principal_engineer. Any difference other than the tested principle is a
+  where that fact sits: in the question, pointing at a piece, at junior; in
+  the question as a requirement, not a piece, at mid_level; in the system
+  description at senior; and in a scenario where both pieces carry a real cost
+  at principal_engineer. Any difference other than the tested principle is a
   defect, so the guidance asks for surface parity. No scaffold and no
   teaching note, since either would point at the answer.
 
@@ -1388,7 +1389,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   spot forever. Decoupling slot frequency from pool size needs slots ranked by
   when the slot itself last filled, which is a change to how every day is
   shaped and not something this preference should drag in behind it.
-- **Difficulty targets and locks**: a user may set any section kind — code_review and pattern included, since a level needs no alternative candidate — to `junior` / `senior` / `principal_engineer` (`KindDifficulty::LEVELS`, which `User::SKILL_LEVELS` reuses, and deliberately disjoint from the review grades). Unset follows `skill_level`; a target replaces it as that section's baseline, with tier annotations and rating adjustments still applying on top; a lock suppresses the `(reduced)` easing rule and both rating adjustments for that section, with no exceptions, including a concept's first exposure. That last part is a deliberate tradeoff: a kind locked at `principal_engineer` can present an unfamiliar concept at full difficulty on day one. Lock changes prompt text only — `DailyPlan`, `ConceptMastery` and `User#concepts_*` never read `KindDifficulty`, and specs pin it — so unlocking reads current evidence. The block is appended by `AiService#kind_difficulty_guidance`, grouped by level, and grounded by per-concept ladder rungs written in the same `#generate_concept_reference` call as the reference and guide. A retention check in a targeted section is pitched at that section's level; raising a target after mastery makes the next check harder than the evidence behind it, an accepted consequence. `LadderCoverage` answers how grounded each kind is; `POST /learn/prepare_ladders` rewrites the ungrounded concepts behind a user's targets, the one scoped exception to the Learn tab's no-bulk-rewrite rule, and since `ConceptReference` is shared, that rewrite reaches every teammate. Weights and difficulty share `section_kind_preferences_version`, so a stale tab is refused whichever half it touched.
+- **Difficulty targets and locks**: a user may set any section kind — code_review and pattern included, since a level needs no alternative candidate — to `junior` / `mid_level` / `senior` / `principal_engineer` (`KindDifficulty::LEVELS`, which `User::SKILL_LEVELS` reuses, and deliberately disjoint from the review grades). Unset follows `skill_level`; a target replaces it as that section's baseline, with tier annotations and rating adjustments still applying on top; a lock suppresses the `(reduced)` easing rule and both rating adjustments for that section, with no exceptions, including a concept's first exposure. That last part is a deliberate tradeoff: a kind locked at `principal_engineer` can present an unfamiliar concept at full difficulty on day one. Lock changes prompt text only — `DailyPlan`, `ConceptMastery` and `User#concepts_*` never read `KindDifficulty`, and specs pin it — so unlocking reads current evidence. The block is appended by `AiService#kind_difficulty_guidance`, grouped by level, and grounded by per-concept ladder rungs written in the same `#generate_concept_reference` call as the reference and guide. A retention check in a targeted section is pitched at that section's level; raising a target after mastery makes the next check harder than the evidence behind it, an accepted consequence. `LadderCoverage` answers how grounded each kind is; `POST /learn/prepare_ladders` rewrites the ungrounded concepts behind a user's targets, the one scoped exception to the Learn tab's no-bulk-rewrite rule, and since `ConceptReference` is shared, that rewrite reaches every teammate. Weights and difficulty share `section_kind_preferences_version`, so a stale tab is refused whichever half it touched. `AiService::MAX_LADDER_GUIDANCE_CHARS` bounds the block's worst case, every rung at its full length: it went from 48,000 to 54,000 on 2026-10-11, because the `mid_level` rung lets a day hold four kinds at four levels, and its spec measured 53,632.
 - **Drills**: a user can mark one concept, or a whole Learn display group, as
   drilled from the Learn tab (`ConceptDrills`, `ConceptDrillsController`). A
   drilled concept leads `User#concepts_needing_reinforcement`, and since
@@ -1469,7 +1470,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   while drilled keeps its drill but waits out the cooldown; `concepts_needing_reinforcement` skips paused rows whether
   drilled or not, and the page says it is waiting.
 - **Each section records the rung it was pitched at**: `ProblemSetIngest`
-  stamps `pitched_at` (`junior` / `senior` / `principal_engineer`) into every
+  stamps `pitched_at` (`junior` / `mid_level` / `senior` / `principal_engineer`) into every
   section the provider returned, not only the ones the day asked for, because
   the rendered set is resolved by slot precedence over what came back and an
   unrequested section can win. Server-owned like `scenario` and
@@ -1537,19 +1538,16 @@ concept-specific difficulty descriptions for future generation, not a new set.
   an unlocked section and only a lock makes a rung exact.
 - **Skill level control**: the choices are the difficulty levels themselves
   (`User::SKILL_LEVELS` is `KindDifficulty::LEVELS`), labelled Junior,
-  Senior and Principal engineer. Junior covers early-career developers and
-  career changers. They replaced
+  Mid-level, Senior and Principal engineer. Junior covers early-career
+  developers and career changers. They replaced
   beginner, developing, solid and strong, which shared their words with the
   review grades: a "developing" grade on a review is the grader's word for
-  where an answer sits, and is no longer also a setting. Stored values from
-  before that are read through `User#skill_level` (`LEGACY_SKILL_LEVELS`:
-  beginner and developing as junior, solid as senior, strong as principal
-  engineer),
-  and nothing in the database was rewritten, because old code validates the old
-  list on every save and would refuse a rewritten row while it serves through
-  the pre-deploy migration. A later migration converts the stored values and
-  the column default, and drops the mapping. A legacy value posted to
-  `PATCH /profile` is refused like any other value outside the list.
+  where an answer sits, and is no longer also a setting. `AddMidLevelRung`
+  rewrote any stored legacy value (beginner and developing as junior, solid as
+  senior, strong as principal engineer) and moved the column default from
+  `developing` to `junior`, so no reader translates old values any more. A
+  legacy value posted to `PATCH /profile` is refused like any other value
+  outside the list.
   Setup's "Skill level" select is the only page
   that edits `User#skill_level`, and it autosaves through `PATCH /profile`,
   which refuses a value outside `User::SKILL_LEVELS` with a 422. It sets the
@@ -1558,8 +1556,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   Joining the junior track sets it to `junior`; nothing else changes it
   automatically, and daily ratings still nudge each set around it. It is not
   part of the Exercise mix, so it does not bump
-  `section_kind_preferences_version`. Every account at the old `developing`
-  default reads as Junior, which pitches at the same rung. The Exercise
+  `section_kind_preferences_version`. The Exercise
   mix's default options name the stored level by its label and are renamed
   in place once a save lands.
 - **What a usage row records**: every provider call writes one `ApiUsage`
