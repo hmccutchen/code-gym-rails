@@ -20,50 +20,18 @@ The rotating groups are derived from the slot roster, as
 candidate has nothing to bias, and a future multi-kind slot gets its controls
 without an edit here.
 
-## save
+## Where the behavior lives
 
-`CodeGymSaveStatus` owns the request, the CSRF token, and what happens when
-the server refuses (see `code_gym/save_status`).
+This page carries no script. Its controls are wired by three Stimulus
+controllers, each with a note of its own:
 
-## Daily sections saves
+- `profile_preferences_controller` — the time zone, Daily sections and Skill
+  level controls, and the skill-level labels inside the difficulty fieldsets.
+- `exercise_mix_controller` — the sliders, exclusions, difficulty radios,
+  locks, the preferences version and the ladder-preparation button.
+- `display_preferences_controller` — the Display disclosure, rendered by
+  `api_keys/_display_preferences`.
 
-Daily sections saves are chained, like the skill level's, so a slow older
-save cannot land last and store a count the page no longer shows.
-
-## Skill level saves
-
-Skill level saves are chained like the Exercise mix's. Sent in parallel, a
-slow older request could land last and store a level the page no longer
-shows. The Exercise mix's default options name the stored skill level, so
-they change only once the server has it.
-
-## syncDifficulty
-
-A lock means something only with a level, so choosing the default clears the
-lock in the page rather than posting a lock the server would refuse. Coverage
-does not depend on the level, so it shows as soon as a level is chosen.
-
-## lockLastInGroup
-
-A group's last remaining kind cannot be excluded. The server validation is
-the authority; this only stops the page offering it.
-
-## version
-
-`version` is the preferences version this tab last saw. Every mix save posts
-it, so a tab whose controls predate another tab's save is refused rather than
-overwriting it. It is updated from whatever the server reports back. A no-op
-save does not bump the server's version.
-
-## applyServerState
-
-After a refusal, this puts the server's state on screen, so the engineer sees
-what is stored instead of re-applying a change against a version that can
-never match again.
-
-## Chained mix saves
-
-The debounce spaces saves by only 400ms, so a request slower than that is
-still in flight when the next is sent. That next request would post the
-version the first is about to move, be refused as a conflict with itself, and
-snap the user's latest change back. Chaining the tab's own saves prevents it.
+The exercise-mix controller's element is the `#exercise-mix` disclosure, so
+`api_keys/_difficulty_controls` carries that controller's targets and actions
+even though it is also rendered for the fixed and single-kind groups.
