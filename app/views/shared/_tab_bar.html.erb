@@ -1,0 +1,8 @@
+<div class="tab-bar" role="navigation" aria-label="<%= t("nav.tab_bar") %>">
+  <% nav_destinations.each do |destination| %>
+    <%= link_to destination.path, aria: { current: ("page" if nav_current?(destination.path)) } do %>
+      <%= nav_icon(destination.key) %>
+      <span><%= destination.label %></span>
+    <% end %>
+  <% end %>
+</div>

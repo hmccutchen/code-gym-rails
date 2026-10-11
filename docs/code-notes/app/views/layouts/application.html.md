@@ -2,6 +2,13 @@
 
 ## Viewport meta tag
 
+`viewport-fit=cover` lets the installed app's page reach under the iPhone home
+indicator, which is what makes `env(safe-area-inset-*)` report real values.
+The bottom tab bar pads itself by `safe-area-inset-bottom`, and the nav and tab
+bar pad by the left and right insets for landscape. The status bar styles the
+app uses (`black`, `default`) are opaque, so nothing reaches under the status
+bar and no rule needs the top inset.
+
 `interactive-widget=resizes-content` is spec-correct and included for Chromium
 and any future WebKit support, but WebKit is believed not to implement it yet.
 It is not what keeps iOS from zooming on focus; `--input-font-size`, on every
@@ -14,8 +21,8 @@ iOS reads the manifest's `display: standalone` only from 17.4, so
 reload and "aA" buttons on a home-screen launch. `mobile-web-app-capable` is
 the standardised spelling of the same declaration. Both status-bar-style
 values `DisplayPreferences` uses, `black` and `default`, keep the app's content
-below the status bar, so nothing here needs `viewport-fit=cover` or safe-area
-insets.
+below the status bar; only the bottom of the screen needs a safe-area inset
+(see the viewport tag above).
 
 ## `--accent-text`
 
@@ -50,6 +57,17 @@ flashes has nothing to report once its field is gone. This is the only way to
 rename yourself, so the installed app has no way to rename. That is a
 deliberate trade, and renaming is unchanged in a browser tab.
 
+On a phone-width installed app the destinations move to a bottom tab bar
+(`shared/_tab_bar`), the layout every native iOS and Android app uses, and the
+collapsed menu and its button are hidden, so there is one way to navigate.
+The tab bar is limited to 48rem because a desktop install also matches
+`display-mode: standalone`, and a tab bar along the bottom of a desktop window
+reads as a phone layout. The body is padded by the bar's height so the end of
+a page can scroll clear of it, and the save banner moves up above it.
+`user-select` and `-webkit-touch-callout` are turned off on the controls only,
+so a long press on a button no longer selects its label or opens the link
+preview, while answers, code and prose stay selectable.
+
 This media query is the app's one standalone-mode test, and a second mechanism
 could disagree with it. The pull-to-refresh script reads its answer from
 whether `.pull-refresh` is displayed for the same reason; `body` outranks that
@@ -73,6 +91,23 @@ container so the collapse can measure the nav in its own text size.
 Containment makes `nav` a stacking context, and the `z-index` keeps the open
 menu above the dashboard's sticky progress bar.
 
+## Palette tokens beyond the base colors
+
+`--surface-raised` is the fill for a hovered or current nav link and for a
+plain `.btn`, one step lighter than `--surface`, so the layers read as depth
+rather than one flat color. `--nav-bg` is `--surface` made translucent, for the
+nav and tab bar, which blur what passes beneath them. `--slot-1` to `--slot-4`
+color a section by its position on the page (see `.section`), and
+`palette_contrast_spec` holds each at 4.5:1 on the surface and on code, since
+each one colors text. `--tab-bar-height` is in px, like the nav toggle, so a
+larger text size cannot push six tabs past a phone's width.
+
+## `.container` from 1024px
+
+A desktop window gets a wider column and more side padding, so the page reads
+as a web app rather than a phone layout centred in a large window. The
+`-1.5rem` coupling below applies only under 600px, where this rule never runs.
+
 ## `nav .inner`
 
 It is wider than the page column, so on a desktop the brand sits apart from the
@@ -91,6 +126,19 @@ shrink below its content otherwise.
 
 A tap leaves a touch screen in `:hover`, so the global underline would stay on
 the logo after every trip home.
+
+## `nav .brand > picture`
+
+When the light palette wraps the mark in a `picture`, that element would
+otherwise sit on a text line, and the line's height added about 10px below the
+mark, so the nav grew taller only on pages that link the display stylesheets.
+
+## `nav .nav-links a`
+
+The links are neutral text rather than the accent color, so the accent marks
+what can be acted on in the page instead of every word in the bar. The current
+page carries `aria-current="page"` (`NavigationHelper#nav_current?`) and gets
+the same raised pill as a hovered link.
 
 ## `nav .brand-mark`
 
@@ -125,6 +173,13 @@ Only `.nav-links` itself ever carries a display in this block, never a child.
 The standalone block hides the name editor through
 `nav .nav-links .name-editor`, and any rule of higher specificity in this
 block would put it back in the installed app.
+
+## `.btn`
+
+A `.btn` with no variant gets the raised fill, so a `button_to` that only
+passes `btn btn-sm` no longer falls back to the browser's white button. The
+press scale is the tap feedback the installed app loses when the standalone
+block removes the grey tap highlight.
 
 ## `.btn-loading`
 
@@ -211,6 +266,13 @@ per-page `<style>` block.
 The summary is the most-tapped control on the page, so it gets a 44px target.
 The negative margins give back exactly what the padding adds, so the label
 stays where it was and the target grows into the space around it.
+
+## `.section` slot accents
+
+`data-slot` is the section's position in `responses/_sections`, never its
+kind, so a color says "the second section today" and adding a kind needs no
+color. The stripe is an inset shadow rather than a top border, so it costs no
+space and a folded section's label stays where it was.
 
 ## `.section` below 600px
 

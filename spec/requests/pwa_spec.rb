@@ -98,6 +98,27 @@ RSpec.describe "PWA", type: :request do
     end
   end
 
+  describe "the bottom tab bar" do
+    let(:layout) { Rails.root.join("app/views/layouts/application.html.erb").read }
+    let(:standalone_block) { layout[/@media \(display-mode: standalone\) \{(.*?)\n    \}/m, 1] }
+
+    it "is shown only from inside the app's one standalone-mode media query" do
+      expect(standalone_block).to include("body .tab-bar { display: flex; }")
+      expect(layout.scan(/^\s*[^{}\n]*\.tab-bar \{[^}]*display: (\w+)/).flatten).to eq(%w[flex none])
+    end
+
+    it "replaces the collapsed menu while it shows" do
+      expect(standalone_block).to include("body nav .nav-toggle, body nav .nav-links, body nav .nav-links[data-open] { display: none; }")
+    end
+
+    it "lets the page reach under the home indicator, so the bar can pad itself clear of it" do
+      get login_path
+
+      expect(response.body).to include("viewport-fit=cover")
+      expect(layout).to include("env(safe-area-inset-bottom)")
+    end
+  end
+
   describe "the pull-to-refresh indicator" do
     let(:layout) { Rails.root.join("app/views/layouts/application.html.erb").read }
     let(:standalone_block) { layout[/@media \(display-mode: standalone\) \{(.*?)\n    \}/m, 1] }

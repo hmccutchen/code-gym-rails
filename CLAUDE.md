@@ -2825,8 +2825,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   make an iOS home-screen launch open standalone instead of inside Safari's
   chrome. The `apple-` meta tags are not redundant with the manifest — iOS reads
   `display: standalone` only from 17.4. `status-bar-style` is `black`, so
-  content stays below the status bar and nothing needs `viewport-fit=cover` or
-  safe-area insets. `app/assets/images/logo-outlined-square.png` is the source
+  content stays below the status bar. `viewport-fit=cover` is set for the
+  bottom of the screen only: on a phone-width installed app the destinations
+  move from the collapsed menu to a bottom tab bar (`shared/_tab_bar`, built
+  from `NavigationHelper#nav_destinations`), which pads itself clear of the
+  home indicator with `env(safe-area-inset-bottom)`. A browser tab and a
+  desktop install keep the top nav. `app/assets/images/logo-outlined-square.png` is the source
   of every icon; `script/generate_icons.py` rasterizes `favicon.ico` (32px
   only, since the art turns to mush at 16px), `icon-192.png`, `icon-512.png`,
   `icon-maskable-512.png` and `apple-touch-icon.png` from it, nearest-neighbor,

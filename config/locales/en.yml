@@ -683,6 +683,8 @@ en:
           other: "Submit your answers; the remaining %{count} sections are optional"
   nav:
     menu: "Menu"
+    tab_bar: "Main sections"
+    today: "Today"
     skip_to_content: "Skip to content"
     history: "History"
     settings: "Settings"
