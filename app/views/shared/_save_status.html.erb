@@ -62,8 +62,10 @@
       requests++;
       return window.CodeGymRequest.send(method, url, body, { fallback: GENERIC }).then((result) => {
         if (issued.get(key) !== ticket) return { ok: false };
-        if (result.ok) clear(key);
-        else report(key, failureMessage || result.message);
+        if (failureMessage !== false) {
+          if (result.ok) clear(key);
+          else report(key, failureMessage || result.message);
+        }
         return { ok: result.ok, status: result.status || undefined, data: result.data };
       }).finally(() => { requests--; });
     }
@@ -78,7 +80,7 @@
           last.body = body;
           last.resolvers.push(resolve);
         } else {
-          line.waiting.push({ method: method, url: url, body: body, resolvers: [resolve] });
+          line.waiting.push({ method: method, url: url, body: body, quiet: Boolean(options?.quiet), resolvers: [resolve] });
         }
         drain(key, line);
       });
@@ -90,7 +92,7 @@
       const next = line.waiting.shift();
       let body = null;
       try { body = typeof next.body === "function" ? next.body() : next.body; } catch (_) { body = null; }
-      const result = body === null ? { ok: false, skipped: true } : await save(next.method, next.url, body, key);
+      const result = body === null ? { ok: false, skipped: true } : await save(next.method, next.url, body, key, next.quiet ? false : null);
       line.busy = false;
       next.resolvers.forEach((resolve) => resolve(result));
       // A task, not a microtask: the reply's handlers update state the next save is built from.

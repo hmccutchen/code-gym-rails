@@ -76,14 +76,14 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     page.execute_script(<<~JS)
       const originalFetch = window.fetch;
       window.fetch = (url, options) => url.endsWith(#{path.to_json})
-        ? Promise.resolve(new Response(JSON.stringify({ errors: ["nope"] }), { status: 500, headers: { "Content-Type": "application/json" } }))
+        ? Promise.resolve(new Response(JSON.stringify({ status: "error", error: "nope" }), { status: 500, headers: { "Content-Type": "application/json" } }))
         : originalFetch(url, options);
     JS
   end
 
   {
     "network failure" => "Promise.reject(new Error('offline'))",
-    "server refusal" => "Promise.resolve(new Response(JSON.stringify({ errors: ['Counter write failed'] }), { status: 500 }))",
+    "server refusal" => "Promise.resolve(new Response(JSON.stringify({ status: 'error', error: 'Counter write failed' }), { status: 500 }))",
     "session redirect" => "Promise.resolve({ redirected: true })"
   }.each do |failure, reply|
     [ "Apply", "Not now" ].each do |action|
@@ -152,7 +152,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     page.execute_script(<<~JS)
       const originalFetch = window.fetch;
       const held = [];
-      const failure = () => new Response(JSON.stringify({ errors: ["nope"] }), { status: 500, headers: { "Content-Type": "application/json" } });
+      const failure = () => new Response(JSON.stringify({ status: "error", error: "nope" }), { status: 500, headers: { "Content-Type": "application/json" } });
       window.releaseFailures = () => { window.fetch = () => Promise.resolve(failure()); held.forEach((resolve) => resolve(failure())); };
       window.fetch = (url, options) => url.endsWith(#{profile_path.to_json})
         ? new Promise((resolve) => held.push(resolve))

@@ -434,7 +434,9 @@
               if (name === lastSaved) return;
               if (name === "") { input.value = lastSaved; return; }
 
-              const { ok, data } = await CodeGymRequest.send("PATCH", "<%= profile_path %>", { user: { name } });
+              const { ok, data } = await CodeGymSaveStatus.queue("name", "PATCH", "<%= profile_path %>",
+                () => ({ user: { name: input.value.trim() || name } }), { latest: true, quiet: true });
+              if (CodeGymSaveStatus.queued("name")) return;
               if (ok && typeof data?.name === "string") {
                 input.value = data.name;
                 lastSaved = data.name;
@@ -451,7 +453,7 @@
             (function () {
               const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
               if (!tz) return;
-              CodeGymRequest.send("PATCH", "<%= profile_path %>", { user: { time_zone: tz } });
+              CodeGymSaveStatus.queue("time_zone", "PATCH", "<%= profile_path %>", { user: { time_zone: tz } }, { quiet: true });
             })();
           </script>
         <% end %>

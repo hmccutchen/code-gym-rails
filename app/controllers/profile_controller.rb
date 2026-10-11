@@ -136,8 +136,7 @@ class ProfileController < ApplicationController
   end
 
   def render_invalid_track_suggestions
-    render json: { errors: [ "Track suggestions must be true or false" ] },
-           status: :unprocessable_content
+    render_json_error("Track suggestions must be true or false", status: :unprocessable_content)
   end
 
   # Check and write under one row lock; the track choice is checked after reload, since Experienced bumps no version.

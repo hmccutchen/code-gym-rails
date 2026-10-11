@@ -64,4 +64,47 @@ RSpec.describe "The shared request module", type: :system do
     expect(result["pending"]).to be(false)
     expect(user.reload.name).to eq("Second")
   end
+
+  it "keeps the newest name when the nav editor's saves overlap, without using the save banner" do
+    result = run(<<~JS)
+      const original = window.fetch;
+      const sent = [];
+      let release;
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/profile")) return original(url, options);
+        sent.push(JSON.parse(options.body).user.name);
+        if (sent.length === 1) return new Promise((resolve) => { release = () => resolve(original(url, options)); });
+        return original(url, options);
+      };
+      const input = document.getElementById("nav-name-input");
+      input.value = "Older";
+      input.dispatchEvent(new Event("blur"));
+      input.value = "Newer";
+      input.dispatchEvent(new Event("blur"));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const whileHeld = sent.slice();
+      release();
+      while (CodeGymSaveStatus.pending()) await new Promise((resolve) => setTimeout(resolve, 20));
+      window.fetch = original;
+      return { whileHeld: whileHeld, sent: sent, shown: input.value, banner: document.getElementById("save-status").hidden };
+    JS
+
+    expect(result["whileHeld"]).to eq([ "Older" ])
+    expect(result["sent"]).to eq(%w[Older Newer])
+    expect(result["shown"]).to eq("Newer")
+    expect(user.reload.name).to eq("Newer")
+    expect(result["banner"]).to be(true)
+  end
+
+  it "keeps a quiet save's failure out of the banner" do
+    hidden = run(<<~JS)
+      const original = window.fetch;
+      window.fetch = () => Promise.resolve(new Response(JSON.stringify({ status: "error", error: "Refused." }), { status: 422 }));
+      await CodeGymSaveStatus.queue("time_zone", "PATCH", "#{profile_path}", { user: { time_zone: "UTC" } }, { quiet: true });
+      window.fetch = original;
+      return document.getElementById("save-status").hidden;
+    JS
+
+    expect(hidden).to be(true)
+  end
 end

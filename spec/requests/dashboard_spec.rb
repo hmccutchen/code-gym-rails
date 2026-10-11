@@ -508,7 +508,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).to include('id="nav-name-input"')
       expect(response.body).to include('value="Editable"')
-      expect(response.body).to include('CodeGymRequest.send("PATCH", "' + profile_path + '", { user: { name } })')
+      expect(response.body).to include('CodeGymSaveStatus.queue("name", "PATCH", "' + profile_path + '"')
       expect(response.body).to include('addEventListener("blur"')
     end
   end

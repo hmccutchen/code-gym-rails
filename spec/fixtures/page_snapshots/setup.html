@@ -117,15 +117,17 @@
       render();
     }
 
-    function save(method, url, body, key) {
+    function save(method, url, body, key, failureMessage = null) {
       const ticket = ++counter;
       issued.set(key, ticket);
 
       requests++;
       return window.CodeGymRequest.send(method, url, body, { fallback: GENERIC }).then((result) => {
         if (issued.get(key) !== ticket) return { ok: false };
-        if (result.ok) clear(key);
-        else report(key, result.message);
+        if (failureMessage !== false) {
+          if (result.ok) clear(key);
+          else report(key, failureMessage || result.message);
+        }
         return { ok: result.ok, status: result.status || undefined, data: result.data };
       }).finally(() => { requests--; });
     }
@@ -140,7 +142,7 @@
           last.body = body;
           last.resolvers.push(resolve);
         } else {
-          line.waiting.push({ method: method, url: url, body: body, resolvers: [resolve] });
+          line.waiting.push({ method: method, url: url, body: body, quiet: Boolean(options?.quiet), resolvers: [resolve] });
         }
         drain(key, line);
       });
@@ -152,7 +154,7 @@
       const next = line.waiting.shift();
       let body = null;
       try { body = typeof next.body === "function" ? next.body() : next.body; } catch (_) { body = null; }
-      const result = body === null ? { ok: false, skipped: true } : await save(next.method, next.url, body, key);
+      const result = body === null ? { ok: false, skipped: true } : await save(next.method, next.url, body, key, next.quiet ? false : null);
       line.busy = false;
       next.resolvers.forEach((resolve) => resolve(result));
       // A task, not a microtask: the reply's handlers update state the next save is built from.
@@ -591,7 +593,9 @@
               if (name === lastSaved) return;
               if (name === "") { input.value = lastSaved; return; }
 
-              const { ok, data } = await CodeGymRequest.send("PATCH", "/profile", { user: { name } });
+              const { ok, data } = await CodeGymSaveStatus.queue("name", "PATCH", "/profile",
+                () => ({ user: { name: input.value.trim() || name } }), { latest: true, quiet: true });
+              if (CodeGymSaveStatus.queued("name")) return;
               if (ok && typeof data?.name === "string") {
                 input.value = data.name;
                 lastSaved = data.name;
@@ -1341,13 +1345,11 @@
   <script>
     (function () {
       // Key per control: all controls PATCH one path, and a shared key lets one success clear another's warning.
-      const save = (payload, key) =>
-        CodeGymSaveStatus.save("PATCH", "/profile", { user: payload }, key);
       const queueSave = (key, payload) =>
         CodeGymSaveStatus.queue(key, "PATCH", "/profile", typeof payload === "function" ? () => ({ user: payload() }) : { user: payload });
 
       const tz = document.getElementById("tz-select");
-      if (tz) tz.addEventListener("change", () => save({ time_zone: tz.value }, "time_zone"));
+      if (tz) tz.addEventListener("change", () => queueSave("time_zone", { time_zone: tz.value }));
 
       const dailySections = document.getElementById("daily-sections");
       if (dailySections) {

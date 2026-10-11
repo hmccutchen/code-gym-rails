@@ -203,13 +203,11 @@
   <script>
     (function () {
       // Key per control: all controls PATCH one path, and a shared key lets one success clear another's warning.
-      const save = (payload, key) =>
-        CodeGymSaveStatus.save("PATCH", "<%= profile_path %>", { user: payload }, key);
       const queueSave = (key, payload) =>
         CodeGymSaveStatus.queue(key, "PATCH", "<%= profile_path %>", typeof payload === "function" ? () => ({ user: payload() }) : { user: payload });
 
       const tz = document.getElementById("tz-select");
-      if (tz) tz.addEventListener("change", () => save({ time_zone: tz.value }, "time_zone"));
+      if (tz) tz.addEventListener("change", () => queueSave("time_zone", { time_zone: tz.value }));
 
       const dailySections = document.getElementById("daily-sections");
       if (dailySections) {

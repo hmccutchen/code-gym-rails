@@ -64,6 +64,13 @@ later, not a microtask, so the reply's own handlers have updated whatever the
 next body is built from (the mix's version, again). Waiting saves count toward
 `pending()`.
 
+`quiet` keeps a queued save's failures out of the banner. The nav name editor
+shows its own "couldn't save" line beside the field, and the layout's one-shot
+time-zone detection is something the user never asked for, so neither should
+raise the banner. Both still queue, under `name` and `time_zone`, so an older
+write can't land after a newer one; Setup's time-zone select shares the
+`time_zone` key with the detection.
+
 ## `report()` and `clear()`
 
 A failure that is not a save, such as a refused submission, still belongs in
