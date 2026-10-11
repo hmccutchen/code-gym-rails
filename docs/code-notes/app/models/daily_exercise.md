@@ -11,3 +11,8 @@ The response is read with `DailyResponse.lock.find_by`, not `#lock!` on a
 loaded association, so a response deleted by `#start_over` after the
 exercise was loaded comes back as nil rather than raising, and one submitted
 in the meantime comes back as committed.
+
+It selects the response dated with the exercise. `daily_exercise_id` is not
+unique, and legacy carry-forward data can leave an older response on the same
+exercise; locking that one would let `RegenerateExerciseJob` miss today's
+reviewed response and replace the set under it.

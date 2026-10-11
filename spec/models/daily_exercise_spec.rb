@@ -211,6 +211,13 @@ RSpec.describe DailyExercise, type: :model do
                             problem_set: { "code_review" => { "question" => "q" } })
     end
 
+    it "yields the response dated with the exercise when an older one also points at it" do
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.yesterday, answers: {})
+      current = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+
+      expect { |block| exercise.with_response_locked(&block) }.to yield_with_args(current)
+    end
+
     it "yields nil when the day has no response" do
       expect { |block| exercise.with_response_locked(&block) }.to yield_with_args(nil)
     end

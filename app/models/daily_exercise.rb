@@ -64,7 +64,7 @@ class DailyExercise < ApplicationRecord
   def with_response_locked
     transaction do
       lock!
-      yield DailyResponse.lock.find_by(daily_exercise_id: id)
+      yield DailyResponse.lock.find_by(daily_exercise_id: id, date: date)
     end
   end
 end
