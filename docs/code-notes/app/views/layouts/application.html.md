@@ -432,8 +432,7 @@ the page has rendered, which confuses rendering with the modules executing.
 The browser paints and accepts input while it is still parsing, and a deferred
 module runs only after parsing ends, so a gesture in that window reaches an
 undefined global. The name editor above saves on blur through
-`CodeGymSaveStatus.queue`, and Setup's controls save the same way on change,
-so either can fire in that window. The dashboard's Submit button no longer
+`CodeGymSaveStatus.queue`, so it can fire in that window. The dashboard's Submit button no longer
 can: it is `type="button"`, so a click before `answer_form_controller`
 connects does nothing at all, and that controller's code note explains why.
 `spec/system/deferred_module_spec.rb` holds that window open and drives it.

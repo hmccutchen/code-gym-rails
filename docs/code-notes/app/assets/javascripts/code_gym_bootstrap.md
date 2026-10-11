@@ -16,8 +16,7 @@ into `answer_form_controller`: the inline handler set the form `inert` before
 awaiting `CodeGymRequest.send`, so the throw stranded the day with nothing
 saved. The inline scripts that remain still reach the globals from handlers
 bound at parse time. The layout's name editor calls `CodeGymSaveStatus.queue`
-on blur and Setup's controls call it on change, so a blur or a change in that
-window would throw and lose the save.
+on blur, so a blur in that window would throw and lose the save.
 
 This file restores the old guarantee in one place. It is served by Propshaft
 and included with `javascript_include_tag` immediately before the importmap
@@ -157,10 +156,9 @@ deleting it.
 
 `spec/system/deferred_module_spec.rb` stalls the module assets, navigates with
 `waitUntil: "commit"` and asserts the document is still `interactive`. Inside
-that window it moves a Setup slider, whose save is queued through the stub
-before the modules arrive, and expects `queued()` and `pending()` to answer
-true at once and the save to land once the flush replays it. That example
-fails without this file.
+that window it moves a Setup slider, which the early-edit recorder counts as
+pending before the modules arrive, and expects the save to land once
+`exercise_mix_controller` connects and adopts the edit.
 
 The same spec types an answer on the dashboard in that window and expects it
 counted as pending and then saved, which is the early-edit recorder's job. It
