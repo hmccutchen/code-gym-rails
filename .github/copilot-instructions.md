@@ -12,8 +12,10 @@ encrypted API key — there is no shared/admin key anywhere in this codebase.
 
 Stack: Rails 8.0.5, PostgreSQL, Solid Queue (background jobs, no Redis),
 Faraday for all AI provider HTTP calls (not the official Anthropic SDK, by
-design — this keeps provider logic swappable). No JS framework — inline
-`<script>` tags are the established convention for client-side behavior.
+design — this keeps provider logic swappable). Client-side behavior lives in
+Stimulus controllers under `app/javascript/controllers`, loaded through
+importmap; a content security policy refuses an inline `<script>`, and
+`spec/conventions/app_views_spec.rb` fails on one.
 
 ## How to review
 
@@ -247,6 +249,12 @@ checked again?** BLOCKING. A `Claimable` claim is released with the token
 compares the column with that token under the row lock first. A claim that
 went stale may belong to another caller by then, and releasing or writing
 over it lets two paid calls apply the same work.
+
+**Does the diff add an inline `<script>` or an `on*` attribute to a view?**
+BLOCKING. `config/initializers/content_security_policy.rb` allows a script
+only from this origin, from `cdn.jsdelivr.net`, or under the nonce the
+importmap tags carry, so an inline tag never runs. Behavior goes in a Stimulus
+controller and binds with `data-action`.
 
 **Does a script build its own request?** BLOCKING. Page scripts send through
 `CodeGymRequest.send`, queue saves that must not overlap through

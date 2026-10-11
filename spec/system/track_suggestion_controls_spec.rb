@@ -22,7 +22,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   end
 
   def wait_for_saves
-    page.driver.with_playwright_page { |pw| pw.wait_for_function("!window.CodeGymSaveStatus.pending()") }
+    wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
   end
 
   it "counts an applied proposal" do

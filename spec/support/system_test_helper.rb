@@ -74,6 +74,17 @@ module JavascriptReadyHelper
   def wait_for_js
     expect(page).to have_css("html[data-js-ready]", visible: :all)
   end
+
+  def wait_for_js_condition(expression, timeout: Capybara.default_max_wait_time)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+    page.driver.with_playwright_page do |pw|
+      until pw.evaluate("Boolean(#{expression})")
+        raise "timed out waiting for #{expression}" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+
+        sleep 0.05
+      end
+    end
+  end
 end
 
 RSpec.configure do |config|

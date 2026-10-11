@@ -161,20 +161,21 @@ activation untouched.
 
 ## Its lifetime
 
-The stub surface is transitional. #357's step 3 converts the last inline page
-script to a Stimulus controller, at which point `data-action` binds through
-Stimulus's own lifecycle and nothing reaches the globals during parse any more.
-The two `window.*` aliases in `application.js` stay, though, which reverses
-what step 3 planned: about fifteen system specs drive the modules through
-those names inside `execute_script` and `wait_for_function`, which run in a
-classic context that cannot import an ES module. The stubs stay with them,
-since the bootstrap publishes both names at parse time and the modules have to
-take the same names over at flush.
+The stub surface outlived the transition it was written for. #357's step 3
+converted the last inline page script to a Stimulus controller, so
+`data-action` binds through Stimulus's own lifecycle and no view reaches the
+globals during parse any more. The two `window.*` aliases in `application.js`
+stay all the same, which reverses what step 3 planned: about fifteen system
+specs drive the modules through those names inside `execute_script`, which
+runs in a classic context that cannot import an ES module. The stubs stay with
+them, since the bootstrap publishes both names at parse time and the modules
+have to take the same names over at flush.
 
-The early-edit recorder stays. It is not about inline scripts at all — it is
-about the gap between a parsed page and a loaded module, which no amount of
-converting views removes. Step 4 shrinks this file to that recorder rather than
-deleting it.
+The early-edit recorder stays too. It is not about inline scripts at all — it
+is about the gap between a parsed page and a loaded module, which no amount of
+converting views removes. Step 4 added the content security policy that makes
+the convention enforceable and left this file as it is; shrinking it to the
+recorder would mean rewriting those specs first.
 
 ## What holds it
 

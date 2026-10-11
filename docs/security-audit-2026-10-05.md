@@ -56,7 +56,7 @@ sections, and that user's duck conversation.
 
 | ID | Area | Severity | Finding | Size |
 |---|---|---|---|---|
-| R1 | Rendering | medium | No Content-Security-Policy and no nonces; 31 inline scripts and 8 inline style blocks | M |
+| R1 | Rendering | medium | No Content-Security-Policy and no nonces; 31 inline scripts and 8 inline style blocks (resolved by #357) | M |
 | R2 | Rendering | medium | Mermaid 11.4.1 is inside nine advisories, including XSS (all fixed by 11.16.1); diagram type isn't checked | S |
 | RL1 | Rate limits | medium | Provider-calling and job-enqueuing endpoints have per-section or per-day caps but no per-user limit across them; repeat clicks on `/generate` enqueue billed duplicates | S–M |
 | L2 | Accounts | medium | Open signup: one IP can create about 1,900 accounts a day, and the attacker picks the name printed in our login email | S, after a decision |
@@ -214,6 +214,12 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
   rather than the template's session id, and add `nonce: true` to every
   `javascript_tag`/`<script>`. No `unsafe-eval`; Mermaid 11 doesn't need it.
 - **Size:** M, because of the many inline scripts.
+- **Resolved** by #357, which moved every inline script into a Stimulus
+  controller and then enforced
+  `config/initializers/content_security_policy.rb` outright, skipping the
+  report-only stage: with no inline script left there was nothing to
+  measure. `esm.sh` is not allowed, since nothing loads from it.
+  `style-src` still carries `'unsafe-inline'` for the `style=` attributes.
 
 **R2. Mermaid 11.4.1 (medium).**
 - **Found:** `app/views/shared/_mermaid_diagram.html.erb:62` imports
