@@ -1,4 +1,4 @@
-# The browser's copy is CodeGymAnswerRules.sectionStatus; spec/system/answer_rules_parity_spec.rb holds them together.
+# Redrawn by the dashboard script's refreshStatus from the server's answered sections; change both together.
 module SectionStatusHelper
   def section_status(response, key)
     return "" unless response.answered?(key)

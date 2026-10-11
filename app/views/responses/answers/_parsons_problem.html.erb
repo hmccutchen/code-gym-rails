@@ -30,7 +30,7 @@
   <p class="parsons-keyhint"><%= t("responses.parsons.key_hint") %></p>
   <p class="parsons-status" aria-live="polite"></p>
   <%# Keep this a sibling of the <ol>: the script finds it through list.parentElement. %>
-  <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>" style="display:none"><%= ExerciseSection::ParsonsProblem.token_answer(answer: response.answers[key], exercise: exercise, key: key, section_data: data) %></textarea>
+  <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" style="display:none"><%= ExerciseSection::ParsonsProblem.token_answer(answer: response.answers[key], exercise: exercise, key: key, section_data: data) %></textarea>
 <% end %>
 <% unless submitted || @parsons_script_emitted %>
   <% @parsons_script_emitted = true %>
@@ -45,9 +45,9 @@
       function syncHiddenField(list) {
         const ids = [...list.querySelectorAll(".parsons-block")].map(li => li.dataset.blockId);
         const textarea = list.parentElement.querySelector('textarea[data-field="parsons_problem"]');
-        textarea.value = window.CodeGymAnswerRules.PARSONS_PREFIX + ids.join(",");
-        textarea.dataset.answerComplete = String(ids.length > 0);
+        textarea.value = "order:" + ids.join(",");
         textarea.dispatchEvent(new Event("input", { bubbles: true }));
+        textarea.dispatchEvent(new Event("change", { bubbles: true }));
       }
 
       function moveBlock(list, li, direction) {

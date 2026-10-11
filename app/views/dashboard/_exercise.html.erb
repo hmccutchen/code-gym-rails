@@ -53,8 +53,8 @@
     <div class="progress-label" id="progress-label"><%= t("dashboard.exercise.answered_count", answered: 0, total: exercise.active_section_keys.size) %></div>
   </div>
 
-  <%= render "shared/answer_rules" %>
-  <%= form_with url: responses_path, method: :post, id: "gym-form", data: { turbo: false } do |f| %>
+  <%= form_with url: responses_path, method: :post, id: "gym-form",
+        data: { turbo: false, answered_sections: response.answered_sections, submit_blocker: response.submit_blocker } do |f| %>
     <%= render "responses/sections", exercise: exercise, response: response, submitted: false %>
 
     <% if exercise.dropped_sections.any? %>
@@ -72,11 +72,11 @@
                          unrated:    t("dashboard.exercise.submit_nudges.unrated") } %>
     <div class="submit-row" id="submit-row">
       <%= f.hidden_field :submit, value: "1" %>
-      <%= f.button t("dashboard.exercise.submit"), type: "submit", id: "submit-answers", class: "btn btn-primary", disabled: submit_blocker.present? %>
+      <%= f.button t("dashboard.exercise.submit"), type: "submit", id: "submit-answers", class: "btn btn-primary" %>
       <span style="font-size:.8rem;color:var(--muted)"><%= t("dashboard.exercise.auto_saved") %></span>
     </div>
-    <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge",
-              hidden: submit_blocker.nil?, data: submit_nudges %>
+    <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge", tabindex: "-1",
+              hidden: submit_blocker.nil?, data: submit_nudges, aria: { live: "polite" } %>
   <% end %>
 
   <script>
@@ -95,26 +95,26 @@
 
     const STALE_RELOADED = <%= t("dashboard.exercise.stale_reloaded").to_json.html_safe %>;
 
-    const rules = window.CodeGymAnswerRules;
-
-    function submitBlocker() {
-      return rules.submitBlocker([...textareas].filter(answered).map(t => t.dataset.field), ratings);
-    }
-
-    function refreshSubmit() {
-      const blocker = submitBlocker();
-      submitButton.disabled = form.inert || blocker !== null;
-      ratingNudge.hidden = blocker === null;
-      if (blocker) ratingNudge.textContent = ratingNudge.dataset[blocker];
-    }
+    // The server's verdict as of its last reply; the page never judges an answer itself.
+    let answeredSections = new Set(JSON.parse(form.dataset.answeredSections || "[]"));
+    let submitBlocker = form.dataset.submitBlocker || null;
 
     function answered(textarea) {
-      return textarea.dataset.answerComplete === "true";
+      return answeredSections.has(textarea.dataset.field);
     }
 
-    function markProse(textarea) {
-      const labels = JSON.parse(textarea.dataset.scaffoldLabels || "[]");
-      textarea.dataset.answerComplete = String(rules.proseAnswered(textarea.value, labels));
+    function applyServerState(data) {
+      if (!Array.isArray(data?.answered_sections)) return;
+      answeredSections = new Set(data.answered_sections);
+      submitBlocker = data.submit_blocker || null;
+      updateProgress();
+      refreshNudge();
+      sectionFields.forEach(refreshStatus);
+    }
+
+    function refreshNudge() {
+      ratingNudge.hidden = submitBlocker === null;
+      if (submitBlocker) ratingNudge.textContent = ratingNudge.dataset[submitBlocker];
     }
 
     const ANSWERED_COUNT = <%= t("dashboard.exercise.answered_count").to_json.html_safe %>;
@@ -146,22 +146,30 @@
 
     let saveTimer = null;
     document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => saveTimer !== null));
-    function autoSave() {
+
+    function sendSave() {
       clearTimeout(saveTimer);
       saveTimer = null;
       if (form.inert) return;
-      saveTimer = setTimeout(() => {
-        saveTimer = null;
-        window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, status, data }) => {
-          if (!ok && status === 409 && data?.status === "stale") {
-            window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
-            window.location.reload();
-            return;
-          }
-          if (ok && data?.submitted && !form.inert && !reviewRequested) window.location.reload();
-        });
-      }, 800);
+      window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, status, data }) => {
+        if (!ok && status === 409 && data?.status === "stale") {
+          window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
+          window.location.reload();
+          return;
+        }
+        if (ok && data?.submitted && !form.inert && !reviewRequested) window.location.reload();
+        else if (ok && saveTimer === null && !form.inert) applyServerState(data);
+      });
     }
+
+    function autoSave() {
+      clearTimeout(saveTimer);
+      saveTimer = form.inert ? null : setTimeout(sendSave, 800);
+    }
+
+    form.addEventListener("change", (event) => {
+      if (event.target.closest("[data-field], [data-comparison-answer]")) sendSave();
+    });
 
     const RATING_LABELS = <%= DailyResponse.self_rating_labels.to_json.html_safe %>;
     const IN_PROGRESS   = <%= t("responses.section_status.in_progress").to_json.html_safe %>;
@@ -170,7 +178,8 @@
       const status = form.querySelector(`.section-status[data-status-for="${section}"]`);
       const t = form.querySelector(`textarea[data-field="${section}"]`);
       if (!status || !t) return;
-      status.textContent = rules.sectionStatus(answered(t), RATING_LABELS[ratings[section]], IN_PROGRESS);
+      if (!answered(t)) status.textContent = "";
+      else status.textContent = ratings[section] ? `✓ ${RATING_LABELS[ratings[section]]}` : IN_PROGRESS;
     }
 
     function reopenIfRated(section) {
@@ -180,9 +189,8 @@
 
     textareas.forEach(t => {
       t.addEventListener("input", () => {
-        if ("proseAnswer" in t.dataset) markProse(t);
         reopenIfRated(t.dataset.field);
-        updateProgress(); refreshSubmit(); refreshStatus(t.dataset.field); autoSave();
+        autoSave();
       });
     });
 
@@ -194,9 +202,8 @@
           b.classList.toggle("active", b === btn);
           b.setAttribute("aria-pressed", b === btn);
         });
-        refreshSubmit();
         refreshStatus(section);
-        autoSave();
+        sendSave();
       });
     });
 
@@ -218,7 +225,7 @@
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (form.inert || submitBlocker()) return;
+      if (form.inert) return;
       clearTimeout(saveTimer);
       saveTimer = null;
 
@@ -229,6 +236,7 @@
 
       let submissionSaved = false;
       let reloading = false;
+      let refused = false;
       try {
         const res = await fetch(form.action, {
           method: "POST",
@@ -254,7 +262,10 @@
             window.location.reload();
             return;
           }
-          alert(<%= t("dashboard.exercise.submit_failed").to_json.html_safe %>);
+          const data = await res.json().catch(() => null);
+          refused = res.status === 422 && Boolean(data?.submit_blocker);
+          if (refused) applyServerState(data);
+          else alert(<%= t("dashboard.exercise.submit_failed").to_json.html_safe %>);
         }
       } catch (error) {
         if (submissionSaved) {
@@ -268,8 +279,9 @@
           form.inert = false;
           submitButton.classList.remove("btn-loading");
           submitButton.textContent = <%= t("dashboard.exercise.submit").to_json.html_safe %>;
-          refreshSubmit();
+          submitButton.disabled = false;
           autoSave();
+          if (refused) ratingNudge.focus();
         }
       }
     });
@@ -279,10 +291,7 @@
       if (event.persisted && reviewRequested) window.location.reload();
     });
 
-    textareas.forEach(t => { if ("proseAnswer" in t.dataset) markProse(t); });
-    sectionFields.forEach(refreshStatus);
     updateProgress();
-    refreshSubmit();
   })();
   </script>
 <% end %>

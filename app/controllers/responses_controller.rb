@@ -255,15 +255,17 @@ class ResponsesController < ApplicationController
     end
   end
 
+  def submit_state = { answered_sections: @response.answered_sections, submit_blocker: @response.submit_blocker }
+
   def render_save_result(saved)
     respond_to do |format|
       format.json do
         if saved
-          payload = { status: "saved", completeness: @response.completeness, submitted: @response.submitted? }
+          payload = { status: "saved", completeness: @response.completeness, submitted: @response.submitted?, **submit_state }
           payload[:review_url] = review_response_path(@response) if response_params[:submit] == "1"
           render json: payload
         else
-          render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_content
+          render json: { status: "error", errors: @response.errors.full_messages, **submit_state }, status: :unprocessable_content
         end
       end
       format.html do

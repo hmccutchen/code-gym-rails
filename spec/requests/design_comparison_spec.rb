@@ -46,16 +46,16 @@ RSpec.describe "The design comparison section", type: :request do
       expect(page.at_css("label[for='#{reason_box['id']}']").text).to eq("What decides it?")
     end
 
-    it "keeps the stored answer in one hidden field the shared gate reads" do
+    it "keeps the stored answer in one hidden field that saves like any other answer" do
       get root_path
 
       field = page.at_css("textarea[data-field='design_comparison']")
       expect(field["name"]).to eq("response[answers][design_comparison]")
-      expect(field["data-answer-complete"]).to eq("false")
+      expect(page.at_css("#gym-form")["data-answered-sections"]).to eq("[]")
       expect(page.css("textarea[data-field]").map { |t| t["data-field"] }).to eq(%w[code_review design_comparison])
     end
 
-    it "restores a saved pick and reason, and marks a complete one complete" do
+    it "restores a saved pick and reason, and starts the page with a complete one counted" do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "design_comparison" => "pick:b\n#{reason}" })
 
@@ -64,7 +64,7 @@ RSpec.describe "The design comparison section", type: :request do
       expect(page.at_css("input[type=radio][value=b]")["checked"]).to be_present
       expect(page.at_css("input[type=radio][value=a]")["checked"]).to be_nil
       expect(page.at_css("textarea[data-comparison-reason]").text.strip).to eq(reason)
-      expect(page.at_css("textarea[data-field='design_comparison']")["data-answer-complete"]).to eq("true")
+      expect(page.at_css("#gym-form")["data-answered-sections"]).to eq('["design_comparison"]')
     end
 
     # The reference illustrates the principle the grade asks for, so opening it would give away the reason.

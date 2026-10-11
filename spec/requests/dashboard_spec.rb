@@ -65,24 +65,26 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include('data-rating="too_hard"')
   end
 
-  it "disables the submit button and asks for ratings on answered sections that have none" do
+  it "keeps Submit clickable and asks for ratings on answered sections that have none" do
     exercise = create_exercise
     create_response(exercise, submitted: false)
 
     get root_path
 
-    expect(response.body).to match(/id="submit-answers"[^>]*disabled/)
+    expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
+    expect(response.body).to include('data-submit-blocker="unrated"')
     expect(response.body).to match(/id="rating-nudge"(?![^>]*hidden)/)
     expect(response.body).to include("Rate each section you answered to finish up.")
   end
 
-  it "disables the submit button and asks for an answer when nothing is answered yet" do
+  it "keeps Submit clickable and asks for an answer when nothing is answered yet" do
     exercise = create_exercise
     create_response(exercise, submitted: false).update!(answers: {})
 
     get root_path
 
-    expect(response.body).to match(/id="submit-answers"[^>]*disabled/)
+    expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
+    expect(response.body).to include('data-answered-sections="[]"')
     expect(response.body).to include("Answer at least one section to finish up.")
   end
 
@@ -110,7 +112,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   end
 
   [ 1, 2, 3 ].each do |count|
-    it "renders a rated #{count}-block Parsons gate from completion rather than encoded length" do
+    it "starts a rated #{count}-block Parsons day from completion rather than encoded length" do
       exercise = create_exercise(problem_set: {
         "code_review" => { "question" => "Find the bug", "snippet" => "code" },
         "parsons_problem" => { "blocks" => Array.new(count) { |i| "block #{i}" },
@@ -121,14 +123,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
       document = Nokogiri::HTML(response.body)
-      expect(document.at_css("#submit-answers")["disabled"]).not_to be_nil
-      expect(document.at_css('textarea[data-field="parsons_problem"]')["data-answer-complete"]).to eq("false")
+      expect(document.at_css("#gym-form")["data-answered-sections"]).to eq("[]")
+      expect(document.at_css("#gym-form")["data-submit-blocker"]).to eq("unanswered")
 
       draft.update!(answers: { "parsons_problem" => "order:#{(0...count).to_a.join(',')}" })
       get root_path
       document = Nokogiri::HTML(response.body)
-      expect(document.at_css("#submit-answers")["disabled"]).to be_nil
-      expect(document.at_css('textarea[data-field="parsons_problem"]')["data-answer-complete"]).to eq("true")
+      expect(document.at_css("#gym-form")["data-answered-sections"]).to eq('["parsons_problem"]')
+      expect(document.at_css("#gym-form")["data-submit-blocker"]).to be_nil
     end
   end
 
@@ -145,12 +147,12 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include('data-rating-for="code_review" data-rating="right_level">Just right</button>')
   end
 
-  it "keeps the submit button visible even when it is disabled" do
+  it "keeps the submit button visible and clickable before anything is answered" do
     create_exercise
 
     get root_path
 
-    expect(response.body).to match(/id="submit-answers"[^>]*disabled/)
+    expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
     expect(response.body).not_to match(/id="submit-row"[^>]*style="display:none"/)
   end
 
@@ -277,8 +279,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(draft.answered_sections).to eq([ "code_review" ])
     expect(draft.answered_concept_tags).to eq("code_review" => "n_plus_one")
     expect(draft).to be_submittable
-    expect(document.at_css("#submit-answers")["disabled"]).to be_nil
-    expect(document.at_css('textarea[data-field="parsons_problem"]')["data-answer-complete"]).to eq("false")
+    expect(document.at_css("#gym-form")["data-answered-sections"]).to eq('["code_review"]')
 
     draft.update!(submitted_at: Time.current)
     get root_path
