@@ -112,6 +112,21 @@ RSpec.describe ModelComparison do
     expect(out.string).not_to include("\"improved_code\"")
   end
 
+it "prints a failed grade with its failure kind, provider, quota and wait" do
+  exercise = create_exercise
+  response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                   answers: { "code_review" => "The query runs once per row, so preload it." },
+                                   submitted_at: Time.current)
+  allow(ReviewGrading).to receive(:grade_section).and_return(
+    [ "code_review", { ok: false, error_code: "rate_limited", failure: "short_rate_limit", provider: "claude",
+                       quota_id: "output_tokens", retry_after: 30 } ]
+  )
+
+  comparison.review(response.id)
+
+  expect(out.string).to include("rate_limited: short_rate_limit from claude, quota output_tokens, retry after 30s")
+end
+
   it "says when a pseudocode section is graded without a saved translation" do
     exercise = create_exercise(FakeService::EXERCISE_PROBLEM_SET.slice("code_review", "pseudocode_to_code"))
     response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,

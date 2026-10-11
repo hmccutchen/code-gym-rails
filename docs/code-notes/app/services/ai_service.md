@@ -167,12 +167,14 @@ no provider.
 `blocking:` means a request thread is waiting on the call. The timeout policy
 for that case stays in this class (`SYNC_GENERATION_READ_TIMEOUT`).
 
-## `#review_sections`
+## `#review_grading_provider`
 
-Each thread has its own service and holds no database connection during the
-HTTP call. A failed section is tagged, not raised. The difficulty assessment
-thread starts first so its extra provider call overlaps the grading instead of
-adding to the wait.
+Hands `ReviewGrading` the provider calls and prompts it needs as callables, the
+way `#judged_generation_provider` does for `JudgedGeneration`. It is public,
+unlike that sibling, because `ReviewGrading`'s specs and
+`script/model_comparison.rb` build a provider from a service they hold; the
+struct carries bound methods and two flags, never a key. The fan-out and
+every per-section rule live there; this class keeps the prompts and the calls.
 
 ## `#generate_concept_reference`
 
@@ -361,25 +363,10 @@ had its labels truncated mid-word (issue #164).
 "rounds" goes to every key so the assembler needn't branch on which kind reads
 it.
 
-## `#translate_before_grading`
-
-Runs before the fan-out because `#build_review_day_context` reads the stored
-translation once for every grading thread.
-
-## `#translatable_length?`
-
-A plan over the limit is skipped rather than truncated: code from a clipped
-plan would be captioned as the engineer's plan.
-
 ## `INFRASTRUCTURE_ERRORS`
 
-Tagged like provider errors so the other sections still save. It does not
+Read by `ReviewGrading` and `JudgedGeneration`. Tagged like provider errors so the other sections still save. It does not
 include `StandardError`, which would hide real bugs behind a retry.
-
-## `#merge_difficulty!`
-
-Merges only onto sections that graded; a section the day never asked about must
-not acquire a difficulty note.
 
 ## `DIFFICULTY_GUIDANCE`
 
