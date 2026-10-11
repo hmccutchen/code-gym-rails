@@ -14,45 +14,25 @@
   <% end %>
 <% else %>
   <% pick, reason = kind.parse_answer(response.answers[key]) %>
-  <div class="comparison-answer" data-comparison-answer="<%= key %>">
+  <div class="comparison-answer" data-comparison-answer="<%= key %>" data-controller="comparison-answer"
+       data-comparison-answer-prefix-value="<%= ExerciseSection::DesignComparison::PICK_PREFIX %>">
     <fieldset class="comparison-pick">
       <legend><%= t("sections.design_comparison.pick_legend") %></legend>
       <% ExerciseSection::DesignComparison::PIECES.each do |piece| %>
         <label>
-          <input type="radio" name="comparison-pick-<%= key %>" value="<%= piece %>" <%= "checked" if pick == piece %>>
+          <input type="radio" name="comparison-pick-<%= key %>" value="<%= piece %>" <%= "checked" if pick == piece %>
+                 data-comparison-answer-target="pick" data-action="change->comparison-answer#compose">
           <%= t("sections.design_comparison.piece", piece: piece.upcase) %>
         </label>
       <% end %>
     </fieldset>
     <label class="comparison-reason-label" for="comparison-reason-<%= key %>"><%= t("sections.design_comparison.reason_label") %></label>
     <textarea id="comparison-reason-<%= key %>" class="<%= kind.answer_class %>" data-comparison-reason
+              data-comparison-answer-target="reason" data-action="input->comparison-answer#compose"
               maxlength="<%= ExerciseSection::DesignComparison::MAX_REASON_LENGTH %>"
               placeholder="<%= t("sections.#{key}.placeholder") %>"><%= reason %></textarea>
     <%# HTML drops the newline after the tag, as with Rails' text_area; without it a reason with no pick loses its "\n". %>
-    <textarea name="response[answers][<%= key %>]" data-field="<%= key %>" hidden><%= "\n" %><%= response.answers[key] %></textarea>
+    <textarea name="response[answers][<%= key %>]" data-field="<%= key %>"
+              data-comparison-answer-target="field" hidden><%= "\n" %><%= response.answers[key] %></textarea>
   </div>
-<% end %>
-<% unless submitted || @design_comparison_script_emitted %>
-  <% @design_comparison_script_emitted = true %>
-  <% content_for :page_scripts do %>
-    <script>
-    (() => {
-      document.querySelectorAll("[data-comparison-answer]").forEach(area => {
-        const field  = area.querySelector("textarea[data-field]");
-        const reason = area.querySelector("textarea[data-comparison-reason]");
-        const prefix = <%= ExerciseSection::DesignComparison::PICK_PREFIX.to_json.html_safe %>;
-
-        // Matches DesignComparison.encode_answer; a reason with no pick keeps its line so a reload shows it.
-        function compose() {
-          const pick = area.querySelector("input[type=radio]:checked")?.value;
-          field.value = pick || reason.value.trim() ? `${pick ? prefix + pick : ""}\n${reason.value}` : "";
-          field.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-
-        area.querySelectorAll("input[type=radio]").forEach(radio => radio.addEventListener("change", compose));
-        reason.addEventListener("input", compose);
-      });
-    })();
-    </script>
-  <% end %>
 <% end %>

@@ -1131,7 +1131,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).not_to include(%(<div class="parsons-controls">))
     end
 
-    it "ships the arrow-injection fallback and a touch delay so a stalled CDN is survivable" do
+    it "mounts the parsons controller, which carries the touch delay and the stalled-CDN fallback" do
       create_exercise(problem_set: {
         "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
         "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
@@ -1143,8 +1143,10 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       })
       get root_path
 
-      expect(response.body).to include("parsonsAddControls")
-      expect(response.body).to include("delayOnTouchOnly: true")
+      expect(response.body).to include(%(data-controller="parsons"))
+      source = Rails.root.join("app/javascript/controllers/parsons_controller.js").read
+      expect(source).to include("delayOnTouchOnly: true")
+      expect(source).to include("DRAG_FALLBACK_MS")
     end
 
     it "makes each block focusable and advertises the reorder shortcut, since drag is pointer-only" do

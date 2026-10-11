@@ -181,4 +181,29 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(user.reload.skill_level).to eq("senior")
     expect(errors).to be_empty
   end
+
+  # The pick and the reason only reach the stored answer through the controller, so an early edit must be adopted.
+  it "adopts a design comparison picked and explained while the modules are still loading" do
+    reason = "Piece A keeps the retry bounded, which the stated requirement asks for."
+
+    travel_to(a_weekday) do
+      watch_page_errors
+      visit_with_todays_set(user)
+      expect(page).to have_css(%([data-comparison-answer="design_comparison"]), wait: 10)
+
+      reload_with_modules_stalled do |pw|
+        pw.evaluate(<<~JS)
+          (() => {
+            const box = document.querySelector('[data-comparison-answer="design_comparison"]');
+            box.querySelector('input[type="radio"]').click();
+            box.querySelector("textarea[data-comparison-reason]").value = #{reason.to_json};
+          })()
+        JS
+      end
+
+      wait_for(20) { user.daily_responses.reload.first&.answers&.dig("design_comparison").to_s.include?(reason) }
+      expect(user.daily_responses.sole.answers["design_comparison"]).to eq("pick:a\n#{reason}")
+      expect(errors).to be_empty
+    end
+  end
 end

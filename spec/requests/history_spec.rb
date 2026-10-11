@@ -229,15 +229,15 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include("mermaid@11.17.2")
     end
 
-    it "emits the ai_review script and the mermaid module exactly once across multiple entries" do
-      # Both scripts would otherwise ship once per entry; they must dedupe into :page_scripts.
+    it "mounts the review controllers once per entry and the mermaid module exactly once" do
+      # Mermaid would otherwise ship once per entry; it must dedupe into :page_scripts.
       3.times { |i| create_session_for(user, date: (i + 5).days.ago.to_date, reviewed: true) }
       architecture_session(diagram: "flowchart TD\n  A[Client] --> B[API]")
 
       login_as(user)
       get history_path
 
-      expect(response.body.scan("const FOLLOW_UP_FAILED").size).to eq(1)
+      expect(response.body.scan('data-controller="follow-ups"').size).to be > 1
       expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
     end
 
