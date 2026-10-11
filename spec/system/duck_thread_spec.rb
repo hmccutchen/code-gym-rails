@@ -45,6 +45,20 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     end
   end
 
+  it "sends on Enter without the form navigating away" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+      duck.find(".duck-input").fill_in(with: "why is this slow?")
+      duck.find(".duck-input").send_keys(:enter)
+
+      expect(duck).to have_selector(".duck-turn.duck-user", text: "why is this slow?", wait: 10)
+      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(page).to have_current_path(root_path)
+    end
+  end
+
   it "labels each turn's speaker for assistive tech, not just by colour" do
     user = create_fake_provider_user
 

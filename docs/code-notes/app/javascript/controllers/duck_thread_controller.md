@@ -22,10 +22,12 @@ unchanged.
 
 ## refreshCap
 
-`refreshCap` runs after every send attempt, successful or not, and after
-Clear. It is the single place that decides whether the input stays usable, so
-the in-flight lock set before a fetch and the cap reached after one always end
-in the same resting state.
+`refreshCap` runs after every send whose reply is still current, successful or
+not, and after Clear. A reply dropped because Clear ran while it was in flight
+returns before it, which is correct: Clear has already left the controls in
+their resting state. It is the single place that decides whether the input
+stays usable, so the in-flight lock set before a fetch and the cap reached
+after one always end in the same resting state.
 
 It writes the status only when the cap is reached. It used to clear the status
 otherwise, and because it ran in the send path's `finally`, that wiped every
