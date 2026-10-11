@@ -73,9 +73,8 @@ refused with a 409 rather than saved in part.
 ## `#save_answers_under_lock`
 
 Takes both locks through `DailyExercise#with_response_locked`, which yields
-only the response dated with today's exercise. An older row on the same
-exercise, which only legacy carry-forward data holds, is left alone, and
-today's is found or created, then locked.
+the exercise's one response, or nil when there is none yet, in which case
+it is found or created, then locked.
 
 A refused submit raises `ActiveRecord::Rollback` instead of returning
 `:failed` early. `#persisted_response_for` has already created the row by
