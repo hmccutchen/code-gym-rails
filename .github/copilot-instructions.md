@@ -239,7 +239,7 @@ so the finding is usually a red build; say what to do instead. A module that
 needs a provider call takes it as a callable on its `Provider` struct, the way
 `ReviewGrading` and `JudgedGeneration` do, and a thread starts through
 `CallerZoneThread.start` so it keeps the caller's time zone. A new exemption
-in that spec needs a stated reason.
+in that spec needs a stated reason and the exact number of threads it covers.
 
 **Is a claim released without its own token, or written under without being
 checked again?** BLOCKING. A `Claimable` claim is released with the token
