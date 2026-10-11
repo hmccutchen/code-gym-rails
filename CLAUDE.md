@@ -360,7 +360,7 @@ Every page load, any day of the week:
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `User`          | email, name, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), invite_code_id (nullable fk; the code that admitted the account), trial_started_at / trial_ends_at / trial_consented_at (nullable; a present trial_ends_at is the trial), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), track_evidence_cutoffs (non-null jsonb, default {}) |
+| `User`          | email, name, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), invite_code_id (nullable fk; the code that admitted the account), trial_started_at / trial_ends_at / trial_consented_at (nullable; a present trial_ends_at is the trial), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), track_evidence_cutoffs (non-null jsonb, default {}), track_suggestions (boolean, default true), track_proposals_answered (integer, default 0) |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at, dropped_sections (jsonb), plan_notes (jsonb, default {}: what the plan did — `coverage`, `shared_concept`) |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), review_provider (which provider wrote the review), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
@@ -487,6 +487,24 @@ concept-specific difficulty descriptions for future generation, not a new set.
   preserves targets, locks, exclusions and pending Exercise mix edits.
   No junior targets remaining automatically records `"none"`; the track
   does not keep proposing steps back after completion or leaving.
+
+  **After three answers, a proposal sends the user to Setup.**
+  `users.track_proposals_answered` counts each Apply and Not now through
+  `POST /learning_track/answer`, which the dashboard sends once the save has
+  succeeded, so a lost count is possible and costs nothing. Below
+  `LearningTrack::IN_PLACE_ANSWERS` (3) a proposal applies in place. From then
+  on its main button links to Setup's Exercise mix with the proposed kinds
+  marked (`?suggested[]=`), and the user changes the level there, so they
+  learn where the control lives. Not now still dismisses in place, and a
+  bundle sent to Setup has no Keep at junior buttons, since the choice is made
+  there. The threshold is a starting value, not a measured one.
+
+  **Suggestions can be turned off and back on.** Every proposal links to the
+  "Suggest level changes" switch on Setup, `users.track_suggestions` (default
+  true). While it is off the dashboard computes no proposal; turning it back
+  on resumes them with every cutoff as it was. Leaving the track is separate
+  and one-way, since joining after the first-run choice is refused, and its
+  hint says so.
 
   Generation, review, both judges and `ConceptMastery` never read track state;
   `spec/services/learning_track_isolation_spec.rb` pins that separation and
@@ -3133,6 +3151,7 @@ always pull in the full suite — is stated once, in
 - `app/services/competency_gate/evidence.rb` — the gate's only query: every rubric-stamped reviewed day, oldest first, in batches, as `CompetencyGate::Day` values.
 - `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileController`.
 - `app/controllers/learning_track_dismissals_controller.rb` — records Not now cutoffs for the current user under the user-row lock.
+- `app/controllers/learning_track_answers_controller.rb` — counts an answered proposal, which decides whether the next one applies in place or links to Setup.
 - `app/views/dashboard/_track_proposal.html.erb` — submitted-day proposal, removable bundle and in-place Apply/Not now saves.
 - `script/prepare_junior_ladders.rb` (+ `script/junior_ladder_preparation.rb`) — operator coverage report; explicit `--run` queues shared-reference refreshes using the operator's key.
 - `spec/requests/existing_account_pages_spec.rb` — exact pre-track Dashboard, Setup, Account and History snapshots. `UPDATE_PAGE_SNAPSHOTS=1` intentionally rewrites fixtures; never use it to conceal a learning-track regression.

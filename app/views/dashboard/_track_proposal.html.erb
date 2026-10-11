@@ -1,9 +1,10 @@
 <%# One learning track proposal. Local: proposal (TrackGraduation::Proposal). %>
 <% name = ->(key) { t("sections.#{key}.name") } %>
+<% in_place = current_user.applies_track_proposals_in_place? %>
 <%= tag.div id: "track-proposal", class: "mix-note track-proposal",
       data: { levels: current_user.section_kind_levels.to_json,
               version: current_user.section_kind_preferences_version,
-              profile_url: profile_path, dismiss_url: learning_track_dismissal_path,
+              profile_url: profile_path, dismiss_url: learning_track_dismissal_path, answer_url: learning_track_answer_path,
               applied_text: t("learning_track.proposal.applied"),
               dismissed_text: t("learning_track.proposal.dismissed"),
               stranded_text: t("learning_track.proposal.stranded"),
@@ -17,8 +18,10 @@
         <li data-step data-kind="<%= step.kind %>" data-to="<%= step.to %>">
           <%= t(step.results_at_level.zero? ? "learning_track.proposal.led_no_results" : "learning_track.proposal.led_with_results",
                 kind: name.call(step.kind)) %>
-          <button type="button" class="btn btn-ghost btn-sm" data-remove-step
-                  aria-label="<%= t("learning_track.proposal.remove_label", kind: name.call(step.kind)) %>"><%= t("learning_track.proposal.remove") %></button>
+          <% if in_place %>
+            <button type="button" class="btn btn-ghost btn-sm" data-remove-step
+                    aria-label="<%= t("learning_track.proposal.remove_label", kind: name.call(step.kind)) %>"><%= t("learning_track.proposal.remove") %></button>
+          <% end %>
         </li>
       <% end %>
     </ul>
@@ -28,8 +31,16 @@
       <%= t("learning_track.proposal.#{proposal.basis}", kind: name.call(step.kind)) %>
     </p>
   <% end %>
-  <button type="button" class="btn btn-primary btn-sm" data-apply><%= t("learning_track.proposal.apply") %></button>
+  <% if in_place %>
+    <button type="button" class="btn btn-primary btn-sm" data-apply><%= t("learning_track.proposal.apply") %></button>
+  <% else %>
+    <%= link_to t("learning_track.proposal.change_in_setup"),
+                setup_path(suggested: proposal.steps.map(&:kind), anchor: "exercise-mix"),
+                class: "btn btn-primary btn-sm", data: { change_in_setup: true } %>
+  <% end %>
   <button type="button" class="btn btn-ghost btn-sm" data-not-now><%= t("learning_track.proposal.not_now") %></button>
+  <p class="hint"><%= t("learning_track.proposal.turn_off_html",
+                        link: link_to(t("learning_track.proposal.turn_off_link"), setup_path(anchor: "learning-track"))) %></p>
 <% end %>
 
 <script>
@@ -46,7 +57,7 @@
     const apply = box.querySelector("[data-apply]");
     const setBusy = (busy) => {
       box.querySelectorAll("button").forEach((button) => { button.disabled = busy; });
-      apply.disabled = busy || listed().length === 0;
+      if (apply) apply.disabled = busy || listed().length === 0;
     };
 
     // The buttons that had focus are gone, so the confirmation takes it and a screen reader reads it out.
@@ -76,6 +87,7 @@
       setTimeout(() => reloadWhenSaved(waited + SAVE_POLL_MS), SAVE_POLL_MS);
     };
 
+    const answer = () => window.CodeGymSaveStatus.save("POST", box.dataset.answerUrl, {}, "track_answer");
     const dismiss = (kinds) => kinds.length === 0
       ? Promise.resolve({ ok: true })
       : window.CodeGymSaveStatus.save("POST", box.dataset.dismissUrl, { kinds }, "track_dismissal");
@@ -87,7 +99,7 @@
       });
     });
 
-    apply.addEventListener("click", async () => {
+    apply?.addEventListener("click", async () => {
       setBusy(true);
       const levels = JSON.parse(box.dataset.levels);
       listed().forEach((element) => { levels[element.dataset.kind] = element.dataset.to; });
@@ -98,6 +110,7 @@
 
       if (result && result.ok) {
         settle(box.dataset.appliedText);
+        answer();
         dismiss(setAside);
         return;
       }
@@ -108,8 +121,9 @@
     box.querySelector("[data-not-now]").addEventListener("click", async () => {
       setBusy(true);
       const result = await dismiss(steps().map((element) => element.dataset.kind));
-      if (result && result.ok) return settle(box.dataset.dismissedText);
-      setBusy(false);
+      if (!result || !result.ok) return setBusy(false);
+      answer();
+      settle(box.dataset.dismissedText);
     });
   })();
 </script>

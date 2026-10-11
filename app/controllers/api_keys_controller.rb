@@ -3,6 +3,8 @@ class ApiKeysController < ApplicationController
 
   skip_before_action :require_provider
 
+  helper_method :suggested_kinds
+
   # GET /setup
   def edit
     redirect_to welcome_path if current_user.first_run?
@@ -28,6 +30,12 @@ class ApiKeysController < ApplicationController
   end
 
   private
+
+  def suggested_kinds
+    return [] unless current_user.on_learning_track?
+
+    ExerciseSection.keys & Array(params[:suggested]).grep(String)
+  end
 
   # Existing keys are never echoed back, so a blank key field means only the other preferences changed.
   def preferences_update

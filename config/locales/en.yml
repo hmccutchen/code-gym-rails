@@ -10,6 +10,9 @@ en:
       remove_label: "Keep %{kind} at junior"
       apply: "Apply"
       not_now: "Not now"
+      change_in_setup: "Change it in Setup"
+      turn_off_html: "You can change levels yourself or turn these suggestions off in %{link}."
+      turn_off_link: "Setup"
       applied: "Done. Your next sets use the new level."
       dismissed: "Okay. This comes back once there's more to go on."
       stranded: "Your settings changed in another tab, and another save on this page is still running. Reload once it finishes to see the current suggestion."
@@ -25,7 +28,10 @@ en:
     setup:
       on_track: "You're on the junior track. Code Gym suggests moving each kind of exercise up as your reviews show you're ready."
       leave: "Leave the track"
-      leave_hint: "Your current difficulty settings stay as they are."
+      leave_hint: "Your current difficulty settings stay as they are. You can't rejoin the track afterwards."
+      suggestions_label: "Suggest level changes"
+      suggestions_hint: "When this is off, the dashboard stops suggesting level changes. You can still change levels yourself in Exercise mix, and turn this back on at any time."
+      suggested: "Code Gym suggested a level change for %{kinds}. Change their difficulty below."
       left: "You've left the junior track. Your difficulty settings stay as they are."
       key_guide:
         title: "Getting an API key"

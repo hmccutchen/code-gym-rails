@@ -1,7 +1,7 @@
 <%# Required locals: kind (an ExerciseSection class), excluded (Boolean). %>
 <% difficulty = KindDifficulty.for(current_user) %>
 <% level      = difficulty.level_for(kind) %>
-<fieldset class="mix-difficulty" data-kind="<%= kind.key %>">
+<fieldset class="mix-difficulty<%= " mix-suggested" if suggested_kinds.include?(kind.key) %>" data-kind="<%= kind.key %>">
   <legend><%= t("exercise_mix.difficulty_legend") %></legend>
   <label>
     <input type="radio" name="level-<%= kind.key %>" value="" <%= "checked" if level.nil? %> <%= "disabled" if excluded %>>
