@@ -26,3 +26,12 @@ The labels are found with a document-wide query rather than a target, because
 they are rendered by `api_keys/_difficulty_controls`, which sits inside the
 exercise-mix controller's element and so cannot carry this controller's
 targets.
+
+## An edit made before the modules load
+
+Time zone, Daily sections and Skill level are server-rendered and nothing is
+bound until `connect()`, which waits on the deferred module graph. So
+`connect()` compares each control with what the server rendered — the
+default-selected option for a select, `defaultChecked` for the sections
+radio — and queues the save the missing listener would have sent. Without it
+the choice sits on screen unsaved until the user touches the control again.

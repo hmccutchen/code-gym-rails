@@ -11,7 +11,8 @@ export default class extends Controller {
   }
 
   connect() {
-    this.savedSuggestions = this.suggestionsTarget.checked
+    this.savedSuggestions = this.suggestionsTarget.defaultChecked
+    if (this.suggestionsTarget.checked !== this.savedSuggestions) this.toggleSuggestions()
   }
 
   async toggleSuggestions() {

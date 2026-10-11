@@ -10,6 +10,22 @@ export default class extends Controller {
     labelTemplate: String
   }
 
+  // An edit made before this controller connected fires no event of its own, so adopt it against what the server rendered.
+  connect() {
+    if (this.timeZoneTarget.value !== this.renderedValue(this.timeZoneTarget)) this.saveTimeZone()
+
+    const sections = this.dailySectionsTarget.querySelector("input[type=radio]:checked")
+    if (sections && !sections.defaultChecked) {
+      this.queueSave("daily_section_count", { daily_section_count: sections.value })
+    }
+
+    if (this.skillLevelTarget.value !== this.renderedValue(this.skillLevelTarget)) this.saveSkillLevel()
+  }
+
+  renderedValue(select) {
+    return Array.from(select.options).find((option) => option.defaultSelected)?.value
+  }
+
   // Key per control: all controls PATCH one path, and a shared key lets one success clear another's warning.
   queueSave(key, payload) {
     return saveStatus.queue(key, "PATCH", this.urlValue, { user: payload })

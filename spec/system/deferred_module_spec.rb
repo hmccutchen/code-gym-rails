@@ -160,4 +160,25 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(user.reload.section_kind_weights).to eq("challenge" => 0.25)
     expect(errors).to be_empty
   end
+
+  it "saves a Setup preference chosen while the modules are still loading" do
+    watch_page_errors
+    visit_as(user)
+    visit setup_path
+    expect(page).to have_css("#skill-level")
+
+    reload_with_modules_stalled do |pw|
+      pw.evaluate(<<~JS)
+        (() => {
+          const select = document.getElementById("skill-level");
+          select.value = "senior";
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        })()
+      JS
+    end
+
+    wait_for { user.reload.skill_level == "senior" }
+    expect(user.reload.skill_level).to eq("senior")
+    expect(errors).to be_empty
+  end
 end

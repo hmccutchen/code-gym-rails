@@ -10,6 +10,13 @@ export default class extends Controller {
     paletteOff: String
   }
 
+  // An edit made before this controller connected fires no event of its own, so adopt it against what the server rendered.
+  connect() {
+    const edited = Array.from(this.element.querySelectorAll("input[type=radio]:checked"))
+      .some((radio) => !radio.defaultChecked)
+    if (edited) this.change()
+  }
+
   chosen() {
     const values = {}
     this.element.querySelectorAll("input[type=radio]:checked").forEach((radio) => {

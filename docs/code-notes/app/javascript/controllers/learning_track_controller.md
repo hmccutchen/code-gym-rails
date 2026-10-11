@@ -21,3 +21,11 @@ confirmation line, which takes focus because the button that had it is gone.
 
 The key guide is removed at the same time because it renders only for an
 account on the track.
+
+## An edit made before the modules load
+
+`savedSuggestions` seeds from `defaultChecked`, not `checked`: the box may
+already have been clicked while the deferred modules were loading, and
+seeding from its current state would record an unsaved change as saved and
+then silently keep it. When the two differ, `connect()` sends the save the
+missing listener would have sent.
