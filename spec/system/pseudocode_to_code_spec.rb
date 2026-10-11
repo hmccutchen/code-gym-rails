@@ -40,20 +40,20 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
     end
   end
 
-  it "enables submit once the written plan is rated, with no translate or critique step in the way" do
+  it "is ready to submit once the written plan is rated, with no translate or critique step in the way" do
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
       open_dashboard(user)
 
-      expect(page).to have_button("Submit answers", disabled: true)
+      expect(page).to have_selector("#rating-nudge", text: "Answer at least one section to finish up.")
       expect(page).not_to have_button("Translate to code")
 
       write_plan(PLAN)
-      expect(page).to have_button("Submit answers", disabled: true)
+      expect(page).to have_selector("#rating-nudge", text: "Rate each section you answered to finish up.")
 
       rate_section("pseudocode_to_code")
-      expect(page).to have_button("Submit answers", disabled: false)
+      expect(page).to have_selector("#rating-nudge", visible: :hidden)
     end
   end
 

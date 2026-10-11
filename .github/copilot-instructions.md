@@ -248,12 +248,12 @@ compares the column with that token under the row lock first. A claim that
 went stale may belong to another caller by then, and releasing or writing
 over it lets two paid calls apply the same work.
 
-**Does a script restate a rule the server owns?** BLOCKING. The browser's copy
-belongs in the shared rules object (`window.CodeGymAnswerRules` for answers),
-with its constants rendered from Ruby, and the parity spec gains rows for the
-new rule. A hand-copied rule drifts silently, and the drift the parity spec
-found (`trim` against `strip`, and text the server cleans away) had been
-there since the rules were first copied.
+**Does a script restate a rule the server owns?** BLOCKING. The page shows the
+answer the server rendered or sent in its latest reply, such as the dashboard's
+`answered_sections` and `submit_blocker`, and never computes it again. A copied
+rule drifts silently: the browser's copy of the answer rules once disagreed
+with the server over `trim` against `strip`, and over text the server cleans
+away.
 
 **Does the diff fork a second copy of existing view logic?** BLOCKING. If a
 rendering already exists for "show one day's response + review," reuse it.

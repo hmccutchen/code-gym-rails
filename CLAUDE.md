@@ -212,12 +212,11 @@ decisions, not defaults that drifted into place:
   under the row lock before anything is written, since a claim that went
   stale may now belong to another caller. Anything that locks an exercise and
   its response goes through `DailyExercise#with_response_locked`.
-- **Browser copies of server rules** — when a page needs a rule the server
-  owns, the browser's copy lives in one `window.CodeGym*` object from a shared
-  partial, with every constant rendered from Ruby, and a parity spec runs one
-  table of cases through the browser copy and the Ruby path production uses,
-  cleaning included (`window.CodeGymAnswerRules`,
-  `spec/system/answer_rules_parity_spec.rb`).
+- **The server decides; the page shows its answer** — when a page needs a
+  rule the server owns, the browser holds no copy of it. The server renders its
+  answer onto the page and sends it again in every reply, and the script only
+  displays the latest one (`answered_sections` and `submit_blocker` on the
+  dashboard form and in each autosave reply).
 - **Domain data stays off provider classes** — lists and tables the domain
   owns live in a module of their own (`ConceptVocabulary`), and `AiService`
   reads them; it keeps only what is about talking to a provider.
@@ -954,8 +953,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `MIN_REASON_LENGTH` (40) characters. The form is a radio fieldset and a
   labelled textarea; an inline script in
   `responses/answers/_design_comparison` writes them into the hidden
-  `data-field` textarea and sets its `data-answer-complete`, so the shared
-  gate, progress and hint lock work unchanged. `review_context` decodes the
+  `data-field` textarea, which saves like any other answer; the server's
+  reply says whether it counts, as for every kind. `review_context` decodes the
   answer ("Picked: B. Reason: …") and hands the grader the key; the grading
   note names the main point and essential pieces, caps a matching pick with
   a vague reason and the other pick with a sound reason at developing, and
@@ -2042,16 +2041,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   ingest bound. An untouched control stays unanswered. Moving a block records
   the arrangement. A one-block exercise has nothing to move, so only it shows a
   "Use this order" button; with two or more blocks the scramble never starts in
-  the correct order and every move already saves. The kind's control supplies
-  `data-answer-complete`, initially computed by the server and updated on
-  interaction; the shared browser gate reads that state without knowing the
-  kind. The browser's copies of the prose, design comparison, submit-gate and
-  section-status rules live in one place, `window.CodeGymAnswerRules`
-  (`shared/_answer_rules`), with every constant rendered in from Ruby, and
-  `spec/system/answer_rules_parity_spec.rb` runs one table of cases through
-  each rule on both sides.
-  Progress, hint gating, history, mastery and generation all ask the same
-  completion authority.
+  the correct order and every move already saves. The browser holds no copy
+  of these rules. The page starts from the server's answered sections and
+  submit blocker, rendered on the form, and every autosave reply and refused
+  submit carries them again (`answered_sections`, `submit_blocker`). Progress,
+  the hint lock, the status lines and the nudge show the latest reply.
+  History, mastery and generation ask the same authority.
 
   `DailyResponse#answer_for` delegates review/display representation to the
   kind too. Prose below the floor, including "add index", appears as skipped
@@ -2060,7 +2055,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   cannot hide the other blocks the engineer arranged; it does not count as
   completed work. Calibration mismatch notes require completion.
 - **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so reloading offers the scaffold again without storing its labels as the user's work. Other draft text remains intact; grading and read-only displays use `answer_for` as described above.
-- **One finish action**: each section's difficulty rating autosaves on click, which enables the Submit button — disabled, with a visible nudge, until at least one section is answered and every answered section is rated (`DailyResponse#submit_blocker`, whose browser copy is `CodeGymAnswerRules.submitBlocker`, checked against the live form). Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. Draft ratings are set-only: `#create` accepts only valid enum values and preserves ratings while answers are edited or cleared. At submission it slices ratings to `answered_sections`, so a cleared, too-short, or scaffold-only answer leaves no self-assessment behind. Partial answer payloads merge into the draft before this slice; omitted answers remain unchanged, and explicit empty strings clear them. The form stays inert during submission and the review handoff, keeping its visible answers and ratings at the submitted snapshot; a failed submission restores editing and recomputes the gate. The progress label reports answers only; the nudge and button report readiness. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script. `#create` still refuses a submit that `submit_blocker` would block, with a 422 carrying the nudge's sentence and nothing saved, not even the draft the request carried. The button already prevents one, but a request from outside the page can still send it, and accepting it would bill a review of every section, freeze the day and count it toward the streak.
+- **One finish action**: the Submit button is always clickable. The server decides whether the day can be submitted (`DailyResponse#submit_blocker`): at least one section answered and every answered section rated. A nudge under the button shows the blocker from the latest autosave reply, and a click the server refuses shows the same sentence and moves focus to it. Typing saves 800 ms after the last keystroke; a rating click, leaving an answer and a design comparison pick or Parsons move save at once, so the nudge follows within one round trip. The browser holds no copy of the rule, so the two cannot disagree; the cost is that the nudge, progress and hint lock update after a save rather than on each keystroke. Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. Draft ratings are set-only: `#create` accepts only valid enum values and preserves ratings while answers are edited or cleared. At submission it slices ratings to `answered_sections`, so a cleared, too-short, or scaffold-only answer leaves no self-assessment behind. Partial answer payloads merge into the draft before this slice; omitted answers remain unchanged, and explicit empty strings clear them. The form stays inert during submission and the review handoff, keeping its visible answers and ratings at the submitted snapshot; a failed submission restores editing. The progress label reports answers only; the nudge reports readiness. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script. `#create` refuses a submit that `submit_blocker` would block, with a 422 carrying the nudge's sentence, the answered sections and the blocker, and nothing saved, not even the draft the request carried. Accepting one would bill a review of every section, freeze the day and count it toward the streak.
   A refused or dropped submission restarts the draft autosave it canceled, so
   the last edit survives without another keystroke. If submission succeeds but
   the browser cannot start the review POST, the page explains that the answers
@@ -2083,8 +2078,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   folding is available whatever the section's state. The summary carries
   the label, as an `<h2>` so VoiceOver's heading rotor reaches each section
   (never give the summary `role="button"`, which would erase it), and a
-  status line (`SectionStatusHelper#section_status`, whose browser copy is
-  `CodeGymAnswerRules.sectionStatus`): a check and the self-rating
+  status line (`SectionStatusHelper#section_status`, the only statement of
+  it: each save reply carries its text as `section_statuses`, which the
+  dashboard shows as is): a check and the self-rating
   once answered and rated, "in progress" once answered, blank otherwise. One
   automatic reopen: editing the answer of a folded, rated section opens it,
   since a fold claims the section is settled and a stale rating must never
@@ -2895,8 +2891,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   remaining sections as optional. A partly answered, unrated day still gets
   the partway nudge; a fully answered, unrated day asks for ratings.
   `DailyResponse#submit_blocker` is the one authority for that gate, read by
-  the dashboard's submit button, `ResponsesController#create`'s refusal and,
-  through `#submittable?`, the nudge,
+  the dashboard's nudge through each autosave reply, `ResponsesController#create`'s
+  refusal and, through `#submittable?`, the push nudge,
   so a notification can never name a button the user cannot press. Readiness
   does not stop nudges: submission and `PushNudgePlan`'s quiet period still do.
 
@@ -3172,7 +3168,7 @@ always pull in the full suite — is stated once, in
 - `app/models/code_format.rb` (+ `app/models/code_format/`) — `CodeFormat`: re-indents a batch of exercise code in the day's language, RuboCop's Layout cops for Ruby and Prettier for JavaScript, handing back what it cannot format unchanged
 - `vendor/prettier/` — the Prettier package and `format.mjs`, the Node script `CodeFormat::Javascript` runs
 - `app/models/code_highlight.rb` — `CodeHighlight`: Rouge highlighting for a code block, its line formatter, the lexer map and the cache key; `SyntaxHighlightingHelper#highlighted_code` is the one call site views use
-- `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value and the `data-scaffold-labels` attribute the dashboard script reads, so the scaffold rule is stated once rather than per textarea
+- `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value, so the scaffold rule is stated once rather than per textarea
 - `app/models/exercise_section/design_comparison.rb` — the second fixed kind: two working pieces, a server-rolled A/B order, the `pick:` answer encoding, its rung-aware vocabulary allowlist, and the judge's blind-solve facets
 - `app/views/responses/bodies/_design_comparison.html.erb` / `answers/_design_comparison.html.erb` — the two pieces in their own disclosures; the pick fieldset, reason textarea and the script that writes the hidden answer, plus "What decides it" once reviewed
 - `script/report_answer_positions.rb` (+ `script/answer_position_balance.rb`) — read-only count of where the better design-comparison piece was shown, totals only
@@ -3212,7 +3208,6 @@ always pull in the full suite — is stated once, in
 - `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
 - `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
-- `app/views/shared/_answer_rules.html.erb` — defines `window.CodeGymAnswerRules`, the browser's copy of the answer, submit-gate and section-status rules; rendered at the top of `dashboard/_exercise`, and held to the Ruby rules by `spec/system/answer_rules_parity_spec.rb`
 - `app/views/shared/_server_message.html.erb` — defines `window.CodeGymServerMessage`: what a page script may show when a request fails, the app's own sentence or the page's fallback
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives

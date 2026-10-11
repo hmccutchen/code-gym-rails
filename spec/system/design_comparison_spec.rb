@@ -12,6 +12,13 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
     find("[data-comparison-answer='design_comparison']")
   end
 
+  # The status line is uppercased by CSS, and Playwright matches the rendered text.
+  def in_progress = /#{I18n.t("responses.section_status.in_progress")}/i
+
+  def wait_for_saved_comparison(user, answer)
+    Timeout.timeout(10) { sleep 0.05 until user.daily_responses.reload.first&.answers&.dig("design_comparison") == answer }
+  end
+
   def hidden_answer
     find("textarea[data-field='design_comparison']", visible: :all)
   end
@@ -35,15 +42,15 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
         choose("Piece B")
         fill_in("What decides it?", with: "Too short")
       end
-      expect(hidden_answer["data-answer-complete"]).to eq("false")
+      wait_for_saved_comparison(user, "pick:b\nToo short")
       expect(page).to have_css(".section-status[data-status-for='design_comparison']", text: "", exact_text: true)
 
       within(comparison) { fill_in("What decides it?", with: reason) }
-      expect(hidden_answer["data-answer-complete"]).to eq("true")
+      expect(page).to have_css(".section-status[data-status-for='design_comparison']", text: in_progress)
       expect(hidden_answer.value).to eq("pick:b\n#{reason}")
 
       rate_section("design_comparison")
-      expect(page).to have_button("Submit answers", disabled: false)
+      expect(page).to have_selector("#rating-nudge", visible: :hidden)
 
       Timeout.timeout(10) do
         sleep 0.05 until user.daily_responses.reload.first&.answered?("design_comparison")
@@ -81,8 +88,8 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
     end
   end
 
-  # The server counts code points, so the browser must too: an emoji is one code point but two UTF-16 units.
-  it "marks a reason complete at the same length the server does, counting code points" do
+  # The server counts code points: an emoji is one code point but two UTF-16 units.
+  it "shows the reason as complete only once the server counts it long enough, in code points" do
     travel_to(a_weekday) do
       user = create_fake_provider_user
       visit_with_todays_set(user)
@@ -92,12 +99,11 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
         choose("Piece A")
         fill_in("What decides it?", with: "\u{1F600}" * (floor - 1))
       end
-      expect(hidden_answer["data-answer-complete"]).to eq("false")
-      expect(ExerciseSection::DesignComparison.answered?(hidden_answer.value)).to be(false)
+      wait_for_saved_comparison(user, "pick:a\n#{"\u{1F600}" * (floor - 1)}")
+      expect(page).to have_css(".section-status[data-status-for='design_comparison']", text: "", exact_text: true)
 
       within(comparison) { fill_in("What decides it?", with: "\u{1F600}" * floor) }
-      expect(hidden_answer["data-answer-complete"]).to eq("true")
-      expect(ExerciseSection::DesignComparison.answered?(hidden_answer.value)).to be(true)
+      expect(page).to have_css(".section-status[data-status-for='design_comparison']", text: in_progress)
     end
   end
 end

@@ -41,20 +41,44 @@ own.
 
 ## Answer completion
 
-Every control supplies its completion state through `data-answer-complete`,
-and this script reads nothing else. Prose fields carry `data-prose-answer`; on
-load and on each input the script sets their flag from
-`CodeGymAnswerRules.proseAnswered`, so a prose value the browser restores on
-back navigation still counts, and the status lines are refreshed after that.
-The design comparison and Parsons controls keep their server-rendered flag
-until the engineer changes them. The submit gate and the section status line come
-from the same rules object, which `spec/system/answer_rules_parity_spec.rb`
-holds to the Ruby rules.
+The page never judges an answer. It starts from the answered sections and
+submit blocker the server rendered on the form, and replaces both with each
+autosave reply (`applyServerState`). Holding no copy of the rules is the point:
+the browser and the server can't disagree about what counts, and the rules
+aren't published to the page. The cost is that progress, the hint lock, the
+status lines and the nudge follow the latest save, not each keystroke.
 
-## autoSave
+The status lines come as text, `section_statuses`, rendered by
+`SectionStatusHelper#section_status`, so the page holds no copy of the status
+rule either; it only puts each string where it belongs.
+
+A reply is applied only when no newer save is waiting (`saveTimer === null`,
+and no save queued behind it), so a reply to an older draft can't flip the page
+back while the engineer is still typing. That includes a rating's checkmark:
+clicking a rating marks the button at once, but the status line changes only
+when the reply that stored the rating arrives, so a failed save never shows a
+rating the server doesn't have.
+
+## autoSave and sendSave
 
 Saves go through `CodeGymSaveStatus` so a refused or dropped save is reported
 rather than lost, since these are the engineer's answers.
+
+Typing waits 800 ms after the last keystroke (`autoSave`). A rating click, and
+a `change` from an answer control (leaving a text box, a design comparison
+pick, a Parsons move), save at once (`sendSave`), so the nudge catches up
+within one round trip at the moments someone is likely to press Submit next.
+The `change` listener only acts on answer controls: the duck's box sits inside
+this form, and its `change` would otherwise save a draft.
+
+Only one save is on the wire at a time (`saving`). Each save carries every
+answer, and the server writes whichever request takes the response lock last,
+so two overlapping saves could land out of order and put older answers over
+newer ones. A save asked for while one is in flight sets `saveAgain`, and when
+the first reply arrives one more save goes out with the answers as they are
+then. Several requests in that window collapse into that one save. The queued
+save counts as pending for `CodeGymSaveStatus.watch`, so pull-to-refresh waits
+for it.
 
 A 409 with status `stale` means the server refused the answer's encoding (see
 `ResponsesController#stale_answer_sections`) and stored nothing, so the page
@@ -76,6 +100,11 @@ the flash. The two stay separate requests in the same order as two clicks:
 the submission is saved and confirmed before the review is requested.
 
 ## Refused submission
+
+Submit is never disabled. When the day isn't ready, `#create` answers with a
+422 carrying `submit_blocker`; the page shows that blocker's sentence in the
+nudge and moves focus to it once the form is editable again, so a screen
+reader hears why nothing happened. Any other failure keeps the generic alert.
 
 A 409 on submit is the same refusal the autosave handles, on the path that
 matters more: nothing was submitted, so reloading is what lets the next press

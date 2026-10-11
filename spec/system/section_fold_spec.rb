@@ -19,8 +19,7 @@ RSpec.describe "Section folding", type: :system do
       section.find(":scope > summary").click
       expect(section).not_to have_selector(%(textarea[data-field="#{first_field}"]))
       expect(section).to have_selector(%(textarea[data-field="#{first_field}"]), visible: :hidden)
-      expect(page).to have_button("Submit answers", disabled: true)
-      expect(page).to have_content("Rate each section you answered to finish up.")
+      expect(page).to have_selector("#rating-nudge", text: "Rate each section you answered to finish up.")
 
       section.find(":scope > summary").click
       rate_section(first_field)

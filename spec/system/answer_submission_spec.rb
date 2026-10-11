@@ -2,7 +2,7 @@ require "rails_helper"
 
 # with_csrf: the submit script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true do
-  it "enables Submit only once every section is rated, then submits and shows the submitted state" do
+  it "refuses an early click with the server's reason, then submits once every answered section is rated" do
     user = create_fake_provider_user
     weekday = a_weekday
 
@@ -11,19 +11,24 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       # Regex: `.section-label` is uppercased by CSS and Playwright matches the rendered text.
       expect(page).to have_content(/Code Review/i, wait: 10)
 
-      expect(page).to have_button("Submit answers", disabled: true)
+      expect(page).to have_button("Submit answers", disabled: false)
+      expect_blocked("Answer at least one section to finish up.")
 
       # Answer every section the page holds, since the count varies with the plan.
       fields = rating_row_fields
       fields.each { |field| fill_in_answer(field, "A substantive answer for #{field} that clears the length floor.") }
 
       fields[0..-2].each { |field| rate_section(field) }
-      expect(page).to have_button("Submit answers", disabled: true)
       expect(page).to have_selector("#progress-label", exact_text: "✓ All answered")
-      expect(page).to have_content("Rate each section you answered to finish up.")
-      rate_section(fields.last)
+      expect_blocked("Rate each section you answered to finish up.")
 
+      click_button "Submit answers"
+      expect(page).to have_selector("#rating-nudge:focus", text: "Rate each section you answered to finish up.")
       expect(page).to have_button("Submit answers", disabled: false)
+      expect(user.daily_responses.sole).not_to be_submitted
+
+      rate_section(fields.last)
+      expect_ready_to_submit
       click_button "Submit answers"
 
       # review_request_spec covers the chained review; this only needs the gated click to have gone through.
@@ -57,7 +62,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     end
   end
 
-  it "enables Submit once the answered sections are rated, and re-locks it when another section is answered" do
+  it "follows the server's verdict as sections are answered and rated" do
     user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
     weekday = a_weekday
 
@@ -65,21 +70,19 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
 
-      expect(page).to have_button("Submit answers", disabled: true)
-      expect(page).to have_content("Answer at least one section to finish up.")
+      expect_blocked("Answer at least one section to finish up.")
 
       fill_in_answer("code_review", "It re-runs the loyalty_tier query inside the loop — precompute it once outside the loop.")
-      expect(page).to have_button("Submit answers", disabled: true)
-      expect(page).to have_content("Rate each section you answered to finish up.")
+      expect_blocked("Rate each section you answered to finish up.")
 
       rate_section("code_review")
-      expect(page).to have_button("Submit answers", disabled: false)
+      expect_ready_to_submit
 
       fill_in_answer("pattern", "A service object because checkout has three unrelated responsibilities.")
-      expect(page).to have_button("Submit answers", disabled: true)
+      expect_blocked("Rate each section you answered to finish up.")
 
       rate_section("pattern")
-      expect(page).to have_button("Submit answers", disabled: false)
+      expect_ready_to_submit
       click_button "Submit answers"
 
       expect(page).to have_content("Review ready!", wait: 10)
@@ -135,7 +138,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
         visit root_path
         expect(find('textarea[data-field="code_review"]').value).to eq(final)
         fill_in_answer("code_review", "")
-        expect(page).to have_button("Submit answers", disabled: true)
+        expect_blocked("Answer at least one section to finish up.")
       end
     end
   end
@@ -211,14 +214,94 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       expect(page).to have_content(/Code Review/i, wait: 10)
       rate_section("code_review")
       fill_in_answer("code_review", "🦆" * DailyResponse::ANSWER_MIN_LENGTH)
-      expect(page).to have_button("Submit answers", disabled: true)
-      expect(page).to have_content("Answer at least one section to finish up.")
+      wait_for_saved_answer(user, "code_review", "🦆" * DailyResponse::ANSWER_MIN_LENGTH)
+      expect_blocked("Answer at least one section to finish up.")
 
       fill_in_answer("code_review", "🦆" * (DailyResponse::ANSWER_MIN_LENGTH + 1))
-      expect(page).to have_button("Submit answers", disabled: false)
+      expect_ready_to_submit
       click_button "Submit answers"
       expect(page).to have_content("Review ready!", wait: 10)
-      expect(user.daily_responses.sole.answered_sections).to eq([ "code_review" ])
+      expect(user.daily_responses.reload.sole.answered_sections).to eq([ "code_review" ])
+    end
+  end
+
+  it "saves at once on leaving an answer, on a rating and on a pick, without the typing delay" do
+    user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      page.execute_script(<<~JS)
+        const originalSetTimeout = window.setTimeout;
+        window.setTimeout = (callback, delay, ...rest) => delay === 800 ? 0 : originalSetTimeout(callback, delay, ...rest);
+      JS
+
+      fill_in_answer("code_review", "An answer that reaches the server once the field is left.")
+      find("body").click
+      wait_for_saved_answer(user, "code_review", "An answer that reaches the server once the field is left.")
+
+      rate_section("code_review")
+      Timeout.timeout(10) { sleep 0.05 until user.daily_responses.reload.first.section_ratings["code_review"] }
+
+      find(%([data-comparison-answer="design_comparison"])).choose("Piece A")
+      wait_for_saved_answer(user, "design_comparison", "pick:a\n")
+      expect_ready_to_submit
+    end
+  end
+
+  it "keeps one save on the wire and sends the newest answers once it returns" do
+    user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch;
+        window.saveRequests = 0;
+        window.fetch = (url, options) => {
+          if (new URL(url, location.href).pathname !== "/responses") return originalFetch(url, options);
+          window.saveRequests++;
+          if (window.saveRequests > 1) return originalFetch(url, options);
+          return new Promise(resolve => { window.releaseFirstSave = () => resolve(originalFetch(url, options)); });
+        };
+      JS
+
+      fill_in_answer("code_review", "The first answer, still on the wire.")
+      find("body").click
+      fill_in_answer("code_review", "The newer answer, written while the first save waits.")
+      find("body").click
+      expect(page.evaluate_script("window.saveRequests")).to eq(1)
+
+      page.execute_script("window.releaseFirstSave()")
+      wait_for_saved_answer(user, "code_review", "The newer answer, written while the first save waits.")
+      page.driver.with_playwright_page { |browser| browser.wait_for_function("!window.CodeGymSaveStatus.pending()") }
+      expect(user.daily_responses.reload.first.answers["code_review"]).to eq("The newer answer, written while the first save waits.")
+    end
+  end
+
+  it "shows a rating in the status line only once the server has stored it" do
+    user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      fill_in_answer("code_review", "An answer long enough for the server to count it.")
+      find("body").click
+      wait_for_saved_answer(user, "code_review", "An answer long enough for the server to count it.")
+      status = find('.section-status[data-status-for="code_review"]')
+      expect(status).to have_text(I18n.t("responses.section_status.in_progress"))
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch;
+        window.fetch = (url, options) => new URL(url, location.href).pathname === "/responses"
+          ? Promise.resolve(new Response("{}", { status: 500, headers: { "Content-Type": "application/json" } }))
+          : originalFetch(url, options);
+      JS
+
+      rate_section("code_review")
+      page.driver.with_playwright_page { |browser| browser.wait_for_function("!window.CodeGymSaveStatus.pending()") }
+
+      expect(status).to have_text(I18n.t("responses.section_status.in_progress"))
+      expect(status).not_to have_text("✓")
     end
   end
 
@@ -250,6 +333,14 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       expect(saved.answers["pattern"]).to eq("")
       expect(saved.section_ratings).to eq("code_review" => "right_level")
     end
+  end
+
+  def expect_blocked(nudge)
+    expect(page).to have_selector("#rating-nudge", text: nudge)
+  end
+
+  def expect_ready_to_submit
+    expect(page).to have_selector("#rating-nudge", visible: :hidden)
   end
 
   def hold_response_requests

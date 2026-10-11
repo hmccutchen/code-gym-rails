@@ -512,9 +512,21 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
-  describe "refusing a submit the button would not allow" do
+  describe "deciding whether the day can be submitted" do
     before do
       create_exercise("code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" })
+    end
+
+    it "reports on every autosave which sections count and what still blocks submitting" do
+      post responses_path, params: { response: { answers: { code_review: "A substantive answer", pattern: "short" } } }, as: :json
+
+      expect(response.parsed_body).to include("answered_sections" => [ "code_review" ], "submit_blocker" => "unrated",
+                                              "section_statuses" => { "code_review" => "in progress", "pattern" => "" })
+
+      post responses_path, params: { response: { section_ratings: { code_review: "right_level" } } }, as: :json
+
+      expect(response.parsed_body).to include("answered_sections" => [ "code_review" ], "submit_blocker" => nil,
+                                              "section_statuses" => { "code_review" => "✓ just right", "pattern" => "" })
     end
 
     it "refuses a submit that answers nothing, saving nothing and enqueuing nothing" do
@@ -523,7 +535,8 @@ RSpec.describe "Responses", type: :request do
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.parsed_body).to eq("status" => "error", "errors" => [ "Answer at least one section to finish up." ])
+      expect(response.parsed_body).to include("status" => "error", "errors" => [ "Answer at least one section to finish up." ],
+                                              "answered_sections" => [], "submit_blocker" => "unanswered")
       expect(user.daily_responses).to be_empty
     end
 
@@ -534,7 +547,8 @@ RSpec.describe "Responses", type: :request do
       post responses_path, params: { response: { answers: { pattern: "Another substantive answer" }, submit: "1" } }, as: :json
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.parsed_body["errors"]).to eq([ "Rate each section you answered to finish up." ])
+      expect(response.parsed_body).to include("errors" => [ "Rate each section you answered to finish up." ],
+                                              "answered_sections" => %w[code_review pattern], "submit_blocker" => "unrated")
       expect(user.daily_responses.sole.attributes).to eq(draft)
     end
 
@@ -1533,11 +1547,8 @@ RSpec.describe "Responses", type: :request do
 
         get root_path
 
-        # The labels also appear in data-scaffold-labels, so a page-wide match would pass without the pre-fill.
         expect(textarea_body("architecture")).to eq(ERB::Util.html_escape(template))
-
-        labels_attr = response.body[/<textarea[^>]*data-field="architecture"[^>]*>/][/data-scaffold-labels="([^"]*)"/, 1]
-        expect(CGI.unescapeHTML(labels_attr)).to eq(scaffold.to_json)
+        expect(response.body).not_to include("data-scaffold-labels")
       end
 
       it "falls back to the kind's default labels when the problem carries no scaffold" do
