@@ -75,10 +75,17 @@ module JavascriptReadyHelper
     expect(page).to have_css("html[data-js-ready]", visible: :all)
   end
 
+  NAVIGATED_AWAY = /Execution context was destroyed|Cannot find context|Target closed/
+
   def wait_for_js_condition(expression, timeout: Capybara.default_max_wait_time)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
     page.driver.with_playwright_page do |pw|
-      until pw.evaluate("Boolean(#{expression})")
+      loop do
+        begin
+          break if pw.evaluate("Boolean(#{expression})")
+        rescue Playwright::Error => error
+          raise unless error.message.to_s.match?(NAVIGATED_AWAY)
+        end
         raise "timed out waiting for #{expression}" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
 
         sleep 0.05
