@@ -3267,7 +3267,7 @@ always pull in the full suite — is stated once, in
   against a rendered attribute a request spec never executes, so a mismatch
   between that label and the raw concept key was invisible to request specs
   and only caught here.
-- `spec/conventions/app_source_spec.rb` — parses `app/` with Prism and fails on `Thread.new` outside `CallerZoneThread` (or a named, reasoned exemption) and on `send(:...)`
+- `spec/conventions/app_source_spec.rb` — parses `app/` with Prism and fails on `Thread.new` outside `CallerZoneThread` (or a named exemption with its reason and exact thread count) and on `send(:...)`
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway

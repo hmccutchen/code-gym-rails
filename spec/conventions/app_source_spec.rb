@@ -2,8 +2,8 @@ require "rails_helper"
 
 RSpec.describe "Conventions held over app/ source" do
   THREAD_EXEMPT = {
-    "app/services/caller_zone_thread.rb" => "the one place a fan-out thread is started",
-    "app/models/code_format/javascript.rb" => "pipe readers for Prettier that touch neither Time.zone nor the database"
+    "app/services/caller_zone_thread.rb" => { threads: 1, reason: "the one place a fan-out thread is started" },
+    "app/models/code_format/javascript.rb" => { threads: 2, reason: "Prettier's stdout and stderr readers, which touch neither Time.zone nor the database" }
   }.freeze
 
   def calls_in(path)
@@ -20,19 +20,22 @@ RSpec.describe "Conventions held over app/ source" do
 
   def relative(path) = Pathname(path).relative_path_from(Rails.root).to_s
 
+  def thread_starts(path)
+    calls_in(path).select { |call| call.name == :new && call.receiver.is_a?(Prism::ConstantReadNode) && call.receiver.name == :Thread }
+  end
+
   it "starts every thread through CallerZoneThread, so a fan-out keeps the caller's zone" do
     offenders = app_files.reject { |path| THREAD_EXEMPT.key?(relative(path)) }.flat_map do |path|
-      calls_in(path).select { |call| call.name == :new && call.receiver.is_a?(Prism::ConstantReadNode) && call.receiver.name == :Thread }
-                    .map { |call| "#{relative(path)}:#{call.location.start_line}" }
+      thread_starts(path).map { |call| "#{relative(path)}:#{call.location.start_line}" }
     end
 
     expect(offenders).to be_empty, "Thread.new outside CallerZoneThread: #{offenders.join(', ')}"
   end
 
-  it "keeps every exemption pointing at a file that still starts a thread" do
-    THREAD_EXEMPT.each_key do |path|
-      starts = calls_in(Rails.root.join(path).to_s).any? { |call| call.name == :new && call.receiver&.slice == "Thread" }
-      expect(starts).to be(true), "#{path} no longer starts a thread; drop its exemption"
+  it "holds each exempt file to exactly the threads its exemption names" do
+    THREAD_EXEMPT.each do |path, exemption|
+      count = thread_starts(Rails.root.join(path).to_s).size
+      expect(count).to eq(exemption[:threads]), "#{path} starts #{count} threads; its exemption covers #{exemption[:threads]} (#{exemption[:reason]})"
     end
   end
 
