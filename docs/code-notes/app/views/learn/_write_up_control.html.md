@@ -2,9 +2,11 @@
 
 ## Inline script
 
-The script is inline because the layout emits no importmap tags, so nothing
-else would run. It polls for the result rather than holding the request open,
-because this generation runs with extended thinking on.
+The script is still inline because #357's conversion to Stimulus controllers
+has not reached it yet. It polls for the result rather than holding the
+request open, because this generation runs with extended thinking on. Its
+poll starts from the button's click, so it needs no wait for the deferred
+`code_gym/request` module the way a parse-time caller does.
 
 ## Poll interval and attempt cap
 

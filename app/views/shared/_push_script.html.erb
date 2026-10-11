@@ -62,8 +62,10 @@
   (function () {
     if (!window.CodeGymPush.supported()) return
 
-    window.CodeGymPush.subscribeAndRegister().catch(function () {
-      // Deliberately silent: the Account page is where push state is shown and repaired.
+    document.addEventListener("DOMContentLoaded", function () {
+      window.CodeGymPush.subscribeAndRegister().catch(function () {
+        // Deliberately silent: the Account page is where push state is shown and repaired.
+      })
     })
   })();
 <% end %>

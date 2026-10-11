@@ -32,6 +32,6 @@
     setTimeout(poll, POLL_INTERVAL_MS);
   }
 
-  setTimeout(poll, POLL_INTERVAL_MS);
+  document.addEventListener("DOMContentLoaded", () => setTimeout(poll, POLL_INTERVAL_MS));
 })();
 </script>

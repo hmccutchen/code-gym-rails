@@ -338,9 +338,9 @@ win. The light palette's `media` attribute is
 
 ## Name editor script
 
-The autosave is an inline script because the layout emits no
-`javascript_importmap_tags`, so no Stimulus or importmap JS runs; the answer
-autosave in `dashboard/_exercise` follows the same convention. Copy still
+The autosave is an inline script because the conversion to Stimulus
+controllers (#357) has not reached it yet; the answer autosave in
+`dashboard/_exercise` follows the same convention for now. Copy still
 comes from I18n, and the CSRF token comes from the meta tag.
 
 ## Time-zone detection script
@@ -403,9 +403,28 @@ against the global defined there.
 
 `javascript_importmap_tags` in `<head>` loads `code_gym/request` and
 `code_gym/save_status`, which `application.js` also puts on `window` for the
-inline page scripts still to be converted. Module scripts are deferred, so an
-inline script that calls either before its own first event has to wait for
-`DOMContentLoaded`; the one-shot time-zone detection higher up this file does,
-and stays fire-and-forget on purpose, since nothing the user did triggers it.
+inline page scripts still to be converted. Module scripts are deferred, so
+they run after the document is parsed and before `DOMContentLoaded`, which is
+*later* than any inline classic script. An inline script that reaches either
+global before its own first user event therefore has to wait for
+`DOMContentLoaded`.
+
+Three shapes need that wait, and the third is the one easy to miss. A
+top-level call does (the one-shot time-zone detection higher up this file, and
+the two `CodeGymSaveStatus.watch` registrations in `dashboard/_exercise` and
+`api_keys/edit`). So does a timer started at parse time
+(`dashboard/_generating`'s first poll). So does an async chain started at
+parse time, even though no global is read on the first line:
+`shared/_push_script`'s re-subscribe reaches `window.CodeGymRequest` only
+after the service worker is ready, which is usually but not always slower than
+a module fetch, and its failure is swallowed on purpose. A handler bound at
+parse time but fired by a user needs no wait, since a click cannot land before
+the page has rendered.
+
+The wait is per caller rather than a bootstrap proxy installed ahead of the
+modules, because the globals are a bridge that ends when #357's step 3
+converts the last caller, and a mechanism built to be deleted two steps later
+is worse than five explicit waits.
+
 The two sentences those modules show are rendered onto `<body>` as data
 attributes, because a module cannot read a translation.
