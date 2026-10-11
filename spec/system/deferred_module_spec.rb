@@ -329,4 +329,34 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       expect(errors).to be_empty
     end
   end
+
+  it "filters the Learn list by a term typed while its controller was still loading" do
+    user.update!(language: "ruby_rails")
+    watch_page_errors
+    visit_as(user)
+    visit learn_path
+    expect(page).to have_css("#learn-filter-input")
+
+    url = page.current_url
+    stalled[:controller] = "learn_filter_controller"
+
+    page.driver.with_playwright_page do |pw|
+      pw.goto(url, waitUntil: "commit")
+      pw.wait_for_selector("#learn-filter-input")
+      connected = pw.evaluate(<<~JS)
+        (() => {
+          const input = document.getElementById("learn-filter-input");
+          input.value = "no such concept anywhere";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          return !!(window.Stimulus && window.Stimulus.getControllerForElementAndIdentifier(
+            document.querySelector('[data-controller~="learn-filter"]'), "learn-filter"));
+        })()
+      JS
+      expect(connected).to be(false)
+    end
+
+    expect(page).to have_css("#learn-empty", visible: :visible, wait: 20)
+    expect(page).to have_no_css(".learn-entry", visible: :visible)
+    expect(errors).to be_empty
+  end
 end

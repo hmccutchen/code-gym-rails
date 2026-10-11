@@ -36,6 +36,13 @@ request. The server refuses a blank name anyway; reverting locally keeps the
 page from showing an error for something the user can only have meant as a
 clear.
 
+A clear made while a save is out restores the name saved before that save, and
+the save then lands with a newer one. Read as text typed after the save, the
+restored name would stay on screen while the database held the new one. So
+`revert()` records the text it put back, and when the save settles that text
+counts as unchanged, so the field shows the name the server returned. Any later
+save clears the record. `spec/system/name_editor_spec.rb` holds this race.
+
 ## A save never writes over text typed after it
 
 The field stays editable while a save is out, and a save that lands replaces

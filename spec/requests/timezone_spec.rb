@@ -63,11 +63,11 @@ RSpec.describe "Per-user timezone", type: :request do
         .to include("resolvedOptions().timeZone")
     end
 
-    it "does not render the detect script once a zone is set" do
+    it "does not mount the detect-once controller once a zone is set" do
       set = create_user_with_key(email: "set@example.com", name: "Set", time_zone: "America/Chicago")
       login_as(set)
       get root_path
-      expect(response.body).not_to include("resolvedOptions().timeZone")
+      expect(response.body).not_to include(%(data-controller="time-zone"))
     end
 
     it "shows a timezone select on the setup page, outside the api-keys form" do

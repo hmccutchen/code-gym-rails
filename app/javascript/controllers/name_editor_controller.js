@@ -21,7 +21,8 @@ export default class extends Controller {
   async save() {
     const name = this.inputTarget.value.trim()
     if (name === this.lastSaved) return
-    if (name === "") return (this.inputTarget.value = this.lastSaved)
+    if (name === "") return this.revert()
+    this.reverted = null
 
     let sent = null
     const { ok, data } = await saveStatus.queue("name", "PATCH", this.urlValue,
@@ -31,7 +32,8 @@ export default class extends Controller {
     if (saveStatus.queued("name")) return
 
     // The field stays editable while the request is out, so only the text this save posted may be written over.
-    const unchanged = sent !== null && this.inputTarget.value.trim() === sent
+    const current = this.inputTarget.value.trim()
+    const unchanged = sent !== null && (current === sent || current === this.reverted)
     if (saved) {
       if (unchanged) this.inputTarget.value = data.name
       this.flash(this.savedTextValue)
@@ -39,6 +41,10 @@ export default class extends Controller {
       if (unchanged) this.inputTarget.value = this.lastSaved
       this.flash(this.errorTextValue)
     }
+  }
+
+  revert() {
+    this.inputTarget.value = this.reverted = this.lastSaved
   }
 
   flash(message) {
