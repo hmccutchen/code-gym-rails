@@ -409,22 +409,37 @@ they run after the document is parsed and before `DOMContentLoaded`, which is
 global before its own first user event therefore has to wait for
 `DOMContentLoaded`.
 
-Three shapes need that wait, and the third is the one easy to miss. A
-top-level call does (the one-shot time-zone detection higher up this file, and
-the two `CodeGymSaveStatus.watch` registrations in `dashboard/_exercise` and
+Four shapes reach a global before the modules run. A top-level call does (the
+one-shot time-zone detection higher up this file, and the two
+`CodeGymSaveStatus.watch` registrations in `dashboard/_exercise` and
 `api_keys/edit`). So does a timer started at parse time
 (`dashboard/_generating`'s first poll). So does an async chain started at
 parse time, even though no global is read on the first line:
 `shared/_push_script`'s re-subscribe reaches `window.CodeGymRequest` only
 after the service worker is ready, which is usually but not always slower than
-a module fetch, and its failure is swallowed on purpose. A handler bound at
-parse time but fired by a user needs no wait, since a click cannot land before
-the page has rendered.
+a module fetch, and its failure is swallowed on purpose. Those three wait for
+`DOMContentLoaded` at the call site.
 
-The wait is per caller rather than a bootstrap proxy installed ahead of the
-modules, because the globals are a bridge that ends when #357's step 3
-converts the last caller, and a mechanism built to be deleted two steps later
-is worse than five explicit waits.
+The fourth is a handler bound at parse time and fired by a user, and an
+earlier version of this note had it wrong: it said a click cannot land before
+the page has rendered, which confuses rendering with the modules executing.
+The browser paints and accepts input while it is still parsing, and a deferred
+module runs only after parsing ends, so a gesture in that window reaches an
+undefined global. On the dashboard that strands the day: the submit handler
+calls `preventDefault`, sets the form `inert` and disables the button before
+awaiting `CodeGymRequest.send`, so the `ReferenceError` skips the restore
+block and leaves no native submission behind.
+`spec/system/deferred_module_spec.rb` holds that window open and drives it.
+
+`code_gym_bootstrap.js` is what covers it, loaded as a blocking classic asset
+immediately before the importmap tags, so it runs during parse. It installs
+stubs on both globals that queue each call and hand back a promise;
+`application.js` calls `CodeGymBootstrap.flush()` after assigning the real
+modules, which replays the queue in order. One file covers every call site,
+which matters because #357's step 3 deletes those sites anyway; the file goes
+with them, once `data-action` makes the race impossible rather than handled.
+`docs/code-notes/app/assets/javascripts/code_gym_bootstrap.md` has the stub's
+surface and the reasoning behind it.
 
 The two sentences those modules show are rendered onto `<body>` as data
 attributes, because a module cannot read a translation.

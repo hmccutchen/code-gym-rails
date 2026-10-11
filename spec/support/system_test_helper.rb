@@ -47,6 +47,20 @@ module RatingHelper
   end
 end
 
+module AnswerFormHelper
+  def fill_in_answer(field, text)
+    comparison = first(%([data-comparison-answer="#{field}"]), minimum: 0)
+    return find(%(textarea[data-field="#{field}"])).fill_in(with: text) unless comparison
+
+    comparison.choose("Piece A")
+    comparison.find("textarea[data-comparison-reason]").fill_in(with: text)
+  end
+
+  def expect_ready_to_submit
+    expect(page).to have_selector("#rating-nudge", visible: :hidden)
+  end
+end
+
 module TodaysSetHelper
   def visit_with_todays_set(user)
     perform_enqueued_jobs do
@@ -66,5 +80,6 @@ RSpec.configure do |config|
 
   config.include SystemTimeHelper, type: :system
   config.include RatingHelper, type: :system
+  config.include AnswerFormHelper, type: :system
   config.include TodaysSetHelper, type: :system
 end
