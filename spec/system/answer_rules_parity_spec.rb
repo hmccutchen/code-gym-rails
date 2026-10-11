@@ -10,12 +10,15 @@ RSpec.describe "Answer rules in the browser and on the server", type: :system do
     [ "\tabcdefghijk\n", [] ], [ "#{nbsp * 6}abcdefgh#{nbsp * 6}", [] ], [ "#{nbsp * 11}", [] ],
     [ "Approach:\nTradeoffs:", labels ], [ "Approach:\nuse a hash map here\nTradeoffs:", labels ],
     [ "  Approach:  \nshort", labels ], [ "Approach:\n#{'x' * 11}", labels ], [ "Approach:\n#{nbsp}Tradeoffs:#{nbsp}", labels ],
-    [ "Approach:\n\nTradeoffs:\n#{'y' * 6}\n#{'z' * 5}", labels ]
+    [ "Approach:\n\nTradeoffs:\n#{'y' * 6}\n#{'z' * 5}", labels ],
+    [ "abcde#{"\u200B" * 6}", [] ], [ "e\u0301" * 6, [] ], [ "abcde\vfghij", [] ], [ "abcde\u202Efghij", [] ],
+    [ "#{"\u{E0041}" * 11}", [] ], [ "Approach:\u200B\n#{'x' * 11}", labels ]
   ]
 
   comparison_cases = [
     [ "a", "x" * 40 ], [ "a", "x" * 39 ], [ nil, "x" * 50 ], [ "c", "x" * 50 ], [ "b", "  #{'x' * 40}  " ],
-    [ "b", "#{nbsp}#{'x' * 39}#{nbsp}" ], [ "a", "😀" * 40 ], [ "a", "#{nbsp * 45}" ]
+    [ "b", "#{nbsp}#{'x' * 39}#{nbsp}" ], [ "a", "😀" * 40 ], [ "a", "#{nbsp * 45}" ],
+    [ "a", "#{'x' * 35}#{"\u200B" * 5}" ], [ "b", "e\u0301" * 40 ]
   ]
 
   blocker_cases = [
@@ -27,10 +30,17 @@ RSpec.describe "Answer rules in the browser and on the server", type: :system do
     JSON.parse(page.evaluate_script("JSON.stringify(window.CodeGymAnswerRules.#{call})"))
   end
 
-  def ruby_prose_answered(text, case_labels)
-    return ExerciseSection::CodeReview.answered?(text) if case_labels.empty?
+  # The server cleans what it receives before it judges it, so the Ruby side runs that same path.
+  def stored(value) = UserText.clean(value, limit: UserText::MAX_ANSWER_LENGTH)
 
-    ExerciseSection::Pattern.answered?(text, "answer_scaffold" => case_labels)
+  def ruby_prose_answered(text, case_labels)
+    return ExerciseSection::CodeReview.answered?(stored(text)) if case_labels.empty?
+
+    ExerciseSection::Pattern.answered?(stored(text), "answer_scaffold" => case_labels)
+  end
+
+  def browser_encoded(pick, reason)
+    "#{pick ? "#{ExerciseSection::DesignComparison::PICK_PREFIX}#{pick}" : ''}\n#{reason}"
   end
 
   def response_with(answered_sections, ratings)
@@ -53,7 +63,7 @@ RSpec.describe "Answer rules in the browser and on the server", type: :system do
       end
 
       comparison_cases.each do |pick, reason|
-        ruby = ExerciseSection::DesignComparison.answered?(ExerciseSection::DesignComparison.encode_answer(pick, reason))
+        ruby = ExerciseSection::DesignComparison.answered?(stored(browser_encoded(pick, reason)))
         expect(rules("comparisonAnswered(#{pick.to_json}, #{reason.to_json})")).to eq(ruby), "comparison #{pick.inspect}, #{reason.inspect}"
       end
 

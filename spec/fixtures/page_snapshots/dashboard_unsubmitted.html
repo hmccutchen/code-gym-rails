@@ -549,6 +549,8 @@ window.CodeGymAnswerRules = (() => {
   // Ruby's String#strip: ASCII whitespace and NUL only, where String.prototype.trim also drops Unicode spaces.
   const strip = text => text.replace(/^[\0\t\n\v\f\r ]+|[\0\t\n\v\f\r ]+$/g, "");
   const length = text => [...text].length;
+  const STRIPPED = new RegExp("[\udb40\udc00-\udb40\udc7f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\u200b\u200c\u2060-\u2064\ufeff\u0000-\b\u000b\f\u000e-\u001f-\u009f]", "gu");
+  const clean = text => text.normalize("NFC").replace(STRIPPED, "");
 
   function substantive(text, labels) {
     if (!labels.length) return strip(text);
@@ -559,12 +561,14 @@ window.CodeGymAnswerRules = (() => {
     PARSONS_PREFIX: "order:",
     PICK_PREFIX: "pick:",
 
+    strip,
+
     proseAnswered(text, labels) {
-      return length(substantive(text, labels)) > MIN_LENGTH;
+      return length(substantive(clean(text), labels)) > MIN_LENGTH;
     },
 
     comparisonAnswered(pick, reason) {
-      return PIECES.includes(pick) && length(strip(reason)) >= MIN_REASON;
+      return PIECES.includes(pick) && length(strip(clean(reason))) >= MIN_REASON;
     },
 
     submitBlocker(answeredSections, ratings) {
@@ -934,6 +938,7 @@ What would be easy to get wrong or worth testing:
     });
 
     textareas.forEach(t => { if ("proseAnswer" in t.dataset) markProse(t); });
+    sectionFields.forEach(refreshStatus);
     updateProgress();
     refreshSubmit();
   })();

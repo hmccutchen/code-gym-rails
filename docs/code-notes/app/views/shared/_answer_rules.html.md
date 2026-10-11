@@ -14,6 +14,14 @@ Ruby rule and its counterpart here and fails on any disagreement:
 Every constant (the length floor, the reason minimum, the pieces, both answer
 prefixes) is rendered in from Ruby rather than copied.
 
+## `clean`
+
+The server runs every answer through `UserText.clean` before judging it: NFC
+normalization and the removal of zero-width, bidi, tag and control
+characters. The browser does the same, with `UserText::STRIPPED`'s own pattern
+rendered in, so text the server will discard can't make the browser count an
+answer, enable Submit and send a day with nothing answered.
+
 ## `strip`
 
 Ruby's `String#strip` removes only ASCII whitespace and NUL, while
