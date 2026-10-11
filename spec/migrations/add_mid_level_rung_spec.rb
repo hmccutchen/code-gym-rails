@@ -1,5 +1,5 @@
 require "rails_helper"
-require Rails.root.join("db/migrate/20261011070000_add_mid_level_rung").to_s
+require Rails.root.join("db/migrate/20261011130000_add_mid_level_rung").to_s
 
 RSpec.describe AddMidLevelRung do
   let(:migration) { described_class.new }
