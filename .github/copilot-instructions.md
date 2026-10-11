@@ -233,6 +233,28 @@ user-facing must go through the existing zone-wrapping convention
 mailer settings get extra scrutiny and must not be bundled into an unrelated
 feature PR.
 
+**Does new code reach a private method through `send`, or start a thread with
+`Thread.new`?** BLOCKING. `spec/conventions/app_source_spec.rb` fails on both,
+so the finding is usually a red build; say what to do instead. A module that
+needs a provider call takes it as a callable on its `Provider` struct, the way
+`ReviewGrading` and `JudgedGeneration` do, and a thread starts through
+`CallerZoneThread.start` so it keeps the caller's time zone. A new exemption
+in that spec needs a stated reason.
+
+**Is a claim released without its own token, or written under without being
+checked again?** BLOCKING. A `Claimable` claim is released with the token
+`#claim_<name>!` returned, and code that writes because it holds a claim
+compares the column with that token under the row lock first. A claim that
+went stale may belong to another caller by then, and releasing or writing
+over it lets two paid calls apply the same work.
+
+**Does a script restate a rule the server owns?** BLOCKING. The browser's copy
+belongs in the shared rules object (`window.CodeGymAnswerRules` for answers),
+with its constants rendered from Ruby, and the parity spec gains rows for the
+new rule. A hand-copied rule drifts silently, and the drift the parity spec
+found (`trim` against `strip`, and text the server cleans away) had been
+there since the rules were first copied.
+
 **Does the diff fork a second copy of existing view logic?** BLOCKING. If a
 rendering already exists for "show one day's response + review," reuse it.
 
