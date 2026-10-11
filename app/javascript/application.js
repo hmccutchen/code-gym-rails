@@ -1,3 +1,7 @@
-// Configure your import map in config/importmap.rb. Read more: https://github.com/rails/importmap-rails
-import "@hotwired/turbo-rails"
 import "controllers"
+import request from "code_gym/request"
+import saveStatus from "code_gym/save_status"
+
+// Aliases for the inline page scripts still to be converted; each goes once its last caller does.
+window.CodeGymRequest = request
+window.CodeGymSaveStatus = saveStatus

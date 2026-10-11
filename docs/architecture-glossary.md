@@ -30,8 +30,8 @@ The review fan-out and the rules applied to each graded section
 
 ## CodeGymRequest
 
-The one way a page script sends a request (`app/views/shared/_request.html.erb`):
+The one way a page script sends a request (`app/javascript/code_gym/request.js`):
 it reads the CSRF token, recognises an expired session, and decides what a
 failure may show. `CodeGymSaveStatus.queue` sends a control's saves one at a
 time on top of it, and `JsonErrors#render_json_error` is the server's half of
-the contract. Its reasoning is in `docs/code-notes/app/views/shared/_request.html.md`.
+the contract. Its reasoning is in `docs/code-notes/app/javascript/code_gym/request.md`.

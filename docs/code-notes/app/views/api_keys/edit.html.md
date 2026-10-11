@@ -23,7 +23,7 @@ without an edit here.
 ## save
 
 `CodeGymSaveStatus` owns the request, the CSRF token, and what happens when
-the server refuses (see `shared/_save_status`).
+the server refuses (see `code_gym/save_status`).
 
 ## Daily sections saves
 

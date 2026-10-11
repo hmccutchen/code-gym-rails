@@ -18,11 +18,8 @@
   <% end %>
   <meta name="theme-color" content="<%= DisplayPreferences::DARK_THEME_COLOR %>">
   <%= csrf_meta_tags %>
-  <% if logged_in? %>
-    <%= render "shared/request" %>
-    <%= render "shared/save_status" %>
-  <% end %>
   <%= csp_meta_tag %>
+  <%= javascript_importmap_tags %>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -427,7 +424,7 @@
     <%= stylesheet_link_tag "display_light", media: display_preferences.light_palette_media, data: { light_palette_media: true } %>
   <% end %>
 </head>
-<body>
+<body <%= script_text_attributes %>>
   <% if display_preferences["background_pattern"] == "on" %>
     <div id="background-pattern" aria-hidden="true"></div>
   <% end %>
@@ -492,7 +489,9 @@
             (function () {
               const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
               if (!tz) return;
-              CodeGymSaveStatus.queue("time_zone", "PATCH", "<%= profile_path %>", { user: { time_zone: tz } }, { quiet: true });
+              document.addEventListener("DOMContentLoaded", function () {
+                CodeGymSaveStatus.queue("time_zone", "PATCH", "<%= profile_path %>", { user: { time_zone: tz } }, { quiet: true });
+              });
             })();
           </script>
         <% end %>

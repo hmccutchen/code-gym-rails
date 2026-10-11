@@ -370,7 +370,7 @@
           });
         };
 
-        CodeGymSaveStatus.watch(() => pending !== null);
+        document.addEventListener("DOMContentLoaded", () => CodeGymSaveStatus.watch(() => pending !== null));
         const saveMix = () => {
           editRevision++;
           prepareButton.disabled = true;

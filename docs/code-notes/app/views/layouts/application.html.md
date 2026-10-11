@@ -401,8 +401,11 @@ reminders on, re-subscribes this browser on launch. It renders ahead of
 `:page_scripts` on purpose, because the Account page's enable button binds
 against the global defined there.
 
-`shared/_save_status` defines `window.CodeGymSaveStatus`, which the
-dashboard's and /setup's autosaves report through. It renders ahead of
-`:page_scripts` for the same reason: those pages' own scripts bind against the
-global. The one-shot time-zone detection higher up this file stays
-fire-and-forget on purpose; see that partial.
+`javascript_importmap_tags` in `<head>` loads `code_gym/request` and
+`code_gym/save_status`, which `application.js` also puts on `window` for the
+inline page scripts still to be converted. Module scripts are deferred, so an
+inline script that calls either before its own first event has to wait for
+`DOMContentLoaded`; the one-shot time-zone detection higher up this file does,
+and stays fire-and-forget on purpose, since nothing the user did triggers it.
+The two sentences those modules show are rendered onto `<body>` as data
+attributes, because a module cannot read a translation.
