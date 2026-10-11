@@ -48,9 +48,12 @@ the browser and the server can't disagree about what counts, and the rules
 aren't published to the page. The cost is that progress, the hint lock, the
 status lines and the nudge follow the latest save, not each keystroke.
 
-A reply is applied only when no newer save is waiting (`saveTimer === null`),
-so a reply to an older draft can't flip the page back while the engineer is
-still typing. `CodeGymSaveStatus` already drops replies to superseded saves.
+A reply is applied only when no newer save is waiting (`saveTimer === null`,
+and no save queued behind it), so a reply to an older draft can't flip the page
+back while the engineer is still typing. That includes a rating's checkmark:
+clicking a rating marks the button at once, but the status line changes only
+when the reply that stored the rating arrives, so a failed save never shows a
+rating the server doesn't have.
 
 ## autoSave and sendSave
 
@@ -63,6 +66,15 @@ pick, a Parsons move), save at once (`sendSave`), so the nudge catches up
 within one round trip at the moments someone is likely to press Submit next.
 The `change` listener only acts on answer controls: the duck's box sits inside
 this form, and its `change` would otherwise save a draft.
+
+Only one save is on the wire at a time (`saving`). Each save carries every
+answer, and the server writes whichever request takes the response lock last,
+so two overlapping saves could land out of order and put older answers over
+newer ones. A save asked for while one is in flight sets `saveAgain`, and when
+the first reply arrives one more save goes out with the answers as they are
+then. Several requests in that window collapse into that one save. The queued
+save counts as pending for `CodeGymSaveStatus.watch`, so pull-to-refresh waits
+for it.
 
 A 409 with status `stale` means the server refused the answer's encoding (see
 `ResponsesController#stale_answer_sections`) and stored nothing, so the page

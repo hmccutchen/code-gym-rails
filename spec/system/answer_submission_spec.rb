@@ -249,6 +249,62 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     end
   end
 
+  it "keeps one save on the wire and sends the newest answers once it returns" do
+    user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch;
+        window.saveRequests = 0;
+        window.fetch = (url, options) => {
+          if (new URL(url, location.href).pathname !== "/responses") return originalFetch(url, options);
+          window.saveRequests++;
+          if (window.saveRequests > 1) return originalFetch(url, options);
+          return new Promise(resolve => { window.releaseFirstSave = () => resolve(originalFetch(url, options)); });
+        };
+      JS
+
+      fill_in_answer("code_review", "The first answer, still on the wire.")
+      find("body").click
+      fill_in_answer("code_review", "The newer answer, written while the first save waits.")
+      find("body").click
+      expect(page.evaluate_script("window.saveRequests")).to eq(1)
+
+      page.execute_script("window.releaseFirstSave()")
+      wait_for_saved_answer(user, "code_review", "The newer answer, written while the first save waits.")
+      page.driver.with_playwright_page { |browser| browser.wait_for_function("!window.CodeGymSaveStatus.pending()") }
+      expect(user.daily_responses.reload.first.answers["code_review"]).to eq("The newer answer, written while the first save waits.")
+    end
+  end
+
+  it "shows a rating in the status line only once the server has stored it" do
+    user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      fill_in_answer("code_review", "An answer long enough for the server to count it.")
+      find("body").click
+      wait_for_saved_answer(user, "code_review", "An answer long enough for the server to count it.")
+      status = find('.section-status[data-status-for="code_review"]')
+      expect(status).to have_text(I18n.t("responses.section_status.in_progress"))
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch;
+        window.fetch = (url, options) => new URL(url, location.href).pathname === "/responses"
+          ? Promise.resolve(new Response("{}", { status: 500, headers: { "Content-Type": "application/json" } }))
+          : originalFetch(url, options);
+      JS
+
+      rate_section("code_review")
+      page.driver.with_playwright_page { |browser| browser.wait_for_function("!window.CodeGymSaveStatus.pending()") }
+
+      expect(status).to have_text(I18n.t("responses.section_status.in_progress"))
+      expect(status).not_to have_text("✓")
+    end
+  end
+
   it "ignores a late autosave acknowledgement during partial submit and still requests the review" do
     user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
 

@@ -145,20 +145,26 @@
     }
 
     let saveTimer = null;
-    document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => saveTimer !== null));
+    let saving = false;
+    let saveAgain = false;
+    document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => saveTimer !== null || saveAgain));
 
     function sendSave() {
       clearTimeout(saveTimer);
       saveTimer = null;
       if (form.inert) return;
+      if (saving) { saveAgain = true; return; }
+      saving = true;
       window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, status, data }) => {
+        saving = false;
         if (!ok && status === 409 && data?.status === "stale") {
           window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
           window.location.reload();
           return;
         }
-        if (ok && data?.submitted && !form.inert && !reviewRequested) window.location.reload();
-        else if (ok && saveTimer === null && !form.inert) applyServerState(data);
+        if (ok && data?.submitted && !form.inert && !reviewRequested) return window.location.reload();
+        if (saveAgain) { saveAgain = false; return sendSave(); }
+        if (ok && saveTimer === null && !form.inert) applyServerState(data);
       });
     }
 
@@ -202,7 +208,6 @@
           b.classList.toggle("active", b === btn);
           b.setAttribute("aria-pressed", b === btn);
         });
-        refreshStatus(section);
         sendSave();
       });
     });
