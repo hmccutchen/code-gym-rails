@@ -1746,7 +1746,8 @@ class AiService
         "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term",
         "guide_worked_example": "#{worked_example_description(concept, medium)}",
         "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing",
-#{LADDER_FIELD_FOR.map { |level, field| %(        "#{field}": "string — a #{level}-level problem about this concept",\n) }.join}        "lesson": #{JSON.generate(ConceptLesson.schema)}
+      #{LADDER_FIELD_FOR.map { |level, field| %(  "#{field}": "string — a #{level}-level problem about this concept",) }.join("\n")}
+        "lesson": #{JSON.generate(ConceptLesson.schema)}
       }
     PROMPT
   end

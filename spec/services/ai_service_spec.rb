@@ -4113,6 +4113,21 @@ RSpec.describe AiService do
       expect(result["tagline"]).to eq("Avoid N+1 by eager loading.")
     end
 
+    it "dedents reference instructions and aligns every generated ladder field with the JSON schema" do
+      service = double_class.new(canned_text: valid_json)
+      service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      prompt = service.last_prompt
+
+      expect(prompt).to start_with("Write a durable reference")
+      expect(prompt).to include("\nThen write a difficulty ladder:", "\nReturn JSON matching this schema exactly:\n{\n")
+      schema = prompt.split("Return JSON matching this schema exactly:\n").last
+      expect(JSON.parse(schema).keys).to include(*AiService::CONCEPT_LADDER_FIELDS, "lesson")
+      AiService::CONCEPT_LADDER_FIELDS.each do |field|
+        expect(schema).to match(/^  "#{field}":/)
+      end
+      expect(schema).to match(/^  "lesson":/)
+    end
+
     it "holds the lesson to ConceptLesson and keeps a reference whose lesson is unusable" do
       with_lesson = JSON.parse(valid_json).merge("lesson" => { "definition" => " Once or twice, same state. ", "habits" => [ { "habit" => "no catch" } ] })
       result = double_class.new(canned_text: with_lesson.to_json).generate_concept_reference(user, "n_plus_one", "ruby_rails")

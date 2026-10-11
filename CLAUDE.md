@@ -1518,7 +1518,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   (`RungLedger#developing_toward`): once any rung above the held one has an
   attempt that did not hold, or any attempt at all when none is held, the
   page shows it one step past the held rung, so the ladder reads not yet,
-  developing toward junior, junior, developing toward senior, and so on. An
+  developing toward junior, junior, developing toward mid-level, mid-level,
+  developing toward senior, and so on. An
   attempt two rungs up still reads as developing toward the next one, since
   the rung between is not held either. Its bar segment is striped in the
   target rung's colour, its dot half filled, and the legend states it once.
@@ -1545,7 +1546,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   where an answer sits, and is no longer also a setting. `AddMidLevelRung`
   rewrote any stored legacy value (beginner and developing as junior, solid as
   senior, strong as principal engineer) and moved the column default from
-  `developing` to `junior`, so no reader translates old values any more. A
+  `developing` to `junior` before the backfill. `User#skill_level` still
+  translates legacy values: an old Rails process caches the previous default
+  and, with partial inserts disabled, can explicitly insert `developing` even
+  after the migration commits. Removing that reader requires another backfill
+  after every old process has stopped. The migration spec reproduces this
+  cached-default overlap. A
   legacy value posted to `PATCH /profile` is refused like any other value
   outside the list.
   Setup's "Skill level" select is the only page

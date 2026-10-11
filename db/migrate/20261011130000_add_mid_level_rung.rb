@@ -3,8 +3,8 @@ class AddMidLevelRung < ActiveRecord::Migration[8.1]
 
   def up
     add_column :concept_references, :ladder_mid_level, :text
-    LEGACY_SKILL_LEVELS.each { |legacy, level| execute("UPDATE users SET skill_level = #{quote(level)} WHERE skill_level = #{quote(legacy)}") }
     change_column_default :users, :skill_level, from: "developing", to: "junior"
+    LEGACY_SKILL_LEVELS.each { |legacy, level| execute("UPDATE users SET skill_level = #{quote(level)} WHERE skill_level = #{quote(legacy)}") }
   end
 
   def down

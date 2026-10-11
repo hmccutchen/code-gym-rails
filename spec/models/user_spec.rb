@@ -866,6 +866,24 @@ RSpec.describe User, type: :model do
   end
 
   describe "#skill_level" do
+    it "reads every legacy value an old process can still write during deployment" do
+      user = create_user
+
+      { "beginner" => "junior", "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer" }.each do |stored, read|
+        user.update_column(:skill_level, stored)
+        expect(user.reload.skill_level).to eq(read)
+      end
+    end
+
+    it "can save another field on a legacy row without changing its stored skill level" do
+      user = create_user
+      user.update_column(:skill_level, "solid")
+
+      user.reload.update!(name: "Renamed")
+
+      expect(User.where(id: user.id).pick(:skill_level)).to eq("solid")
+    end
+
     it "starts a new account at junior" do
       expect(create_user.reload.skill_level).to eq("junior")
     end
