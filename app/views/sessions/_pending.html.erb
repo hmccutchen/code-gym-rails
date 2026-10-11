@@ -2,7 +2,6 @@
   <%= t("sessions.pending.message") %>
 </p>
 
-<%# Design notes: docs/code-notes/app/views/sessions/_pending.html.md %>
 <% code_alert = flash[:alert].present? && action_name == "verify_code" %>
 <% flash_ids = [ ("flash-alert" if code_alert), ("flash-notice" if flash[:notice].present?) ].compact %>
 <%= form_with url: verify_login_code_path, method: :post do |f| %>

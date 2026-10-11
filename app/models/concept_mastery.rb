@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/models/concept_mastery.md
 class ConceptMastery < ApplicationRecord
   belongs_to :user
 

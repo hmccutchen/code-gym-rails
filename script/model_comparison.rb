@@ -1,7 +1,6 @@
 require_relative "solve_agreement"
 require_relative "forced_concept_drafts"
 
-# Design notes: docs/code-notes/script/model_comparison.md
 class ModelComparison
   CANDIDATES = {
     "generate"  => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-opus-5-5", effort: "medium" } ],

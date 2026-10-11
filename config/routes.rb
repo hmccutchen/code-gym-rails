@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/config/routes.md
 Rails.application.routes.draw do
   # Railway's healthcheck target (railway.toml healthcheckPath).
   get "up" => "rails/health#show", as: :rails_health_check

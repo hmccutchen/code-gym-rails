@@ -1,6 +1,5 @@
 <%# Locals: note, field, submitted, response. %>
 <% if note.present? %>
-  <%# Design notes: docs/code-notes/app/views/dashboard/_teaching_hint.html.md %>
   <% locked = !submitted && !response.answered?(field) %>
   <% disclosure = capture do %>
     <details class="hint">

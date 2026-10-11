@@ -1,6 +1,5 @@
 require "optparse"
 
-# Design notes: docs/code-notes/script/gemini_capacity_probe.md
 class GeminiCapacityProbe
   DUCK_TURNS = 3
   DUCK_MESSAGES = [

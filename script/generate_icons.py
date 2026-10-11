@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Run: python3 script/generate_icons.py (needs Pillow). Design notes: docs/code-notes/script/generate_icons.md
+# Run: python3 script/generate_icons.py (needs Pillow).
 import re
 from pathlib import Path
 

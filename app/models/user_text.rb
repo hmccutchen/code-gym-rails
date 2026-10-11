@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/models/user_text.md
 module UserText
   TAGS = "\u{E0000}-\u{E007F}"
   BIDI = "\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069"

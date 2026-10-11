@@ -7,29 +7,25 @@ terms the app shows on hover.
 ## ConceptVocabulary
 
 The closed concept lists and the questions asked of them
-(`app/models/concept_vocabulary.rb`). Its reasoning is in
-`docs/code-notes/app/models/concept_vocabulary.md`.
+(`app/models/concept_vocabulary.rb`).
 
 ## Claimable
 
 The claim on a paid provider call that a review or a regeneration holds while
-it runs (`app/models/concerns/claimable.rb`). Its reasoning is in
-`docs/code-notes/app/models/concerns/claimable.md`.
+it runs (`app/models/concerns/claimable.rb`).
 
 ## ResponseReview
 
 Applying a review to a submitted response, from taking the claim to recording
-mastery (`app/services/response_review.rb`). Its reasoning is in
-`docs/code-notes/app/services/response_review.md`.
+mastery (`app/services/response_review.rb`).
 
 ## ReviewGrading
 
 The review fan-out and the rules applied to each graded section
-(`app/services/review_grading.rb`). Its reasoning is in
-`docs/code-notes/app/services/review_grading.md`.
+(`app/services/review_grading.rb`).
 
 ## CodeGymAnswerRules
 
 The browser's copy of the answer, submit-gate and section-status rules
 (`app/views/shared/_answer_rules.html.erb`), held to the Ruby rules by a parity
-spec. Its reasoning is in `docs/code-notes/app/views/shared/_answer_rules.html.md`.
+spec.

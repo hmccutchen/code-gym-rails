@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/models/daily_response.md
 class DailyResponse < ApplicationRecord
   belongs_to :user, inverse_of: :daily_responses
   belongs_to :daily_exercise

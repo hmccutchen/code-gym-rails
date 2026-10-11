@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/services/judged_generation.md
 class JudgedGeneration
   # judge_section(user, kind, section, rung:, locked:), retry_section(user, language, draft, kind, concept); both raise.
   Provider = Data.define(:judge_section, :retry_section)

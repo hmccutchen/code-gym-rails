@@ -16,7 +16,7 @@
   <% if pending_login_email.present? %>
     <%= render "sessions/pending" %>
 
-    <%# Keep the form below the pending banner: see docs/code-notes/app/views/sessions/new.html.md %>
+    <%# Keep the form below the pending banner. %>
     <p class="pending-divider"><%= t("sessions.new.resend_prompt") %></p>
   <% else %>
     <p><%= t("sessions.new.intro_html") %></p>

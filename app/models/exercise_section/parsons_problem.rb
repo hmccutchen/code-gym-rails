@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/models/exercise_section/parsons_problem.md
 class ExerciseSection::ParsonsProblem < ExerciseSection
   ANSWER_PREFIX = "order:".freeze
 

@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/services/review_grading.md
 class ReviewGrading
   # grade, judge_prose, assess_difficulty, translate and day_context raise; provider_key and judges_prose are values.
   Provider = Data.define(:grade, :judge_prose, :assess_difficulty, :translate, :day_context, :provider_key, :judges_prose)

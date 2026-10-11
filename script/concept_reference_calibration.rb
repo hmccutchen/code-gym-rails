@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/script/concept_reference_calibration.md
 class ConceptReferenceCalibration
   PROVIDERS = {
     "claude" => { service: ClaudeService, key: "ANTHROPIC_API_KEY" },

@@ -13,7 +13,6 @@
     <% @mermaid_diagram_script_emitted = true %>
     <% content_for :page_scripts do %>
       <script type="module">
-        // Design notes: docs/code-notes/app/views/shared/_mermaid_diagram.html.md
         const pending = () => document.querySelectorAll(".mermaid-diagram[data-diagram]:not([data-mermaid-done])");
         // Remove the <details> only when this partial created it; architecture's belongs to its caller.
         const removeFailed = (el) => (el.dataset.ownsDetails === "1" ? el.closest("details") : el).remove();

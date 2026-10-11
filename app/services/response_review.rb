@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/services/response_review.md
 class ResponseReview
   Outcome = Data.define(:status, :successes, :failures, :missing, :error) do
     def self.of(status, successes: {}, failures: {}, missing: [], error: nil)

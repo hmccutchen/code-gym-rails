@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/models/concerns/claimable.md
 module Claimable
   extend ActiveSupport::Concern
 

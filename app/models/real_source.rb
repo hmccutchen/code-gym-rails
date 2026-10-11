@@ -1,7 +1,6 @@
 # Production boot never loads prism, so without this the first real-source pick raises NameError; a spec pins it.
 require "prism"
 
-# Design notes: docs/code-notes/app/models/real_source.md
 class RealSource
   LANGUAGE = "ruby_rails".freeze
 

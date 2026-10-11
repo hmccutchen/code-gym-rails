@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/models/concept_vocabulary.md
 module ConceptVocabulary
   class UnknownLanguage < StandardError; end
 

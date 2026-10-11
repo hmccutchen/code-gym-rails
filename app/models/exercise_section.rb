@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/models/exercise_section.md
 class ExerciseSection
   MAX_SCAFFOLD_LABELS       = 4
   MAX_SCAFFOLD_LABEL_LENGTH = 80

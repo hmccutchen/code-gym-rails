@@ -1,7 +1,6 @@
 require "faraday"
 require "faraday/retry"
 
-# Design notes: docs/code-notes/app/services/gemini_service.md
 class GeminiService < AiService
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 

@@ -164,7 +164,6 @@ en:
       no_review_to_email: "No review to email yet."
       review_emailed: "Review sent to %{email}."
       save_failed: "Couldn't save your answers."
-  # Placeholders and variant fallback: docs/code-notes/config/locales/en.md
   provider_failures:
     outcomes:
       generation: "nothing was generated"

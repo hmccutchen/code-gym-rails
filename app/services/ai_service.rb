@@ -1,6 +1,5 @@
 require "json"
 
-# Design notes: docs/code-notes/app/services/ai_service.md
 class AiService
   class Error < StandardError
     attr_reader :http_status, :quota_id, :retry_after

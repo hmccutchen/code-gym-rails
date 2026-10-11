@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/services/daily_plan.md
 class DailyPlan
   Result = Data.define(:pattern, :third, :reinforcement, :due_checks, :established,
                         :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established,

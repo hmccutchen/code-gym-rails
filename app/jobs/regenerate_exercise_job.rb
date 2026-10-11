@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/jobs/regenerate_exercise_job.md
 class RegenerateExerciseJob < ApplicationJob
   queue_as :default
 

@@ -1,7 +1,6 @@
 require "faraday"
 require "faraday/retry"
 
-# Design notes: docs/code-notes/app/services/claude_service.md
 class ClaudeService < AiService
   API_URL = "https://api.anthropic.com/v1/messages"
 

@@ -43,3 +43,6 @@
 
 # RSpec --only-failures state, one file per parallel_tests process
 /spec/examples*.txt
+
+# Each developer's local notes on a file; not part of the repository.
+/docs/code-notes/

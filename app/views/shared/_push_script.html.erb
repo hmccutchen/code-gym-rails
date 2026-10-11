@@ -1,4 +1,4 @@
-<%# Never request permission here: it must run inside a click (accounts/_push_reminders). Notes: docs/code-notes/app/views/shared/_push_script.html.md %>
+<%# Never request permission here: it must run inside a click (accounts/_push_reminders). %>
 <script>
   window.CodeGymPush = (function () {
     const VAPID_KEY = <%= WebPushCredentials.public_key.to_json.html_safe %>;

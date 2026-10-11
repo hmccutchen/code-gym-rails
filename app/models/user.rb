@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/models/user.md
 class User < ApplicationRecord
   has_many :daily_exercises, dependent: :destroy
   has_many :daily_responses, dependent: :destroy, inverse_of: :user

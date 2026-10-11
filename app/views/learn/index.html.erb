@@ -2,7 +2,6 @@
 <h1><%= t("learn.title") %></h1>
 <p class="learn-intro"><%= t("learn.intro") %></p>
 
-<%# Design notes: docs/code-notes/app/views/learn/index.html.md %>
 <% if @featured %>
   <%= render "shared/featured_concept", reference: @featured %>
 <% end %>

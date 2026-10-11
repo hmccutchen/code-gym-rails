@@ -34,13 +34,10 @@ Python. The cop names below are the Ruby side.
   has to change with this line is part of that; the design or history behind
   it belongs in the documentation.
 - **Business decisions live in the documentation:** this file, or a doc under
-  `docs/`. The reasoning behind one file's code lives in
-  `docs/code-notes/`, at the file's own path with `.md` in place of its last
-  extension (`app/services/ai_service.rb` →
-  `docs/code-notes/app/services/ai_service.md`;
-  `app/views/layouts/application.html.erb` →
-  `docs/code-notes/app/views/layouts/application.html.md`).
-  A comment may point there in its one line.
+  `docs/`. `docs/code-notes/` is ignored by git: it holds each developer's
+  local working notes on a file, and the repository does not have it. No
+  comment, doc or spec may point there, and reasoning a later reader needs
+  belongs in this file or a tracked doc under `docs/`.
 
 **Comments are extremely minimal.** Write one only for a non-obvious *why* — a
 hidden constraint, a workaround, an invariant a future reader would otherwise
@@ -2392,9 +2389,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   the largest reply used a fraction of `REVIEW_JUDGE_MAX_TOKENS` and the
   slowest call a tenth of `REVIEW_JUDGE_READ_TIMEOUT`.
   `REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS` moves to what this run measured;
-  that constant and its section in `docs/code-notes/app/services/ai_service.md`
-  are where the number and its remaining headroom are stated, so they are not
-  restated here to go stale.
+  that constant is where the number is stated, so it is not restated here to
+  go stale.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a

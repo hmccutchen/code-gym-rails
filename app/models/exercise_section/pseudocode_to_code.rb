@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/models/exercise_section/pseudocode_to_code.md
 class ExerciseSection::PseudocodeToCode < ExerciseSection
   MAX_CRITIQUE_POINTS = 3
 

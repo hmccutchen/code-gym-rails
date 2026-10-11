@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/controllers/profile_controller.md
 class ProfileController < ApplicationController
   include ExerciseMixLadders
 

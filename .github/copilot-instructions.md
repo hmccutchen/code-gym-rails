@@ -146,8 +146,9 @@ The comment rules in CLAUDE.md's Code Style section are never waived: each
 comment is one line, attached to the code directly below it (or trailing it),
 and a file holds at most 5. RuboCop enforces those three in Ruby
 files and `bin/comment-check` in ERB, JavaScript, CSS, YAML and Python. Business
-decisions belong in CLAUDE.md or `docs/` (a file's own notes in `docs/code-notes/`),
-never in a comment.
+decisions belong in CLAUDE.md or a tracked doc under `docs/`, never in a comment.
+`docs/code-notes/` is git-ignored and local to each developer, so a comment, doc
+or spec that points there is a BLOCKING finding: nobody else can follow it.
 
 Some comments read as obvious but carry something real and must survive: a
 non-RESTful route, a partial's required locals, an abstract method's contract,

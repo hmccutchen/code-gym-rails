@@ -1,4 +1,3 @@
-# Design notes: docs/code-notes/app/models/exercise_section/design_comparison.md
 class ExerciseSection::DesignComparison < ExerciseSection
   MAX_PIECE_LINES = 24
 
