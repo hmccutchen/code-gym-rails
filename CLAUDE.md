@@ -491,7 +491,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   **After three answers, a proposal sends the user to Setup.**
   `users.track_proposals_answered` counts each Apply and Not now through
   `POST /learning_track/answer`, which the dashboard sends once the save has
-  succeeded, so a lost count is possible and costs nothing. Below
+  succeeded. A lost count delays the switch to Setup without undoing the
+  choice; its warning says the choice was saved and need not be repeated.
+  Once an Apply finishes the track, the count endpoint returns success without
+  incrementing, because there will be no later suggestion to route. Below
   `LearningTrack::IN_PLACE_ANSWERS` (3) a proposal applies in place. From then
   on its main button links to Setup's Exercise mix with the proposed kinds
   marked and the level named (`?suggested[]=…&suggested_level=…`), and the

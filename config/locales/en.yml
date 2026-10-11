@@ -15,6 +15,7 @@ en:
       turn_off_link: "Setup"
       applied: "Done. Your next sets use the new level."
       dismissed: "Okay. This comes back once there's more to go on."
+      count_failed: "Your choice was saved, but we couldn't update the suggestion count. You don't need to repeat it."
       stranded: "Your settings changed in another tab, and another save on this page is still running. Reload once it finishes to see the current suggestion."
       reload: "Reload"
       invalid: "Those sections can't be set aside."

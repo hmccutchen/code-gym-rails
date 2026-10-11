@@ -81,6 +81,35 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     JS
   end
 
+  {
+    "network failure" => "Promise.reject(new Error('offline'))",
+    "server refusal" => "Promise.resolve(new Response(JSON.stringify({ errors: ['Counter write failed'] }), { status: 500 }))",
+    "session redirect" => "Promise.resolve({ redirected: true })"
+  }.each do |failure, reply|
+    [ "Apply", "Not now" ].each do |action|
+      it "preserves the saved #{action} result when its counter request has a #{failure}" do
+        own_proposal(answered: 0)
+        page.execute_script(<<~JS)
+          const originalFetch = window.fetch;
+          window.fetch = (url, options) => url.endsWith(#{learning_track_answer_path.to_json})
+            ? #{reply}
+            : originalFetch(url, options);
+        JS
+
+        within("#track-proposal") { click_button action }
+        wait_for_saves
+
+        expected_level = action == "Apply" ? "senior" : "junior"
+        expect(user.reload.section_kind_levels["code_review"]).to eq(expected_level)
+        expect(user.track_evidence_cutoffs["code_review"]).to eq("level" => expected_level, "through" => Date.current.iso8601)
+        expect(user.track_proposals_answered).to eq(0)
+        confirmation = action == "Apply" ? "Done. Your next sets use the new level." : "Okay. This comes back once there's more to go on."
+        expect(page).to have_css("#track-proposal", text: confirmation)
+        expect(page).to have_css("#save-status", text: "Your choice was saved, but we couldn't update the suggestion count. You don't need to repeat it.")
+      end
+    end
+  end
+
   it "counts a dismissal from a proposal that links to Setup" do
     own_proposal(answered: LearningTrack::IN_PLACE_ANSWERS)
 

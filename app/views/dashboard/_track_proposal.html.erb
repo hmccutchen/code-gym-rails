@@ -7,6 +7,7 @@
               profile_url: profile_path, dismiss_url: learning_track_dismissal_path, answer_url: learning_track_answer_path,
               applied_text: t("learning_track.proposal.applied"),
               dismissed_text: t("learning_track.proposal.dismissed"),
+              count_failed_text: t("learning_track.proposal.count_failed"),
               stranded_text: t("learning_track.proposal.stranded"),
               reload_label: t("learning_track.proposal.reload") } do %>
   <% if proposal.basis == :led %>
@@ -89,7 +90,7 @@
       setTimeout(() => reloadWhenSaved(waited + SAVE_POLL_MS), SAVE_POLL_MS);
     };
 
-    const answer = () => window.CodeGymSaveStatus.save("POST", box.dataset.answerUrl, {}, "track_answer");
+    const answer = () => window.CodeGymSaveStatus.save("POST", box.dataset.answerUrl, {}, "track_answer", box.dataset.countFailedText);
     const dismiss = (kinds) => kinds.length === 0
       ? Promise.resolve({ ok: true })
       : window.CodeGymSaveStatus.save("POST", box.dataset.dismissUrl, { kinds }, "track_dismissal");

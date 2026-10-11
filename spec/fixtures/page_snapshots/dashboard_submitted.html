@@ -886,7 +886,7 @@
       return document.querySelector('meta[name="csrf-token"]')?.content ?? "";
     }
 
-    function save(method, url, body, key) {
+    function save(method, url, body, key, failureMessage = null) {
       const ticket = ++counter;
       issued.set(key, ticket);
 
@@ -905,17 +905,17 @@
         if (!current()) return { ok: false };
 
         // fetch follows redirects, so an expired session arrives as the login page with ok true.
-        if (response.redirected) { fail(key, SIGNED_OUT); return { ok: false }; }
+        if (response.redirected) { fail(key, failureMessage || SIGNED_OUT); return { ok: false }; }
         if (response.ok) {
           succeed(key);
           return { ok: true, data: await response.json().catch(() => null) };
         }
 
         const data = await response.json().catch(() => null);
-        fail(key, (data && data.errors && data.errors[0]) || GENERIC);
+        fail(key, failureMessage || (data && data.errors && data.errors[0]) || GENERIC);
         return { ok: false, status: response.status, data: data };
       }).catch(() => {
-        if (current()) fail(key, GENERIC);
+        if (current()) fail(key, failureMessage || GENERIC);
         return { ok: false };
       }).finally(() => { requests--; });
     }
