@@ -102,8 +102,8 @@ caller that waits on it — pull-to-refresh, the save queue's drain — would wa
 forever. And a controller that owns an edited field schedules the save itself on
 connect — `answer_form_controller` compares each textarea's `value` with its
 `defaultValue`, which is exactly the server-rendered content, so a difference
-means the user typed. Without that the answer is not saved promptly; the spec
-below takes four minutes instead of five seconds.
+means the user typed. Without that the answer is never saved, and the spec
+below times out waiting for it.
 
 A controller with no such check leaves its field unsaved until the user touches
 it again, which is the pre-#357 behaviour for every control that had no inline
