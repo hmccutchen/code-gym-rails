@@ -23,7 +23,7 @@
                push_enable_blocked_text_value: t("accounts.push_reminders.blocked", app_name: t("app_name")),
                push_enable_not_granted_text_value: t("accounts.push_reminders.not_granted"),
                push_enable_failed_text_value: t("accounts.push_reminders.failed") }) %>>
-      <button type="button" id="push-enable" class="btn btn-ghost"
+      <button type="button" id="push-enable" class="btn btn-ghost" disabled
               data-push-enable-target="button" data-action="push-enable#enable"><%= t("accounts.push_reminders.turn_on") %></button>
       <p class="reminder-status" id="push-status" hidden data-push-enable-target="status"></p>
     </div>

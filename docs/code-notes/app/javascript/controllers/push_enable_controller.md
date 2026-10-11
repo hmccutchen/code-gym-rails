@@ -13,6 +13,16 @@ user gesture, and fails silently otherwise — no prompt and no error. So
 or the status line, and the VAPID key arrives as a value on the element rather
 than through a fetch that would have to precede the call.
 
+## The button renders disabled
+
+The controller arrives with the rest of the page's JavaScript, so a click
+landing before it connected reached no action and did nothing. That first
+click is the one that matters: the permission request has to run inside the
+gesture, so it cannot be replayed once the controller arrives. The partial
+renders the button `disabled`, and `connect()` enables it only when
+`push.supported()` passes. On a browser without push it stays disabled beside
+the sentence saying why.
+
 ## Capability is tested, not sniffed
 
 `push.supported()` asks for `PushManager`, which on iOS is simply absent

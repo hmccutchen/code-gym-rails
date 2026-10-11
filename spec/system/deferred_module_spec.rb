@@ -234,6 +234,30 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(errors).to be_empty
   end
 
+  it "keeps the reminder button disabled until its controller can make the permission request" do
+    ENV["VAPID_PUBLIC_KEY"] = "public"
+    ENV["VAPID_PRIVATE_KEY"] = "private"
+    watch_page_errors
+    visit_as(user)
+    visit account_path
+    expect(page).to have_css("#push-enable", visible: :all)
+
+    url = page.current_url
+    stalled[:controller] = "push_enable_controller"
+
+    page.driver.with_playwright_page do |pw|
+      pw.goto(url, waitUntil: "commit")
+      expect(pw.evaluate(%(document.querySelector("#push-enable").disabled))).to be(true)
+    end
+
+    wait_for(20) { !page.driver.with_playwright_page { |pw| pw.evaluate(%(document.querySelector("#push-enable").disabled)) } }
+    expect(page).to have_button("Turn on daily reminders", disabled: false)
+    expect(errors).to be_empty
+  ensure
+    ENV.delete("VAPID_PUBLIC_KEY")
+    ENV.delete("VAPID_PRIVATE_KEY")
+  end
+
   # A name typed and blurred before the controller connects is only saved if connect adopts it.
   it "adopts a name typed into the nav while the modules are still loading" do
     watch_page_errors

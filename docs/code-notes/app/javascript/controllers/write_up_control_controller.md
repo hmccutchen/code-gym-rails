@@ -13,6 +13,13 @@ starts it. The attempt ceiling is computed in Ruby from the poll interval and
 `AiService::CONCEPT_REFERENCE_READ_TIMEOUT`, so the page gives up when the call
 behind it can no longer be running rather than after a number chosen here.
 
+## Reaching the cap usually means a queued job
+
+The bulk actions and this per-concept job share the default queue against
+three worker threads, so a slow batch can leave this job still queued when the
+budget runs out. That is the likeliest state when the cap is reached, rather
+than a dead job.
+
 ## rewritten is a separate ending from ready
 
 A rewrite that completed without producing the field being waited on sends the

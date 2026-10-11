@@ -475,6 +475,16 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include('data-loading-form-label-value="Generating…"')
       expect(response.body).to include("data-loading-form-confirm-message-value")
     end
+
+    it "renders Generate new set and Start over disabled until their confirmation is loaded" do
+      create_response(create_exercise)
+      get root_path
+      page = Nokogiri::HTML(response.body)
+      [ "Generate new set", "Start over" ].each do |label|
+        button = page.css("form[data-controller='loading-form'] button").find { |b| b.text.strip == label }
+        expect(button["disabled"]).not_to be_nil, label
+      end
+    end
   end
 
   describe "review button label" do
