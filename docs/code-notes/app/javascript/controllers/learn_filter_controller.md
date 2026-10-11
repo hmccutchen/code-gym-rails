@@ -22,3 +22,12 @@ label find nothing, which `spec/system/learn_filter_spec.rb` exists to catch.
 
 A group whose every entry is hidden is hidden itself, and so is a bucket whose
 groups are all empty. Otherwise a filtered page shows headings over nothing.
+
+## connect() applies the filter
+
+A term typed, the checkbox ticked, or either restored by the browser on Back
+before the controller connects reaches no action, so the controls would show a
+filter the list does not. `connect()` runs `apply()` once so the list always
+matches the controls. `spec/system/deferred_module_spec.rb` stalls this
+controller's module, types a term, and expects the list filtered once it
+connects.

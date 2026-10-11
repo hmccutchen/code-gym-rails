@@ -4,6 +4,10 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   static targets = ["input", "seenOnly", "empty", "entry", "block", "section"]
 
+  connect() {
+    this.apply()
+  }
+
   apply() {
     const term = this.inputTarget.value.trim().toLowerCase()
     let shown = 0
