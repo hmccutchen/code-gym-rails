@@ -22,21 +22,10 @@
 
       buttons.forEach(b => b.disabled = true);
       status.textContent = <%= t("concept_reference.thinking").to_json.html_safe %>;
-      try {
-        const res = await fetch(container.dataset.url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-          },
-          body: JSON.stringify({ prior_alternates: framings.get(refId) || [] })
-        });
-        // Fails closed: an expired session's redirect returns a 200 HTML page with res.ok true.
-        const data = await CodeGymServerMessage.read(res);
-        if (!res.ok || res.redirected || !data || data.status !== "ok" || !data.alternate) {
-          throw CodeGymServerMessage.failure(res, data, ALTERNATE_FAILED);
-        }
-
+      const result = await CodeGymRequest.send("POST", container.dataset.url,
+        { prior_alternates: framings.get(refId) || [] }, { fallback: ALTERNATE_FAILED });
+      const data = result.data;
+      if (result.ok && data?.status === "ok" && data.alternate) {
         framings.set(refId, [...(framings.get(refId) || []), data.alternate]);
         let focused = null;
         containers.forEach(c => {
@@ -58,8 +47,8 @@
           if (focused) focused.focus();
           buttons.forEach(b => b.remove());
         }
-      } catch (e) {
-        status.textContent = CodeGymServerMessage.message(e, ALTERNATE_FAILED);
+      } else {
+        status.textContent = result.message || ALTERNATE_FAILED;
         if ((framings.get(refId) || []).length < MAX) { buttons.forEach(b => b.disabled = false); }
       }
     });

@@ -18,6 +18,10 @@
   <% end %>
   <meta name="theme-color" content="<%= DisplayPreferences::DARK_THEME_COLOR %>">
   <%= csrf_meta_tags %>
+  <% if logged_in? %>
+    <%= render "shared/request" %>
+    <%= render "shared/save_status" %>
+  <% end %>
   <%= csp_meta_tag %>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -430,27 +434,12 @@
               if (name === lastSaved) return;
               if (name === "") { input.value = lastSaved; return; }
 
-              try {
-                const response = await fetch("<%= profile_path %>", {
-                  method: "PATCH",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-                  },
-                  body: JSON.stringify({ user: { name } })
-                });
-
-                if (response.ok) {
-                  const data = await response.json();
-                  input.value = data.name;
-                  lastSaved = data.name;
-                  flash(savedText);
-                } else {
-                  input.value = lastSaved;
-                  flash(errorText);
-                }
-              } catch {
+              const { ok, data } = await CodeGymRequest.send("PATCH", "<%= profile_path %>", { user: { name } });
+              if (ok && typeof data?.name === "string") {
+                input.value = data.name;
+                lastSaved = data.name;
+                flash(savedText);
+              } else {
                 input.value = lastSaved;
                 flash(errorText);
               }
@@ -462,15 +451,7 @@
             (function () {
               const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
               if (!tz) return;
-              fetch("<%= profile_path %>", {
-                method: "PATCH",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Accept": "application/json",
-                  "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-                },
-                body: JSON.stringify({ user: { time_zone: tz } })
-              });
+              CodeGymRequest.send("PATCH", "<%= profile_path %>", { user: { time_zone: tz } });
             })();
           </script>
         <% end %>
@@ -602,9 +583,8 @@
       });
     })();
   </script>
-  <%= render "shared/server_message" if logged_in? %>
   <%= render "shared/push_script" if logged_in? && WebPushCredentials.configured? %>
-  <%= render "shared/save_status" if logged_in? %>
+  <%= render "shared/save_status_banner" if logged_in? %>
   <%= render "shared/pull_to_refresh" %>
   <%= render "shared/code_lines_script" %>
   <%= yield :page_scripts %>

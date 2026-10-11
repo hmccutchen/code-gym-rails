@@ -1,6 +1,7 @@
 class ApplicationController < ActionController::Base
   # Adds its callback only when PREVIEW_APP is set at boot, which committed config does only for PR deployments.
   include PreviewAutoLogin
+  include JsonErrors
 
   before_action :require_login
   before_action :require_provider

@@ -248,6 +248,14 @@ compares the column with that token under the row lock first. A claim that
 went stale may belong to another caller by then, and releasing or writing
 over it lets two paid calls apply the same work.
 
+**Does a script build its own request?** BLOCKING. Page scripts send through
+`CodeGymRequest.send`, queue saves that must not overlap through
+`CodeGymSaveStatus.queue`, and show failures through the result's `message`.
+A hand-built `fetch` repeats the CSRF read, the signed-out check and the
+error rule, and the copies drift: before they were merged, two modules showed
+different text for the same failed request. A controller's JSON error goes
+through `render_json_error`.
+
 **Does a script restate a rule the server owns?** BLOCKING. The page shows the
 answer the server rendered or sent in its latest reply, such as the dashboard's
 `answered_sections` and `submit_blocker`, and never computes it again. A copied

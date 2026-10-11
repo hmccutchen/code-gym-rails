@@ -224,8 +224,8 @@ RSpec.describe "Push subscriptions", type: :request do
 
       get account_path
 
-      expect(response.body).to include("redirect: \"error\"")
-      expect(response.body).to include("if (!response.ok) throw CodeGymServerMessage.error(")
+      expect(response.body).to include("window.CodeGymRequest.send(\"POST\", REGISTER_PATH")
+      expect(response.body).to include("if (!result.ok) throw failure(")
     end
 
     it "re-subscribes on launch for a user who has reminders on" do

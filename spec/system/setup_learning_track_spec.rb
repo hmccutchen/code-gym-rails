@@ -90,7 +90,7 @@ RSpec.describe "Leaving the learning track on Setup", type: :system, with_csrf: 
       window.fetch = function (url, options) {
         if (String(url).includes("/profile") && JSON.parse(options.body).user.learning_track) {
           window.fetch = original;
-          return Promise.resolve(new Response(JSON.stringify({ errors: ["Leave was refused"] }),
+          return Promise.resolve(new Response(JSON.stringify({ status: "error", error: "Leave was refused" }),
             { status: 422, headers: { "Content-Type": "application/json" } }));
         }
         return original.apply(this, arguments);
@@ -114,7 +114,7 @@ RSpec.describe "Leaving the learning track on Setup", type: :system, with_csrf: 
       const original = window.fetch;
       window.fetch = function (url, options) {
         if (String(url).includes("/profile") && JSON.parse(options.body).user.section_kind_weights) {
-          return Promise.resolve(new Response(JSON.stringify({ errors: ["Mix was refused"] }),
+          return Promise.resolve(new Response(JSON.stringify({ status: "error", error: "Mix was refused" }),
             { status: 422, headers: { "Content-Type": "application/json" } }));
         }
         return original.apply(this, arguments);

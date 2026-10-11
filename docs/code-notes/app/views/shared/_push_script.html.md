@@ -8,7 +8,7 @@ It never requests notification permission. That call has to happen synchronously
 
 ## register
 
-A resolved fetch is not a saved subscription. Fetch settles normally for a 4xx, and an expired session answers this POST with a redirect to /login that fetch would otherwise follow to a 200. `redirect: "error"` and the `response.ok` check make both reject. Without them the enable flow reloads after a failed enrolment and leaves the user looking at an unchanged toggle with nothing explaining why.
+A resolved fetch is not a saved subscription. Fetch settles normally for a 4xx, and an expired session answers this POST with a redirect to /login that fetch would otherwise follow to a 200. `CodeGymRequest.send` reports both as not `ok`, the redirect through `response.redirected`, and `register` rejects on either. Without them the enable flow reloads after a failed enrolment and leaves the user looking at an unchanged toggle with nothing explaining why.
 
 ## Launch re-subscribe
 

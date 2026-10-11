@@ -209,8 +209,8 @@ RSpec.describe "Responses", type: :request do
            as: :json
 
       expect(response).to have_http_status(:conflict)
-      expect(response.parsed_body["errors"].first).to include("Refresh")
-      expect(response.parsed_body["errors"].first).not_to match(/reloading/i)
+      expect(response.parsed_body["error"]).to include("Refresh")
+      expect(response.parsed_body["error"]).not_to match(/reloading/i)
     end
 
     it "re-reads the problem set under the lock, so a regeneration cannot land between the check and the save" do
@@ -535,7 +535,7 @@ RSpec.describe "Responses", type: :request do
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.parsed_body).to include("status" => "error", "errors" => [ "Answer at least one section to finish up." ],
+      expect(response.parsed_body).to include("status" => "error", "error" => "Answer at least one section to finish up.",
                                               "answered_sections" => [], "submit_blocker" => "unanswered")
       expect(user.daily_responses).to be_empty
     end
@@ -547,7 +547,7 @@ RSpec.describe "Responses", type: :request do
       post responses_path, params: { response: { answers: { pattern: "Another substantive answer" }, submit: "1" } }, as: :json
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.parsed_body).to include("errors" => [ "Rate each section you answered to finish up." ],
+      expect(response.parsed_body).to include("error" => "Rate each section you answered to finish up.",
                                               "answered_sections" => %w[code_review pattern], "submit_blocker" => "unrated")
       expect(user.daily_responses.sole.attributes).to eq(draft)
     end

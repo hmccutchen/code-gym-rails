@@ -30,7 +30,7 @@ class ConceptReferencesController < ApplicationController
                    remaining: MAX_ALTERNATES_PER_CONCEPT - prior.size - 1 }
   rescue ActiveRecord::RecordNotFound
     # A JSON body because the client calls res.json() before checking res.ok.
-    render json: { status: "error", error: t("errors.concept_references.reference_missing") }, status: :not_found
+    render_json_error(t("errors.concept_references.reference_missing"), status: :not_found)
   rescue AiService::Error => e
     render_provider_failure(e, :alternate)
   end
@@ -44,6 +44,6 @@ class ConceptReferencesController < ApplicationController
   end
 
   def render_error(message)
-    render json: { status: "error", error: message }, status: :unprocessable_content
+    render_json_error(message, status: :unprocessable_content)
   end
 end

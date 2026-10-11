@@ -139,7 +139,7 @@ class ResponsesController < ApplicationController
   # POST /responses/duck_thread
   def duck_thread
     exercise = current_user.daily_exercises.for_date.first
-    return render json: { status: "error", error: t("errors.no_exercise_today") }, status: :not_found unless exercise
+    return render_json_error(t("errors.no_exercise_today"), status: :not_found) unless exercise
 
     section = params[:section].to_s
     return render_section_error(t("errors.section_not_in_exercise")) unless exercise.active_section_keys.include?(section)
@@ -232,7 +232,7 @@ class ResponsesController < ApplicationController
   def render_stale_answers
     respond_to do |format|
       format.json do
-        render json: { status: "stale", errors: [ t("flash.responses.stale_answers") ] }, status: :conflict
+        render_json_error(t("flash.responses.stale_answers"), status: :conflict, outcome: "stale")
       end
       format.html { redirect_to root_path, alert: t("flash.responses.stale_answers") }
     end
@@ -268,7 +268,7 @@ class ResponsesController < ApplicationController
           payload[:review_url] = review_response_path(@response) if response_params[:submit] == "1"
           render json: payload
         else
-          render json: { status: "error", errors: @response.errors.full_messages, **submit_state }, status: :unprocessable_content
+          render_json_error(@response.errors.full_messages.to_sentence, status: :unprocessable_content, **submit_state)
         end
       end
       format.html do
@@ -307,7 +307,7 @@ class ResponsesController < ApplicationController
   def load_pseudocode_context
     exercise = current_user.daily_exercises.for_date.first
     unless exercise
-      render json: { status: "error", error: t("errors.no_exercise_today") }, status: :not_found
+      render_json_error(t("errors.no_exercise_today"), status: :not_found)
       return
     end
 
@@ -392,7 +392,7 @@ class ResponsesController < ApplicationController
   end
 
   def render_section_error(message)
-    render json: { status: "error", error: message }, status: :unprocessable_content
+    render_json_error(message, status: :unprocessable_content)
   end
 
   def partial_review_notice(outcome)

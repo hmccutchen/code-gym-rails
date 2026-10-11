@@ -109,7 +109,7 @@ class LearnController < ApplicationController
 
   def preparing_limited
     message = t("learn.preparing_limited")
-    return render json: { status: "error", error: message }, status: :too_many_requests if request.format.json?
+    return render_json_error(message, status: :too_many_requests) if request.format.json?
 
     redirect_back fallback_location: learn_path, alert: message
   end

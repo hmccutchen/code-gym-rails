@@ -23,8 +23,7 @@ class ProfileController < ApplicationController
     if saved
       render json: saved_body
     else
-      render json: { errors: current_user.errors.full_messages },
-             status: :unprocessable_content
+      render_json_error(current_user.errors.full_messages.to_sentence, status: :unprocessable_content)
     end
   end
 
@@ -47,8 +46,7 @@ class ProfileController < ApplicationController
   end
 
   def render_invalid_daily_section_count
-    render json: { errors: [ "Daily sections must be #{User::AUTOMATIC_SECTION_COUNT} or one of #{User::DAILY_SECTION_COUNTS.to_a.join(', ')}" ] },
-           status: :unprocessable_content
+    render_json_error("Daily sections must be #{User::AUTOMATIC_SECTION_COUNT} or one of #{User::DAILY_SECTION_COUNTS.to_a.join(', ')}", status: :unprocessable_content)
   end
 
   # Only an absent key skips: a wrong-shaped value would be dropped by strong params and return 200 having saved nothing.
@@ -63,8 +61,7 @@ class ProfileController < ApplicationController
   end
 
   def render_invalid_weight
-    render json: { errors: [ "Section weight must be one of #{KindPreferences::MULTIPLIERS.join(', ')}" ] },
-           status: :unprocessable_content
+    render_json_error("Section weight must be one of #{KindPreferences::MULTIPLIERS.join(', ')}", status: :unprocessable_content)
   end
 
   def invalid_excluded_section_kinds?
@@ -87,8 +84,7 @@ class ProfileController < ApplicationController
   end
 
   def render_invalid_exclusion
-    render json: { errors: [ "Excluded section kinds must be a list of strings" ] },
-           status: :unprocessable_content
+    render_json_error("Excluded section kinds must be a list of strings", status: :unprocessable_content)
   end
 
   def invalid_section_kind_levels?
@@ -102,13 +98,11 @@ class ProfileController < ApplicationController
   end
 
   def render_invalid_level
-    render json: { errors: [ "Section difficulty must be one of #{KindDifficulty::LEVELS.join(', ')}" ] },
-           status: :unprocessable_content
+    render_json_error("Section difficulty must be one of #{KindDifficulty::LEVELS.join(', ')}", status: :unprocessable_content)
   end
 
   def render_invalid_lock
-    render json: { errors: [ "Locked section kinds must be a list of strings" ] },
-           status: :unprocessable_content
+    render_json_error("Locked section kinds must be a list of strings", status: :unprocessable_content)
   end
 
   def invalid_display_preferences?
@@ -122,8 +116,7 @@ class ProfileController < ApplicationController
   end
 
   def render_invalid_display
-    render json: { errors: [ "Display preferences must use the listed options" ] },
-           status: :unprocessable_content
+    render_json_error("Display preferences must use the listed options", status: :unprocessable_content)
   end
 
   def invalid_skill_level?
@@ -133,8 +126,7 @@ class ProfileController < ApplicationController
   end
 
   def render_invalid_skill_level
-    render json: { errors: [ "Skill level must be one of #{User::SKILL_LEVELS.join(', ')}" ] },
-           status: :unprocessable_content
+    render_json_error("Skill level must be one of #{User::SKILL_LEVELS.join(', ')}", status: :unprocessable_content)
   end
 
   def invalid_track_suggestions?
@@ -185,13 +177,11 @@ class ProfileController < ApplicationController
   end
 
   def render_invalid_learning_track
-    render json: { errors: [ "That learning track change isn't available." ] },
-           status: :unprocessable_content
+    render_json_error("That learning track change isn't available.", status: :unprocessable_content)
   end
 
   def render_stale_preferences
-    render json: {
-      errors: [ t("exercise_mix.conflict") ],
+    render_json_error(t("exercise_mix.conflict"), status: :conflict,
       current: {
         section_kind_weights:             current_user.section_kind_weights,
         excluded_section_kinds:           current_user.excluded_section_kinds,
@@ -199,8 +189,7 @@ class ProfileController < ApplicationController
         locked_section_kinds:             current_user.locked_section_kinds,
         section_kind_preferences_version: current_user.section_kind_preferences_version,
         ladder_preparation:               ladder_preparation
-      }
-    }, status: :conflict
+      })
   end
 
   def saved_body

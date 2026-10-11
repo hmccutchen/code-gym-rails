@@ -30,7 +30,7 @@ RSpec.describe "Profile", type: :request do
             headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(JSON.parse(response.body)["errors"]).to be_present
+      expect(JSON.parse(response.body)).to include("status" => "error", "error" => be_present)
       expect(user.reload.name).to eq(original)
     end
 
@@ -311,7 +311,7 @@ RSpec.describe "Profile", type: :request do
       patch_profile(section_kind_levels: { "challenge" => "strong" })
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.parsed_body["errors"].join).to include(KindDifficulty::LEVELS.join(", "))
+      expect(response.parsed_body["error"]).to include(KindDifficulty::LEVELS.join(", "))
       expect(user.reload.section_kind_levels).to eq({})
     end
 
@@ -398,7 +398,7 @@ RSpec.describe "Profile", type: :request do
         save_daily_sections(value)
 
         expect(response).to have_http_status(:unprocessable_content), "#{value.inspect} was accepted"
-        expect(response.parsed_body["errors"]).to eq([ "Daily sections must be automatic or one of #{User::DAILY_SECTION_COUNTS.to_a.join(', ')}" ]),
+        expect(response.parsed_body["error"]).to eq("Daily sections must be automatic or one of #{User::DAILY_SECTION_COUNTS.to_a.join(', ')}"),
           "#{value.inspect} passed the boundary"
         expect(user.reload.daily_section_count).to eq(3)
       end

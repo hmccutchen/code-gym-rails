@@ -13,6 +13,176 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="theme-color" content="#1a1a2e">
   
+    <script>
+  window.CodeGymRequest = (function () {
+    const SIGNED_OUT = "Your session expired — reload the page and try again.";
+
+    function csrf() {
+      return document.querySelector('meta[name="csrf-token"]')?.content ?? "";
+    }
+
+    async function read(response) {
+      try { return await response.json(); } catch (_) { return null; }
+    }
+
+    // Rails' own error JSON carries a numeric status, so only the app's replies pass.
+    function appMessage(data) {
+      return data && typeof data.status === "string" && typeof data.error === "string" ? data.error : null;
+    }
+
+    async function send(method, url, body, options) {
+      const fallback = options?.fallback ?? "";
+      const headers = { "Accept": "application/json", "X-CSRF-Token": csrf() };
+      const init = { method: method, headers: headers };
+      if (body !== undefined) {
+        headers["Content-Type"] = "application/json";
+        init.body = JSON.stringify(body);
+      }
+
+      let response;
+      try {
+        response = await fetch(url, init);
+      } catch (_) {
+        return { ok: false, status: 0, data: null, message: fallback, signedOut: false };
+      }
+
+      // The only redirect a JSON endpoint gives is to the login page after the session expires.
+      if (response.redirected) {
+        return { ok: false, status: response.status, data: null, message: options?.signedOut ?? SIGNED_OUT, signedOut: true };
+      }
+
+      const data = await read(response);
+      if (response.ok) return { ok: true, status: response.status, data: data, message: null, signedOut: false };
+      return { ok: false, status: response.status, data: data, message: appMessage(data) || fallback, signedOut: false };
+    }
+
+    return { send: send, get: (url, options) => send("GET", url, undefined, options) };
+  })();
+</script>
+
+    <script>
+  window.CodeGymSaveStatus = (function () {
+    const GENERIC = "Couldn't save your last change. It hasn't reached the server — check your connection and try again.";
+    const SIGNED_OUT = "Couldn't save your last change — you've been signed out. Reload the page and sign in again.";
+
+    const failures = new Map();
+    const issued = new Map();
+    const queues = new Map();
+    let counter = 0;
+
+    let requests = 0;
+    const probes = [];
+
+    function watch(probe) {
+      probes.push(probe);
+    }
+
+    function queued(key) {
+      return (queues.get(key)?.waiting.length ?? 0) > 0;
+    }
+
+    function pending() {
+      return requests > 0 || [...queues.values()].some((line) => line.busy || line.waiting.length > 0) || probes.some((probe) => probe());
+    }
+
+    function render() {
+      const banner = document.getElementById("save-status");
+      const announcer = document.getElementById("save-status-announcer");
+      if (!banner || !announcer) {
+        document.addEventListener("DOMContentLoaded", render, { once: true });
+        return;
+      }
+      const messages = Array.from(failures.values());
+
+      if (messages.length === 0) {
+        banner.hidden = true;
+        banner.textContent = "";
+        announcer.textContent = "";
+        return;
+      }
+
+      banner.textContent = messages[messages.length - 1];
+      announcer.textContent = banner.textContent;
+      banner.hidden = false;
+    }
+
+    function report(key, message) {
+      failures.delete(key);
+      failures.set(key, message);
+      render();
+    }
+
+    function clear(key) {
+      failures.delete(key);
+      render();
+    }
+
+    function save(method, url, body, key) {
+      const ticket = ++counter;
+      issued.set(key, ticket);
+
+      requests++;
+      return window.CodeGymRequest.send(method, url, body, { fallback: GENERIC, signedOut: SIGNED_OUT }).then((result) => {
+        if (issued.get(key) !== ticket) return { ok: false };
+        if (result.ok) clear(key);
+        else report(key, result.message);
+        return { ok: result.ok, status: result.status || undefined, data: result.data };
+      }).finally(() => { requests--; });
+    }
+
+    // A body given as a function is read when the save is sent; returning null drops that save.
+    function queue(key, method, url, body, options) {
+      const line = queues.get(key) ?? { busy: false, waiting: [] };
+      queues.set(key, line);
+      return new Promise((resolve) => {
+        const last = line.waiting[line.waiting.length - 1];
+        if (options?.latest && last) {
+          last.body = body;
+          last.resolvers.push(resolve);
+        } else {
+          line.waiting.push({ method: method, url: url, body: body, resolvers: [resolve] });
+        }
+        drain(key, line);
+      });
+    }
+
+    async function drain(key, line) {
+      if (line.busy || line.waiting.length === 0) return;
+      line.busy = true;
+      const next = line.waiting.shift();
+      const body = typeof next.body === "function" ? next.body() : next.body;
+      const result = body === null ? { ok: false, skipped: true } : await save(next.method, next.url, body, key);
+      line.busy = false;
+      next.resolvers.forEach((resolve) => resolve(result));
+      // A task, not a microtask: the reply's handlers update state the next save is built from.
+      setTimeout(() => drain(key, line), 0);
+    }
+
+    const CARRIED = "code-gym-save-status-carried";
+
+    function carry(key, message) {
+      try {
+        sessionStorage.setItem(CARRIED, JSON.stringify({ key: key, message: message, path: location.pathname }));
+      } catch (_) {
+        return;
+      }
+    }
+
+    try {
+      const carried = sessionStorage.getItem(CARRIED);
+      if (carried) {
+        sessionStorage.removeItem(CARRIED);
+        const parsed = JSON.parse(carried);
+        if (parsed && parsed.message && parsed.path === location.pathname) report(parsed.key || "carried", parsed.message);
+      }
+    } catch (_) {
+      try { sessionStorage.removeItem(CARRIED); } catch (_) { /* storage is unavailable; the page shows no carried message */ }
+    }
+
+    return { save: save, queue: queue, queued: queued, watch: watch, pending: pending, carry: carry, report: report, clear: clear };
+  })();
+</script>
+
   
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -418,27 +588,12 @@
               if (name === lastSaved) return;
               if (name === "") { input.value = lastSaved; return; }
 
-              try {
-                const response = await fetch("/profile", {
-                  method: "PATCH",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-                  },
-                  body: JSON.stringify({ user: { name } })
-                });
-
-                if (response.ok) {
-                  const data = await response.json();
-                  input.value = data.name;
-                  lastSaved = data.name;
-                  flash(savedText);
-                } else {
-                  input.value = lastSaved;
-                  flash(errorText);
-                }
-              } catch {
+              const { ok, data } = await CodeGymRequest.send("PATCH", "/profile", { user: { name } });
+              if (ok && typeof data?.name === "string") {
+                input.value = data.name;
+                lastSaved = data.name;
+                flash(savedText);
+              } else {
                 input.value = lastSaved;
                 flash(errorText);
               }
@@ -624,152 +779,9 @@
       });
     })();
   </script>
-  <script>
-  window.CodeGymServerMessage = (function () {
-    const SIGNED_OUT = "Your session expired — reload the page and try again.";
-    const written = new WeakSet();
-
-    // null for an HTML error page, a redirected login page, or an empty body.
-    async function read(response) {
-      try { return await response.json(); } catch (_) { return null; }
-    }
-
-    function error(text) {
-      const e = new Error(text);
-      written.add(e);
-      return e;
-    }
-
-    // The only redirect a JSON endpoint gives is to the login page after the session expires.
-    function failure(response, data, fallback) {
-      if (response && response.redirected) return error(SIGNED_OUT);
-      const ours = data && data.status === "error" && typeof data.error === "string" && data.error;
-      return error(ours || fallback);
-    }
-
-    function message(e, fallback) {
-      return written.has(e) ? e.message : fallback;
-    }
-
-    return { read: read, error: error, failure: failure, message: message };
-  })();
-</script>
-
   
   <p id="save-status" class="save-status" hidden></p>
 <p id="save-status-announcer" class="visually-hidden" role="alert"></p>
-
-<script>
-  window.CodeGymSaveStatus = (function () {
-    const GENERIC = "Couldn't save your last change. It hasn't reached the server — check your connection and try again.";
-    const SIGNED_OUT = "Couldn't save your last change — you've been signed out. Reload the page and sign in again.";
-    const banner = document.getElementById("save-status");
-    const announcer = document.getElementById("save-status-announcer");
-
-    const failures = new Map();
-    const issued = new Map();
-    let counter = 0;
-
-    let requests = 0;
-    const probes = [];
-
-    function watch(probe) {
-      probes.push(probe);
-    }
-
-    function pending() {
-      return requests > 0 || probes.some((probe) => probe());
-    }
-
-    function render() {
-      const messages = Array.from(failures.values());
-
-      if (messages.length === 0) {
-        banner.hidden = true;
-        banner.textContent = "";
-        announcer.textContent = "";
-        return;
-      }
-
-      banner.textContent = messages[messages.length - 1];
-      announcer.textContent = banner.textContent;
-      banner.hidden = false;
-    }
-
-    function fail(key, message) {
-      failures.delete(key);
-      failures.set(key, message);
-      render();
-    }
-
-    function succeed(key) {
-      failures.delete(key);
-      render();
-    }
-
-    // With forgery protection off there is no csrf meta tag, and a throw here would stop the save silently.
-    function csrf() {
-      return document.querySelector('meta[name="csrf-token"]')?.content ?? "";
-    }
-
-    function save(method, url, body, key, failureMessage = null) {
-      const ticket = ++counter;
-      issued.set(key, ticket);
-
-      const current = () => issued.get(key) === ticket;
-
-      requests++;
-      return fetch(url, {
-        method: method,
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "X-CSRF-Token": csrf()
-        },
-        body: JSON.stringify(body)
-      }).then(async (response) => {
-        if (!current()) return { ok: false };
-
-        // fetch follows redirects, so an expired session arrives as the login page with ok true.
-        if (response.redirected) { fail(key, failureMessage || SIGNED_OUT); return { ok: false }; }
-        if (response.ok) {
-          succeed(key);
-          return { ok: true, data: await response.json().catch(() => null) };
-        }
-
-        const data = await response.json().catch(() => null);
-        fail(key, failureMessage || (data && data.errors && data.errors[0]) || GENERIC);
-        return { ok: false, status: response.status, data: data };
-      }).catch(() => {
-        if (current()) fail(key, failureMessage || GENERIC);
-        return { ok: false };
-      }).finally(() => { requests--; });
-    }
-
-    const CARRIED = "code-gym-save-status-carried";
-
-    function carry(key, message) {
-      try {
-        sessionStorage.setItem(CARRIED, JSON.stringify({ key: key, message: message, path: location.pathname }));
-      } catch (error) {
-        // Private browsing can refuse the write; the reloaded page then just shows no message.
-      }
-    }
-
-    try {
-      const carried = sessionStorage.getItem(CARRIED);
-      if (carried) {
-        sessionStorage.removeItem(CARRIED);
-        const parsed = JSON.parse(carried);
-        if (parsed && parsed.message && parsed.path === location.pathname) fail(parsed.key || "carried", parsed.message);
-      }
-    } catch (error) {
-      try { sessionStorage.removeItem(CARRIED); } catch (ignored) {}
-    }
-
-    return { save: save, watch: watch, pending: pending, carry: carry };
-  })();
-</script>
 
   <div class="pull-refresh" id="pull-refresh" aria-hidden="true"><span class="spinner"></span></div>
 <script>
