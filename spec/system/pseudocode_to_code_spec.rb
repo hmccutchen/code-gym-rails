@@ -1,6 +1,6 @@
 require "rails_helper"
 
-# Request specs can't run this inline JavaScript; with_csrf because it reads the CSRF meta tag test config blanks.
+# Request specs can't run the pseudocode-round controller; with_csrf because it reads the CSRF meta tag test config blanks.
 RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
   # Created up front: plan_review wins the fourth slot by precedence, so a generated day never shows this section.
   def create_exercise_for(user)
