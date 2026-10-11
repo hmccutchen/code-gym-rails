@@ -86,6 +86,11 @@ RSpec.describe KindDifficulty do
     it "has exactly one fallback definition per level" do
       expect(described_class::LEVEL_DEFINITIONS.keys).to eq(described_class::LEVELS)
     end
+
+    # Every kind reads these, and architecture, pattern and ambiguity hunt show no code.
+    it "words every definition without assuming the section shows code" do
+      described_class::LEVEL_DEFINITIONS.each_value { |definition| expect(definition).not_to match(/\bcode\b/i) }
+    end
   end
 
   it "is constructed from stated preference alone" do

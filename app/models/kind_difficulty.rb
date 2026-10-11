@@ -4,7 +4,7 @@ class KindDifficulty
 
   LEVEL_DEFINITIONS = {
     "junior"             => "one clearly visible instance of the concept in a small scenario.",
-    "mid_level"          => "one instance of the concept in realistic code, not pointed out, where finding it means reading the code rather than spotting a label.",
+    "mid_level"          => "one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.",
     "senior"             => "the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.",
     "principal_engineer" => "the concept framed as a decision with costs on both sides at system scale."
   }.freeze
