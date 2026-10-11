@@ -230,7 +230,7 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include("mermaid@11.17.2")
     end
 
-    it "mounts the review controllers once per entry and the mermaid module exactly once" do
+    it "mounts the review controllers once per reviewed section and the mermaid module exactly once" do
       # The mermaid controller scans the whole page from <body>, so several entries share one mount.
       3.times { |i| create_session_for(user, date: (i + 5).days.ago.to_date, reviewed: true) }
       architecture_session(diagram: "flowchart TD\n  A[Client] --> B[API]")

@@ -9,14 +9,17 @@ which is the one thing it must not be. It is read through
 `DailyResponse#difficulty_for`, which drops a level this app has no
 vocabulary for.
 
-## Controllers mounted per entry
+## Controllers mounted per reviewed section
 
-This partial can render once per history entry, up to one per reviewed session
-on the page. The alternates and follow-ups controls are Stimulus controllers
-(`review-alternates`, `follow-ups`), so each entry's markup mounts its own
-instance and no shared script has to be emitted once or guarded against wiring
-a control twice. `spec/requests/history_spec.rb` counts one follow-ups mount
-per reviewed entry.
+This partial loops over a response's reviewed sections, and it can render once
+per history entry, so a page holds one pair of controls for every reviewed
+section of every entry shown. The alternates and follow-ups controls are
+Stimulus controllers (`review-alternates`, `follow-ups`), so each section's
+markup mounts its own instance and no shared script has to be emitted once or
+guarded against wiring a control twice. Several instances in one entry are
+expected; deduplicating them would leave sections without their controls.
+`spec/requests/history_spec.rb` counts three follow-ups mounts because its
+fixture has three entries with one reviewed section each.
 
 ## Alternate status line
 
