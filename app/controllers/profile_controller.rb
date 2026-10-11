@@ -13,6 +13,7 @@ class ProfileController < ApplicationController
     return render_invalid_lock      if invalid_locked_section_kinds?
     return render_invalid_display   if invalid_display_preferences?
     return render_invalid_skill_level if invalid_skill_level?
+    return render_invalid_track_suggestions if invalid_track_suggestions?
 
     saved = save_with_preference_precondition
 
@@ -136,6 +137,17 @@ class ProfileController < ApplicationController
            status: :unprocessable_content
   end
 
+  def invalid_track_suggestions?
+    user_params = params.require(:user)
+
+    user_params.key?(:track_suggestions) && [ true, false ].exclude?(user_params[:track_suggestions])
+  end
+
+  def render_invalid_track_suggestions
+    render json: { errors: [ "Track suggestions must be true or false" ] },
+           status: :unprocessable_content
+  end
+
   # Check and write under one row lock; the track choice is checked after reload, since Experienced bumps no version.
   def save_with_preference_precondition
     user_params = params.require(:user)
@@ -206,7 +218,7 @@ class ProfileController < ApplicationController
   end
 
   def profile_params
-    permitted = params.require(:user).permit(:name, :time_zone, :daily_section_count, :learning_track, :skill_level,
+    permitted = params.require(:user).permit(:name, :time_zone, :daily_section_count, :learning_track, :skill_level, :track_suggestions,
                                              section_kind_weights: {}, excluded_section_kinds: [],
                                              section_kind_levels: {}, locked_section_kinds: [],
                                              display_preferences: {})

@@ -7,9 +7,7 @@
 <% else %>
   <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>"
             placeholder="<%= t("sections.#{key}.placeholder") %>" data-field="<%= key %>"
-            maxlength="<%= UserText::MAX_ANSWER_LENGTH %>"
-            data-prose-answer data-answer-complete="<%= response.answered?(key) %>"
-            <%= tag.attributes(answer_scaffold_labels_attr(response, key)) %>><%= answer_starting_value(response, key) %></textarea>
+            maxlength="<%= UserText::MAX_ANSWER_LENGTH %>"><%= answer_starting_value(response, key) %></textarea>
 <% end %>
 
 <div class="pseudocode-rounds" data-pseudocode-section="<%= key %>">

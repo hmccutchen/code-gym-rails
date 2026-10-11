@@ -358,6 +358,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_130000) do
     t.datetime "trial_started_at"
     t.datetime "trial_ends_at"
     t.datetime "trial_consented_at"
+    t.boolean "track_suggestions", default: true, null: false
+    t.integer "track_proposals_answered", default: 0, null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["invite_code_id"], name: "index_users_on_invite_code_id"
   end

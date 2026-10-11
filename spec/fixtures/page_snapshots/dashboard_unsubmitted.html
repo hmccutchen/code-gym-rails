@@ -543,51 +543,7 @@
     <div class="progress-label" id="progress-label">0 of 3 answered</div>
   </div>
 
-  <script>
-window.CodeGymAnswerRules = (() => {
-  const MIN_LENGTH = 10;
-  const MIN_REASON = 40;
-  const PIECES = ["a","b"];
-  // Ruby's String#strip: ASCII whitespace and NUL only, where String.prototype.trim also drops Unicode spaces.
-  const strip = text => text.replace(/^[\0\t\n\v\f\r ]+|[\0\t\n\v\f\r ]+$/g, "");
-  const length = text => [...text].length;
-  const STRIPPED = new RegExp("[\udb40\udc00-\udb40\udc7f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\u200b\u200c\u2060-\u2064\ufeff\u0000-\b\u000b\f\u000e-\u001f-\u009f]", "gu");
-  const clean = text => text.normalize("NFC").replace(STRIPPED, "");
-
-  function substantive(text, labels) {
-    if (!labels.length) return strip(text);
-    return strip(text.split("\n").filter(line => !labels.includes(strip(line))).join("\n"));
-  }
-
-  return {
-    PARSONS_PREFIX: "order:",
-    PICK_PREFIX: "pick:",
-
-    strip,
-
-    proseAnswered(text, labels) {
-      return length(substantive(clean(text), labels)) > MIN_LENGTH;
-    },
-
-    comparisonAnswered(pick, reason) {
-      return PIECES.includes(pick) && length(strip(clean(reason))) >= MIN_REASON;
-    },
-
-    submitBlocker(answeredSections, ratings) {
-      if (answeredSections.length === 0) return "unanswered";
-      if (answeredSections.some(section => !ratings[section])) return "unrated";
-      return null;
-    },
-
-    sectionStatus(answered, ratingLabel, inProgress) {
-      if (!answered) return "";
-      return ratingLabel ? `✓ ${ratingLabel}` : inProgress;
-    }
-  };
-})();
-</script>
-
-  <form id="gym-form" data-turbo="false" action="/responses" accept-charset="UTF-8" method="post">
+  <form id="gym-form" data-turbo="false" data-answered-sections="[]" data-submit-blocker="unanswered" action="/responses" accept-charset="UTF-8" method="post">
       <details class="section" open data-section-fold="code_review">
   <summary class="section-label"><h2 class="section-title">  1 — Code Review
 </h2>
@@ -603,7 +559,7 @@ window.CodeGymAnswerRules = (() => {
 
   
 
-    <textarea name="response[answers][code_review]" class="answer" placeholder="What&#39;s the issue and how would you fix it?" maxlength="12000" data-field="code_review" data-prose-answer data-answer-complete="false" ></textarea>
+    <textarea name="response[answers][code_review]" class="answer" placeholder="What&#39;s the issue and how would you fix it?" maxlength="12000" data-field="code_review"></textarea>
 
 
     <div class="rating-row" data-rating-for="code_review" role="group"
@@ -648,7 +604,7 @@ window.CodeGymAnswerRules = (() => {
 
   
 
-    <textarea name="response[answers][pattern]" class="answer" placeholder="Your answer…" maxlength="12000" data-field="pattern" data-prose-answer data-answer-complete="false" data-scaffold-labels="[&quot;Your approach:&quot;,&quot;Interface — how would this be called:&quot;,&quot;What would be easy to get wrong or worth testing:&quot;]">Your approach:
+    <textarea name="response[answers][pattern]" class="answer" placeholder="Your answer…" maxlength="12000" data-field="pattern">Your approach:
 
 
 Interface — how would this be called:
@@ -699,7 +655,7 @@ What would be easy to get wrong or worth testing:
 
   
 
-    <textarea name="response[answers][challenge]" class="answer code-answer" placeholder="# Your implementation…" maxlength="12000" data-field="challenge" data-prose-answer data-answer-complete="false" ></textarea>
+    <textarea name="response[answers][challenge]" class="answer code-answer" placeholder="# Your implementation…" maxlength="12000" data-field="challenge"></textarea>
 
 
     <div class="rating-row" data-rating-for="challenge" role="group"
@@ -734,10 +690,10 @@ What would be easy to get wrong or worth testing:
 
     <div class="submit-row" id="submit-row">
       <input autocomplete="off" value="1" type="hidden" name="submit" id="submit" />
-      <button name="button" type="submit" id="submit-answers" class="btn btn-primary" disabled="disabled">Submit answers</button>
+      <button name="button" type="submit" id="submit-answers" class="btn btn-primary">Submit answers</button>
       <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
     </div>
-    <p class="progress-label" id="rating-nudge" data-unanswered="Answer at least one section to finish up." data-unrated="Rate each section you answered to finish up.">Answer at least one section to finish up.</p>
+    <p class="progress-label" id="rating-nudge" tabindex="-1" data-unanswered="Answer at least one section to finish up." data-unrated="Rate each section you answered to finish up." aria-live="polite">Answer at least one section to finish up.</p>
 </form>
   <script>
   (() => {
@@ -755,26 +711,29 @@ What would be easy to get wrong or worth testing:
 
     const STALE_RELOADED = "The set changed, so that last change wasn't saved. This is the current set — your saved work is still there.";
 
-    const rules = window.CodeGymAnswerRules;
-
-    function submitBlocker() {
-      return rules.submitBlocker([...textareas].filter(answered).map(t => t.dataset.field), ratings);
-    }
-
-    function refreshSubmit() {
-      const blocker = submitBlocker();
-      submitButton.disabled = form.inert || blocker !== null;
-      ratingNudge.hidden = blocker === null;
-      if (blocker) ratingNudge.textContent = ratingNudge.dataset[blocker];
-    }
+    // The server's verdict as of its last reply; the page never judges an answer itself.
+    let answeredSections = new Set(JSON.parse(form.dataset.answeredSections || "[]"));
+    let submitBlocker = form.dataset.submitBlocker || null;
 
     function answered(textarea) {
-      return textarea.dataset.answerComplete === "true";
+      return answeredSections.has(textarea.dataset.field);
     }
 
-    function markProse(textarea) {
-      const labels = JSON.parse(textarea.dataset.scaffoldLabels || "[]");
-      textarea.dataset.answerComplete = String(rules.proseAnswered(textarea.value, labels));
+    function applyServerState(data) {
+      if (!Array.isArray(data?.answered_sections)) return;
+      answeredSections = new Set(data.answered_sections);
+      submitBlocker = data.submit_blocker || null;
+      updateProgress();
+      refreshNudge();
+      Object.entries(data.section_statuses || {}).forEach(([section, text]) => {
+        const status = form.querySelector(`.section-status[data-status-for="${section}"]`);
+        if (status) status.textContent = text;
+      });
+    }
+
+    function refreshNudge() {
+      ratingNudge.hidden = submitBlocker === null;
+      if (submitBlocker) ratingNudge.textContent = ratingNudge.dataset[submitBlocker];
     }
 
     const ANSWERED_COUNT = "%{answered} of %{total} answered";
@@ -805,33 +764,37 @@ What would be easy to get wrong or worth testing:
     }
 
     let saveTimer = null;
-    document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => saveTimer !== null));
-    function autoSave() {
+    let saving = false;
+    let saveAgain = false;
+    document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => saveTimer !== null || saveAgain));
+
+    function sendSave() {
       clearTimeout(saveTimer);
       saveTimer = null;
       if (form.inert) return;
-      saveTimer = setTimeout(() => {
-        saveTimer = null;
-        window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, status, data }) => {
-          if (!ok && status === 409 && data?.status === "stale") {
-            window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
-            window.location.reload();
-            return;
-          }
-          if (ok && data?.submitted && !form.inert && !reviewRequested) window.location.reload();
-        });
-      }, 800);
+      if (saving) { saveAgain = true; return; }
+      saving = true;
+      window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, status, data }) => {
+        saving = false;
+        if (!ok && status === 409 && data?.status === "stale") {
+          window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
+          window.location.reload();
+          return;
+        }
+        if (ok && data?.submitted && !form.inert && !reviewRequested) return window.location.reload();
+        if (saveAgain) { saveAgain = false; return sendSave(); }
+        if (ok && saveTimer === null && !form.inert) applyServerState(data);
+      });
     }
 
-    const RATING_LABELS = {"too_easy":"too easy","right_level":"just right","too_hard":"too hard"};
-    const IN_PROGRESS   = "in progress";
-
-    function refreshStatus(section) {
-      const status = form.querySelector(`.section-status[data-status-for="${section}"]`);
-      const t = form.querySelector(`textarea[data-field="${section}"]`);
-      if (!status || !t) return;
-      status.textContent = rules.sectionStatus(answered(t), RATING_LABELS[ratings[section]], IN_PROGRESS);
+    function autoSave() {
+      clearTimeout(saveTimer);
+      saveTimer = form.inert ? null : setTimeout(sendSave, 800);
     }
+
+    form.addEventListener("change", (event) => {
+      if (event.target.closest("[data-field], [data-comparison-answer]")) sendSave();
+    });
 
     function reopenIfRated(section) {
       const fold = form.querySelector(`details.section[data-section-fold="${section}"]`);
@@ -840,9 +803,8 @@ What would be easy to get wrong or worth testing:
 
     textareas.forEach(t => {
       t.addEventListener("input", () => {
-        if ("proseAnswer" in t.dataset) markProse(t);
         reopenIfRated(t.dataset.field);
-        updateProgress(); refreshSubmit(); refreshStatus(t.dataset.field); autoSave();
+        autoSave();
       });
     });
 
@@ -854,9 +816,7 @@ What would be easy to get wrong or worth testing:
           b.classList.toggle("active", b === btn);
           b.setAttribute("aria-pressed", b === btn);
         });
-        refreshSubmit();
-        refreshStatus(section);
-        autoSave();
+        sendSave();
       });
     });
 
@@ -878,7 +838,7 @@ What would be easy to get wrong or worth testing:
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (form.inert || submitBlocker()) return;
+      if (form.inert) return;
       clearTimeout(saveTimer);
       saveTimer = null;
 
@@ -889,6 +849,7 @@ What would be easy to get wrong or worth testing:
 
       let submissionSaved = false;
       let reloading = false;
+      let refused = false;
       try {
         const res = await fetch(form.action, {
           method: "POST",
@@ -914,7 +875,10 @@ What would be easy to get wrong or worth testing:
             window.location.reload();
             return;
           }
-          alert("Couldn't submit your answers — please try again.");
+          const data = await res.json().catch(() => null);
+          refused = res.status === 422 && Boolean(data?.submit_blocker);
+          if (refused) applyServerState(data);
+          else alert("Couldn't submit your answers — please try again.");
         }
       } catch (error) {
         if (submissionSaved) {
@@ -928,8 +892,9 @@ What would be easy to get wrong or worth testing:
           form.inert = false;
           submitButton.classList.remove("btn-loading");
           submitButton.textContent = "Submit answers";
-          refreshSubmit();
+          submitButton.disabled = false;
           autoSave();
+          if (refused) ratingNudge.focus();
         }
       }
     });
@@ -939,10 +904,7 @@ What would be easy to get wrong or worth testing:
       if (event.persisted && reviewRequested) window.location.reload();
     });
 
-    textareas.forEach(t => { if ("proseAnswer" in t.dataset) markProse(t); });
-    sectionFields.forEach(refreshStatus);
     updateProgress();
-    refreshSubmit();
   })();
   </script>
 
@@ -1113,7 +1075,7 @@ What would be easy to get wrong or worth testing:
       return document.querySelector('meta[name="csrf-token"]')?.content ?? "";
     }
 
-    function save(method, url, body, key) {
+    function save(method, url, body, key, failureMessage = null) {
       const ticket = ++counter;
       issued.set(key, ticket);
 
@@ -1132,17 +1094,17 @@ What would be easy to get wrong or worth testing:
         if (!current()) return { ok: false };
 
         // fetch follows redirects, so an expired session arrives as the login page with ok true.
-        if (response.redirected) { fail(key, SIGNED_OUT); return { ok: false }; }
+        if (response.redirected) { fail(key, failureMessage || SIGNED_OUT); return { ok: false }; }
         if (response.ok) {
           succeed(key);
           return { ok: true, data: await response.json().catch(() => null) };
         }
 
         const data = await response.json().catch(() => null);
-        fail(key, (data && data.errors && data.errors[0]) || GENERIC);
+        fail(key, failureMessage || (data && data.errors && data.errors[0]) || GENERIC);
         return { ok: false, status: response.status, data: data };
       }).catch(() => {
-        if (current()) fail(key, GENERIC);
+        if (current()) fail(key, failureMessage || GENERIC);
         return { ok: false };
       }).finally(() => { requests--; });
     }

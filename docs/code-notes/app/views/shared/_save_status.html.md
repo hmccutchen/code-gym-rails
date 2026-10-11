@@ -5,8 +5,9 @@
 The autosaves on the dashboard and /setup report through this partial, so a
 rejected write tells the engineer instead of vanishing. The page's control
 keeps whatever the user set, because snapping a slider back under their hand is
-worse than the problem this solves. The banner says the change did not reach
-the server.
+worse than the problem this solves. By default, the banner says the change did
+not reach the server; a caller can supply wording for a bookkeeping failure
+after the user's change was saved.
 
 One exception belongs to the caller, not this file. A save refused because
 another tab got there first comes back carrying the state that is actually
@@ -27,7 +28,7 @@ renders `shared/_push_script`, so a page's own script can rely on
 The visible banner is toggled with `hidden`, and screen readers often stay
 silent about a live region that appears with its text already in it. This copy
 is always in the page, so a failed save is always announced, and assertively
-(`role="alert"`), since the engineer's work did not reach the server.
+(`role="alert"`), including when only a follow-up bookkeeping request failed.
 
 ## `failures`
 
@@ -61,15 +62,22 @@ surface.
 particular refusal can. Callers that cannot simply ignore it; the failure has
 already been reported either way.
 
+The optional fifth argument, `failureMessage`, replaces the default wording
+for network failures, HTTP refusals and session redirects. The track proposal
+uses an app-owned, localized sentence for its separate answer-count request:
+the choice was saved, the count could not be updated, and the user need not
+repeat the choice. This changes only the message; failure keys, pending
+requests and stale-response handling still work the same way.
+
 `fetch` follows redirects, so a request made after the session expired arrives
 as the login page: status 200 and `ok` true, for a save that stored nothing.
 Neither endpoint redirects on success, so a redirect can only mean the write
 did not happen.
 
 A failure can answer with an HTML error page rather than JSON, and parsing that
-throws, hence the inner catch. Only a message the server actually wrote is
-shown; anything else falls back to `GENERIC`, which is why the rejection path
-ignores its own error. A dropped connection rejects with a browser string
+throws, hence the inner catch. Without an override, only a message the server
+actually wrote is shown; anything else falls back to `GENERIC`, which is why
+the rejection path ignores its own error. A dropped connection rejects with a browser string
 ("Failed to fetch"), which is a developer's sentence and not one to show an
 engineer.
 
