@@ -192,6 +192,35 @@ decisions, not defaults that drifted into place:
   a new group adds another. Don't enumerate the groups here — the constants
   live in `ConceptVocabulary` and each group's guidance method in `AiService`,
   and a count kept in this file has already gone stale once.
+- **Provider calls as callables** — a module that orchestrates provider calls
+  takes them as a `Provider` struct of callables, with a `providers:` factory
+  that returns a fresh one for each thread (`JudgedGeneration::Provider`,
+  `ReviewGrading::Provider`, built by `AiService#judged_generation_provider`
+  and `#review_grading_provider`). `AiService` keeps the prompts and the calls;
+  the module keeps the orchestration and the policy, and its specs drive it
+  with lambdas. Threads start through `CallerZoneThread.start`, and
+  `spec/conventions/app_source_spec.rb` fails on any other `Thread.new` and on
+  `send(:...)` anywhere in `app/`.
+- **Outcomes at the HTTP edge** — domain work an action triggers returns a
+  value naming what happened (`ResponseReview::Outcome`, like
+  `ProblemSetIngest::Result`), and the action only maps it to a redirect and a
+  message, raising on a status it doesn't handle. Behavior specs drive the
+  module; the request spec keeps one example per outcome.
+- **Claims and lock order** — a timestamp column held as a lease on a paid
+  call is declared with `Claimable` (`claim :name, column:, stale_after:`),
+  released only with the token `#claim_<name>!` returned, and checked again
+  under the row lock before anything is written, since a claim that went
+  stale may now belong to another caller. Anything that locks an exercise and
+  its response goes through `DailyExercise#with_response_locked`.
+- **Browser copies of server rules** — when a page needs a rule the server
+  owns, the browser's copy lives in one `window.CodeGym*` object from a shared
+  partial, with every constant rendered from Ruby, and a parity spec runs one
+  table of cases through the browser copy and the Ruby path production uses,
+  cleaning included (`window.CodeGymAnswerRules`,
+  `spec/system/answer_rules_parity_spec.rb`).
+- **Domain data stays off provider classes** — lists and tables the domain
+  owns live in a module of their own (`ConceptVocabulary`), and `AiService`
+  reads them; it keeps only what is about talking to a provider.
 
 **Deviating from an established in-repo pattern requires stating why in the PR
 description.** Deviation is allowed — patterns outlive their reasons sometimes
@@ -3238,6 +3267,7 @@ always pull in the full suite — is stated once, in
   against a rendered attribute a request spec never executes, so a mismatch
   between that label and the raw concept key was invisible to request specs
   and only caught here.
+- `spec/conventions/app_source_spec.rb` — parses `app/` with Prism and fails on `Thread.new` outside `CallerZoneThread` (or a named, reasoned exemption) and on `send(:...)`
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway
