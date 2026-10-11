@@ -35,8 +35,27 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
       write_plan(PLAN)
 
       click_button "Check my plan"
-      expect(page).to have_content(/never says what happens when the input list is empty/i, wait: 10)
+      expect(page).to have_selector(".pseudocode-critique li", text: /never says what happens when the input list is empty/i, wait: 10)
       expect(page).to have_button("Check my plan", disabled: true)
+      expect(find(".pseudocode-status").text).to eq("")
+
+      round = user.daily_responses.find_by(date: Date.current).pseudocode_round("pseudocode_to_code")
+      expect(round["initial_pseudocode"]).to eq(PLAN)
+    end
+  end
+
+  it "keeps the critique button disabled after a reload once the plan has been critiqued" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      open_dashboard(user)
+      write_plan(PLAN)
+      click_button "Check my plan"
+      expect(page).to have_selector(".pseudocode-critique li", text: /input list is empty/i, wait: 10)
+
+      visit current_path
+      expect(page).to have_button("Check my plan", disabled: true, wait: 10)
+      expect(page).to have_selector(".pseudocode-critique li", text: /input list is empty/i)
     end
   end
 
