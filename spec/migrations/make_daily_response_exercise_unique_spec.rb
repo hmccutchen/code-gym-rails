@@ -48,13 +48,37 @@ RSpec.describe MakeDailyResponseExerciseUnique do
     expect(DailyResponse.where(daily_exercise_id: exercise.id)).to eq([ newest ])
   end
 
-  it "deletes a submitted extra and its follow-ups too" do
+  # A stored review has already moved ConceptMastery, so it outranks the date match.
+  it "keeps a reviewed response over an unreviewed one dated with the exercise" do
+    reviewed = response(Date.current - 3, submitted_at: 3.days.ago, ai_review: { "code_review" => { "rating" => "solid" } })
+    connection.execute(<<~SQL)
+      INSERT INTO review_follow_ups (daily_response_id, section, role, content, created_at, updated_at)
+      VALUES (#{reviewed.id}, 'code_review', 0, 'q', now(), now())
+    SQL
+    response(Date.current)
+
+    described_class.new.up
+
+    expect(DailyResponse.where(daily_exercise_id: exercise.id)).to eq([ reviewed ])
+    expect(ReviewFollowUp.where(daily_response_id: reviewed.id).count).to eq(1)
+  end
+
+  it "keeps a submitted response over a draft dated with the exercise" do
+    submitted = response(Date.current - 3, submitted_at: 3.days.ago)
+    response(Date.current)
+
+    described_class.new.up
+
+    expect(DailyResponse.where(daily_exercise_id: exercise.id)).to eq([ submitted ])
+  end
+
+  it "deletes an extra response's follow-ups with it" do
     extra = response(Date.current - 3, submitted_at: 3.days.ago)
     connection.execute(<<~SQL)
       INSERT INTO review_follow_ups (daily_response_id, section, role, content, created_at, updated_at)
       VALUES (#{extra.id}, 'code_review', 0, 'q', now(), now())
     SQL
-    current = response(Date.current)
+    current = response(Date.current, submitted_at: Time.current)
 
     described_class.new.up
 

@@ -22,7 +22,9 @@ class MakeDailyResponseExerciseUnique < ActiveRecord::Migration[8.1]
         SELECT responses.id,
                row_number() OVER (
                  PARTITION BY responses.daily_exercise_id
-                 ORDER BY (responses.date = exercises.date) DESC, responses.date DESC, responses.id DESC
+                 ORDER BY (responses.ai_review IS NOT NULL AND responses.ai_review <> '{}'::jsonb) DESC,
+                          (responses.submitted_at IS NOT NULL) DESC,
+                          (responses.date = exercises.date) DESC, responses.date DESC, responses.id DESC
                ) AS position
         FROM daily_responses responses
         JOIN daily_exercises exercises ON exercises.id = responses.daily_exercise_id
