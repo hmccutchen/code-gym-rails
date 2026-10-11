@@ -595,10 +595,11 @@
 
               const { ok, data } = await CodeGymSaveStatus.queue("name", "PATCH", "/profile",
                 () => ({ user: { name: input.value.trim() || name } }), { latest: true, quiet: true });
+              const saved = ok && typeof data?.name === "string";
+              if (saved) lastSaved = data.name;
               if (CodeGymSaveStatus.queued("name")) return;
-              if (ok && typeof data?.name === "string") {
+              if (saved) {
                 input.value = data.name;
-                lastSaved = data.name;
                 flash(savedText);
               } else {
                 input.value = lastSaved;

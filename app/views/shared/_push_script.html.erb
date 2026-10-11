@@ -33,8 +33,8 @@
         endpoint: json.endpoint,
         p256dh: json.keys.p256dh,
         auth: json.keys.auth
-      }).then(function (result) {
-        if (!result.ok) throw failure(<%= t("push.register_failed").to_json.html_safe %>)
+      }, { fallback: <%= t("push.register_failed").to_json.html_safe %> }).then(function (result) {
+        if (!result.ok) throw failure(result.message)
 
         return result
       })

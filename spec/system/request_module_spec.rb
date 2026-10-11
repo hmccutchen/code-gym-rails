@@ -107,4 +107,43 @@ RSpec.describe "The shared request module", type: :system do
 
     expect(hidden).to be(true)
   end
+
+  it "keeps the earlier saved name in the field when a newer name's save fails" do
+    result = run(<<~JS)
+      const original = window.fetch;
+      let calls = 0;
+      let release;
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/profile")) return original(url, options);
+        calls += 1;
+        if (calls === 1) return new Promise((resolve) => { release = () => resolve(original(url, options)); });
+        return Promise.resolve(new Response(JSON.stringify({ status: "error", error: "Refused." }), { status: 422 }));
+      };
+      const input = document.getElementById("nav-name-input");
+      input.value = "Saved First";
+      input.dispatchEvent(new Event("blur"));
+      input.value = "Refused Second";
+      input.dispatchEvent(new Event("blur"));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      release();
+      while (CodeGymSaveStatus.pending()) await new Promise((resolve) => setTimeout(resolve, 20));
+      window.fetch = original;
+      return input.value;
+    JS
+
+    expect(result).to eq("Saved First")
+    expect(user.reload.name).to eq("Saved First")
+  end
+
+  it "drops a save whose body throws and still sends the next one" do
+    result = run(<<~JS)
+      const dropped = await CodeGymSaveStatus.queue("broken", "PATCH", "#{profile_path}", () => { throw new Error("boom"); });
+      const next = await CodeGymSaveStatus.queue("broken", "PATCH", "#{profile_path}", { user: { name: "After Throw" } });
+      while (CodeGymSaveStatus.pending()) await new Promise((resolve) => setTimeout(resolve, 20));
+      return { dropped: dropped.skipped === true, next: next.ok, pending: CodeGymSaveStatus.pending() };
+    JS
+
+    expect(result).to eq("dropped" => true, "next" => true, "pending" => false)
+    expect(user.reload.name).to eq("After Throw")
+  end
 end
