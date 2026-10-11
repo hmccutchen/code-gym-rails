@@ -11,11 +11,12 @@ module is always deferred: it executes after parsing ends and after its own
 fetch. Everything the browser paints before that point is interactive, and a
 page script reaching either global in that window gets a `ReferenceError`.
 
-The dashboard is where that costs the most. Its submit handler calls
-`preventDefault`, sets the form `inert` and disables the button, and only then
-awaits `CodeGymRequest.send`. The throw skips the restore block, so the button
-stays on "Submitting…", the form stays inert and no native submission happens
-either. The day is stranded with nothing saved.
+The dashboard was where that cost the most, before its submit handler moved
+into `answer_form_controller`: the inline handler set the form `inert` before
+awaiting `CodeGymRequest.send`, so the throw stranded the day with nothing
+saved. The inline scripts that remain still reach the globals from handlers
+bound at parse time. The layout's name editor calls `CodeGymSaveStatus.queue`
+on blur, so a blur in that window would throw and lose the save.
 
 This file restores the old guarantee in one place. It is served by Propshaft
 and included with `javascript_include_tag` immediately before the importmap
@@ -154,11 +155,12 @@ deleting it.
 ## What holds it
 
 `spec/system/deferred_module_spec.rb` stalls the module assets, navigates with
-`waitUntil: "commit"`, asserts the document is still `interactive`, clicks
-Submit inside that window and expects the review to arrive. It fails without
-this file.
+`waitUntil: "commit"` and asserts the document is still `interactive`. Inside
+that window it moves a Setup slider, which the early-edit recorder counts as
+pending before the modules arrive, and expects the save to land once
+`exercise_mix_controller` connects and adopts the edit.
 
-The same spec types an answer on the dashboard and moves a Setup slider in that
-window, and expects `pending()` to be true at once and the edit to be saved
-once the modules run. Those two fail if either page registers its probe at
-`DOMContentLoaded` instead of straight away.
+The same spec types an answer on the dashboard in that window and expects it
+counted as pending and then saved, which is the early-edit recorder's job. It
+also clicks Submit in that window and expects nothing to be posted, since the
+button is not a submit button until `answer_form_controller` connects.

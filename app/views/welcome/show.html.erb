@@ -15,12 +15,12 @@
   <p><%= t("learning_track.welcome.question") %></p>
 
   <button type="button" class="btn btn-primary welcome-choice" data-track="junior"
-          data-welcome-target="choice" data-action="welcome#choose">
+          data-welcome-target="choice" data-action="click->welcome#choose">
     <%= t("learning_track.welcome.junior") %>
     <span class="hint"><%= t("learning_track.welcome.junior_hint") %></span>
   </button>
   <button type="button" class="btn btn-ghost welcome-choice" data-track="none"
-          data-welcome-target="choice" data-action="welcome#choose">
+          data-welcome-target="choice" data-action="click->welcome#choose">
     <%= t("learning_track.welcome.experienced") %>
     <span class="hint"><%= t("learning_track.welcome.experienced_hint") %></span>
   </button>
