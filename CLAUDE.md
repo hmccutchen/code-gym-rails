@@ -505,6 +505,17 @@ concept-specific difficulty descriptions for future generation, not a new set.
   kind's difficulty and the user would have nothing to change. The threshold
   is a starting value, not a measured one.
 
+  **The preview migration version is reconciled.** The PR app first added
+  these controls under `20261011040000`, which main then used for
+  `MakeDailyResponseExerciseUnique`. Renaming the controls migration to
+  `20261011050000` lets it run where the columns already exist, but Rails
+  still considers the response-index migration applied. The later
+  `ReconcileDailyResponseExerciseUnique` checks for the unique exercise index
+  and, only when absent, runs the original migration's duplicate cleanup and
+  index change. It keeps the original response-ranking rule in one place.
+  A database with the correct index is untouched; rolling back reconciliation
+  leaves the index in place, since the original migration owns its rollback.
+
   **Suggestions can be turned off and back on.** Every proposal links to the
   "Suggest level changes" switch on Setup, `users.track_suggestions` (default
   true). While it is off the dashboard computes no proposal; turning it back
