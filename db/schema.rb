@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_11_071900) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_11_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -73,6 +73,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_071900) do
     t.text "tagline"
     t.datetime "updated_at", null: false
     t.jsonb "lesson"
+    t.text "ladder_mid_level"
     t.index ["concept", "language"], name: "index_concept_references_on_concept_and_language", unique: true
     t.index ["featured_on"], name: "index_concept_references_on_featured_on", unique: true
   end
@@ -341,7 +342,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_071900) do
     t.jsonb "section_kind_levels", default: {}, null: false
     t.integer "section_kind_preferences_version", default: 0, null: false
     t.jsonb "section_kind_weights", default: {}, null: false
-    t.string "skill_level", default: "developing", null: false
+    t.string "skill_level", default: "junior", null: false
     t.string "time_zone"
     t.datetime "updated_at", null: false
     t.jsonb "display_preferences", default: {}, null: false

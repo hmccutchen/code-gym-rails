@@ -68,6 +68,10 @@ RSpec.describe KindDifficulty do
   end
 
   describe "LEVELS" do
+    it "climbs junior, mid-level, senior, principal engineer" do
+      expect(described_class::LEVELS).to eq(%w[junior mid_level senior principal_engineer])
+    end
+
     # Skill levels are these levels; the rating scales stay apart from both.
     it "shares no value with either rating scale" do
       [ DailyResponse::DIFFICULTY_LEVELS, ConceptMastery::AI_RATING_RANK.keys ].each do |scale|
@@ -81,6 +85,11 @@ RSpec.describe KindDifficulty do
 
     it "has exactly one fallback definition per level" do
       expect(described_class::LEVEL_DEFINITIONS.keys).to eq(described_class::LEVELS)
+    end
+
+    # Every kind reads these, and architecture, pattern and ambiguity hunt show no code.
+    it "words every definition without assuming the section shows code" do
+      described_class::LEVEL_DEFINITIONS.each_value { |definition| expect(definition).not_to match(/\bcode\b/i) }
     end
   end
 

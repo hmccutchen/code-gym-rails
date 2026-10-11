@@ -1,0 +1,16 @@
+{
+  "kind": "design_comparison",
+  "rung": "mid_level",
+  "locked": false,
+  "expected": "keep",
+  "principle": null,
+  "expected_better": "b",
+  "section": {
+    "title": "Posting a book club's next meeting",
+    "scenario": "A neighborhood book club posts its next meeting date in a small app. The organizer set the schedule when the club began: the first Thursday of each month. Members copy the date from the app into their own calendars.",
+    "question": "Members asked the organizer to keep the same day every month so they can plan ahead, and the organizer agreed. Which piece should work out the next meeting, and which stated fact decides it?",
+    "piece_a": "class MeetingSchedule\n  RULES = {\n    weekly: ->(from) { from + 7 },\n    first_thursday: ->(from) { MeetingSchedule.first_thursday(from.next_month) },\n    every_two_weeks: ->(from) { from + 14 }\n  }.freeze\n\n  def self.first_thursday(date)\n    day = date.beginning_of_month\n    day += 1 until day.thursday?\n    day\n  end\n\n  def next_meeting(from: Date.current, rule: :first_thursday)\n    RULES.fetch(rule).call(from)\n  end\nend",
+    "piece_b": "class MeetingSchedule\n  def next_meeting(from: Date.current)\n    day = from.next_month.beginning_of_month\n    day += 1 until day.thursday?\n    day\n  end\nend",
+    "concept": "proportionality"
+  }
+}

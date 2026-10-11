@@ -13,6 +13,7 @@ RSpec.describe GenerateConceptReferenceJob do
       "guide_worked_example" => "A worked example.",
       "guide_pitfalls"       => "What people get wrong.",
       "ladder_junior"             => "j",
+      "ladder_mid_level"          => "m",
       "ladder_senior"             => "s",
       "ladder_principal_engineer" => "p"
     }
@@ -233,7 +234,7 @@ RSpec.describe GenerateConceptReferenceJob do
     it "leaves a fully written row alone even when asked to refresh" do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "kept",
                                guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x",
-                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p",
+                               ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p",
                                lesson: { "definition" => "d" })
       expect(AiService).not_to receive(:for)
 
@@ -246,7 +247,7 @@ RSpec.describe GenerateConceptReferenceJob do
     it "rewrites a row with a guide and ladder but no lesson when asked to refresh, and stores the lesson" do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "old",
                                guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x",
-                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+                               ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
       stub_service(returning: reference_hash.merge("lesson" => { "definition" => "d" }))
 
       described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
@@ -258,7 +259,7 @@ RSpec.describe GenerateConceptReferenceJob do
     it "leaves a row with a guide and ladder but no lesson alone without a refresh" do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "kept",
                                guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x",
-                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+                               ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
       expect(AiService).not_to receive(:for)
 
       described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
@@ -275,7 +276,7 @@ RSpec.describe GenerateConceptReferenceJob do
         record.update!(
           guide_plain_language: "winner plain", guide_worked_example: "winner worked",
           guide_pitfalls: "winner pitfalls",
-          ladder_junior: "winner j", ladder_senior: "winner s", ladder_principal_engineer: "winner p",
+          ladder_junior: "winner j", ladder_mid_level: "winner m", ladder_senior: "winner s", ladder_principal_engineer: "winner p",
           lesson: { "definition" => "winner" }, generation_version: 1
         )
         block.call

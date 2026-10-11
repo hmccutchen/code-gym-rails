@@ -5,7 +5,7 @@ RSpec.describe LadderCoverage do
 
   def laddered(concept, bucket)
     ConceptReference.create!(concept: concept, language: bucket,
-                             ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+                             ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
   end
 
   it "has an entry for every section kind, targeted or not" do

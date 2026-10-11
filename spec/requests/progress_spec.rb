@@ -42,8 +42,8 @@ RSpec.describe "Progress", type: :request do
 
     page = Nokogiri::HTML(response.body)
     n_plus_one = page.at_css('[data-concept="n_plus_one"]')
-    expect(n_plus_one["data-standing"]).to eq("developing_senior")
-    expect(n_plus_one.at_css(".progress-word").text).to eq("developing toward senior")
+    expect(n_plus_one["data-standing"]).to eq("developing_mid_level")
+    expect(n_plus_one.at_css(".progress-word").text).to eq("developing toward mid-level")
     expect(n_plus_one.css(".progress-rung.held").size).to eq(1)
     expect(n_plus_one.css(".progress-rung.toward").size).to eq(1)
     expect(page.at_css('[data-concept="memoization"]')["data-standing"]).to eq("developing_junior")
@@ -54,7 +54,7 @@ RSpec.describe "Progress", type: :request do
     get progress_path
 
     legend = Nokogiri::HTML(response.body).css(".progress-legend dt").map(&:text)
-    expect(legend).to eq([ "principal", "senior", "junior", "developing", "not yet", "not offered" ])
+    expect(legend).to eq([ "principal", "senior", "mid-level", "junior", "developing", "not yet", "not offered" ])
   end
 
   # Developing toward junior means nothing is held, so the legend must cover that case too.

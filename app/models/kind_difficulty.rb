@@ -1,9 +1,10 @@
 # Invalid levels read as unset and orphaned locks as unlocked, so a console write can't suppress easing.
 class KindDifficulty
-  LEVELS = %w[junior senior principal_engineer].freeze
+  LEVELS = %w[junior mid_level senior principal_engineer].freeze
 
   LEVEL_DEFINITIONS = {
     "junior"             => "one clearly visible instance of the concept in a small scenario.",
+    "mid_level"          => "one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.",
     "senior"             => "the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.",
     "principal_engineer" => "the concept framed as a decision with costs on both sides at system scale."
   }.freeze

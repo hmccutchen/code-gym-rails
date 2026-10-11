@@ -28,6 +28,8 @@ class ExerciseSection::DesignComparison < ExerciseSection
 
   RUNG_GUIDANCE = {
     "junior" => "the deciding fact is in the question, in a line or two, and points plainly at one piece.",
+    "mid_level" => "the deciding fact is in the question but names a requirement, not a piece, " \
+                   "so choosing means working out which piece meets it.",
     "senior" => "the deciding fact is in the scenario's description of the system and has to be connected to the code. " \
                 "Both pieces are equally readable; their structures respond differently to the stated maintenance or workload constraint.",
     "principal_engineer" => "both pieces are defensible and each has a real cost. The scenario sets the tradeoff, " \

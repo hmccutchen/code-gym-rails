@@ -43,7 +43,7 @@ RSpec.describe JuniorLadderPreparation do
 
   it "queues each missing or incomplete ladder once, excluding grounded pairs" do
     ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
-      ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+      ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
     ConceptReference.create!(concept: "caching", language: "ruby_rails", ladder_junior: "j")
     gaps = preparation.gaps
 
@@ -63,7 +63,7 @@ RSpec.describe JuniorLadderPreparation do
   it "does not enqueue or alter records when every pair is grounded" do
     preparation.gaps.each do |concept, bucket|
       ConceptReference.create!(concept: concept, language: bucket,
-        ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+        ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
     end
     fresh = described_class.new(operator_id: operator.id, out: out)
 

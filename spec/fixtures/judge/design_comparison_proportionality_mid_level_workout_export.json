@@ -1,0 +1,16 @@
+{
+  "kind": "design_comparison",
+  "rung": "mid_level",
+  "locked": false,
+  "expected": "keep",
+  "principle": null,
+  "expected_better": "a",
+  "section": {
+    "title": "Downloading a member's week of workouts",
+    "scenario": "A gym's member app keeps each member's workout log. Before a session, a coach downloads one member's past week of workouts and opens the file in a spreadsheet. This download is the only export the app offers.",
+    "question": "The coach's request was a file that opens in a spreadsheet, and that is the whole request. Which piece should build the download, and which stated fact decides it?",
+    "piece_a": "require \"csv\"\n\nclass WeeklyWorkoutExport\n  def initialize(member, week_start)\n    @member = member\n    @week_start = week_start\n  end\n\n  def export\n    CSV.generate do |csv|\n      csv << %w[date exercise sets reps]\n      rows.each { |row| csv << row }\n    end\n  end\n\n  private\n\n  def rows\n    @member.workouts.where(performed_on: @week_start...(@week_start + 7)).order(:performed_on)\n      .map { |workout| [ workout.performed_on, workout.exercise, workout.sets, workout.reps ] }\n  end\nend",
+    "piece_b": "require \"csv\"\n\nclass WeeklyWorkoutExport\n  FORMATTERS = {\n    \"csv\" => ->(rows) { CSV.generate { |csv| rows.each { |row| csv << row } } },\n    \"tsv\" => ->(rows) { rows.map { |row| row.join(\"\\t\") }.join(\"\\n\") }\n  }.freeze\n\n  def initialize(member, week_start, format: \"csv\")\n    @member = member\n    @week_start = week_start\n    @formatter = FORMATTERS.fetch(format)\n  end\n\n  def export\n    @formatter.call([ %w[date exercise sets reps] ] + rows)\n  end\n\n  private\n\n  def rows\n    @member.workouts.where(performed_on: @week_start...(@week_start + 7)).order(:performed_on)\n      .map { |workout| [ workout.performed_on, workout.exercise, workout.sets, workout.reps ] }\n  end\nend",
+    "concept": "proportionality"
+  }
+}

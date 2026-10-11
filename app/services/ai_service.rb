@@ -383,7 +383,7 @@ class AiService
 
   MAX_LADDER_RUNG_LENGTH = 300
 
-  MAX_LADDER_GUIDANCE_CHARS = 48_000
+  MAX_LADDER_GUIDANCE_CHARS = 54_000
 
   MAX_CONCEPT_GUIDE_LENGTH = 4_000
 
@@ -1730,7 +1730,8 @@ class AiService
       Then write a difficulty ladder: for each of #{KindDifficulty::LEVELS.join(', ')}, what a
       problem about THIS concept looks like at that level. Name its concrete form, never a
       description of the level in general. For missing_index, for example: junior is an
-      unindexed foreign key, senior is composite index column order, principal_engineer is
+      unindexed foreign key, mid_level is an index the query can't use because it wraps the
+      column in a function, senior is composite index column order, principal_engineer is
       the write-cost tradeoff of adding an index. Each rung is one or two sentences, under
       #{MAX_LADDER_RUNG_LENGTH} characters.
 
@@ -1745,9 +1746,7 @@ class AiService
         "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term",
         "guide_worked_example": "#{worked_example_description(concept, medium)}",
         "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing",
-        "ladder_junior":             "string — a junior-level problem about this concept",
-        "ladder_senior":             "string — a senior-level problem about this concept",
-        "ladder_principal_engineer": "string — a principal_engineer-level problem about this concept",
+      #{LADDER_FIELD_FOR.map { |level, field| %(  "#{field}": "string — a #{level}-level problem about this concept",) }.join("\n")}
         "lesson": #{JSON.generate(ConceptLesson.schema)}
       }
     PROMPT

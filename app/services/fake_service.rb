@@ -231,6 +231,7 @@ class FakeService < AiService
       "The appealing wrong idea is that this only matters at scale, so it can wait. It matters as soon as the code is " \
       "read by someone who did not write it, which is usually sooner.",
     "ladder_junior" => "One obvious instance in a short method, where the fix is a single change.",
+    "ladder_mid_level" => "The instance sits in realistic code nobody has flagged, so the reader has to find it.",
     "ladder_senior" => "The instance hides behind a helper or a callback, so finding it means tracing a call path.",
     "ladder_principal_engineer" => "The fix has a real cost elsewhere, and the answer weighs that cost against leaving it.",
     "lesson" => {

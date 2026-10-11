@@ -311,7 +311,7 @@ RSpec.describe "Profile", type: :request do
       patch_profile(section_kind_levels: { "challenge" => "strong" })
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.parsed_body["errors"].join).to include("junior, senior, principal_engineer")
+      expect(response.parsed_body["errors"].join).to include(KindDifficulty::LEVELS.join(", "))
       expect(user.reload.section_kind_levels).to eq({})
     end
 

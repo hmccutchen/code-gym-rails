@@ -22,19 +22,14 @@ RSpec.describe "Setup skill level control", type: :request do
 
     get setup_path
 
-    expect(page_html.css("select#skill-level option").map(&:text)).to eq([ "Junior", "Senior", "Principal engineer" ])
+    expect(page_html.css("select#skill-level option").map(&:text)).to eq([ "Junior", "Mid-level", "Senior", "Principal engineer" ])
     expect(page_html.css("select#skill-level option").map(&:text))
       .to eq(User::SKILL_LEVELS.map { |level| I18n.t("exercise_mix.levels.#{level}") })
     expect(page_html.text).to include("Junior suits early-career developers and career changers. Your ratings")
   end
 
-  it "selects Junior for an account still storing the old developing default" do
-    user.update_column(:skill_level, "developing")
-    login_as(user)
-
-    get setup_path
-
-    expect(page_html.at_css("select#skill-level option[selected]")["value"]).to eq("junior")
+  it "defaults a new account to Junior" do
+    expect(User.new.skill_level).to eq("junior")
   end
 
   it "says what the setting does and that ratings still adjust each set" do

@@ -147,6 +147,22 @@ migration semantics.
 Many rungs share one generation prompt, so this is tighter than
 `MAX_CONCEPT_GUIDE_LENGTH`.
 
+## `MAX_LADDER_GUIDANCE_CHARS`
+
+Adding mid-level raises the tested ceiling from 48,000 to 54,000 characters.
+The exhaustive day-shape spec measures 53,632 characters with four levels
+against 45,270 with three, using maximum-length rungs: 8,362 more characters
+in the largest possible block. The constant checks the budget; it neither
+pads nor truncates a prompt.
+
+Per-generation spend depends on actual rung text, targets and provider
+tokenization. As an illustrative estimate only, at three characters per token
+the maximum-block increase is about 2,787 input tokens, or $0.011 for one
+uncached Opus 5.5 draft at $4 per million input tokens. That is not a measured
+token count or a dollar ceiling. Shorter rungs and shared levels reduce the
+block; a day without explicit targets sends none. Reference rewrites also
+generate one additional rung, whose actual output-token cost is unmeasured.
+
 ## `MAX_CONCEPT_GUIDE_LENGTH`
 
 Catches a runaway response: several times the two short paragraphs per field
