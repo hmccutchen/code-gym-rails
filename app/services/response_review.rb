@@ -12,7 +12,11 @@ class ResponseReview
     @reviewer = reviewer
   end
 
-  def call
+  def call = Time.use_zone(@user.effective_time_zone) { run }
+
+  private
+
+  def run
     return Outcome.of(:not_submitted) unless @response.submitted?
     return Outcome.of(:already_reviewed) if missing_sections.empty?
 
@@ -31,8 +35,6 @@ class ResponseReview
     @response.release_reviewing!(@claim) if @claim
     raise
   end
-
-  private
 
   def review(missing)
     first_batch = @response.ai_review.blank?

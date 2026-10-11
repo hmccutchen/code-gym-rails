@@ -110,15 +110,17 @@ RSpec.describe ResponseReview do
       .with(response, sections: %w[pattern], apply_session_countdown: false)
   end
 
-  it "clears today's stale generation error once a section is reviewed" do
-    user.update!(last_generation_error: "Couldn't generate", last_generation_error_date: Date.current)
-    allow(reviewer).to receive(:review_sections).and_return("code_review" => review_result("solid"),
-                                                            "pattern" => review_result("solid"))
-    allow(user).to receive(:clear_stale_generation_error!).and_call_original
+  it "reads today in the user's zone, so a caller outside a request clears the right day's error" do
+    travel_to Time.utc(2026, 10, 12, 20, 0) do
+      user.update!(time_zone: "Auckland", last_generation_error: "Couldn't generate",
+                   last_generation_error_date: Date.new(2026, 10, 13))
+      allow(reviewer).to receive(:review_sections).and_return("code_review" => review_result("solid"),
+                                                              "pattern" => review_result("solid"))
 
-    review
+      Time.use_zone("UTC") { review }
 
-    expect(user).to have_received(:clear_stale_generation_error!)
+      expect(user.reload.last_generation_error_date).to be_nil
+    end
   end
 
   it "re-checks after taking the claim and stops when another review finished the day" do

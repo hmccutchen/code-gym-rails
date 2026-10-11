@@ -40,6 +40,7 @@ class ResponsesController < ApplicationController
     when :ready            then redirect_to review_anchor, notice: t("flash.responses.review_ready")
     when :partial          then redirect_to review_anchor, notice: partial_review_notice(outcome)
     when :failed           then redirect_to root_path, alert: review_failure_text(outcome.failures, :review).full
+    else raise ArgumentError, "Unhandled review outcome: #{outcome.status.inspect}"
     end
   end
 

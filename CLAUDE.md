@@ -2598,7 +2598,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   lock. Two first-visits landing together both read nothing and both try to
   stamp; the loser's write violates the index, and `.claim_feature` rescues
   `RecordNotUnique` by re-reading the winner's pick, so both visitors see one
-  concept. Deliberately lighter than the `with_lock` the cost-bearing paths
+  concept. Deliberately lighter than the row locks the cost-bearing paths
   take (`User#resume_generation!`, `ResponseReview`) — this picks a
   row to *read*, so losing costs a re-read rather than a duplicated provider
   call. The stamp sits in a SAVEPOINT (`requires_new: true`) for the same

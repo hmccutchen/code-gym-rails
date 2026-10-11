@@ -14,10 +14,14 @@ can raise for an ended trial, and that has to come back as a
 
 ## `#call`
 
+Runs in the user's zone, so "today" means the user's day whoever calls it.
+
 The claim makes a second click back off instead of making a second provider
 call. It is released with its own token on every exit that still owns it, an
 unexpected error included, so a review that overran its window can't clear
-the claim of the one that took over.
+the claim of the one that took over. Two exits leave it: `:set_cleared`, whose
+row is gone, and `:busy` after a takeover, where the claim belongs to the
+review that took it.
 
 The missing sections are counted again after the row is reloaded under the claim:
 another request may have finished the last section between the first check

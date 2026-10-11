@@ -252,7 +252,7 @@ present the solution as the learner's order.
 ## `#log_pseudocode_critique`
 
 Logs counts and flags only, and pairs with
-`ResponsesController#log_pseudocode_review_diagnostics` by user id and date.
+`ResponseReview#log_pseudocode_diagnostics` by user id and date.
 
 ## `#prior_framings`
 
@@ -290,7 +290,7 @@ Uses the day's language, not `cm.language`: `ConceptVocabulary::LANGUAGES`'
 ## `#log_difficulty_diagnostics`
 
 Difficulty adaptation is advisory. This line pairs what was requested with what
-was delivered to check it, alongside `log_review_diagnostics`.
+was delivered to check it, alongside `ResponseReview#log_diagnostics`.
 
 ## `#annotate_reinforcement`
 
