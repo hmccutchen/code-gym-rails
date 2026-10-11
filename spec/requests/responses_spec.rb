@@ -434,7 +434,7 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.count).to eq(1)
 
       post responses_path,
-        params: { response: { answers: { code_review: "b" * 20 }, submit: "1" } }.to_json,
+        params: { response: { answers: { code_review: "b" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(response).to have_http_status(:ok)
@@ -492,6 +492,42 @@ RSpec.describe "Responses", type: :request do
         expect(draft.reload.section_ratings.keys).to match_array(exercise.active_section_keys)
         expect(draft.answers.keys).to match_array(exercise.active_section_keys)
       end
+    end
+  end
+
+  describe "refusing a submit the button would not allow" do
+    before do
+      create_exercise("code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" })
+    end
+
+    it "refuses a submit that answers nothing, saving nothing and enqueuing nothing" do
+      expect {
+        post responses_path, params: { response: { answers: { code_review: "short" }, submit: "1" } }, as: :json
+      }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to eq("status" => "error", "errors" => [ "Answer at least one section to finish up." ])
+      expect(user.daily_responses).to be_empty
+    end
+
+    it "refuses a submit with an answered section left unrated and keeps the draft as it was" do
+      post responses_path, params: { response: { answers: { code_review: "A substantive answer" } } }, as: :json
+      draft = user.daily_responses.sole.attributes
+
+      post responses_path, params: { response: { answers: { pattern: "Another substantive answer" }, submit: "1" } }, as: :json
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["errors"]).to eq([ "Rate each section you answered to finish up." ])
+      expect(user.daily_responses.sole.attributes).to eq(draft)
+    end
+
+    it "accepts the same submit once every answered section is rated" do
+      post responses_path, params: { response: {
+        answers: { code_review: "A substantive answer" }, section_ratings: { code_review: "right_level" }, submit: "1"
+      } }, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(user.daily_responses.sole).to be_submitted
     end
   end
 
@@ -1116,7 +1152,7 @@ RSpec.describe "Responses", type: :request do
         "challenge" => { "title" => "t", "question" => "q", "concept" => "n_plus_one" }
       )
       post responses_path,
-        params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }.to_json,
+        params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
     end
 
@@ -1140,7 +1176,7 @@ RSpec.describe "Responses", type: :request do
 
       expect {
         post responses_path,
-          params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }.to_json,
+          params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
           headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "service_objects", language: "ruby_rails", user_id: user.id)
@@ -1174,7 +1210,7 @@ RSpec.describe "Responses", type: :request do
       )
       expect {
         post responses_path,
-          params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }.to_json,
+          params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
           headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "other", language: "ruby_rails", user_id: user.id)
@@ -1189,7 +1225,7 @@ RSpec.describe "Responses", type: :request do
 
       expect {
         post responses_path,
-          params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }.to_json,
+          params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
           headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
       }.to have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "service_boundaries", language: "architecture", user_id: user.id)
@@ -1208,7 +1244,7 @@ RSpec.describe "Responses", type: :request do
 
       expect {
         post responses_path,
-          params: { response: { answers: { security_review: "a" * 20 }, submit: "1" } }.to_json,
+          params: { response: { answers: { security_review: "a" * 20 }, section_ratings: { security_review: "right_level" }, submit: "1" } }.to_json,
           headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
       }.to have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "sql_injection_prevention", language: "ruby_rails", user_id: user.id)
@@ -1227,7 +1263,7 @@ RSpec.describe "Responses", type: :request do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" })
 
       post responses_path,
-        params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }.to_json,
+        params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(JSON.parse(response.body)["review_url"]).to eq(review_response_path(DailyResponse.last))
@@ -1246,7 +1282,7 @@ RSpec.describe "Responses", type: :request do
     it "redirects a native (no-JS) final submit back to the dashboard" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
 
-      post responses_path, params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }
+      post responses_path, params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }
 
       expect(response).to redirect_to(root_path)
     end

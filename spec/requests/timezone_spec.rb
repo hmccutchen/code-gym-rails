@@ -42,7 +42,7 @@ RSpec.describe "Per-user timezone", type: :request do
       login_as(pacific)
 
       post responses_path,
-           params: { response: { answers: { code_review: "x" * 20 }, submit: "1" } }.to_json,
+           params: { response: { answers: { code_review: "x" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(response).to have_http_status(:ok)
