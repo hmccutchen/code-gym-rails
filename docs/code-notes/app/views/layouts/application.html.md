@@ -410,15 +410,20 @@ global before its own first user event therefore has to wait for
 `DOMContentLoaded`.
 
 Four shapes reach a global before the modules run. A top-level call does (the
-one-shot time-zone detection higher up this file, and the two
-`CodeGymSaveStatus.watch` registrations in `dashboard/_exercise` and
-`api_keys/edit`). So does a timer started at parse time
+one-shot time-zone detection higher up this file). So does a timer started at parse time
 (`dashboard/_generating`'s first poll). So does an async chain started at
 parse time, even though no global is read on the first line:
 `shared/_push_script`'s re-subscribe reaches `window.CodeGymRequest` only
 after the service worker is ready, which is usually but not always slower than
 a module fetch, and its failure is swallowed on purpose. Those three wait for
 `DOMContentLoaded` at the call site.
+
+The two `CodeGymSaveStatus.watch` registrations in `dashboard/_exercise` and
+`api_keys/edit` are also top-level calls, but they must not wait. Each probe
+reports a delayed save the page is holding, and pull-to-refresh reloads once
+`pending()` is false, so a probe registered at `DOMContentLoaded` would leave an
+edit made while the modules load uncounted and let a pull reload over it. The
+bootstrap below records a probe synchronously, so both register at parse time.
 
 The fourth is a handler bound at parse time and fired by a user, and an
 earlier version of this note had it wrong: it said a click cannot land before

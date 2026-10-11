@@ -42,7 +42,6 @@ RSpec.describe "Page scripts", type: :request do
     expect(importmap["imports"].keys.grep(/turbo/)).to be_empty
   end
 
-
   it "defines no page script inline in the head" do
     expect(doc.css("head script").map { |tag| tag["src"] || tag["type"] }).to all(be_present)
   end

@@ -87,3 +87,8 @@ aliases in `application.js` go at the same time, and this file goes with them.
 `waitUntil: "commit"`, asserts the document is still `interactive`, clicks
 Submit inside that window and expects the review to arrive. It fails without
 this file.
+
+The same spec types an answer on the dashboard and moves a Setup slider in that
+window, and expects `pending()` to be true at once and the edit to be saved
+once the modules run. Those two fail if either page registers its probe at
+`DOMContentLoaded` instead of straight away.

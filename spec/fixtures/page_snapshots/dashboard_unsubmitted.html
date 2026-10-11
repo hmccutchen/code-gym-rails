@@ -810,7 +810,7 @@ What would be easy to get wrong or worth testing:
     }
 
     let saveTimer = null;
-    document.addEventListener("DOMContentLoaded", () => CodeGymSaveStatus.watch(() => saveTimer !== null));
+    CodeGymSaveStatus.watch(() => saveTimer !== null);
 
     function sendSave() {
       clearTimeout(saveTimer);
