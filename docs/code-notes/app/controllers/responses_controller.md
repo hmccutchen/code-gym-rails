@@ -62,6 +62,12 @@ refused with a 409 rather than saved in part.
 Locks the exercise, then the response: the order `RegenerateExerciseJob`
 takes, so the two serialize instead of deadlocking.
 
+A refused submit raises `ActiveRecord::Rollback` instead of returning
+`:failed` early. `#persisted_response_for` has already created the row by
+then, and returning early would commit it. The rollback makes the transaction
+return `nil`, which the trailing `|| :failed` turns into the failure outcome
+`#create` renders as a 422.
+
 ## `#duck_thread_param`
 
 Roles are normalized and limited to `user` and `assistant`; the turn cap

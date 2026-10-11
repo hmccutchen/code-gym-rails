@@ -254,10 +254,17 @@ class ResponsesController < ApplicationController
         assign_draft_response(exercise)
         newly_submitted = @response.submitted?
       end
+      raise ActiveRecord::Rollback if newly_submitted && refuse_unsubmittable
       next :failed unless @response.save
 
       newly_submitted ? :newly_submitted : :saved
-    end
+    end || :failed
+  end
+
+  def refuse_unsubmittable
+    blocker = @response.submit_blocker
+    @response.errors.add(:base, t("dashboard.exercise.submit_nudges.#{blocker}")) if blocker
+    blocker
   end
 
   def render_stale_answers
