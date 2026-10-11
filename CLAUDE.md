@@ -292,7 +292,7 @@ User logs in (emailed 6-digit code)
          saves: DailyExercise { problem_set: jsonb, language } on success, or
          persists last_generation_error(_date) on the user on failure — the
          dashboard learns the outcome by polling GET /dashboard/status and
-         reloading (this app loads no Turbo/Stimulus JS, so a live push has
+         reloading (this app loads no Turbo JS, so a live push has
          no subscriber)
 
 User opens dashboard:
@@ -1691,7 +1691,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `JsonErrors#render_json_error`, as `{status: "error", error: "…"}` plus any
   keys the caller needs (a stale save says `"stale"`), so the string status
   is what marks a reply as the app's own. Every page script sends through
-  `window.CodeGymRequest.send` (`shared/_request`), which reads the CSRF
+  `CodeGymRequest.send` (`app/javascript/code_gym/request.js`), which reads the CSRF
   token safely, never throws, and returns `{ok, status, data, message,
   signedOut}`. Its `message` is the reply's `error` when `status` is a
   string, "your session expired" when fetch followed a redirect, and the
@@ -3261,8 +3261,8 @@ always pull in the full suite — is stated once, in
 - `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
 - `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
-- `app/views/shared/_request.html.erb` — defines `window.CodeGymRequest`, rendered in `<head>`: the one way a page script sends a request, and what it may show when one fails
-- `app/views/shared/_save_status.html.erb` / `_save_status_banner.html.erb` — `window.CodeGymSaveStatus`, rendered in `<head>`: the save banner's failures by control, the per-control save queue (in order, or collapsing to the latest), and `pending()`; the banner markup sits in `<body>`
+- `app/javascript/code_gym/request.js` — the one way a page script sends a request, and what it may show when one fails; loaded through importmap from the layout's `javascript_importmap_tags`
+- `app/javascript/code_gym/save_status.js` / `app/views/shared/_save_status_banner.html.erb` — the save banner's failures by control, the per-control save queue (in order, or collapsing to the latest), and `pending()`; the banner markup sits in `<body>`
 - `app/controllers/concerns/json_errors.rb` — `render_json_error`: the one shape of a JSON error reply
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives

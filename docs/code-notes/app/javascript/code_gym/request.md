@@ -1,8 +1,8 @@
-# app/views/shared/_request.html.erb
+# app/javascript/code_gym/request.js
 
 ## Purpose
 
-Every page script sends its requests through `window.CodeGymRequest.send`, so
+Every page script sends its requests through `CodeGymRequest.send`, so
 three things are decided once: how the CSRF token is read, how an expired
 session is recognised, and what a failed request may show a person. Before this
 module, twelve scripts built their own requests, and two helpers showed
@@ -37,5 +37,16 @@ request silently.
 
 ## Load order
 
-The layout renders this in `<head>`, ahead of `shared/_save_status`, so every
-page script and every other shared script can call it as it runs.
+The layout loads this through `javascript_importmap_tags`, so it is a deferred
+module: it evaluates after the document is parsed and before
+`DOMContentLoaded`. `app/javascript/application.js` puts it on
+`window.CodeGymRequest` for the inline page scripts still to be converted, and
+an inline script that needs it before its own first event waits for
+`DOMContentLoaded`.
+
+## Where the text comes from
+
+A module cannot read a translation, so the layout renders the signed-out
+sentence onto `<body>` as a data attribute and `text()` reads it when a request
+actually fails. `<body>` because it is there whenever a deferred module runs,
+and the sentence is the page's, not one control's.

@@ -1,8 +1,8 @@
-# app/views/shared/_save_status.html.erb
+# app/javascript/code_gym/save_status.js
 
 ## Purpose
 
-The autosaves on the dashboard and /setup report through this partial, so a
+The autosaves on the dashboard and /setup report through this module, so a
 rejected write tells the engineer instead of vanishing. The page's control
 keeps whatever the user set, because snapping a slider back under their hand is
 worse than the problem this solves. By default, the banner says the change did
@@ -19,10 +19,14 @@ The layout's one-shot time-zone detection deliberately does not report here.
 Nothing the user did triggers it, so a banner would name a failure they took no
 action to cause, and it runs again on the next page load anyway.
 
-The layout renders this script in `<head>`, after `shared/_request`, so every
-page script can call it as it runs; nothing registers on `DOMContentLoaded` to
-reach it. The banner markup is `shared/_save_status_banner`, rendered in
-`<body>`, so `render()` looks the elements up when it runs and waits for
+The layout loads this through `javascript_importmap_tags`, so it is a deferred
+module that imports `code_gym/request` rather than reaching for a global.
+`app/javascript/application.js` puts it on `window.CodeGymSaveStatus` for the
+inline page scripts still to be converted, and an inline script that needs it
+before its own first event waits for `DOMContentLoaded`. Its generic failure
+wording is rendered onto `<body>` as a data attribute, since a module cannot
+read a translation. The banner markup is `shared/_save_status_banner`, rendered
+in `<body>`, so `render()` looks the elements up when it runs and waits for
 `DOMContentLoaded` if a carried message arrives before they exist.
 
 ## `#save-status-announcer`

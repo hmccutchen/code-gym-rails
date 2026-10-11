@@ -229,14 +229,14 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(response.body).to include("if (!result.ok) throw failure(result.message)")
     end
 
-    it "re-subscribes on launch for a user who has reminders on" do
+    it "waits for DOMContentLoaded before re-subscribing on launch, since the chain reaches a deferred module" do
       configure_vapid
       user.update!(reminder_level: :ready)
       login_as(user)
 
       get account_path
 
-      expect(response.body).to include("CodeGymPush.subscribeAndRegister()")
+      expect(response.body).to match(/DOMContentLoaded.{0,120}CodeGymPush\.subscribeAndRegister\(\)/m)
     end
 
     it "emits no push script for a logged-out visitor" do

@@ -341,10 +341,6 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     expect(page).to have_selector("#rating-nudge", text: nudge)
   end
 
-  def expect_ready_to_submit
-    expect(page).to have_selector("#rating-nudge", visible: :hidden)
-  end
-
   def hold_response_requests
     page.execute_script(<<~JS)
       const originalFetch = window.fetch;
@@ -367,15 +363,6 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
         });
       };
     JS
-  end
-
-  # A design comparison's answer is written by its pick and reason controls, so answer through them.
-  def fill_in_answer(field, text)
-    comparison = first(%([data-comparison-answer="#{field}"]), minimum: 0)
-    return find(%(textarea[data-field="#{field}"])).fill_in(with: text) unless comparison
-
-    comparison.choose("Piece A")
-    comparison.find("textarea[data-comparison-reason]").fill_in(with: text)
   end
 
   def wait_for_saved_answer(user, field, text)
