@@ -90,7 +90,7 @@ RSpec.describe FakeService do
       end
     end
 
-    # AiService#safe_difficulty_assessment swallows every error, so only this spec makes a broken scan loud.
+    # ReviewGrading swallows every difficulty-assessment error, so only this spec makes a broken scan loud.
     it "returns a difficulty for every section it was asked about" do
       user_exercise = DailyExercise.create!(
         user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,

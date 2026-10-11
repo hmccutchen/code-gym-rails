@@ -21,3 +21,9 @@ it runs (`app/models/concerns/claimable.rb`). Its reasoning is in
 Applying a review to a submitted response, from taking the claim to recording
 mastery (`app/services/response_review.rb`). Its reasoning is in
 `docs/code-notes/app/services/response_review.md`.
+
+## ReviewGrading
+
+The review fan-out and the rules applied to each graded section
+(`app/services/review_grading.rb`). Its reasoning is in
+`docs/code-notes/app/services/review_grading.md`.

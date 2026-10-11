@@ -65,7 +65,7 @@ class JudgedGeneration
   def judge_all(set)
     threads = @draft.kinds.filter_map do |kind|
       section = set[kind.key]
-      thread_in_caller_zone { judge_outcome(kind, section) } if section
+      CallerZoneThread.start { judge_outcome(kind, section) } if section
     end
 
     threads.map(&:value).each_with_object({}) do |(key, outcome, section), outcomes|
@@ -77,7 +77,7 @@ class JudgedGeneration
   def resolve_rejections(set, outcomes)
     rejected_keys(outcomes).map { |key|
       kind = ExerciseSection.find(key)
-      thread_in_caller_zone { [ key, *resolve_rejection(kind, drafted_concept(key), outcomes[key]) ] }
+      CallerZoneThread.start { [ key, *resolve_rejection(kind, drafted_concept(key), outcomes[key]) ] }
     }.map(&:value)
   end
 
@@ -213,11 +213,5 @@ class JudgedGeneration
 
   def elapsed_ms(started)
     ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1_000).round
-  end
-
-  # Time.zone is per thread; carry the caller's zone so every ApiUsage row of one fan-out lands on the same date.
-  def thread_in_caller_zone(&work)
-    zone = Time.zone
-    Thread.new { Time.use_zone(zone, &work) }
   end
 end
