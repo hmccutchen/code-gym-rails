@@ -6,7 +6,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     visit_with_todays_set(user)
     expect(page).to have_content(/Code Review/i, wait: 10)
 
-    duck = first("[data-duck-thread][data-section='code_review']")
+    duck = first(".duck-thread[data-duck-thread-section-value='code_review']")
     duck.find(".duck-toggle").click
     duck
   end
@@ -175,7 +175,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       expect(page).to have_content("Review ready!", wait: 10)
 
       expect(page).to have_content("✓ Submitted")
-      expect(page).to have_no_css("[data-duck-thread]")
+      expect(page).to have_no_css(".duck-thread")
     end
   end
 end

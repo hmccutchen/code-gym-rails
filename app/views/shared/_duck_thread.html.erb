@@ -1,128 +1,25 @@
 <%# Local: field (section key, e.g. "code_review"). Design notes: docs/code-notes/app/views/shared/_duck_thread.html.md %>
-<div class="duck-thread" data-duck-thread data-section="<%= field %>">
-  <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-<%= field %>"><%= t("duck.toggle") %></button>
-  <div class="duck-body" id="duck-body-<%= field %>" hidden>
-    <div class="duck-turns" aria-live="polite"></div>
+<div class="duck-thread"
+     data-controller="duck-thread"
+     data-duck-thread-section-value="<%= field %>"
+     data-duck-thread-url-value="<%= duck_thread_responses_path %>"
+     data-duck-thread-max-turns-value="<%= ResponsesController::MAX_DUCK_TURNS_PER_SECTION %>"
+     data-duck-thread-explain-message-value="<%= AiService::DUCK_EXPLAIN_REQUEST %>"
+     data-duck-thread-send-failed-text-value="<%= t("duck.send_failed") %>"
+     data-duck-thread-thinking-text-value="<%= t("duck.thinking") %>"
+     data-duck-thread-capped-text-value="<%= t("duck.turns_used", count: ResponsesController::MAX_DUCK_TURNS_PER_SECTION) %>"
+     data-duck-thread-user-speaker-value="<%= t("duck.speakers.user") %>"
+     data-duck-thread-assistant-speaker-value="<%= t("duck.speakers.assistant") %>">
+  <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-<%= field %>" data-duck-thread-target="toggle" data-action="duck-thread#toggle"><%= t("duck.toggle") %></button>
+  <div class="duck-body" id="duck-body-<%= field %>" hidden data-duck-thread-target="body">
+    <div class="duck-turns" aria-live="polite" data-duck-thread-target="turns"></div>
     <div class="duck-form">
       <label class="visually-hidden" for="duck-input-<%= field %>"><%= t("duck.prompt") %></label>
-      <input type="text" class="duck-input" id="duck-input-<%= field %>" placeholder="<%= t("duck.prompt") %>">
-      <button type="button" class="btn btn-ghost btn-sm duck-send"><%= t("duck.send") %></button>
-      <button type="button" class="btn btn-ghost btn-sm duck-explain" data-message="<%= AiService::DUCK_EXPLAIN_REQUEST %>"><%= t("duck.explain") %></button>
-      <button type="button" class="btn btn-ghost btn-sm duck-clear"><%= t("duck.clear") %></button>
+      <input type="text" class="duck-input" id="duck-input-<%= field %>" placeholder="<%= t("duck.prompt") %>" data-duck-thread-target="input" data-action="keydown.enter->duck-thread#send:prevent">
+      <button type="button" class="btn btn-ghost btn-sm duck-send" data-duck-thread-target="send" data-action="duck-thread#send"><%= t("duck.send") %></button>
+      <button type="button" class="btn btn-ghost btn-sm duck-explain" data-duck-thread-target="explain" data-action="duck-thread#explain"><%= t("duck.explain") %></button>
+      <button type="button" class="btn btn-ghost btn-sm duck-clear" data-action="duck-thread#clear"><%= t("duck.clear") %></button>
     </div>
-    <span class="duck-status" aria-live="polite"></span>
+    <span class="duck-status" aria-live="polite" data-duck-thread-target="status"></span>
   </div>
 </div>
-
-<% unless @duck_thread_script_emitted %>
-  <% @duck_thread_script_emitted = true %>
-  <% content_for :page_scripts do %>
-    <script>
-(() => {
-  const MAX_TURNS = <%= ResponsesController::MAX_DUCK_TURNS_PER_SECTION %>;
-  const DUCK_URL = "<%= duck_thread_responses_path %>";
-  const SEND_FAILED = <%= t("duck.send_failed").to_json.html_safe %>;
-
-  const SPEAKER = { user: <%= t("duck.speakers.user").to_json.html_safe %>, assistant: <%= t("duck.speakers.assistant").to_json.html_safe %> };
-
-  const renderTurns = (box) => {
-    const list = box.querySelector(".duck-turns");
-    list.replaceChildren();
-    box.duckThread.forEach((turn) => {
-      const p = document.createElement("p");
-      p.className = "duck-turn duck-" + turn.role;
-
-      // Without this the speaker shows only as CSS colour, which assistive tech never receives.
-      const who = document.createElement("span");
-      who.className = "visually-hidden";
-      who.textContent = (SPEAKER[turn.role] || turn.role) + ": ";
-      p.appendChild(who);
-      p.appendChild(document.createTextNode(turn.content));
-
-      list.appendChild(p);
-    });
-  };
-
-  const userTurnCount = (box) => box.duckThread.filter((t) => t.role === "user").length;
-
-  // Writes the status only when capped: clearing it here, in sendMessage's finally, would wipe every error message.
-  const refreshCap = (box) => {
-    const input = box.querySelector(".duck-input");
-    const send = box.querySelector(".duck-send");
-    const explain = box.querySelector(".duck-explain");
-    const status = box.querySelector(".duck-status");
-    const capped = userTurnCount(box) >= MAX_TURNS;
-    input.disabled = capped;
-    send.disabled = capped;
-    explain.disabled = capped;
-    if (capped) {
-      status.textContent =
-        <%= t("duck.turns_used", count: ResponsesController::MAX_DUCK_TURNS_PER_SECTION).to_json.html_safe %>;
-    }
-  };
-
-  document.querySelectorAll("[data-duck-thread]:not([data-duck-wired])").forEach((box) => {
-    box.dataset.duckWired = "1";
-    box.duckThread = [];
-
-    const toggle = box.querySelector(".duck-toggle");
-    const body   = box.querySelector(".duck-body");
-    const input  = box.querySelector(".duck-input");
-    const send    = box.querySelector(".duck-send");
-    const explain = box.querySelector(".duck-explain");
-    const clear  = box.querySelector(".duck-clear");
-    const status = box.querySelector(".duck-status");
-
-    toggle.addEventListener("click", () => {
-      body.hidden = !body.hidden;
-      toggle.setAttribute("aria-expanded", String(!body.hidden));
-    });
-
-    box.duckGeneration = 0;
-
-    const sendMessage = async (explicitMessage) => {
-      const message = explicitMessage || input.value.trim();
-      if (!message || send.disabled) return;
-
-      const priorThread = box.duckThread.slice();
-      const generation = box.duckGeneration;
-      input.disabled = true;
-      send.disabled = true;
-      explain.disabled = true;
-      status.textContent = <%= t("duck.thinking").to_json.html_safe %>;
-
-      const result = await CodeGymRequest.send("POST", DUCK_URL,
-        { section: box.dataset.section, message: message, thread: priorThread }, { fallback: SEND_FAILED });
-      // Clear ran while this was in flight; dropping the reply keeps a cleared thread cleared.
-      if (generation !== box.duckGeneration) return;
-
-      if (result.ok && result.data) {
-        box.duckThread.push({ role: "user", content: message }, { role: "assistant", content: result.data.answer });
-        renderTurns(box);
-        if (!explicitMessage) input.value = "";
-        status.textContent = "";
-      } else {
-        status.textContent = result.message || SEND_FAILED;
-      }
-      refreshCap(box);
-    };
-
-    send.addEventListener("click", () => sendMessage());
-    explain.addEventListener("click", () => sendMessage(explain.dataset.message));
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") { event.preventDefault(); sendMessage(); }
-    });
-
-    clear.addEventListener("click", () => {
-      box.duckGeneration += 1;
-      box.duckThread = [];
-      // input.value is left alone: after a failed send it holds text to retry, and Clear names the conversation.
-      status.textContent = "";
-      renderTurns(box);
-      refreshCap(box);
-    });
-  });
-})();
-    </script>
-  <% end %>
-<% end %>
