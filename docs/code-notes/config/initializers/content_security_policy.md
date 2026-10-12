@@ -9,10 +9,11 @@ refuses every inline handler whatever its event, and it skips the few Ruby
 option words that start the same way (`only:`, `once:`, `one:`, `online`,
 `onboarding`) so a helper option is not mistaken for one. It matches at the
 assignment, whatever the value looks like, so `onclick: handler` and an
-unquoted `onclick=go()` fail as surely as a quoted one, and a `javascript:`
-URL fails quoted or not. The script check covers the helpers that write a
-`<script>` tag (`javascript_tag`, `tag.script`, `content_tag :script`) as well
-as a literal one.
+unquoted `onclick=go()` or a string key like `"onclick" =>` fail as surely as
+a quoted one, and a `javascript:` URL fails quoted or not. The script check
+covers the helpers that write a `<script>` tag (`javascript_tag`,
+`tag.script`, and `content_tag` or `tag` given `:script` or `"script"`) as
+well as a literal one.
 
 ## `script-src`
 

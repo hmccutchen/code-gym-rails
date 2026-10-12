@@ -7,7 +7,7 @@ RSpec.describe "Conventions held over app/views" do
 
   def inline_handler
     event = "on(?!(?:ly|ce|e|line|boarding)\\b)[a-z]+"
-    /(?<![\w-])#{event}(?:\s*=|"?:(?!:))|["'=]\s*javascript:/i
+    /(?<![\w-])#{event}["']?\s*(?:=|:(?!:))|["'=]\s*javascript:/i
   end
 
   def offending_lines(pattern)
@@ -18,7 +18,7 @@ RSpec.describe "Conventions held over app/views" do
     end
   end
 
-  def inline_script = /<script\b|\bjavascript_tag\b|\btag\.script\b|\b(?:content_)?tag[ (]:script\b/i
+  def inline_script = /<script\b|\bjavascript_tag\b|\btag\.script\b|\b(?:content_)?tag[ (]\s*[:"']script\b/i
 
   it "keeps every page script in a Stimulus controller rather than an inline tag" do
     offenders = offending_lines(inline_script)
@@ -52,6 +52,8 @@ RSpec.describe "Conventions held over app/views" do
     expect(%(button_tag "Go", onclick: handler)).to match(inline_handler)
     expect(%(<button onclick=go()>)).to match(inline_handler)
     expect(%(<a href=javascript:void(0)>)).to match(inline_handler)
+    expect(%(button_tag "Go", "onclick" => "go()")).to match(inline_handler)
+    expect(%(tag.div "onwheel" => handler)).to match(inline_handler)
     expect(%(render "x", only: "y")).not_to match(inline_handler)
     expect(%(link_to "x", path, once: "y")).not_to match(inline_handler)
     expect(%(<div data-action="click->x#go">)).not_to match(inline_handler)
@@ -63,6 +65,8 @@ RSpec.describe "Conventions held over app/views" do
     expect(%(<%= javascript_tag "go()" %>)).to match(inline_script)
     expect(%(<%= tag.script "go()" %>)).to match(inline_script)
     expect(%(<%= content_tag :script, "go()" %>)).to match(inline_script)
+    expect(%(<%= content_tag "script", "go()" %>)).to match(inline_script)
+    expect(%(<%= tag("script", nil, true) %>)).to match(inline_script)
     expect(%(<%= javascript_include_tag "app" %>)).not_to match(inline_script)
     expect(%(<%= javascript_importmap_tags %>)).not_to match(inline_script)
   end
