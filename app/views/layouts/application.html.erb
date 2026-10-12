@@ -161,6 +161,7 @@
     }
     .pull-refresh.is-ready .spinner, .pull-refresh.is-refreshing .spinner { opacity: 1; }
     .pull-refresh.is-refreshing .spinner { animation: spin .7s linear infinite; }
+    html.pull-resuming [data-pull-content] { transform: translateY(64px); }
     .pull-refresh.is-settling, .pull-settling { transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .3s ease; }
 
     code, kbd, samp, pre { font-family: monospace, monospace; }

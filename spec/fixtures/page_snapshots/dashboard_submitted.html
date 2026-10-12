@@ -14,7 +14,7 @@
   <meta name="theme-color" content="#1a1a2e">
   
   <meta name="csp-nonce" content="NONCE" />
-  <script src="/assets/code_gym_bootstrap-16527746.js"></script>
+  <script src="/assets/code_gym_bootstrap-80e8843f.js"></script>
   <script type="importmap" data-turbo-track="reload" nonce="NONCE">{
   "imports": {
     "application": "/assets/application-200f7401.js",
@@ -41,7 +41,7 @@
     "controllers/parsons_controller": "/assets/controllers/parsons_controller-f27d83fa.js",
     "controllers/profile_preferences_controller": "/assets/controllers/profile_preferences_controller-ae1eecf6.js",
     "controllers/pseudocode_round_controller": "/assets/controllers/pseudocode_round_controller-2525e08e.js",
-    "controllers/pull_to_refresh_controller": "/assets/controllers/pull_to_refresh_controller-ac11018b.js",
+    "controllers/pull_to_refresh_controller": "/assets/controllers/pull_to_refresh_controller-635a0330.js",
     "controllers/push_enable_controller": "/assets/controllers/push_enable_controller-98519283.js",
     "controllers/push_launch_controller": "/assets/controllers/push_launch_controller-a856cbb4.js",
     "controllers/review_alternates_controller": "/assets/controllers/review_alternates_controller-4e899575.js",
@@ -79,7 +79,7 @@
 <link rel="modulepreload" href="/assets/controllers/parsons_controller-f27d83fa.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/profile_preferences_controller-ae1eecf6.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/pseudocode_round_controller-2525e08e.js" nonce="NONCE">
-<link rel="modulepreload" href="/assets/controllers/pull_to_refresh_controller-ac11018b.js" nonce="NONCE">
+<link rel="modulepreload" href="/assets/controllers/pull_to_refresh_controller-635a0330.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/push_enable_controller-98519283.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/push_launch_controller-a856cbb4.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/review_alternates_controller-4e899575.js" nonce="NONCE">
@@ -232,6 +232,7 @@
     }
     .pull-refresh.is-ready .spinner, .pull-refresh.is-refreshing .spinner { opacity: 1; }
     .pull-refresh.is-refreshing .spinner { animation: spin .7s linear infinite; }
+    html.pull-resuming [data-pull-content] { transform: translateY(64px); }
     .pull-refresh.is-settling, .pull-settling { transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .3s ease; }
 
     code, kbd, samp, pre { font-family: monospace, monospace; }

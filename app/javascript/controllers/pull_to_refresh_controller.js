@@ -10,6 +10,7 @@ const MIN_SPIN_MS = 500
 const SAVE_POLL_MS = 100
 const SAVE_WAIT_LIMIT_MS = 10000
 const RELOADED_KEY = "codegym:pull-refreshed"
+const HOLDING_CLASS = "pull-resuming"
 
 function isEditable(element) {
   return element instanceof Element && element.matches("input, textarea, select, [contenteditable]")
@@ -24,11 +25,7 @@ function insideScrolledArea(element) {
 
 // sessionStorage throws in some private modes; the spinner is only polish.
 function remember(key, value) {
-  try { value === null ? sessionStorage.removeItem(key) : sessionStorage.setItem(key, value) } catch {}
-}
-
-function recall(key) {
-  try { return sessionStorage.getItem(key) } catch { return null }
+  try { sessionStorage.setItem(key, value) } catch {}
 }
 
 export default class extends Controller {
@@ -36,6 +33,8 @@ export default class extends Controller {
 
   connect() {
     this.content = document.querySelector("[data-pull-content]")
+    const resuming = document.documentElement.classList.contains(HOLDING_CLASS)
+    document.documentElement.classList.remove(HOLDING_CLASS)
     if (!this.content || getComputedStyle(this.element).display === "none") return
 
     this.nav = document.querySelector("body > nav")
@@ -56,7 +55,7 @@ export default class extends Controller {
     document.addEventListener("touchend", this.onTouchEnd)
     document.addEventListener("touchcancel", this.onTouchCancel)
 
-    this.resumeAfterReload()
+    if (resuming) this.resumeAfterReload()
   }
 
   disconnect() {
@@ -164,9 +163,10 @@ export default class extends Controller {
   }
 
   resumeAfterReload() {
-    if (!recall(RELOADED_KEY)) return
-    remember(RELOADED_KEY, null)
     this.measureGap()
+    this.moveTo(HOLD)
+    this.element.getBoundingClientRect()
+    this.setSettling(true)
     this.spin()
     const settle = () => { this.settleTimer = setTimeout(() => this.reset(), this.settleDelayValue) }
     if (document.readyState === "complete") settle()

@@ -61,6 +61,13 @@
     clear: forward("CodeGymSaveStatus", "clear")
   }
 
+  try {
+    if (sessionStorage.getItem("codegym:pull-refreshed")) {
+      sessionStorage.removeItem("codegym:pull-refreshed")
+      document.documentElement.classList.add("pull-resuming")
+    }
+  } catch (error) {} // pull_to_refresh_controller.js writes this note and releases the hold.
+
   window.CodeGymEarlyEdit = early
   window.CodeGymSaveStatus.watch(function () { return early.dirty })
 
