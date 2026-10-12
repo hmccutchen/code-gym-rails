@@ -260,7 +260,7 @@
     code.highlight :is(.ss, .na, .vi, .vc, .vg) { color: var(--code-symbol); }
     code.highlight :is(.nb, .bp, .no, .nt) { color: var(--code-builtin); }
     .review-block { background: rgba(124,106,247,.06); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem; margin-top: .75rem; }
-    .review-block h3 { color: var(--accent-text); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
+    .review-block h3 { color: var(--slot-accent, var(--accent-text)); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
     .review-rating { display: inline-block; background: rgba(124,106,247,.15); border-radius: 4px; padding: .1rem .5rem; font-size: .75rem; margin-left: .5rem; text-transform: none; letter-spacing: 0; }
     .difficulty-note { font-size: .8rem; line-height: 1.6; color: var(--muted); margin-top: .3rem; }
     .review-item { font-size: .9rem; line-height: 1.7; margin-top: .4rem; }
@@ -295,10 +295,11 @@
     .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 
     .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; margin-bottom: 1.5rem; }
-    .section[data-slot] { --slot-accent: var(--slot-1); box-shadow: inset 0 3px 0 var(--slot-accent), var(--shadow); }
-    .section[data-slot="2"] { --slot-accent: var(--slot-2); }
-    .section[data-slot="3"] { --slot-accent: var(--slot-3); }
-    .section[data-slot="4"] { --slot-accent: var(--slot-4); }
+    [data-slot] { --slot-accent: var(--slot-1); }
+    [data-slot="2"] { --slot-accent: var(--slot-2); }
+    [data-slot="3"] { --slot-accent: var(--slot-3); }
+    [data-slot="4"] { --slot-accent: var(--slot-4); }
+    .section[data-slot] { box-shadow: inset 0 3px 0 var(--slot-accent), var(--shadow); }
     .section-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--slot-accent, var(--accent-text)); margin-bottom: .95rem; }
     details.section > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
     details.section > summary::-webkit-details-marker { display: none; }
@@ -496,7 +497,7 @@
     }
   </style>
     <link rel="stylesheet" href="/assets/display-b72f27f6.css" />
-    <link rel="stylesheet" href="/assets/display_light-7cbb8d29.css" media="not all" data-light-palette-media="true" />
+    <link rel="stylesheet" href="/assets/display_light-eae354e1.css" media="not all" data-light-palette-media="true" />
 </head>
 <body data-signed-out-text="Your session expired, so that didn&#39;t go through. Reload the page and sign in again." data-save-failed-text="Couldn&#39;t save your last change. It hasn&#39;t reached the server — check your connection and try again."
       data-controller="glossary code-lines mermaid"

@@ -84,14 +84,14 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     open_display
     expect_pattern("gym-pattern-tile-dark", "rgb(190, 205, 240)")
     choose_display("theme", "light")
-    expect_pattern("gym-pattern-tile", "rgb(52, 97, 154)")
+    expect_pattern("gym-pattern-tile", "rgb(91, 71, 214)")
     choose_display("theme", "dark")
     expect_pattern("gym-pattern-tile-dark", "rgb(190, 205, 240)")
 
     choose_display("theme", "device")
     page.driver.with_playwright_page do |pw|
       pw.emulate_media(colorScheme: "light")
-      expect_pattern("gym-pattern-tile", "rgb(52, 97, 154)")
+      expect_pattern("gym-pattern-tile", "rgb(91, 71, 214)")
       pw.emulate_media(colorScheme: "dark")
       expect_pattern("gym-pattern-tile-dark", "rgb(190, 205, 240)")
     end
@@ -104,7 +104,7 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     visit login_path
     page.driver.with_playwright_page do |pw|
       pw.emulate_media(colorScheme: "light")
-      expect_pattern("gym-pattern-tile", "rgb(52, 97, 154)")
+      expect_pattern("gym-pattern-tile", "rgb(91, 71, 214)")
       pw.emulate_media(colorScheme: "dark")
       expect_pattern("gym-pattern-tile-dark", "rgb(190, 205, 240)")
     end

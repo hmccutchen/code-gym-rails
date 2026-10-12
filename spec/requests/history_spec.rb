@@ -44,6 +44,22 @@ RSpec.describe "History", type: :request do
     expect(response.body).not_to include("SENTINEL-ORIGINAL")
   end
 
+  it "numbers each review block with its section's slot, so the heading takes that section's color" do
+    reviewed = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+    reviewed.update!(ai_review: {
+      "code_review" => { "rating" => "solid" }, "pattern" => { "rating" => "solid" }, "retired_kind" => { "rating" => "solid" }
+    })
+    keys = reviewed.daily_exercise.active_section_keys
+
+    login_as(user)
+    get history_path
+
+    slots = Nokogiri::HTML5(response.body).css(".review-block").to_h { |block| [ block.at_css("h3").children.first.text, block["data-slot"] ] }
+    expect(slots).to eq(
+      "Code review" => (keys.index("code_review") + 1).to_s, "Pattern" => (keys.index("pattern") + 1).to_s, "Retired kind" => nil
+    )
+  end
+
   describe "parsons_problem third section, submitted" do
     it "renders the submitted order read-only, without the reorder controls" do
       exercise = DailyExercise.create!(

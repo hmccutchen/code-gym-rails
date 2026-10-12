@@ -1,8 +1,10 @@
 <%# Design notes: docs/code-notes/app/views/shared/_ai_review.html.md %>
 <% exercise_language = response.daily_exercise.language %>
+<% section_keys = response.daily_exercise.active_section_keys %>
 <% response.ai_review.each do |section, fb| %>
   <% next unless fb.is_a?(Hash) %>
-  <div class="review-block">
+  <% slot = section_keys.index(section)&.succ %>
+  <div class="review-block"<% if slot %> data-slot="<%= slot %>"<% end %>>
     <h3><%= section.humanize %><% if fb["rating"].present? %><span class="review-rating"><%= fb["rating"] %></span><% end %></h3>
     <%# Context under the grade badge, never a badge of its own: a second pill would read as a second score. %>
     <% if (difficulty = response.difficulty_for(section)) %>

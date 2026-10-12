@@ -103,9 +103,10 @@ RSpec.describe "palette contrast" do
       end
     end
 
-    it "keeps every section slot's accent at 4.5:1 or more, since it colors the label and the toggles" do
+    it "keeps every section slot's accent at 4.5:1 or more, since it colors the label, the toggles and the review heading" do
+      review_block = over(background_of(".review-block"), vars["surface"])
       %w[slot-1 slot-2 slot-3 slot-4].each do |name|
-        result = ratios(vars.fetch(name), "surface" => vars["surface"], "code" => code_background)
+        result = ratios(vars.fetch(name), "surface" => vars["surface"], "code" => code_background, "review block" => review_block)
         expect(result.values).to all(be >= 4.5), "#{name}: #{result.inspect}"
       end
     end

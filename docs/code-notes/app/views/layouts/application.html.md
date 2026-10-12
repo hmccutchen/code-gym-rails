@@ -98,8 +98,8 @@ plain `.btn`, one step lighter than `--surface`, so the layers read as depth
 rather than one flat color. `--nav-bg` is `--surface` made translucent, for the
 nav and tab bar, which blur what passes beneath them. `--slot-1` to `--slot-4`
 color a section by its position on the page (see `.section`), and
-`palette_contrast_spec` holds each at 4.5:1 on the surface and on code, since
-each one colors text. `--tab-bar-height` is in px, like the nav toggle, so a
+`palette_contrast_spec` holds each at 4.5:1 on the surface, on code and on the
+review block, since each one colors text. `--tab-bar-height` is in px, like the nav toggle, so a
 larger text size cannot push six tabs past a phone's width.
 
 ## `.container` from 1024px
@@ -276,9 +276,12 @@ stays where it was and the target grows into the space around it.
 `data-slot` is the section's position in `responses/_sections`, never its
 kind, so a color says "the second section today" and adding a kind needs no
 color. The stripe is an inset shadow rather than a top border, so it costs no
-space and a folded section's label stays where it was. The accent and the stripe sit on
+space and a folded section's label stays where it was. The stripe sits on
 `.section[data-slot]` only: the dashboard's generating, failed and paused
-panels and the admin card share `.section` and are not exercise slots.
+panels and the admin card share `.section` and are not exercise slots. The
+accent variable follows any `[data-slot]`, so a review block that carries its
+section's slot (`shared/_ai_review`) colors its heading to match; a block with
+no slot keeps `--accent-text`.
 
 ## `.section` below 600px
 

@@ -138,7 +138,8 @@ RSpec.describe "PWA", type: :request do
       plain = rules.select { |rule| rule.selectors.include?(".section") }
 
       expect(plain.map(&:declarations).join).not_to include("slot-accent")
-      expect(rules.find { |rule| rule.selectors == [ ".section[data-slot]" ] }.declaration("--slot-accent")).to eq("var(--slot-1)")
+      expect(rules.find { |rule| rule.selectors == [ "[data-slot]" ] }.declaration("--slot-accent")).to eq("var(--slot-1)")
+      expect(rules.find { |rule| rule.selectors == [ ".section[data-slot]" ] }.declaration("box-shadow")).to include("var(--slot-accent)")
     end
   end
 

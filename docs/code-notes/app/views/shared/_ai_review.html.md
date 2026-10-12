@@ -27,3 +27,12 @@ The status line is set after an alternate lands and never cleared, because the
 explanation itself is inserted outside the live region; the rule lives in
 `review_alternates_controller.js`. The concept
 reference's alternates use the same pattern.
+
+## Heading color
+
+Each review block carries the slot number of the section it grades, read from
+`DailyExercise#active_section_keys`, so its heading takes the same accent as
+that section's label above it. The blocks follow the stored review's key
+order, which is not page order, so the slot is looked up per section rather
+than counted. A review for a section the day no longer shows gets no slot and
+keeps the plain accent.
