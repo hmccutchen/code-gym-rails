@@ -3272,7 +3272,7 @@ always pull in the full suite — is stated once, in
 - `app/javascript/code_gym/request.js` — the one way a page script sends a request, and what it may show when one fails; loaded through importmap from the layout's `javascript_importmap_tags`
 - `app/javascript/code_gym/save_status.js` / `app/views/shared/_save_status_banner.html.erb` — the save banner's failures by control, the per-control save queue (in order, or collapsing to the latest), and `pending()`; the banner markup sits in `<body>`
 - `app/controllers/concerns/json_errors.rb` — `render_json_error`: the one shape of a JSON error reply
-- `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
+- `app/views/shared/_push_script.html.erb` — mounts the `push-launch` controller, which re-subscribes on launch through `app/javascript/code_gym/push.js`; rendered from the layout for a signed-in user when push is configured
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
 - `app/views/pwa/service-worker.js` — shows the notification. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing
 - `app/services/schema_wait.rb` — blocks the worker's Railway pre-deploy step until the schema the Solid Queue supervisor boots against exists; waits rather than migrating, so migrations keep exactly one owner
