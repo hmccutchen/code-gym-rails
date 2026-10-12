@@ -630,7 +630,7 @@ en:
       one: "You've used your one follow-up for this section."
       other: "You've used all %{count} follow-ups for this section."
   duck:
-    toggle: "🦆 Stuck? Talk it through"
+    toggle: "Stuck? Talk it through"
     prompt: "What are you stuck on?"
     send: "Ask"
     explain: "Explain this simply"
