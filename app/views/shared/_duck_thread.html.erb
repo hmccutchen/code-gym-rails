@@ -10,7 +10,7 @@
      data-duck-thread-capped-text-value="<%= t("duck.turns_used", count: ResponsesController::MAX_DUCK_TURNS_PER_SECTION) %>"
      data-duck-thread-user-speaker-value="<%= t("duck.speakers.user") %>"
      data-duck-thread-assistant-speaker-value="<%= t("duck.speakers.assistant") %>">
-  <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-<%= field %>" data-duck-thread-target="toggle" data-action="duck-thread#toggle"><%= t("duck.toggle") %></button>
+  <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-<%= field %>" data-duck-thread-target="toggle" data-action="duck-thread#toggle"><%= image_tag("duck-flex.png", alt: "", class: "duck-icon", aria: { hidden: true }) %><%= t("duck.toggle") %></button>
   <div class="duck-body" id="duck-body-<%= field %>" hidden data-duck-thread-target="body">
     <div class="duck-turns" aria-live="polite" data-duck-thread-target="turns"></div>
     <div class="duck-form">
