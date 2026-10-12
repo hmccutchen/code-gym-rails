@@ -63,3 +63,26 @@ picture.
 `spec/system/deferred_module_spec.rb` stalls the module assets, types an
 answer, and expects it saved. Without the `defaultValue` check no save is ever
 scheduled, so the example times out.
+
+## Submit waits for the page's controllers
+
+Submit is always clickable, and the payload reads each section's hidden
+field. A kind whose answer only reaches that field through its own controller
+— the design comparison's pick and reason — would post the previous answer if
+the click landed before that controller connected. So `submit()` awaits
+`CodeGymBootstrap.ready`, which resolves once every controller on the page
+has connected and the early-edit recorder has been settled. The click is
+deferred, never dropped.
+
+`ready` is not proof that they connected, though. It gives up after a timeout
+(`app/javascript/application.js`) so that an early edit cannot stay pending
+for the life of the page, and a module that fails to load or takes longer than
+that would then leave its hidden field stale. So once `ready` settles,
+`submit()` checks every controller inside the form itself. If any is missing,
+it posts nothing, shows `dashboard.exercise.controls_not_ready` in the save
+banner and gives the form back. The check covers every controller in the form,
+not only the ones that write a hidden field, because a module that never
+arrived means the page needs a reload either way. A later click submits once
+the module has connected. `spec/system/deferred_module_spec.rb` answers the
+missing comparison module with a 404 and expects the stale pick to stay
+unsubmitted.

@@ -10,16 +10,23 @@
             maxlength="<%= UserText::MAX_ANSWER_LENGTH %>"><%= answer_starting_value(response, key) %></textarea>
 <% end %>
 
-<div class="pseudocode-rounds" data-pseudocode-section="<%= key %>">
+<div class="pseudocode-rounds"<% unless submitted %> data-controller="pseudocode-round"
+     data-pseudocode-round-section-value="<%= key %>"
+     data-pseudocode-round-url-value="<%= pseudocode_critique_responses_path %>"
+     data-pseudocode-round-heading-text-value="<%= t("pseudocode.critique_heading") %>"
+     data-pseudocode-round-no-gaps-text-value="<%= t("pseudocode.no_gaps") %>"
+     data-pseudocode-round-working-text-value="<%= t("pseudocode.working") %>"
+     data-pseudocode-round-failed-text-value="<%= t("pseudocode.critique_failed") %>"<% end %>>
   <% unless submitted %>
     <div class="pseudocode-controls">
-      <button type="button" class="btn btn-ghost btn-sm" data-pseudocode-critique
+      <button type="button" class="btn btn-ghost btn-sm" data-pseudocode-round-target="button"
+              data-action="pseudocode-round#critique"
               <%= "disabled" if response.critiqued?(key) %>><%= t("pseudocode.critique_button") %></button>
-      <span class="pseudocode-status" aria-live="polite"></span>
+      <span class="pseudocode-status" aria-live="polite" data-pseudocode-round-target="status"></span>
     </div>
   <% end %>
 
-  <div class="pseudocode-critique" data-pseudocode-critique-out aria-live="polite">
+  <div class="pseudocode-critique" aria-live="polite"<% unless submitted %> data-pseudocode-round-target="output"<% end %>>
     <% if response.critiqued?(key) %>
       <% if points.any? %>
         <p class="pseudocode-critique-label"><%= t("pseudocode.critique_heading") %></p>
@@ -40,60 +47,3 @@
   </div>
 </div>
 
-<% unless submitted %>
-  <% content_for :page_scripts do %>
-    <script>
-    (() => {
-      const box = document.querySelector("[data-pseudocode-section]");
-      if (!box || box.dataset.pseudoWired) return;
-      box.dataset.pseudoWired = "1";
-
-      const section  = box.dataset.pseudocodeSection;
-      const form     = document.getElementById("gym-form");
-      const textarea = form.querySelector(`textarea[data-field="${section}"]`);
-      const status   = box.querySelector(".pseudocode-status");
-      const critiqueBtn = box.querySelector("[data-pseudocode-critique]");
-      const critiqueOut = box.querySelector("[data-pseudocode-critique-out]");
-
-      const CRITIQUE_HEADING = <%= t("pseudocode.critique_heading").to_json.html_safe %>;
-      const NO_GAPS  = <%= t("pseudocode.no_gaps").to_json.html_safe %>;
-      const WORKING  = <%= t("pseudocode.working").to_json.html_safe %>;
-      const CRITIQUE_FAILED = <%= t("pseudocode.critique_failed").to_json.html_safe %>;
-
-      // One-shot round: stays locked on success, re-enables on failure since the cap wasn't consumed.
-      critiqueBtn.addEventListener("click", async () => {
-        if (critiqueBtn.disabled) return;
-        critiqueBtn.disabled = true;
-        status.textContent = WORKING;
-
-        const result = await CodeGymRequest.send("POST", "<%= pseudocode_critique_responses_path %>",
-          { section: section, pseudocode: textarea.value }, { fallback: CRITIQUE_FAILED });
-        const data = result.data;
-        if (result.ok && data && (!data.gaps_found || Array.isArray(data.gaps))) {
-          critiqueOut.replaceChildren();
-          const label = document.createElement("p");
-          label.className = "pseudocode-critique-label";
-          if (!data.gaps_found) {
-            label.textContent = NO_GAPS;
-            critiqueOut.appendChild(label);
-          } else {
-            label.textContent = CRITIQUE_HEADING;
-            const ul = document.createElement("ul");
-            data.gaps.forEach((gap) => {
-              const li = document.createElement("li");
-              // textContent, never innerHTML: this is provider output.
-              li.textContent = gap;
-              ul.appendChild(li);
-            });
-            critiqueOut.append(label, ul);
-          }
-          status.textContent = "";
-        } else {
-          status.textContent = result.message || CRITIQUE_FAILED;
-          critiqueBtn.disabled = false;
-        }
-      });
-    })();
-    </script>
-  <% end %>
-<% end %>

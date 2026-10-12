@@ -20,16 +20,21 @@
     "application": "/assets/application-6b9dc00f.js",
     "@hotwired/stimulus": "/assets/stimulus.min-4b1e420e.js",
     "@hotwired/stimulus-loading": "/assets/stimulus-loading-1fc53fe7.js",
-    "controllers/answer_form_controller": "/assets/controllers/answer_form_controller-99c3489e.js",
+    "controllers/answer_form_controller": "/assets/controllers/answer_form_controller-72dc2b0b.js",
     "controllers/application": "/assets/controllers/application-3affb389.js",
+    "controllers/comparison_answer_controller": "/assets/controllers/comparison_answer_controller-68d3cd32.js",
     "controllers/display_preferences_controller": "/assets/controllers/display_preferences_controller-68202f5e.js",
     "controllers/duck_thread_controller": "/assets/controllers/duck_thread_controller-cb4ca1f7.js",
     "controllers/exercise_mix_controller": "/assets/controllers/exercise_mix_controller-ae4c947d.js",
+    "controllers/follow_ups_controller": "/assets/controllers/follow_ups_controller-612ff595.js",
     "controllers/generating_controller": "/assets/controllers/generating_controller-bc2d79f1.js",
     "controllers": "/assets/controllers/index-ee64e1f1.js",
     "controllers/learning_track_controller": "/assets/controllers/learning_track_controller-8898d395.js",
+    "controllers/parsons_controller": "/assets/controllers/parsons_controller-f27d83fa.js",
     "controllers/profile_preferences_controller": "/assets/controllers/profile_preferences_controller-ae1eecf6.js",
+    "controllers/pseudocode_round_controller": "/assets/controllers/pseudocode_round_controller-2525e08e.js",
     "controllers/pull_to_refresh_controller": "/assets/controllers/pull_to_refresh_controller-ac11018b.js",
+    "controllers/review_alternates_controller": "/assets/controllers/review_alternates_controller-4e899575.js",
     "controllers/review_button_controller": "/assets/controllers/review_button_controller-ce9f39dc.js",
     "controllers/track_proposal_controller": "/assets/controllers/track_proposal_controller-8b5db41c.js",
     "controllers/welcome_controller": "/assets/controllers/welcome_controller-8f0cff0e.js",
@@ -40,16 +45,21 @@
 <link rel="modulepreload" href="/assets/application-6b9dc00f.js">
 <link rel="modulepreload" href="/assets/stimulus.min-4b1e420e.js">
 <link rel="modulepreload" href="/assets/stimulus-loading-1fc53fe7.js">
-<link rel="modulepreload" href="/assets/controllers/answer_form_controller-99c3489e.js">
+<link rel="modulepreload" href="/assets/controllers/answer_form_controller-72dc2b0b.js">
 <link rel="modulepreload" href="/assets/controllers/application-3affb389.js">
+<link rel="modulepreload" href="/assets/controllers/comparison_answer_controller-68d3cd32.js">
 <link rel="modulepreload" href="/assets/controllers/display_preferences_controller-68202f5e.js">
 <link rel="modulepreload" href="/assets/controllers/duck_thread_controller-cb4ca1f7.js">
 <link rel="modulepreload" href="/assets/controllers/exercise_mix_controller-ae4c947d.js">
+<link rel="modulepreload" href="/assets/controllers/follow_ups_controller-612ff595.js">
 <link rel="modulepreload" href="/assets/controllers/generating_controller-bc2d79f1.js">
 <link rel="modulepreload" href="/assets/controllers/index-ee64e1f1.js">
 <link rel="modulepreload" href="/assets/controllers/learning_track_controller-8898d395.js">
+<link rel="modulepreload" href="/assets/controllers/parsons_controller-f27d83fa.js">
 <link rel="modulepreload" href="/assets/controllers/profile_preferences_controller-ae1eecf6.js">
+<link rel="modulepreload" href="/assets/controllers/pseudocode_round_controller-2525e08e.js">
 <link rel="modulepreload" href="/assets/controllers/pull_to_refresh_controller-ac11018b.js">
+<link rel="modulepreload" href="/assets/controllers/review_alternates_controller-4e899575.js">
 <link rel="modulepreload" href="/assets/controllers/review_button_controller-ce9f39dc.js">
 <link rel="modulepreload" href="/assets/controllers/track_proposal_controller-8b5db41c.js">
 <link rel="modulepreload" href="/assets/controllers/welcome_controller-8f0cff0e.js">
@@ -680,22 +690,34 @@
               <li>Right</li>
             </ul>
           </div>
-    <div class="alternates" data-section="pattern">
+    <div class="alternates" data-section="pattern" data-controller="review-alternates"
+         data-review-alternates-section-value="pattern"
+         data-review-alternates-url-value="/responses/900001/explain_differently"
+         data-review-alternates-thinking-text-value="Thinking…"
+         data-review-alternates-added-text-value="A different explanation was added above."
+         data-review-alternates-added-last-text-value="A different explanation was added above — that was the last one."
+         data-review-alternates-failed-text-value="Couldn&#39;t generate that — try again">
         <button type="button" class="btn btn-ghost btn-sm explain-differently"
-                data-url="/responses/900001/explain_differently"
-                data-section="pattern">Explain this differently</button>
-      <span class="alternate-status" aria-live="polite"></span>
+                data-review-alternates-target="button"
+                data-action="review-alternates#explain">Explain this differently</button>
+      <span class="alternate-status" aria-live="polite" data-review-alternates-target="status"></span>
     </div>
-    <div class="follow-ups" data-section="pattern">
-      <div class="follow-up-thread" aria-live="polite">
+    <div class="follow-ups" data-section="pattern" data-controller="follow-ups"
+         data-follow-ups-section-value="pattern"
+         data-follow-ups-url-value="/responses/900001/follow_ups"
+         data-follow-ups-thinking-text-value="Thinking…"
+         data-follow-ups-capped-text-value="You&#39;ve used all 3 follow-ups for this section."
+         data-follow-ups-failed-text-value="Couldn&#39;t send that — try again">
+      <div class="follow-up-thread" aria-live="polite" data-follow-ups-target="thread">
       </div>
-        <div class="follow-up-form">
+        <div class="follow-up-form" data-follow-ups-target="form">
           <label class="visually-hidden" for="follow-up-input-900001-pattern">Ask a follow-up about this feedback</label>
           <input type="text" class="follow-up-input" id="follow-up-input-900001-pattern" placeholder="Ask a follow-up about this feedback…"
-                 data-url="/responses/900001/follow_ups" data-section="pattern">
-          <button type="button" class="btn btn-ghost btn-sm follow-up-send">Ask</button>
+                 data-follow-ups-target="input" data-action="keydown->follow-ups#enter">
+          <button type="button" class="btn btn-ghost btn-sm follow-up-send"
+                  data-follow-ups-target="send" data-action="follow-ups#send">Ask</button>
         </div>
-      <span class="follow-up-status" aria-live="polite"></span>
+      <span class="follow-up-status" aria-live="polite" data-follow-ups-target="status"></span>
     </div>
   </div>
   <div class="review-block">
@@ -706,22 +728,34 @@
               <li>Right</li>
             </ul>
           </div>
-    <div class="alternates" data-section="challenge">
+    <div class="alternates" data-section="challenge" data-controller="review-alternates"
+         data-review-alternates-section-value="challenge"
+         data-review-alternates-url-value="/responses/900001/explain_differently"
+         data-review-alternates-thinking-text-value="Thinking…"
+         data-review-alternates-added-text-value="A different explanation was added above."
+         data-review-alternates-added-last-text-value="A different explanation was added above — that was the last one."
+         data-review-alternates-failed-text-value="Couldn&#39;t generate that — try again">
         <button type="button" class="btn btn-ghost btn-sm explain-differently"
-                data-url="/responses/900001/explain_differently"
-                data-section="challenge">Explain this differently</button>
-      <span class="alternate-status" aria-live="polite"></span>
+                data-review-alternates-target="button"
+                data-action="review-alternates#explain">Explain this differently</button>
+      <span class="alternate-status" aria-live="polite" data-review-alternates-target="status"></span>
     </div>
-    <div class="follow-ups" data-section="challenge">
-      <div class="follow-up-thread" aria-live="polite">
+    <div class="follow-ups" data-section="challenge" data-controller="follow-ups"
+         data-follow-ups-section-value="challenge"
+         data-follow-ups-url-value="/responses/900001/follow_ups"
+         data-follow-ups-thinking-text-value="Thinking…"
+         data-follow-ups-capped-text-value="You&#39;ve used all 3 follow-ups for this section."
+         data-follow-ups-failed-text-value="Couldn&#39;t send that — try again">
+      <div class="follow-up-thread" aria-live="polite" data-follow-ups-target="thread">
       </div>
-        <div class="follow-up-form">
+        <div class="follow-up-form" data-follow-ups-target="form">
           <label class="visually-hidden" for="follow-up-input-900001-challenge">Ask a follow-up about this feedback</label>
           <input type="text" class="follow-up-input" id="follow-up-input-900001-challenge" placeholder="Ask a follow-up about this feedback…"
-                 data-url="/responses/900001/follow_ups" data-section="challenge">
-          <button type="button" class="btn btn-ghost btn-sm follow-up-send">Ask</button>
+                 data-follow-ups-target="input" data-action="keydown->follow-ups#enter">
+          <button type="button" class="btn btn-ghost btn-sm follow-up-send"
+                  data-follow-ups-target="send" data-action="follow-ups#send">Ask</button>
         </div>
-      <span class="follow-up-status" aria-live="polite"></span>
+      <span class="follow-up-status" aria-live="polite" data-follow-ups-target="status"></span>
     </div>
   </div>
   <div class="review-block">
@@ -732,25 +766,36 @@
               <li>Right</li>
             </ul>
           </div>
-    <div class="alternates" data-section="code_review">
+    <div class="alternates" data-section="code_review" data-controller="review-alternates"
+         data-review-alternates-section-value="code_review"
+         data-review-alternates-url-value="/responses/900001/explain_differently"
+         data-review-alternates-thinking-text-value="Thinking…"
+         data-review-alternates-added-text-value="A different explanation was added above."
+         data-review-alternates-added-last-text-value="A different explanation was added above — that was the last one."
+         data-review-alternates-failed-text-value="Couldn&#39;t generate that — try again">
         <button type="button" class="btn btn-ghost btn-sm explain-differently"
-                data-url="/responses/900001/explain_differently"
-                data-section="code_review">Explain this differently</button>
-      <span class="alternate-status" aria-live="polite"></span>
+                data-review-alternates-target="button"
+                data-action="review-alternates#explain">Explain this differently</button>
+      <span class="alternate-status" aria-live="polite" data-review-alternates-target="status"></span>
     </div>
-    <div class="follow-ups" data-section="code_review">
-      <div class="follow-up-thread" aria-live="polite">
+    <div class="follow-ups" data-section="code_review" data-controller="follow-ups"
+         data-follow-ups-section-value="code_review"
+         data-follow-ups-url-value="/responses/900001/follow_ups"
+         data-follow-ups-thinking-text-value="Thinking…"
+         data-follow-ups-capped-text-value="You&#39;ve used all 3 follow-ups for this section."
+         data-follow-ups-failed-text-value="Couldn&#39;t send that — try again">
+      <div class="follow-up-thread" aria-live="polite" data-follow-ups-target="thread">
       </div>
-        <div class="follow-up-form">
+        <div class="follow-up-form" data-follow-ups-target="form">
           <label class="visually-hidden" for="follow-up-input-900001-code_review">Ask a follow-up about this feedback</label>
           <input type="text" class="follow-up-input" id="follow-up-input-900001-code_review" placeholder="Ask a follow-up about this feedback…"
-                 data-url="/responses/900001/follow_ups" data-section="code_review">
-          <button type="button" class="btn btn-ghost btn-sm follow-up-send">Ask</button>
+                 data-follow-ups-target="input" data-action="keydown->follow-ups#enter">
+          <button type="button" class="btn btn-ghost btn-sm follow-up-send"
+                  data-follow-ups-target="send" data-action="follow-ups#send">Ask</button>
         </div>
-      <span class="follow-up-status" aria-live="polite"></span>
+      <span class="follow-up-status" aria-live="polite" data-follow-ups-target="status"></span>
     </div>
   </div>
-
 
   </div>
 
@@ -898,91 +943,6 @@
   })();
 </script>
 
-      <script>
-(() => {
-  const ALTERNATE_FAILED = "Couldn't generate that — try again";
-  const FOLLOW_UP_FAILED = "Couldn't send that — try again";
-
-  document.querySelectorAll(".explain-differently:not([data-alt-wired])").forEach(button => {
-    button.dataset.altWired = "1";
-    const container = button.parentElement;
-    const status = container.querySelector(".alternate-status");
-
-    button.addEventListener("click", async () => {
-      button.disabled = true;
-      status.textContent = "Thinking…";
-      const result = await CodeGymRequest.send("POST", button.dataset.url,
-        { section: button.dataset.section }, { fallback: ALTERNATE_FAILED });
-      const data = result.data;
-      if (result.ok && data) {
-        const p = document.createElement("p");
-        p.className = "alternate-item";
-        p.textContent = data.alternate;
-        container.insertBefore(p, button);
-        // Set, never cleared: the explanation lands outside this live region.
-        status.textContent = data.remaining > 0
-          ? "A different explanation was added above."
-          : "A different explanation was added above — that was the last one.";
-        if (data.remaining > 0) { button.disabled = false; } else { button.remove(); }
-      } else {
-        status.textContent = result.message || ALTERNATE_FAILED;
-        button.disabled = false;
-      }
-    });
-  });
-
-  document.querySelectorAll(".follow-up-send:not([data-fu-wired])").forEach(button => {
-    button.dataset.fuWired = "1";
-    const container = button.closest(".follow-ups");
-    const input = container.querySelector(".follow-up-input");
-    const thread = container.querySelector(".follow-up-thread");
-    const status = container.querySelector(".follow-up-status");
-
-    const addTurn = (role, text) => {
-      const p = document.createElement("p");
-      p.className = "follow-up-turn follow-up-" + role;
-      p.textContent = text;
-      thread.appendChild(p);
-    };
-
-    const send = async () => {
-      const question = input.value.trim();
-      if (!question) return;
-      button.disabled = true;
-      input.disabled = true;
-      status.textContent = "Thinking…";
-      const result = await CodeGymRequest.send("POST", input.dataset.url,
-        { section: input.dataset.section, question: question }, { fallback: FOLLOW_UP_FAILED });
-      const data = result.data;
-      if (result.ok && data) {
-        addTurn("user", data.question);
-        addTurn("assistant", data.answer);
-        input.value = "";
-        status.textContent = "";
-        if (data.remaining > 0) {
-          button.disabled = false;
-          input.disabled = false;
-        } else {
-          container.querySelector(".follow-up-form").remove();
-          const capped = document.createElement("p");
-          capped.className = "follow-up-capped";
-          capped.textContent = "You've used all 3 follow-ups for this section.";
-          container.insertBefore(capped, status);
-        }
-      } else {
-        status.textContent = result.message || FOLLOW_UP_FAILED;
-        button.disabled = false;
-        input.disabled = false;
-      }
-    };
-
-    button.addEventListener("click", send);
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") { event.preventDefault(); send(); }
-    });
-  });
-})();
-    </script>
-
+  
 </body>
 </html>

@@ -42,128 +42,48 @@
         <pre class="snippet" style="margin-top:.75rem"><%= highlighted_code(improved_code, exercise_language) %></pre>
       <% end %>
     <% end %>
-    <div class="alternates" data-section="<%= section %>">
+    <div class="alternates" data-section="<%= section %>" data-controller="review-alternates"
+         data-review-alternates-section-value="<%= section %>"
+         data-review-alternates-url-value="<%= explain_differently_response_path(response) %>"
+         data-review-alternates-thinking-text-value="<%= t("review.thinking") %>"
+         data-review-alternates-added-text-value="<%= t("review.alternate_added") %>"
+         data-review-alternates-added-last-text-value="<%= t("review.alternate_added_last") %>"
+         data-review-alternates-failed-text-value="<%= t("review.alternate_failed") %>">
       <% Array(response.review_alternates[section]).each do |alt| %>
         <p class="alternate-item"><%= alt %></p>
       <% end %>
       <% if Array(response.review_alternates[section]).size < DailyResponse::MAX_ALTERNATES_PER_SECTION %>
         <button type="button" class="btn btn-ghost btn-sm explain-differently"
-                data-url="<%= explain_differently_response_path(response) %>"
-                data-section="<%= section %>"><%= t("review.explain_differently") %></button>
+                data-review-alternates-target="button"
+                data-action="review-alternates#explain"><%= t("review.explain_differently") %></button>
       <% end %>
-      <span class="alternate-status" aria-live="polite"></span>
+      <span class="alternate-status" aria-live="polite" data-review-alternates-target="status"></span>
     </div>
     <% turns = response.review_follow_ups.select { |t| t.section == section }.sort_by { |t| [ t.created_at, t.id ] } %>
     <% asked = turns.count { |t| t.role_user? } %>
-    <div class="follow-ups" data-section="<%= section %>">
-      <div class="follow-up-thread" aria-live="polite">
+    <div class="follow-ups" data-section="<%= section %>" data-controller="follow-ups"
+         data-follow-ups-section-value="<%= section %>"
+         data-follow-ups-url-value="<%= follow_ups_response_path(response) %>"
+         data-follow-ups-thinking-text-value="<%= t("review.thinking") %>"
+         data-follow-ups-capped-text-value="<%= t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION) %>"
+         data-follow-ups-failed-text-value="<%= t("review.follow_up_failed") %>">
+      <div class="follow-up-thread" aria-live="polite" data-follow-ups-target="thread">
         <% turns.each do |turn| %>
           <p class="follow-up-turn follow-up-<%= turn.role %>"><%= turn.content %></p>
         <% end %>
       </div>
       <% if asked < DailyResponse::MAX_FOLLOW_UPS_PER_SECTION %>
-        <div class="follow-up-form">
+        <div class="follow-up-form" data-follow-ups-target="form">
           <label class="visually-hidden" for="follow-up-input-<%= response.id %>-<%= section %>"><%= t("review.follow_up_label") %></label>
           <input type="text" class="follow-up-input" id="follow-up-input-<%= response.id %>-<%= section %>" placeholder="<%= t("review.follow_up_placeholder") %>"
-                 data-url="<%= follow_ups_response_path(response) %>" data-section="<%= section %>">
-          <button type="button" class="btn btn-ghost btn-sm follow-up-send"><%= t("review.follow_up_send") %></button>
+                 data-follow-ups-target="input" data-action="keydown->follow-ups#enter">
+          <button type="button" class="btn btn-ghost btn-sm follow-up-send"
+                  data-follow-ups-target="send" data-action="follow-ups#send"><%= t("review.follow_up_send") %></button>
         </div>
       <% else %>
         <p class="follow-up-capped"><%= t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION) %></p>
       <% end %>
-      <span class="follow-up-status" aria-live="polite"></span>
+      <span class="follow-up-status" aria-live="polite" data-follow-ups-target="status"></span>
     </div>
   </div>
-<% end %>
-
-<%# Emitted once per request; the :not([data-*-wired]) guards stop a control being wired twice. %>
-<% unless @ai_review_script_emitted %>
-  <% @ai_review_script_emitted = true %>
-  <% content_for :page_scripts do %>
-    <script>
-(() => {
-  const ALTERNATE_FAILED = <%= t("review.alternate_failed").to_json.html_safe %>;
-  const FOLLOW_UP_FAILED = <%= t("review.follow_up_failed").to_json.html_safe %>;
-
-  document.querySelectorAll(".explain-differently:not([data-alt-wired])").forEach(button => {
-    button.dataset.altWired = "1";
-    const container = button.parentElement;
-    const status = container.querySelector(".alternate-status");
-
-    button.addEventListener("click", async () => {
-      button.disabled = true;
-      status.textContent = <%= t("review.thinking").to_json.html_safe %>;
-      const result = await CodeGymRequest.send("POST", button.dataset.url,
-        { section: button.dataset.section }, { fallback: ALTERNATE_FAILED });
-      const data = result.data;
-      if (result.ok && data) {
-        const p = document.createElement("p");
-        p.className = "alternate-item";
-        p.textContent = data.alternate;
-        container.insertBefore(p, button);
-        // Set, never cleared: the explanation lands outside this live region.
-        status.textContent = data.remaining > 0
-          ? <%= t("review.alternate_added").to_json.html_safe %>
-          : <%= t("review.alternate_added_last").to_json.html_safe %>;
-        if (data.remaining > 0) { button.disabled = false; } else { button.remove(); }
-      } else {
-        status.textContent = result.message || ALTERNATE_FAILED;
-        button.disabled = false;
-      }
-    });
-  });
-
-  document.querySelectorAll(".follow-up-send:not([data-fu-wired])").forEach(button => {
-    button.dataset.fuWired = "1";
-    const container = button.closest(".follow-ups");
-    const input = container.querySelector(".follow-up-input");
-    const thread = container.querySelector(".follow-up-thread");
-    const status = container.querySelector(".follow-up-status");
-
-    const addTurn = (role, text) => {
-      const p = document.createElement("p");
-      p.className = "follow-up-turn follow-up-" + role;
-      p.textContent = text;
-      thread.appendChild(p);
-    };
-
-    const send = async () => {
-      const question = input.value.trim();
-      if (!question) return;
-      button.disabled = true;
-      input.disabled = true;
-      status.textContent = <%= t("review.thinking").to_json.html_safe %>;
-      const result = await CodeGymRequest.send("POST", input.dataset.url,
-        { section: input.dataset.section, question: question }, { fallback: FOLLOW_UP_FAILED });
-      const data = result.data;
-      if (result.ok && data) {
-        addTurn("user", data.question);
-        addTurn("assistant", data.answer);
-        input.value = "";
-        status.textContent = "";
-        if (data.remaining > 0) {
-          button.disabled = false;
-          input.disabled = false;
-        } else {
-          container.querySelector(".follow-up-form").remove();
-          const capped = document.createElement("p");
-          capped.className = "follow-up-capped";
-          capped.textContent = <%= t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION).to_json.html_safe %>;
-          container.insertBefore(capped, status);
-        }
-      } else {
-        status.textContent = result.message || FOLLOW_UP_FAILED;
-        button.disabled = false;
-        input.disabled = false;
-      }
-    };
-
-    button.addEventListener("click", send);
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") { event.preventDefault(); send(); }
-    });
-  });
-})();
-    </script>
-  <% end %>
 <% end %>
