@@ -1,6 +1,6 @@
 require "rails_helper"
 
-# A user with no display choices keeps the defaults: no <html> attribute, no stylesheet, dark bar, outlined logo.
+# A user with no display choices keeps the defaults: no <html> attribute, no stylesheet, dark bar, dark brand mark.
 RSpec.describe "Display preferences in the layout", type: :request do
   let(:user) { create_user_with_key }
 
@@ -73,10 +73,10 @@ RSpec.describe "Display preferences in the layout", type: :request do
         .to contain_exactly([ "display", nil ], [ "display_light", "all" ])
     end
 
-    it "shows the plain logo and asks iOS for the white status bar" do
+    it "shows the light brand mark at its own square size and asks iOS for the white status bar" do
       source = Nokogiri::HTML5(response.body).at_css("nav picture source")
-      expect(source["srcset"]).to include("logo")
-      expect(source["srcset"]).not_to include("outlined")
+      expect(source["srcset"]).to match(%r{/assets/brand-mark-light-[0-9a-f]+\.png})
+      expect([ source["width"], source["height"] ]).to eq(%w[512 512])
       expect(source["media"]).to eq("all")
       expect(response.body).to include('<meta name="apple-mobile-web-app-status-bar-style" content="default">')
       expect(theme_colors).to eq([ [ "#ffffff", "all" ], [ "#1a1a2e", nil ] ])

@@ -11,8 +11,10 @@ PUBLIC = ROOT / "public"
 
 # Every pixel that differs from the fill stays inside the 80% safe-zone circle all platform masks keep.
 MASKABLE_SAFE_RADIUS = 0.4
-# The master's fill carries an invisible panel a few levels off the corner color, which is not part of the mark.
+# Near-navy noise a few levels off the corner color is not part of the mark.
 FILL_TOLERANCE = 8
+FAVICON_ICO_SIZES = [16, 32, 48]
+FAVICON_PNG_SIZE = 96
 
 
 def master(path):
@@ -49,7 +51,9 @@ def maskable_icon(image, size):
 def main():
     app_icon = master(APP_ICON_SOURCE)
 
-    resized(master(FAVICON_SOURCE), 32).convert("RGBA").save(PUBLIC / "favicon.ico", sizes=[(32, 32)])
+    favicon = master(FAVICON_SOURCE)
+    favicon.convert("RGBA").save(PUBLIC / "favicon.ico", sizes=[(size, size) for size in FAVICON_ICO_SIZES])
+    resized(favicon, FAVICON_PNG_SIZE).save(PUBLIC / f"favicon-{FAVICON_PNG_SIZE}.png")
     resized(app_icon, 180).save(PUBLIC / "apple-touch-icon.png")
     resized(app_icon, 192).save(PUBLIC / "icon-192.png")
     resized(app_icon, 512).save(PUBLIC / "icon-512.png")
