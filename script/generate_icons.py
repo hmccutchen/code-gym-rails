@@ -1,79 +1,59 @@
 #!/usr/bin/env python3
 # Run: python3 script/generate_icons.py (needs Pillow). Design notes: docs/code-notes/script/generate_icons.md
-import re
 from pathlib import Path
 
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "app/assets/images/logo-outlined-square.png"
-LAYOUT = ROOT / "app/views/layouts/application.html.erb"
+APP_ICON_SOURCE = ROOT / "app/assets/images/app-icon-master.png"
+FAVICON_SOURCE = ROOT / "app/assets/images/favicon-master.png"
 PUBLIC = ROOT / "public"
 
-PLAIN_ICON_WIDTH = 0.96
-# Every opaque pixel of the maskable icon stays inside the 80% safe-zone circle all platform masks keep.
-MASKABLE_SAFE_DIAMETER = 0.8
-
-# Width-to-height ratio the favicon trims the plates to, so the lifter stays readable in a square tab icon.
-FAVICON_ASPECT = 1.1
+# Every pixel that differs from the fill stays inside the 80% safe-zone circle all platform masks keep.
+MASKABLE_SAFE_RADIUS = 0.4
+# The master's fill carries an invisible panel a few levels off the corner color, which is not part of the mark.
+FILL_TOLERANCE = 8
 
 
-def layout_background():
-    hex_color = re.search(r"--bg:\s*#([0-9a-fA-F]{6})", LAYOUT.read_text()).group(1)
-    return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4)) + (255,)
+def master(path):
+    return Image.open(path).convert("RGB")
 
 
-def artwork():
-    source = Image.open(SOURCE).convert("RGBA")
-    return source.crop(source.getchannel("A").getbbox())
+def resized(image, size):
+    return image.resize((size, size), Image.LANCZOS)
 
 
-def centered(art, size, art_width, background):
-    height = round(art.height * art_width / art.width)
-    canvas = Image.new("RGBA", (size, size), background)
-    scaled = art.resize((art_width, height), Image.NEAREST)
-    canvas.alpha_composite(scaled, ((size - art_width) // 2, (size - height) // 2))
-    return canvas
+def differs_from(pixel, fill):
+    return max(abs(channel - fill_channel) for channel, fill_channel in zip(pixel, fill)) > FILL_TOLERANCE
 
 
-def plain_icon(art, size, background):
-    return centered(art, size, round(size * PLAIN_ICON_WIDTH), background)
-
-
-def farthest_opaque_reach(art):
-    alpha = art.getchannel("A").load()
-    center_x, center_y = art.width / 2, art.height / 2
+def farthest_mark_reach(image):
+    pixels = image.load()
+    fill = pixels[0, 0]
+    center_x, center_y = image.width / 2, image.height / 2
     return max(
         ((x + 0.5 - center_x) ** 2 + (y + 0.5 - center_y) ** 2) ** 0.5
-        for y in range(art.height) for x in range(art.width) if alpha[x, y]
+        for y in range(image.height) for x in range(image.width) if differs_from(pixels[x, y], fill)
     )
 
 
-def maskable_icon(art, size, background):
-    scale = size * MASKABLE_SAFE_DIAMETER / 2 / farthest_opaque_reach(art)
-    return centered(art, size, int(art.width * scale), background)
-
-
-def trimmed_to_aspect(art, aspect):
-    width = min(art.width, round(art.height * aspect))
-    left = (art.width - width) // 2
-    return art.crop((left, 0, left + width, art.height))
-
-
-def favicon(art):
-    # Transparent: a tab has its own background, and the outline keeps the barbell visible on a dark one.
-    return centered(trimmed_to_aspect(art, FAVICON_ASPECT), 32, 32, (0, 0, 0, 0))
+def maskable_icon(image, size):
+    icon = resized(image, size)
+    reach = farthest_mark_reach(icon)
+    print(f"maskable mark reaches {reach:.1f}px from center, limit {MASKABLE_SAFE_RADIUS * size:.1f}px")
+    if reach > MASKABLE_SAFE_RADIUS * size:
+        raise SystemExit("The mark leaves the maskable safe zone.")
+    return icon
 
 
 def main():
-    art = artwork()
-    background = layout_background()
+    app_icon = master(APP_ICON_SOURCE)
 
-    favicon(art).save(PUBLIC / "favicon.ico", sizes=[(32, 32)])
-    plain_icon(art, 180, background).convert("RGB").save(PUBLIC / "apple-touch-icon.png")
-    plain_icon(art, 192, background).convert("RGB").save(PUBLIC / "icon-192.png")
-    plain_icon(art, 512, background).convert("RGB").save(PUBLIC / "icon-512.png")
-    maskable_icon(art, 512, background).convert("RGB").save(PUBLIC / "icon-maskable-512.png")
+    resized(master(FAVICON_SOURCE), 32).convert("RGBA").save(PUBLIC / "favicon.ico", sizes=[(32, 32)])
+    resized(app_icon, 180).save(PUBLIC / "apple-touch-icon.png")
+    resized(app_icon, 192).save(PUBLIC / "icon-192.png")
+    resized(app_icon, 512).save(PUBLIC / "icon-512.png")
+    maskable_icon(app_icon, 512).save(PUBLIC / "icon-maskable-512.png")
 
 
 if __name__ == "__main__":

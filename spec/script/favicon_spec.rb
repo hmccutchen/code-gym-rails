@@ -64,9 +64,7 @@ RSpec.describe "public/favicon.ico" do
     expect([ rows.first.size, rows.size ]).to eq([ 32, 32 ])
   end
 
-  it "is cropped so the artwork fills nearly the full height of the tab icon" do
-    occupied = rows.each_index.select { |y| rows[y].any?(&:positive?) }
-
-    expect(occupied.last - occupied.first + 1).to be >= 29
+  it "is opaque, so it carries its own navy fill on any tab" do
+    expect(rows.flatten.uniq).to eq([ 255 ])
   end
 end
