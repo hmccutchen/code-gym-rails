@@ -278,5 +278,13 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("addEventListener(\"push\"")
     end
+
+    it "versions the notification icon by its bytes, since production caches public files for a year" do
+      get "/service-worker.js"
+
+      icon = Object.new.extend(PublicFileHelper).versioned_public_path("icon-192.png")
+      expect(response.body).to include(%(icon: "#{icon}"), %(badge: "#{icon}"))
+      expect(response.body).not_to include('"/icon-192.png"')
+    end
   end
 end

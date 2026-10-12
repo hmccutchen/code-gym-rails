@@ -2849,7 +2849,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   circle. The nav logo (`logo-outlined.png`, and `logo.png` under the light
   palette) is separate artwork; `logo-square.png` and
   `logo-outlined-square.png` are no longer read by anything. Production
-  caches `public/` for a year, so the layout and the manifest link every icon
+  caches `public/` for a year, so the layout, the manifest and the service
+  worker's notification link every icon
   through `PublicFileHelper#versioned_public_path`, which appends a digest of
   the file's bytes: regenerated icons get new URLs with nothing to bump.
   iOS still keeps the icon it saved when the app was added, so an existing
@@ -3291,7 +3292,7 @@ always pull in the full suite — is stated once, in
 - `app/controllers/concerns/json_errors.rb` — `render_json_error`: the one shape of a JSON error reply
 - `app/views/shared/_push_script.html.erb` — mounts the `push-launch` controller, which re-subscribes on launch through `app/javascript/code_gym/push.js`; rendered from the layout for a signed-in user when push is configured
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
-- `app/views/pwa/service-worker.js` — shows the notification. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing
+- `app/views/pwa/service-worker.js.erb` — shows the notification, with the versioned icon. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing
 - `app/services/schema_wait.rb` — blocks the worker's Railway pre-deploy step until the schema the Solid Queue supervisor boots against exists; waits rather than migrating, so migrations keep exactly one owner
 - `app/services/preview_environment.rb` — single authority for "is this a Railway PR deployment," derived from `PREVIEW_APP`
 - `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PreviewEnvironment.active?`
