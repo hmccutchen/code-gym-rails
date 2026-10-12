@@ -2844,7 +2844,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `app/assets/images/app-icon-master.png` (the kettlebell between braces) for
   `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` and
   `icon-maskable-512.png`, and `favicon-master.png` (the kettlebell alone,
-  since the braces make it too wide to read at 32px) for `favicon.ico`.
+  since the braces make it too wide to read at 32px) for `favicon.ico`, which
+  holds 16, 32 and 48px frames, and `favicon-96.png`. The layout declares
+  both with their sizes, so a high-density screen picks a large enough one
+  instead of enlarging 32 pixels, which looked blocky.
   `script/generate_icons.py` resizes them with Lanczos and composites
   nothing, since an opaque icon has no transparent pixels for iOS to fill
   with black. The maskable icon is the same image: the script fails if the

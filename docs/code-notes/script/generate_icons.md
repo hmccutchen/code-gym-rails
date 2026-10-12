@@ -32,3 +32,9 @@ and still catches the mark's antialiased edges.
 
 The favicon is the kettlebell alone, opaque on the same navy, because the
 braces make the mark too wide to read at 32px.
+
+The layout offers two files so the browser can pick a size that fits the
+screen. `favicon.ico` holds 16, 32 and 48px frames, which Pillow resizes from
+the master with Lanczos, and `favicon-96.png` covers screens at 2x and 3x.
+When the ICO held only 32px, a high-density tab enlarged it, and the mark
+looked blocky.
