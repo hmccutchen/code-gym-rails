@@ -135,23 +135,22 @@ RSpec.describe ExerciseSection::DesignComparison do
       expect(described_class.parse_answer("b\n#{reason}")).to eq([ nil, reason ])
     end
 
-    it "counts as answered only with a pick and a reason of at least the minimum length" do
-      short = "x" * (described_class::MIN_REASON_LENGTH - 1)
-      long  = "x" * described_class::MIN_REASON_LENGTH
-
-      expect(described_class.answered?("pick:a\n#{long}")).to be(true)
-      expect(described_class.answered?("pick:a\n#{short}")).to be(false)
-      expect(described_class.answered?("\n#{long}")).to be(false)
+    it "counts as answered with a pick and any reason, however short" do
+      expect(described_class.answered?("pick:a\n#{reason}")).to be(true)
+      expect(described_class.answered?("pick:a\nRetries")).to be(true)
+      expect(described_class.answered?("pick:a\n   ")).to be(false)
+      expect(described_class.answered?("\n#{reason}")).to be(false)
       expect(described_class.answered?("pick:a")).to be(false)
     end
 
     it "is the authority DailyResponse.answered? reads" do
-      expect(DailyResponse.answered?("design_comparison", "pick:a\nfine", {})).to be(false)
-      expect(DailyResponse.answered?("design_comparison", "pick:a\n#{reason}", {})).to be(true)
+      expect(DailyResponse.answered?("design_comparison", "pick:a\n", {})).to be(false)
+      expect(DailyResponse.answered?("design_comparison", "pick:a\nfine", {})).to be(true)
     end
 
-    it "shows nothing for a pick with too short a reason" do
-      expect(described_class.answer_for("pick:a\nshort")).to be_nil
+    it "shows nothing for a pick with no reason, and shows a short one" do
+      expect(described_class.answer_for("pick:a\n  ")).to be_nil
+      expect(described_class.answer_for("pick:a\nshort")).to be_present
     end
   end
 

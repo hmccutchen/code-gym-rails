@@ -40,13 +40,14 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
       within(comparison) do
         expect(page).to have_css("legend", text: "Which piece fits this system better?")
         choose("Piece B")
-        fill_in("What decides it?", with: "Too short")
       end
-      wait_for_saved_comparison(user, "pick:b\nToo short")
+      wait_for_saved_comparison(user, "pick:b\n")
       expect(page).to have_css(".section-status[data-status-for='design_comparison']", text: "", exact_text: true)
 
-      within(comparison) { fill_in("What decides it?", with: reason) }
+      within(comparison) { fill_in("What decides it?", with: "Retries") }
       expect(page).to have_css(".section-status[data-status-for='design_comparison']", text: in_progress)
+
+      within(comparison) { fill_in("What decides it?", with: reason) }
       expect(hidden_answer.value).to eq("pick:b\n#{reason}")
 
       rate_section("design_comparison")
@@ -85,25 +86,6 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
 
       expect(ExerciseSection::DesignComparison.parse_answer(user.daily_responses.sole.answers["design_comparison"]))
         .to eq([ nil, reason ])
-    end
-  end
-
-  # The server counts code points: an emoji is one code point but two UTF-16 units.
-  it "shows the reason as complete only once the server counts it long enough, in code points" do
-    travel_to(a_weekday) do
-      user = create_fake_provider_user
-      visit_with_todays_set(user)
-      floor = ExerciseSection::DesignComparison::MIN_REASON_LENGTH
-
-      within(comparison) do
-        choose("Piece A")
-        fill_in("What decides it?", with: "\u{1F600}" * (floor - 1))
-      end
-      wait_for_saved_comparison(user, "pick:a\n#{"\u{1F600}" * (floor - 1)}")
-      expect(page).to have_css(".section-status[data-status-for='design_comparison']", text: "", exact_text: true)
-
-      within(comparison) { fill_in("What decides it?", with: "\u{1F600}" * floor) }
-      expect(page).to have_css(".section-status[data-status-for='design_comparison']", text: in_progress)
     end
   end
 end

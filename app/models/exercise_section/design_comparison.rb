@@ -2,8 +2,6 @@
 class ExerciseSection::DesignComparison < ExerciseSection
   MAX_PIECE_LINES = 24
 
-  MIN_REASON_LENGTH = 40
-
   PICK_PREFIX = "pick:".freeze
   PIECES = %w[a b].freeze
 
@@ -146,7 +144,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
 
     def answered?(value, _section_data = nil)
       pick, reason = parse_answer(value)
-      pick.present? && reason.length >= MIN_REASON_LENGTH
+      pick.present? && reason.present?
     end
 
     def review_context(section:, answer:, rating:)
