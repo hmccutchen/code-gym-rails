@@ -61,10 +61,42 @@
     clear: forward("CodeGymSaveStatus", "clear")
   }
 
+  var PULL_NOTE = "codegym:pull-refreshed"
+  var PULL_HOLD = "pull-resuming"
+  var PULL_HOLD_LIMIT_MS = 10000
+  var pullHoldTimer = null
+
+  // sessionStorage throws in some private modes; the pull's spinner is only polish.
+  function withSessionStorage(use) {
+    try { return use(window.sessionStorage) } catch (error) { return null }
+  }
+
+  function releasePullHold() {
+    clearTimeout(pullHoldTimer)
+    var held = document.documentElement.classList.contains(PULL_HOLD)
+    document.documentElement.classList.remove(PULL_HOLD)
+    return held
+  }
+
+  var pullNoted = withSessionStorage(function (storage) {
+    var noted = storage.getItem(PULL_NOTE)
+    storage.removeItem(PULL_NOTE)
+    return noted
+  })
+
+  if (pullNoted) {
+    document.documentElement.classList.add(PULL_HOLD)
+    pullHoldTimer = setTimeout(releasePullHold, PULL_HOLD_LIMIT_MS)
+  }
+
   window.CodeGymEarlyEdit = early
   window.CodeGymSaveStatus.watch(function () { return early.dirty })
 
   window.CodeGymBootstrap = {
+    pullRefresh: {
+      note: function () { withSessionStorage(function (storage) { storage.setItem(PULL_NOTE, "1") }) },
+      release: releasePullHold
+    },
     settleEarlyEdits: function () {
       document.removeEventListener("input", recordEdit, true)
       document.removeEventListener("change", recordEdit, true)

@@ -28,6 +28,7 @@
       --accent: #7c6af7; --text: #e0e0f0; --muted: #999;
       --accent-text: #988bf9;
       --button-bg: #6a57e8; --button-bg-hover: #5b48d9;
+      --pull-hold: 64px;
       --focus-ring: #c9c0ff; --focus-ring-width: 2px; --focus-ring-offset: 2px;
       --green: #4ade80; --red: #f87171; --yellow: #fbbf24;
       --code-bg: #0d0d1a; --code-symbol: #a78bfa; --code-builtin: #7dd3fc;
@@ -161,6 +162,7 @@
     }
     .pull-refresh.is-ready .spinner, .pull-refresh.is-refreshing .spinner { opacity: 1; }
     .pull-refresh.is-refreshing .spinner { animation: spin .7s linear infinite; }
+    html.pull-resuming [data-pull-content] { transform: translateY(var(--pull-hold)); }
     .pull-refresh.is-settling, .pull-settling { transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .3s ease; }
 
     code, kbd, samp, pre { font-family: monospace, monospace; }
