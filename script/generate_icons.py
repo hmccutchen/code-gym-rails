@@ -11,7 +11,7 @@ PUBLIC = ROOT / "public"
 
 # Every pixel that differs from the fill stays inside the 80% safe-zone circle all platform masks keep.
 MASKABLE_SAFE_RADIUS = 0.4
-# The master's fill carries an invisible panel a few levels off the corner color, which is not part of the mark.
+# Near-navy noise a few levels off the corner color is not part of the mark.
 FILL_TOLERANCE = 8
 
 

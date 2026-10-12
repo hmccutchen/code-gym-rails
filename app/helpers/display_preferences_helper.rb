@@ -15,12 +15,12 @@ module DisplayPreferencesHelper
 
   # Uses the light palette's own media value, so the logo and palette can never disagree.
   def brand_mark
-    outlined = image_tag("logo-outlined.png", alt: t("app_name"), class: "brand-mark", width: 930, height: 654)
-    return outlined unless display_stylesheets?
+    mark = image_tag("brand-mark.png", alt: t("app_name"), class: "brand-mark", width: 723, height: 492)
+    return mark unless display_stylesheets?
 
     tag.picture do
-      tag.source(srcset: image_path("logo.png"), media: display_preferences.light_palette_media,
-                 data: { light_palette_media: true }) + outlined
+      tag.source(srcset: image_path("brand-mark-light.png"), media: display_preferences.light_palette_media,
+                 width: 512, height: 512, data: { light_palette_media: true }) + mark
     end
   end
 end

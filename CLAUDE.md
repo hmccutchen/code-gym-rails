@@ -2838,23 +2838,32 @@ concept-specific difficulty descriptions for future generation, not a new set.
   move from the collapsed menu to a bottom tab bar (`shared/_tab_bar`, built
   from `NavigationHelper#nav_destinations`), which pads itself clear of the
   home indicator with `env(safe-area-inset-bottom)`. A browser tab and a
-  desktop install keep the top nav. The icons come from two opaque 1024px
-  masters with their own navy fill: `app/assets/images/app-icon-master.png`
-  (braces and kettlebell) for `apple-touch-icon.png`, `icon-192.png`,
-  `icon-512.png` and `icon-maskable-512.png`, and `favicon-master.png` (the
-  kettlebell alone) for the 32px `favicon.ico`. `script/generate_icons.py`
-  resizes them with Lanczos and composites nothing, since an opaque icon has
-  no transparent pixels for iOS to fill with black. The maskable icon is the
-  same image, and the script fails if the mark reaches past the 80% safe
-  circle. The nav logo (`logo-outlined.png`, and `logo.png` under the light
-  palette) is separate artwork; `logo-square.png` and
-  `logo-outlined-square.png` are no longer read by anything. Production
+  desktop install keep the top nav. One brand mark, a violet kettlebell
+  between braces, is used everywhere. The icons come from two opaque 1024px
+  masters on the navy `rgb(25, 25, 45)`:
+  `app/assets/images/app-icon-master.png` (the kettlebell between braces) for
+  `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` and
+  `icon-maskable-512.png`, and `favicon-master.png` (the kettlebell alone,
+  since the braces make it too wide to read at 32px) for `favicon.ico`.
+  `script/generate_icons.py` resizes them with Lanczos and composites
+  nothing, since an opaque icon has no transparent pixels for iOS to fill
+  with black. The maskable icon is the same image: the script fails if the
+  mark reaches more than 40% of the size from the center, the 80% safe circle
+  every platform mask keeps, and `spec/script/maskable_icon_spec.rb` repeats
+  that check on the committed file, since CI has no Pillow. The current mark
+  reaches 35.6%. The nav shows `brand-mark.png`, the transparent mark, and
+  under the light palette `brand-mark-light.png`, the mark on a rounded dark
+  tile, through the `<picture>` source `DisplayPreferencesHelper#brand_mark`
+  writes; both are sized by height with `width: auto`, so the square tile
+  keeps its shape. The older pixel-lifter files (`logo*.png`) are no longer
+  read by anything. Production
   caches `public/` for a year, so the layout, the manifest and the service
   worker's notification link every icon
   through `PublicFileHelper#versioned_public_path`, which appends a digest of
   the file's bytes: regenerated icons get new URLs with nothing to bump.
   iOS still keeps the icon it saved when the app was added, so an existing
-  home-screen install shows new art only after it is removed and added again.
+  home-screen install shows new art only after it is removed and added again,
+  and the same goes for a new mark.
   Standalone mode itself still needs no service worker — but one is registered
   now, for the daily reminder (see "Push reminders" below); `GET
   /service-worker.js` serves it from the root path, since a worker's scope is
@@ -2926,7 +2935,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   opaque mask pixel, including through tinted backgrounds.
 
   **The other display defaults remain unchanged**: no attribute on
-  `<html>`, no stylesheet link, the same outlined logo, the same `black`
+  `<html>`, no stylesheet link, the same dark brand mark, the same `black`
   status bar. A chosen value renders as a `data-*` attribute on `<html>` for
   the first paint. `display.css` holds text size, spacing and the font;
   `display_light.css` holds the light palette. The layout links both only for

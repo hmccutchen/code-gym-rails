@@ -20,11 +20,13 @@ and fails when it is past 40% of the size from the center.
 
 ## FILL_TOLERANCE
 
-The app icon master has a panel behind the mark whose navy is 1 to 3 levels
-off the corner color in each channel. Nobody can see it, but an exact
-comparison counts its corners as the mark and fails the safe-zone check.
-Requiring a difference above 8 levels skips that panel and still catches the
-mark's antialiased edges.
+An earlier master had a panel behind the mark whose navy was 1 to 3 levels
+off the corner color in each channel. Nobody could see it, but an exact
+comparison counted its corners as the mark and failed the safe-zone check.
+The current violet master has no such panel and measures the same at a
+tolerance of 0 or 8, but requiring a difference above 8 levels keeps the
+check about the visible mark whatever near-navy noise a later master carries,
+and still catches the mark's antialiased edges.
 
 ## favicon
 
