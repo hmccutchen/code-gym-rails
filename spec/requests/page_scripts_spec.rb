@@ -28,10 +28,19 @@ RSpec.describe "Page scripts", type: :request do
     expect(body["data-save-failed-text"]).to eq(I18n.t("save_status.generic"))
   end
 
+  it "marks only a signed-out page, where the device's copy of unsent answers is deleted" do
+    expect(doc.at_css("body")["data-signed-out-page"]).to be_nil
+
+    reset!
+    get login_path
+
+    expect(doc.at_css("body")["data-signed-out-page"]).to eq("true")
+  end
+
   it "loads the shared modules through importmap" do
     importmap = JSON.parse(doc.at_css('script[type="importmap"]').text)
 
-    expect(importmap["imports"]).to include("application", "code_gym/request", "code_gym/save_status")
+    expect(importmap["imports"]).to include("application", "code_gym/request", "code_gym/save_status", "code_gym/draft_store")
     expect(doc.at_css('script[type="module"]')).to be_present
   end
 

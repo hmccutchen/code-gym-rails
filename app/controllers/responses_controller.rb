@@ -269,7 +269,8 @@ class ResponsesController < ApplicationController
     respond_to do |format|
       format.json do
         if saved
-          payload = { status: "saved", completeness: @response.completeness, submitted: @response.submitted?, **submit_state }
+          payload = { status: "saved", completeness: @response.completeness, submitted: @response.submitted?,
+                      draft_token: @response.draft_token, **submit_state }
           payload[:review_url] = review_response_path(@response) if response_params[:submit] == "1"
           render json: payload
         else

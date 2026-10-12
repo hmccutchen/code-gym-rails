@@ -71,6 +71,22 @@ later, not a microtask, so the reply's own handlers have updated whatever the
 next body is built from (the mix's version, again). Waiting saves count toward
 `pending()`.
 
+`offline` retries a save that got no reply at all (the fetch rejected), and
+shows the given sentence instead of the generic one while it waits. Only the
+dashboard's answers pass it. It waits for the browser's `online` event or a
+timer (`RETRY_DELAYS_MS`, 5 to 30 seconds), whichever comes first, then reads
+the body again, so the retry carries the newest answers. A refusal, a 5xx and
+the signed-out redirect all got a reply and are never retried. The line stays
+busy while it waits, so `pending()` stays true and pull-to-refresh will not
+reload over the unsent save. Every attempt goes through `save()`, so the
+`issued` ticket check still applies to each one.
+
+A lost connection can also mean the server stored the save and only the reply
+was lost. Retrying is safe for answers because `ResponsesController#create`
+accepts the same payload twice. It would be wrong for the track proposal's
+answer count, which increments on every request, and that is why retrying is
+opt-in per queue rather than the default.
+
 `quiet` keeps a queued save's failures out of the banner. The nav name editor
 shows its own "couldn't save" line beside the field, and the layout's one-shot
 time-zone detection is something the user never asked for, so neither should

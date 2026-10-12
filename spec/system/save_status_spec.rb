@@ -24,7 +24,7 @@ RSpec.describe "Save status", type: :system do
       find(%(textarea[data-field="code_review"]))
         .fill_in(with: "An answer the server is never going to receive.")
 
-      expect(page).to have_css("#save-status", text: /couldn't save/i, wait: 5)
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"), wait: 5)
       expect(user.daily_responses).to be_empty
     end
   end

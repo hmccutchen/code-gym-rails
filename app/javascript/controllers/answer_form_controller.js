@@ -2,6 +2,7 @@
 import { Controller } from "@hotwired/stimulus"
 import request from "code_gym/request"
 import saveStatus from "code_gym/save_status"
+import draftStore from "code_gym/draft_store"
 
 const AUTOSAVE_DELAY_MS = 800
 
@@ -12,6 +13,7 @@ export default class extends Controller {
     answeredSections: Array,
     submitBlocker: String,
     draftScope: String,
+    draftToken: String,
     answeredCount: String,
     allAnswered: String,
     staleReloaded: String,
@@ -19,6 +21,8 @@ export default class extends Controller {
     submitLabel: String,
     generatingReview: String,
     submitFailed: String,
+    savingOffline: String,
+    submitOffline: String,
     reviewStartFailed: String,
     controlsNotReady: String
   }
@@ -36,8 +40,14 @@ export default class extends Controller {
       this.ratings[button.dataset.ratingFor] = button.dataset.rating
     })
 
+    this.draftToken = this.draftTokenValue
+    this.offlineSubmit = false
+    const restored = this.restoreDraft()
+
     saveStatus.watch(() => this.saveTimer !== null)
-    if (this.textareas.some((area) => area.value !== area.defaultValue)) this.autoSave()
+    if (restored || this.textareas.some((area) => area.value !== area.defaultValue)) this.autoSave()
+    this.onOnline = () => this.retryAfterOfflineSubmit()
+    window.addEventListener("online", this.onOnline)
     this.onPageShow = (event) => {
       // Safari bfcaches this no-store page anyway (every iOS home-screen launch), so reload a stale submitted form.
       if (event.persisted && this.reviewRequested) window.location.reload()
@@ -51,6 +61,41 @@ export default class extends Controller {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
     window.removeEventListener("pageshow", this.onPageShow)
+    window.removeEventListener("online", this.onOnline)
+  }
+
+  restoreDraft() {
+    const draft = draftStore.read()
+    if (!draft || draft.token !== this.draftToken) {
+      draftStore.clear()
+      return false
+    }
+    this.textareas.filter((area) => !area.closest("[data-controller~='parsons']")).forEach((area) => {
+      const saved = draft.answers?.[area.dataset.field]
+      if (typeof saved !== "string" || area.value !== area.defaultValue) return
+      area.value = saved
+      area.dispatchEvent(new CustomEvent("answer-form:restored", { bubbles: true }))
+    })
+    Object.entries(draft.ratings || {}).forEach(([section, rating]) => this.showRating(section, rating))
+    return true
+  }
+
+  storeDraft() {
+    if (this.formTarget.inert) return
+    const { answers, section_ratings } = this.payload().response
+    draftStore.write({ token: this.draftToken, answers: answers, ratings: section_ratings })
+  }
+
+  settleDraft(data) {
+    if (typeof data?.draft_token === "string") this.draftToken = data.draft_token
+    if (JSON.stringify(this.lastSent) === JSON.stringify(this.payload())) draftStore.clear()
+    else this.storeDraft()
+  }
+
+  nextSave() {
+    if (this.formTarget.inert) return null
+    this.lastSent = this.payload()
+    return this.lastSent
   }
 
   isAnswered(textarea) {
@@ -104,22 +149,29 @@ export default class extends Controller {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
     if (this.formTarget.inert) return
-    saveStatus.queue("answers", "POST", this.formTarget.action, () => (this.formTarget.inert ? null : this.payload()), { latest: true })
+    this.storeDraft()
+    saveStatus.queue("answers", "POST", this.formTarget.action, () => this.nextSave(), { latest: true, offline: this.savingOfflineValue })
       .then(({ ok, status, data, skipped }) => {
         if (skipped) return
         if (ok) saveStatus.clear("submit")
+        if (ok) this.settleDraft(data)
         if (!ok && status === 409 && data?.status === "stale") {
+          draftStore.clear()
           saveStatus.carry("answers", this.staleReloadedValue)
           window.location.reload()
           return
         }
-        if (ok && data?.submitted && !this.formTarget.inert && !this.reviewRequested) return window.location.reload()
+        if (ok && data?.submitted && !this.formTarget.inert && !this.reviewRequested) {
+          draftStore.clear()
+          return window.location.reload()
+        }
         if (ok && this.saveTimer === null && !saveStatus.queued("answers") && !this.formTarget.inert) this.applyServerState(data)
       })
   }
 
   autoSave() {
     clearTimeout(this.saveTimer)
+    this.storeDraft()
     this.saveTimer = this.formTarget.inert ? null : setTimeout(() => this.sendSave(), AUTOSAVE_DELAY_MS)
   }
 
@@ -142,13 +194,19 @@ export default class extends Controller {
   rate(event) {
     const button = event.target.closest("button[data-rating-for]")
     if (!button) return
-    const section = button.dataset.ratingFor
-    this.ratings[section] = button.dataset.rating
-    this.formTarget.querySelectorAll(`button[data-rating-for="${section}"]`).forEach((other) => {
-      other.classList.toggle("active", other === button)
-      other.setAttribute("aria-pressed", other === button)
-    })
+    this.showRating(button.dataset.ratingFor, button.dataset.rating)
     this.sendSave()
+  }
+
+  showRating(section, rating) {
+    const buttons = [...this.formTarget.querySelectorAll(`button[data-rating-for="${section}"]`)]
+    const chosen = buttons.find((button) => button.dataset.rating === rating)
+    if (!chosen) return
+    this.ratings[section] = rating
+    buttons.forEach((other) => {
+      other.classList.toggle("active", other === chosen)
+      other.setAttribute("aria-pressed", other === chosen)
+    })
   }
 
   requestReview(url) {
@@ -178,6 +236,7 @@ export default class extends Controller {
 
     const result = await request.send("POST", this.formTarget.action, this.payload({ submit: "1" }), { fallback: this.submitFailedValue })
     if (result.ok) saveStatus.clear("submit")
+    if (result.ok || result.status === 409) draftStore.clear()
     if (this.startReview(result) || this.reloadAfterSubmit(result)) return
 
     const refused = result.status === 422 && Boolean(result.data?.submit_blocker)
@@ -185,10 +244,18 @@ export default class extends Controller {
       saveStatus.clear("submit")
       this.applyServerState(result.data)
     } else {
-      saveStatus.report("submit", result.message)
+      this.offlineSubmit = result.status === 0
+      saveStatus.report("submit", this.offlineSubmit ? this.submitOfflineValue : result.message)
     }
-    this.unlock()
+    this.unlock({ autosave: !this.offlineSubmit })
     if (refused) this.nudgeTarget.focus()
+  }
+
+  retryAfterOfflineSubmit() {
+    if (!this.offlineSubmit) return
+    this.offlineSubmit = false
+    saveStatus.clear("submit")
+    this.autoSave()
   }
 
   formControllersConnected() {
@@ -229,11 +296,11 @@ export default class extends Controller {
     return true
   }
 
-  unlock() {
+  unlock({ autosave = true } = {}) {
     this.formTarget.inert = false
     this.submitButtonTarget.classList.remove("btn-loading")
     this.submitButtonTarget.textContent = this.submitLabelValue
     this.submitButtonTarget.disabled = false
-    this.autoSave()
+    if (autosave) this.autoSave()
   }
 }

@@ -54,6 +54,7 @@
   <div data-controller="answer-form" data-answer-form-answered-sections-value="<%= response.answered_sections.to_json %>"
        data-answer-form-submit-blocker-value="<%= submit_blocker %>"
        data-answer-form-draft-scope-value="<%= exercise.draft_scope %>"
+       data-answer-form-draft-token-value="<%= response.draft_token %>"
        data-answer-form-answered-count-value="<%= t("dashboard.exercise.answered_count") %>"
        data-answer-form-all-answered-value="<%= t("dashboard.exercise.all_answered") %>"
        data-answer-form-stale-reloaded-value="<%= t("dashboard.exercise.stale_reloaded") %>"
@@ -61,6 +62,8 @@
        data-answer-form-submit-label-value="<%= t("dashboard.exercise.submit") %>"
        data-answer-form-generating-review-value="<%= t("review.generating_label") %>"
        data-answer-form-submit-failed-value="<%= t("dashboard.exercise.submit_failed") %>"
+       data-answer-form-saving-offline-value="<%= t("dashboard.exercise.saving_offline") %>"
+       data-answer-form-submit-offline-value="<%= t("dashboard.exercise.submit_offline") %>"
        data-answer-form-review-start-failed-value="<%= t("dashboard.exercise.review_start_failed") %>"
        data-answer-form-controls-not-ready-value="<%= t("dashboard.exercise.controls_not_ready") %>">
     <div class="progress-sticky">

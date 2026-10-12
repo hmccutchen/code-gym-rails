@@ -320,6 +320,12 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.find_by(daily_exercise: exercise)).to be_nil
     end
 
+    it "answers each save with the draft token the next page load will render" do
+      save_with_scope(exercise.draft_scope)
+
+      expect(response.parsed_body["draft_token"]).to eq(DailyResponse.find_by(daily_exercise: exercise).draft_token)
+    end
+
     it "still saves a payload that names no scope" do
       post responses_path, params: { response: { answers: { "code_review" => answer } } }, as: :json
 

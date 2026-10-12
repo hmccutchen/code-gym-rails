@@ -86,3 +86,41 @@ arrived means the page needs a reload either way. A later click submits once
 the module has connected. `spec/system/deferred_module_spec.rb` answers the
 missing comparison module with a 404 and expects the stale pick to stay
 unsubmitted.
+
+## The copy on the device
+
+Every edit writes the answers and ratings to `code_gym/draft_store` with the
+draft token the copy was built on: the one the server rendered, or the one the
+last save reply carried. On connect, `restoreDraft()` puts a copy back only
+when its token equals the page's token, meaning the server's saved answers are
+still exactly the ones the copy started from. Anything else (another day, a
+regenerated set, a Start over, a save from another tab or device) deletes it.
+The token is a digest of the saved answers and ratings, not `updated_at`,
+because a pseudocode round writes the same row without touching the answers.
+
+A restored field is skipped when its value already differs from what the
+server rendered, since that is text typed before the controller connected.
+Parsons is never restored: its blocks are rendered in the server's order, and
+each move saves at once. A restored design comparison is told through the
+bubbling `answer-form:restored` event, and its own controller also checks on
+connect, because either controller can connect first.
+
+`settleDraft()` clears the copy when a save reply arrives for exactly the
+answers on screen, and otherwise rewrites it on the reply's token, so later
+edits stay kept. `nextSave()` records what each attempt sent, because the
+queue reads the body again on every retry. A submit, a stale refusal and a
+reload into the submitted page all clear it.
+
+When a save reaches the server but its reply is lost, and the page is killed
+before a retry, the next load renders a token the copy does not have. The copy
+is dropped and the server's draft shows. That draft holds the save that got
+through, so what is lost is limited to the edits made after it.
+
+## Submitting offline
+
+A submit that got no reply shows `submitOffline` instead of the generic
+failure and leaves Submit enabled. It does not restart the autosave, which
+would only replace that sentence with the saving-offline one a moment later.
+The browser's `online` event clears it and restarts the autosave. A submit is
+never queued: the server runs the review as part of it, which needs a live
+connection anyway.
