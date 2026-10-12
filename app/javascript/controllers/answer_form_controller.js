@@ -236,7 +236,7 @@ export default class extends Controller {
 
     const result = await request.send("POST", this.formTarget.action, this.payload({ submit: "1" }), { fallback: this.submitFailedValue })
     if (result.ok) saveStatus.clear("submit")
-    if (result.ok || result.status === 409) draftStore.clear()
+    if (result.ok) draftStore.clear()
     if (this.startReview(result) || this.reloadAfterSubmit(result)) return
 
     const refused = result.status === 422 && Boolean(result.data?.submit_blocker)
@@ -291,6 +291,7 @@ export default class extends Controller {
   reloadAfterSubmit(result) {
     const stale = result.status === 409
     if (!result.ok && !stale) return false
+    draftStore.clear()
     saveStatus.carry("answers", result.ok ? this.reviewStartFailedValue : this.staleReloadedValue)
     window.location.reload()
     return true
