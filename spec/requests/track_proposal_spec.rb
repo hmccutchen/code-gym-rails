@@ -51,10 +51,10 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(proposal_text).to include("Move Code Review up to senior?")
     expect(proposed_kinds).to eq([ "code_review" ])
     box = Nokogiri::HTML(response.body).at_css("#track-proposal")
-    expect(JSON.parse(box["data-levels"])).to eq(user.section_kind_levels)
-    expect(box["data-version"]).to eq(user.reload.section_kind_preferences_version.to_s)
-    expect(box["data-profile-url"]).to eq(profile_path)
-    expect(box["data-dismiss-url"]).to eq(learning_track_dismissal_path)
+    expect(JSON.parse(box["data-track-proposal-levels-value"])).to eq(user.section_kind_levels)
+    expect(box["data-track-proposal-version-value"]).to eq(user.reload.section_kind_preferences_version.to_s)
+    expect(box["data-track-proposal-url-value"]).to eq(profile_path)
+    expect(box["data-track-proposal-dismiss-url-value"]).to eq(learning_track_dismissal_path)
   end
 
   it "bundles led kinds and names the registry's lead" do

@@ -276,7 +276,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
       page.execute_script("window.releaseFirstSave()")
       wait_for_saved_answer(user, "code_review", "The newer answer, written while the first save waits.")
-      page.driver.with_playwright_page { |browser| browser.wait_for_function("!window.CodeGymSaveStatus.pending()") }
+      wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
       expect(user.daily_responses.reload.first.answers["code_review"]).to eq("The newer answer, written while the first save waits.")
     end
   end
@@ -300,7 +300,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       JS
 
       rate_section("code_review")
-      page.driver.with_playwright_page { |browser| browser.wait_for_function("!window.CodeGymSaveStatus.pending()") }
+      wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
 
       expect(status).to have_text(I18n.t("responses.section_status.in_progress"))
       expect(status).not_to have_text("✓")

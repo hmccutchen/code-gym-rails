@@ -1,54 +1,16 @@
 <%# Required locals: awaiting ("guide", "ladder" or "lesson"), message, button, generation_version (Integer or nil) %>
-<div id="learn-guide"
-     data-url="<%= prepare_learn_concept_path(bucket: @bucket, concept: @concept) %>"
-     data-status-url="<%= learn_concept_status_path(bucket: @bucket, concept: @concept, awaiting: awaiting, generation_version: generation_version) %>">
-  <p class="learn-no-guide"><%= message %></p>
-  <button type="button" class="btn btn-sm" id="write-guide"><%= button %></button>
-  <span class="learn-status" aria-live="polite"></span>
-</div>
-
-<%# Design notes: docs/code-notes/app/views/learn/_write_up_control.html.md %>
 <% poll_interval_s = 2.0 %>
-<script>
-  (function () {
-    const box    = document.getElementById("learn-guide");
-    const button = document.getElementById("write-guide");
-    const status = box.querySelector(".learn-status");
-
-    const INTERVAL_MS = <%= (poll_interval_s * 1000).to_i %>;
-    const MAX_ATTEMPTS = <%= (AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT) / poll_interval_s).ceil %>;
-    const FAILED = "<%= j t("learn.write_guide_failed") %>";
-    let attempts = 0;
-
-    async function poll() {
-      attempts++;
-      if (attempts > MAX_ATTEMPTS) {
-        status.textContent = FAILED;
-        return;
-      }
-
-      const { ok, data } = await CodeGymRequest.get(box.dataset.statusUrl);
-      if (!ok || !data) return setTimeout(poll, INTERVAL_MS);
-      if (data.ready) return window.location.reload();
-      if (data.rewritten) return window.location.assign(window.location.pathname + "?<%= awaiting %>=missing");
-      if (data.failed) {
-        status.textContent = data.message;
-        button.disabled = false;
-        return;
-      }
-      setTimeout(poll, INTERVAL_MS);
-    }
-
-    button.addEventListener("click", async () => {
-      attempts = 0;
-      button.disabled = true;
-      status.textContent = "<%= j t("learn.writing_guide") %>";
-
-      const result = await CodeGymRequest.send("POST", box.dataset.url, undefined, { fallback: FAILED });
-      if (result.ok) return poll();
-
-      button.disabled = false;
-      status.textContent = result.message;
-    });
-  })();
-</script>
+<div id="learn-guide" data-controller="write-up-control"
+     <%= tag.attributes(data: {
+           write_up_control_url_value: prepare_learn_concept_path(bucket: @bucket, concept: @concept),
+           write_up_control_status_url_value: learn_concept_status_path(bucket: @bucket, concept: @concept, awaiting: awaiting, generation_version: generation_version),
+           write_up_control_rewritten_url_value: learn_concept_path(bucket: @bucket, concept: @concept, awaiting => "missing"),
+           write_up_control_interval_ms_value: (poll_interval_s * 1000).to_i,
+           write_up_control_max_attempts_value: (AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT) / poll_interval_s).ceil,
+           write_up_control_writing_text_value: t("learn.writing_guide"),
+           write_up_control_failed_text_value: t("learn.write_guide_failed") }) %>>
+  <p class="learn-no-guide"><%= message %></p>
+  <button type="button" class="btn btn-sm" id="write-guide"
+          data-write-up-control-target="button" data-action="write-up-control#start"><%= button %></button>
+  <span class="learn-status" aria-live="polite" data-write-up-control-target="status"></span>
+</div>

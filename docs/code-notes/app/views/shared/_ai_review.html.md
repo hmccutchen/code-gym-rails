@@ -9,20 +9,21 @@ which is the one thing it must not be. It is read through
 `DailyResponse#difficulty_for`, which drops a level this app has no
 vocabulary for.
 
-## Script emitted once per request
+## Controllers mounted per reviewed section
 
-This partial can render once per history entry, up to one per reviewed session
-on the page. The script is therefore emitted into the layout's shared
-`:page_scripts` region, and only on the first render of the partial in a
-request, rather than inline, where it would ship one identical copy per entry.
-
-The `:not([data-alt-wired])` and `:not([data-fu-wired])` guards inside the
-script still matter. They let the single copy wire the controls that appear in
-every entry's markup without wiring a control twice and duplicating its
-listener.
+This partial loops over a response's reviewed sections, and it can render once
+per history entry, so a page holds one pair of controls for every reviewed
+section of every entry shown. The alternates and follow-ups controls are
+Stimulus controllers (`review-alternates`, `follow-ups`), so each section's
+markup mounts its own instance and no shared script has to be emitted once or
+guarded against wiring a control twice. Several instances in one entry are
+expected; deduplicating them would leave sections without their controls.
+`spec/requests/history_spec.rb` counts three follow-ups mounts because its
+fixture has three entries with one reviewed section each.
 
 ## Alternate status line
 
 The status line is set after an alternate lands and never cleared, because the
-explanation itself is inserted outside the live region. The concept
+explanation itself is inserted outside the live region; the rule lives in
+`review_alternates_controller.js`. The concept
 reference's alternates use the same pattern.

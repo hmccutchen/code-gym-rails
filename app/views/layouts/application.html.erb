@@ -425,113 +425,47 @@
     <%= stylesheet_link_tag "display_light", media: display_preferences.light_palette_media, data: { light_palette_media: true } %>
   <% end %>
 </head>
-<body <%= script_text_attributes %>>
+<body <%= script_text_attributes %>
+      data-controller="glossary code-lines mermaid"
+      data-action="click->glossary#click keydown->glossary#key focusin->glossary#reposition pointerover->glossary#reposition resize@window->glossary#repositionOpen">
   <% if display_preferences["background_pattern"] == "on" %>
     <div id="background-pattern" aria-hidden="true"></div>
   <% end %>
   <% if logged_in? %>
   <a class="skip-link" href="#main-content"><%= t("nav.skip_to_content") %></a>
-  <nav>
+  <nav data-controller="nav-menu"
+       data-action="click@document->nav-menu#closeOnOutsideClick keydown@document->nav-menu#closeOnEscape">
     <div class="container inner">
       <%= link_to root_path, class: "brand" do %><%= brand_mark %><span aria-hidden="true"><%= t("app_name") %></span><% end %>
       <button type="button" class="nav-toggle" id="nav-toggle"
               aria-expanded="false" aria-controls="nav-links"
-              aria-label="<%= t("nav.menu") %>">
+              aria-label="<%= t("nav.menu") %>"
+              data-nav-menu-target="toggle" data-action="nav-menu#toggle">
         <span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span>
       </button>
-      <div class="nav-links" id="nav-links">
-        <span class="name-editor">
+      <div class="nav-links" id="nav-links" data-nav-menu-target="links">
+        <span class="name-editor"
+              data-controller="name-editor"
+              data-name-editor-url-value="<%= profile_path %>"
+              data-name-editor-saved-text-value="<%= t("profile.name.saved") %>"
+              data-name-editor-error-text-value="<%= t("profile.name.error") %>">
           <input type="text"
                  id="nav-name-input"
                  class="name-editor-input"
                  value="<%= current_user.name %>"
-                 aria-label="<%= t("profile.name.aria_label") %>">
-          <span id="nav-name-status" class="name-editor-status" aria-live="polite"></span>
+                 aria-label="<%= t("profile.name.aria_label") %>"
+                 data-name-editor-target="input"
+                 data-action="blur->name-editor#save">
+          <span id="nav-name-status" class="name-editor-status" aria-live="polite"
+                data-name-editor-target="status"></span>
         </span>
-        <script>
-          (function () {
-            const input  = document.getElementById("nav-name-input");
-            const status = document.getElementById("nav-name-status");
-            if (!input) return;
-
-            let lastSaved = input.value;
-            const savedText = "<%= j t("profile.name.saved") %>";
-            const errorText = "<%= j t("profile.name.error") %>";
-            let statusTimer;
-
-            function flash(message) {
-              status.textContent = message;
-              clearTimeout(statusTimer);
-              statusTimer = setTimeout(() => { status.textContent = ""; }, 2000);
-            }
-
-            input.addEventListener("blur", async () => {
-              const name = input.value.trim();
-              if (name === lastSaved) return;
-              if (name === "") { input.value = lastSaved; return; }
-
-              const { ok, data } = await CodeGymSaveStatus.queue("name", "PATCH", "<%= profile_path %>",
-                () => ({ user: { name: input.value.trim() || name } }), { latest: true, quiet: true });
-              const saved = ok && typeof data?.name === "string";
-              if (saved) lastSaved = data.name;
-              if (CodeGymSaveStatus.queued("name")) return;
-              if (saved) {
-                input.value = data.name;
-                flash(savedText);
-              } else {
-                input.value = lastSaved;
-                flash(errorText);
-              }
-            });
-          })();
-        </script>
         <% if current_user.time_zone.blank? %>
-          <script>
-            (function () {
-              const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-              if (!tz) return;
-              document.addEventListener("DOMContentLoaded", function () {
-                CodeGymSaveStatus.queue("time_zone", "PATCH", "<%= profile_path %>", { user: { time_zone: tz } }, { quiet: true });
-              });
-            })();
-          </script>
+          <span data-controller="time-zone" data-time-zone-url-value="<%= profile_path %>"></span>
         <% end %>
         <% nav_destinations.drop(1).each do |destination| %>
           <%= link_to destination.label, destination.path, aria: { current: ("page" if nav_current?(destination.path)) } %>
         <% end %>
       </div>
-      <script>
-        (function () {
-          const toggle = document.getElementById("nav-toggle");
-          const links  = document.getElementById("nav-links");
-          if (!toggle || !links) return;
-
-          function closeMenu() {
-            links.removeAttribute("data-open");
-            toggle.setAttribute("aria-expanded", "false");
-          }
-
-          toggle.addEventListener("click", (event) => {
-            event.stopPropagation();
-            if (links.hasAttribute("data-open")) { closeMenu(); return; }
-            links.setAttribute("data-open", "");
-            toggle.setAttribute("aria-expanded", "true");
-          });
-
-          document.addEventListener("click", (event) => {
-            if (!links.hasAttribute("data-open")) return;
-            if (links.contains(event.target)) return;
-            closeMenu();
-          });
-
-          document.addEventListener("keydown", (event) => {
-            if (event.key !== "Escape") return;
-            if (!links.hasAttribute("data-open")) return;
-            closeMenu();
-            toggle.focus();
-          });
-        })();
-      </script>
     </div>
   </nav>
   <% end %>
@@ -549,84 +483,8 @@
     </main>
   </div>
   <%= render "shared/tab_bar" if logged_in? %>
-  <script>
-    (() => {
-      document.querySelectorAll("form[data-loading-form]").forEach(form => {
-        const button = form.querySelector('button[type="submit"], input[type="submit"]');
-        if (!button) return;
-
-        const isButtonTag = button.tagName === "BUTTON";
-        const originalLabel = isButtonTag ? button.textContent : button.value;
-        const setLabel = (text) => { if (isButtonTag) { button.textContent = text; } else { button.value = text; } };
-
-        form.addEventListener("submit", (event) => {
-          const message = form.dataset.confirmMessage;
-          if (message && !window.confirm(message)) { event.preventDefault(); return; }
-
-          // Deferred a tick: disabling synchronously inside the submit handler can cancel the submission.
-          setTimeout(() => {
-            button.disabled = true;
-            button.classList.add("btn-loading");
-            if (form.dataset.loadingLabel) setLabel(form.dataset.loadingLabel);
-          }, 0);
-        });
-
-        window.addEventListener("pageshow", (event) => {
-          if (!event.persisted) return;
-          button.disabled = false;
-          button.classList.remove("btn-loading");
-          setLabel(originalLabel);
-        });
-      });
-    })();
-  </script>
-  <script>
-    (() => {
-      const positionPanel = (term) => {
-        const box = term.closest(".section, .container");
-        if (!box) return;
-        const rect = box.getBoundingClientRect();
-        const pad = parseFloat(getComputedStyle(box).paddingLeft) || 0;
-        term.style.setProperty("--gloss-width", `${rect.width - pad * 2}px`);
-        term.style.setProperty("--gloss-shift", `${rect.left + pad - term.getBoundingClientRect().left}px`);
-      };
-
-      const toggleTerm = (term) => {
-        document.querySelectorAll(".gloss-term.gloss-open").forEach((el) => {
-          if (el !== term) el.classList.remove("gloss-open");
-        });
-        if (term && term.classList.toggle("gloss-open")) positionPanel(term);
-      };
-
-      document.addEventListener("click", (event) => {
-        toggleTerm(event.target.closest(".gloss-term"));
-      });
-
-      document.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        const term = event.target.closest(".gloss-term");
-        if (!term) return;
-        event.preventDefault();
-        toggleTerm(term);
-      });
-
-      const positionFromEvent = (event) => {
-        const term = event.target.closest && event.target.closest(".gloss-term");
-        if (term) positionPanel(term);
-      };
-      document.addEventListener("focusin", positionFromEvent);
-      document.addEventListener("pointerover", positionFromEvent);
-
-      window.addEventListener("resize", () => {
-        const open = document.querySelector(".gloss-term.gloss-open");
-        if (open) positionPanel(open);
-      });
-    })();
-  </script>
   <%= render "shared/push_script" if logged_in? && WebPushCredentials.configured? %>
   <%= render "shared/save_status_banner" if logged_in? %>
   <%= render "shared/pull_to_refresh" %>
-  <%= render "shared/code_lines_script" %>
-  <%= yield :page_scripts %>
 </body>
 </html>

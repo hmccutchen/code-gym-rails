@@ -34,11 +34,11 @@ RSpec.describe "Skill level on Setup", type: :system do
     JS
 
     select "Senior", from: "Skill level"
-    page.driver.with_playwright_page { |pw| pw.wait_for_function("typeof window.releaseSenior === 'function'") }
+    wait_for_js_condition("typeof window.releaseSenior === 'function'")
     select "Principal engineer", from: "Skill level"
     page.driver.with_playwright_page { |pw| pw.wait_for_timeout(300) }
     page.execute_script("window.releaseSenior()")
-    page.driver.with_playwright_page { |pw| pw.wait_for_function("!window.CodeGymSaveStatus.pending()") }
+    wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
 
     expect(user.reload.skill_level).to eq("principal_engineer")
     expect(default_labels).to eq([ "Your skill level (Principal engineer)" ])

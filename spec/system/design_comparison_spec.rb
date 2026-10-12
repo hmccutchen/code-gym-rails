@@ -1,6 +1,6 @@
 require "rails_helper"
 
-# The pick and reason write one stored answer through an inline script, which only a real browser runs.
+# The pick and reason write one stored answer through a Stimulus controller, which only a real browser runs.
 RSpec.describe "Answering a design comparison on a phone", type: :system do
   let(:reason) { "A new carrier is added every month, so the registry means no edit to working code." }
 

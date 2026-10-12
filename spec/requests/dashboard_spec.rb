@@ -72,7 +72,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     get root_path
 
     expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
-    expect(response.body).to include('data-submit-blocker="unrated"')
+    expect(response.body).to include('data-answer-form-submit-blocker-value="unrated"')
     expect(response.body).to match(/id="rating-nudge"(?![^>]*hidden)/)
     expect(response.body).to include("Rate each section you answered to finish up.")
   end
@@ -84,7 +84,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     get root_path
 
     expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
-    expect(response.body).to include('data-answered-sections="[]"')
+    expect(response.body).to include('data-answer-form-answered-sections-value="[]"')
     expect(response.body).to include("Answer at least one section to finish up.")
   end
 
@@ -93,8 +93,11 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     get root_path
 
-    carried = response.body.scan(/CodeGymSaveStatus\.carry\("answers", STALE_RELOADED\);\s*\n\s*window\.location\.reload\(\);/)
-    expect(carried.length).to eq(response.body.scan(/status === 409 && data\?\.status === "stale"/).length)
+    expect(response.body).to include('data-answer-form-stale-reloaded-value')
+
+    source = Rails.root.join("app/javascript/controllers/answer_form_controller.js").read
+    carried = source.scan(/saveStatus\.carry\("answers",[^\n]*\n\s*window\.location\.reload\(\)/)
+    expect(carried.length).to eq(source.scan(/status === 409/).length)
     expect(carried).not_to be_empty
   end
 
@@ -123,14 +126,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
       document = Nokogiri::HTML(response.body)
-      expect(document.at_css("#gym-form")["data-answered-sections"]).to eq("[]")
-      expect(document.at_css("#gym-form")["data-submit-blocker"]).to eq("unanswered")
+      expect(answer_form(document)["data-answer-form-answered-sections-value"]).to eq("[]")
+      expect(answer_form(document)["data-answer-form-submit-blocker-value"]).to eq("unanswered")
 
       draft.update!(answers: { "parsons_problem" => "order:#{(0...count).to_a.join(',')}" })
       get root_path
       document = Nokogiri::HTML(response.body)
-      expect(document.at_css("#gym-form")["data-answered-sections"]).to eq('["parsons_problem"]')
-      expect(document.at_css("#gym-form")["data-submit-blocker"]).to be_nil
+      expect(answer_form(document)["data-answer-form-answered-sections-value"]).to eq('["parsons_problem"]')
+      expect(answer_form(document)["data-answer-form-submit-blocker-value"]).to eq("")
     end
   end
 
@@ -279,7 +282,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(draft.answered_sections).to eq([ "code_review" ])
     expect(draft.answered_concept_tags).to eq("code_review" => "n_plus_one")
     expect(draft).to be_submittable
-    expect(document.at_css("#gym-form")["data-answered-sections"]).to eq('["code_review"]')
+    expect(answer_form(document)["data-answer-form-answered-sections-value"]).to eq('["code_review"]')
 
     draft.update!(submitted_at: Time.current)
     get root_path
@@ -468,9 +471,19 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     it "wires the loading-form contract with the confirm message" do
       create_exercise
       get root_path
-      expect(response.body).to include('data-loading-form="true"')
-      expect(response.body).to include('data-loading-label="Generating…"')
-      expect(response.body).to include("data-confirm-message")
+      expect(response.body).to include('data-controller="loading-form"')
+      expect(response.body).to include('data-loading-form-label-value="Generating…"')
+      expect(response.body).to include("data-loading-form-confirm-message-value")
+    end
+
+    it "renders Generate new set and Start over disabled until their confirmation is loaded" do
+      create_response(create_exercise)
+      get root_path
+      page = Nokogiri::HTML(response.body)
+      [ "Generate new set", "Start over" ].each do |label|
+        button = page.css("form[data-controller='loading-form'] button").find { |b| b.text.strip == label }
+        expect(button["disabled"]).not_to be_nil, label
+      end
     end
   end
 
@@ -508,8 +521,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).to include('id="nav-name-input"')
       expect(response.body).to include('value="Editable"')
-      expect(response.body).to include('CodeGymSaveStatus.queue("name", "PATCH", "' + profile_path + '"')
-      expect(response.body).to include('addEventListener("blur"')
+      expect(response.body).to include('data-controller="name-editor"')
+      expect(response.body).to include(%(data-name-editor-url-value="#{profile_path}"))
+      expect(response.body).to include("blur->name-editor#save")
     end
   end
 
@@ -572,7 +586,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       it "announces the generating hint's updates from inside a live region" do
         get root_path
 
-        expect(response.body).to include('id="generating-hint" aria-live="polite"')
+        hint = Nokogiri::HTML(response.body).at_css("#generating-hint")
+      expect(hint["aria-live"]).to eq("polite")
+      expect(hint["data-generating-target"]).to eq("hint")
       end
     end
 
@@ -590,8 +606,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       it "wires the weekend generate button as a loading form" do
         get root_path
-        expect(response.body).to include('data-loading-form="true"')
-        expect(response.body).to include('data-loading-label="Generating…"')
+        expect(response.body).to include('data-controller="loading-form"')
+        expect(response.body).to include('data-loading-form-label-value="Generating…"')
       end
     end
 
@@ -720,7 +736,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).to match(/<form[^>]*action="#{generate_path}"/)
       expect(response.body).to include(">Try again<")
-      expect(response.body).to include('data-loading-form="true"')
+      expect(response.body).to include('data-controller="loading-form"')
     end
   end
 
@@ -786,7 +802,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       get root_path
 
       expect(response.body).to include("This didn&#39;t quite land — try a different explanation")
-      expect(response.body).to include(%(data-url="#{explain_differently_concept_reference_path(reference)}"))
+      expect(response.body).to include(%(data-concept-alternates-url-value="#{explain_differently_concept_reference_path(reference)}"))
     end
 
     it "renders that control as a non-submitting button, since it sits inside #gym-form" do
@@ -1126,7 +1142,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).not_to include(%(<div class="parsons-controls">))
     end
 
-    it "ships the arrow-injection fallback and a touch delay so a stalled CDN is survivable" do
+    it "mounts the parsons controller, which carries the touch delay and the stalled-CDN fallback" do
       create_exercise(problem_set: {
         "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
         "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
@@ -1138,8 +1154,10 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       })
       get root_path
 
-      expect(response.body).to include("parsonsAddControls")
-      expect(response.body).to include("delayOnTouchOnly: true")
+      expect(response.body).to include(%(data-controller="parsons"))
+      source = Rails.root.join("app/javascript/controllers/parsons_controller.js").read
+      expect(source).to include("delayOnTouchOnly: true")
+      expect(source).to include("DRAG_FALLBACK_MS")
     end
 
     it "makes each block focusable and advertises the reorder shortcut, since drag is pointer-only" do
@@ -1311,8 +1329,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       travel_to Time.utc(2026, 8, 7, 12, 0, 0) do
         get root_path
 
-        attempts = response.body[/MAX_ATTEMPTS = (\d+)/, 1].to_i
-        interval = response.body[/POLL_INTERVAL_MS = (\d+)/, 1].to_i / 1000.0
+        poller = Nokogiri::HTML(response.body).at_css("[data-controller~='generating']")
+        attempts = poller["data-generating-max-attempts-value"].to_i
+        interval = poller["data-generating-interval-value"].to_i / 1000.0
 
         expect(attempts).to be_positive
         expect(attempts * interval).to be > AiService::GENERATION_READ_TIMEOUT
@@ -1379,8 +1398,10 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("🗺️ Structure diagram")
       expect(response.body).to include("mermaid-diagram")
       expect(response.body).to include("flowchart TD")
-      expect(response.body).to include("mermaid@11.17.2")
-      expect(response.body).to match(/securityLevel:\s*["']strict["']/)
+      expect(response.body).to include("mermaid")
+      source = Rails.root.join("app/javascript/controllers/mermaid_controller.js").read
+      expect(source).to include("mermaid@11.17.2")
+      expect(source).to match(/securityLevel:\s*["']strict["']/)
 
       expect(response.body).to include('data-owns-details="1"')
     end
@@ -1397,7 +1418,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body.scan("🗺️ Structure diagram").size).to eq(3)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
-      expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
+      expect(response.body.scan(%(data-controller="glossary code-lines mermaid")).size).to eq(1)
     end
 
     it "renders no disclosure or script for a stored diagram MermaidSource refuses, as rows from before ingest checks can hold" do
@@ -1421,7 +1442,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).not_to include('class="mermaid-diagram"')
       expect(response.body).not_to include("🗺️ Structure diagram")
-      expect(response.body).not_to include("mermaid@11.17.2")
     end
 
     it "still shows every section's diagram, each collapsed, on a submitted day, where the questions are still on screen" do
@@ -1438,7 +1458,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("graph LR")
       expect(response.body.scan("🗺️ Structure diagram").size).to eq(3)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
-      expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
+      expect(response.body.scan(%(data-controller="glossary code-lines mermaid")).size).to eq(1)
     end
 
     it "renders collapsible code_review/pattern diagrams alongside architecture's non-collapsible one on the same page" do
@@ -1458,7 +1478,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       # Architecture's diagram is collapsible: false, so its tradeoffs summary is its only wrapper.
       expect(response.body.scan("🗺️ Structure diagram").size).to eq(2)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
-      expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
+      expect(response.body.scan(%(data-controller="glossary code-lines mermaid")).size).to eq(1)
     end
   end
 end

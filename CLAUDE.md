@@ -217,6 +217,14 @@ decisions, not defaults that drifted into place:
   answer onto the page and sends it again in every reply, and the script only
   displays the latest one (`answered_sections` and `submit_blocker` on the
   dashboard form and in each autosave reply).
+- **Page behavior is a Stimulus controller** — a view carries markup and
+  `data-action` attributes, never a `<script>` tag or an `on*` handler.
+  `config/initializers/content_security_policy.rb` enforces it: a script runs
+  only from this origin, from the two `cdn.jsdelivr.net` package directories
+  the mermaid and Parsons controllers import, or under the nonce
+  `javascript_importmap_tags` puts on its own tags, so an inline tag or
+  handler is dead code. `spec/conventions/app_views_spec.rb` fails on either
+  before CSP has to.
 - **One way to send a request** — a page script sends through
   `CodeGymRequest.send`, and a save that must not overlap another goes
   through `CodeGymSaveStatus.queue`, never a hand-built `fetch` or its own
@@ -267,6 +275,7 @@ advisory signal; it is not evidence that anything was verified.
 - **Rails 8.1.4** + PostgreSQL
 - **Solid Queue** — background jobs + recurring hourly cron, gated per user to 8am weekdays for generation and to early afternoon for reminder nudges (no Redis needed)
 - **Solid Cable / ActionCable** — mounted but unused; the dashboard learns generation is done by polling `GET /dashboard/status`, since this app's layout never loads Turbo JS
+- **Stimulus and importmap** — every page script is a controller under `app/javascript/controllers`, bound with `data-action`; `app/assets/javascripts/code_gym_bootstrap.js` is the one blocking classic script, whose stubs answer for `window.CodeGymRequest` and `window.CodeGymSaveStatus` and record an edit typed before the modules load
 - **Faraday** — provider API calls (not the official SDKs)
 - **Rouge** — server-side syntax highlighting for every code block (`CodeHighlight`)
 - **RuboCop and Prettier** — re-indent provider-written exercise code once, at ingest (`CodeFormat`); Prettier runs in Node from `vendor/prettier`
@@ -992,9 +1001,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   Parsons stores `"order:…"`. The kind owns `parse_answer`, `encode_answer`
   and `answered?`: a valid pick and a non-blank reason of any length, since
   judging a short reason is the grader's job. The form is a radio fieldset and a
-  labelled textarea; an inline script in
-  `responses/answers/_design_comparison` writes them into the hidden
-  `data-field` textarea, which saves like any other answer; the server's
+  labelled textarea; the `comparison-answer` Stimulus controller writes
+  them into the hidden `data-field` textarea, which saves like any other answer; the server's
   reply says whether it counts, as for every kind. `review_context` decodes the
   answer ("Picked: B. Reason: …") and hands the grader the key; the grading
   note names the main point and essential pieces, caps a matching pick with
@@ -2102,7 +2110,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   cannot hide the other blocks the engineer arranged; it does not count as
   completed work. Calibration mismatch notes require completion.
 - **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so reloading offers the scaffold again without storing its labels as the user's work. Other draft text remains intact; grading and read-only displays use `answer_for` as described above.
-- **One finish action**: the Submit button is always clickable. The server decides whether the day can be submitted (`DailyResponse#submit_blocker`): at least one section answered and every answered section rated. A nudge under the button shows the blocker from the latest autosave reply, and a click the server refuses shows the same sentence and moves focus to it. Typing saves 800 ms after the last keystroke; a rating click, leaving an answer and a design comparison pick or Parsons move save at once, so the nudge follows within one round trip. The browser holds no copy of the rule, so the two cannot disagree; the cost is that the nudge, progress and hint lock update after a save rather than on each keystroke. Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. Draft ratings are set-only: `#create` accepts only valid enum values and preserves ratings while answers are edited or cleared. At submission it slices ratings to `answered_sections`, so a cleared, too-short, or scaffold-only answer leaves no self-assessment behind. Partial answer payloads merge into the draft before this slice; omitted answers remain unchanged, and explicit empty strings clear them. The form stays inert during submission and the review handoff, keeping its visible answers and ratings at the submitted snapshot; a failed submission restores editing. The progress label reports answers only; the nudge reports readiness. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script. `#create` refuses a submit that `submit_blocker` would block, with a 422 carrying the nudge's sentence, the answered sections and the blocker, and nothing saved, not even the draft the request carried. Accepting one would bill a review of every section, freeze the day and count it toward the streak.
+- **One finish action**: the Submit button is always clickable. The server decides whether the day can be submitted (`DailyResponse#submit_blocker`): at least one section answered and every answered section rated. A nudge under the button shows the blocker from the latest autosave reply, and a click the server refuses shows the same sentence and moves focus to it. Typing saves 800 ms after the last keystroke; a rating click, leaving an answer and a design comparison pick or Parsons move save at once, so the nudge follows within one round trip. The browser holds no copy of the rule, so the two cannot disagree; the cost is that the nudge, progress and hint lock update after a save rather than on each keystroke. Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. Draft ratings are set-only: `#create` accepts only valid enum values and preserves ratings while answers are edited or cleared. At submission it slices ratings to `answered_sections`, so a cleared, too-short, or scaffold-only answer leaves no self-assessment behind. Partial answer payloads merge into the draft before this slice; omitted answers remain unchanged, and explicit empty strings clear them. The form stays inert during submission and the review handoff, keeping its visible answers and ratings at the submitted snapshot; a failed submission restores editing. The progress label reports answers only; the nudge reports readiness. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by `answer_form_controller.js`, a Stimulus controller. `#create` refuses a submit that `submit_blocker` would block, with a 422 carrying the nudge's sentence, the answered sections and the blocker, and nothing saved, not even the draft the request carried. Accepting one would bill a review of every section, freeze the day and count it toward the streak.
   A refused or dropped submission restarts the draft autosave it canceled, so
   the last edit survives without another keystroke. If submission succeeds but
   the browser cannot start the review POST, the page explains that the answers
@@ -2779,10 +2787,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   production's Solid Cache would make every block a database query, and
   /history renders dozens. A deploy starts it empty, so it can never serve
   old markup. No page loads a browser highlighter.
-  `shared/_code_lines_script`, rendered once from the layout, decides only
-  what needs the rendered width: whether a block wraps, which hides its
-  padding. Duck, follow-up and alternate-explanation replies are built
-  by page scripts as plain text and show no code blocks.
+  The `code-lines` controller, mounted once on the layout's `<body>`,
+  decides only what needs the rendered width: whether a block wraps, which
+  hides its padding. Duck, follow-up and alternate-explanation replies are
+  built by their controllers as plain text and show no code blocks.
 - **Exercise code is re-indented once, at ingest**: models often write code
   with uneven indentation, and the highlighter shows whitespace exactly as
   written. `ProblemSetIngest#format_code!` passes each kind's
@@ -2845,8 +2853,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   **Pull-to-refresh in the installed app.** The layout's
   `overscroll-behavior-y: none` removes the rubber-band bounce, and with it
   the only way to reload a home-screen launch, which has no reload button.
-  `shared/_pull_to_refresh` adds the gesture back as plain touch listeners on
-  top of that rule, which is unchanged. It follows the iOS pattern: the nav
+  `shared/_pull_to_refresh` adds the gesture back through the
+  `pull-to-refresh` controller's touch listeners, on top of that rule, which
+  is unchanged. It follows the iOS pattern: the nav
   stays where it is while the layout's `[data-pull-content]` slides down with
   UIScrollView's rubber-band resistance, and the spinner, layered beneath both,
   shows in the gap that opens. The content's transform is cleared whenever it
@@ -2858,9 +2867,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   waits for `CodeGymSaveStatus.pending()` to clear first: that counts
   requests on the wire, saves waiting in `CodeGymSaveStatus.queue`, and the
   delayed saves the dashboard and /setup register through `watch()`, since
-  both hold an edit for a moment before sending it. The layout defines
-  `CodeGymRequest` and `CodeGymSaveStatus` in `<head>`, so page scripts call
-  them as they run.
+  both hold an edit for a moment before sending it. `code_gym_bootstrap.js`
+  defines `window.CodeGymRequest` and `window.CodeGymSaveStatus` before the
+  importmap's modules load, so anything running at parse time finds them.
   A save still pending after ten seconds cancels the pull rather than
   reloading over it. The gesture also refuses to start while a text field has
   focus, while any form is `inert` (the dashboard's submission and review
@@ -3005,9 +3014,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
   **Intent is a three-value dial, `User#reminder_level`** (`none` / `ready` /
   `ready_and_nudges`). `#push_reminders_enabled?` is derived from it rather
-  than stored, because that name answers transport as well as intent: the
-  layout's re-subscribe script uses it to ask whether this browser is enrolled
-  at all, which the dial does not change.
+  than stored, because that name answers transport as well as intent:
+  `shared/_push_script` uses it to decide whether to mount the `push-launch`
+  controller that re-subscribes this browser, which the dial does not change.
 
   **The permission call must be the first synchronous statement in the click
   handler.** iOS grants a prompt only to a request made synchronously inside a
@@ -3223,7 +3232,7 @@ always pull in the full suite — is stated once, in
 - `app/models/code_highlight.rb` — `CodeHighlight`: Rouge highlighting for a code block, its line formatter, the lexer map and the cache key; `SyntaxHighlightingHelper#highlighted_code` is the one call site views use
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value, so the scaffold rule is stated once rather than per textarea
 - `app/models/exercise_section/design_comparison.rb` — the second fixed kind: two working pieces, a server-rolled A/B order, the `pick:` answer encoding, its rung-aware vocabulary allowlist, and the judge's blind-solve facets
-- `app/views/responses/bodies/_design_comparison.html.erb` / `answers/_design_comparison.html.erb` — the two pieces in their own disclosures; the pick fieldset, reason textarea and the script that writes the hidden answer, plus "What decides it" once reviewed
+- `app/views/responses/bodies/_design_comparison.html.erb` / `answers/_design_comparison.html.erb` — the two pieces in their own disclosures; the pick fieldset and reason textarea, which the `comparison-answer` controller writes into the hidden answer, plus "What decides it" once reviewed
 - `script/report_answer_positions.rb` (+ `script/answer_position_balance.rb`) — read-only count of where the better design-comparison piece was shown, totals only
 - `script/solve_agreement.rb` — `SolveAgreement`: prints blind-solve agreement per model, rung and concept for `script/compare_models.rb`'s judge modes, never a solve or a key
 - `app/services/claude_service.rb` / `gemini_service.rb` / `openai_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
@@ -3250,7 +3259,7 @@ always pull in the full suite — is stated once, in
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
 - `app/controllers/concept_references_controller.rb` — one action: the same concept explained another way, on demand from inside its own disclosure. Persists nothing; owns the cap, since there is no model data for it to live on
-- `app/views/shared/_concept_reference_alternates_script.html.erb` — wires that control across the page, keying the framings already shown by reference id so one reference rendering several times still shares one cap
+- `app/javascript/controllers/concept_alternates_controller.js` — the `concept-alternates` controller each reference's disclosure mounts; it keys the framings already shown by reference id, so one reference rendering several times still shares one cap
 - `app/services/web_push_credentials.rb` — `WebPushCredentials`: the VAPID pair from ENV, and the single authority for whether push is configured at all
 - `app/services/push_delivery.rb` — sends one notification to one endpoint, and deletes the endpoint when the push service reports it gone; the pruning is what keeps the job honest as iOS drops subscriptions
 - `app/models/push_subscription.rb` — one browser install's endpoint. `.register!` upserts by endpoint, because the client re-subscribes on every launch
@@ -3264,7 +3273,7 @@ always pull in the full suite — is stated once, in
 - `app/javascript/code_gym/request.js` — the one way a page script sends a request, and what it may show when one fails; loaded through importmap from the layout's `javascript_importmap_tags`
 - `app/javascript/code_gym/save_status.js` / `app/views/shared/_save_status_banner.html.erb` — the save banner's failures by control, the per-control save queue (in order, or collapsing to the latest), and `pending()`; the banner markup sits in `<body>`
 - `app/controllers/concerns/json_errors.rb` — `render_json_error`: the one shape of a JSON error reply
-- `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
+- `app/views/shared/_push_script.html.erb` — mounts the `push-launch` controller, which re-subscribes on launch through `app/javascript/code_gym/push.js`; rendered from the layout for a signed-in user when push is configured
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
 - `app/views/pwa/service-worker.js` — shows the notification. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing
 - `app/services/schema_wait.rb` — blocks the worker's Railway pre-deploy step until the schema the Solid Queue supervisor boots against exists; waits rather than migrating, so migrations keep exactly one owner
@@ -3314,10 +3323,12 @@ always pull in the full suite — is stated once, in
   which decides where a concept's mastery history records, and must not
   acquire one.
 - `spec/system/learn_filter_spec.rb` — pins that typing the humanized label
-  actually shown on screen narrows the Learn list; the filter script matches
+  actually shown on screen narrows the Learn list; the `learn-filter` controller matches
   against a rendered attribute a request spec never executes, so a mismatch
   between that label and the raw concept key was invisible to request specs
   and only caught here.
+- `config/initializers/content_security_policy.rb` — the policy that makes the Stimulus convention enforceable: `script-src` is this origin, the mermaid and SortableJS package directories on `cdn.jsdelivr.net`, and a per-request nonce, and `style-src` keeps `'unsafe-inline'`, since the views still carry `style=` attributes
+- `spec/conventions/app_views_spec.rb` — fails on an inline `<script>`, `on*` handler or `javascript:` URL in any view, so the convention breaks a build rather than a page
 - `spec/conventions/app_source_spec.rb` — parses `app/` with Prism and fails on `Thread.new` outside `CallerZoneThread` (or a named exemption with its reason and exact thread count) and on `send(:...)`
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)

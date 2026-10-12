@@ -36,11 +36,11 @@ RSpec.describe "Welcome", type: :request do
     expect(document.css("[data-track]").map { |button| button["data-track"] }).to eq(%w[junior none])
     expect(response.body).to include("Early in my career", "Experienced")
     box = document.at_css("#welcome")
-    expect(JSON.parse(box["data-preset"])).to eq(LearningTrack.preset_levels)
-    expect(box["data-skill-level"]).to eq("junior")
-    expect(box["data-version"]).to eq(user.section_kind_preferences_version.to_s)
-    expect(box["data-profile-url"]).to eq(profile_path)
-    expect(box["data-setup-url"]).to eq(setup_path)
+    expect(JSON.parse(box["data-welcome-preset-value"])).to eq(LearningTrack.preset_levels)
+    expect(box["data-welcome-skill-level-value"]).to eq("junior")
+    expect(box["data-welcome-version-value"]).to eq(user.section_kind_preferences_version.to_s)
+    expect(box["data-welcome-url-value"]).to eq(profile_path)
+    expect(box["data-welcome-setup-url-value"]).to eq(setup_path)
   end
 
   it "never asks a backfilled account with no exercises" do

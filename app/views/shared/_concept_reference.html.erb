@@ -8,12 +8,19 @@
     <pre class="snippet"><%= highlighted_code(reference.code_example, reference.language) %></pre>
     <p>🔭 <%= reference.senior_lens %></p>
     <%# Inside the disclosure so a collapsed <details> hides it with no script. %>
-    <div class="concept-alternates" data-reference-id="<%= reference.id %>"
-         data-url="<%= explain_differently_concept_reference_path(reference) %>">
+    <div class="concept-alternates" data-controller="concept-alternates"
+         <%= tag.attributes(data: {
+               concept_alternates_url_value: explain_differently_concept_reference_path(reference),
+               concept_alternates_reference_id_value: reference.id,
+               concept_alternates_max_value: ConceptReferencesController::MAX_ALTERNATES_PER_CONCEPT,
+               concept_alternates_thinking_text_value: t("concept_reference.thinking"),
+               concept_alternates_added_text_value: t("concept_reference.alternate_added"),
+               concept_alternates_added_last_text_value: t("concept_reference.alternate_added_last"),
+               concept_alternates_failed_text_value: t("concept_reference.alternate_failed") }) %>>
       <%# type="button": on the dashboard this renders inside #gym-form, where a default button would submit the day. %>
-      <button type="button" class="btn btn-ghost btn-sm explain-concept-differently"><%= t("concept_reference.explain_differently") %></button>
-      <span class="alternate-status" aria-live="polite"></span>
+      <button type="button" class="btn btn-ghost btn-sm explain-concept-differently"
+              data-concept-alternates-target="button" data-action="concept-alternates#explain"><%= t("concept_reference.explain_differently") %></button>
+      <span class="alternate-status" aria-live="polite" data-concept-alternates-target="status"></span>
     </div>
   </div>
 </details>
-<%= render "shared/concept_reference_alternates_script" %>

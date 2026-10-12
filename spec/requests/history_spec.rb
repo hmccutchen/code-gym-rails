@@ -191,7 +191,7 @@ RSpec.describe "History", type: :request do
       )
     end
 
-    it "renders a collapsed disclosure and the mermaid module when a diagram is present" do
+    it "renders a collapsed disclosure and mounts the mermaid controller when a diagram is present" do
       architecture_session(diagram: "flowchart TD\n  A[Client] --> B[API]")
       login_as(user)
       get history_path
@@ -201,26 +201,27 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include("🗺️ Structure diagram")
       expect(response.body).to include("mermaid-diagram")
       expect(response.body).to include("flowchart TD")
-      expect(response.body).to include("cdn.jsdelivr.net")
-      expect(response.body).to match(/securityLevel:\s*["']strict["']/)
+      expect(response.body).to include(%(data-controller="glossary code-lines mermaid"))
+      source = Rails.root.join("app/javascript/controllers/mermaid_controller.js").read
+      expect(source).to include("cdn.jsdelivr.net")
+      expect(source).to match(/securityLevel:\s*["']strict["']/)
 
-      # Without data-owns-details, a failed render removes only the diagram div; the module script names the attribute.
+      # Without data-owns-details, a failed render removes only the diagram div; the controller names the attribute.
       diagram_div = response.body[/<div class="mermaid-diagram"[^>]*>/]
       expect(diagram_div).to be_present
       expect(diagram_div).not_to include("data-owns-details")
     end
 
-    it "renders no container and no mermaid script when the diagram is an empty string" do
+    it "renders no container when the diagram is an empty string" do
       architecture_session(diagram: "")
       login_as(user)
       get history_path
 
-      # The .mermaid-diagram CSS rule is global, so assert on the container and the script instead.
+      # The .mermaid-diagram CSS rule is global, so assert on the container instead.
       expect(response.body).not_to include('<div class="mermaid-diagram"')
-      expect(response.body).not_to include("mermaid@11.17.2")
     end
 
-    it "renders no container and no mermaid script for an exercise generated before diagrams existed" do
+    it "renders no container for an exercise generated before diagrams existed" do
       architecture_session(diagram: nil)
       login_as(user)
       get history_path
@@ -229,16 +230,16 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include("mermaid@11.17.2")
     end
 
-    it "emits the ai_review script and the mermaid module exactly once across multiple entries" do
-      # Both scripts would otherwise ship once per entry; they must dedupe into :page_scripts.
+    it "mounts the review controllers once per reviewed section and the mermaid module exactly once" do
+      # The mermaid controller scans the whole page from <body>, so several entries share one mount.
       3.times { |i| create_session_for(user, date: (i + 5).days.ago.to_date, reviewed: true) }
       architecture_session(diagram: "flowchart TD\n  A[Client] --> B[API]")
 
       login_as(user)
       get history_path
 
-      expect(response.body.scan("const FOLLOW_UP_FAILED").size).to eq(1)
-      expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
+      expect(response.body.scan('data-controller="follow-ups"').size).to eq(3)
+      expect(response.body.scan(%(data-controller="glossary code-lines mermaid")).size).to eq(1)
     end
 
     it "renders improved_code for a visible pattern section" do
@@ -365,7 +366,7 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      expect(response.body.scan(%(data-reference-id="#{reference.id}")).size).to eq(2)
+      expect(response.body.scan(%(data-concept-alternates-reference-id-value="#{reference.id}")).size).to eq(2)
       expect(response.body.scan(%(class="btn btn-ghost btn-sm explain-concept-differently")).size).to eq(2)
     end
 
@@ -504,7 +505,7 @@ RSpec.describe "History", type: :request do
       expect(pseudocode.css(".code-line span:not(.code-align-extra)")).to be_empty
     end
 
-    it "emits the code line script exactly once across multiple reviewed entries" do
+    it "mounts the code-lines controller exactly once across multiple reviewed entries" do
       3.times do |i|
         session = create_session_for(user, date: (i + 5).days.ago.to_date, reviewed: true)
         session.update!(ai_review: { "code_review" => { "rating" => "solid", "improved_code" => "improved" } })
@@ -513,11 +514,12 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      expect(response.body.scan("function fitAlignment(").size).to eq(1)
+      expect(response.body.scan(%(data-controller="glossary code-lines mermaid")).size).to eq(1)
+      expect(Rails.root.join("app/javascript/controllers/code_lines_controller.js").read).to include("WRAP_RATIO")
       expect(response.body).not_to include("highlight.js")
     end
 
-    it "highlights a reviewed session with no improved_code in any section and still emits the script" do
+    it "highlights a reviewed session with no improved_code in any section and still mounts code-lines" do
       session = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
       session.update!(ai_review: { "code_review" => { "rating" => "solid", "correct" => "Good job" } })
 
@@ -525,7 +527,7 @@ RSpec.describe "History", type: :request do
       get history_path
 
       expect(Nokogiri::HTML(response.body).css("code.highlight").size).to eq(1)
-      expect(response.body).to include("function fitAlignment(")
+      expect(response.body).to include(%(data-controller="glossary code-lines mermaid"))
     end
   end
 

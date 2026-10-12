@@ -11,11 +11,11 @@ module is always deferred: it executes after parsing ends and after its own
 fetch. Everything the browser paints before that point is interactive, and a
 page script reaching either global in that window gets a `ReferenceError`.
 
-The dashboard is where that costs the most. Its submit handler calls
-`preventDefault`, sets the form `inert` and disables the button, and only then
-awaits `CodeGymRequest.send`. The throw skips the restore block, so the button
-stays on "Submitting…", the form stays inert and no native submission happens
-either. The day is stranded with nothing saved.
+The dashboard was where that cost the most, before its submit handler moved
+into `answer_form_controller`: the inline handler set the form `inert` before
+awaiting `CodeGymRequest.send`, so the throw stranded the day with nothing
+saved. Once the layout's name editor moved into `name_editor_controller`,
+no inline script reached the globals any more.
 
 This file restores the old guarantee in one place. It is served by Propshaft
 and included with `javascript_include_tag` immediately before the importmap
@@ -57,6 +57,91 @@ return value.
 `flush()` drains the queue in call order, so a page script's own sequencing
 survives.
 
+## The early-edit recorder
+
+The stubs above cover a page script that *calls* one of the globals. An edit
+typed before the modules arrive calls nothing at all, and that is the commoner
+case: the HTML parses, the user starts typing, the module lands a couple of
+hundred milliseconds later.
+
+Before #357 the dashboard's inline script bound its own `input` listener and
+registered `watch(() => saveTimer !== null)` during parse, so a keystroke in
+that window was already pending work. A Stimulus controller registers both in
+`connect()`, which runs only once the modules have loaded, so the keystroke
+fell into a hole: pull-to-refresh saw nothing pending and could reload over it,
+and no later `input` event existed to schedule the save.
+
+So the bootstrap listens for `input` and `change` on `document` in the capture
+phase and sets `early.dirty` when the event came from inside a
+`[data-controller]` region. It registers that flag through its own `watch`,
+which means `pending()` answers true straight away and the real `save_status`
+inherits the same probe at flush.
+
+That selector rather than `form` is what makes the flag match who can clear
+it. Setup's Exercise mix autosaves a slider that sits in no form at all, so a
+form gate recorded nothing there, while a control outside every controlled
+region has nobody to adopt it on connect and would hold `pending()` true until
+settling.
+
+Two halves finish the job, and neither belongs here. `application.js` settles
+the recorder only once every controller on the page has connected and taken
+over; settling in `flush()` would open a gap between the globals being assigned
+and Stimulus connecting, in which the edit is pending to nobody.
+
+`application.start()` resolving is not that moment.
+`eagerLoadControllersFrom` fires one dynamic `import()` per controller and
+awaits none of them, so start resolves while any number of controllers are
+still loading — settling there cleared the flag and unbound the recorder with
+the controller that owned the edited field not yet connected, and a
+pull-to-refresh in that window reloaded over the edit. So `application.js`
+waits for `application.getControllerForElementAndIdentifier` to answer for
+every identifier named by a `[data-controller]` element on the page, and
+exposes the result as `window.CodeGymBootstrap.ready`. A controller whose
+module never arrives would hold the edit pending for the rest of the page's
+life, so the wait gives up after ten seconds and settles anyway.
+
+Settling removes the two listeners as well as clearing the flag. Leaving them
+bound would set `dirty` again on the next keystroke with nothing left to clear
+it, so `pending()` would answer true for the rest of the page's life and every
+caller that waits on it — pull-to-refresh, the save queue's drain — would wait
+forever. And a controller that owns an edited field schedules the save itself on
+connect — `answer_form_controller` compares each textarea's `value` with its
+`defaultValue`, which is exactly the server-rendered content, so a difference
+means the user typed. Without that the answer is never saved, and the spec
+below times out waiting for it.
+
+`exercise_mix_controller` does the same in its own terms: a range input is
+compared with its `defaultValue` and a checkbox or radio with its
+`defaultChecked`, and a difference re-syncs the slider label, the disabled
+states and the group lock before saving, since none of that ran while the
+modules were loading.
+
+`comparison_answer_controller` and `name_editor_controller` follow the same
+rule. The name field is the one that showed the race is not confined to a
+stalled asset: its controller used to read `value` on connect, so a name typed
+and blurred in the ordinary load gap was captured as the already-saved value
+and never sent. Reading `defaultValue` instead makes the typed name a
+difference the controller saves.
+
+A controller with no such check leaves its field unsaved until the user touches
+it again, which is the pre-#357 behaviour for every control that had no inline
+listener, so this is a per-controller decision rather than something the
+bootstrap can do for everyone.
+
+## The data-js-ready marker
+
+`application.js` sets `data-js-ready` on `<html>` in the same `then` that
+settles the recorder, after `application.start()` resolves. Controllers connect
+during `start()`, so a connect-time save is queued before the early flag
+clears, and the attribute appearing means both have happened.
+
+It exists because `visit` returns on the document's `load` event, which can
+precede Stimulus connecting. A spec that drove a converted control straight
+after `visit` was racing that gap, and won or lost depending on what ran
+before it. `wait_for_js` in `spec/support/system_test_helper.rb` waits on the
+attribute, which is the same shape as the existing `data-parsons-wired` and
+`data-sortable-done` markers. Nothing in the app reads it.
+
 ## Why this shape
 
 A per-call-site `DOMContentLoaded` gate was the alternative and is worse here.
@@ -76,19 +161,31 @@ activation untouched.
 
 ## Its lifetime
 
-This file is transitional. #357's step 3 converts the last inline page script
-to a Stimulus controller, at which point `data-action` binds through Stimulus's
-own lifecycle and the window this covers stops existing. The two `window.*`
-aliases in `application.js` go at the same time, and this file goes with them.
+The stub surface outlived the transition it was written for. #357's step 3
+converted the last inline page script to a Stimulus controller, so
+`data-action` binds through Stimulus's own lifecycle and no view reaches the
+globals during parse any more. The two `window.*` aliases in `application.js`
+stay all the same, which reverses what step 3 planned: about fifteen system
+specs drive the modules through those names inside `execute_script`, which
+runs in a classic context that cannot import an ES module. The stubs stay with
+them, since the bootstrap publishes both names at parse time and the modules
+have to take the same names over at flush.
+
+The early-edit recorder stays too. It is not about inline scripts at all — it
+is about the gap between a parsed page and a loaded module, which no amount of
+converting views removes. Step 4 added the content security policy that makes
+the convention enforceable and left this file as it is; shrinking it to the
+recorder would mean rewriting those specs first.
 
 ## What holds it
 
 `spec/system/deferred_module_spec.rb` stalls the module assets, navigates with
-`waitUntil: "commit"`, asserts the document is still `interactive`, clicks
-Submit inside that window and expects the review to arrive. It fails without
-this file.
+`waitUntil: "commit"` and asserts the document is still `interactive`. Inside
+that window it moves a Setup slider, which the early-edit recorder counts as
+pending before the modules arrive, and expects the save to land once
+`exercise_mix_controller` connects and adopts the edit.
 
-The same spec types an answer on the dashboard and moves a Setup slider in that
-window, and expects `pending()` to be true at once and the edit to be saved
-once the modules run. Those two fail if either page registers its probe at
-`DOMContentLoaded` instead of straight away.
+The same spec types an answer on the dashboard in that window and expects it
+counted as pending and then saved, which is the early-edit recorder's job. It
+also clicks Submit in that window and expects nothing to be posted, since the
+button is not a submit button until `answer_form_controller` connects.

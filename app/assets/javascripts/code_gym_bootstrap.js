@@ -3,6 +3,15 @@
   var waiting = []
   var probes = []
   var open = Object.create(null)
+  var early = { dirty: false }
+
+  function recordEdit(event) {
+    var target = event.target
+    if (target && target.closest && target.closest("[data-controller]")) early.dirty = true
+  }
+
+  document.addEventListener("input", recordEdit, true)
+  document.addEventListener("change", recordEdit, true)
 
   function afterModules(call) {
     return new Promise(function (resolve) {
@@ -52,7 +61,15 @@
     clear: forward("CodeGymSaveStatus", "clear")
   }
 
+  window.CodeGymEarlyEdit = early
+  window.CodeGymSaveStatus.watch(function () { return early.dirty })
+
   window.CodeGymBootstrap = {
+    settleEarlyEdits: function () {
+      document.removeEventListener("input", recordEdit, true)
+      document.removeEventListener("change", recordEdit, true)
+      early.dirty = false
+    },
     flush: function () {
       var held = waiting
       waiting = []

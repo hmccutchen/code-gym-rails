@@ -1,6 +1,7 @@
 <div class="section" style="text-align:center;padding:3rem;">
   <p style="color:var(--muted);margin-bottom:1rem;"><%= t("dashboard.paused_empty.message") %></p>
   <%= button_to t("dashboard.generate_anyway"), generate_path, method: :post, class: "btn btn-ghost btn-sm",
-        form: { data: { loading_form: true, loading_label: t("dashboard.generating_label") } } %>
+        form: { data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore",
+                        loading_form_label_value: t("dashboard.generating_label") } } %>
   <p style="margin-top:1rem;font-size:.85rem;"><%= link_to t("dashboard.paused_empty.resume"), account_path %></p>
 </div>

@@ -6,18 +6,10 @@ CLAUDE.md's "Pull-to-refresh in the installed app" paragraph covers the gesture'
 
 The spinner sits at `z-index: -1`, beneath both the nav and the page content, so it only shows in the gap the content opens as it moves down.
 
-## `insideScrolledArea`
+## The controller
 
-A pull that starts inside an inner area scrolled away from its top scrolls that area, not the page, so it never counts as a refresh.
-
-## `savesPending`
-
-`window.CodeGymSaveStatus` is absent on signed-out pages. Those pages have nothing to save, so a missing helper reads as no pending save.
-
-## `reloadWhenSaved`
-
-A save still pending at `SAVE_WAIT_LIMIT_MS` is treated as hung. The pull is cancelled rather than reloading over the save, and the person can pull again.
-
-## The `touchstart` listener
-
-A second finger, or any touch that cannot start a pull, resets a pull already in progress, so the content is never left pulled down.
+`data-controller="pull-to-refresh"` on the indicator drives the gesture;
+`docs/code-notes/app/javascript/controllers/pull_to_refresh_controller.md`
+covers the document-level listeners and their teardown, the inner-scroll and
+editable-field guards, the hung-save limit, and why a second finger resets a
+pull already in progress.

@@ -39,10 +39,13 @@ request silently.
 
 The layout loads this through `javascript_importmap_tags`, so it is a deferred
 module: it evaluates after the document is parsed and before
-`DOMContentLoaded`. `app/javascript/application.js` puts it on
-`window.CodeGymRequest` for the inline page scripts still to be converted, and
-an inline script that needs it before its own first event waits for
-`DOMContentLoaded`.
+`DOMContentLoaded`. Every page script now imports it. `app/javascript/application.js`
+still puts it on `window.CodeGymRequest`, for two reasons: system specs drive
+the module through that name inside `execute_script`, which runs in a classic
+context that cannot import a module, and the bootstrap
+(`app/assets/javascripts/code_gym_bootstrap.js`) publishes the name at parse
+time, so the module has to take it over when it loads. The bootstrap's note
+covers the parse-time stubs.
 
 ## Where the text comes from
 

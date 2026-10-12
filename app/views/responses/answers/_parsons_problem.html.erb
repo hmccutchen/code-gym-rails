@@ -17,130 +17,24 @@
        display_order: data["display_order"],
        block_count: blocks.size
      ) %>
-  <ol class="parsons-list" data-parsons-blocks>
-    <% initial_order.each do |block_id| %>
-      <li class="parsons-block" data-block-id="<%= ExerciseSection::ParsonsProblem.block_token(block_id, exercise: exercise, key: key, section_data: data) %>" tabindex="0" aria-keyshortcuts="Control+ArrowUp Control+ArrowDown">
-        <pre class="snippet"><%= highlighted_code(blocks[block_id], language) %></pre>
-      </li>
+  <div data-controller="parsons" data-action="keydown->parsons#keydown"
+       data-parsons-prefix-value="<%= ExerciseSection::ParsonsProblem::ANSWER_PREFIX %>"
+       data-parsons-moved-text-value="<%= t("responses.parsons.moved") %>"
+       data-parsons-recorded-text-value="<%= t("responses.parsons.recorded") %>"
+       data-parsons-move-up-text-value="<%= t("responses.parsons.move_up") %>"
+       data-parsons-move-down-text-value="<%= t("responses.parsons.move_down") %>">
+    <ol class="parsons-list" data-parsons-blocks data-parsons-target="list">
+      <% initial_order.each do |block_id| %>
+        <li class="parsons-block" data-parsons-target="block" data-block-id="<%= ExerciseSection::ParsonsProblem.block_token(block_id, exercise: exercise, key: key, section_data: data) %>" tabindex="0" aria-keyshortcuts="Control+ArrowUp Control+ArrowDown">
+          <pre class="snippet"><%= highlighted_code(blocks[block_id], language) %></pre>
+        </li>
+      <% end %>
+    </ol>
+    <% if blocks.size == 1 %>
+      <button type="button" class="btn btn-ghost btn-sm" data-action="parsons#confirm" data-parsons-confirm><%= t("responses.parsons.confirm_button") %></button>
     <% end %>
-  </ol>
-  <% if blocks.size == 1 %>
-    <button type="button" class="btn btn-ghost btn-sm" data-parsons-confirm><%= t("responses.parsons.confirm_button") %></button>
-  <% end %>
-  <p class="parsons-keyhint"><%= t("responses.parsons.key_hint") %></p>
-  <p class="parsons-status" aria-live="polite"></p>
-  <%# Keep this a sibling of the <ol>: the script finds it through list.parentElement. %>
-  <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" style="display:none"><%= ExerciseSection::ParsonsProblem.token_answer(answer: response.answers[key], exercise: exercise, key: key, section_data: data) %></textarea>
-<% end %>
-<% unless submitted || @parsons_script_emitted %>
-  <% @parsons_script_emitted = true %>
-  <% content_for :page_scripts do %>
-    <script>
-    (() => {
-      const MOVED     = <%= t("responses.parsons.moved").to_json.html_safe %>;
-      const RECORDED  = <%= t("responses.parsons.recorded").to_json.html_safe %>;
-      const MOVE_UP   = <%= t("responses.parsons.move_up").to_json.html_safe %>;
-      const MOVE_DOWN = <%= t("responses.parsons.move_down").to_json.html_safe %>;
-
-      function syncHiddenField(list) {
-        const ids = [...list.querySelectorAll(".parsons-block")].map(li => li.dataset.blockId);
-        const textarea = list.parentElement.querySelector('textarea[data-field="parsons_problem"]');
-        textarea.value = <%= ExerciseSection::ParsonsProblem::ANSWER_PREFIX.to_json.html_safe %> + ids.join(",");
-        textarea.dispatchEvent(new Event("input", { bubbles: true }));
-        textarea.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-
-      function moveBlock(list, li, direction) {
-        if (direction === "up") {
-          const prev = li.previousElementSibling;
-          if (!prev) return;
-          list.insertBefore(li, prev);
-        } else {
-          const next = li.nextElementSibling;
-          if (!next) return;
-          list.insertBefore(next, li);
-        }
-        syncHiddenField(list);
-        announce(list, li);
-      }
-
-      function announce(list, li) {
-        const status = list.parentElement.querySelector(".parsons-status");
-        if (!status) return;
-        const blocks = [ ...list.querySelectorAll(".parsons-block") ];
-        status.textContent = MOVED.replace("%{position}", blocks.indexOf(li) + 1).replace("%{total}", blocks.length);
-      }
-
-      function handleKey(list, event) {
-        const li = event.target.closest?.(".parsons-block");
-        if (!li || !list.contains(li)) return;
-        const direction = event.key === "ArrowUp" ? "up" : event.key === "ArrowDown" ? "down" : null;
-        if (!direction) return;
-
-        if (event.ctrlKey || event.metaKey) {
-          event.preventDefault();
-          moveBlock(list, li, direction);
-          li.focus();
-          return;
-        }
-        const sibling = direction === "up" ? li.previousElementSibling : li.nextElementSibling;
-        if (sibling) {
-          event.preventDefault();
-          sibling.focus();
-        }
-      }
-
-      function controlButton(list, li, direction) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `btn btn-ghost btn-sm parsons-move-${direction}`;
-        btn.textContent = direction === "up" ? "↑" : "↓";
-        btn.setAttribute("aria-label", direction === "up" ? MOVE_UP : MOVE_DOWN);
-        btn.addEventListener("click", () => moveBlock(list, li, direction));
-        return btn;
-      }
-
-      function addControls(list) {
-        if (list.dataset.parsonsControls) return;
-        list.dataset.parsonsControls = "1";
-        list.querySelectorAll(".parsons-block").forEach(li => {
-          const controls = document.createElement("div");
-          controls.className = "parsons-controls";
-          controls.append(controlButton(list, li, "up"), controlButton(list, li, "down"));
-          li.appendChild(controls);
-        });
-      }
-
-      document.querySelectorAll("ol[data-parsons-blocks]:not([data-parsons-wired])").forEach(list => {
-        list.dataset.parsonsWired = "1";
-        list.parsonsSync = () => syncHiddenField(list);
-        list.parsonsAddControls = () => addControls(list);
-        list.addEventListener("keydown", event => handleKey(list, event));
-        list.parentElement.querySelector("[data-parsons-confirm]")?.addEventListener("click", () => {
-          syncHiddenField(list);
-          list.parentElement.querySelector(".parsons-status").textContent = RECORDED;
-        });
-        // A hung CDN never rejects the import below, so its catch alone would leave this unanswerable.
-        setTimeout(() => { if (!list.dataset.sortableDone) addControls(list); }, 3000);
-      });
-    })();
-    </script>
-    <script type="module">
-      try {
-        const { default: Sortable } = await import("https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/modular/sortable.esm.js");
-        document.querySelectorAll("ol[data-parsons-blocks]:not([data-sortable-done])").forEach(list => {
-          list.dataset.sortableDone = "1";
-          // delayOnTouchOnly: a touch drag needs a brief hold so an ordinary swipe still scrolls the page.
-          Sortable.create(list, {
-            animation: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 150,
-            delay: 150,
-            delayOnTouchOnly: true,
-            onEnd: () => list.parsonsSync?.()
-          });
-        });
-      } catch {
-        document.querySelectorAll("ol[data-parsons-blocks]").forEach(list => list.parsonsAddControls?.());
-      }
-    </script>
-  <% end %>
+    <p class="parsons-keyhint"><%= t("responses.parsons.key_hint") %></p>
+    <p class="parsons-status" aria-live="polite" data-parsons-target="status"></p>
+    <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" data-parsons-target="field" style="display:none"><%= ExerciseSection::ParsonsProblem.token_answer(answer: response.answers[key], exercise: exercise, key: key, section_data: data) %></textarea>
+  </div>
 <% end %>
