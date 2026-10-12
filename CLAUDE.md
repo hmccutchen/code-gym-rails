@@ -999,8 +999,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
   **Answer storage.** `"pick:a\n" + reason` in the existing answer slot, as
   Parsons stores `"order:…"`. The kind owns `parse_answer`, `encode_answer`
-  and `answered?`: a valid pick and a reason of at least
-  `MIN_REASON_LENGTH` (40) characters. The form is a radio fieldset and a
+  and `answered?`: a valid pick and a non-blank reason of any length, since
+  judging a short reason is the grader's job. The form is a radio fieldset and a
   labelled textarea; the `comparison-answer` Stimulus controller writes
   them into the hidden `data-field` textarea, which saves like any other answer; the server's
   reply says whether it counts, as for every kind. `review_context` decodes the
