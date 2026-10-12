@@ -7,8 +7,10 @@ module PngPixels
 
   def inside_ico(path)
     ico = File.binread(path)
-    size, offset = ico.byteslice(6 + 8, 8).unpack("VV")
-    ico.byteslice(offset, size)
+    Array.new(ico.byteslice(4, 2).unpack1("v")) do |index|
+      size, offset = ico.byteslice(6 + (16 * index) + 8, 8).unpack("VV")
+      ico.byteslice(offset, size)
+    end
   end
 
   def chunks(png)

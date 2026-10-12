@@ -5,7 +5,7 @@ html[data-text-size="140"] { font-size: 140%; }
 
 /* Fixed size: sized in rem, the brand outgrew a phone's width at larger text. */
 html[data-text-size] nav .brand { font-size: 22px; }
-html[data-text-size] nav .brand-mark { height: 44px; width: 62px; }
+html[data-text-size] nav .brand-mark { height: 44px; width: auto; }
 
 /* Prose only; controls, labels and code keep their own font and spacing. */
 html[data-line-spacing="relaxed"] :is(p, li, dd, .question, .section-scenario, .why-box, .plan-excerpt,

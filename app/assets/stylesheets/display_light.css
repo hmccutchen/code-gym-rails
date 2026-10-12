@@ -8,7 +8,7 @@
   --focus-ring: #4b37c2;
   --green: #116530; --red: #b42318; --yellow: #8a5a00;
   --pattern-mask: url("gym-pattern-tile.png");
-  /* --accent written as rgb(), since palette_contrast_spec reads a literal; change both together. */
+  /* Same color as --accent (#5b47d6), written as rgb() because palette_contrast_spec reads a literal; change both together. */
   --pattern-tint: rgb(91, 71, 214); --pattern-opacity: .07;
   --code-bg: #f0f0f6; --code-symbol: #6d28d9; --code-builtin: #0b6394;
   --surface-raised: #ededf5; --nav-bg: rgba(255, 255, 255, .86);

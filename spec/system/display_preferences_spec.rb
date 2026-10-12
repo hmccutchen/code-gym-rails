@@ -137,21 +137,22 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     expect(stored { |values| !values.key?("text_size") }).not_to have_key("text_size")
   end
 
-  it "shows the plain logo on the light theme and the outlined one on dark" do
+  it "shows the light brand mark on the light theme and the dark one on dark" do
     open_display
     logo = -> { page.evaluate_script("document.querySelector('nav .brand-mark').currentSrc") }
 
-    expect(logo.call).to include("logo-outlined")
+    dark_mark = %r{/brand-mark-[0-9a-f]+\.png}
+    expect(logo.call).to match(dark_mark)
 
     choose_display("theme", "light")
     expect(page).to have_css("nav .brand-mark")
-    # currentSrc reads empty while the new source loads, so wait for the plain logo itself.
-    plain_logo = %r{/logo-[0-9a-f]+\.png}
-    Timeout.timeout(5) { sleep 0.05 until logo.call.match?(plain_logo) }
-    expect(logo.call).to match(plain_logo)
+    # currentSrc reads empty while the new source loads, so wait for the light mark itself.
+    light_mark = %r{/brand-mark-light-[0-9a-f]+\.png}
+    Timeout.timeout(5) { sleep 0.05 until logo.call.match?(light_mark) }
+    expect(logo.call).to match(light_mark)
 
     choose_display("theme", "dark")
-    Timeout.timeout(5) { sleep 0.05 until logo.call.include?("outlined") }
+    Timeout.timeout(5) { sleep 0.05 until logo.call.match?(dark_mark) }
   end
 
   it "stores the later of two quick choices even when the first save is slow to leave" do

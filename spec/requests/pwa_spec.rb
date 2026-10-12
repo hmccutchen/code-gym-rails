@@ -72,7 +72,12 @@ RSpec.describe "PWA", type: :request do
     end
 
     it "versions the favicon by its bytes, since production caches public files for a year" do
-      expect(response.body).to include(%(<link rel="icon" href="#{Object.new.extend(PublicFileHelper).versioned_public_path("favicon.ico")}" sizes="32x32">))
+      expect(response.body).to include(%(<link rel="icon" href="#{Object.new.extend(PublicFileHelper).versioned_public_path("favicon.ico")}" sizes="16x16 32x32 48x48">))
+    end
+
+    it "offers a larger favicon, so a high-density screen never enlarges a small one" do
+      expect(response.body).to include(%(<link rel="icon" type="image/png" href="#{Object.new.extend(PublicFileHelper).versioned_public_path("favicon-96.png")}" sizes="96x96">))
+      expect(Rails.public_path.join("favicon-96.png")).to exist
     end
 
     it "names and illustrates the home screen entry" do
