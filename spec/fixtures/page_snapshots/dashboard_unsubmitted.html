@@ -14,25 +14,33 @@
   <meta name="theme-color" content="#1a1a2e">
   
   
-  <script src="/assets/code_gym_bootstrap-23949582.js"></script>
+  <script src="/assets/code_gym_bootstrap-ee36f2cc.js"></script>
   <script type="importmap" data-turbo-track="reload">{
   "imports": {
-    "application": "/assets/application-0929250a.js",
+    "application": "/assets/application-6b9dc00f.js",
     "@hotwired/stimulus": "/assets/stimulus.min-4b1e420e.js",
     "@hotwired/stimulus-loading": "/assets/stimulus-loading-1fc53fe7.js",
+    "controllers/answer_form_controller": "/assets/controllers/answer_form_controller-99c3489e.js",
     "controllers/application": "/assets/controllers/application-3affb389.js",
     "controllers/duck_thread_controller": "/assets/controllers/duck_thread_controller-cb4ca1f7.js",
+    "controllers/generating_controller": "/assets/controllers/generating_controller-bc2d79f1.js",
     "controllers": "/assets/controllers/index-ee64e1f1.js",
+    "controllers/pull_to_refresh_controller": "/assets/controllers/pull_to_refresh_controller-ac11018b.js",
+    "controllers/review_button_controller": "/assets/controllers/review_button_controller-ce9f39dc.js",
     "code_gym/request": "/assets/code_gym/request-3b03ef19.js",
     "code_gym/save_status": "/assets/code_gym/save_status-0f07ed8f.js"
   }
 }</script>
-<link rel="modulepreload" href="/assets/application-0929250a.js">
+<link rel="modulepreload" href="/assets/application-6b9dc00f.js">
 <link rel="modulepreload" href="/assets/stimulus.min-4b1e420e.js">
 <link rel="modulepreload" href="/assets/stimulus-loading-1fc53fe7.js">
+<link rel="modulepreload" href="/assets/controllers/answer_form_controller-99c3489e.js">
 <link rel="modulepreload" href="/assets/controllers/application-3affb389.js">
 <link rel="modulepreload" href="/assets/controllers/duck_thread_controller-cb4ca1f7.js">
+<link rel="modulepreload" href="/assets/controllers/generating_controller-bc2d79f1.js">
 <link rel="modulepreload" href="/assets/controllers/index-ee64e1f1.js">
+<link rel="modulepreload" href="/assets/controllers/pull_to_refresh_controller-ac11018b.js">
+<link rel="modulepreload" href="/assets/controllers/review_button_controller-ce9f39dc.js">
 <link rel="modulepreload" href="/assets/code_gym/request-3b03ef19.js">
 <link rel="modulepreload" href="/assets/code_gym/save_status-0f07ed8f.js">
 <script type="module">import "application"</script>
@@ -584,15 +592,25 @@
 
 </div>
 
-  <div class="progress-sticky">
-    <div class="progress-bar">
-      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+  <div data-controller="answer-form" data-answer-form-answered-sections-value="[]"
+       data-answer-form-submit-blocker-value="unanswered"
+       data-answer-form-answered-count-value="%{answered} of %{total} answered"
+       data-answer-form-all-answered-value="✓ All answered"
+       data-answer-form-stale-reloaded-value="The set changed, so that last change wasn&#39;t saved. This is the current set — your saved work is still there."
+       data-answer-form-submitting-value="Submitting…"
+       data-answer-form-submit-label-value="Submit answers"
+       data-answer-form-generating-review-value="Generating review…"
+       data-answer-form-submit-failed-value="Couldn&#39;t submit your answers — please try again."
+       data-answer-form-review-start-failed-value="Your answers were saved, but the review couldn&#39;t start. Start it again with the button below your answers.">
+    <div class="progress-sticky">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill" style="width:0%"></div>
+      </div>
+      <div class="progress-label" id="progress-label" data-answer-form-target="progressLabel">0 of 3 answered</div>
     </div>
-    <div class="progress-label" id="progress-label">0 of 3 answered</div>
-  </div>
 
-  <form id="gym-form" data-turbo="false" data-answered-sections="[]" data-submit-blocker="unanswered" action="/responses" accept-charset="UTF-8" method="post">
-      <details class="section" open data-slot="1" data-section-fold="code_review">
+    <form id="gym-form" data-turbo="false" data-answer-form-target="form" data-action="submit-&gt;answer-form#submit input-&gt;answer-form#input change-&gt;answer-form#change click-&gt;answer-form#rate" action="/responses" accept-charset="UTF-8" method="post">
+        <details class="section" open data-slot="1" data-section-fold="code_review">
   <summary class="section-label"><h2 class="section-title">  1 — Code Review
 </h2>
     <span class="section-status" data-status-for="code_review"></span>
@@ -763,204 +781,13 @@ What would be easy to get wrong or worth testing:
 
 
 
-    <div class="submit-row" id="submit-row">
-      <input autocomplete="off" value="1" type="hidden" name="submit" id="submit" />
-      <button name="button" type="submit" id="submit-answers" class="btn btn-primary">Submit answers</button>
-      <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
-    </div>
-    <p class="progress-label" id="rating-nudge" tabindex="-1" data-unanswered="Answer at least one section to finish up." data-unrated="Rate each section you answered to finish up." aria-live="polite">Answer at least one section to finish up.</p>
-</form>
-  <script>
-  (() => {
-    const form = document.getElementById("gym-form");
-    const textareas = form.querySelectorAll("textarea[data-field]");
-    const progressFill = document.getElementById("progress-fill");
-    const progressLabel = document.getElementById("progress-label");
-    const ratingButtons = form.querySelectorAll("button[data-rating-for]");
-    const submitButton  = document.getElementById("submit-answers");
-    const ratingNudge   = document.getElementById("rating-nudge");
-    const sectionFields = [...form.querySelectorAll("textarea[data-field]")].map(t => t.dataset.field);
-
-    const ratings = {};
-    form.querySelectorAll("button.rating-btn.active").forEach(b => { ratings[b.dataset.ratingFor] = b.dataset.rating; });
-
-    const STALE_RELOADED = "The set changed, so that last change wasn't saved. This is the current set — your saved work is still there.";
-
-    // The server's verdict as of its last reply; the page never judges an answer itself.
-    let answeredSections = new Set(JSON.parse(form.dataset.answeredSections || "[]"));
-    let submitBlocker = form.dataset.submitBlocker || null;
-
-    function answered(textarea) {
-      return answeredSections.has(textarea.dataset.field);
-    }
-
-    function applyServerState(data) {
-      if (!Array.isArray(data?.answered_sections)) return;
-      answeredSections = new Set(data.answered_sections);
-      submitBlocker = data.submit_blocker || null;
-      updateProgress();
-      refreshNudge();
-      Object.entries(data.section_statuses || {}).forEach(([section, text]) => {
-        const status = form.querySelector(`.section-status[data-status-for="${section}"]`);
-        if (status) status.textContent = text;
-      });
-    }
-
-    function refreshNudge() {
-      ratingNudge.hidden = submitBlocker === null;
-      if (submitBlocker) ratingNudge.textContent = ratingNudge.dataset[submitBlocker];
-    }
-
-    const ANSWERED_COUNT = "%{answered} of %{total} answered";
-
-    function updateProgress() {
-      const filled = [...textareas].filter(answered).length;
-      progressFill.style.width = (filled / sectionFields.length * 100) + "%";
-      progressLabel.textContent = filled === sectionFields.length ? "✓ All answered" : ANSWERED_COUNT.replace("%{answered}", filled).replace("%{total}", sectionFields.length);
-      form.querySelectorAll(".hint-slot[data-hint-for]").forEach(slot => {
-        const t = form.querySelector(`textarea[data-field="${slot.dataset.hintFor}"]`);
-        if (t) setHintLocked(slot, !answered(t));
-      });
-    }
-
-    function setHintLocked(slot, locked) {
-      slot.querySelector(".hint-locked").hidden = !locked;
-      const disclosure = slot.querySelector(":scope > details.hint");
-      if (locked) disclosure?.remove();
-      else if (!disclosure) slot.querySelector(".hint-locked").after(slot.querySelector("template").content.cloneNode(true));
-    }
-
-    function payload(extra) {
-      const answers = {};
-      textareas.forEach(t => answers[t.dataset.field] = t.value);
-      return { response: Object.assign(
-        { answers: answers, section_ratings: ratings }, extra || {}
-      ) };
-    }
-
-    let saveTimer = null;
-    CodeGymSaveStatus.watch(() => saveTimer !== null);
-
-    function sendSave() {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-      if (form.inert) return;
-      CodeGymSaveStatus.queue("answers", "POST", form.action, () => (form.inert ? null : payload()), { latest: true })
-        .then(({ ok, status, data, skipped }) => {
-          if (skipped) return;
-          if (ok) CodeGymSaveStatus.clear("submit");
-          if (!ok && status === 409 && data?.status === "stale") {
-            CodeGymSaveStatus.carry("answers", STALE_RELOADED);
-            window.location.reload();
-            return;
-          }
-          if (ok && data?.submitted && !form.inert && !reviewRequested) return window.location.reload();
-          if (ok && saveTimer === null && !CodeGymSaveStatus.queued("answers") && !form.inert) applyServerState(data);
-        });
-    }
-
-    function autoSave() {
-      clearTimeout(saveTimer);
-      saveTimer = form.inert ? null : setTimeout(sendSave, 800);
-    }
-
-    form.addEventListener("change", (event) => {
-      if (event.target.closest("[data-field], [data-comparison-answer]")) sendSave();
-    });
-
-    function reopenIfRated(section) {
-      const fold = form.querySelector(`details.section[data-section-fold="${section}"]`);
-      if (fold && !fold.open && ratings[section]) fold.open = true;
-    }
-
-    textareas.forEach(t => {
-      t.addEventListener("input", () => {
-        reopenIfRated(t.dataset.field);
-        autoSave();
-      });
-    });
-
-    ratingButtons.forEach(btn => {
-      btn.addEventListener("click", () => {
-        const section = btn.dataset.ratingFor;
-        ratings[section] = btn.dataset.rating;
-        form.querySelectorAll(`button[data-rating-for="${section}"]`).forEach(b => {
-          b.classList.toggle("active", b === btn);
-          b.setAttribute("aria-pressed", b === btn);
-        });
-        sendSave();
-      });
-    });
-
-    const GENERATING_REVIEW = "Generating review…";
-    const SUBMIT_FAILED = "Couldn't submit your answers — please try again.";
-    const REVIEW_START_FAILED = "Your answers were saved, but the review couldn't start. Start it again with the button below your answers.";
-    let reviewRequested = false;
-
-    function requestReview(url) {
-      const reviewForm = document.createElement("form");
-      reviewForm.method = "post";
-      reviewForm.action = url;
-      const token = document.createElement("input");
-      token.type = "hidden";
-      token.name = "authenticity_token";
-      token.value = document.querySelector('meta[name="csrf-token"]')?.content ?? "";
-      reviewForm.appendChild(token);
-      document.body.appendChild(reviewForm);
-      reviewForm.submit();
-    }
-
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (form.inert) return;
-      clearTimeout(saveTimer);
-      saveTimer = null;
-
-      form.inert = true;
-      submitButton.disabled = true;
-      submitButton.classList.add("btn-loading");
-      submitButton.textContent = "Submitting…";
-
-      const result = await CodeGymRequest.send("POST", form.action, payload({ submit: "1" }), { fallback: SUBMIT_FAILED });
-      const reviewUrl = result.ok ? result.data?.review_url : null;
-      if (result.ok) CodeGymSaveStatus.clear("submit");
-
-      if (reviewUrl) {
-        submitButton.textContent = GENERATING_REVIEW;
-        reviewRequested = true;
-        try { requestReview(reviewUrl); return; } catch (_) { reviewRequested = false; }
-      }
-      // Stays inert behind the reload: restoring the form would queue an autosave of the refused payload.
-      if (result.ok || result.status === 409) {
-        CodeGymSaveStatus.carry("answers", result.ok ? REVIEW_START_FAILED : STALE_RELOADED);
-        window.location.reload();
-        return;
-      }
-
-      const refused = result.status === 422 && Boolean(result.data?.submit_blocker);
-      if (refused) {
-        CodeGymSaveStatus.clear("submit");
-        applyServerState(result.data);
-      } else {
-        CodeGymSaveStatus.report("submit", result.message);
-      }
-
-      form.inert = false;
-      submitButton.classList.remove("btn-loading");
-      submitButton.textContent = "Submit answers";
-      submitButton.disabled = false;
-      autoSave();
-      if (refused) ratingNudge.focus();
-    });
-
-    // Safari bfcaches this no-store page anyway (every iOS home-screen launch), so reload a stale submitted form.
-    window.addEventListener("pageshow", (event) => {
-      if (event.persisted && reviewRequested) window.location.reload();
-    });
-
-    updateProgress();
-  })();
-  </script>
+      <div class="submit-row" id="submit-row">
+        <input autocomplete="off" value="1" type="hidden" name="submit" id="submit" />
+        <button name="button" type="button" id="submit-answers" class="btn btn-primary" data-answer-form-target="submitButton" data-action="answer-form#submit">Submit answers</button>
+        <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
+      </div>
+      <p class="progress-label" id="rating-nudge" tabindex="-1" data-unanswered="Answer at least one section to finish up." data-unrated="Rate each section you answered to finish up." data-answer-form-target="nudge" aria-live="polite">Answer at least one section to finish up.</p>
+</form>  </div>
 
 </div>
 
@@ -1066,161 +893,7 @@ What would be easy to get wrong or worth testing:
   <p id="save-status" class="save-status" hidden></p>
 <p id="save-status-announcer" class="visually-hidden" role="alert"></p>
 
-  <div class="pull-refresh" id="pull-refresh" aria-hidden="true"><span class="spinner"></span></div>
-<script>
-  (() => {
-    const indicator = document.getElementById("pull-refresh");
-    const content = document.querySelector("[data-pull-content]");
-    if (!content || getComputedStyle(indicator).display === "none") return;
-
-    // UIScrollView's rubber band: travel approaches MAX_TRAVEL but never reaches it.
-    const MAX_TRAVEL = 160;
-    const THRESHOLD = 64;
-    const HOLD = 64;
-    const MIN_SPIN_MS = 500;
-    const SETTLE_AFTER_LOAD_MS = 400;
-    const SAVE_POLL_MS = 100;
-    const SAVE_WAIT_LIMIT_MS = 10000;
-    const RELOADED_KEY = "codegym:pull-refreshed";
-    const nav = document.querySelector("body > nav");
-    const spinner = indicator.querySelector(".spinner");
-    let startY = null;
-    let ready = false;
-    let refreshing = false;
-    let gap = null;
-
-    function isEditable(element) {
-      return element instanceof Element && element.matches("input, textarea, select, [contenteditable]");
-    }
-
-    function insideScrolledArea(element) {
-      for (let node = element; node instanceof Element; node = node.parentElement) {
-        if (node.scrollTop > 0) return true;
-      }
-      return false;
-    }
-
-    function canStart(event) {
-      return event.touches.length === 1 &&
-             window.scrollY <= 0 &&
-             !isEditable(document.activeElement) &&
-             !isEditable(event.target) &&
-             !document.querySelector("form[inert]") &&
-             !insideScrolledArea(event.target);
-    }
-
-    // Read while the content is at rest, so the gap is the layout's own.
-    function measureGap() {
-      const top = nav ? nav.getBoundingClientRect().bottom : 0;
-      gap = { top, height: content.getBoundingClientRect().top - top };
-    }
-
-    function rubberBand(distance) {
-      return distance * MAX_TRAVEL / (distance + MAX_TRAVEL);
-    }
-
-    function setSettling(settling) {
-      indicator.classList.toggle("is-settling", settling);
-      content.classList.toggle("pull-settling", settling);
-    }
-
-    function moveTo(travel) {
-      const middle = gap.top + (gap.height + travel) / 2;
-      content.style.transform = travel > 0 ? `translateY(${travel}px)` : "";
-      indicator.style.transform = `translateY(${middle - indicator.offsetHeight / 2}px)`;
-    }
-
-    function show(distance) {
-      const travel = rubberBand(distance);
-      setSettling(false);
-      moveTo(travel);
-      indicator.style.opacity = Math.min(travel / THRESHOLD, 1);
-      spinner.style.transform = `rotate(${travel * 4}deg)`;
-      ready = travel >= THRESHOLD;
-      indicator.classList.toggle("is-ready", ready);
-    }
-
-    function spin() {
-      refreshing = true;
-      spinner.style.transform = "";
-      indicator.classList.add("is-refreshing");
-      moveTo(HOLD);
-      indicator.style.opacity = 1;
-    }
-
-    // sessionStorage throws in some private modes; the spinner is only polish.
-    function remember(key, value) {
-      try { value === null ? sessionStorage.removeItem(key) : sessionStorage.setItem(key, value); } catch {}
-    }
-
-    function recall(key) {
-      try { return sessionStorage.getItem(key); } catch { return null; }
-    }
-
-    function reload() {
-      remember(RELOADED_KEY, "1");
-      window.location.reload();
-    }
-
-    function reset() {
-      startY = null;
-      ready = false;
-      refreshing = false;
-      setSettling(true);
-      indicator.classList.remove("is-refreshing", "is-ready");
-      content.style.transform = "";
-      indicator.style.transform = "";
-      indicator.style.opacity = "";
-    }
-
-    function savesPending() {
-      return window.CodeGymSaveStatus?.pending() ?? false;
-    }
-
-    function reloadWhenSaved(waited = 0) {
-      if (!savesPending()) return reload();
-      if (waited >= SAVE_WAIT_LIMIT_MS) return reset();
-      setTimeout(() => reloadWhenSaved(waited + SAVE_POLL_MS), SAVE_POLL_MS);
-    }
-
-    // A second finger, or a touch that cannot start a pull, ends the pull already showing.
-    document.addEventListener("touchstart", (event) => {
-      if (refreshing) return;
-      if (startY !== null) reset();
-      if (!canStart(event)) return;
-      measureGap();
-      startY = event.touches[0].clientY;
-    }, { passive: true });
-
-    document.addEventListener("touchmove", (event) => {
-      if (startY === null) return;
-      const distance = event.touches[0].clientY - startY;
-      if (distance <= 0 || window.scrollY > 0) return reset();
-      show(distance);
-    }, { passive: true });
-
-    document.addEventListener("touchend", () => {
-      if (startY === null) return;
-      if (!ready) return reset();
-
-      startY = null;
-      setSettling(true);
-      spin();
-      setTimeout(reloadWhenSaved, MIN_SPIN_MS);
-    });
-
-    document.addEventListener("touchcancel", () => { if (startY !== null) reset(); });
-
-    if (recall(RELOADED_KEY)) {
-      remember(RELOADED_KEY, null);
-      measureGap();
-      spin();
-      const settle = () => setTimeout(reset, SETTLE_AFTER_LOAD_MS);
-      if (document.readyState === "complete") settle();
-      else window.addEventListener("load", settle, { once: true });
-    }
-  })();
-</script>
+  <div class="pull-refresh" id="pull-refresh" aria-hidden="true" data-controller="pull-to-refresh"><span class="spinner"></span></div>
 
   <script>
   (() => {

@@ -46,228 +46,50 @@
     <%= render "dashboard/track_proposal", proposal: @track_proposal %>
   <% end %>
 <% else %>
-  <div class="progress-sticky">
-    <div class="progress-bar">
-      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+  <% submit_blocker = response.submit_blocker %>
+  <% submit_nudges = { unanswered: t("dashboard.exercise.submit_nudges.unanswered"),
+                       unrated:    t("dashboard.exercise.submit_nudges.unrated") } %>
+  <div data-controller="answer-form" data-answer-form-answered-sections-value="<%= response.answered_sections.to_json %>"
+       data-answer-form-submit-blocker-value="<%= submit_blocker %>"
+       data-answer-form-answered-count-value="<%= t("dashboard.exercise.answered_count") %>"
+       data-answer-form-all-answered-value="<%= t("dashboard.exercise.all_answered") %>"
+       data-answer-form-stale-reloaded-value="<%= t("dashboard.exercise.stale_reloaded") %>"
+       data-answer-form-submitting-value="<%= t("dashboard.exercise.submitting") %>"
+       data-answer-form-submit-label-value="<%= t("dashboard.exercise.submit") %>"
+       data-answer-form-generating-review-value="<%= t("review.generating_label") %>"
+       data-answer-form-submit-failed-value="<%= t("dashboard.exercise.submit_failed") %>"
+       data-answer-form-review-start-failed-value="<%= t("dashboard.exercise.review_start_failed") %>">
+    <div class="progress-sticky">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill" style="width:0%"></div>
+      </div>
+      <div class="progress-label" id="progress-label" data-answer-form-target="progressLabel"><%= t("dashboard.exercise.answered_count", answered: 0, total: exercise.active_section_keys.size) %></div>
     </div>
-    <div class="progress-label" id="progress-label"><%= t("dashboard.exercise.answered_count", answered: 0, total: exercise.active_section_keys.size) %></div>
+
+    <%= form_with url: responses_path, method: :post, id: "gym-form",
+          data: { turbo: false, answer_form_target: "form",
+                  action: "submit->answer-form#submit input->answer-form#input change->answer-form#change click->answer-form#rate" } do |f| %>
+      <%= render "responses/sections", exercise: exercise, response: response, submitted: false %>
+
+      <% if exercise.dropped_sections.any? %>
+        <p class="hint"><%= t("dashboard.section_left_out", count: exercise.dropped_sections.size) %></p>
+      <% end %>
+      <% if (coverage_reason = exercise.coverage_shown) %>
+        <p class="hint"><%= t("dashboard.coverage_added.#{coverage_reason}") %></p>
+      <% end %>
+      <% if exercise.shared_concept_shown? %>
+        <p class="hint"><%= t("dashboard.shared_concept", sections: ExerciseSection.fixed.map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
+      <% end %>
+
+      <div class="submit-row" id="submit-row">
+        <%= f.hidden_field :submit, value: "1" %>
+        <%# Not type=submit: a click before the module loads would otherwise natively post the whole day. %>
+        <%= f.button t("dashboard.exercise.submit"), type: "button", id: "submit-answers", class: "btn btn-primary",
+              data: { answer_form_target: "submitButton", action: "answer-form#submit" } %>
+        <span style="font-size:.8rem;color:var(--muted)"><%= t("dashboard.exercise.auto_saved") %></span>
+      </div>
+      <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge", tabindex: "-1",
+                hidden: submit_blocker.nil?, data: submit_nudges.merge(answer_form_target: "nudge"), aria: { live: "polite" } %>
+    <% end %>
   </div>
-
-  <%= form_with url: responses_path, method: :post, id: "gym-form",
-        data: { turbo: false, answered_sections: response.answered_sections, submit_blocker: response.submit_blocker } do |f| %>
-    <%= render "responses/sections", exercise: exercise, response: response, submitted: false %>
-
-    <% if exercise.dropped_sections.any? %>
-      <p class="hint"><%= t("dashboard.section_left_out", count: exercise.dropped_sections.size) %></p>
-    <% end %>
-    <% if (coverage_reason = exercise.coverage_shown) %>
-      <p class="hint"><%= t("dashboard.coverage_added.#{coverage_reason}") %></p>
-    <% end %>
-    <% if exercise.shared_concept_shown? %>
-      <p class="hint"><%= t("dashboard.shared_concept", sections: ExerciseSection.fixed.map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
-    <% end %>
-
-    <% submit_blocker = response.submit_blocker %>
-    <% submit_nudges = { unanswered: t("dashboard.exercise.submit_nudges.unanswered"),
-                         unrated:    t("dashboard.exercise.submit_nudges.unrated") } %>
-    <div class="submit-row" id="submit-row">
-      <%= f.hidden_field :submit, value: "1" %>
-      <%= f.button t("dashboard.exercise.submit"), type: "submit", id: "submit-answers", class: "btn btn-primary" %>
-      <span style="font-size:.8rem;color:var(--muted)"><%= t("dashboard.exercise.auto_saved") %></span>
-    </div>
-    <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge", tabindex: "-1",
-              hidden: submit_blocker.nil?, data: submit_nudges, aria: { live: "polite" } %>
-  <% end %>
-
-  <script>
-  (() => {
-    const form = document.getElementById("gym-form");
-    const textareas = form.querySelectorAll("textarea[data-field]");
-    const progressFill = document.getElementById("progress-fill");
-    const progressLabel = document.getElementById("progress-label");
-    const ratingButtons = form.querySelectorAll("button[data-rating-for]");
-    const submitButton  = document.getElementById("submit-answers");
-    const ratingNudge   = document.getElementById("rating-nudge");
-    const sectionFields = [...form.querySelectorAll("textarea[data-field]")].map(t => t.dataset.field);
-
-    const ratings = {};
-    form.querySelectorAll("button.rating-btn.active").forEach(b => { ratings[b.dataset.ratingFor] = b.dataset.rating; });
-
-    const STALE_RELOADED = <%= t("dashboard.exercise.stale_reloaded").to_json.html_safe %>;
-
-    // The server's verdict as of its last reply; the page never judges an answer itself.
-    let answeredSections = new Set(JSON.parse(form.dataset.answeredSections || "[]"));
-    let submitBlocker = form.dataset.submitBlocker || null;
-
-    function answered(textarea) {
-      return answeredSections.has(textarea.dataset.field);
-    }
-
-    function applyServerState(data) {
-      if (!Array.isArray(data?.answered_sections)) return;
-      answeredSections = new Set(data.answered_sections);
-      submitBlocker = data.submit_blocker || null;
-      updateProgress();
-      refreshNudge();
-      Object.entries(data.section_statuses || {}).forEach(([section, text]) => {
-        const status = form.querySelector(`.section-status[data-status-for="${section}"]`);
-        if (status) status.textContent = text;
-      });
-    }
-
-    function refreshNudge() {
-      ratingNudge.hidden = submitBlocker === null;
-      if (submitBlocker) ratingNudge.textContent = ratingNudge.dataset[submitBlocker];
-    }
-
-    const ANSWERED_COUNT = <%= t("dashboard.exercise.answered_count").to_json.html_safe %>;
-
-    function updateProgress() {
-      const filled = [...textareas].filter(answered).length;
-      progressFill.style.width = (filled / sectionFields.length * 100) + "%";
-      progressLabel.textContent = filled === sectionFields.length ? <%= t("dashboard.exercise.all_answered").to_json.html_safe %> : ANSWERED_COUNT.replace("%{answered}", filled).replace("%{total}", sectionFields.length);
-      form.querySelectorAll(".hint-slot[data-hint-for]").forEach(slot => {
-        const t = form.querySelector(`textarea[data-field="${slot.dataset.hintFor}"]`);
-        if (t) setHintLocked(slot, !answered(t));
-      });
-    }
-
-    function setHintLocked(slot, locked) {
-      slot.querySelector(".hint-locked").hidden = !locked;
-      const disclosure = slot.querySelector(":scope > details.hint");
-      if (locked) disclosure?.remove();
-      else if (!disclosure) slot.querySelector(".hint-locked").after(slot.querySelector("template").content.cloneNode(true));
-    }
-
-    function payload(extra) {
-      const answers = {};
-      textareas.forEach(t => answers[t.dataset.field] = t.value);
-      return { response: Object.assign(
-        { answers: answers, section_ratings: ratings }, extra || {}
-      ) };
-    }
-
-    let saveTimer = null;
-    CodeGymSaveStatus.watch(() => saveTimer !== null);
-
-    function sendSave() {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-      if (form.inert) return;
-      CodeGymSaveStatus.queue("answers", "POST", form.action, () => (form.inert ? null : payload()), { latest: true })
-        .then(({ ok, status, data, skipped }) => {
-          if (skipped) return;
-          if (ok) CodeGymSaveStatus.clear("submit");
-          if (!ok && status === 409 && data?.status === "stale") {
-            CodeGymSaveStatus.carry("answers", STALE_RELOADED);
-            window.location.reload();
-            return;
-          }
-          if (ok && data?.submitted && !form.inert && !reviewRequested) return window.location.reload();
-          if (ok && saveTimer === null && !CodeGymSaveStatus.queued("answers") && !form.inert) applyServerState(data);
-        });
-    }
-
-    function autoSave() {
-      clearTimeout(saveTimer);
-      saveTimer = form.inert ? null : setTimeout(sendSave, 800);
-    }
-
-    form.addEventListener("change", (event) => {
-      if (event.target.closest("[data-field], [data-comparison-answer]")) sendSave();
-    });
-
-    function reopenIfRated(section) {
-      const fold = form.querySelector(`details.section[data-section-fold="${section}"]`);
-      if (fold && !fold.open && ratings[section]) fold.open = true;
-    }
-
-    textareas.forEach(t => {
-      t.addEventListener("input", () => {
-        reopenIfRated(t.dataset.field);
-        autoSave();
-      });
-    });
-
-    ratingButtons.forEach(btn => {
-      btn.addEventListener("click", () => {
-        const section = btn.dataset.ratingFor;
-        ratings[section] = btn.dataset.rating;
-        form.querySelectorAll(`button[data-rating-for="${section}"]`).forEach(b => {
-          b.classList.toggle("active", b === btn);
-          b.setAttribute("aria-pressed", b === btn);
-        });
-        sendSave();
-      });
-    });
-
-    const GENERATING_REVIEW = <%= t("review.generating_label").to_json.html_safe %>;
-    const SUBMIT_FAILED = <%= t("dashboard.exercise.submit_failed").to_json.html_safe %>;
-    const REVIEW_START_FAILED = <%= t("dashboard.exercise.review_start_failed").to_json.html_safe %>;
-    let reviewRequested = false;
-
-    function requestReview(url) {
-      const reviewForm = document.createElement("form");
-      reviewForm.method = "post";
-      reviewForm.action = url;
-      const token = document.createElement("input");
-      token.type = "hidden";
-      token.name = "authenticity_token";
-      token.value = document.querySelector('meta[name="csrf-token"]')?.content ?? "";
-      reviewForm.appendChild(token);
-      document.body.appendChild(reviewForm);
-      reviewForm.submit();
-    }
-
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (form.inert) return;
-      clearTimeout(saveTimer);
-      saveTimer = null;
-
-      form.inert = true;
-      submitButton.disabled = true;
-      submitButton.classList.add("btn-loading");
-      submitButton.textContent = <%= t("dashboard.exercise.submitting").to_json.html_safe %>;
-
-      const result = await CodeGymRequest.send("POST", form.action, payload({ submit: "1" }), { fallback: SUBMIT_FAILED });
-      const reviewUrl = result.ok ? result.data?.review_url : null;
-      if (result.ok) CodeGymSaveStatus.clear("submit");
-
-      if (reviewUrl) {
-        submitButton.textContent = GENERATING_REVIEW;
-        reviewRequested = true;
-        try { requestReview(reviewUrl); return; } catch (_) { reviewRequested = false; }
-      }
-      // Stays inert behind the reload: restoring the form would queue an autosave of the refused payload.
-      if (result.ok || result.status === 409) {
-        CodeGymSaveStatus.carry("answers", result.ok ? REVIEW_START_FAILED : STALE_RELOADED);
-        window.location.reload();
-        return;
-      }
-
-      const refused = result.status === 422 && Boolean(result.data?.submit_blocker);
-      if (refused) {
-        CodeGymSaveStatus.clear("submit");
-        applyServerState(result.data);
-      } else {
-        CodeGymSaveStatus.report("submit", result.message);
-      }
-
-      form.inert = false;
-      submitButton.classList.remove("btn-loading");
-      submitButton.textContent = <%= t("dashboard.exercise.submit").to_json.html_safe %>;
-      submitButton.disabled = false;
-      autoSave();
-      if (refused) ratingNudge.focus();
-    });
-
-    // Safari bfcaches this no-store page anyway (every iOS home-screen launch), so reload a stale submitted form.
-    window.addEventListener("pageshow", (event) => {
-      if (event.persisted && reviewRequested) window.location.reload();
-    });
-
-    updateProgress();
-  })();
-  </script>
 <% end %>

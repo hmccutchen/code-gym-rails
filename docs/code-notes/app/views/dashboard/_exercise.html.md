@@ -22,17 +22,20 @@ the sections on small screens.
 ## Answer form
 
 The form always POSTs, never PATCHes: `ResponsesController#create` serializes
-saves and repeated submits under the response lock. The script sends both
+saves and repeated submits under the response lock. The controller sends both
 through fetch.
 
-## Script wrapper
+## The controller
 
-The script is wrapped in an immediately invoked function so that running it a
-second time cannot redeclare top-level `const` and `let` bindings. The
-original comment gave Turbo re-executing the script on a replaced partial as
-the reason; this app loads no Turbo JS, so that case no longer arises.
+`data-controller="answer-form"` wraps the progress bar and the form, since the
+two sit beside each other in the markup;
+`docs/code-notes/app/javascript/controllers/answer_form_controller.md` covers
+why the form is a target, why the submit button is `type="button"` rather
+than a submit button, and why the input, change and rating listeners are
+delegated actions. The IIFE the inline
+script needed is gone with it.
 
-## STALE_RELOADED
+## staleReloaded
 
 This sentence is carried across the reload that a refused save triggers. It
 has to describe a page that has already come back, so it is used instead of
@@ -87,7 +90,7 @@ A 409 with status `stale` means the server refused the answer's encoding (see
 has to come back before another save can land. Reloading is the whole
 recovery: the server re-renders the section in the encoding it now expects.
 The navigation would wipe the banner this save just set, so the explanation is
-carried to the page that loads. It is `STALE_RELOADED` rather than the
+carried to the page that loads. It is `staleReloaded` rather than the
 server's sentence, because the server's asks for a refresh that has already
 happened by the time anyone reads it.
 

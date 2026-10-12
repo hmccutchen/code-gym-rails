@@ -14,8 +14,21 @@ RSpec.describe "Pull to refresh", type: :system do
     }).observe(document, { childList: true, subtree: true });
   JS
 
+  SLOW_SETTLE = <<~JS.freeze
+    const timer = setInterval(() => {
+      const indicator = document.getElementById("pull-refresh");
+      if (!indicator) return;
+      indicator.setAttribute("data-pull-to-refresh-settle-delay-value", "3000");
+      clearInterval(timer);
+    }, 5);
+  JS
+
   def launch_standalone
     page.driver.with_playwright_page { |pw| pw.add_init_script(script: FORCE_STANDALONE) }
+  end
+
+  def slow_settle
+    page.driver.with_playwright_page { |pw| pw.add_init_script(script: SLOW_SETTLE) }
   end
 
   # Synthetic touch events: steps are [type, y] for one finger, or [type, y, fingers].
@@ -217,15 +230,17 @@ RSpec.describe "Pull to refresh", type: :system do
   # The reload replaces the page the spinner was drawn on, so the new page must pick the spinner up.
   it "opens the reloaded page with the content held down and the spinner turning, then settles" do
     launch_standalone
+    slow_settle
     visit_as(user)
     visit learn_path
+    expect(page).to have_css("#pull-refresh", visible: :all)
     page.execute_script("sessionStorage.setItem('codegym:pull-refreshed', '1')")
 
     visit learn_path
 
-    expect(indicator("classList.contains('is-refreshing')")).to be(true)
+    expect(page).to have_css("#pull-refresh.is-refreshing", visible: :all, wait: 10)
     expect(content("style.transform")).to eq("translateY(64px)")
-    Timeout.timeout(5) { sleep 0.1 while indicator("classList.contains('is-refreshing')") }
+    expect(page).to have_no_css("#pull-refresh.is-refreshing", visible: :all, wait: 10)
     expect(indicator("style.transform")).to eq("")
     expect(content("style.transform")).to eq("")
     expect(page.evaluate_script("sessionStorage.getItem('codegym:pull-refreshed') === null")).to be(true)

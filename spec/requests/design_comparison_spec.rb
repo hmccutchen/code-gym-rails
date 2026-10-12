@@ -51,7 +51,7 @@ RSpec.describe "The design comparison section", type: :request do
 
       field = page.at_css("textarea[data-field='design_comparison']")
       expect(field["name"]).to eq("response[answers][design_comparison]")
-      expect(page.at_css("#gym-form")["data-answered-sections"]).to eq("[]")
+      expect(answer_form(page)["data-answer-form-answered-sections-value"]).to eq("[]")
       expect(page.css("textarea[data-field]").map { |t| t["data-field"] }).to eq(%w[code_review design_comparison])
     end
 
@@ -64,7 +64,7 @@ RSpec.describe "The design comparison section", type: :request do
       expect(page.at_css("input[type=radio][value=b]")["checked"]).to be_present
       expect(page.at_css("input[type=radio][value=a]")["checked"]).to be_nil
       expect(page.at_css("textarea[data-comparison-reason]").text.strip).to eq(reason)
-      expect(page.at_css("#gym-form")["data-answered-sections"]).to eq('["design_comparison"]')
+      expect(answer_form(page)["data-answer-form-answered-sections-value"]).to eq('["design_comparison"]')
     end
 
     # The reference illustrates the principle the grade asks for, so opening it would give away the reason.

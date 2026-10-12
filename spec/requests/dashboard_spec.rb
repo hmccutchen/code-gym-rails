@@ -72,7 +72,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     get root_path
 
     expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
-    expect(response.body).to include('data-submit-blocker="unrated"')
+    expect(response.body).to include('data-answer-form-submit-blocker-value="unrated"')
     expect(response.body).to match(/id="rating-nudge"(?![^>]*hidden)/)
     expect(response.body).to include("Rate each section you answered to finish up.")
   end
@@ -84,7 +84,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     get root_path
 
     expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
-    expect(response.body).to include('data-answered-sections="[]"')
+    expect(response.body).to include('data-answer-form-answered-sections-value="[]"')
     expect(response.body).to include("Answer at least one section to finish up.")
   end
 
@@ -93,8 +93,11 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     get root_path
 
-    carried = response.body.scan(/CodeGymSaveStatus\.carry\("answers", STALE_RELOADED\);\s*\n\s*window\.location\.reload\(\);/)
-    expect(carried.length).to eq(response.body.scan(/status === 409 && data\?\.status === "stale"/).length)
+    expect(response.body).to include('data-answer-form-stale-reloaded-value')
+
+    source = Rails.root.join("app/javascript/controllers/answer_form_controller.js").read
+    carried = source.scan(/saveStatus\.carry\("answers",[^\n]*\n\s*window\.location\.reload\(\)/)
+    expect(carried.length).to eq(source.scan(/status === 409/).length)
     expect(carried).not_to be_empty
   end
 
@@ -123,14 +126,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
       document = Nokogiri::HTML(response.body)
-      expect(document.at_css("#gym-form")["data-answered-sections"]).to eq("[]")
-      expect(document.at_css("#gym-form")["data-submit-blocker"]).to eq("unanswered")
+      expect(answer_form(document)["data-answer-form-answered-sections-value"]).to eq("[]")
+      expect(answer_form(document)["data-answer-form-submit-blocker-value"]).to eq("unanswered")
 
       draft.update!(answers: { "parsons_problem" => "order:#{(0...count).to_a.join(',')}" })
       get root_path
       document = Nokogiri::HTML(response.body)
-      expect(document.at_css("#gym-form")["data-answered-sections"]).to eq('["parsons_problem"]')
-      expect(document.at_css("#gym-form")["data-submit-blocker"]).to be_nil
+      expect(answer_form(document)["data-answer-form-answered-sections-value"]).to eq('["parsons_problem"]')
+      expect(answer_form(document)["data-answer-form-submit-blocker-value"]).to eq("")
     end
   end
 
@@ -279,7 +282,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(draft.answered_sections).to eq([ "code_review" ])
     expect(draft.answered_concept_tags).to eq("code_review" => "n_plus_one")
     expect(draft).to be_submittable
-    expect(document.at_css("#gym-form")["data-answered-sections"]).to eq('["code_review"]')
+    expect(answer_form(document)["data-answer-form-answered-sections-value"]).to eq('["code_review"]')
 
     draft.update!(submitted_at: Time.current)
     get root_path
@@ -572,7 +575,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       it "announces the generating hint's updates from inside a live region" do
         get root_path
 
-        expect(response.body).to include('id="generating-hint" aria-live="polite"')
+        hint = Nokogiri::HTML(response.body).at_css("#generating-hint")
+      expect(hint["aria-live"]).to eq("polite")
+      expect(hint["data-generating-target"]).to eq("hint")
       end
     end
 
@@ -1311,8 +1316,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       travel_to Time.utc(2026, 8, 7, 12, 0, 0) do
         get root_path
 
-        attempts = response.body[/MAX_ATTEMPTS = (\d+)/, 1].to_i
-        interval = response.body[/POLL_INTERVAL_MS = (\d+)/, 1].to_i / 1000.0
+        poller = Nokogiri::HTML(response.body).at_css("[data-controller~='generating']")
+        attempts = poller["data-generating-max-attempts-value"].to_i
+        interval = poller["data-generating-interval-value"].to_i / 1000.0
 
         expect(attempts).to be_positive
         expect(attempts * interval).to be > AiService::GENERATION_READ_TIMEOUT

@@ -8,7 +8,10 @@
     <%= button_to response.reviewed? ? t("review.finish_button") : t("review.get_button", provider: response.user.provider_label),
           review_response_path(response), method: :post,
           class: "btn btn-primary btn-sm",
-          form: { class: "review-form", data: { turbo: false } } %>
+          data: { review_button_target: "button" },
+          form: { class: "review-form",
+                  data: { turbo: false, controller: "review-button", action: "submit->review-button#submit",
+                          review_button_loading_label_value: t("review.generating_label") } } %>
   <% end %>
 </div>
 <% if !response.fully_reviewed? && (failure = review_failure_sentence(response)) %>
@@ -24,37 +27,3 @@
     <%= render "shared/ai_review", response: response %>
   </div>
 <% end %>
-
-<%# Design notes: docs/code-notes/app/views/responses/_submission.html.md %>
-<script>
-(() => {
-  document.querySelectorAll("form.review-form:not([data-review-wired])").forEach(form => {
-    form.dataset.reviewWired = "1";
-
-    const button = form.querySelector('button[type="submit"], input[type="submit"]');
-    if (!button) return;
-
-    // button_to renders a <button>, not an <input>, and the two keep their label in different properties.
-    const isButtonTag = button.tagName === "BUTTON";
-    const originalLabel = isButtonTag ? button.textContent : button.value;
-    const setLabel = (text) => { if (isButtonTag) { button.textContent = text; } else { button.value = text; } };
-
-    form.addEventListener("submit", () => {
-      // Disabling synchronously inside the submit handler can cancel the submission in some browsers.
-      setTimeout(() => {
-        button.disabled = true;
-        button.classList.add("btn-loading");
-        setLabel(<%= t("review.generating_label").to_json.html_safe %>);
-      }, 0);
-    });
-
-    // A Back navigation can restore this page from bfcache with the button still disabled; reset it.
-    window.addEventListener("pageshow", (event) => {
-      if (!event.persisted) return;
-      button.disabled = false;
-      button.classList.remove("btn-loading");
-      setLabel(originalLabel);
-    });
-  });
-})();
-</script>

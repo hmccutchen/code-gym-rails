@@ -1,37 +1,12 @@
-<div class="section" style="text-align:center;padding:3rem;">
+<%# Outlasts both first-time generation and a regeneration claim going stale, whichever is longer %>
+<% poll_interval_s = 3.0 %>
+<div class="section" style="text-align:center;padding:3rem;"
+     data-controller="generating"
+     data-generating-url-value="<%= dashboard_status_path %>"
+     data-generating-interval-value="<%= (poll_interval_s * 1000).to_i %>"
+     data-generating-max-attempts-value="<%= ([AiService::JUDGED_GENERATION_BUDGET, DailyExercise::REGENERATION_STALE_AFTER.to_i].max / poll_interval_s).ceil + 1 %>"
+     data-generating-slow-hint-value="<%= t("dashboard.generating.slow_hint") %>">
   <div class="spinner" style="margin-bottom:1rem;" aria-hidden="true"></div>
   <p style="color:var(--muted);margin-bottom:.5rem;"><%= t("dashboard.generating.title") %></p>
-  <p style="font-size:.85rem;color:var(--muted);" id="generating-hint" aria-live="polite"><%= t("dashboard.generating.hint") %></p>
+  <p style="font-size:.85rem;color:var(--muted);" id="generating-hint" data-generating-target="hint" aria-live="polite"><%= t("dashboard.generating.hint") %></p>
 </div>
-
-<%# IIFE: a retry can run this script again, and top-level const/let would redeclare %>
-<script>
-(() => {
-  const hint = document.getElementById("generating-hint");
-  const statusUrl = "<%= dashboard_status_path %>";
-  let attempts = 0;
-  <%# Outlasts both first-time generation and a regeneration claim going stale, whichever is longer %>
-  <% poll_interval_s = 3.0 %>
-  const POLL_INTERVAL_MS = <%= (poll_interval_s * 1000).to_i %>;
-  const MAX_ATTEMPTS = <%= ([AiService::JUDGED_GENERATION_BUDGET, DailyExercise::REGENERATION_STALE_AFTER.to_i].max / poll_interval_s).ceil + 1 %>;
-
-  async function poll() {
-    attempts += 1;
-
-    const { data } = await CodeGymRequest.get(statusUrl);
-    if (data?.status === "ready" || data?.status === "failed") {
-      window.location.reload();
-      return;
-    }
-
-    if (attempts >= MAX_ATTEMPTS) {
-      hint.textContent = <%= t("dashboard.generating.slow_hint").to_json.html_safe %>;
-      return;
-    }
-
-    setTimeout(poll, POLL_INTERVAL_MS);
-  }
-
-  document.addEventListener("DOMContentLoaded", () => setTimeout(poll, POLL_INTERVAL_MS));
-})();
-</script>
