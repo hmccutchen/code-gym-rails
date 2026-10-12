@@ -187,10 +187,11 @@ block removes the grey tap highlight.
 ## `.btn-loading`
 
 This is the loading state for buttons whose click starts a wait. It has two
-consumers: forms tagged `data-loading-form` (the shared script at the bottom
-of this layout) and the fetch-driven submit and review handlers, which toggle
-the class themselves. `pointer-events` guards the gap before `disabled` lands,
-since the shared script applies it a tick late.
+consumers: forms that mount the `loading-form` Stimulus controller
+(`app/javascript/controllers/loading_form_controller.js`) and the fetch-driven
+submit and review handlers, which toggle the class themselves.
+`pointer-events` guards the gap before `disabled` lands, since the controller
+sets `disabled` a tick after the submit so it does not cancel the submission.
 
 ## `.pull-refresh`
 
