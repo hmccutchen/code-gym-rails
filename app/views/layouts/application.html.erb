@@ -6,12 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <title><%= document_title %></title>
   <link rel="manifest" href="<%= pwa_manifest_path %>">
-  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="<%= versioned_public_path("favicon.ico") %>" sizes="32x32">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="<%= display_preferences.status_bar_style %>">
   <meta name="apple-mobile-web-app-title" content="<%= t("app_name") %>">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="apple-touch-icon" href="<%= versioned_public_path("apple-touch-icon.png") %>">
   <% if display_stylesheets? %>
     <%= tag.meta(name: "theme-color", content: DisplayPreferences::LIGHT_THEME_COLOR,
                  media: display_preferences.light_palette_media, data: { light_palette_media: true }) %>

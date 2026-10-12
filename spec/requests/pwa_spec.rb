@@ -41,12 +41,13 @@ RSpec.describe "PWA", type: :request do
       expect(response).to have_http_status(:not_found)
     end
 
-    it "points every icon at artwork that exists" do
+    it "points every icon at artwork that exists, versioned by its bytes" do
       sources = manifest["icons"].map { |icon| icon["src"] }
+      helper = Object.new.extend(PublicFileHelper)
 
-      expect(sources).to include("/icon-192.png", "/icon-512.png", "/icon-maskable-512.png")
+      expect(sources).to eq(%w[icon-192.png icon-512.png icon-maskable-512.png].map { |name| helper.versioned_public_path(name) })
       sources.each do |src|
-        expect(Rails.public_path.join(src.delete_prefix("/"))).to exist
+        expect(Rails.public_path.join(src.delete_prefix("/").split("?").first)).to exist
       end
     end
 
@@ -70,9 +71,13 @@ RSpec.describe "PWA", type: :request do
       expect(response.body).to include(%(<meta name="theme-color" content="#{layout_color("surface")}">))
     end
 
+    it "versions the favicon by its bytes, since production caches public files for a year" do
+      expect(response.body).to include(%(<link rel="icon" href="#{Object.new.extend(PublicFileHelper).versioned_public_path("favicon.ico")}" sizes="32x32">))
+    end
+
     it "names and illustrates the home screen entry" do
       expect(response.body).to include(%(<meta name="apple-mobile-web-app-title" content="Code Gym">))
-      expect(response.body).to include(%(<link rel="apple-touch-icon" href="/apple-touch-icon.png">))
+      expect(response.body).to include(%(<link rel="apple-touch-icon" href="#{Object.new.extend(PublicFileHelper).versioned_public_path("apple-touch-icon.png")}">))
       expect(Rails.public_path.join("apple-touch-icon.png")).to exist
     end
 

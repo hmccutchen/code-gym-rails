@@ -13,8 +13,8 @@ function notificationFor(event) {
 
   return self.registration.showNotification(payload.title || "Code Gym", {
     body: options.body || "Today's set is ready.",
-    icon: "/icon-192.png",
-    badge: "/icon-192.png",
+    icon: "<%= versioned_public_path("icon-192.png") %>",
+    badge: "<%= versioned_public_path("icon-192.png") %>",
     data: options.data || { path: "/" },
     tag: "daily-reminder"
   })
