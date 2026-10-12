@@ -70,6 +70,12 @@ module TodaysSetHelper
   end
 end
 
+module JavascriptReadyHelper
+  def wait_for_js
+    expect(page).to have_css("html[data-js-ready]", visible: :all)
+  end
+end
+
 RSpec.configure do |config|
   config.before(:each, type: :system) do
     driven_by :capybara_playwright
@@ -82,4 +88,5 @@ RSpec.configure do |config|
   config.include RatingHelper, type: :system
   config.include AnswerFormHelper, type: :system
   config.include TodaysSetHelper, type: :system
+  config.include JavascriptReadyHelper, type: :system
 end

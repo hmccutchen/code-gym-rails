@@ -21,9 +21,12 @@ action to cause, and it runs again on the next page load anyway.
 
 The layout loads this through `javascript_importmap_tags`, so it is a deferred
 module that imports `code_gym/request` rather than reaching for a global.
-`app/javascript/application.js` puts it on `window.CodeGymSaveStatus` for the
-inline page scripts still to be converted, and an inline script that needs it
-before its own first event waits for `DOMContentLoaded`. Its generic failure
+Every page script now imports it. `app/javascript/application.js` still puts
+it on `window.CodeGymSaveStatus`, because system specs drive the module through
+that name inside `execute_script` and `wait_for_function`, which cannot import
+a module, and because the bootstrap
+(`app/assets/javascripts/code_gym_bootstrap.js`) publishes the name at parse
+time, so the module has to take it over when it loads. Its generic failure
 wording is rendered onto `<body>` as a data attribute, since a module cannot
 read a translation. The banner markup is `shared/_save_status_banner`, rendered
 in `<body>`, so `render()` looks the elements up when it runs and waits for

@@ -131,7 +131,6 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     end
   end
 
-  # Readiness gives up after its timeout, so a controller that never arrives would post its stale hidden field.
   it "refuses to submit while a controller inside the form never connected" do
     reason = "Piece A keeps the retry bounded, which the stated requirement asks for here."
 
@@ -238,6 +237,74 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(errors).to be_empty
   end
 
+  it "refuses the account delete until its confirmation is loaded" do
+    watch_page_errors
+    visit_as(user)
+    visit account_path
+    expect(page).to have_css("#delete-account-form button", visible: :all)
+
+    url = page.current_url
+    stalled[:controller] = "loading_form_controller"
+
+    page.driver.with_playwright_page do |pw|
+      pw.goto(url, waitUntil: "commit")
+      pw.evaluate(%(document.querySelector("#delete-account-form button").click()))
+      expect(pw.evaluate(%(document.querySelector("#delete-account-form button").disabled))).to be(true)
+    end
+
+    sleep 1
+    expect(user.reload.anonymized_at).to be_nil
+    wait_for(20) { !page.driver.with_playwright_page { |pw| pw.evaluate(%(document.querySelector("#delete-account-form button").disabled)) } }
+    expect(errors).to be_empty
+  end
+
+  it "keeps the reminder button disabled until its controller can make the permission request" do
+    ENV["VAPID_PUBLIC_KEY"] = "public"
+    ENV["VAPID_PRIVATE_KEY"] = "private"
+    watch_page_errors
+    visit_as(user)
+    visit account_path
+    expect(page).to have_css("#push-enable", visible: :all)
+
+    url = page.current_url
+    stalled[:controller] = "push_enable_controller"
+
+    page.driver.with_playwright_page do |pw|
+      pw.goto(url, waitUntil: "commit")
+      expect(pw.evaluate(%(document.querySelector("#push-enable").disabled))).to be(true)
+    end
+
+    wait_for(20) { !page.driver.with_playwright_page { |pw| pw.evaluate(%(document.querySelector("#push-enable").disabled)) } }
+    expect(page).to have_button("Turn on daily reminders", disabled: false)
+    expect(errors).to be_empty
+  ensure
+    ENV.delete("VAPID_PUBLIC_KEY")
+    ENV.delete("VAPID_PRIVATE_KEY")
+  end
+
+  # A name typed and blurred before the controller connects is only saved if connect adopts it.
+  it "adopts a name typed into the nav while the modules are still loading" do
+    watch_page_errors
+    visit_as(user)
+    visit setup_path
+    expect(page).to have_css("#nav-name-input", visible: :all)
+
+    reload_with_modules_stalled do |pw|
+      pw.evaluate(<<~JS)
+        (() => {
+          const input = document.getElementById("nav-name-input");
+          input.value = "Typed Early";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("blur"));
+        })()
+      JS
+    end
+
+    wait_for(20) { user.reload.name == "Typed Early" }
+    expect(user.reload.name).to eq("Typed Early")
+    expect(errors).to be_empty
+  end
+
   # The pick and the reason only reach the stored answer through the controller, so an early edit must be adopted.
   it "adopts a design comparison picked and explained while the modules are still loading" do
     reason = "Piece A keeps the retry bounded, which the stated requirement asks for."
@@ -261,5 +328,35 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       expect(user.daily_responses.sole.answers["design_comparison"]).to eq("pick:a\n#{reason}")
       expect(errors).to be_empty
     end
+  end
+
+  it "filters the Learn list by a term typed while its controller was still loading" do
+    user.update!(language: "ruby_rails")
+    watch_page_errors
+    visit_as(user)
+    visit learn_path
+    expect(page).to have_css("#learn-filter-input")
+
+    url = page.current_url
+    stalled[:controller] = "learn_filter_controller"
+
+    page.driver.with_playwright_page do |pw|
+      pw.goto(url, waitUntil: "commit")
+      pw.wait_for_selector("#learn-filter-input")
+      connected = pw.evaluate(<<~JS)
+        (() => {
+          const input = document.getElementById("learn-filter-input");
+          input.value = "no such concept anywhere";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          return !!(window.Stimulus && window.Stimulus.getControllerForElementAndIdentifier(
+            document.querySelector('[data-controller~="learn-filter"]'), "learn-filter"));
+        })()
+      JS
+      expect(connected).to be(false)
+    end
+
+    expect(page).to have_css("#learn-empty", visible: :visible, wait: 20)
+    expect(page).to have_no_css(".learn-entry", visible: :visible)
+    expect(errors).to be_empty
   end
 end

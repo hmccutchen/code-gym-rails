@@ -14,64 +14,18 @@
     <%= button_to t("accounts.push_reminders.turn_off"), push_subscription_path, method: :delete, class: "btn btn-ghost" %>
   <% else %>
     <p><%= t("accounts.push_reminders.offer") %></p>
-    <button type="button" id="push-enable" class="btn btn-ghost"><%= t("accounts.push_reminders.turn_on") %></button>
-    <p class="reminder-status" id="push-status" hidden></p>
-
-    <% content_for :page_scripts do %>
-      <script>
-        (function () {
-          const button = document.getElementById("push-enable");
-          if (!button) return;
-
-          const status = document.getElementById("push-status");
-          const push = window.CodeGymPush;
-
-          function say(message) {
-            status.textContent = message;
-            status.hidden = false;
-          }
-
-          // iPadOS reports itself as a Mac; touch points separate it from desktop Safari, which has no Home Screen.
-          function isApplePortable() {
-            return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                   (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-          }
-
-          if (!push || !push.supported()) {
-            button.disabled = true;
-            say(isApplePortable()
-              ? <%= t("accounts.push_reminders.home_screen_only", app_name: t("app_name")).to_json.html_safe %>
-              : <%= t("accounts.push_reminders.unsupported").to_json.html_safe %>);
-            return;
-          }
-
-          button.addEventListener("click", function () {
-            // Must stay the first statement: iOS silently refuses a permission request not made synchronously in the gesture.
-            const permission = Notification.requestPermission();
-
-            button.disabled = true;
-            say(<%= t("accounts.push_reminders.waiting").to_json.html_safe %>);
-
-            permission
-              .then(function (state) {
-                if (state !== "granted") {
-                  throw push.failure(state === "denied"
-                    ? <%= t("accounts.push_reminders.blocked", app_name: t("app_name")).to_json.html_safe %>
-                    : <%= t("accounts.push_reminders.not_granted").to_json.html_safe %>);
-                }
-
-                return push.subscribeAndRegister();
-              })
-              .then(function () {
-                window.location.reload();
-              })
-              .catch(function (error) {
-                button.disabled = false;
-                say(error?.readable ? error.message : <%= t("accounts.push_reminders.failed").to_json.html_safe %>);
-              });
-          });
-        })();
-      </script>
-    <% end %>
+    <div data-controller="push-enable"
+         <%= tag.attributes(data: push_settings_data("push_enable")) %>
+         <%= tag.attributes(data: {
+               push_enable_home_screen_only_text_value: t("accounts.push_reminders.home_screen_only", app_name: t("app_name")),
+               push_enable_unsupported_text_value: t("accounts.push_reminders.unsupported"),
+               push_enable_waiting_text_value: t("accounts.push_reminders.waiting"),
+               push_enable_blocked_text_value: t("accounts.push_reminders.blocked", app_name: t("app_name")),
+               push_enable_not_granted_text_value: t("accounts.push_reminders.not_granted"),
+               push_enable_failed_text_value: t("accounts.push_reminders.failed") }) %>>
+      <button type="button" id="push-enable" class="btn btn-ghost" disabled
+              data-push-enable-target="button" data-action="push-enable#enable"><%= t("accounts.push_reminders.turn_on") %></button>
+      <p class="reminder-status" id="push-status" hidden data-push-enable-target="status"></p>
+    </div>
   <% end %>
 </div>

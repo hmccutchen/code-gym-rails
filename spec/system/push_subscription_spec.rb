@@ -1,0 +1,70 @@
+require "rails_helper"
+
+RSpec.describe "Re-subscribing to push reminders on launch", type: :system do
+  let(:user) { create_fake_provider_user.tap { |user| user.update!(reminder_level: "ready") } }
+  let(:endpoint) { "https://fcm.googleapis.com/fcm/send/launch-endpoint" }
+
+  # Headless Chromium cannot grant push, so the browser's push APIs are replaced before any page script runs.
+  def stub_push_apis
+    script = <<~JS
+      window.pushPosts = [];
+      window.pushSubscribed = false;
+      const subscription = {
+        endpoint: #{endpoint.to_json},
+        toJSON() { return { endpoint: this.endpoint, keys: { p256dh: "p256dh-key", auth: "auth-key" } }; }
+      };
+      const pushManager = {
+        subscribe: async () => { window.pushSubscribed = true; return subscription; },
+        getSubscription: async () => subscription
+      };
+      Object.defineProperty(navigator, "serviceWorker", {
+        configurable: true,
+        value: { register: async () => ({ pushManager }), ready: Promise.resolve({ pushManager }) }
+      });
+      window.PushManager = function PushManager() {};
+      Object.defineProperty(Notification, "permission", { configurable: true, get: () => "granted" });
+      const originalFetch = window.fetch;
+      window.fetch = (url, options) => {
+        if (String(url).includes("/push_subscription")) window.pushPosts.push(JSON.parse(options.body));
+        return originalFetch(url, options);
+      };
+    JS
+    page.driver.with_playwright_page { |pw| pw.add_init_script(script: script) }
+  end
+
+  around do |example|
+    ENV["VAPID_PUBLIC_KEY"] = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U"
+    ENV["VAPID_PRIVATE_KEY"] = "private"
+    example.run
+  ensure
+    ENV.delete("VAPID_PUBLIC_KEY")
+    ENV.delete("VAPID_PRIVATE_KEY")
+  end
+
+  def wait_until_subscribed
+    Timeout.timeout(10) { sleep 0.05 until page.evaluate_script("window.pushSubscribed") }
+  end
+
+  it "registers an endpoint the server does not hold yet" do
+    stub_push_apis
+    visit_as(user)
+    wait_for_js
+    wait_until_subscribed
+
+    Timeout.timeout(10) { sleep 0.1 until user.push_subscriptions.reload.any? }
+    expect(page.evaluate_script("window.pushPosts")).to eq([ { "endpoint" => endpoint, "p256dh" => "p256dh-key", "auth" => "auth-key" } ])
+    expect(user.push_subscriptions.reload.pluck(:endpoint, :p256dh_key, :auth_key)).to eq([ [ endpoint, "p256dh-key", "auth-key" ] ])
+  end
+
+  it "posts nothing for an endpoint the server already holds" do
+    user.push_subscriptions.create!(endpoint: endpoint, p256dh_key: "p256dh-key", auth_key: "auth-key")
+    stub_push_apis
+    visit_as(user)
+    wait_for_js
+    wait_until_subscribed
+
+    sleep 0.5
+    expect(page.evaluate_script("window.pushPosts")).to eq([])
+    expect(user.push_subscriptions.reload.count).to eq(1)
+  end
+end

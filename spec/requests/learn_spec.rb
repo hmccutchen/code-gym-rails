@@ -335,7 +335,7 @@ RSpec.describe "Learn", type: :request do
         get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
 
         expect(response.body).to include(I18n.t("learn.write_lesson"))
-        status_url = Nokogiri::HTML(response.body).at_css("#learn-guide")["data-status-url"]
+        status_url = Nokogiri::HTML(response.body).at_css("#learn-guide")["data-write-up-control-status-url-value"]
         expect(Rack::Utils.parse_query(URI.parse(status_url).query))
           .to include("awaiting" => "lesson", "generation_version" => written.generation_version.to_s)
         expect(response.body).to include("PLAIN LANGUAGE", "PITFALLS")
@@ -379,7 +379,7 @@ RSpec.describe "Learn", type: :request do
 
         expect(response.body).to include(I18n.t("learn.write_ladder"))
         expect(response.body).to include(I18n.t("sections.challenge.name"))
-        status_url = Nokogiri::HTML(response.body).at_css("#learn-guide")["data-status-url"]
+        status_url = Nokogiri::HTML(response.body).at_css("#learn-guide")["data-write-up-control-status-url-value"]
         expect(Rack::Utils.parse_query(URI.parse(status_url).query))
           .to include("generation_version" => guided.generation_version.to_s)
       end

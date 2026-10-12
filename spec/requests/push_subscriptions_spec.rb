@@ -214,7 +214,16 @@ RSpec.describe "Push subscriptions", type: :request do
 
       get account_path
 
-      expect(response.body).to include("const VAPID_KEY = \"public\"")
+      expect(response.body).to include(%(data-push-enable-vapid-key-value="public"))
+    end
+
+    it "renders the enable button disabled until its controller connects" do
+      configure_vapid
+      login_as(user)
+
+      get account_path
+
+      expect(Nokogiri::HTML(response.body).at_css("#push-enable")["disabled"]).not_to be_nil
     end
 
     # fetch resolves for a 4xx and follows a logged-out redirect to a 200, so both must count as failure.
@@ -224,27 +233,31 @@ RSpec.describe "Push subscriptions", type: :request do
 
       get account_path
 
-      expect(response.body).to include("window.CodeGymRequest.send(\"POST\", REGISTER_PATH")
-      expect(response.body).to include("{ fallback: #{I18n.t("push.register_failed").to_json} }")
-      expect(response.body).to include("if (!result.ok) throw failure(result.message)")
+      expect(response.body).to include(%(data-push-enable-register-path-value="#{push_subscription_path}"))
+      expect(response.body).to include(%(data-push-enable-register-failed-text-value="#{ERB::Util.html_escape(I18n.t("push.register_failed"))}"))
+      source = Rails.root.join("app/javascript/code_gym/push.js").read
+      expect(source).to include('send("POST", registerPath, {')
+      expect(source).to include("if (!result.ok) throw failure(result.message)")
     end
 
-    it "waits for DOMContentLoaded before re-subscribing on launch, since the chain reaches a deferred module" do
+    it "re-subscribes on launch for an enrolled user, since the chain reaches a deferred module" do
       configure_vapid
       user.update!(reminder_level: :ready)
       login_as(user)
 
       get account_path
 
-      expect(response.body).to match(/DOMContentLoaded.{0,120}CodeGymPush\.subscribeAndRegister\(\)/m)
+      expect(response.body).to include(%(data-controller="push-launch"))
+      expect(response.body).to include(%(data-push-launch-register-path-value="#{push_subscription_path}"))
     end
 
-    it "emits no push script for a logged-out visitor" do
+    it "mounts no push controller for a logged-out visitor" do
       configure_vapid
 
       get login_path
 
-      expect(response.body).not_to include("CodeGymPush")
+      expect(response.body).not_to include("push-launch")
+      expect(response.body).not_to include("push-enable")
     end
 
     it "renders the nudge opt-in on the Account page once enrolled" do
