@@ -2927,7 +2927,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   The layout sets `--pattern-mask`, tint and opacity for dark; the existing
   light stylesheet overrides all three, so its media rule also selects the
   artwork for "Match my device" without another theme switch. Light uses
-  the logo's shirt blue, `rgb(52, 97, 154)`, at 7%; dark uses
+  the light accent, `rgb(91, 71, 214)` (`#5b47d6`), at 7%; dark uses
   `rgb(190, 205, 240)` at 8%. The layer sits outside `[data-pull-content]` and
   below the refresh indicator, so neither scrolling nor the pull gesture
   moves it. Off omits the layer from the response; Setup adds or removes it
