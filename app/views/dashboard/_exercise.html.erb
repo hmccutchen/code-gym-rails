@@ -53,6 +53,7 @@
                        unrated:    t("dashboard.exercise.submit_nudges.unrated") } %>
   <div data-controller="answer-form" data-answer-form-answered-sections-value="<%= response.answered_sections.to_json %>"
        data-answer-form-submit-blocker-value="<%= submit_blocker %>"
+       data-answer-form-draft-scope-value="<%= exercise.draft_scope %>"
        data-answer-form-answered-count-value="<%= t("dashboard.exercise.answered_count") %>"
        data-answer-form-all-answered-value="<%= t("dashboard.exercise.all_answered") %>"
        data-answer-form-stale-reloaded-value="<%= t("dashboard.exercise.stale_reloaded") %>"

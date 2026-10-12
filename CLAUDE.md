@@ -2708,6 +2708,16 @@ concept-specific difficulty descriptions for future generation, not a new set.
   review retries. The form's inert state suppresses that reload during submit,
   so a late autosave cannot interrupt its review request. Start over and
   regeneration retain their existing reviewed/reviewing guards.
+
+  **A save names the set it was written for.** The dashboard sends
+  `DailyExercise#draft_scope` (the exercise id and `generated_at`) with every
+  save and submit, and `#create` refuses a different one under the exercise
+  lock with the same `409 "stale"` the Parsons token check gives, writing
+  nothing. Without it, `#create` writes to whatever set is today's, so a tab
+  left open overnight, or a save sent after a regenerate in another tab, put
+  one set's text into the next set: plain text decodes anywhere, and only
+  structured answers tripped the old check. A carry-forward keeps the scope,
+  since the set itself does not change. A post with no scope still saves.
 - **Preview apps**: a Railway PR environment starts with an empty database and
   needs no configuration. `railway.toml`'s `[environments.pr.deploy]` block
   exports `PREVIEW_APP=1` into both the pre-deploy and server processes, and

@@ -274,6 +274,59 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
+  describe "POST /responses draft scope" do
+    let!(:exercise) { create_exercise("code_review" => { "title" => "T", "question" => "Q", "code" => "x" }) }
+    let(:answer) { "A real answer about the query plan." }
+
+    def save_with_scope(scope, submit: false)
+      body = { answers: { "code_review" => answer }, draft_scope: scope }
+      body.merge!(section_ratings: { "code_review" => "right_level" }, submit: "1") if submit
+      post responses_path, params: { response: body }, as: :json
+    end
+
+    it "saves a payload written for the set on the page" do
+      save_with_scope(exercise.draft_scope)
+
+      expect(response).to have_http_status(:ok)
+      expect(DailyResponse.find_by(daily_exercise: exercise).answers["code_review"]).to eq(answer)
+    end
+
+    it "refuses a payload written before the set was regenerated and keeps the draft that landed" do
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current, answers: { "code_review" => "Earlier saved text here." })
+      scope = exercise.draft_scope
+      exercise.update!(generated_at: 1.second.from_now)
+
+      save_with_scope(scope)
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["status"]).to eq("stale")
+      expect(DailyResponse.find_by(daily_exercise: exercise).answers["code_review"]).to eq("Earlier saved text here.")
+    end
+
+    it "refuses a payload written for another day's set" do
+      yesterday = user.daily_exercises.create!(date: Date.current - 1, generated_at: 1.day.ago, language: "ruby_rails",
+                                               problem_set: exercise.problem_set)
+
+      save_with_scope(yesterday.draft_scope)
+
+      expect(response).to have_http_status(:conflict)
+      expect(DailyResponse.find_by(daily_exercise: exercise)).to be_nil
+    end
+
+    it "refuses a submit written for another set without submitting" do
+      save_with_scope("#{exercise.id}-0", submit: true)
+
+      expect(response).to have_http_status(:conflict)
+      expect(DailyResponse.find_by(daily_exercise: exercise)).to be_nil
+    end
+
+    it "still saves a payload that names no scope" do
+      post responses_path, params: { response: { answers: { "code_review" => answer } } }, as: :json
+
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
   describe "POST /responses after resuming from a pause" do
     include ActiveSupport::Testing::TimeHelpers
 

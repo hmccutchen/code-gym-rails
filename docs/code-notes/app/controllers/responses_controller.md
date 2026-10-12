@@ -48,6 +48,12 @@ Round 1: one text-only critique of the engineer's plan.
 Parsons tokens that can't be read mean the set was replaced. The whole post is
 refused with a 409 rather than saved in part.
 
+## `#stale_draft_scope?`
+
+Runs under the exercise lock, after `lock!` has re-read the row, so a
+regeneration cannot land between the check and the save. A post that names no
+scope still saves, so a page loaded before the scope existed keeps working.
+
 ## `#save_answers_under_lock`
 
 Takes both locks through `DailyExercise#with_response_locked`, which yields

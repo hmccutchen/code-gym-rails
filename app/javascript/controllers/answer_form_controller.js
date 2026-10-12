@@ -11,6 +11,7 @@ export default class extends Controller {
   static values = {
     answeredSections: Array,
     submitBlocker: String,
+    draftScope: String,
     answeredCount: String,
     allAnswered: String,
     staleReloaded: String,
@@ -96,7 +97,7 @@ export default class extends Controller {
   payload(extra) {
     const answers = {}
     this.textareas.forEach((area) => answers[area.dataset.field] = area.value)
-    return { response: Object.assign({ answers: answers, section_ratings: this.ratings }, extra || {}) }
+    return { response: Object.assign({ answers: answers, section_ratings: this.ratings, draft_scope: this.draftScopeValue }, extra || {}) }
   }
 
   sendSave() {
