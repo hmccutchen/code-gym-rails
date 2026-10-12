@@ -2787,10 +2787,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   production's Solid Cache would make every block a database query, and
   /history renders dozens. A deploy starts it empty, so it can never serve
   old markup. No page loads a browser highlighter.
-  `shared/_code_lines_script`, rendered once from the layout, decides only
-  what needs the rendered width: whether a block wraps, which hides its
-  padding. Duck, follow-up and alternate-explanation replies are built
-  by page scripts as plain text and show no code blocks.
+  The `code-lines` controller, mounted once on the layout's `<body>`,
+  decides only what needs the rendered width: whether a block wraps, which
+  hides its padding. Duck, follow-up and alternate-explanation replies are
+  built by their controllers as plain text and show no code blocks.
 - **Exercise code is re-indented once, at ingest**: models often write code
   with uneven indentation, and the highlighter shows whitespace exactly as
   written. `ProblemSetIngest#format_code!` passes each kind's
@@ -2853,8 +2853,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   **Pull-to-refresh in the installed app.** The layout's
   `overscroll-behavior-y: none` removes the rubber-band bounce, and with it
   the only way to reload a home-screen launch, which has no reload button.
-  `shared/_pull_to_refresh` adds the gesture back as plain touch listeners on
-  top of that rule, which is unchanged. It follows the iOS pattern: the nav
+  `shared/_pull_to_refresh` adds the gesture back through the
+  `pull-to-refresh` controller's touch listeners, on top of that rule, which
+  is unchanged. It follows the iOS pattern: the nav
   stays where it is while the layout's `[data-pull-content]` slides down with
   UIScrollView's rubber-band resistance, and the spinner, layered beneath both,
   shows in the gap that opens. The content's transform is cleared whenever it
@@ -3013,9 +3014,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
   **Intent is a three-value dial, `User#reminder_level`** (`none` / `ready` /
   `ready_and_nudges`). `#push_reminders_enabled?` is derived from it rather
-  than stored, because that name answers transport as well as intent: the
-  layout's re-subscribe script uses it to ask whether this browser is enrolled
-  at all, which the dial does not change.
+  than stored, because that name answers transport as well as intent:
+  `shared/_push_script` uses it to decide whether to mount the `push-launch`
+  controller that re-subscribes this browser, which the dial does not change.
 
   **The permission call must be the first synchronous statement in the click
   handler.** iOS grants a prompt only to a request made synchronously inside a
@@ -3231,7 +3232,7 @@ always pull in the full suite — is stated once, in
 - `app/models/code_highlight.rb` — `CodeHighlight`: Rouge highlighting for a code block, its line formatter, the lexer map and the cache key; `SyntaxHighlightingHelper#highlighted_code` is the one call site views use
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value, so the scaffold rule is stated once rather than per textarea
 - `app/models/exercise_section/design_comparison.rb` — the second fixed kind: two working pieces, a server-rolled A/B order, the `pick:` answer encoding, its rung-aware vocabulary allowlist, and the judge's blind-solve facets
-- `app/views/responses/bodies/_design_comparison.html.erb` / `answers/_design_comparison.html.erb` — the two pieces in their own disclosures; the pick fieldset, reason textarea and the script that writes the hidden answer, plus "What decides it" once reviewed
+- `app/views/responses/bodies/_design_comparison.html.erb` / `answers/_design_comparison.html.erb` — the two pieces in their own disclosures; the pick fieldset and reason textarea, which the `comparison-answer` controller writes into the hidden answer, plus "What decides it" once reviewed
 - `script/report_answer_positions.rb` (+ `script/answer_position_balance.rb`) — read-only count of where the better design-comparison piece was shown, totals only
 - `script/solve_agreement.rb` — `SolveAgreement`: prints blind-solve agreement per model, rung and concept for `script/compare_models.rb`'s judge modes, never a solve or a key
 - `app/services/claude_service.rb` / `gemini_service.rb` / `openai_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
@@ -3258,7 +3259,7 @@ always pull in the full suite — is stated once, in
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
 - `app/controllers/concept_references_controller.rb` — one action: the same concept explained another way, on demand from inside its own disclosure. Persists nothing; owns the cap, since there is no model data for it to live on
-- `app/views/shared/_concept_reference_alternates_script.html.erb` — wires that control across the page, keying the framings already shown by reference id so one reference rendering several times still shares one cap
+- `app/javascript/controllers/concept_alternates_controller.js` — the `concept-alternates` controller each reference's disclosure mounts; it keys the framings already shown by reference id, so one reference rendering several times still shares one cap
 - `app/services/web_push_credentials.rb` — `WebPushCredentials`: the VAPID pair from ENV, and the single authority for whether push is configured at all
 - `app/services/push_delivery.rb` — sends one notification to one endpoint, and deletes the endpoint when the push service reports it gone; the pruning is what keeps the job honest as iOS drops subscriptions
 - `app/models/push_subscription.rb` — one browser install's endpoint. `.register!` upserts by endpoint, because the client re-subscribes on every launch
@@ -3322,7 +3323,7 @@ always pull in the full suite — is stated once, in
   which decides where a concept's mastery history records, and must not
   acquire one.
 - `spec/system/learn_filter_spec.rb` — pins that typing the humanized label
-  actually shown on screen narrows the Learn list; the filter script matches
+  actually shown on screen narrows the Learn list; the `learn-filter` controller matches
   against a rendered attribute a request spec never executes, so a mismatch
   between that label and the raw concept key was invisible to request specs
   and only caught here.
