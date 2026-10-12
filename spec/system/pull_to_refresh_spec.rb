@@ -273,6 +273,25 @@ RSpec.describe "Pull to refresh", type: :system do
     expect(page.evaluate_script("window.__firstFrameTransform")).to eq("matrix(1, 0, 0, 1, 0, 64)")
   end
 
+  it "holds the reloaded page before its controller loads, and lets go if it never does" do
+    launch_standalone
+    visit_as(user)
+    visit learn_path
+    expect(page).to have_css("#pull-refresh", visible: :all)
+    page.driver.with_playwright_page do |pw|
+      pw.route("**/controllers/pull_to_refresh_controller-*.js", ->(route, _request) { route.abort })
+    end
+    page.execute_script("sessionStorage.setItem('codegym:pull-refreshed', '1')")
+
+    visit learn_path
+
+    expect(page).to have_css("html.pull-resuming", visible: :all)
+    expect(page.evaluate_script("getComputedStyle(document.querySelector('[data-pull-content]')).transform"))
+      .to eq("matrix(1, 0, 0, 1, 0, 64)")
+    expect(page).to have_css("html:not(.pull-resuming)", visible: :all, wait: 15)
+    expect(page.evaluate_script("getComputedStyle(document.querySelector('[data-pull-content]')).transform")).to eq("none")
+  end
+
   it "drops the hold without a spinner in a browser tab" do
     visit_as(user)
     visit learn_path

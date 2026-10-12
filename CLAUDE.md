@@ -2877,11 +2877,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   content settles to a held gap and the spinner turns for at least half a
   second, and a sessionStorage note lets the reloaded page open still held
   with the spinner turning, and settle once loaded, since the page it was drawn on is gone by then.
-  `code_gym_bootstrap.js` reads that note and adds `pull-resuming` to `<html>`, whose
-  CSS rule holds the content down in the first frame; the controller, a module
-  that runs only after the page has been drawn once, removes the class, holds the
-  content itself and fades the spinner in. Reading the note in the module alone
-  drew the page at rest first, then jumped it down. Playwright cannot emulate
+  `code_gym_bootstrap.js` owns that note (`CodeGymBootstrap.pullRefresh`): it reads
+  it and adds `pull-resuming` to `<html>`, whose CSS rule holds the content down by
+  `--pull-hold` in the first frame. The controller, a module that runs only after
+  the page has been drawn once, releases the class, holds the content itself and
+  fades the spinner in. Reading the note in the module alone drew the page at
+  rest first, then jumped it down. If the controller never connects, the
+  bootstrap releases the hold after ten seconds rather than leave the page low. Playwright cannot emulate
   `display-mode`, so `spec/requests/pwa_spec.rb` pins the stylesheet rule and
   `spec/system/pull_to_refresh_spec.rb` forces that rule on to drive the
   gesture.

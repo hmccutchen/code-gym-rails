@@ -5,12 +5,9 @@ import saveStatus from "code_gym/save_status"
 // UIScrollView's rubber band: travel approaches MAX_TRAVEL but never reaches it.
 const MAX_TRAVEL = 160
 const THRESHOLD = 64
-const HOLD = 64
 const MIN_SPIN_MS = 500
 const SAVE_POLL_MS = 100
 const SAVE_WAIT_LIMIT_MS = 10000
-const RELOADED_KEY = "codegym:pull-refreshed"
-const HOLDING_CLASS = "pull-resuming"
 
 function isEditable(element) {
   return element instanceof Element && element.matches("input, textarea, select, [contenteditable]")
@@ -23,22 +20,17 @@ function insideScrolledArea(element) {
   return false
 }
 
-// sessionStorage throws in some private modes; the spinner is only polish.
-function remember(key, value) {
-  try { sessionStorage.setItem(key, value) } catch {}
-}
-
 export default class extends Controller {
   static values = { settleDelay: { type: Number, default: 400 } }
 
   connect() {
     this.content = document.querySelector("[data-pull-content]")
-    const resuming = document.documentElement.classList.contains(HOLDING_CLASS)
-    document.documentElement.classList.remove(HOLDING_CLASS)
+    const resuming = window.CodeGymBootstrap.pullRefresh.release()
     if (!this.content || getComputedStyle(this.element).display === "none") return
 
     this.nav = document.querySelector("body > nav")
     this.spinner = this.element.querySelector(".spinner")
+    this.hold = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--pull-hold"))
     this.startY = null
     this.ready = false
     this.refreshing = false
@@ -109,7 +101,7 @@ export default class extends Controller {
     this.refreshing = true
     this.spinner.style.transform = ""
     this.element.classList.add("is-refreshing")
-    this.moveTo(HOLD)
+    this.moveTo(this.hold)
     this.element.style.opacity = 1
   }
 
@@ -125,7 +117,7 @@ export default class extends Controller {
   }
 
   reload() {
-    remember(RELOADED_KEY, "1")
+    window.CodeGymBootstrap.pullRefresh.note()
     window.location.reload()
   }
 
@@ -162,10 +154,14 @@ export default class extends Controller {
     this.reloadTimer = setTimeout(() => this.reloadWhenSaved(), MIN_SPIN_MS)
   }
 
+  placeBeforeFadingIn() {
+    this.moveTo(this.hold)
+    this.element.getBoundingClientRect()
+  }
+
   resumeAfterReload() {
     this.measureGap()
-    this.moveTo(HOLD)
-    this.element.getBoundingClientRect()
+    this.placeBeforeFadingIn()
     this.setSettling(true)
     this.spin()
     const settle = () => { this.settleTimer = setTimeout(() => this.reset(), this.settleDelayValue) }
