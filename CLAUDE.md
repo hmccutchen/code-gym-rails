@@ -2848,7 +2848,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   same image, and the script fails if the mark reaches past the 80% safe
   circle. The nav logo (`logo-outlined.png`, and `logo.png` under the light
   palette) is separate artwork; `logo-square.png` and
-  `logo-outlined-square.png` are no longer read by anything.
+  `logo-outlined-square.png` are no longer read by anything. Production
+  caches `public/` for a year, so the layout and the manifest link every icon
+  through `PublicFileHelper#versioned_public_path`, which appends a digest of
+  the file's bytes: regenerated icons get new URLs with nothing to bump.
+  iOS still keeps the icon it saved when the app was added, so an existing
+  home-screen install shows new art only after it is removed and added again.
   Standalone mode itself still needs no service worker — but one is registered
   now, for the daily reminder (see "Push reminders" below); `GET
   /service-worker.js` serves it from the root path, since a worker's scope is
