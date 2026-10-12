@@ -11,7 +11,6 @@ RSpec.describe "Security hardening targets", type: :request do
   end
 
   it "sends a Content-Security-Policy header (finding R1)" do
-    pending "config/initializers/content_security_policy.rb is commented out"
     login_as(user)
 
     get root_path

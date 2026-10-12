@@ -44,16 +44,19 @@ RSpec.describe "Pages for an account that predates the learning track", type: :r
                           submitted_at: Time.current, ai_review: review)
   end
 
+  def without_nonces(body) = body.gsub(/nonce="[^"]*"/, 'nonce="NONCE"').gsub(/content="[^"]*" name="csp-nonce"/, 'content="NONCE" name="csp-nonce"').gsub(/name="csp-nonce" content="[^"]*"/, 'name="csp-nonce" content="NONCE"')
+
   def expect_snapshot(name)
     expect(response).to have_http_status(:ok)
     path = snapshot_dir.join("#{name}.html")
+    body = without_nonces(response.body)
     if ENV["UPDATE_PAGE_SNAPSHOTS"] == "1"
       FileUtils.mkdir_p(snapshot_dir)
-      File.write(path, response.body)
+      File.write(path, body)
     end
 
     expect(path).to exist, "No snapshot at #{path.relative_path_from(Rails.root)}. Record it with UPDATE_PAGE_SNAPSHOTS=1."
-    expect(response.body).to eq(File.read(path))
+    expect(body).to eq(File.read(path))
   end
 
   before { login_as(user) }

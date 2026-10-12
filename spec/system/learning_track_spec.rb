@@ -27,9 +27,7 @@ RSpec.describe "Leaving the learning track", type: :system do
       slider.dispatchEvent(new Event("input"));
       document.querySelector("#leave-learning-track").click();
     JS
-    page.driver.with_playwright_page do |pw|
-      pw.wait_for_function("window.trackSetupPage === undefined || !window.CodeGymSaveStatus.pending()")
-    end
+    wait_for_js_condition("window.trackSetupPage === undefined || !window.CodeGymSaveStatus.pending()")
 
     aggregate_failures do
       expect_same_page

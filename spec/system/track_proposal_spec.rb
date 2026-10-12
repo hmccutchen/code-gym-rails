@@ -50,7 +50,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
     expect(page.evaluate_script("window.CodeGymSaveStatus.pending()")).to be(true)
     expect_same_page
     page.execute_script("window.finishDismissal()")
-    page.driver.with_playwright_page { |pw| pw.wait_for_function("!window.CodeGymSaveStatus.pending()") }
+    wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
     expect(user.reload.track_evidence_cutoffs["architecture"]).to eq("level" => "junior", "through" => Date.current.iso8601)
     expect_same_page
   end
@@ -120,7 +120,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
     expect_same_page
 
     click_button "Reload"
-    page.driver.with_playwright_page { |pw| pw.wait_for_function("window.proposalPage === undefined") }
+    wait_for_js_condition("window.proposalPage === undefined")
     expect(page).to have_css("#track-proposal")
   end
 
@@ -139,7 +139,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
     expect(user.reload.section_kind_levels["pattern"]).to eq("junior")
 
     page.execute_script("window.otherSavePending = false")
-    page.driver.with_playwright_page { |pw| pw.wait_for_function("window.proposalPage === undefined") }
+    wait_for_js_condition("window.proposalPage === undefined")
     expect(page).to have_css("#track-proposal")
     expect(page).not_to have_css('#track-proposal [data-kind="pattern"]')
   end

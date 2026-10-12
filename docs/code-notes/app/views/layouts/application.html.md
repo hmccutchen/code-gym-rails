@@ -343,8 +343,9 @@ Every behavior this layout used to carry as an inline script is now a
 Stimulus controller, mounted by a `data-controller` attribute: `nav-menu`,
 `name-editor`, `time-zone` and `loading-form`, plus `glossary code-lines
 mermaid` on `<body>`. Each controller's reasoning lives in its own note under
-`docs/code-notes/app/javascript/controllers/`, so it is not restated here. No
-view renders into `:page_scripts` any more; the `yield` is an empty slot.
+`docs/code-notes/app/javascript/controllers/`, so it is not restated here.
+The layout has no `yield :page_scripts` slot any more, since no view has a
+script to put there.
 
 ## The two shared modules
 

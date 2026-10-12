@@ -486,6 +486,5 @@
   <%= render "shared/push_script" if logged_in? && WebPushCredentials.configured? %>
   <%= render "shared/save_status_banner" if logged_in? %>
   <%= render "shared/pull_to_refresh" %>
-  <%= yield :page_scripts %>
 </body>
 </html>
