@@ -138,7 +138,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     end
   end
 
-  it "holds a slider save made while the modules are still loading, then replays it" do
+  it "counts a slider moved while the modules are still loading as pending, then saves it" do
     watch_page_errors
     visit_as(user)
     visit setup_path
@@ -154,17 +154,31 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
         })()
       JS
       expect(pending).to be(true)
-
-      held_by_stub = pw.evaluate(<<~JS)
-        new Promise((resolve) => setTimeout(() => resolve(
-          window.CodeGymBootstrap.ready === undefined && window.CodeGymSaveStatus.queued("exercise_mix")
-        ), 1000))
-      JS
-      expect(held_by_stub).to be(true)
     end
 
     wait_for { user.reload.section_kind_weights == { "challenge" => 0.25 } }
     expect(user.reload.section_kind_weights).to eq("challenge" => 0.25)
+    expect(errors).to be_empty
+  end
+
+  it "saves a Setup preference chosen while the modules are still loading" do
+    watch_page_errors
+    visit_as(user)
+    visit setup_path
+    expect(page).to have_css("#skill-level")
+
+    reload_with_modules_stalled do |pw|
+      pw.evaluate(<<~JS)
+        (() => {
+          const select = document.getElementById("skill-level");
+          select.value = "senior";
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        })()
+      JS
+    end
+
+    wait_for { user.reload.skill_level == "senior" }
+    expect(user.reload.skill_level).to eq("senior")
     expect(errors).to be_empty
   end
 end

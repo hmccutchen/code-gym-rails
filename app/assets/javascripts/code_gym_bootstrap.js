@@ -7,7 +7,7 @@
 
   function recordEdit(event) {
     var target = event.target
-    if (target && target.closest && target.closest("form")) early.dirty = true
+    if (target && target.closest && target.closest("[data-controller]")) early.dirty = true
   }
 
   document.addEventListener("input", recordEdit, true)

@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#1a1a2e">
   
   
-  <script src="/assets/code_gym_bootstrap-ee36f2cc.js"></script>
+  <script src="/assets/code_gym_bootstrap-16527746.js"></script>
   <script type="importmap" data-turbo-track="reload">{
   "imports": {
     "application": "/assets/application-6b9dc00f.js",
@@ -23,11 +23,17 @@
     "@hotwired/stimulus-loading": "/assets/stimulus-loading-1fc53fe7.js",
     "controllers/answer_form_controller": "/assets/controllers/answer_form_controller-99c3489e.js",
     "controllers/application": "/assets/controllers/application-3affb389.js",
+    "controllers/display_preferences_controller": "/assets/controllers/display_preferences_controller-68202f5e.js",
     "controllers/duck_thread_controller": "/assets/controllers/duck_thread_controller-cb4ca1f7.js",
+    "controllers/exercise_mix_controller": "/assets/controllers/exercise_mix_controller-ae4c947d.js",
     "controllers/generating_controller": "/assets/controllers/generating_controller-bc2d79f1.js",
     "controllers": "/assets/controllers/index-ee64e1f1.js",
+    "controllers/learning_track_controller": "/assets/controllers/learning_track_controller-8898d395.js",
+    "controllers/profile_preferences_controller": "/assets/controllers/profile_preferences_controller-ae1eecf6.js",
     "controllers/pull_to_refresh_controller": "/assets/controllers/pull_to_refresh_controller-ac11018b.js",
     "controllers/review_button_controller": "/assets/controllers/review_button_controller-ce9f39dc.js",
+    "controllers/track_proposal_controller": "/assets/controllers/track_proposal_controller-8b5db41c.js",
+    "controllers/welcome_controller": "/assets/controllers/welcome_controller-8f0cff0e.js",
     "code_gym/request": "/assets/code_gym/request-3b03ef19.js",
     "code_gym/save_status": "/assets/code_gym/save_status-0f07ed8f.js"
   }
@@ -37,11 +43,17 @@
 <link rel="modulepreload" href="/assets/stimulus-loading-1fc53fe7.js">
 <link rel="modulepreload" href="/assets/controllers/answer_form_controller-99c3489e.js">
 <link rel="modulepreload" href="/assets/controllers/application-3affb389.js">
+<link rel="modulepreload" href="/assets/controllers/display_preferences_controller-68202f5e.js">
 <link rel="modulepreload" href="/assets/controllers/duck_thread_controller-cb4ca1f7.js">
+<link rel="modulepreload" href="/assets/controllers/exercise_mix_controller-ae4c947d.js">
 <link rel="modulepreload" href="/assets/controllers/generating_controller-bc2d79f1.js">
 <link rel="modulepreload" href="/assets/controllers/index-ee64e1f1.js">
+<link rel="modulepreload" href="/assets/controllers/learning_track_controller-8898d395.js">
+<link rel="modulepreload" href="/assets/controllers/profile_preferences_controller-ae1eecf6.js">
 <link rel="modulepreload" href="/assets/controllers/pull_to_refresh_controller-ac11018b.js">
 <link rel="modulepreload" href="/assets/controllers/review_button_controller-ce9f39dc.js">
+<link rel="modulepreload" href="/assets/controllers/track_proposal_controller-8b5db41c.js">
+<link rel="modulepreload" href="/assets/controllers/welcome_controller-8f0cff0e.js">
 <link rel="modulepreload" href="/assets/code_gym/request-3b03ef19.js">
 <link rel="modulepreload" href="/assets/code_gym/save_status-0f07ed8f.js">
 <script type="module">import "application"</script>
@@ -581,7 +593,9 @@
   .display-hint { flex-basis: 100%; margin-top: 0; }
 </style>
 
-<div class="setup-wrap">
+<div class="setup-wrap" data-controller="profile-preferences"
+     data-profile-preferences-url-value="/profile"
+     data-profile-preferences-label-template-value="Your skill level (__LEVEL__)">
   <h1>Add your API key</h1>
   <p>Your key is encrypted at rest and only used to generate your personal exercise sets and reviews. Usage is tracked per-user for transparency.</p>
 
@@ -610,7 +624,7 @@
 </form>
   <div class="form-field">
     <label for="tz-select">Time zone</label>
-    <select name="tz_select" id="tz-select"><option value="">— detect automatically —</option><option value="America/New_York">Eastern</option>
+    <select name="tz_select" id="tz-select" data-profile-preferences-target="timeZone" data-action="change-&gt;profile-preferences#saveTimeZone"><option value="">— detect automatically —</option><option value="America/New_York">Eastern</option>
 <option value="America/Chicago">Central</option>
 <option value="America/Denver">Mountain</option>
 <option value="America/Phoenix">Mountain (Arizona, no DST)</option>
@@ -621,7 +635,8 @@
   </div>
 
   <div class="form-field">
-    <fieldset class="display-group daily-sections" id="daily-sections">
+    <fieldset class="display-group daily-sections" id="daily-sections"
+              data-profile-preferences-target="dailySections" data-action="change->profile-preferences#saveDailySections">
       <legend>Daily sections</legend>
       <label>
         <input type="radio" name="daily_section_count" value="automatic" checked>
@@ -645,14 +660,20 @@
 
   <div class="form-field">
     <label for="skill-level">Skill level</label>
-    <select name="skill_level" id="skill-level" data-label-template="Your skill level (__LEVEL__)"><option selected="selected" value="junior">Junior</option>
+    <select name="skill_level" id="skill-level" data-profile-preferences-target="skillLevel" data-action="change-&gt;profile-preferences#saveSkillLevel"><option selected="selected" value="junior">Junior</option>
 <option value="mid_level">Mid-level</option>
 <option value="senior">Senior</option>
 <option value="principal_engineer">Principal engineer</option></select>
     <p class="hint">How hard your sections start out, unless you&#39;ve set a difficulty for that section in the Exercise mix below. Junior suits early-career developers and career changers. Your ratings still nudge each day&#39;s set up or down.</p>
   </div>
 
-  <details class="form-field" id="exercise-mix">
+  <details class="form-field" id="exercise-mix"
+           data-controller="exercise-mix"
+           data-exercise-mix-url-value="/profile"
+           data-exercise-mix-stops-value="[0.25,0.5,1.0,2.0,4.0]"
+           data-exercise-mix-default-stop-value="1.0"
+           data-exercise-mix-labels-value="[&quot;Much less&quot;,&quot;Less&quot;,&quot;Default&quot;,&quot;More&quot;,&quot;Much more&quot;]"
+           data-exercise-mix-version-value="0">
     <summary>Exercise mix</summary>
     <p class="hint">Bias how often each rotating section appears, and set how hard any section is pitched. Neither changes how many sections a day holds — that&#39;s the setting above. Changes save automatically.</p>
 
@@ -672,31 +693,38 @@
       <legend>In every set</legend>
         <div class="mix-row mix-row-fixed">
           <span>Code Review</span>
-          <fieldset class="mix-difficulty" data-kind="code_review">
+          <fieldset class="mix-difficulty" data-kind="code_review"
+          data-exercise-mix-target="difficulty">
   <legend>Difficulty target</legend>
   <label>
-    <input type="radio" name="level-code_review" value="" checked >
+    <input type="radio" name="level-code_review" value="" checked 
+           data-action="change->exercise-mix#chooseLevel">
     <span data-skill-level-label>Your skill level (Junior)</span>
   </label>
     <label>
-      <input type="radio" name="level-code_review" value="junior"  >
+      <input type="radio" name="level-code_review" value="junior"  
+             data-action="change->exercise-mix#chooseLevel">
       Junior
     </label>
     <label>
-      <input type="radio" name="level-code_review" value="mid_level"  >
+      <input type="radio" name="level-code_review" value="mid_level"  
+             data-action="change->exercise-mix#chooseLevel">
       Mid-level
     </label>
     <label>
-      <input type="radio" name="level-code_review" value="senior"  >
+      <input type="radio" name="level-code_review" value="senior"  
+             data-action="change->exercise-mix#chooseLevel">
       Senior
     </label>
     <label>
-      <input type="radio" name="level-code_review" value="principal_engineer"  >
+      <input type="radio" name="level-code_review" value="principal_engineer"  
+             data-action="change->exercise-mix#chooseLevel">
       Principal engineer
     </label>
   <label class="mix-lock" for="lock-code_review">
     <input type="checkbox" class="mix-lock-box" id="lock-code_review"
-            disabled>
+            disabled
+           data-action="change->exercise-mix#toggleLock">
     Lock at this level
   </label>
   <p class="hint mix-coverage" hidden>
@@ -707,31 +735,38 @@
         </div>
         <div class="mix-row mix-row-fixed">
           <span>Design Comparison</span>
-          <fieldset class="mix-difficulty" data-kind="design_comparison">
+          <fieldset class="mix-difficulty" data-kind="design_comparison"
+          data-exercise-mix-target="difficulty">
   <legend>Difficulty target</legend>
   <label>
-    <input type="radio" name="level-design_comparison" value="" checked >
+    <input type="radio" name="level-design_comparison" value="" checked 
+           data-action="change->exercise-mix#chooseLevel">
     <span data-skill-level-label>Your skill level (Junior)</span>
   </label>
     <label>
-      <input type="radio" name="level-design_comparison" value="junior"  >
+      <input type="radio" name="level-design_comparison" value="junior"  
+             data-action="change->exercise-mix#chooseLevel">
       Junior
     </label>
     <label>
-      <input type="radio" name="level-design_comparison" value="mid_level"  >
+      <input type="radio" name="level-design_comparison" value="mid_level"  
+             data-action="change->exercise-mix#chooseLevel">
       Mid-level
     </label>
     <label>
-      <input type="radio" name="level-design_comparison" value="senior"  >
+      <input type="radio" name="level-design_comparison" value="senior"  
+             data-action="change->exercise-mix#chooseLevel">
       Senior
     </label>
     <label>
-      <input type="radio" name="level-design_comparison" value="principal_engineer"  >
+      <input type="radio" name="level-design_comparison" value="principal_engineer"  
+             data-action="change->exercise-mix#chooseLevel">
       Principal engineer
     </label>
   <label class="mix-lock" for="lock-design_comparison">
     <input type="checkbox" class="mix-lock-box" id="lock-design_comparison"
-            disabled>
+            disabled
+           data-action="change->exercise-mix#toggleLock">
     Lock at this level
   </label>
   <p class="hint mix-coverage" hidden>
@@ -745,31 +780,38 @@
         <legend>Pattern section, in some sets</legend>
         <div class="mix-row mix-row-fixed">
           <span>Pattern of the Month</span>
-          <fieldset class="mix-difficulty" data-kind="pattern">
+          <fieldset class="mix-difficulty" data-kind="pattern"
+          data-exercise-mix-target="difficulty">
   <legend>Difficulty target</legend>
   <label>
-    <input type="radio" name="level-pattern" value="" checked >
+    <input type="radio" name="level-pattern" value="" checked 
+           data-action="change->exercise-mix#chooseLevel">
     <span data-skill-level-label>Your skill level (Junior)</span>
   </label>
     <label>
-      <input type="radio" name="level-pattern" value="junior"  >
+      <input type="radio" name="level-pattern" value="junior"  
+             data-action="change->exercise-mix#chooseLevel">
       Junior
     </label>
     <label>
-      <input type="radio" name="level-pattern" value="mid_level"  >
+      <input type="radio" name="level-pattern" value="mid_level"  
+             data-action="change->exercise-mix#chooseLevel">
       Mid-level
     </label>
     <label>
-      <input type="radio" name="level-pattern" value="senior"  >
+      <input type="radio" name="level-pattern" value="senior"  
+             data-action="change->exercise-mix#chooseLevel">
       Senior
     </label>
     <label>
-      <input type="radio" name="level-pattern" value="principal_engineer"  >
+      <input type="radio" name="level-pattern" value="principal_engineer"  
+             data-action="change->exercise-mix#chooseLevel">
       Principal engineer
     </label>
   <label class="mix-lock" for="lock-pattern">
     <input type="checkbox" class="mix-lock-box" id="lock-pattern"
-            disabled>
+            disabled
+           data-action="change->exercise-mix#toggleLock">
     Lock at this level
   </label>
   <p class="hint mix-coverage" hidden>
@@ -780,44 +822,53 @@
         </div>
       </fieldset>
 
-      <fieldset class="mix-group mix-group-rotating">
+      <fieldset class="mix-group mix-group-rotating" data-exercise-mix-target="group">
         <legend>Rotating third section</legend>
 
-          <div class="mix-row" data-kind="architecture" data-weighted>
+          <div class="mix-row" data-kind="architecture" data-exercise-mix-target="row">
             <label for="weight-architecture">Architecture Decision</label>
             <input type="range" id="weight-architecture" min="0" max="4" step="1"
                    value="2" 
-                   aria-valuetext="Default">
+                   aria-valuetext="Default"
+                   data-action="input->exercise-mix#slide">
             <output id="weight-label-architecture">Default</output>
             <label class="mix-exclude" for="exclude-architecture">
-              <input type="checkbox" id="exclude-architecture" class="mix-exclude-box" >
+              <input type="checkbox" id="exclude-architecture" class="mix-exclude-box" 
+                     data-action="change->exercise-mix#toggleExclude">
               Exclude
             </label>
-            <fieldset class="mix-difficulty" data-kind="architecture">
+            <fieldset class="mix-difficulty" data-kind="architecture"
+          data-exercise-mix-target="difficulty">
   <legend>Difficulty target</legend>
   <label>
-    <input type="radio" name="level-architecture" value="" checked >
+    <input type="radio" name="level-architecture" value="" checked 
+           data-action="change->exercise-mix#chooseLevel">
     <span data-skill-level-label>Your skill level (Junior)</span>
   </label>
     <label>
-      <input type="radio" name="level-architecture" value="junior"  >
+      <input type="radio" name="level-architecture" value="junior"  
+             data-action="change->exercise-mix#chooseLevel">
       Junior
     </label>
     <label>
-      <input type="radio" name="level-architecture" value="mid_level"  >
+      <input type="radio" name="level-architecture" value="mid_level"  
+             data-action="change->exercise-mix#chooseLevel">
       Mid-level
     </label>
     <label>
-      <input type="radio" name="level-architecture" value="senior"  >
+      <input type="radio" name="level-architecture" value="senior"  
+             data-action="change->exercise-mix#chooseLevel">
       Senior
     </label>
     <label>
-      <input type="radio" name="level-architecture" value="principal_engineer"  >
+      <input type="radio" name="level-architecture" value="principal_engineer"  
+             data-action="change->exercise-mix#chooseLevel">
       Principal engineer
     </label>
   <label class="mix-lock" for="lock-architecture">
     <input type="checkbox" class="mix-lock-box" id="lock-architecture"
-            disabled>
+            disabled
+           data-action="change->exercise-mix#toggleLock">
     Lock at this level
   </label>
   <p class="hint mix-coverage" hidden>
@@ -826,41 +877,50 @@
 </fieldset>
 
           </div>
-          <div class="mix-row" data-kind="security_review" data-weighted>
+          <div class="mix-row" data-kind="security_review" data-exercise-mix-target="row">
             <label for="weight-security_review">Security Review</label>
             <input type="range" id="weight-security_review" min="0" max="4" step="1"
                    value="2" 
-                   aria-valuetext="Default">
+                   aria-valuetext="Default"
+                   data-action="input->exercise-mix#slide">
             <output id="weight-label-security_review">Default</output>
             <label class="mix-exclude" for="exclude-security_review">
-              <input type="checkbox" id="exclude-security_review" class="mix-exclude-box" >
+              <input type="checkbox" id="exclude-security_review" class="mix-exclude-box" 
+                     data-action="change->exercise-mix#toggleExclude">
               Exclude
             </label>
-            <fieldset class="mix-difficulty" data-kind="security_review">
+            <fieldset class="mix-difficulty" data-kind="security_review"
+          data-exercise-mix-target="difficulty">
   <legend>Difficulty target</legend>
   <label>
-    <input type="radio" name="level-security_review" value="" checked >
+    <input type="radio" name="level-security_review" value="" checked 
+           data-action="change->exercise-mix#chooseLevel">
     <span data-skill-level-label>Your skill level (Junior)</span>
   </label>
     <label>
-      <input type="radio" name="level-security_review" value="junior"  >
+      <input type="radio" name="level-security_review" value="junior"  
+             data-action="change->exercise-mix#chooseLevel">
       Junior
     </label>
     <label>
-      <input type="radio" name="level-security_review" value="mid_level"  >
+      <input type="radio" name="level-security_review" value="mid_level"  
+             data-action="change->exercise-mix#chooseLevel">
       Mid-level
     </label>
     <label>
-      <input type="radio" name="level-security_review" value="senior"  >
+      <input type="radio" name="level-security_review" value="senior"  
+             data-action="change->exercise-mix#chooseLevel">
       Senior
     </label>
     <label>
-      <input type="radio" name="level-security_review" value="principal_engineer"  >
+      <input type="radio" name="level-security_review" value="principal_engineer"  
+             data-action="change->exercise-mix#chooseLevel">
       Principal engineer
     </label>
   <label class="mix-lock" for="lock-security_review">
     <input type="checkbox" class="mix-lock-box" id="lock-security_review"
-            disabled>
+            disabled
+           data-action="change->exercise-mix#toggleLock">
     Lock at this level
   </label>
   <p class="hint mix-coverage" hidden>
@@ -869,41 +929,50 @@
 </fieldset>
 
           </div>
-          <div class="mix-row" data-kind="challenge" data-weighted>
+          <div class="mix-row" data-kind="challenge" data-exercise-mix-target="row">
             <label for="weight-challenge">Coding Challenge</label>
             <input type="range" id="weight-challenge" min="0" max="4" step="1"
                    value="2" 
-                   aria-valuetext="Default">
+                   aria-valuetext="Default"
+                   data-action="input->exercise-mix#slide">
             <output id="weight-label-challenge">Default</output>
             <label class="mix-exclude" for="exclude-challenge">
-              <input type="checkbox" id="exclude-challenge" class="mix-exclude-box" >
+              <input type="checkbox" id="exclude-challenge" class="mix-exclude-box" 
+                     data-action="change->exercise-mix#toggleExclude">
               Exclude
             </label>
-            <fieldset class="mix-difficulty" data-kind="challenge">
+            <fieldset class="mix-difficulty" data-kind="challenge"
+          data-exercise-mix-target="difficulty">
   <legend>Difficulty target</legend>
   <label>
-    <input type="radio" name="level-challenge" value="" checked >
+    <input type="radio" name="level-challenge" value="" checked 
+           data-action="change->exercise-mix#chooseLevel">
     <span data-skill-level-label>Your skill level (Junior)</span>
   </label>
     <label>
-      <input type="radio" name="level-challenge" value="junior"  >
+      <input type="radio" name="level-challenge" value="junior"  
+             data-action="change->exercise-mix#chooseLevel">
       Junior
     </label>
     <label>
-      <input type="radio" name="level-challenge" value="mid_level"  >
+      <input type="radio" name="level-challenge" value="mid_level"  
+             data-action="change->exercise-mix#chooseLevel">
       Mid-level
     </label>
     <label>
-      <input type="radio" name="level-challenge" value="senior"  >
+      <input type="radio" name="level-challenge" value="senior"  
+             data-action="change->exercise-mix#chooseLevel">
       Senior
     </label>
     <label>
-      <input type="radio" name="level-challenge" value="principal_engineer"  >
+      <input type="radio" name="level-challenge" value="principal_engineer"  
+             data-action="change->exercise-mix#chooseLevel">
       Principal engineer
     </label>
   <label class="mix-lock" for="lock-challenge">
     <input type="checkbox" class="mix-lock-box" id="lock-challenge"
-            disabled>
+            disabled
+           data-action="change->exercise-mix#toggleLock">
     Lock at this level
   </label>
   <p class="hint mix-coverage" hidden>
@@ -912,41 +981,50 @@
 </fieldset>
 
           </div>
-          <div class="mix-row" data-kind="parsons_problem" data-weighted>
+          <div class="mix-row" data-kind="parsons_problem" data-exercise-mix-target="row">
             <label for="weight-parsons_problem">Parsons Problem</label>
             <input type="range" id="weight-parsons_problem" min="0" max="4" step="1"
                    value="2" 
-                   aria-valuetext="Default">
+                   aria-valuetext="Default"
+                   data-action="input->exercise-mix#slide">
             <output id="weight-label-parsons_problem">Default</output>
             <label class="mix-exclude" for="exclude-parsons_problem">
-              <input type="checkbox" id="exclude-parsons_problem" class="mix-exclude-box" >
+              <input type="checkbox" id="exclude-parsons_problem" class="mix-exclude-box" 
+                     data-action="change->exercise-mix#toggleExclude">
               Exclude
             </label>
-            <fieldset class="mix-difficulty" data-kind="parsons_problem">
+            <fieldset class="mix-difficulty" data-kind="parsons_problem"
+          data-exercise-mix-target="difficulty">
   <legend>Difficulty target</legend>
   <label>
-    <input type="radio" name="level-parsons_problem" value="" checked >
+    <input type="radio" name="level-parsons_problem" value="" checked 
+           data-action="change->exercise-mix#chooseLevel">
     <span data-skill-level-label>Your skill level (Junior)</span>
   </label>
     <label>
-      <input type="radio" name="level-parsons_problem" value="junior"  >
+      <input type="radio" name="level-parsons_problem" value="junior"  
+             data-action="change->exercise-mix#chooseLevel">
       Junior
     </label>
     <label>
-      <input type="radio" name="level-parsons_problem" value="mid_level"  >
+      <input type="radio" name="level-parsons_problem" value="mid_level"  
+             data-action="change->exercise-mix#chooseLevel">
       Mid-level
     </label>
     <label>
-      <input type="radio" name="level-parsons_problem" value="senior"  >
+      <input type="radio" name="level-parsons_problem" value="senior"  
+             data-action="change->exercise-mix#chooseLevel">
       Senior
     </label>
     <label>
-      <input type="radio" name="level-parsons_problem" value="principal_engineer"  >
+      <input type="radio" name="level-parsons_problem" value="principal_engineer"  
+             data-action="change->exercise-mix#chooseLevel">
       Principal engineer
     </label>
   <label class="mix-lock" for="lock-parsons_problem">
     <input type="checkbox" class="mix-lock-box" id="lock-parsons_problem"
-            disabled>
+            disabled
+           data-action="change->exercise-mix#toggleLock">
     Lock at this level
   </label>
   <p class="hint mix-coverage" hidden>
@@ -958,44 +1036,53 @@
 
         <p class="hint mix-last-note" hidden>At least one section in this group has to stay in rotation.</p>
       </fieldset>
-      <fieldset class="mix-group mix-group-rotating">
+      <fieldset class="mix-group mix-group-rotating" data-exercise-mix-target="group">
         <legend>Rotating fourth section</legend>
 
-          <div class="mix-row" data-kind="plan_review" data-weighted>
+          <div class="mix-row" data-kind="plan_review" data-exercise-mix-target="row">
             <label for="weight-plan_review">Plan Review</label>
             <input type="range" id="weight-plan_review" min="0" max="4" step="1"
                    value="2" 
-                   aria-valuetext="Default">
+                   aria-valuetext="Default"
+                   data-action="input->exercise-mix#slide">
             <output id="weight-label-plan_review">Default</output>
             <label class="mix-exclude" for="exclude-plan_review">
-              <input type="checkbox" id="exclude-plan_review" class="mix-exclude-box" >
+              <input type="checkbox" id="exclude-plan_review" class="mix-exclude-box" 
+                     data-action="change->exercise-mix#toggleExclude">
               Exclude
             </label>
-            <fieldset class="mix-difficulty" data-kind="plan_review">
+            <fieldset class="mix-difficulty" data-kind="plan_review"
+          data-exercise-mix-target="difficulty">
   <legend>Difficulty target</legend>
   <label>
-    <input type="radio" name="level-plan_review" value="" checked >
+    <input type="radio" name="level-plan_review" value="" checked 
+           data-action="change->exercise-mix#chooseLevel">
     <span data-skill-level-label>Your skill level (Junior)</span>
   </label>
     <label>
-      <input type="radio" name="level-plan_review" value="junior"  >
+      <input type="radio" name="level-plan_review" value="junior"  
+             data-action="change->exercise-mix#chooseLevel">
       Junior
     </label>
     <label>
-      <input type="radio" name="level-plan_review" value="mid_level"  >
+      <input type="radio" name="level-plan_review" value="mid_level"  
+             data-action="change->exercise-mix#chooseLevel">
       Mid-level
     </label>
     <label>
-      <input type="radio" name="level-plan_review" value="senior"  >
+      <input type="radio" name="level-plan_review" value="senior"  
+             data-action="change->exercise-mix#chooseLevel">
       Senior
     </label>
     <label>
-      <input type="radio" name="level-plan_review" value="principal_engineer"  >
+      <input type="radio" name="level-plan_review" value="principal_engineer"  
+             data-action="change->exercise-mix#chooseLevel">
       Principal engineer
     </label>
   <label class="mix-lock" for="lock-plan_review">
     <input type="checkbox" class="mix-lock-box" id="lock-plan_review"
-            disabled>
+            disabled
+           data-action="change->exercise-mix#toggleLock">
     Lock at this level
   </label>
   <p class="hint mix-coverage" hidden>
@@ -1004,41 +1091,50 @@
 </fieldset>
 
           </div>
-          <div class="mix-row" data-kind="ambiguity_hunt" data-weighted>
+          <div class="mix-row" data-kind="ambiguity_hunt" data-exercise-mix-target="row">
             <label for="weight-ambiguity_hunt">Ambiguity Hunt</label>
             <input type="range" id="weight-ambiguity_hunt" min="0" max="4" step="1"
                    value="2" 
-                   aria-valuetext="Default">
+                   aria-valuetext="Default"
+                   data-action="input->exercise-mix#slide">
             <output id="weight-label-ambiguity_hunt">Default</output>
             <label class="mix-exclude" for="exclude-ambiguity_hunt">
-              <input type="checkbox" id="exclude-ambiguity_hunt" class="mix-exclude-box" >
+              <input type="checkbox" id="exclude-ambiguity_hunt" class="mix-exclude-box" 
+                     data-action="change->exercise-mix#toggleExclude">
               Exclude
             </label>
-            <fieldset class="mix-difficulty" data-kind="ambiguity_hunt">
+            <fieldset class="mix-difficulty" data-kind="ambiguity_hunt"
+          data-exercise-mix-target="difficulty">
   <legend>Difficulty target</legend>
   <label>
-    <input type="radio" name="level-ambiguity_hunt" value="" checked >
+    <input type="radio" name="level-ambiguity_hunt" value="" checked 
+           data-action="change->exercise-mix#chooseLevel">
     <span data-skill-level-label>Your skill level (Junior)</span>
   </label>
     <label>
-      <input type="radio" name="level-ambiguity_hunt" value="junior"  >
+      <input type="radio" name="level-ambiguity_hunt" value="junior"  
+             data-action="change->exercise-mix#chooseLevel">
       Junior
     </label>
     <label>
-      <input type="radio" name="level-ambiguity_hunt" value="mid_level"  >
+      <input type="radio" name="level-ambiguity_hunt" value="mid_level"  
+             data-action="change->exercise-mix#chooseLevel">
       Mid-level
     </label>
     <label>
-      <input type="radio" name="level-ambiguity_hunt" value="senior"  >
+      <input type="radio" name="level-ambiguity_hunt" value="senior"  
+             data-action="change->exercise-mix#chooseLevel">
       Senior
     </label>
     <label>
-      <input type="radio" name="level-ambiguity_hunt" value="principal_engineer"  >
+      <input type="radio" name="level-ambiguity_hunt" value="principal_engineer"  
+             data-action="change->exercise-mix#chooseLevel">
       Principal engineer
     </label>
   <label class="mix-lock" for="lock-ambiguity_hunt">
     <input type="checkbox" class="mix-lock-box" id="lock-ambiguity_hunt"
-            disabled>
+            disabled
+           data-action="change->exercise-mix#toggleLock">
     Lock at this level
   </label>
   <p class="hint mix-coverage" hidden>
@@ -1047,41 +1143,50 @@
 </fieldset>
 
           </div>
-          <div class="mix-row" data-kind="pseudocode_to_code" data-weighted>
+          <div class="mix-row" data-kind="pseudocode_to_code" data-exercise-mix-target="row">
             <label for="weight-pseudocode_to_code">Pseudocode to Code</label>
             <input type="range" id="weight-pseudocode_to_code" min="0" max="4" step="1"
                    value="2" 
-                   aria-valuetext="Default">
+                   aria-valuetext="Default"
+                   data-action="input->exercise-mix#slide">
             <output id="weight-label-pseudocode_to_code">Default</output>
             <label class="mix-exclude" for="exclude-pseudocode_to_code">
-              <input type="checkbox" id="exclude-pseudocode_to_code" class="mix-exclude-box" >
+              <input type="checkbox" id="exclude-pseudocode_to_code" class="mix-exclude-box" 
+                     data-action="change->exercise-mix#toggleExclude">
               Exclude
             </label>
-            <fieldset class="mix-difficulty" data-kind="pseudocode_to_code">
+            <fieldset class="mix-difficulty" data-kind="pseudocode_to_code"
+          data-exercise-mix-target="difficulty">
   <legend>Difficulty target</legend>
   <label>
-    <input type="radio" name="level-pseudocode_to_code" value="" checked >
+    <input type="radio" name="level-pseudocode_to_code" value="" checked 
+           data-action="change->exercise-mix#chooseLevel">
     <span data-skill-level-label>Your skill level (Junior)</span>
   </label>
     <label>
-      <input type="radio" name="level-pseudocode_to_code" value="junior"  >
+      <input type="radio" name="level-pseudocode_to_code" value="junior"  
+             data-action="change->exercise-mix#chooseLevel">
       Junior
     </label>
     <label>
-      <input type="radio" name="level-pseudocode_to_code" value="mid_level"  >
+      <input type="radio" name="level-pseudocode_to_code" value="mid_level"  
+             data-action="change->exercise-mix#chooseLevel">
       Mid-level
     </label>
     <label>
-      <input type="radio" name="level-pseudocode_to_code" value="senior"  >
+      <input type="radio" name="level-pseudocode_to_code" value="senior"  
+             data-action="change->exercise-mix#chooseLevel">
       Senior
     </label>
     <label>
-      <input type="radio" name="level-pseudocode_to_code" value="principal_engineer"  >
+      <input type="radio" name="level-pseudocode_to_code" value="principal_engineer"  
+             data-action="change->exercise-mix#chooseLevel">
       Principal engineer
     </label>
   <label class="mix-lock" for="lock-pseudocode_to_code">
     <input type="checkbox" class="mix-lock-box" id="lock-pseudocode_to_code"
-            disabled>
+            disabled
+           data-action="change->exercise-mix#toggleLock">
     Lock at this level
   </label>
   <p class="hint mix-coverage" hidden>
@@ -1094,14 +1199,20 @@
         <p class="hint mix-last-note" hidden>At least one section in this group has to stay in rotation.</p>
       </fieldset>
 
-    <div id="mix-ladder-preparation" hidden>
+    <div id="mix-ladder-preparation" hidden
+         data-exercise-mix-target="preparation">
       <p class="hint" id="mix-ladder-explanation">Optional: prepare concept-specific guidance that tells the AI what problems at each difficulty level should look like. Your targets work without it. The count is the concepts behind your targets that still need guidance; this does not generate a new exercise set.</p>
-      <form class="mix-ladders" method="post" action="/learn/prepare_ladders"><button class="btn btn-sm" id="prepare-ladders" aria-describedby="mix-ladder-explanation mix-ladder-cost" type="submit">Prepare AI guidance for 0 concepts</button></form>
+      <form class="mix-ladders" method="post" action="/learn/prepare_ladders"><button class="btn btn-sm" id="prepare-ladders" data-exercise-mix-target="prepareButton" aria-describedby="mix-ladder-explanation mix-ladder-cost" type="submit">Prepare AI guidance for 0 concepts</button></form>
       <p class="hint" id="mix-ladder-cost">One provider call per concept, on your API key. What it writes is shared with everyone on the team, and rewrites those concepts&#39; references, so their wording may change.</p>
     </div>
   </details>
 
-  <details class="form-field" id="display-preferences">
+  <details class="form-field" id="display-preferences" data-controller="display-preferences"
+         data-display-preferences-url-value="/profile"
+         data-display-preferences-defaults-value="{&quot;theme&quot;:&quot;dark&quot;,&quot;text_size&quot;:&quot;100&quot;,&quot;line_spacing&quot;:&quot;default&quot;,&quot;font&quot;:&quot;default&quot;,&quot;background_pattern&quot;:&quot;on&quot;}"
+         data-display-preferences-palette-value="{&quot;light&quot;:&quot;all&quot;,&quot;device&quot;:&quot;(prefers-color-scheme: light)&quot;}"
+         data-display-preferences-palette-off-value="not all"
+         data-action="change->display-preferences#change">
   <summary>Display</summary>
   <p class="hint">How pages look for you. Each change applies right away and is saved.</p>
 
@@ -1194,263 +1305,8 @@
     </fieldset>
 </details>
 
-<script>
-  (function () {
-    const box = document.getElementById("display-preferences");
-    if (!box) return;
-
-    const DEFAULTS     = {"theme":"dark","text_size":"100","line_spacing":"default","font":"default","background_pattern":"on"};
-    const PALETTE      = {"light":"all","device":"(prefers-color-scheme: light)"};
-    const PALETTE_OFF  = "not all";
-    const root = document.documentElement;
-
-    const chosen = () => {
-      const values = {};
-      box.querySelectorAll("input[type=radio]:checked").forEach((radio) => { values[radio.dataset.setting] = radio.value; });
-      return values;
-    };
-
-    // Mirrors the attributes the layout renders from stored values; change both together.
-    const apply = (values) => {
-      Object.entries(values).forEach(([setting, value]) => {
-        const attribute = "data-" + setting.replace(/_/g, "-");
-        if (value === DEFAULTS[setting]) root.removeAttribute(attribute);
-        else root.setAttribute(attribute, value);
-      });
-      const media = PALETTE[values.theme] || PALETTE_OFF;
-      document.querySelectorAll("[data-light-palette-media]").forEach((element) => { element.media = media; });
-      const pattern = document.getElementById("background-pattern");
-      if (values.background_pattern === "off") pattern?.remove();
-      else if (!pattern) {
-        const layer = document.createElement("div");
-        layer.id = "background-pattern";
-        layer.setAttribute("aria-hidden", "true");
-        document.body.prepend(layer);
-      }
-    };
-
-    // Queued in order: each save carries the whole object, so parallel saves could land out of order.
-    box.addEventListener("change", () => {
-      apply(chosen());
-      CodeGymSaveStatus.queue("display_preferences", "PATCH", "/profile",
-                              () => ({ user: { display_preferences: chosen() } }));
-    });
-  })();
-</script>
 
 
-  <script>
-    (function () {
-      // Key per control: all controls PATCH one path, and a shared key lets one success clear another's warning.
-      const queueSave = (key, payload) =>
-        CodeGymSaveStatus.queue(key, "PATCH", "/profile", typeof payload === "function" ? () => ({ user: payload() }) : { user: payload });
-
-      const tz = document.getElementById("tz-select");
-      if (tz) tz.addEventListener("change", () => queueSave("time_zone", { time_zone: tz.value }));
-
-      const dailySections = document.getElementById("daily-sections");
-      if (dailySections) {
-        dailySections.addEventListener("change", (event) => {
-          queueSave("daily_section_count", { daily_section_count: event.target.value });
-        });
-      }
-
-      const skill = document.getElementById("skill-level");
-      if (skill) {
-        skill.addEventListener("change", async () => {
-          const level = skill.value;
-          const result = await queueSave("skill_level", { skill_level: level });
-          if (!result.ok) return;
-          const levelLabel = Array.from(skill.options).find((option) => option.value === level).textContent;
-          document.querySelectorAll("[data-skill-level-label]").forEach((label) => {
-            label.textContent = skill.dataset.labelTemplate.replace("__LEVEL__", levelLabel);
-          });
-        });
-      }
-
-      const STOPS  = [0.25,0.5,1.0,2.0,4.0];
-      const DEFAULT_STOP = 1.0;
-      const LABELS = ["Much less","Less","Default","More","Much more"];
-      // Without aria-valuetext a screen reader announces the slider's index, not the stop word.
-      const showStop = (slider, output) => {
-        const stopLabel = LABELS[Number(slider.value)];
-        output.textContent = stopLabel;
-        slider.setAttribute("aria-valuetext", stopLabel);
-      };
-      const mix    = document.getElementById("exercise-mix");
-
-      if (mix) {
-        const rows = Array.from(mix.querySelectorAll(".mix-row[data-weighted]"));
-
-        const difficulties = Array.from(mix.querySelectorAll(".mix-difficulty"));
-        const difficultyFor = (kind) => mix.querySelector('.mix-difficulty[data-kind="' + kind + '"]');
-        const chosenLevel = (box) => (box.querySelector("input[type=radio]:checked") || { value: "" }).value;
-
-        const syncDifficulty = (box) => {
-          const targeted = chosenLevel(box) !== "";
-          const lock = box.querySelector(".mix-lock-box");
-          const excluded = box.querySelector("input[type=radio]").disabled;
-
-          if (!targeted) lock.checked = false;
-          lock.disabled = excluded || !targeted;
-          box.querySelector(".mix-coverage").hidden = !targeted;
-        };
-
-        const setDifficultyDisabled = (box, disabled) => {
-          box.querySelectorAll("input[type=radio]").forEach((radio) => { radio.disabled = disabled; });
-          syncDifficulty(box);
-        };
-
-        const state = () => {
-          const weights = {};
-          const excluded = [];
-
-          rows.forEach((row) => {
-            const kind = row.dataset.kind;
-            const slider = row.querySelector("input[type=range]");
-            const box = row.querySelector(".mix-exclude-box");
-            const value = STOPS[Number(slider.value)];
-
-            if (box.checked) excluded.push(kind);
-            if (value !== DEFAULT_STOP) weights[kind] = value;
-          });
-
-          const levels = {};
-          const locked = [];
-          difficulties.forEach((box) => {
-            const level = chosenLevel(box);
-            if (level === "") return;
-            levels[box.dataset.kind] = level;
-            if (box.querySelector(".mix-lock-box").checked) locked.push(box.dataset.kind);
-          });
-
-          return { section_kind_weights: weights, excluded_section_kinds: excluded,
-                   section_kind_levels: levels, locked_section_kinds: locked };
-        };
-
-        const preparation = document.getElementById("mix-ladder-preparation");
-        const prepareButton = document.getElementById("prepare-ladders");
-        const applyLadderPreparation = (data) => {
-          preparation.hidden = data.count === 0;
-          prepareButton.textContent = data.button_label;
-          difficulties.forEach((box) => {
-            box.querySelector(".mix-coverage").textContent = data.coverage[box.dataset.kind];
-          });
-        };
-
-        const lockLastInGroup = () => {
-          mix.querySelectorAll(".mix-group-rotating").forEach((group) => {
-            const boxes = Array.from(group.querySelectorAll(".mix-exclude-box"));
-            const remaining = boxes.filter((box) => !box.checked);
-            const locked = remaining.length === 1;
-
-            remaining.forEach((box) => { box.disabled = locked; });
-            group.querySelector(".mix-last-note").hidden = !locked;
-          });
-        };
-
-        let version = 0;
-
-        const applyServerState = (current) => {
-          const weights = current.section_kind_weights || {};
-          const excluded = current.excluded_section_kinds || [];
-
-          rows.forEach((row) => {
-            const kind = row.dataset.kind;
-            const slider = row.querySelector("input[type=range]");
-            const box = row.querySelector(".mix-exclude-box");
-            const stop = Object.prototype.hasOwnProperty.call(weights, kind) ? weights[kind] : DEFAULT_STOP;
-            const index = STOPS.indexOf(stop);
-
-            slider.value = index === -1 ? STOPS.indexOf(DEFAULT_STOP) : index;
-            showStop(slider, row.querySelector("output"));
-            box.checked = excluded.indexOf(kind) !== -1;
-            slider.disabled = box.checked;
-          });
-
-          const levels = current.section_kind_levels || {};
-          const lockedKinds = current.locked_section_kinds || [];
-          difficulties.forEach((box) => {
-            const kind = box.dataset.kind;
-            const level = Object.prototype.hasOwnProperty.call(levels, kind) ? levels[kind] : "";
-            box.querySelectorAll("input[type=radio]").forEach((radio) => { radio.checked = radio.value === level; });
-            box.querySelector(".mix-lock-box").checked = lockedKinds.indexOf(kind) !== -1;
-            setDifficultyDisabled(box, excluded.indexOf(kind) !== -1);
-          });
-
-          lockLastInGroup();
-          version = current.section_kind_preferences_version;
-          applyLadderPreparation(current.ladder_preparation);
-        };
-
-        let pending = null;
-        let editRevision = 0;
-        const persistMix = () => {
-          let revision;
-          const payload = () => {
-            revision = editRevision;
-            return Object.assign(state(), { section_kind_preferences_version: version });
-          };
-
-          // Queued in order: a parallel save would post the version the one in flight is about to move, and 409 against itself.
-          return queueSave("exercise_mix", payload).then((result) => {
-            const reported = result.data && result.data.section_kind_preferences_version;
-            if (result.ok && typeof reported === "number") version = reported;
-            if (result.status === 409 && result.data && result.data.current) {
-              applyServerState(result.data.current);
-              return revision === editRevision;
-            }
-
-            if (result.ok && revision === editRevision) {
-              applyLadderPreparation(result.data.ladder_preparation);
-              return true;
-            }
-            return false;
-          });
-        };
-
-        CodeGymSaveStatus.watch(() => pending !== null);
-        const saveMix = () => {
-          editRevision++;
-          prepareButton.disabled = true;
-          clearTimeout(pending);
-          pending = setTimeout(() => {
-            pending = null;
-            persistMix().then((savedLatest) => {
-              prepareButton.disabled = !savedLatest || pending !== null || CodeGymSaveStatus.queued("exercise_mix");
-            });
-          }, 400);
-        };
-
-        rows.forEach((row) => {
-          const slider = row.querySelector("input[type=range]");
-          const box = row.querySelector(".mix-exclude-box");
-          const label = row.querySelector("output");
-
-          slider.addEventListener("input", () => {
-            showStop(slider, label);
-            saveMix();
-          });
-
-          box.addEventListener("change", () => {
-            slider.disabled = box.checked;
-            lockLastInGroup();
-            setDifficultyDisabled(difficultyFor(row.dataset.kind), box.checked);
-            saveMix();
-          });
-        });
-
-        difficulties.forEach((box) => {
-          box.querySelectorAll("input[type=radio]").forEach((radio) => {
-            radio.addEventListener("change", () => { syncDifficulty(box); saveMix(); });
-          });
-          box.querySelector(".mix-lock-box").addEventListener("change", saveMix);
-        });
-
-        lockLastInGroup();
-      }
-    })();
-  </script>
 </div>
 
     </main>
