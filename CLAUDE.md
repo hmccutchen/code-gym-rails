@@ -2838,13 +2838,17 @@ concept-specific difficulty descriptions for future generation, not a new set.
   move from the collapsed menu to a bottom tab bar (`shared/_tab_bar`, built
   from `NavigationHelper#nav_destinations`), which pads itself clear of the
   home indicator with `env(safe-area-inset-bottom)`. A browser tab and a
-  desktop install keep the top nav. `app/assets/images/logo-outlined-square.png` is the source
-  of every icon; `script/generate_icons.py` rasterizes `favicon.ico` (32px
-  only, since the art turns to mush at 16px), `icon-192.png`, `icon-512.png`,
-  `icon-maskable-512.png` and `apple-touch-icon.png` from it, nearest-neighbor,
-  onto the layout's `--bg`. `logo.png` and `logo-square.png` are the same art
-  without the light outline, unused while every surface the logo sits on is
-  dark.
+  desktop install keep the top nav. The icons come from two opaque 1024px
+  masters with their own navy fill: `app/assets/images/app-icon-master.png`
+  (braces and kettlebell) for `apple-touch-icon.png`, `icon-192.png`,
+  `icon-512.png` and `icon-maskable-512.png`, and `favicon-master.png` (the
+  kettlebell alone) for the 32px `favicon.ico`. `script/generate_icons.py`
+  resizes them with Lanczos and composites nothing, since an opaque icon has
+  no transparent pixels for iOS to fill with black. The maskable icon is the
+  same image, and the script fails if the mark reaches past the 80% safe
+  circle. The nav logo (`logo-outlined.png`, and `logo.png` under the light
+  palette) is separate artwork; `logo-square.png` and
+  `logo-outlined-square.png` are no longer read by anything.
   Standalone mode itself still needs no service worker — but one is registered
   now, for the daily reminder (see "Push reminders" below); `GET
   /service-worker.js` serves it from the root path, since a worker's scope is
