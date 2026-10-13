@@ -327,6 +327,15 @@ like the submission-rendering styles it cannot live in a per-page `<style>`
 block. `.featured-compact` is the dashboard's wrapper; it dials the same block
 down rather than giving it a second markup.
 
+## `.featured-marker`
+
+`responses/_featured_marker` renders inside the section wrapper, which the
+dashboard and every History entry share, so its style lives here beside
+`.featured-concept`. `text-transform: none` keeps it readable inside the
+uppercase section label; the read-only label is a plain `div`, so only there
+does it need its own left margin, while the answer form's summary already
+spaces its children with `gap`.
+
 ## `.save-status`
 
 The status is fixed rather than inline because the dashboard's autosave fires

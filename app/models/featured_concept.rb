@@ -51,6 +51,11 @@ class FeaturedConcept < ApplicationRecord
   end
   private_class_method :met_concepts
 
+  # The one rule for marking a section with this week's concept; any later fade rule belongs here.
+  def marks?(concept:, bucket:)
+    self.concept == concept && self.bucket == bucket
+  end
+
   def fits?(language)
     ConceptBucket.slice_for(language).include?(bucket) && ConceptBucket.vocabulary_for(bucket).include?(concept)
   end

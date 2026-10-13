@@ -152,4 +152,21 @@ RSpec.describe FeaturedConcept, type: :model do
 
     expect { featured(monday) }.not_to change(ApiUsage, :count)
   end
+
+  describe "#marks?" do
+    let(:featured) { described_class.new(concept: "missing_constraint", bucket: "ruby_rails") }
+
+    it "marks a section carrying the same concept in the same bucket" do
+      expect(featured.marks?(concept: "missing_constraint", bucket: "ruby_rails")).to be(true)
+    end
+
+    # Data-modeling concepts sit in both language vocabularies, so the name alone is not enough.
+    it "leaves the same concept in another bucket unmarked" do
+      expect(featured.marks?(concept: "missing_constraint", bucket: "javascript")).to be(false)
+    end
+
+    it "leaves a section with no concept unmarked" do
+      expect(featured.marks?(concept: nil, bucket: "ruby_rails")).to be(false)
+    end
+  end
 end
