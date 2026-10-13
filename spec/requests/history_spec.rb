@@ -44,6 +44,16 @@ RSpec.describe "History", type: :request do
     expect(response.body).not_to include("SENTINEL-ORIGINAL")
   end
 
+  it "lets each section of a past day fold on its own" do
+    session = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+
+    login_as(user)
+    get history_path
+
+    folds = Nokogiri::HTML5(response.body).css("details.answers details.section").map { |section| section["data-section-fold"] }
+    expect(folds).to eq(session.daily_exercise.active_section_keys)
+  end
+
   it "numbers each review block with its section's slot, so the heading takes that section's color" do
     reviewed = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
     reviewed.update!(ai_review: {
