@@ -9,7 +9,7 @@ class FeaturedConcept < ApplicationRecord
   def self.for(user, today: Date.current)
     week   = week_of(today)
     stored = user.featured_concepts.find_by(week_of: week)
-    return stored if stored&.fits?(user.language)
+    return stored if stored&.still_met_by?(user, today)
 
     pair = pick_for(user, week, today)
     if pair.nil?
@@ -50,6 +50,11 @@ class FeaturedConcept < ApplicationRecord
     end
   end
   private_class_method :met_concepts
+
+  # Start over can destroy a submitted, unreviewed day, taking the only exposure to this concept with it.
+  def still_met_by?(user, today)
+    fits?(user.language) && user.concept_exposure_count(concept, bucket, on_or_before: today).positive?
+  end
 
   def fits?(language)
     ConceptBucket.slice_for(language).include?(bucket) && ConceptBucket.vocabulary_for(bucket).include?(concept)

@@ -1,8 +1,9 @@
 module MetConceptHelpers
   # One submitted, reviewed set dated `date` whose only section showed `concept`, so the user has met it.
-  def submit_set_showing(user, concept, date:, section: "code_review", rung: "senior", ai: "developing", answered: true)
+  def submit_set_showing(user, concept, date:, section: "code_review", rung: "senior", ai: "developing", answered: true,
+                         language: "ruby_rails")
     exercise = DailyExercise.create!(
-      user: user, date: date, language: "ruby_rails", generated_at: date.to_time,
+      user: user, date: date, language: language, generated_at: date.to_time,
       problem_set: { section => { "question" => "q", "concept" => concept, "pitched_at" => rung } }
     )
     DailyResponse.create!(
