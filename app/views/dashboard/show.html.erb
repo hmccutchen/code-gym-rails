@@ -61,6 +61,6 @@
 <%# Outside #dashboard-content, which the generating poller replaces. Placement: docs/code-notes/app/views/dashboard/show.html.md %>
 <% if @featured %>
   <div class="featured-compact">
-    <%= render "shared/featured_concept", reference: @featured %>
+    <%= render "shared/featured_concept", featured: @featured, day_response: @response %>
   </div>
 <% end %>

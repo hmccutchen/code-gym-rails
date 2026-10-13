@@ -1,12 +1,14 @@
-<%# Required locals: reference (the ConceptReference featured this week, stamped with its Monday). %>
+<%# Required locals: featured (this week's FeaturedConcept). Optional: day_response, the dashboard's day, read by featured_tagline_shown?. %>
+<% reference = concept_reference_for(featured.concept, featured.bucket) %>
 <div class="featured-concept">
   <p class="featured-label"><%= t("learn.featured.label") %></p>
   <h2 class="featured-title">
-    <%= link_to reference.concept.humanize,
-                learn_concept_path(bucket: reference.language, concept: reference.concept) %>
+    <%= link_to featured.concept.humanize,
+                learn_concept_path(bucket: featured.bucket, concept: featured.concept) %>
   </h2>
-  <p class="featured-bucket"><%= t("learn.buckets.#{reference.language}") %></p>
-  <% if reference.tagline.present? %>
+  <p class="featured-bucket"><%= t("learn.buckets.#{featured.bucket}") %> · <%= t("learn.featured.seen",
+        count: current_user.concept_exposure_count(featured.concept, featured.bucket, on_or_before: Date.current)) %></p>
+  <% if featured_tagline_shown?(local_assigns[:day_response]) && reference&.tagline.present? %>
     <p class="featured-tagline"><%= reference.tagline %></p>
   <% end %>
 </div>

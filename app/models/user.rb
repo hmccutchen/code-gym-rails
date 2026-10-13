@@ -5,6 +5,7 @@ class User < ApplicationRecord
   has_many :api_usages,      dependent: :destroy
   has_many :concept_masteries, dependent: :destroy
   has_many :push_subscriptions, dependent: :destroy
+  has_many :featured_concepts, dependent: :destroy
   belongs_to :invite_code, optional: true
 
   serialize :api_keys, coder: JSON
