@@ -595,6 +595,7 @@ en:
     section:
       label: "%{slot} — %{name}"
       titled_label: "%{slot} — %{name}: %{title}"
+      featured: "This week's concept"
     answered:
       skipped: "(skipped)"
     section_status:

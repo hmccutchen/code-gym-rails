@@ -5,8 +5,6 @@ class DashboardController < ApplicationController
   def show
     return redirect_to(welcome_path) if current_user.first_run?
 
-    @featured = FeaturedConcept.for(current_user)
-
     # Re-read after the move: a second first-load of the day can lose the race and move nothing.
     @exercise = current_user.daily_exercises.for_date.first
     if @exercise.nil?

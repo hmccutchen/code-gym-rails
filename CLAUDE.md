@@ -365,11 +365,11 @@ User browses /learn (independent of the daily flow above):
   └→ LearnController#show              → one concept's cached reference plus its
        guide, generating either on demand when the row is missing or stale
 
-Every dashboard and /learn load, any day of the week:
+Every dashboard, /learn and /history load, any day of the week:
   └→ FeaturedConcept.for(user)        → this user's concept for the week, from
        concepts they have met, picked on their first visit of the week and read
        by every visit after — rendered at the top of /learn and as a small
-       callout on the dashboard
+       callout on the dashboard, and marked on every section that carries it
 ```
 
 ## Models
@@ -2721,6 +2721,20 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `FeaturedConceptHelper#featured_tagline_shown?` holds it back on the
   dashboard until the day is submitted; the Learn page, and a dashboard with
   no set today, always show it.
+
+  **Every section carrying it is marked.** `FeaturedConceptHelper#featured_concept`
+  reads the pick once per request, and the section wrapper
+  (`responses/_section`) renders `responses/_featured_marker` beside the
+  section's label whenever `FeaturedConcept#marks?` says so: on the answer
+  form before anything is answered, where it stays visible while the section
+  is folded, on the submitted dashboard, and on every History entry that
+  carries the concept, older weeks included. `#marks?` compares the concept
+  and its bucket, since data-modeling and meta-skill concepts sit in both
+  language vocabularies, and it is the one place a later rule, such as
+  marking less once a concept is held at the user's rung, would go. Marking
+  a section before it is answered was a deliberate choice: a met concept's
+  reference already names it in its closed disclosure's title, and the
+  engineer still has to find and explain it.
 - **Idempotent saves and frozen evidence**: `ResponsesController#create`
   shares `persisted_response_for` with pseudocode rounds, recovering an
   initial-create race through the existing unique date constraint. Every
@@ -3379,8 +3393,12 @@ always pull in the full suite — is stated once, in
   when it leaves the user's slice
 - `app/services/featured_concept_pick.rb` — `FeaturedConceptPick`: the pure
   rule choosing among met concepts, from the ledger and the user's past picks
-- `app/helpers/featured_concept_helper.rb` — `#featured_tagline_shown?`: the
-  one rule for when the callout shows the reference's tagline
+- `app/helpers/featured_concept_helper.rb` — `#featured_concept`, the pick
+  read once per request; `#featured_section?`, which the section wrapper asks;
+  and `#featured_tagline_shown?`, the one rule for when the callout shows the
+  reference's tagline
+- `app/views/responses/_featured_marker.html.erb` — the marker beside a
+  section's label when it carries this week's concept
 - `app/models/concept_book_sources.rb` — `ConceptBookSources`: the hand-curated
   book pointers a Learn page renders under "Where this comes from". Closed,
   array-valued, and never read by any prompt — extend it by adding a line
