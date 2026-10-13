@@ -3,16 +3,13 @@
 <% label = capture do %>
   <% if kind.titled_label? %><%= t("responses.section.titled_label", slot: slot, name: t("sections.#{key}.name"), title: data["title"]) %><% else %><%= t("responses.section.label", slot: slot, name: t("sections.#{key}.name")) %><% end %>
 <% end %>
-<% if submitted %>
-<div class="section" data-slot="<%= slot %>">
-  <div class="section-label"><%= label %><%= render "responses/featured_marker" if featured_section?(data["concept"], bucket) %></div>
-<% else %>
 <details class="section" open data-slot="<%= slot %>" data-section-fold="<%= key %>">
   <%# No glossary terms in the summary (a control nested in a control), and never role="button": it erases the <h2>. %>
   <summary class="section-label"><h2 class="section-title"><%= label %></h2><%= render "responses/featured_marker" if featured_section?(data["concept"], bucket) %>
+  <% unless submitted %>
     <span class="section-status" data-status-for="<%= key %>"><%= section_status(response, key) %></span>
+  <% end %>
   </summary>
-<% end %>
   <% if data["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(data["scenario"]) %></div><% end %>
   <div class="question"><%= glossary_wrap(data["question"]) %></div>
 
@@ -42,8 +39,4 @@
     </div>
     <%= render "shared/duck_thread", field: key %>
   <% end %>
-<% if submitted %>
-</div>
-<% else %>
 </details>
-<% end %>

@@ -430,7 +430,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       create_response(exercise)
       get root_path
-      labels = Nokogiri::HTML(response.body).css("div.section > .section-label")
+      labels = Nokogiri::HTML(response.body).css("details.section > summary")
       expect(labels.map(&:text).join).to include("Service Objects")
       expect(labels.css(".gloss-term")).to be_empty
     end
@@ -1516,14 +1516,17 @@ RSpec.describe "Dashboard section folding", type: :request do
     expect(response.body).to match(%r{data-status-for="pattern"[^>]*>in progress<})
   end
 
-  it "keeps the read-only render as plain sections" do
+  it "lets each submitted section fold, open by default and with no status line" do
     exercise = exercise_with_sections
     DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                           answers: { "code_review" => "a" * 20, "pattern" => "b" * 20 })
     get root_path
 
-    expect(response.body).not_to include('<details class="section"')
-    expect(response.body).to include('<div class="section" data-slot="1">')
+    sections = Nokogiri::HTML(response.body).css("details.section")
+    expect(sections.map { |section| section["data-section-fold"] }).to eq(exercise.active_section_keys)
+    expect(sections).to all(satisfy { |section| section.key?("open") })
+    expect(sections.map { |section| section.at_css("> summary > h2.section-title") }).to all(be_present)
+    expect(sections.css(".section-status")).to be_empty
   end
 end
 

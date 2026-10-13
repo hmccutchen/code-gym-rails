@@ -315,7 +315,6 @@
     details.section:not([open]) > summary { margin-bottom: -12.5px; }
     .section-label .section-title { font: inherit; letter-spacing: inherit; margin: 0; }
     .featured-marker { display: inline-block; font-size: .7rem; letter-spacing: .04em; text-transform: none; color: var(--accent-text); border: 1px solid var(--accent); border-radius: 999px; padding: .05rem .5rem; }
-    div.section-label .featured-marker { margin-left: .5rem; }
     .section-status { font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); margin-left: auto; }
     .section h2 { font-size: 1.1rem; margin-bottom: .75rem; }
     .section-scenario { font-size: .95rem; color: var(--muted); margin-bottom: .75rem; }
@@ -593,9 +592,10 @@
 </div>
 
   <div data-submitted-day hidden></div>
-    <div class="section" data-slot="1">
-  <div class="section-label">  1 — Code Review
-</div>
+    <details class="section" open data-slot="1" data-section-fold="code_review">
+  <summary class="section-label"><h2 class="section-title">  1 — Code Review
+</h2>
+  </summary>
   
   <div class="question">Find the bug</div>
 
@@ -609,11 +609,12 @@
     <div class="answer-display">aaaaaaaaaaaaaaaaaaaa</div>
 
 
-</div>
+</details>
 
-  <div class="section" data-slot="2">
-  <div class="section-label">  2 — Pattern of the Month: Service Objects
-</div>
+  <details class="section" open data-slot="2" data-section-fold="pattern">
+  <summary class="section-label"><h2 class="section-title">  2 — Pattern of the Month: Service Objects
+</h2>
+  </summary>
   
   <div class="question">When?</div>
 
@@ -627,11 +628,12 @@
     <div class="answer-display">bbbbbbbbbbbbbbbbbbbb</div>
 
 
-</div>
+</details>
 
-  <div class="section" data-slot="3">
-  <div class="section-label">  3 — Coding Challenge
-</div>
+  <details class="section" open data-slot="3" data-section-fold="challenge">
+  <summary class="section-label"><h2 class="section-title">  3 — Coding Challenge
+</h2>
+  </summary>
   
   <div class="question">Implement X</div>
 
@@ -644,7 +646,7 @@
     <div class="answer-display">cccccccccccccccccccc</div>
 
 
-</div>
+</details>
 
 
 

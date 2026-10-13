@@ -2177,7 +2177,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   Fold state is not persisted: a reload opens every section, which costs one
   tap per section and avoids keying browser storage to a response that
   regenerate and start-over would have to invalidate. The read-only render
-  stays a plain div.
+  folds the same way, open by default with the label in the summary and no
+  status line, so on the submitted dashboard a reader can fold the answered
+  problems away and reach the review below them without scrolling past
+  every section. Each section inside a History entry folds too.
 - **No free-text feedback box**: the answer form once carried an "Anything
   to adjust next time?" field whose text was quoted into the next ten days'
   generation prompts with no instruction about what to do with it. It was
