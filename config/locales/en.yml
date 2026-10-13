@@ -406,6 +406,9 @@ en:
       stopped: "Stopped drilling %{name}."
     featured:
       label: "This week's concept"
+      seen:
+        one: "seen in 1 of your sets"
+        other: "seen in %{count} of your sets"
     recognition:
       summary: "How to look for these"
       questions: "What to ask"

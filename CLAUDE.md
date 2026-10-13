@@ -363,10 +363,11 @@ User browses /learn (independent of the daily flow above):
   └→ LearnController#show              → one concept's cached reference plus its
        guide, generating either on demand when the row is missing or stale
 
-Every page load, any day of the week:
-  └→ ConceptReference.featured        → the week's one globally-featured concept,
-       picked on the first visit of the week and read by every visit after —
-       rendered at the top of /learn and as a small callout on the dashboard
+Every dashboard and /learn load, any day of the week:
+  └→ FeaturedConcept.for(user)        → this user's concept for the week, from
+       concepts they have met, picked on their first visit of the week and read
+       by every visit after — rendered at the top of /learn and as a small
+       callout on the dashboard
 ```
 
 ## Models
@@ -379,13 +380,14 @@ Every page load, any day of the week:
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
 | `InviteCode`    | code_digest (SHA-256 of the raw code, unique), label, seats, redeemed_count, expires_at, trial_days, daily_request_cap |
 | `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
+| `FeaturedConcept` | user_id, week_of (the Monday, in the user's zone), bucket, concept — unique on user_id and week_of; one row per week a user had a concept to feature |
 
 `ConceptReference` (not listed above — it has no `user_id`; see "The Learn tab"
 below) now also carries `guide_plain_language`, `guide_worked_example`,
-`guide_pitfalls` (all nullable text) and `featured_on` (nullable date, uniquely
-indexed). `ConceptReference#guide?` — all three guide fields present — is the
-single authority for "does this row carry a guide"; `featured_on` is the Monday
-of the week the row was the featured concept, and nil means it never has been. It also
+`guide_pitfalls` (all nullable text). `ConceptReference#guide?` — all three
+guide fields present — is the single authority for "does this row carry a
+guide". Its `featured_on` column, the stamp of the old team-wide pick, is in
+`ignored_columns` until a later release drops it with its unique index. It also
 carries `ladder_junior`, `ladder_mid_level`, `ladder_senior`,
 `ladder_principal_engineer` (all nullable text), and `ConceptReference#ladder?`
 — every ladder field present, one per rung in `KindDifficulty::LEVELS`, derived from the field list the same way `#guide?` is — is the
@@ -2623,76 +2625,76 @@ concept-specific difficulty descriptions for future generation, not a new set.
   holds all of it to the standard's checkable rules: the placeholder phrases,
   read from the standard itself, and no text whose every sentence opens with
   the same word. The rest of the standard needs a reader's judgment.
-- **The weekly featured concept**: one concept surfaced each week, the same
-  one for the whole team — `ConceptReference.featured`, read at the top of
-  `/learn` and as a small callout on the dashboard ("This week's concept"). A
-  week rather than a day, so a teammate who opens the app only a few times
-  has time to read the whole guide. **Global, not per-user**, because
-  `ConceptReference` is itself a shared row with no `user_id`; no per-user
-  state exists for this and none should be added.
+- **The weekly featured concept**: each user gets one concept a week, chosen
+  from concepts they have met — `FeaturedConcept.for(user)`, read at the top
+  of `/learn` and as a small callout on the dashboard ("This week's concept").
+  A week rather than a day, so someone who opens the app only a few times has
+  time to read the whole guide. It replaced a single team-wide pick, which
+  could only draw from the four language-independent buckets, because a
+  global pick had to be reachable from every teammate's slice.
 
-  **Picked lazily on visit, not by a cron entry.** `featured_on` holds the
-  Monday of the week a row was featured (`ConceptReference.featured_week_of`).
-  The first page load of a week finds no row stamped with that Monday, takes
-  the stalest one and stamps it; every load after reads it. Monday rather
-  than Sunday, so a weekend visit still shows the concept the working week
-  began with. The date being asked about is the method's only input, so
-  nothing has to be configured or fire on schedule — unlike generation,
-  which `config/recurring.yml` and `GenerateDailyExercisesJob` deliberately
-  gate to 8am weekdays. Rows featured while the pick was daily keep their
-  weekday stamps: they count as recently featured, and one stamped on a
-  Monday is that week's pick. No migration was needed. Ordering is
-  `featured_on ASC NULLS FIRST`: a never-featured concept outranks every dated
-  one, the same "unseen outranks stale" rule `SectionRotation` applies to
-  exercise kinds.
+  **The pick rule is `FeaturedConceptPick`, pure over plain values.** The
+  candidates are the concepts in the user's slice (`ConceptBucket.slice_for`
+  and each bucket's vocabulary) that at least one submitted set has shown,
+  counted by `User#concept_exposure_count`, the same count as Learn's "in your
+  sets" marker. `RungLedger` sorts them the way the Progress page does: a
+  concept with `developing_toward` is preferred; next, one met with no ledger
+  evidence yet (only skipped, eased or unreviewed sections); a held concept
+  with nothing above it in progress is never featured. Last week's concept is
+  dropped whenever any other candidate exists. Within the preferred group a
+  concept never featured for this user comes first, then the one featured
+  longest ago, ties in slice order, the same "unseen outranks stale" rule
+  `SectionRotation` applies to kinds. No candidate means no row and no
+  callout: a new account, or one that holds everything it has met, sees
+  nothing until it meets something new. There is no team-wide fallback.
 
-  **Selects and displays only — it never generates.** Every field it renders
-  was written by the Learn tab's existing `#generate_concept_reference`, so the
-  feature adds no provider call and no `ApiUsage` row (a spec pins that). A
-  featured row whose guide was never written needs no fallback of its own: the
-  callout links to the ordinary `LearnController#show` page, which already
-  offers the on-demand "Write this up" control for exactly that row.
+  **Tier stays invisible.** The pick reads `RungLedger` and the exposure
+  index, both built from submitted responses, and never `ConceptMastery`,
+  drills or pause state. The ledger's standings are already on the Progress
+  page, so featuring a developing concept says nothing that page does not.
 
-  **The pool is the four language-independent buckets**
-  (`ConceptReference::FEATURABLE_BUCKETS`, derived from
-  `ConceptBucket::LANGUAGE_INDEPENDENT`), not every vocabulary. A single global
-  pick has to be readable and relevant to everyone, and `LearnController#show`
-  validates `:bucket` against the viewer's own slice — so a `javascript` pick
-  is a 404 for a Rails user, and the reverse for a JS user. On a team split
-  across stacks these are the only concepts that are genuinely
-  one-for-everyone. Accepted cost: neither language vocabulary is ever
-  featured, and they are the larger half. No count is quoted here on purpose —
-  the rotation's length is however many rows the pool holds, and growing a
-  vocabulary only lengthens it; two specs hold the exclusion itself, which is
-  the part that can break.
+  **Stored, so it holds for the week.** `featured_concepts` keeps one row per
+  user and `week_of`, the Monday of the week in the user's own zone, which
+  `ApplicationController#use_time_zone` sets around every action. The first
+  page load of a week computes and stores the pick, and every load after reads
+  it, so new work during the week cannot move it. A pick computed on every
+  load was rejected: it would build `RungLedger`, which reads every submitted
+  response and its exercise, twice on each dashboard and Learn load, and could
+  avoid only last week's concept rather than rotate. The stored rows are also
+  the rotation's history. Accepted cost: a user with met concepts but none
+  eligible stores nothing, so each of their dashboard and Learn loads builds
+  the ledger again until something qualifies.
 
-  **The week is the team's, never the viewer's.** `ApplicationController`'s
-  `around_action :use_time_zone` runs every action inside the current user's
-  zone, so a bare `Date.current` in `.featured` would resolve per viewer — two
-  teammates either side of Sunday midnight would ask about different weeks,
-  each stamp a row, and each get their own "this week's concept", which is the
-  one global pick this feature exists to be, broken. The unique index cannot
-  catch that, since the two weeks genuinely differ. `ConceptReference.team_today` resolves it in
-  `User::DEFAULT_TIME_ZONE` — the zone `User` already falls back to and
-  `config/recurring.yml` already calls the team default — rather than a second
-  constant of the same value that could later disagree. UTC was the alternative
-  and is worse: it rolls the concept over on Sunday evening for this team.
+  **A stored pick is checked on every read** (`FeaturedConcept#still_met_by?`).
+  When a language change moves its bucket out of the slice, or its concept
+  leaves the vocabulary, `LearnController#show` would 404 on the link; and
+  when Start over destroys a submitted day whose review failed, the only set
+  that showed the concept can go with it, leaving a callout that says "seen
+  in 0 of your sets". Either way the row is re-picked in place for the rest
+  of the week, or removed when nothing qualifies.
 
-  **The same-week race guard is the unique index on `featured_on`**, not a row
-  lock. Two first-visits landing together both read nothing and both try to
-  stamp; the loser's write violates the index, and `.claim_feature` rescues
-  `RecordNotUnique` by re-reading the winner's pick, so both visitors see one
-  concept. Deliberately lighter than the row locks the cost-bearing paths
-  take (`User#resume_generation!`, `ResponseReview`) — this picks a
-  row to *read*, so losing costs a re-read rather than a duplicated provider
-  call. The stamp sits in a SAVEPOINT (`requires_new: true`) for the same
-  reason `PushSubscription.upsert` and `User#carry_forward` do: without one the
-  write joins a caller's open transaction and the violation aborts it, so the
-  recovery read raises `PG::InFailedSqlTransaction` instead of returning the
-  winner. No caller opens a transaction around it today — and note that
-  transactional specs cannot surface this, since Rails opens its test wrapper
-  non-joinable and `update!` then gets a savepoint of its own; the spec that
-  pins it opens an ordinary caller transaction explicitly.
+  **The race guard is the unique index on (user_id, week_of).** Two first
+  visits landing together both find no row and both insert; the loser's insert
+  violates the index, and `.claim` rescues `RecordNotUnique` by re-reading the
+  winner's row. The insert sits in a SAVEPOINT (`requires_new: true`) for the
+  same reason `PushSubscription.upsert` and `User#carry_forward` do: without
+  one it joins a caller's open transaction and the violation aborts it, so the
+  recovery read raises `PG::InFailedSqlTransaction`. Transactional specs
+  cannot surface this, since Rails opens its test wrapper non-joinable, so the
+  spec that pins it opens an ordinary caller transaction explicitly.
+
+  **Selects and displays only — it never generates.** No provider call and no
+  `ApiUsage` row (a spec pins that). Shared `ConceptReference` rows are read,
+  never written. A featured concept whose guide was never written, or with no
+  reference row at all, still links to the ordinary `LearnController#show`
+  page, which offers the on-demand "Write this up" control.
+
+  **What the callout shows.** The concept's name, its bucket and "seen in N
+  of your sets" from `User#concept_exposure_count`. The reference's tagline
+  can describe what a section asks the engineer to find, so
+  `FeaturedConceptHelper#featured_tagline_shown?` holds it back on the
+  dashboard until the day is submitted; the Learn page, and a dashboard with
+  no set today, always show it.
 - **Idempotent saves and frozen evidence**: `ResponsesController#create`
   shares `persisted_response_for` with pseudocode rounds, recovering an
   initial-create race through the existing unique date constraint. Every
@@ -3333,6 +3335,13 @@ always pull in the full suite — is stated once, in
 - `app/views/shared/_featured_concept.html.erb` — the weekly featured concept's
   one rendering, shared by the Learn tab and the dashboard; its styles live in
   the layout for that reason, like `responses/_answered_sections`
+- `app/models/featured_concept.rb` — `FeaturedConcept.for(user)`: this week's
+  stored pick for one user, computed on the first visit, re-picked in place
+  when it leaves the user's slice
+- `app/services/featured_concept_pick.rb` — `FeaturedConceptPick`: the pure
+  rule choosing among met concepts, from the ledger and the user's past picks
+- `app/helpers/featured_concept_helper.rb` — `#featured_tagline_shown?`: the
+  one rule for when the callout shows the reference's tagline
 - `app/models/concept_book_sources.rb` — `ConceptBookSources`: the hand-curated
   book pointers a Learn page renders under "Where this comes from". Closed,
   array-valued, and never read by any prompt — extend it by adding a line

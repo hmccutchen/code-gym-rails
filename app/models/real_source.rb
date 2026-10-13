@@ -208,7 +208,6 @@ class RealSource
     Method.new("app/services/weighted_roll.rb", "pick"),
     Method.new("app/services/section_rotation.rb", "pick_kind"),
     Method.new("app/services/section_count.rb", "for"),
-    Method.new("app/models/concept_reference.rb", "claim_feature"),
     Method.new("app/models/user.rb", "carry_forward"),
     Method.new("app/models/user.rb", "authenticate_login_code"),
     Method.new("app/models/user.rb", "current_streak"),
