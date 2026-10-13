@@ -222,6 +222,24 @@ RSpec.describe "Learn", type: :request do
       expect(response.body).to include("PLAIN LANGUAGE", "WORKED EXAMPLE", "PITFALLS")
     end
 
+    it "highlights the worked example's code and shows its prose with inline code" do
+      full_reference.update!(guide_worked_example: "orders.each { |order| order.customer }\n\n" \
+                                                   "Each `order.customer` call runs a query.")
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      worked = Nokogiri::HTML(response.body).css(".learn-code-examples")
+      expect(worked.css("pre.snippet code.highlight").map(&:text)).to include("orders.each { |order| order.customer }")
+      expect(worked.css("p.learn-worked-example").text).to eq("Each order.customer call runs a query.")
+      expect(worked.css("p.learn-worked-example code").text).to eq("order.customer")
+    end
+
+    it "escapes the worked example's prose and inline code" do
+      full_reference.update!(guide_worked_example: "Never trust `<b>raw</b>` or <i>this</i>.")
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response.body).to include("<code>&lt;b&gt;raw&lt;/b&gt;</code>", "&lt;i&gt;this&lt;/i&gt;")
+    end
+
     it "lists a cited concept's book sources" do
       full_reference
       get learn_concept_path(bucket: "ruby_rails", concept: "shotgun_surgery")
