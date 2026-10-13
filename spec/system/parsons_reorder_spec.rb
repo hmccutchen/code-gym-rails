@@ -226,6 +226,22 @@ RSpec.describe "Parsons reorder controls", type: :system do
     end
   end
 
+  it "keeps the server's block order when the device copy holds another one" do
+    travel_to(weekday) do
+      visit_seeded_dashboard(cdn: :loaded)
+      field = %(textarea[data-field="parsons_problem"])
+      rendered = find(field, visible: :all).value
+      token = find("[data-controller~='answer-form']")["data-answer-form-draft-token-value"]
+      copy = { token: token, answers: { parsons_problem: "order:not-a-real-arrangement" }, ratings: {} }
+      page.execute_script("localStorage.setItem('code-gym-answer-draft', #{copy.to_json.to_json})")
+
+      visit root_path
+      expect(page).to have_css("ol[data-parsons-blocks][data-parsons-wired]", wait: 10)
+
+      expect(find(field, visible: :all).value).to eq(rendered)
+    end
+  end
+
   it "moves focus between blocks with a bare arrow key" do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)

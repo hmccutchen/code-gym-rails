@@ -100,8 +100,9 @@ because a pseudocode round writes the same row without touching the answers.
 
 A restored field is skipped when its value already differs from what the
 server rendered, since that is text typed before the controller connected.
-Parsons is never restored: its blocks are rendered in the server's order, and
-each move saves at once. A restored design comparison is told through the
+A field marked `data-draft-restore="off"` is never restored, so a kind opts
+out in its own answer partial rather than here. Parsons does: its blocks are
+rendered in the server's order, and each move saves at once. A restored design comparison is told through the
 bubbling `answer-form:restored` event, and its own controller also checks on
 connect, because either controller can connect first.
 

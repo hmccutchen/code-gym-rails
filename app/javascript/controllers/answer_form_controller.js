@@ -75,7 +75,7 @@ export default class extends Controller {
       draftStore.clear()
       return false
     }
-    this.textareas.filter((area) => !area.closest("[data-controller~='parsons']")).forEach((area) => {
+    this.textareas.filter((area) => area.dataset.draftRestore !== "off").forEach((area) => {
       const saved = draft.answers?.[area.dataset.field]
       if (typeof saved !== "string" || area.value !== area.defaultValue) return
       area.value = saved
