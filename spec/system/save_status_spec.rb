@@ -24,7 +24,7 @@ RSpec.describe "Save status", type: :system do
       find(%(textarea[data-field="code_review"]))
         .fill_in(with: "An answer the server is never going to receive.")
 
-      expect(page).to have_css("#save-status", text: /couldn't save/i, wait: 5)
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"), wait: 5)
       expect(user.daily_responses).to be_empty
     end
   end
@@ -42,6 +42,19 @@ RSpec.describe "Save status", type: :system do
       expect(page).to have_no_css("#gym-form", wait: 10)
       expect(page).to have_content("The answer already submitted")
       expect(saved.reload.answers["code_review"]).to eq("The answer already submitted")
+    end
+  end
+
+  it "reloads a form left open across a regeneration instead of saving into the new set" do
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      user.daily_exercises.sole.update!(generated_at: 1.minute.from_now)
+
+      find(%(textarea[data-field="code_review"])).fill_in(with: "Text written for the set before it was replaced")
+
+      expect(page).to have_css("#save-status", text: /the set changed/i, wait: 10)
+      expect(user.daily_responses).to be_empty
     end
   end
 

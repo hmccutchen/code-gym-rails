@@ -134,7 +134,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
         page.execute_script("window.finishSubmit()")
         expect(page).to have_no_selector("#gym-form[inert]")
         expect(page).to have_button("Submit answers", disabled: false)
-        expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.submit_failed"))
+        expect(page).to have_css("#save-status", text: I18n.t(failure == :http ? "dashboard.exercise.submit_failed" : "dashboard.exercise.submit_offline"))
         expect(page.evaluate_script("window.alerts")).to eq([])
         wait_for_saved_answer(user, "code_review", final)
         expect(page).to have_no_css("#save-status", visible: true)

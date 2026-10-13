@@ -229,7 +229,9 @@ decisions, not defaults that drifted into place:
   `CodeGymRequest.send`, and a save that must not overlap another goes
   through `CodeGymSaveStatus.queue`, never a hand-built `fetch` or its own
   promise chain. The server answers every error with `render_json_error`, so
-  the browser has one rule for what a failure may show.
+  the browser has one rule for what a failure may show. A queue retries only
+  when its caller passes `offline:` and only a save that got no reply; the
+  dashboard's answers are the one caller, since its endpoint accepts a repeat.
 - **Domain data stays off provider classes** — lists and tables the domain
   owns live in a module of their own (`ConceptVocabulary`), and `AiService`
   reads them; it keeps only what is about talking to a provider.
@@ -1709,7 +1711,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   may show. `spec/system/server_message_spec.rb` drives each of those replies
   through the thinking partner, and `spec/system/request_module_spec.rb` holds
   the module itself. The sign-up form's refused address gets
-  `sessions.email_not_accepted` rather than the validation exception.
+  `sessions.email_not_accepted` rather than the validation exception. A save
+  with no reply at all (`status` 0) is the one case the dashboard words for
+  itself: its autosave and submit say the answers are kept on this device
+  (see "Offline answer saving").
 
   **Rendered when read, not when written.** A failed generation stores its
   class, provider, time and requested wait (`users.last_generation_failure`,
@@ -2114,10 +2119,32 @@ concept-specific difficulty descriptions for future generation, not a new set.
 - **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so reloading offers the scaffold again without storing its labels as the user's work. Other draft text remains intact; grading and read-only displays use `answer_for` as described above.
 - **One finish action**: the Submit button is always clickable. The server decides whether the day can be submitted (`DailyResponse#submit_blocker`): at least one section answered and every answered section rated. A nudge under the button shows the blocker from the latest autosave reply, and a click the server refuses shows the same sentence and moves focus to it. Typing saves 800 ms after the last keystroke; a rating click, leaving an answer and a design comparison pick or Parsons move save at once, so the nudge follows within one round trip. The browser holds no copy of the rule, so the two cannot disagree; the cost is that the nudge, progress and hint lock update after a save rather than on each keystroke. Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. Draft ratings are set-only: `#create` accepts only valid enum values and preserves ratings while answers are edited or cleared. At submission it slices ratings to `answered_sections`, so a cleared, too-short, or scaffold-only answer leaves no self-assessment behind. Partial answer payloads merge into the draft before this slice; omitted answers remain unchanged, and explicit empty strings clear them. The form stays inert during submission and the review handoff, keeping its visible answers and ratings at the submitted snapshot; a failed submission restores editing. The progress label reports answers only; the nudge reports readiness. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by `answer_form_controller.js`, a Stimulus controller. `#create` refuses a submit that `submit_blocker` would block, with a 422 carrying the nudge's sentence, the answered sections and the blocker, and nothing saved, not even the draft the request carried. Accepting one would bill a review of every section, freeze the day and count it toward the streak.
   A refused or dropped submission restarts the draft autosave it canceled, so
-  the last edit survives without another keystroke. If submission succeeds but
+  the last edit survives without another keystroke. A submission that got no
+  reply restarts it too, since the server may have committed the submit and
+  lost only the reply; that autosave then reloads into the submitted page. If submission succeeds but
   the browser cannot start the review POST, the page explains that the answers
   were saved and reloads the submitted state with its manual review button.
   It never restores an editable draft after an acknowledged submission.
+- **Offline answer saving**: the dashboard keeps answers typed during a lost
+  connection and sends them when it returns
+  (`docs/offline-answer-saving-2026-10-12.md`). `code_gym/draft_store` keeps
+  one copy of the unsent answers and ratings in localStorage, written on every
+  edit. The page restores it only when its `DailyResponse#draft_token` equals
+  the one the server rendered: the set's draft scope, the response id, and a
+  digest of the saved answers and ratings, so another day, a regenerate, a
+  Start over or a save from elsewhere deletes it instead. The answers queue
+  retries a save that got no reply on the `online` event or a 5 to 30 second
+  timer, never a refusal, a 5xx or the signed-out redirect. A confirmed save,
+  a submit, a submitted dashboard and every signed-out page clear the copy,
+  the last because this app runs on shared devices; a save reply or a stale refusal clears it only when
+  the stored copy is the one that tab sent or owns, since every tab shares it,
+  and the "kept on this device" wording shows only when the write succeeded. If a save reaches the server, its reply is lost and
+  the page is killed before a retry, the copy no longer matches and the
+  server's draft shows; that draft holds the save that got through, so the
+  loss is limited to edits made after it. Submit stays manual: offline, it
+  says the answers were not submitted and are kept, and stays enabled.
+  Parsons answers are not restored, and opening the app offline still shows
+  the browser's offline page, since nothing caches the dashboard.
 
   **Partial submission still incurs a full-day review.** The existing review
   fan-out grades every active section, including skipped ones, and also calls
@@ -2724,6 +2751,16 @@ concept-specific difficulty descriptions for future generation, not a new set.
   review retries. The form's inert state suppresses that reload during submit,
   so a late autosave cannot interrupt its review request. Start over and
   regeneration retain their existing reviewed/reviewing guards.
+
+  **A save names the set it was written for.** The dashboard sends
+  `DailyExercise#draft_scope` (the exercise id and `generated_at`) with every
+  save and submit, and `#create` refuses a different one under the exercise
+  lock with the same `409 "stale"` the Parsons token check gives, writing
+  nothing. Without it, `#create` writes to whatever set is today's, so a tab
+  left open overnight, or a save sent after a regenerate in another tab, put
+  one set's text into the next set: plain text decodes anywhere, and only
+  structured answers tripped the old check. A carry-forward keeps the scope,
+  since the set itself does not change. A post with no scope still saves.
 - **Preview apps**: a Railway PR environment starts with an empty database and
   needs no configuration. `railway.toml`'s `[environments.pr.deploy]` block
   exports `PREVIEW_APP=1` into both the pre-deploy and server processes, and
@@ -2905,7 +2942,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   waits for `CodeGymSaveStatus.pending()` to clear first: that counts
   requests on the wire, saves waiting in `CodeGymSaveStatus.queue`, and the
   delayed saves the dashboard and /setup register through `watch()`, since
-  both hold an edit for a moment before sending it. `code_gym_bootstrap.js`
+  both hold an edit for a moment before sending it. A dashboard save waiting
+  to retry after a lost connection counts too, so a pull while offline is
+  cancelled rather than reloading onto the browser's offline page. `code_gym_bootstrap.js`
   defines `window.CodeGymRequest` and `window.CodeGymSaveStatus` before the
   importmap's modules load, so anything running at parse time finds them.
   A save still pending after ten seconds cancels the pull rather than
@@ -3316,7 +3355,8 @@ always pull in the full suite — is stated once, in
 - `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
 - `app/javascript/code_gym/request.js` — the one way a page script sends a request, and what it may show when one fails; loaded through importmap from the layout's `javascript_importmap_tags`
-- `app/javascript/code_gym/save_status.js` / `app/views/shared/_save_status_banner.html.erb` — the save banner's failures by control, the per-control save queue (in order, or collapsing to the latest), and `pending()`; the banner markup sits in `<body>`
+- `app/javascript/code_gym/save_status.js` / `app/views/shared/_save_status_banner.html.erb` — the save banner's failures by control, the per-control save queue (in order, or collapsing to the latest, and retrying a save that got no reply when the caller opts in), and `pending()`; the banner markup sits in `<body>`
+- `app/javascript/code_gym/draft_store.js` — the dashboard's one copy of unsent answers on the device; cleared on every signed-out page and on a submitted dashboard
 - `app/controllers/concerns/json_errors.rb` — `render_json_error`: the one shape of a JSON error reply
 - `app/views/shared/_push_script.html.erb` — mounts the `push-launch` controller, which re-subscribes on launch through `app/javascript/code_gym/push.js`; rendered from the layout for a signed-in user when push is configured
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives

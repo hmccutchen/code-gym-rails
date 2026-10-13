@@ -206,9 +206,14 @@ class ResponsesController < ApplicationController
     submitted.keys.map(&:to_s) - DailyResponse.normalize_answers(submitted, exercise).keys.map(&:to_s)
   end
 
+  def stale_draft_scope?(exercise)
+    posted = response_params[:draft_scope]
+    posted.present? && posted != exercise.draft_scope
+  end
+
   def save_answers_under_lock(exercise)
     exercise.with_response_locked do |locked|
-      next :stale if stale_answer_sections(exercise).any?
+      next :stale if stale_draft_scope?(exercise) || stale_answer_sections(exercise).any?
 
       @response = locked || persisted_response_for(exercise).lock!
       newly_submitted = false
@@ -264,7 +269,8 @@ class ResponsesController < ApplicationController
     respond_to do |format|
       format.json do
         if saved
-          payload = { status: "saved", completeness: @response.completeness, submitted: @response.submitted?, **submit_state }
+          payload = { status: "saved", completeness: @response.completeness, submitted: @response.submitted?,
+                      draft_token: @response.draft_token, **submit_state }
           payload[:review_url] = review_response_path(@response) if response_params[:submit] == "1"
           render json: payload
         else
@@ -411,6 +417,7 @@ class ResponsesController < ApplicationController
   def response_params
     @response_params ||= params.require(:response).permit(
       :submit,
+      :draft_scope,
       answers: ExerciseSection.keys,
       section_ratings: ExerciseSection.keys
     )

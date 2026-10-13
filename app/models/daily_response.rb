@@ -171,6 +171,11 @@ class DailyResponse < ApplicationRecord
     (ExerciseSection.find(section) || ExerciseSection).answer_for(answers[section.to_s], section_data(section))
   end
 
+  def draft_token
+    saved_draft = Digest::SHA256.hexdigest([ answers.sort, section_ratings.sort ].to_json).first(16)
+    [ daily_exercise.draft_scope, id || "new", saved_draft ].join(":")
+  end
+
   def section_keys
     daily_exercise&.active_section_keys || []
   end
