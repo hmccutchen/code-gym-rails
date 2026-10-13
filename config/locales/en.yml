@@ -619,6 +619,9 @@ en:
       next_step: "Next step"
     finish_button: "Finish review"
     generating_label: "Generating review…"
+    in_progress:
+      hint: "Your review is still being written. This page will update on its own when it finishes."
+      slow_hint: "This is taking longer than expected. Try reloading the page."
     heading: "%{provider}'s Review"
     history_summary: "%{provider}'s review"
     calibration_note: "You rated this \"%{rating}\" — the review suggests there's more to work on here."

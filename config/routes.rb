@@ -63,6 +63,7 @@ Rails.application.routes.draw do
   resources :responses, only: [ :create ] do
     member do
       post :review
+      get :review_status
       post :email_review
       post :explain_differently
       post :follow_ups

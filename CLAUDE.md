@@ -338,7 +338,9 @@ User interacts:
        Synchronous; the button disables and relabels while it runs. Fired by a
        successful submit rather than a second click; the button in
        responses/_submission is what remains for a failed or part-finished
-       review.
+       review. A dashboard loaded while the review claim is held shows the
+       review as running and polls GET /responses/:id/review_status, then
+       reloads once the claim is released or goes stale.
   └→ ResponsesController#email_review→ mails the completed review to the user,
        then returns to the dashboard (where the button lives)
   └→ DailyExercisesController#regenerate → replaces today's set in place (once/day),
@@ -3335,6 +3337,7 @@ always pull in the full suite — is stated once, in
 - `app/services/caller_zone_thread.rb` — `CallerZoneThread.start`: a thread that runs in the caller's `Time.zone`, shared by `ReviewGrading` and `JudgedGeneration`
 - `app/services/response_review.rb` — `ResponseReview`: applies a review to a submitted response (claim, provider call for the missing sections, stored results and failures, mastery, the review's diagnostics) and returns an `Outcome` whose status says what happened. Knows nothing about HTTP
 - `app/views/responses/_sections.html.erb` / `_section.html.erb` (+ `bodies/`, `answers/`) — the one loop over `DailyExercise#active_section_keys` and the one wrapper every section renders through, in both the answer-form and read-only states. Only the body and the answer area vary per kind, and each kind names its own partial for those (`ExerciseSection.body_partial` / `.answer_partial`), so adding a ninth kind is a body partial, an answer partial if it needs one, two `sections.<key>` locale strings, and whichever facets differ from the defaults — never a new branch in a template.
+- `app/views/responses/_review_in_progress.html.erb` — the running-review line the submitted dashboard shows while the review claim is held; polls `GET /responses/:id/review_status` through the `generating` controller and reloads once the claim is released or stale
 - `app/views/responses/_answered_sections.html.erb` — read-only render of a submitted day; shared by the dashboard's submitted state and every history entry. Its styles live in the layout's `<style>`, not a per-page block, precisely because it renders on both.
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
 - `app/controllers/history_controller.rb` — paginated list of submitted sessions

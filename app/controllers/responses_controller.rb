@@ -3,7 +3,7 @@ class ResponsesController < ApplicationController
   include ProviderFailureRendering
 
   limit_provider_calls only: [ :explain_differently, :follow_ups, :duck_thread, :pseudocode_critique ]
-  before_action :set_response, only: [ :review, :email_review, :explain_differently, :follow_ups, :start_over ]
+  before_action :set_response, only: [ :review, :review_status, :email_review, :explain_differently, :follow_ups, :start_over ]
   before_action :require_reviewed_section!, only: [ :explain_differently, :follow_ups ]
 
   MAX_DUCK_TURNS_PER_SECTION = 6
@@ -42,6 +42,11 @@ class ResponsesController < ApplicationController
     when :failed           then redirect_to root_path, alert: review_failure_text(outcome.failures, :review).full
     else raise ArgumentError, "Unhandled review outcome: #{outcome.status.inspect}"
     end
+  end
+
+  # GET /responses/:id/review_status
+  def review_status
+    render json: { status: @response.reviewing? ? "pending" : "ready" }
   end
 
   # DELETE /responses/:id/start_over

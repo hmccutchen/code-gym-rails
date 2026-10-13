@@ -1,0 +1,9 @@
+<%# Local: response. Polls until the review claim is released or goes stale, then reloads to show the outcome. %>
+<% poll_interval_s = 3.0 %>
+<div data-controller="generating"
+     data-generating-url-value="<%= review_status_response_path(response) %>"
+     data-generating-interval-value="<%= (poll_interval_s * 1000).to_i %>"
+     data-generating-max-attempts-value="<%= (DailyResponse::REVIEW_CLAIM_STALE_AFTER.to_i / poll_interval_s).ceil + 1 %>"
+     data-generating-slow-hint-value="<%= t("review.in_progress.slow_hint") %>">
+  <p class="hint review-in-progress" data-generating-target="hint" aria-live="polite"><%= t("review.in_progress.hint") %></p>
+</div>
