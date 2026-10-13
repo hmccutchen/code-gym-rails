@@ -216,6 +216,39 @@ RSpec.describe "Answers through a lost connection", type: :system do
     end
   end
 
+  it "clears the copy when the confirmed save matches it in a different key order" do
+    travel_to(a_weekday) do
+      open_dashboard
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch
+        window.fetch = (url, options) => new Promise((resolve) => { window.releaseSave = () => resolve(originalFetch(url, options)) })
+      JS
+      find(code_review_field).fill_in(with: answer)
+      wait_for_js_condition("typeof window.releaseSave === 'function'")
+      reordered = stored_draft.merge("answers" => stored_draft["answers"].to_a.reverse.to_h)
+      page.execute_script("localStorage.setItem('code-gym-answer-draft', #{reordered.to_json.to_json})")
+
+      page.execute_script("window.releaseSave()")
+
+      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null && !window.CodeGymSaveStatus.pending()")
+    end
+  end
+
+  it "clears a leftover copy when the day turns out to be submitted" do
+    travel_to(a_weekday) do
+      open_dashboard
+      keep_an_unsent_answer
+      exercise = user.daily_exercises.sole
+      user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
+                                   answers: { "code_review" => answer }, submitted_at: Time.current)
+
+      visit root_path
+      expect(page).to have_no_css("#gym-form", wait: 10)
+
+      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null")
+    end
+  end
+
   it "does not promise the answers are kept when the device refuses to store them" do
     travel_to(a_weekday) do
       open_dashboard

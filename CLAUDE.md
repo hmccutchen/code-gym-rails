@@ -2133,8 +2133,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   Start over or a save from elsewhere deletes it instead. The answers queue
   retries a save that got no reply on the `online` event or a 5 to 30 second
   timer, never a refusal, a 5xx or the signed-out redirect. A confirmed save,
-  a submit and every signed-out page clear the copy, the last because this app
-  runs on shared devices; a save reply or a stale refusal clears it only when
+  a submit, a submitted dashboard and every signed-out page clear the copy,
+  the last because this app runs on shared devices; a save reply or a stale refusal clears it only when
   the stored copy is the one that tab sent or owns, since every tab shares it,
   and the "kept on this device" wording shows only when the write succeeded. If a save reaches the server, its reply is lost and
   the page is killed before a retry, the copy no longer matches and the
@@ -3340,7 +3340,7 @@ always pull in the full suite — is stated once, in
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
 - `app/javascript/code_gym/request.js` — the one way a page script sends a request, and what it may show when one fails; loaded through importmap from the layout's `javascript_importmap_tags`
 - `app/javascript/code_gym/save_status.js` / `app/views/shared/_save_status_banner.html.erb` — the save banner's failures by control, the per-control save queue (in order, or collapsing to the latest, and retrying a save that got no reply when the caller opts in), and `pending()`; the banner markup sits in `<body>`
-- `app/javascript/code_gym/draft_store.js` — the dashboard's one copy of unsent answers on the device; cleared on every signed-out page
+- `app/javascript/code_gym/draft_store.js` — the dashboard's one copy of unsent answers on the device; cleared on every signed-out page and on a submitted dashboard
 - `app/controllers/concerns/json_errors.rb` — `render_json_error`: the one shape of a JSON error reply
 - `app/views/shared/_push_script.html.erb` — mounts the `push-launch` controller, which re-subscribes on launch through `app/javascript/code_gym/push.js`; rendered from the layout for a signed-in user when push is configured
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives

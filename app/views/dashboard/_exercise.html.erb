@@ -37,6 +37,7 @@
 </div>
 
 <% if submitted %>
+  <div data-submitted-day hidden></div>
   <%= render "responses/answered_sections", exercise: exercise, response: response %>
   <%= render "responses/submission", response: response %>
   <% if @size_change&.direction == :larger %>

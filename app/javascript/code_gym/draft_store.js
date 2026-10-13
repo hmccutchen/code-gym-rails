@@ -27,6 +27,6 @@ export function clearIf(matches) {
   if (draft && matches(draft)) clear()
 }
 
-if (document.body?.dataset.signedOutPage !== undefined) clear()
+if (document.body?.dataset.signedOutPage !== undefined || document.querySelector("[data-submitted-day]")) clear()
 
 export default { read, write, clear, clearIf }

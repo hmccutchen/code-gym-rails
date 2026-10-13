@@ -52,6 +52,9 @@ that save.
   changes, since today's set refuses it.
 - Every signed-out page deletes the copy, for shared devices. A session that
   expires with unsent text loses that text.
+- A submitted dashboard deletes the copy too. The day is frozen once
+  submitted, so a copy left by a tab that never heard the submit could never
+  be saved.
 - 5xx replies are not retried, so a deploy's brief 502 or 503 shows the
   generic failure. The copy still holds the text, and the next edit or reload
   sends it.

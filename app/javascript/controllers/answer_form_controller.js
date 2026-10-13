@@ -6,6 +6,14 @@ import draftStore from "code_gym/draft_store"
 
 const AUTOSAVE_DELAY_MS = 800
 
+function sortedEntries(object) {
+  return Object.entries(object || {}).sort(([ a ], [ b ]) => (a < b ? -1 : a > b ? 1 : 0))
+}
+
+function canonicalDraft(answers, ratings) {
+  return JSON.stringify([ sortedEntries(answers), sortedEntries(ratings) ])
+}
+
 export default class extends Controller {
   static targets = ["form", "progressFill", "progressLabel", "submitButton", "nudge"]
 
@@ -85,9 +93,10 @@ export default class extends Controller {
 
   settleDraft(data) {
     if (typeof data?.draft_token === "string") this.draftToken = data.draft_token
-    if (JSON.stringify(this.lastSent) !== JSON.stringify(this.payload())) return this.storeDraft()
-    const sent = this.lastSent.response
-    draftStore.clearIf((stored) => JSON.stringify([ stored.answers, stored.ratings ]) === JSON.stringify([ sent.answers, sent.section_ratings ]))
+    const sent = canonicalDraft(this.lastSent.response.answers, this.lastSent.response.section_ratings)
+    const { answers, section_ratings } = this.payload().response
+    if (sent !== canonicalDraft(answers, section_ratings)) return this.storeDraft()
+    draftStore.clearIf((stored) => canonicalDraft(stored.answers, stored.ratings) === sent)
   }
 
   clearOwnDraft() {

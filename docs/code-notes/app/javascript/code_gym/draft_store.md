@@ -22,6 +22,13 @@ layout marks every signed-out page with `data-signed-out-page` on `<body>`, so t
 module deletes the copy there. That also covers a session that expired: the
 copy is gone, and with it any text that never reached the server.
 
+## Cleared on a submitted dashboard
+
+A submitted day takes no more saves, so a copy left behind by another tab, or
+by a tab that never heard its own submit's reply, can never be sent. The
+submitted dashboard has no answer form to clear it, so it renders a
+`data-submitted-day` marker and this module deletes the copy when it finds one.
+
 ## Every access is wrapped
 
 Private browsing, a full quota or blocked site data can make localStorage

@@ -106,7 +106,9 @@ bubbling `answer-form:restored` event, and its own controller also checks on
 connect, because either controller can connect first.
 
 `settleDraft()` clears the copy when a save reply arrives for exactly the
-answers on screen, and otherwise rewrites it on the reply's token, so later
+answers on screen, comparing answers and ratings with their keys sorted, like
+the server's digest, since two tabs can insert the same ratings in different
+orders, and otherwise rewrites it on the reply's token, so later
 edits stay kept. `nextSave()` records what each attempt sent, because the
 queue reads the body again on every retry. A submit, a stale refusal and a
 reload into the submitted page all clear it.
