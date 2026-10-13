@@ -139,7 +139,7 @@ export default class extends Controller {
   payload(extra) {
     const answers = {}
     this.textareas.forEach((area) => answers[area.dataset.field] = area.value)
-    return { response: Object.assign({ answers: answers, section_ratings: this.ratings, draft_scope: this.draftScopeValue }, extra || {}) }
+    return { response: Object.assign({ answers: answers, section_ratings: { ...this.ratings }, draft_scope: this.draftScopeValue }, extra || {}) }
   }
 
   sendSave() {

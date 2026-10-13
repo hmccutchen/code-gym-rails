@@ -152,6 +152,30 @@ RSpec.describe "Answers through a lost connection", type: :system do
     end
   end
 
+  it "keeps a rating changed while an earlier save was on the wire" do
+    travel_to(a_weekday) do
+      open_dashboard
+      fill_in_answer("code_review", answer)
+      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null && !window.CodeGymSaveStatus.pending()")
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch
+        window.fetch = (url, options) => {
+          if (new URL(url, location.href).pathname !== "/responses") return originalFetch(url, options)
+          if (window.releaseFirstSave) return Promise.reject(new TypeError("offline"))
+          return new Promise((resolve) => { window.releaseFirstSave = () => resolve(originalFetch(url, options)) })
+        }
+      JS
+
+      rate_section("code_review", value: "too_hard")
+      wait_for_js_condition("typeof window.releaseFirstSave === 'function'")
+      rate_section("code_review", value: "right_level")
+      page.execute_script("window.releaseFirstSave()")
+
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"), wait: 10)
+      expect(stored_draft["ratings"]).to eq("code_review" => "right_level")
+    end
+  end
+
   it "clears the copy once the server confirms the save" do
     travel_to(a_weekday) do
       open_dashboard
