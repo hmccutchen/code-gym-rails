@@ -1,7 +1,4 @@
 class ConceptReference < ApplicationRecord
-  # Ignored until every running process has stopped reading it; a later migration drops it.
-  self.ignored_columns += [ "featured_on" ]
-
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: :language }
 
