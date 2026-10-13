@@ -388,8 +388,7 @@ Every dashboard and /learn load, any day of the week:
 below) now also carries `guide_plain_language`, `guide_worked_example`,
 `guide_pitfalls` (all nullable text). `ConceptReference#guide?` — all three
 guide fields present — is the single authority for "does this row carry a
-guide". Its `featured_on` column, the stamp of the old team-wide pick, is in
-`ignored_columns` until a later release drops it with its unique index. It also
+guide". It also
 carries `ladder_junior`, `ladder_mid_level`, `ladder_senior`,
 `ladder_principal_engineer` (all nullable text), and `ConceptReference#ladder?`
 — every ladder field present, one per rung in `KindDifficulty::LEVELS`, derived from the field list the same way `#guide?` is — is the
@@ -403,8 +402,8 @@ lesson?`, the check `GenerateConceptReferenceJob` skips a row on.
 `generation_version` advances on each successful generation write, even when
 the provider returns unchanged text or an incomplete ladder. Learn polls that
 counter to distinguish a completed rewrite from queued work; `updated_at` and
-content equality cannot do that because featuring changes the timestamp and
-a valid generation may leave the prose unchanged. Failed calls and skipped
+content equality cannot do that because an unrelated update changes the
+timestamp and a valid generation may leave the prose unchanged. Failed calls and skipped
 rewrites do not advance it.
 
 `GenerateConceptReferenceJob` uses Solid Queue's per-concept/language
