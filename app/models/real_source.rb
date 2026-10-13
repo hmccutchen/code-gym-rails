@@ -230,7 +230,6 @@ class RealSource
   SCHEMA_REVIEW = [
     Migration.new("db/migrate/20260905120000_create_push_subscriptions.rb"),
     Migration.new("db/migrate/20260908120000_add_reminder_level_to_users.rb"),
-    Migration.new("db/migrate/20260911000001_add_featured_on_to_concept_references.rb"),
     Migration.new("db/migrate/20260819153107_add_pseudocode_rounds_to_daily_responses.rb"),
     Migration.new("db/migrate/20260723010000_create_concept_masteries.rb"),
     Migration.new("db/migrate/20260101000003_create_daily_responses.rb"),
