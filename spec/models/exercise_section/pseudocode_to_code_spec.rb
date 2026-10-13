@@ -4,7 +4,7 @@ RSpec.describe ExerciseSection::PseudocodeToCode do
   it "is a fourth-slot kind" do
     expect(described_class.key).to eq("pseudocode_to_code")
     expect(described_class.fourth?).to be(true)
-    expect(described_class.third?).to be(false)
+    expect(described_class.thirds).not_to include(described_class)
   end
 
   it "draws its own vocabulary" do

@@ -1,5 +1,5 @@
 class ProblemSetIngest
-  SERVER_STAMPS = %w[pitched_at eased source anchored].freeze
+  SERVER_STAMPS = %w[pitched_at eased source].freeze
 
   Suggestion = Data.define(:bucket, :name)
 

@@ -135,8 +135,6 @@ class User < ApplicationRecord
     update!(last_generation_error_date: nil, last_generation_error: nil, **NO_GENERATION_FAILURE)
   end
 
-  def generation_failed_today? = last_generation_error_date == Date.current
-
   def generation_failure_message(surface:, now: Time.current)
     return last_generation_error if last_generation_failure.blank?
 

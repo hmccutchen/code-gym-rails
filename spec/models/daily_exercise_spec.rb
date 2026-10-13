@@ -84,28 +84,6 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
-  describe "#fourth_key" do
-    it "returns 'plan_review' when present" do
-      exercise = DailyExercise.new(problem_set: { "plan_review" => {} })
-      expect(exercise.fourth_key).to eq("plan_review")
-    end
-
-    it "returns 'ambiguity_hunt' when present without plan_review" do
-      exercise = DailyExercise.new(problem_set: { "ambiguity_hunt" => {} })
-      expect(exercise.fourth_key).to eq("ambiguity_hunt")
-    end
-
-    it "returns nil for an old exercise with neither fourth-slot key — no fallback kind" do
-      exercise = DailyExercise.new(problem_set: { "code_review" => {}, "pattern" => {}, "challenge" => {} })
-      expect(exercise.fourth_key).to be_nil
-    end
-
-    it "skips a fourth key holding a non-Hash value, falling through to the next real section" do
-      exercise = DailyExercise.new(problem_set: { "plan_review" => "not a section", "ambiguity_hunt" => {} })
-      expect(exercise.fourth_key).to eq("ambiguity_hunt")
-    end
-  end
-
   describe "#active_section_keys" do
     it "returns the four sections a current exercise presents" do
       exercise = DailyExercise.new(problem_set: {
@@ -136,6 +114,19 @@ RSpec.describe DailyExercise, type: :model do
       expect(exercise.active_section_keys).to eq(%w[code_review pattern architecture plan_review])
     end
 
+    it "skips a third or fourth key holding null or a non-Hash value, falling through to the next real one" do
+      exercise = DailyExercise.new(problem_set: {
+        "code_review" => {}, "pattern" => {}, "architecture" => nil, "security_review" => "not a section",
+        "challenge" => {}, "plan_review" => [], "ambiguity_hunt" => {}
+      })
+      expect(exercise.active_section_keys).to eq(%w[code_review pattern challenge ambiguity_hunt])
+    end
+
+    it "resolves parsons_problem when it is the only third-shaped key present" do
+      exercise = DailyExercise.new(problem_set: { "code_review" => {}, "pattern" => {}, "parsons_problem" => {} })
+      expect(exercise.active_section_keys).to eq(%w[code_review pattern parsons_problem])
+    end
+
     it "drops a fixed key holding a non-Hash value" do
       exercise = DailyExercise.new(problem_set: { "code_review" => "junk", "pattern" => {}, "challenge" => {} })
       expect(exercise.active_section_keys).to eq(%w[pattern challenge])
@@ -146,46 +137,6 @@ RSpec.describe DailyExercise, type: :model do
 
       expect(exercise.active_section_keys).to eq(ExerciseSection.resolved_keys(FakeService::EXERCISE_PROBLEM_SET))
       expect(exercise.active_section_keys).to eq(%w[code_review design_comparison pattern architecture])
-    end
-  end
-
-  describe "#third_key" do
-    it "returns 'architecture' when the architecture key is present" do
-      exercise = DailyExercise.new(problem_set: { "architecture" => {} })
-      expect(exercise.third_key).to eq("architecture")
-    end
-
-    it "returns 'security_review' when present without architecture" do
-      exercise = DailyExercise.new(problem_set: { "security_review" => {} })
-      expect(exercise.third_key).to eq("security_review")
-    end
-
-    it "returns 'challenge' when neither architecture nor security_review is present" do
-      exercise = DailyExercise.new(problem_set: { "challenge" => {} })
-      expect(exercise.third_key).to eq("challenge")
-    end
-
-    it "skips a third key present with a null value, falling through to the next real section" do
-      exercise = DailyExercise.new(problem_set: { "architecture" => nil, "challenge" => {} })
-      expect(exercise.third_key).to eq("challenge")
-    end
-
-    it "skips a third key holding a non-Hash value, falling through to the next real section" do
-      exercise = DailyExercise.new(problem_set: { "architecture" => "not a section", "challenge" => {} })
-      expect(exercise.third_key).to eq("challenge")
-    end
-
-    it "skips a non-Hash architecture in favour of a real security_review" do
-      exercise = DailyExercise.new(problem_set: { "architecture" => [], "security_review" => {} })
-      expect(exercise.third_key).to eq("security_review")
-    end
-
-    it "resolves to parsons_problem when that's the only third-shaped key present" do
-      exercise = DailyExercise.new(problem_set: {
-        "code_review" => { "concept" => "x" }, "pattern" => { "concept" => "y" },
-        "parsons_problem" => { "blocks" => [ "a", "b" ] }
-      })
-      expect(exercise.third_key).to eq("parsons_problem")
     end
   end
 

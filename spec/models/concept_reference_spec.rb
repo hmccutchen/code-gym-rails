@@ -110,32 +110,6 @@ RSpec.describe ConceptReference do
       expect(row.reload.generation_version).to eq(0)
     end
 
-    describe ".ladder_rungs" do
-      it "returns the level's rung for laddered rows in the bucket and vocabulary" do
-        reference(**full_ladder)
-        reference(concept: "caching")                                          # no ladder
-        reference(concept: "memoization", **full_ladder)                       # not asked for
-        reference(concept: "n_plus_one", language: "javascript", **full_ladder) # other bucket
-
-        rungs = ConceptReference.ladder_rungs(bucket: "ruby_rails", concepts: %w[n_plus_one caching], level: "senior")
-
-        expect(rungs).to eq("n_plus_one" => "s")
-      end
-
-      it "truncates a rung on read" do
-        reference(**full_ladder.merge(ladder_junior: "x" * 500))
-
-        rung = ConceptReference.ladder_rungs(bucket: "ruby_rails", concepts: %w[n_plus_one], level: "junior")["n_plus_one"]
-
-        expect(rung.length).to eq(AiService::MAX_LADDER_RUNG_LENGTH)
-      end
-
-      it "refuses a level outside the vocabulary" do
-        expect { ConceptReference.ladder_rungs(bucket: "ruby_rails", concepts: [], level: "strong") }
-          .to raise_error(KeyError)
-      end
-    end
-
     it "keeps every language-independent vocabulary disjoint from the others, since the prompt merges rungs by concept name" do
       independent = ConceptBucket::LANGUAGE_INDEPENDENT
 

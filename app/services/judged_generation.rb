@@ -24,7 +24,7 @@ class JudgedGeneration
     set = ProblemSetIngest.prune_to_expected_keys(@draft.problem_set, expected_keys: @draft.kinds.map(&:key))
     outcomes = judge_all(set).merge(unusable_outcomes)
 
-    resolve_rejections(set, outcomes).each do |key, section, outcome|
+    resolve_rejections(outcomes).each do |key, section, outcome|
       outcomes[key] = outcome
       section ? set[key] = section : set.delete(key)
     end
@@ -74,7 +74,7 @@ class JudgedGeneration
     end
   end
 
-  def resolve_rejections(set, outcomes)
+  def resolve_rejections(outcomes)
     rejected_keys(outcomes).map { |key|
       kind = ExerciseSection.find(key)
       CallerZoneThread.start { [ key, *resolve_rejection(kind, drafted_concept(key), outcomes[key]) ] }

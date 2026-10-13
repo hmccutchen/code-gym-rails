@@ -1704,6 +1704,19 @@ RSpec.describe AiService do
         expect(ladders.keys).to eq([ "senior" ])
         expect(ladders["senior"]).to include("n_plus_one" => "s", schema_concept => "s2")
       end
+
+      it "skips a row with no ladder and truncates a rung on read" do
+        ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                                 ladder_junior: "x" * 500, ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
+        ConceptReference.create!(concept: "caching", language: "ruby_rails", ladder_junior: "j")
+        kinds = ExerciseSection.for_plan(third: :challenge, fourth: nil)
+        difficulty = KindDifficulty.new(levels: { "code_review" => "junior" }, locked: [])
+
+        rungs = service.send(:ladders_for, kinds, difficulty, "ruby_rails", :application_code)["junior"]
+
+        expect(rungs.fetch("n_plus_one").length).to eq(AiService::MAX_LADDER_RUNG_LENGTH)
+        expect(rungs).not_to have_key("caching")
+      end
     end
 
     describe "MAX_LADDER_GUIDANCE_CHARS" do
@@ -2599,7 +2612,7 @@ RSpec.describe AiService do
       })
       resp = DailyResponse.new(answers: {}, section_ratings: {})
 
-      expect(exercise.fourth_key).to be_nil
+      expect(exercise.active_section_keys).to eq(%w[code_review pattern challenge])
       context = service.send(:build_review_day_context, "Rails", exercise, resp)
       expect(context).not_to match(/plan review|ambiguity hunt/i)
     end
@@ -4375,7 +4388,7 @@ RSpec.describe AiService do
 
       problem_set = svc.generate_exercise(user)
 
-      expect(ExerciseSection.resolved_fourth_key(problem_set)).to eq("ambiguity_hunt")
+      expect(ExerciseSection.resolved_key(problem_set, ExerciseSection.fourths)).to eq("ambiguity_hunt")
       expect(svc.last_prompt).to include("\"ambiguity_hunt\"")
       expect(svc.last_prompt).not_to include("\"plan_review\"")
     end
@@ -4862,7 +4875,7 @@ RSpec.describe AiService, "#judge_section" do
     svc = FakeService.new("fake-key")
     captured = nil
     allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
-    stamped = section.merge("eased" => true, "source" => "excerpt-trace-id", "anchored" => true,
+    stamped = section.merge("eased" => true, "source" => "excerpt-trace-id",
                             "current_schema" => "create_table :orders do |t|")
 
     svc.judge_section(user, ExerciseSection::CodeReview, stamped, rung: "senior", locked: false)
@@ -5370,18 +5383,6 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
     }.to change { ApiUsage.where(purpose: "retry_section").count }.by(1)
       .and change { ApiUsage.where(purpose: "generate_exercise").count }.by(1)
-  end
-
-  it "stamps anchored on no section" do
-    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
-      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::CodeReview
-
-      verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
-    end
-
-    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
-
-    expect(judged.problem_set.values).to all(satisfy { |section| !section.key?("anchored") })
   end
 
   it "dates every judge thread's usage row on the caller's date" do

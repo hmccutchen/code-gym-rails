@@ -117,7 +117,6 @@ class DailyResponse < ApplicationRecord
 
   def self_rating_for(section) = section_ratings[section.to_s]
   def self_rating_favorable?(section)  = SELF_RATING_FAVORABLE.include?(self_rating_for(section))
-  def self_rating_unfavorable?(section) = SELF_RATING_UNFAVORABLE.include?(self_rating_for(section))
   def self_rating_label(section)       = self.class.self_rating_labels[self_rating_for(section)]
 
   def self.usable_difficulty(assessment)

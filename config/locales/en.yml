@@ -269,7 +269,6 @@ en:
         other: "You've already asked for %{count} other framings of this concept."
       too_much_explanation: "That's more explanation than this can carry — reload the page to start fresh."
       reference_missing: "That reference no longer exists."
-  hello: "Hello world"
   self_ratings:
     too_easy: "too easy"
     right_level: "just right"

@@ -1164,9 +1164,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `GenerateDailyExercisesJob` records through `persist_failure` like any
   other failed generation, so no empty day is ever written. Before both
   fixed kinds existed, a twice-rejected `code_review` shipped with
-  `fallback: anchor` and an `anchored: true` stamp. Nothing writes that
-  stamp now; older rows keep it harmlessly, and it stays in
-  `ProblemSetIngest::SERVER_STAMPS` so a provider cannot forge it.
+  `fallback: anchor` and an `anchored: true` stamp. Older rows keep it, and
+  nothing writes or reads it, so it is no longer a server stamp.
 
   **The rotation trade is stated rather than compensated for.** A dropped
   section still reads as scheduled: `User#recent_exercise_history` puts the
@@ -1737,8 +1736,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   before the columns existed, which render as they did. A failed review
   section stores `{kind, provider, quota_id, retry_after, at}` in
   `review_errors`, never the message; the submitted dashboard renders the
-  newest one beside the retry button, and rows that still carry the old
-  `code` read as the nearest kind.
+  newest one beside the retry button; a row with no `kind` reads as
+  `other`.
 
   **Out of credit is never a rate limit.** Per platform.claude.com's error
   and rate-limit pages, Anthropic returns a 402 `billing_error`, a 400 whose
@@ -2916,8 +2915,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   under the light palette `brand-mark-light.png`, the mark on a rounded dark
   tile, through the `<picture>` source `DisplayPreferencesHelper#brand_mark`
   writes; both are sized by height with `width: auto`, so the square tile
-  keeps its shape. The older pixel-lifter files (`logo*.png`) are no longer
-  read by anything. Production
+  keeps its shape. Production
   caches `public/` for a year, so the layout, the manifest and the service
   worker's notification link every icon
   through `PublicFileHelper#versioned_public_path`, which appends a digest of
