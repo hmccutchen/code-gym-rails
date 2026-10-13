@@ -9,7 +9,7 @@ class FeaturedConcept < ApplicationRecord
   def self.for(user, today: Date.current)
     week   = week_of(today)
     stored = user.featured_concepts.find_by(week_of: week)
-    return stored if stored&.fits?(user.language)
+    return stored if stored&.still_met_by?(user, today)
 
     pair = pick_for(user, week, today)
     if pair.nil?
@@ -54,6 +54,11 @@ class FeaturedConcept < ApplicationRecord
   # The one rule for marking a section with this week's concept; any later fade rule belongs here.
   def marks?(concept:, bucket:)
     self.concept == concept && self.bucket == bucket
+  end
+
+  # Start over can destroy a submitted, unreviewed day, taking the only exposure to this concept with it.
+  def still_met_by?(user, today)
+    fits?(user.language) && user.concept_exposure_count(concept, bucket, on_or_before: today).positive?
   end
 
   def fits?(language)

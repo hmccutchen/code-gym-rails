@@ -363,7 +363,7 @@ User browses /learn (independent of the daily flow above):
   └→ LearnController#show              → one concept's cached reference plus its
        guide, generating either on demand when the row is missing or stale
 
-Every page load, any day of the week:
+Every dashboard, /learn and /history load, any day of the week:
   └→ FeaturedConcept.for(user)        → this user's concept for the week, from
        concepts they have met, picked on their first visit of the week and read
        by every visit after — rendered at the top of /learn and as a small
@@ -2665,10 +2665,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   eligible stores nothing, so each of their dashboard and Learn loads builds
   the ledger again until something qualifies.
 
-  **A stored pick is checked on every read.** When a language change moves its
-  bucket out of the slice, or its concept leaves the vocabulary,
-  `LearnController#show` would 404 on the link, so the row is re-picked in
-  place for the rest of the week, or removed when nothing qualifies.
+  **A stored pick is checked on every read** (`FeaturedConcept#still_met_by?`).
+  When a language change moves its bucket out of the slice, or its concept
+  leaves the vocabulary, `LearnController#show` would 404 on the link; and
+  when Start over destroys a submitted day whose review failed, the only set
+  that showed the concept can go with it, leaving a callout that says "seen
+  in 0 of your sets". Either way the row is re-picked in place for the rest
+  of the week, or removed when nothing qualifies.
 
   **The race guard is the unique index on (user_id, week_of).** Two first
   visits landing together both find no row and both insert; the loser's insert

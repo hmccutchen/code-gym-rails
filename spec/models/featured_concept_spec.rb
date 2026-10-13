@@ -112,11 +112,28 @@ RSpec.describe FeaturedConcept, type: :model do
     expect(described_class.exists?(stale.id)).to be(false)
   end
 
-  it "picks from either language for a mixed user" do
+  it "picks from JavaScript for a mixed user who met a concept only there" do
     user.update!(language: "mixed")
-    meet("caching_strategy", date: monday - 3, section: "architecture")
+    meet("closures", date: monday - 3, language: "javascript")
 
-    expect(pair(featured(monday))).to eq(%w[caching_strategy architecture])
+    expect(pair(featured(monday))).to eq(%w[closures javascript])
+  end
+
+  it "leaves JavaScript out for a user whose language is Ruby" do
+    meet("closures", date: monday - 3, language: "javascript")
+
+    expect(featured(monday)).to be_nil
+  end
+
+  it "re-picks in place when the only set that showed the stored concept is gone" do
+    shown = meet("n_plus_one", date: monday - 3)
+    meet("memoization", date: monday - 2, answered: false)
+    stored = featured(monday)
+    expect(pair(stored)).to eq(%w[n_plus_one ruby_rails])
+
+    shown.destroy!
+
+    expect(featured(monday + 1)).to have_attributes(id: stored.id, concept: "memoization")
   end
 
   # The read is faked to miss once, so the insert really collides with the winner's row.
