@@ -2,9 +2,13 @@
 
 ## What it owns
 
-The dashboard's "generating" panel: the poll against `GET /dashboard/status`
-that reloads once the day's set lands or the attempt fails, and the slower-
-than-expected hint once the attempts run out.
+A poll that reloads the page once the server says the work it is waiting on
+has finished, and shows a slower-than-expected hint once the attempts run out.
+Two views mount it. The dashboard's "generating" panel polls
+`GET /dashboard/status` until the day's set lands or the attempt fails.
+`responses/_review_in_progress` polls `GET /responses/:id/review_status` until
+the review claim is released or goes stale. Each view supplies its own URL,
+interval, attempt budget and hint; the controller knows neither.
 
 ## The IIFE is gone
 

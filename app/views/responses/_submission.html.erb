@@ -4,7 +4,9 @@
   <% response.section_ratings.each do |section, value| %>
     <span class="history-pill"><%= section.humanize %>: <%= DailyResponse.self_rating_labels[value] %></span>
   <% end %>
-  <% unless response.fully_reviewed? %>
+  <% if response.reviewing? %>
+    <button type="button" class="btn btn-primary btn-sm btn-loading" disabled><%= t("review.generating_label") %></button>
+  <% elsif !response.fully_reviewed? %>
     <%= button_to response.reviewed? ? t("review.finish_button") : t("review.get_button", provider: response.user.provider_label),
           review_response_path(response), method: :post,
           class: "btn btn-primary btn-sm",
@@ -14,7 +16,9 @@
                           review_button_loading_label_value: t("review.generating_label") } } %>
   <% end %>
 </div>
-<% if !response.fully_reviewed? && (failure = review_failure_sentence(response)) %>
+<% if response.reviewing? %>
+  <%= render "responses/review_in_progress", response: response %>
+<% elsif !response.fully_reviewed? && (failure = review_failure_sentence(response)) %>
   <p class="hint review-failure"><%= failure %></p>
 <% end %>
 
