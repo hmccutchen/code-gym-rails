@@ -2824,8 +2824,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   targets a particular entry, so nothing has to work out which page holds one.
 - **Code blocks are highlighted on the server**: every code block on a
   page, exercise snippets, schemas, comparison pieces, Parsons blocks,
-  improved code, pseudocode translations, Learn code examples and
-  hand-written lessons, renders through `highlighted_code`, which calls
+  improved code, pseudocode translations, Learn code examples, the code
+  fragments of a Learn worked example (split from its prose by
+  `WorkedExample`) and hand-written lessons, renders through `highlighted_code`, which calls
   `CodeHighlight.html`. That is the one place code becomes HTML: Rouge's own
   HTML formatter escapes each token, and only its output is marked safe.
   `CodeHighlight::LineFormatter` wraps each source line in a `.code-line`
@@ -3314,6 +3315,7 @@ always pull in the full suite — is stated once, in
 - `app/models/exercise_section.rb` (+ `app/models/exercise_section/`) — the registry of section kinds (code_review, design_comparison, pattern, challenge, architecture, security_review, parsons_problem, plan_review, ambiguity_hunt, pseudocode_to_code); one class per kind answers which are fixed (`.fixed?`, each in a slot of its own, which `.slots`, `SectionRotation::OPTIONAL_SLOTS` and `MANDATORY_SLOT_COUNT` derive from), which are thirds, which are fourths, which vocabulary they draw from and how it narrows that list for generation (`.narrow_vocabulary`, given an optional rung), which fields are answer key (`.answer_key_fields`), what the provider boundary refuses (`.reject_unusable!`), how many judge retries a rejection buys (`.judge_retries`) and any extra judge instructions (`.judge_guidance`), how a resolved section is arranged after it is accepted (`.arrange!`), whether the judge solves it blind (`.judge_solve_options`, `.solve_matches_key?`), which show improved code, which scaffold their answer, and — via `.schema_fragment` / `.generation_guidance` — what the generation prompt says about them. `AiService` assembles those fragments and owns each language's prompt wording (`LANGUAGE_PROMPTS`); it no longer branches on section keys — or on kind identity — to build them. `.generation_guidance` takes a uniform context (`vocabulary:, label:, mode:, artifact:, test_framework:`) that every kind receives and each reads only its own part of; kinds that read none of the optional values absorb them with `**`. Adding a kind means adding a class here, not editing `AiService`.
 - `app/models/code_format.rb` (+ `app/models/code_format/`) — `CodeFormat`: re-indents a batch of exercise code in the day's language, RuboCop's Layout cops for Ruby and Prettier for JavaScript, handing back what it cannot format unchanged
 - `vendor/prettier/` — the Prettier package and `format.mjs`, the Node script `CodeFormat::Javascript` runs
+- `app/models/worked_example.rb` — `WorkedExample.parts`: a stored `guide_worked_example` split into code and prose runs for the Learn page; pure
 - `app/models/code_highlight.rb` — `CodeHighlight`: Rouge highlighting for a code block, its line formatter, the lexer map and the cache key; `SyntaxHighlightingHelper#highlighted_code` is the one call site views use
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value, so the scaffold rule is stated once rather than per textarea
 - `app/models/exercise_section/design_comparison.rb` — the second fixed kind: two working pieces, a server-rolled A/B order, the `pick:` answer encoding, its rung-aware vocabulary allowlist, and the judge's blind-solve facets

@@ -22,6 +22,11 @@ visible half of generating the reference and the guide in a single response.
 The code example and worked example are folded so the page reads short on a
 phone. The code is still there for anyone who opens it.
 
+The worked example is stored as one string of code and prose, so
+`learn/_worked_example` splits it with `WorkedExample.parts`: code runs render
+highlighted like every other code block, and prose runs render as text, with
+any backtick span shown as inline code.
+
 ## Write-up controls
 
 None of the "not written yet" states is an error. The library is browsable

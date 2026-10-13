@@ -24,7 +24,7 @@
     <pre class="snippet"><%= highlighted_code(@reference.code_example, @bucket) %></pre>
     <% if @reference.guide? %>
       <h2><%= t("learn.worked_example") %></h2>
-      <p class="learn-worked-example"><%= @reference.guide_worked_example %></p>
+      <%= render "learn/worked_example", text: @reference.guide_worked_example, language: @bucket %>
     <% end %>
   </details>
 <% end %>
@@ -53,9 +53,6 @@
       </li>
     <% end %>
   </ul>
-<% end %>
-
-<% if @reference %>
 <% end %>
 
 <% if !@reference&.guide? %>
