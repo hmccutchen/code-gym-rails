@@ -10,13 +10,23 @@ export function read() {
 }
 
 export function write(draft) {
-  try { storage()?.setItem(KEY, JSON.stringify(draft)) } catch (_) { /* refused write: the server's copy is the only one */ }
+  try {
+    storage().setItem(KEY, JSON.stringify(draft))
+    return true
+  } catch (_) {
+    return false
+  }
 }
 
 export function clear() {
   try { storage()?.removeItem(KEY) } catch (_) { /* storage unavailable: nothing was kept */ }
 }
 
+export function clearIf(matches) {
+  const draft = read()
+  if (draft && matches(draft)) clear()
+}
+
 if (document.body?.dataset.signedOutPage !== undefined) clear()
 
-export default { read, write, clear }
+export default { read, write, clear, clearIf }

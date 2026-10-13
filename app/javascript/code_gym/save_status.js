@@ -71,7 +71,7 @@ export function save(method, url, body, key, failureMessage = null) {
       if (result.ok) clear(key);
       else report(key, failureMessage || result.message);
     }
-    return { ok: result.ok, status: result.status || undefined, data: result.data, unreached: result.status === 0 };
+    return { ok: result.ok, status: result.status || undefined, data: result.data, unreached: result.status === 0, message: result.message };
   }).finally(() => { requests--; });
 }
 
@@ -113,7 +113,7 @@ async function sendRetryingUnreached(key, next) {
     if (body === null) return { ok: false, skipped: true };
     const result = await save(next.method, next.url, body, key, next.quiet ? false : null);
     if (!next.offline || !result.unreached) return result;
-    report(key, typeof next.offline === "function" ? next.offline() : next.offline);
+    report(key, (typeof next.offline === "function" ? next.offline() : next.offline) || result.message);
     await connectionBack(attempt);
   }
 }

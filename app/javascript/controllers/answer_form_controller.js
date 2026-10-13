@@ -80,13 +80,18 @@ export default class extends Controller {
   storeDraft() {
     if (this.formTarget.inert) return
     const { answers, section_ratings } = this.payload().response
-    draftStore.write({ token: this.draftToken, answers: answers, ratings: section_ratings })
+    this.draftKept = draftStore.write({ token: this.draftToken, answers: answers, ratings: section_ratings })
   }
 
   settleDraft(data) {
     if (typeof data?.draft_token === "string") this.draftToken = data.draft_token
-    if (JSON.stringify(this.lastSent) === JSON.stringify(this.payload())) draftStore.clear()
-    else this.storeDraft()
+    if (JSON.stringify(this.lastSent) !== JSON.stringify(this.payload())) return this.storeDraft()
+    const sent = this.lastSent.response
+    draftStore.clearIf((stored) => JSON.stringify([ stored.answers, stored.ratings ]) === JSON.stringify([ sent.answers, sent.section_ratings ]))
+  }
+
+  clearOwnDraft() {
+    draftStore.clearIf((stored) => stored.token === this.draftToken)
   }
 
   nextSave() {
@@ -153,7 +158,7 @@ export default class extends Controller {
         if (ok) this.settleSubmitFailure()
         if (ok) this.settleDraft(data)
         if (!ok && status === 409 && data?.status === "stale") {
-          draftStore.clear()
+          this.clearOwnDraft()
           saveStatus.carry("answers", this.staleReloadedValue)
           window.location.reload()
           return
@@ -242,13 +247,14 @@ export default class extends Controller {
       this.applyServerState(result.data)
     } else {
       this.offlineSubmit = result.status === 0
-      saveStatus.report("submit", this.offlineSubmit ? this.submitOfflineValue : result.message)
+      saveStatus.report("submit", (this.offlineSubmit && this.draftKept) ? this.submitOfflineValue : result.message)
     }
     this.unlock()
     if (refused) this.nudgeTarget.focus()
   }
 
   offlineSentence() {
+    if (!this.draftKept) return null
     return this.offlineSubmit ? this.submitOfflineValue : this.savingOfflineValue
   }
 
@@ -290,7 +296,7 @@ export default class extends Controller {
   reloadAfterSubmit(result) {
     const stale = result.status === 409
     if (!result.ok && !stale) return false
-    draftStore.clear()
+    this.clearOwnDraft()
     saveStatus.carry("answers", result.ok ? this.reviewStartFailedValue : this.staleReloadedValue)
     window.location.reload()
     return true

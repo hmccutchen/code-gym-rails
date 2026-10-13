@@ -25,4 +25,12 @@ copy is gone, and with it any text that never reached the server.
 ## Every access is wrapped
 
 Private browsing, a full quota or blocked site data can make localStorage
-throw. The page then works as it did before this module existed.
+throw. The page then works as it did before this module existed. `write`
+returns whether it stored the copy, so the answer form promises the answers
+are kept on this device only when they are.
+
+## `clearIf`
+
+Every dashboard tab shares the one key, so a tab clears the copy only when the
+stored copy is the one it owns or sent; the test is the caller's, since only
+the answer form knows what it sent.

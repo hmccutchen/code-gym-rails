@@ -2134,7 +2134,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   retries a save that got no reply on the `online` event or a 5 to 30 second
   timer, never a refusal, a 5xx or the signed-out redirect. A confirmed save,
   a submit and every signed-out page clear the copy, the last because this app
-  runs on shared devices. If a save reaches the server, its reply is lost and
+  runs on shared devices; a save reply or a stale refusal clears it only when
+  the stored copy is the one that tab sent or owns, since every tab shares it,
+  and the "kept on this device" wording shows only when the write succeeded. If a save reaches the server, its reply is lost and
   the page is killed before a retry, the copy no longer matches and the
   server's draft shows; that draft holds the save that got through, so the
   loss is limited to edits made after it. Submit stays manual: offline, it

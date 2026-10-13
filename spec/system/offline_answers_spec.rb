@@ -176,6 +176,59 @@ RSpec.describe "Answers through a lost connection", type: :system do
     end
   end
 
+  it "leaves a newer tab's copy alone when this stale tab is refused" do
+    travel_to(a_weekday) do
+      open_dashboard
+      exercise = user.daily_exercises.sole
+      exercise.update!(generated_at: 1.minute.from_now)
+      newer_token = DailyResponse.new(user: user, daily_exercise: exercise, date: exercise.date).draft_token
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch
+        window.fetch = (url, options) => new Promise((resolve) => { window.releaseSave = () => resolve(originalFetch(url, options)) })
+      JS
+      find(code_review_field).fill_in(with: "Text from the stale tab.")
+      wait_for_js_condition("typeof window.releaseSave === 'function'")
+      page.execute_script("localStorage.setItem('code-gym-answer-draft', #{{ token: newer_token, answers: { code_review: "Text from the newer tab." }, ratings: {} }.to_json.to_json})")
+
+      page.execute_script("window.releaseSave()")
+
+      expect(page).to have_css("#save-status", text: /the set changed/i, wait: 10)
+      expect(find(code_review_field).value).to eq("Text from the newer tab.")
+    end
+  end
+
+  it "leaves another tab's newer copy alone when an earlier save is confirmed" do
+    travel_to(a_weekday) do
+      open_dashboard
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch
+        window.fetch = (url, options) => new Promise((resolve) => { window.releaseSave = () => resolve(originalFetch(url, options)) })
+      JS
+      find(code_review_field).fill_in(with: answer)
+      wait_for_js_condition("typeof window.releaseSave === 'function'")
+      other_tab = stored_draft.merge("answers" => stored_draft["answers"].merge("code_review" => "Written in another tab."))
+      page.execute_script("localStorage.setItem('code-gym-answer-draft', #{other_tab.to_json.to_json})")
+
+      page.execute_script("window.releaseSave()")
+      wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
+
+      expect(stored_draft["answers"]["code_review"]).to eq("Written in another tab.")
+    end
+  end
+
+  it "does not promise the answers are kept when the device refuses to store them" do
+    travel_to(a_weekday) do
+      open_dashboard
+      page.execute_script("Storage.prototype.setItem = () => { throw new DOMException('full', 'QuotaExceededError') }")
+      go_offline
+
+      find(code_review_field).fill_in(with: answer)
+
+      expect(page).to have_css("#save-status", text: I18n.t("save_status.generic"), wait: 10)
+      expect(page).to have_no_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"))
+    end
+  end
+
   it "clears the copy once the server confirms the save" do
     travel_to(a_weekday) do
       open_dashboard

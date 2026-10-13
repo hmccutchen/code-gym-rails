@@ -127,5 +127,19 @@ the same `submitOffline` sentence (`offlineSentence()`, read on every failed
 attempt, so a retry already waiting when Submit fails switches too), so the banner keeps
 saying the answers were not submitted rather than switching to the
 saving-offline one. The first save that lands clears both. A submit is never
-queued: the server runs the review as part of it, which needs a live
-connection anyway.
+queued: it saves the answers and returns the review URL, and the page then
+posts that URL as a separate request that starts the billed review, so a
+queued submit would start a review later, out of the user's sight.
+
+Both sentences promise the answers are kept on this device, so they show only
+when the last write to `draft_store` succeeded (`draftKept`). With storage
+blocked or full, the retry shows the generic failure and an offline submit
+the generic submit failure.
+
+## Clearing another tab's copy
+
+Every tab on the dashboard shares one stored copy. A save reply clears it only
+when the stored copy holds exactly what that save sent, and a stale refusal
+clears it only when the stored copy carries this tab's token, so an old tab
+cannot delete what a newer one wrote. A successful submit, and a reload into
+the submitted page, clear it whoever wrote it, since the day is finished.
