@@ -113,7 +113,7 @@ async function sendRetryingUnreached(key, next) {
     if (body === null) return { ok: false, skipped: true };
     const result = await save(next.method, next.url, body, key, next.quiet ? false : null);
     if (!next.offline || !result.unreached) return result;
-    report(key, next.offline);
+    report(key, typeof next.offline === "function" ? next.offline() : next.offline);
     await connectionBack(attempt);
   }
 }

@@ -72,7 +72,9 @@ next body is built from (the mix's version, again). Waiting saves count toward
 `pending()`.
 
 `offline` retries a save that got no reply at all (the fetch rejected), and
-shows the given sentence instead of the generic one while it waits. Only the
+shows the given sentence instead of the generic one while it waits. It may be
+a function, read on every failed attempt, so a retry already waiting shows
+the caller's current wording. Only the
 dashboard's answers pass it. It waits for the browser's `online` event or a
 timer (`RETRY_DELAYS_MS`, 5 to 30 seconds), whichever comes first, then reads
 the body again, so the retry carries the newest answers. A refusal, a 5xx and

@@ -123,7 +123,8 @@ failure and leaves Submit enabled. It still restarts the autosave, because no
 reply can also mean the server committed the submit and only the reply was
 lost; that autosave comes back `submitted: true` and reloads into the
 submitted page. While the connection is down, that autosave's retry carries
-the same `submitOffline` sentence (`offlineSentence()`), so the banner keeps
+the same `submitOffline` sentence (`offlineSentence()`, read on every failed
+attempt, so a retry already waiting when Submit fails switches too), so the banner keeps
 saying the answers were not submitted rather than switching to the
 saving-offline one. The first save that lands clears both. A submit is never
 queued: the server runs the review as part of it, which needs a live

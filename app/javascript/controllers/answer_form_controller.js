@@ -147,7 +147,7 @@ export default class extends Controller {
     this.saveTimer = null
     if (this.formTarget.inert) return
     this.storeDraft()
-    saveStatus.queue("answers", "POST", this.formTarget.action, () => this.nextSave(), { latest: true, offline: this.offlineSentence() })
+    saveStatus.queue("answers", "POST", this.formTarget.action, () => this.nextSave(), { latest: true, offline: () => this.offlineSentence() })
       .then(({ ok, status, data, skipped }) => {
         if (skipped) return
         if (ok) this.settleSubmitFailure()

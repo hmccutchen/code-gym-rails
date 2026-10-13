@@ -176,6 +176,25 @@ RSpec.describe "Answers through a lost connection", type: :system do
     end
   end
 
+  it "keeps saying the answers were not submitted when a retry already waiting fails again" do
+    travel_to(a_weekday) do
+      open_dashboard
+      fill_in_answer("code_review", answer)
+      rate_section("code_review")
+      expect_ready_to_submit
+      go_offline
+      find(code_review_field).fill_in(with: "#{answer} One more line typed offline.")
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"), wait: 10)
+
+      click_button I18n.t("dashboard.exercise.submit")
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.submit_offline"), wait: 10)
+      page.execute_script("window.dispatchEvent(new Event('online'))")
+      sleep 0.5
+
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.submit_offline"))
+    end
+  end
+
   it "keeps the answers and Submit when submitting offline, and submits once back online" do
     travel_to(a_weekday) do
       open_dashboard

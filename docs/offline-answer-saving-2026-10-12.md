@@ -58,7 +58,9 @@ that save.
 
 ## Out of scope
 
-Caching the dashboard in the service worker, and queueing Submit: the server
-runs the review as part of submitting, so it needs a live connection. A review
+Caching the dashboard in the service worker, and queueing Submit. A submit
+saves the answers and returns the review URL, and the page then posts that URL
+as a separate request that starts the billed review; queueing either while
+offline would fire them later, out of the user's sight. A review
 the server is still running shows as a plain "Get AI review" button on
 return; that is #376.
