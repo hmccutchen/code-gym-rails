@@ -14,7 +14,7 @@
   <% end %>
 <% else %>
   <% pick, reason = kind.parse_answer(response.answers[key]) %>
-  <div class="comparison-answer" data-comparison-answer="<%= key %>" data-controller="comparison-answer"
+  <div class="comparison-answer" data-comparison-answer="<%= key %>" data-controller="comparison-answer" data-action="answer-form:restored->comparison-answer#show"
        data-comparison-answer-prefix-value="<%= ExerciseSection::DesignComparison::PICK_PREFIX %>">
     <fieldset class="comparison-pick">
       <legend><%= t("sections.design_comparison.pick_legend") %></legend>

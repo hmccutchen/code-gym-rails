@@ -2,8 +2,17 @@
 import { Controller } from "@hotwired/stimulus"
 import request from "code_gym/request"
 import saveStatus from "code_gym/save_status"
+import draftStore from "code_gym/draft_store"
 
 const AUTOSAVE_DELAY_MS = 800
+
+function sortedEntries(object) {
+  return Object.entries(object || {}).sort(([ a ], [ b ]) => (a < b ? -1 : a > b ? 1 : 0))
+}
+
+function canonicalDraft(answers, ratings) {
+  return JSON.stringify([ sortedEntries(answers), sortedEntries(ratings) ])
+}
 
 export default class extends Controller {
   static targets = ["form", "progressFill", "progressLabel", "submitButton", "nudge"]
@@ -11,6 +20,8 @@ export default class extends Controller {
   static values = {
     answeredSections: Array,
     submitBlocker: String,
+    draftScope: String,
+    draftToken: String,
     answeredCount: String,
     allAnswered: String,
     staleReloaded: String,
@@ -18,6 +29,8 @@ export default class extends Controller {
     submitLabel: String,
     generatingReview: String,
     submitFailed: String,
+    savingOffline: String,
+    submitOffline: String,
     reviewStartFailed: String,
     controlsNotReady: String
   }
@@ -35,8 +48,12 @@ export default class extends Controller {
       this.ratings[button.dataset.ratingFor] = button.dataset.rating
     })
 
+    this.draftToken = this.draftTokenValue
+    this.offlineSubmit = false
+    const restored = this.restoreDraft()
+
     saveStatus.watch(() => this.saveTimer !== null)
-    if (this.textareas.some((area) => area.value !== area.defaultValue)) this.autoSave()
+    if (restored || this.textareas.some((area) => area.value !== area.defaultValue)) this.autoSave()
     this.onPageShow = (event) => {
       // Safari bfcaches this no-store page anyway (every iOS home-screen launch), so reload a stale submitted form.
       if (event.persisted && this.reviewRequested) window.location.reload()
@@ -50,6 +67,46 @@ export default class extends Controller {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
     window.removeEventListener("pageshow", this.onPageShow)
+  }
+
+  restoreDraft() {
+    const draft = draftStore.read()
+    if (!draft || draft.token !== this.draftToken) {
+      draftStore.clear()
+      return false
+    }
+    this.textareas.filter((area) => area.dataset.draftRestore !== "off").forEach((area) => {
+      const saved = draft.answers?.[area.dataset.field]
+      if (typeof saved !== "string" || area.value !== area.defaultValue) return
+      area.value = saved
+      area.dispatchEvent(new CustomEvent("answer-form:restored", { bubbles: true }))
+    })
+    Object.entries(draft.ratings || {}).forEach(([section, rating]) => this.showRating(section, rating))
+    return true
+  }
+
+  storeDraft() {
+    if (this.formTarget.inert) return
+    const { answers, section_ratings } = this.payload().response
+    this.draftKept = draftStore.write({ token: this.draftToken, answers: answers, ratings: section_ratings })
+  }
+
+  settleDraft(data) {
+    if (typeof data?.draft_token === "string") this.draftToken = data.draft_token
+    const sent = canonicalDraft(this.lastSent.response.answers, this.lastSent.response.section_ratings)
+    const { answers, section_ratings } = this.payload().response
+    if (sent !== canonicalDraft(answers, section_ratings)) return this.storeDraft()
+    draftStore.clearIf((stored) => canonicalDraft(stored.answers, stored.ratings) === sent)
+  }
+
+  clearOwnDraft() {
+    draftStore.clearIf((stored) => stored.token === this.draftToken)
+  }
+
+  nextSave() {
+    if (this.formTarget.inert) return null
+    this.lastSent = this.payload()
+    return this.lastSent
   }
 
   isAnswered(textarea) {
@@ -96,29 +153,36 @@ export default class extends Controller {
   payload(extra) {
     const answers = {}
     this.textareas.forEach((area) => answers[area.dataset.field] = area.value)
-    return { response: Object.assign({ answers: answers, section_ratings: this.ratings }, extra || {}) }
+    return { response: Object.assign({ answers: answers, section_ratings: { ...this.ratings }, draft_scope: this.draftScopeValue }, extra || {}) }
   }
 
   sendSave() {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
     if (this.formTarget.inert) return
-    saveStatus.queue("answers", "POST", this.formTarget.action, () => (this.formTarget.inert ? null : this.payload()), { latest: true })
+    this.storeDraft()
+    saveStatus.queue("answers", "POST", this.formTarget.action, () => this.nextSave(), { latest: true, offline: () => this.offlineSentence() })
       .then(({ ok, status, data, skipped }) => {
         if (skipped) return
-        if (ok) saveStatus.clear("submit")
+        if (ok) this.settleSubmitFailure()
+        if (ok) this.settleDraft(data)
         if (!ok && status === 409 && data?.status === "stale") {
+          this.clearOwnDraft()
           saveStatus.carry("answers", this.staleReloadedValue)
           window.location.reload()
           return
         }
-        if (ok && data?.submitted && !this.formTarget.inert && !this.reviewRequested) return window.location.reload()
+        if (ok && data?.submitted && !this.formTarget.inert && !this.reviewRequested) {
+          draftStore.clear()
+          return window.location.reload()
+        }
         if (ok && this.saveTimer === null && !saveStatus.queued("answers") && !this.formTarget.inert) this.applyServerState(data)
       })
   }
 
   autoSave() {
     clearTimeout(this.saveTimer)
+    this.storeDraft()
     this.saveTimer = this.formTarget.inert ? null : setTimeout(() => this.sendSave(), AUTOSAVE_DELAY_MS)
   }
 
@@ -141,13 +205,19 @@ export default class extends Controller {
   rate(event) {
     const button = event.target.closest("button[data-rating-for]")
     if (!button) return
-    const section = button.dataset.ratingFor
-    this.ratings[section] = button.dataset.rating
-    this.formTarget.querySelectorAll(`button[data-rating-for="${section}"]`).forEach((other) => {
-      other.classList.toggle("active", other === button)
-      other.setAttribute("aria-pressed", other === button)
-    })
+    this.showRating(button.dataset.ratingFor, button.dataset.rating)
     this.sendSave()
+  }
+
+  showRating(section, rating) {
+    const buttons = [...this.formTarget.querySelectorAll(`button[data-rating-for="${section}"]`)]
+    const chosen = buttons.find((button) => button.dataset.rating === rating)
+    if (!chosen) return
+    this.ratings[section] = rating
+    buttons.forEach((other) => {
+      other.classList.toggle("active", other === chosen)
+      other.setAttribute("aria-pressed", other === chosen)
+    })
   }
 
   requestReview(url) {
@@ -177,6 +247,7 @@ export default class extends Controller {
 
     const result = await request.send("POST", this.formTarget.action, this.payload({ submit: "1" }), { fallback: this.submitFailedValue })
     if (result.ok) saveStatus.clear("submit")
+    if (result.ok) draftStore.clear()
     if (this.startReview(result) || this.reloadAfterSubmit(result)) return
 
     const refused = result.status === 422 && Boolean(result.data?.submit_blocker)
@@ -184,10 +255,21 @@ export default class extends Controller {
       saveStatus.clear("submit")
       this.applyServerState(result.data)
     } else {
-      saveStatus.report("submit", result.message)
+      this.offlineSubmit = result.status === 0
+      saveStatus.report("submit", (this.offlineSubmit && this.draftKept) ? this.submitOfflineValue : result.message)
     }
     this.unlock()
     if (refused) this.nudgeTarget.focus()
+  }
+
+  offlineSentence() {
+    if (!this.draftKept) return null
+    return this.offlineSubmit ? this.submitOfflineValue : this.savingOfflineValue
+  }
+
+  settleSubmitFailure() {
+    this.offlineSubmit = false
+    saveStatus.clear("submit")
   }
 
   formControllersConnected() {
@@ -223,6 +305,7 @@ export default class extends Controller {
   reloadAfterSubmit(result) {
     const stale = result.status === 409
     if (!result.ok && !stale) return false
+    this.clearOwnDraft()
     saveStatus.carry("answers", result.ok ? this.reviewStartFailedValue : this.staleReloadedValue)
     window.location.reload()
     return true

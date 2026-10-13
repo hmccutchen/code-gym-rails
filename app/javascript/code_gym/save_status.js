@@ -2,6 +2,7 @@
 import request from "code_gym/request"
 
 const CARRIED = "code-gym-save-status-carried";
+const RETRY_DELAYS_MS = [5000, 10000, 20000, 30000];
 
 const failures = new Map();
 const issued = new Map();
@@ -70,7 +71,7 @@ export function save(method, url, body, key, failureMessage = null) {
       if (result.ok) clear(key);
       else report(key, failureMessage || result.message);
     }
-    return { ok: result.ok, status: result.status || undefined, data: result.data };
+    return { ok: result.ok, status: result.status || undefined, data: result.data, unreached: result.status === 0, message: result.message };
   }).finally(() => { requests--; });
 }
 
@@ -84,7 +85,8 @@ export function queue(key, method, url, body, options) {
       last.body = body;
       last.resolvers.push(resolve);
     } else {
-      line.waiting.push({ method: method, url: url, body: body, quiet: Boolean(options?.quiet), resolvers: [resolve] });
+      line.waiting.push({ method: method, url: url, body: body, quiet: Boolean(options?.quiet),
+                          offline: options?.offline ?? null, resolvers: [resolve] });
     }
     drain(key, line);
   });
@@ -94,13 +96,38 @@ async function drain(key, line) {
   if (line.busy || line.waiting.length === 0) return;
   line.busy = true;
   const next = line.waiting.shift();
-  let body = null;
-  try { body = typeof next.body === "function" ? next.body() : next.body; } catch (_) { body = null; }
-  const result = body === null ? { ok: false, skipped: true } : await save(next.method, next.url, body, key, next.quiet ? false : null);
+  const result = await sendRetryingUnreached(key, next);
   line.busy = false;
   next.resolvers.forEach((resolve) => resolve(result));
   // A task, not a microtask: the reply's handlers update state the next save is built from.
   setTimeout(() => drain(key, line), 0);
+}
+
+function bodyOf(next) {
+  try { return typeof next.body === "function" ? next.body() : next.body; } catch (_) { return null; }
+}
+
+async function sendRetryingUnreached(key, next) {
+  for (let attempt = 0; ; attempt++) {
+    const body = bodyOf(next);
+    if (body === null) return { ok: false, skipped: true };
+    const result = await save(next.method, next.url, body, key, next.quiet ? false : null);
+    if (!next.offline || !result.unreached) return result;
+    report(key, (typeof next.offline === "function" ? next.offline() : next.offline) || result.message);
+    await connectionBack(attempt);
+  }
+}
+
+function connectionBack(attempt) {
+  return new Promise((resolve) => {
+    const resume = () => {
+      clearTimeout(timer);
+      window.removeEventListener("online", resume);
+      resolve();
+    };
+    const timer = setTimeout(resume, RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)]);
+    window.addEventListener("online", resume);
+  });
 }
 
 export function carry(key, message) {

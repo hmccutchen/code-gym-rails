@@ -10,6 +10,14 @@ export default class extends Controller {
   connect() {
     const picked = this.pickTargets.some((radio) => radio.checked !== radio.defaultChecked)
     if (picked || this.reasonTarget.value !== this.reasonTarget.defaultValue) this.compose()
+    else if (this.fieldTarget.value !== this.fieldTarget.defaultValue) this.show()
+  }
+
+  show() {
+    const [firstLine, ...reasonLines] = this.fieldTarget.value.split("\n")
+    const pick = firstLine.startsWith(this.prefixValue) ? firstLine.slice(this.prefixValue.length) : null
+    this.pickTargets.forEach((radio) => { radio.checked = radio.value === pick })
+    this.reasonTarget.value = reasonLines.join("\n")
   }
 
   // Matches DesignComparison.encode_answer; a reason with no pick keeps its line so a reload shows it.

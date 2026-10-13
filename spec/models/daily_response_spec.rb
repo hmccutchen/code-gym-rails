@@ -122,6 +122,50 @@ RSpec.describe DailyResponse, type: :model do
     user.daily_exercises.create!(date: Date.current + 1, generated_at: Time.current, problem_set: exercise.problem_set)
   end
 
+  describe "#draft_token" do
+    let(:response) do
+      described_class.create!(user: user, daily_exercise: exercise, date: Date.current,
+                              answers: { "code_review" => "First answer", "pattern" => "Second answer" },
+                              section_ratings: { "code_review" => "right_level" })
+    end
+
+    it "names the set, the response and what is saved" do
+      expect(response.draft_token).to start_with("#{exercise.draft_scope}:#{response.id}:")
+    end
+
+    it "reads the same however the saved answers are ordered" do
+      reordered = described_class.new(user: user, daily_exercise: exercise, id: response.id,
+                                      answers: response.answers.to_a.reverse.to_h,
+                                      section_ratings: response.section_ratings)
+
+      expect(reordered.draft_token).to eq(response.draft_token)
+    end
+
+    it "changes when the saved answers or ratings change" do
+      token = response.draft_token
+
+      response.update!(answers: response.answers.merge("pattern" => "A newer answer"))
+      after_answer = response.draft_token
+      response.update!(section_ratings: { "code_review" => "too_hard" })
+
+      expect([ token, after_answer, response.draft_token ].uniq.size).to eq(3)
+    end
+
+    it "stays the same when only a pseudocode round is written" do
+      token = response.draft_token
+
+      response.merge_pseudocode_round!("pseudocode_to_code", "critique_claimed_at" => Time.current.iso8601)
+
+      expect(response.reload.draft_token).to eq(token)
+    end
+
+    it "marks a response that has never been saved" do
+      unsaved = described_class.new(user: user, daily_exercise: exercise, date: Date.current)
+
+      expect(unsaved.draft_token).to start_with("#{exercise.draft_scope}:new:")
+    end
+  end
+
   describe "#answered_sections" do
     it "returns keys whose answers have substance (>10 chars), preserving the completeness heuristic" do
       daily_response = user.daily_responses.create!(

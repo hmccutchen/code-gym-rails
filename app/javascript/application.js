@@ -2,6 +2,7 @@ import { application } from "controllers/application"
 import "controllers"
 import request from "code_gym/request"
 import saveStatus from "code_gym/save_status"
+import "code_gym/draft_store"
 
 const CONNECT_TIMEOUT_MS = 10000
 const CONNECT_POLL_MS = 10
