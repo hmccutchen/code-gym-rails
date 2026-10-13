@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_11_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_13_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -114,6 +114,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_130000) do
     t.index ["daily_exercise_id"], name: "index_daily_responses_on_daily_exercise_id", unique: true
     t.index ["user_id", "date"], name: "index_daily_responses_on_user_id_and_date", unique: true
     t.index ["user_id"], name: "index_daily_responses_on_user_id"
+  end
+
+  create_table "featured_concepts", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.date "week_of", null: false
+    t.string "bucket", null: false
+    t.string "concept", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id", "week_of"], name: "index_featured_concepts_on_user_id_and_week_of", unique: true
   end
 
   create_table "invite_codes", force: :cascade do |t|
@@ -369,6 +379,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_130000) do
   add_foreign_key "daily_exercises", "users"
   add_foreign_key "daily_responses", "daily_exercises"
   add_foreign_key "daily_responses", "users"
+  add_foreign_key "featured_concepts", "users"
   add_foreign_key "push_subscriptions", "users"
   add_foreign_key "review_follow_ups", "daily_responses"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

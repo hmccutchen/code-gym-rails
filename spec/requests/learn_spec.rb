@@ -507,9 +507,9 @@ RSpec.describe "Learn", type: :request do
       end
     end
 
-    it "does not report a completed generation for a feature stamp or other unrelated update" do
+    it "does not report a completed generation for an unrelated update" do
       row = reference(**guide)
-      row.update!(featured_on: Date.current)
+      row.update!(tagline: "Reworded by hand")
 
       status(awaiting: "ladder", generation_version: row.generation_version)
 

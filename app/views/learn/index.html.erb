@@ -4,7 +4,7 @@
 
 <%# Design notes: docs/code-notes/app/views/learn/index.html.md %>
 <% if @featured %>
-  <%= render "shared/featured_concept", reference: @featured %>
+  <%= render "shared/featured_concept", featured: @featured %>
 <% end %>
 
 <% if @ungenerated.positive? || @ungenerated_guides.positive? %>

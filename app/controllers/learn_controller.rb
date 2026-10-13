@@ -10,7 +10,7 @@ class LearnController < ApplicationController
              unless: :own_key?
 
   def index
-    @featured   = ConceptReference.featured
+    @featured   = FeaturedConcept.for(current_user)
     @references = references_by_key
     @drills     = ConceptDrills.for(current_user)
     @buckets    = learn_buckets.map do |bucket|
