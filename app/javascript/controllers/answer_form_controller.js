@@ -46,8 +46,6 @@ export default class extends Controller {
 
     saveStatus.watch(() => this.saveTimer !== null)
     if (restored || this.textareas.some((area) => area.value !== area.defaultValue)) this.autoSave()
-    this.onOnline = () => this.retryAfterOfflineSubmit()
-    window.addEventListener("online", this.onOnline)
     this.onPageShow = (event) => {
       // Safari bfcaches this no-store page anyway (every iOS home-screen launch), so reload a stale submitted form.
       if (event.persisted && this.reviewRequested) window.location.reload()
@@ -61,7 +59,6 @@ export default class extends Controller {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
     window.removeEventListener("pageshow", this.onPageShow)
-    window.removeEventListener("online", this.onOnline)
   }
 
   restoreDraft() {
@@ -150,10 +147,10 @@ export default class extends Controller {
     this.saveTimer = null
     if (this.formTarget.inert) return
     this.storeDraft()
-    saveStatus.queue("answers", "POST", this.formTarget.action, () => this.nextSave(), { latest: true, offline: this.savingOfflineValue })
+    saveStatus.queue("answers", "POST", this.formTarget.action, () => this.nextSave(), { latest: true, offline: this.offlineSentence() })
       .then(({ ok, status, data, skipped }) => {
         if (skipped) return
-        if (ok) saveStatus.clear("submit")
+        if (ok) this.settleSubmitFailure()
         if (ok) this.settleDraft(data)
         if (!ok && status === 409 && data?.status === "stale") {
           draftStore.clear()
@@ -247,15 +244,17 @@ export default class extends Controller {
       this.offlineSubmit = result.status === 0
       saveStatus.report("submit", this.offlineSubmit ? this.submitOfflineValue : result.message)
     }
-    this.unlock({ autosave: !this.offlineSubmit })
+    this.unlock()
     if (refused) this.nudgeTarget.focus()
   }
 
-  retryAfterOfflineSubmit() {
-    if (!this.offlineSubmit) return
+  offlineSentence() {
+    return this.offlineSubmit ? this.submitOfflineValue : this.savingOfflineValue
+  }
+
+  settleSubmitFailure() {
     this.offlineSubmit = false
     saveStatus.clear("submit")
-    this.autoSave()
   }
 
   formControllersConnected() {
@@ -297,11 +296,11 @@ export default class extends Controller {
     return true
   }
 
-  unlock({ autosave = true } = {}) {
+  unlock() {
     this.formTarget.inert = false
     this.submitButtonTarget.classList.remove("btn-loading")
     this.submitButtonTarget.textContent = this.submitLabelValue
     this.submitButtonTarget.disabled = false
-    if (autosave) this.autoSave()
+    this.autoSave()
   }
 }

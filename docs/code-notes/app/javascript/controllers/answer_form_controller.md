@@ -119,8 +119,12 @@ through, so what is lost is limited to the edits made after it.
 ## Submitting offline
 
 A submit that got no reply shows `submitOffline` instead of the generic
-failure and leaves Submit enabled. It does not restart the autosave, which
-would only replace that sentence with the saving-offline one a moment later.
-The browser's `online` event clears it and restarts the autosave. A submit is
-never queued: the server runs the review as part of it, which needs a live
+failure and leaves Submit enabled. It still restarts the autosave, because no
+reply can also mean the server committed the submit and only the reply was
+lost; that autosave comes back `submitted: true` and reloads into the
+submitted page. While the connection is down, that autosave's retry carries
+the same `submitOffline` sentence (`offlineSentence()`), so the banner keeps
+saying the answers were not submitted rather than switching to the
+saving-offline one. The first save that lands clears both. A submit is never
+queued: the server runs the review as part of it, which needs a live
 connection anyway.
