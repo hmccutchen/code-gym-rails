@@ -161,3 +161,7 @@ name a provider while holding no keys.
 
 It reads the slot roster from `ExerciseSection.slots`, so a future slot that
 holds several kinds needs no edit here. Single-kind slots are skipped.
+
+## `ignored_columns`: `track_suggestions` and `track_evidence_cutoffs`
+
+`AddLevelSuggestionColumnsToUsers` copies both into `level_suggestions` and `level_suggestion_cutoffs` and leaves them in place, so the release still serving while the pre-deploy migration runs keeps working, and rolling back needs no data restored. They are ignored for one release, as `api_key` and `adaptive_set_size` were, and a later migration drops them. A dismissal the old release writes after the copy and before the new code serves is not carried over; it costs at most one repeated suggestion.

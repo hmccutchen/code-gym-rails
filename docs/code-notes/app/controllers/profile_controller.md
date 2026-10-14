@@ -11,3 +11,7 @@ the request would return 200 having saved nothing.
 The response includes `section_kind_preferences_version` and the ladder
 preparation only when the request touched a preference, so the body every
 other caller receives is unchanged.
+
+## `LEVEL_SUGGESTION_KEYS`
+
+The suggestions switch saved as `track_suggestions` before the column was renamed `level_suggestions`. A Setup tab opened before the rename still posts the old key, so the controller accepts either, holds both to the same true-or-false check, and saves the old one under the new name. Remove the old key with the ignored track columns.

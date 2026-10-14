@@ -83,13 +83,13 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     end
 
     it "shows nothing while suggestions are off, and the same proposal once they are back on" do
-      user = track_user(track_suggestions: false)
+      user = track_user(level_suggestions: false)
       with_own_proposal(user)
 
       get root_path
       expect(proposal).to be_nil
 
-      user.update!(track_suggestions: true)
+      user.update!(level_suggestions: true)
       get root_path
       expect(proposal.text).to include("Try Code Review at mid-level?")
     end
@@ -119,17 +119,17 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     end
   end
 
-  describe "PATCH /profile track_suggestions" do
+  describe "PATCH /profile level_suggestions" do
     it "turns suggestions off and back on" do
       user = track_user
       login_as(user)
 
-      patch profile_path, params: { user: { track_suggestions: false } }.to_json, headers: json
+      patch profile_path, params: { user: { level_suggestions: false } }.to_json, headers: json
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_suggestions).to be(false)
+      expect(user.reload.level_suggestions).to be(false)
 
-      patch profile_path, params: { user: { track_suggestions: true } }.to_json, headers: json
-      expect(user.reload.track_suggestions).to be(true)
+      patch profile_path, params: { user: { level_suggestions: true } }.to_json, headers: json
+      expect(user.reload.level_suggestions).to be(true)
     end
 
     [ "false", nil, 0 ].each do |value|
@@ -137,22 +137,42 @@ RSpec.describe "Learning track suggestion controls", type: :request do
         user = track_user
         login_as(user)
 
-        patch profile_path, params: { user: { track_suggestions: value } }.to_json, headers: json
+        patch profile_path, params: { user: { level_suggestions: value } }.to_json, headers: json
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(user.reload.track_suggestions).to be(true)
+        expect(user.reload.level_suggestions).to be(true)
       end
+    end
+
+    it "accepts the switch under its old name from a Setup tab opened before the rename" do
+      user = track_user
+      login_as(user)
+
+      patch profile_path, params: { user: { track_suggestions: false } }.to_json, headers: json
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.level_suggestions).to be(false)
+    end
+
+    it "refuses a non-boolean under the old name" do
+      user = track_user
+      login_as(user)
+
+      patch profile_path, params: { user: { track_suggestions: "false" } }.to_json, headers: json
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.level_suggestions).to be(true)
     end
   end
 
   describe "Setup" do
     it "shows the suggestions switch with its current state and warns that leaving is final" do
-      user = track_user(track_suggestions: false)
+      user = track_user(level_suggestions: false)
       login_as(user)
 
       get setup_path
 
-      box = page_html.at_css("#track-suggestions")
+      box = page_html.at_css("#level-suggestions")
       expect(box).to be_present
       expect(box["checked"]).to be_nil
       expect(page_html.at_css("#learning-track").text).to include("You can't rejoin the track afterwards.")

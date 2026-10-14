@@ -14,7 +14,7 @@ RSpec.describe "Level suggestion paths from before the rename", type: :request d
     post "/learning_track/dismissal", params: { kinds: [ "code_review" ] }.to_json, headers: json
 
     expect(response).to have_http_status(:ok)
-    expect(user.reload.track_evidence_cutoffs.keys).to eq([ "code_review" ])
+    expect(user.reload.level_suggestion_cutoffs.keys).to eq([ "code_review" ])
   end
 
   it "counts an answer posted to the old path without a redirect" do

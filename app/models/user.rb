@@ -7,6 +7,9 @@ class User < ApplicationRecord
   has_many :push_subscriptions, dependent: :destroy
   has_many :featured_concepts, dependent: :destroy
   has_many :level_suggestion_events, dependent: :destroy
+
+  self.ignored_columns += %w[track_suggestions track_evidence_cutoffs]
+
   belongs_to :invite_code, optional: true
 
   serialize :api_keys, coder: JSON
@@ -228,7 +231,7 @@ class User < ApplicationRecord
 
   def on_learning_track? = learning_track == LearningTrack::ON
 
-  def suggests_track_moves? = on_learning_track? && track_suggestions?
+  def suggests_track_moves? = on_learning_track? && level_suggestions?
 
   def applies_track_proposals_in_place? = track_proposals_answered < LearningTrack::IN_PLACE_ANSWERS
 
@@ -470,7 +473,7 @@ class User < ApplicationRecord
     return if moved.empty?
 
     through = Time.use_zone(effective_time_zone) { Date.current }.iso8601
-    self.track_evidence_cutoffs = track_evidence_cutoffs.merge(
+    self.level_suggestion_cutoffs = level_suggestion_cutoffs.merge(
       moved.to_h { |key, level| [ key, { "level" => level, "through" => through } ] }
     )
   end
@@ -481,8 +484,8 @@ class User < ApplicationRecord
       before_levels: section_kind_levels_before_last_save || {},
       after_levels: section_kind_levels,
       locked: locked_section_kinds_before_last_save || [],
-      cutoffs: track_evidence_cutoffs_before_last_save || {},
-      suggestions_on: track_suggestions_before_last_save
+      cutoffs: level_suggestion_cutoffs_before_last_save || {},
+      suggestions_on: level_suggestions_before_last_save
     ))
   end
 

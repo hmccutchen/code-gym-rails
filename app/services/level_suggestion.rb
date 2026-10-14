@@ -19,7 +19,7 @@ class LevelSuggestion
 
   def self.for(user)
     proposal(levels: user.section_kind_levels, locked: user.locked_section_kinds,
-             results: Evidence.for(user).results, cutoffs: user.track_evidence_cutoffs)
+             results: Evidence.for(user).results, cutoffs: user.level_suggestion_cutoffs)
   end
 
   def self.proposal(levels:, locked:, results:, cutoffs:)

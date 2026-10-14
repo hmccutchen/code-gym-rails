@@ -289,7 +289,7 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(response).to have_http_status(:conflict)
     expect(user.reload.section_kind_levels["code_review"]).to eq("junior")
     expect(user.locked_section_kinds).to eq([ "pattern" ])
-    expect(user.track_evidence_cutoffs).to eq({})
+    expect(user.level_suggestion_cutoffs).to eq({})
   end
 
   it "clears the track on the final Apply and keeps the senior targets" do
@@ -314,11 +314,11 @@ RSpec.describe "Learning track proposals", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to eq("dismissed" => %w[code_review architecture])
-      expect(user.reload.track_evidence_cutoffs).to eq(
+      expect(user.reload.level_suggestion_cutoffs).to eq(
         "code_review" => { "level" => "junior", "through" => (Date.current - 1).iso8601 },
         "architecture" => { "level" => "junior", "through" => (Date.current - 1).iso8601 }
       )
-      expect(other.reload.track_evidence_cutoffs).to eq({})
+      expect(other.reload.level_suggestion_cutoffs).to eq({})
     end
 
     it "uses the user's today when no reviewed evidence exists" do
@@ -329,7 +329,7 @@ RSpec.describe "Learning track proposals", type: :request do
       dismiss([ "pattern" ])
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_evidence_cutoffs.dig("pattern", "through")).to eq("2026-10-15")
+      expect(user.reload.level_suggestion_cutoffs.dig("pattern", "through")).to eq("2026-10-15")
     end
 
     [ nil, [], "pattern", [ nil ], [ {} ], [ "unknown" ], %w[pattern unknown] ].each do |kinds|
@@ -339,7 +339,7 @@ RSpec.describe "Learning track proposals", type: :request do
         dismiss(kinds)
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(user.reload.track_evidence_cutoffs).to eq({})
+        expect(user.reload.level_suggestion_cutoffs).to eq({})
       end
     end
 
@@ -350,7 +350,7 @@ RSpec.describe "Learning track proposals", type: :request do
       dismiss([ "unknown" ])
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(user.reload.track_evidence_cutoffs).to eq({})
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
     end
 
     [ nil, "principal_engineer" ].each do |level|
@@ -362,7 +362,7 @@ RSpec.describe "Learning track proposals", type: :request do
         dismiss(%w[pattern architecture])
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(user.reload.track_evidence_cutoffs).to eq({})
+        expect(user.reload.level_suggestion_cutoffs).to eq({})
       end
     end
 
@@ -373,7 +373,7 @@ RSpec.describe "Learning track proposals", type: :request do
       dismiss([ "pattern" ])
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_evidence_cutoffs["pattern"]).to eq("level" => "mid_level", "through" => Date.current.iso8601)
+      expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq("level" => "mid_level", "through" => Date.current.iso8601)
     end
 
     it "is not found for a user off the track" do
@@ -392,14 +392,14 @@ RSpec.describe "Learning track proposals", type: :request do
       login_as(user)
       concurrent = { "architecture" => { "level" => "junior", "through" => Date.current.iso8601 } }
       allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
-        User.find(user.id).update_column(:track_evidence_cutoffs, concurrent)
+        User.find(user.id).update_column(:level_suggestion_cutoffs, concurrent)
         original.call(*args)
       end
 
       dismiss([ "pattern" ])
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_evidence_cutoffs).to eq(
+      expect(user.reload.level_suggestion_cutoffs).to eq(
         concurrent.merge("pattern" => { "level" => "junior", "through" => Date.current.iso8601 })
       )
     end
@@ -419,7 +419,7 @@ RSpec.describe "Learning track proposals", type: :request do
           reviewed_window(user, { "code_review" => "junior" })
           other_tab.post level_suggestion_dismissal_path, params: { kinds: [ "code_review" ] }.to_json, headers: json
           expect(other_tab.response).to have_http_status(:ok)
-          expect(user.reload.track_evidence_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
+          expect(user.reload.level_suggestion_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
         end
         evidence
       end
@@ -428,7 +428,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
       expect(response).to have_http_status(:ok)
       aggregate_failures do
-        expect(user.reload.track_evidence_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
+        expect(user.reload.level_suggestion_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
         expect(LevelSuggestion.for(user)).to be_nil
       end
     end
@@ -442,21 +442,21 @@ RSpec.describe "Learning track proposals", type: :request do
       dismiss([ "pattern" ])
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_evidence_cutoffs["pattern"]).to eq(
+      expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq(
         "level" => "senior", "through" => Date.current.iso8601
       )
     end
 
     it "advances an older cutoff at the same level" do
       user = track_user
-      user.update!(track_evidence_cutoffs: { "pattern" => { "level" => "junior", "through" => "2026-10-12" } })
+      user.update!(level_suggestion_cutoffs: { "pattern" => { "level" => "junior", "through" => "2026-10-12" } })
       reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
       login_as(user)
 
       dismiss([ "pattern" ])
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_evidence_cutoffs["pattern"]).to eq("level" => "junior", "through" => "2026-10-13")
+      expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq("level" => "junior", "through" => "2026-10-13")
     end
 
     [ nil, "junk", [], {}, { "through" => "2099-01-01" }, { "level" => "junior" },
@@ -465,14 +465,14 @@ RSpec.describe "Learning track proposals", type: :request do
       { "level" => "senior", "through" => "2099-01-01" } ].each do |entry|
       it "replaces an inapplicable historical cutoff #{entry.inspect}" do
         user = track_user
-        user.update!(track_evidence_cutoffs: { "pattern" => entry })
+        user.update!(level_suggestion_cutoffs: { "pattern" => entry })
         reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
         login_as(user)
 
         dismiss([ "pattern" ])
 
         expect(response).to have_http_status(:ok)
-        expect(user.reload.track_evidence_cutoffs["pattern"]).to eq("level" => "junior", "through" => "2026-10-13")
+        expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq("level" => "junior", "through" => "2026-10-13")
       end
     end
 
@@ -488,7 +488,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
       expect(response).to have_http_status(:not_found)
       expect(user.reload.learning_track).to eq("none")
-      expect(user.track_evidence_cutoffs).to eq({})
+      expect(user.level_suggestion_cutoffs).to eq({})
     end
 
     it "uses a target another request changed before taking the lock" do
@@ -508,8 +508,8 @@ RSpec.describe "Learning track proposals", type: :request do
       dismiss([ "pattern" ])
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_evidence_cutoffs.dig("pattern", "level")).to eq("senior")
-      expect(user.track_evidence_cutoffs.dig("pattern", "through")).to eq(Date.current.iso8601)
+      expect(user.reload.level_suggestion_cutoffs.dig("pattern", "level")).to eq("senior")
+      expect(user.level_suggestion_cutoffs.dig("pattern", "through")).to eq(Date.current.iso8601)
     end
   end
 end
