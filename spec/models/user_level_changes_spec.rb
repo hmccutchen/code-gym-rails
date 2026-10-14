@@ -179,14 +179,18 @@ RSpec.describe User, "level changes", type: :model do
       )
     end
 
-    it "records a cutoff for every untargeted kind when the skill level changes, and none for a targeted one" do
+    it "records a cutoff for every untargeted kind when the skill level changes, and no event" do
       account.update!(skill_level: "mid_level")
 
       expect(account.reload.level_suggestion_cutoffs.keys).to match_array(untargeted)
       expect(account.level_suggestion_cutoffs.values.uniq).to eq([ { "level" => "mid_level", "through" => local_today.iso8601 } ])
-      expect(account.level_suggestion_events.pluck(:kind, :from_level, :to_level)).to match_array(
-        untargeted.map { |kind| [ kind, "junior", "mid_level" ] }
-      )
+      expect(account.level_suggestion_events).to be_empty
+    end
+
+    it "records events only for the kinds whose target a save changed" do
+      account.update!(skill_level: "mid_level", section_kind_levels: { "pattern" => "junior" })
+
+      expect(account.level_suggestion_events.pluck(:kind, :from_level, :to_level)).to eq([ %w[pattern senior junior] ])
     end
 
     it "keeps results from an earlier stay at the new skill level out of the evidence" do
@@ -197,11 +201,10 @@ RSpec.describe User, "level changes", type: :model do
       expect(LevelSuggestion.for(account.reload)).to be_nil
     end
 
-    it "records no cutoff when the skill level moves to principal engineer, and a row for each kind it moved" do
+    it "records no cutoff when the skill level moves to principal engineer" do
       account.update!(skill_level: "principal_engineer")
 
       expect(account.reload.level_suggestion_cutoffs).to eq({})
-      expect(account.level_suggestion_events.pluck(:to_level).uniq).to eq([ "principal_engineer" ])
     end
 
     it "records nothing when the skill level changes and every kind is targeted" do

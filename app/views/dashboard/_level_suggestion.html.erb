@@ -1,4 +1,4 @@
-<%# One learning track proposal. Local: proposal (LevelSuggestion::Proposal). %>
+<%# One level suggestion. Local: proposal (LevelSuggestion::Proposal). %>
 <% name = ->(key) { t("sections.#{key}.name") } %>
 <% level_name = ->(level) { t("exercise_mix.levels.#{level}").downcase } %>
 <% in_place = current_user.applies_level_suggestions_in_place? || (proposal.steps.map(&:kind) & current_user.excluded_section_kinds).any? %>
@@ -16,7 +16,7 @@
               level_suggestion_reload_label_value: t("learning_track.proposal.reload") } do %>
   <% if proposal.steps.one? %>
     <% step = proposal.steps.first %>
-    <p data-step data-level-suggestion-target="step" data-kind="<%= step.kind %>" data-to="<%= step.to %>">
+    <p data-step data-level-suggestion-target="step" data-kind="<%= step.kind %>" data-from="<%= step.from %>" data-to="<%= step.to %>">
       <% if proposal.basis == :struggling %>
         <%= t("learning_track.proposal.struggling", kind: name.call(step.kind), too_hard: step.too_hard,
               window: [ step.results_at_level, LevelSuggestion::STEP_BACK_WINDOW ].min,
@@ -30,7 +30,7 @@
     <p><%= t("learning_track.proposal.own_heading", level: level_name.call(proposal.steps.first.to)) %></p>
     <ul>
       <% proposal.steps.each do |step| %>
-        <li data-step data-level-suggestion-target="step" data-kind="<%= step.kind %>" data-to="<%= step.to %>">
+        <li data-step data-level-suggestion-target="step" data-kind="<%= step.kind %>" data-from="<%= step.from %>" data-to="<%= step.to %>">
           <%= t("learning_track.proposal.own_item", kind: name.call(step.kind), favourable: step.favourable,
                 window: LevelSuggestion::WINDOW) %>
           <% if in_place %>

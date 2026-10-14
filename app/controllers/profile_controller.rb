@@ -145,7 +145,7 @@ class ProfileController < ApplicationController
   def save_with_preference_precondition
     user_params = params.require(:user)
     posted = user_params[:section_kind_preferences_version]
-    return current_user.update(profile_params) if posted.nil? && !user_params.key?(:learning_track)
+    return current_user.update(profile_params) unless locked_save?(user_params)
 
     outcome = nil
     current_user.with_lock do
@@ -153,11 +153,29 @@ class ProfileController < ApplicationController
         :track_refused
       elsif !posted.nil? && posted.to_s != current_user.section_kind_preferences_version.to_s
         :stale
+      elsif stale_expected_rungs?
+        :stale
       else
         current_user.update(profile_params)
       end
     end
     outcome
+  end
+
+  RUNG_KEYS = %w[skill_level section_kind_levels].freeze
+
+  def locked_save?(user_params)
+    !user_params[:section_kind_preferences_version].nil? || user_params.key?(:learning_track) ||
+      RUNG_KEYS.any? { |key| user_params.key?(key) }
+  end
+
+  def stale_expected_rungs?
+    expected = params[:expected_rungs]
+    return false if expected.nil?
+    return true unless expected.respond_to?(:to_unsafe_h)
+
+    rungs = current_user.kind_rungs
+    expected.to_unsafe_h.any? { |kind, rung| rungs[kind] != rung }
   end
 
   TRACK_CHOICE_KEYS = {
@@ -212,7 +230,8 @@ class ProfileController < ApplicationController
                                              section_kind_weights: {}, excluded_section_kinds: [],
                                              section_kind_levels: {}, locked_section_kinds: [],
                                              display_preferences: {})
-    permitted[:level_suggestions] = permitted.delete(:track_suggestions) if permitted.key?(:track_suggestions)
+    old_switch = permitted.delete(:track_suggestions)
+    permitted[:level_suggestions] = old_switch unless old_switch.nil? || permitted.key?(:level_suggestions)
     permitted[:name] = permitted[:name].to_s.strip if permitted.key?(:name)
     permitted[:time_zone] = permitted[:time_zone].to_s.strip.presence if permitted.key?(:time_zone)
     permitted[:daily_section_count] = nil if permitted[:daily_section_count] == User::AUTOMATIC_SECTION_COUNT

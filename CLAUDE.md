@@ -534,9 +534,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   records `applied` rows (source `suggestion` or `setup_edit`), `dismissed`
   and `removed` rows, each with the evidence counts behind it, written only
   by rung-changing saves and the dismissal endpoint, which writes a row only
-  for a kind whose cutoff moves forward. A skill-level change writes a row
-  for each kind it moved, and a reset to Default reads as a move to the
-  skill level's rung. Ending or leaving the track changes no suggestion.
+  for a kind whose cutoff moves forward. Applied rows cover only kinds whose
+  target changed, so a skill-level change records cutoffs and no rows, and a
+  reset to Default reads as a move to the skill level's rung. Apply sends the
+  rung each kind was shown at, and `PATCH /profile` refuses it with a 409
+  when a skill-level change has since moved one, since that change bumps no
+  preference version. Saves touching the skill level or targets take the
+  user-row lock, like the dismissal endpoint. Ending or leaving the track changes no suggestion.
 
   **After three answers, a proposal sends the user to Setup.**
   `users.track_proposals_answered` counts each Apply and Not now through
@@ -1658,7 +1662,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   automatically, and daily ratings still nudge each set around it. A level
   suggestion's Apply adds a target instead, so the setting stays where the
   user put it, which Setup's hint says. A change records a suggestion cutoff
-  and event for every untargeted kind it moves. It is not
+  for every untargeted kind it moves, under the user-row lock. It is not
   part of the Exercise mix, so it does not bump
   `section_kind_preferences_version`. The Exercise
   mix's default options name the stored level by its label and are renamed

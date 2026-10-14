@@ -72,12 +72,12 @@ the save that joins the track, whose preset is a first-run choice rather than
 an answer to a suggestion, made by an account that has no exercises yet.
 
 `#record_level_suggestion_events` runs in `after_save` under the same two
-exceptions, when the save changed `section_kind_levels` or `skill_level`. It
+exceptions, when the save changed `section_kind_levels`. It
 passes `LevelSuggestionEvent.applied_rows` the rungs, locks, cutoffs and
 suggestion switch as they stood before the save (`*_before_last_save`), and
-inserts one `applied` row per kind whose rung moved, in the same transaction,
-so a failed insert raises and rolls back the change and its cutoff. A
-skill-level change therefore writes a row for each untargeted kind; a Leave
+inserts one `applied` row per kind whose target changed and whose rung moved,
+in the same transaction, so a failed insert raises and rolls back the change
+and its cutoff. A skill-level change records cutoffs but writes no row; a Leave
 that changes no level writes nothing; the save that ends the track by moving
 the last kind to senior still writes its rows.
 

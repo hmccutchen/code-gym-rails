@@ -43,7 +43,7 @@ RSpec.describe LevelSuggestionEvent, type: :model do
     around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
     def rows(before:, after:)
-      described_class.applied_rows(user, before_rungs: before, after_rungs: after,
+      described_class.applied_rows(user, kinds: ExerciseSection.keys, before_rungs: before, after_rungs: after,
                                          locked: [], cutoffs: {}, suggestions_on: true)
     end
 
@@ -70,6 +70,16 @@ RSpec.describe LevelSuggestionEvent, type: :model do
       kinds = rows(before: before, after: before.merge("pattern" => "senior", "architecture" => "mid_level")).map { _1[:kind] }
 
       expect(kinds).to contain_exactly("pattern", "architecture")
+    end
+
+    it "leaves out kinds whose rung moved without their target changing" do
+      before = ExerciseSection.keys.index_with { "junior" }
+      after = before.merge("pattern" => "senior", "architecture" => "mid_level")
+
+      rows = described_class.applied_rows(user, kinds: [ "pattern" ], before_rungs: before, after_rungs: after,
+                                                locked: [], cutoffs: {}, suggestions_on: true)
+
+      expect(rows.map { _1[:kind] }).to eq([ "pattern" ])
     end
   end
 end

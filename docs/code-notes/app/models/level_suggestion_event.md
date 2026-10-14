@@ -15,6 +15,10 @@ the cutoffs as they stood before the change. Nothing the browser sends is
 used. The levels are rungs, so an untargeted kind is counted at the skill
 level it was pitched at.
 
+## Which kinds get an applied row
+
+Only kinds whose target the save changed. A skill-level change moves every untargeted kind's rung, and `User` records a cutoff for each, but nobody chose those kinds one by one, so a row for each would bury the per-kind decisions this table exists to measure. A target change that leaves the rung where it was, such as a reset to Default at the skill level's own rung, writes nothing either.
+
 ## `source` on applied rows
 
 `User` detects every saved rung change, whichever page sent it, so `source`
@@ -29,7 +33,7 @@ one the target named.
 
 `applied_rows` is a plain builder: it reads no dirty tracking. `User` calls
 it from one `after_save`, which runs when the save changed
-`section_kind_levels` or `skill_level`, and passes the rungs,
+`section_kind_levels`, and passes the changed kinds, the rungs,
 locks, cutoffs and suggestion switch from `*_before_last_save`, since the
 save has already written the new values by then. The insert runs in the
 save's transaction, so a failed insert raises and rolls back the level change

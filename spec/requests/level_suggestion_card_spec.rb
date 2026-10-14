@@ -69,6 +69,7 @@ RSpec.describe "Level suggestion card", type: :request do
     expect(proposed_kinds).to eq([ "code_review" ])
     step = Nokogiri::HTML(response.body).at_css("#level-suggestion [data-step]")
     expect(step["data-to"]).to eq("mid_level")
+    expect(step["data-from"]).to eq("junior")
     expect(Nokogiri::HTML(response.body).css("#level-suggestion [data-remove-step]")).to be_empty
     box = Nokogiri::HTML(response.body).at_css("#level-suggestion")
     expect(JSON.parse(box["data-level-suggestion-levels-value"])).to eq(user.section_kind_levels)
@@ -275,6 +276,48 @@ RSpec.describe "Level suggestion card", type: :request do
                                                                  from_level: "junior", to_level: "mid_level")
     get root_path
     expect(response.body).not_to include("level-suggestion")
+  end
+
+  it "refuses an Apply whose card showed a rung the skill level has since moved" do
+    user = account_off_track(skill_level: "junior")
+    login_as(user)
+    patch profile_path, params: { user: { skill_level: "senior" } }.to_json, headers: json
+    expect(response).to have_http_status(:ok)
+
+    patch profile_path, params: {
+      user: { section_kind_levels: { "code_review" => "mid_level" },
+              section_kind_preferences_version: user.reload.section_kind_preferences_version },
+      expected_rungs: { "code_review" => "junior" }
+    }.to_json, headers: json
+
+    expect(response).to have_http_status(:conflict)
+    expect(user.reload.section_kind_levels).to eq({})
+  end
+
+  it "applies when the card's rungs still hold" do
+    user = account_off_track(skill_level: "junior")
+    login_as(user)
+
+    patch profile_path, params: {
+      user: { section_kind_levels: { "code_review" => "mid_level" },
+              section_kind_preferences_version: user.reload.section_kind_preferences_version },
+      expected_rungs: { "code_review" => "junior" }
+    }.to_json, headers: json
+
+    expect(response).to have_http_status(:ok)
+    expect(user.reload.section_kind_levels).to eq("code_review" => "mid_level")
+  end
+
+  it "records cutoffs, under the row lock, when the skill level is saved from Setup" do
+    user = account_off_track(skill_level: "junior", section_kind_levels: { "pattern" => "senior" })
+    login_as(user)
+    expect_any_instance_of(User).to receive(:with_lock).and_call_original
+
+    patch profile_path, params: { user: { skill_level: "mid_level" } }.to_json, headers: json
+
+    expect(response).to have_http_status(:ok)
+    expect(user.reload.level_suggestion_cutoffs.keys).to match_array(ExerciseSection.keys - [ "pattern" ])
+    expect(user.level_suggestion_events).to be_empty
   end
 
   it "offers nothing to an untargeted kind while the skill level is principal engineer" do

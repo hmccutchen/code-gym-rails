@@ -79,10 +79,15 @@ export default class extends Controller {
   async apply() {
     this.setBusy(true)
     const levels = Object.assign({}, this.levelsValue)
-    this.listed().forEach((element) => { levels[element.dataset.kind] = element.dataset.to })
+    const expectedRungs = {}
+    this.listed().forEach((element) => {
+      levels[element.dataset.kind] = element.dataset.to
+      expectedRungs[element.dataset.kind] = element.dataset.from
+    })
     const setAside = this.removed()
     const result = await saveStatus.save("PATCH", this.urlValue,
-      { user: { section_kind_levels: levels, section_kind_preferences_version: this.versionValue } },
+      { user: { section_kind_levels: levels, section_kind_preferences_version: this.versionValue },
+        expected_rungs: expectedRungs },
       "track_apply")
 
     if (result && result.ok) {

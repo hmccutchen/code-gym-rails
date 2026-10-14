@@ -15,8 +15,8 @@ class LevelSuggestionEvent < ApplicationRecord
   def applied? = action == APPLIED
 
   # The proposal on screen was computed from the state before the save, so the caller passes that state in.
-  def self.applied_rows(user, before_rungs:, after_rungs:, locked:, cutoffs:, suggestions_on:)
-    changes = after_rungs.reject { |kind, rung| before_rungs[kind] == rung }
+  def self.applied_rows(user, kinds:, before_rungs:, after_rungs:, locked:, cutoffs:, suggestions_on:)
+    changes = after_rungs.slice(*kinds).reject { |kind, rung| before_rungs[kind] == rung }
     return [] if changes.empty?
 
     results = LevelSuggestion::Evidence.for(user).results

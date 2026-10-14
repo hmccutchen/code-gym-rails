@@ -55,7 +55,7 @@ class User < ApplicationRecord
   }
   before_save :finish_learning_track, if: :on_learning_track?
   after_save :record_level_suggestion_events, if: -> {
-    !previously_new_record? && !joined_learning_track? && (saved_change_to_section_kind_levels? || saved_change_to_skill_level?)
+    !previously_new_record? && !joined_learning_track? && saved_change_to_section_kind_levels?
   }
 
   scope :active, -> { where(anonymized_at: nil) }
@@ -478,10 +478,11 @@ class User < ApplicationRecord
   end
 
   def record_level_suggestion_events
-    before = KindDifficulty.new(levels: section_kind_levels_before_last_save || {},
-                                locked: locked_section_kinds_before_last_save || [])
+    before_levels = section_kind_levels_before_last_save || {}
+    before = KindDifficulty.new(levels: before_levels, locked: locked_section_kinds_before_last_save || [])
     level_suggestion_events.create!(LevelSuggestionEvent.applied_rows(
       self,
+      kinds: (before_levels.keys | section_kind_levels.keys).reject { |kind| before_levels[kind] == section_kind_levels[kind] },
       before_rungs: before.rungs(skill_level: skill_level_before_last_save),
       after_rungs: kind_rungs,
       locked: before.locked_keys,
