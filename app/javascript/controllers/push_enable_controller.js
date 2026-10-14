@@ -50,6 +50,7 @@ export default class extends Controller {
       .then(() => window.location.reload())
       .catch((error) => {
         this.buttonTarget.disabled = false
+        if (this.repairValue && Notification.permission === "denied") this.buttonTarget.hidden = true
         this.say(error?.readable ? error.message : this.failedTextValue)
       })
   }

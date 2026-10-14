@@ -4,13 +4,9 @@
 
     <div data-controller="push-enable"
          <%= tag.attributes(data: push_settings_data("push_enable")) %>
-         <%= tag.attributes(data: {
+         <%= tag.attributes(data: push_enable_outcome_texts.merge(
                push_enable_repair_value: true,
-               push_enable_repair_text_value: t("accounts.push_reminders.repair"),
-               push_enable_blocked_text_value: t("accounts.push_reminders.blocked", app_name: t("app_name")),
-               push_enable_waiting_text_value: t("accounts.push_reminders.waiting"),
-               push_enable_not_granted_text_value: t("accounts.push_reminders.not_granted"),
-               push_enable_failed_text_value: t("accounts.push_reminders.failed") }) %>>
+               push_enable_repair_text_value: t("accounts.push_reminders.repair"))) %>>
       <p class="reminder-status" id="push-repair-status" hidden data-push-enable-target="status"></p>
       <button type="button" id="push-repair" class="btn btn-ghost" hidden disabled
               data-push-enable-target="button" data-action="push-enable#enable"><%= t("accounts.push_reminders.repair_button") %></button>
@@ -30,13 +26,9 @@
     <p><%= t("accounts.push_reminders.offer") %></p>
     <div data-controller="push-enable"
          <%= tag.attributes(data: push_settings_data("push_enable")) %>
-         <%= tag.attributes(data: {
+         <%= tag.attributes(data: push_enable_outcome_texts.merge(
                push_enable_home_screen_only_text_value: t("accounts.push_reminders.home_screen_only", app_name: t("app_name")),
-               push_enable_unsupported_text_value: t("accounts.push_reminders.unsupported"),
-               push_enable_waiting_text_value: t("accounts.push_reminders.waiting"),
-               push_enable_blocked_text_value: t("accounts.push_reminders.blocked", app_name: t("app_name")),
-               push_enable_not_granted_text_value: t("accounts.push_reminders.not_granted"),
-               push_enable_failed_text_value: t("accounts.push_reminders.failed") }) %>>
+               push_enable_unsupported_text_value: t("accounts.push_reminders.unsupported"))) %>>
       <button type="button" id="push-enable" class="btn btn-ghost" disabled
               data-push-enable-target="button" data-action="push-enable#enable"><%= t("accounts.push_reminders.turn_on") %></button>
       <p class="reminder-status" id="push-status" hidden data-push-enable-target="status"></p>

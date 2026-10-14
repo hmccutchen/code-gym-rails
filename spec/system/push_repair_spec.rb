@@ -6,7 +6,7 @@ RSpec.describe "Allowing notifications on a device after reminders are already o
   let(:new_endpoint) { "https://web.push.apple.com/reinstalled" }
 
   # Like iOS, subscribe() fails until permission is granted, which only a click on the page can ask for.
-  def stub_push_apis(permission:)
+  def stub_push_apis(permission:, answer: "granted")
     script = <<~JS
       window.pushPermission = #{permission.to_json};
       const subscription = {
@@ -28,8 +28,8 @@ RSpec.describe "Allowing notifications on a device after reminders are already o
       Object.defineProperty(Notification, "permission", { configurable: true, get: () => window.pushPermission });
       Notification.requestPermission = () => {
         sessionStorage.setItem("permissionRequests", String(Number(sessionStorage.getItem("permissionRequests")) + 1));
-        window.pushPermission = "granted";
-        return Promise.resolve("granted");
+        window.pushPermission = #{answer.to_json};
+        return Promise.resolve(window.pushPermission);
       };
     JS
     page.driver.with_playwright_page { |pw| pw.add_init_script(script: script) }
@@ -59,6 +59,19 @@ RSpec.describe "Allowing notifications on a device after reminders are already o
     Timeout.timeout(10) { sleep 0.1 until user.push_subscriptions.reload.exists?(endpoint: new_endpoint) }
     expect(page.evaluate_script(%(Number(sessionStorage.getItem("permissionRequests"))))).to eq(1)
     expect(user.reload.reminder_level).to eq("ready_and_nudges")
+  end
+
+  it "takes the button away once the prompt is answered with Don't Allow" do
+    stub_push_apis(permission: "default", answer: "denied")
+    visit_as(user)
+    visit account_path
+    wait_for_js
+
+    click_button I18n.t("accounts.push_reminders.repair_button")
+
+    expect(page).to have_text(I18n.t("accounts.push_reminders.blocked", app_name: I18n.t("app_name")))
+    expect(page).to have_no_button(I18n.t("accounts.push_reminders.repair_button"))
+    expect(user.push_subscriptions.reload.pluck(:endpoint)).to eq([ old_endpoint ])
   end
 
   it "offers nothing on a device that already allowed notifications" do

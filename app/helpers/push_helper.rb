@@ -7,6 +7,13 @@ module PushHelper
       "#{controller}_register_failed_text_value" => t("push.register_failed") }
   end
 
+  def push_enable_outcome_texts
+    { push_enable_waiting_text_value: t("accounts.push_reminders.waiting"),
+      push_enable_blocked_text_value: t("accounts.push_reminders.blocked", app_name: t("app_name")),
+      push_enable_not_granted_text_value: t("accounts.push_reminders.not_granted"),
+      push_enable_failed_text_value: t("accounts.push_reminders.failed") }
+  end
+
   def known_push_endpoints
     return [] unless current_user.push_reminders_enabled?
 
