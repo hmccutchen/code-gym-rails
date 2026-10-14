@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_14_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_14_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -135,6 +135,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_14_120000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["code_digest"], name: "index_invite_codes_on_code_digest", unique: true
+  end
+
+  create_table "level_suggestion_events", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "kind", null: false
+    t.string "action", null: false
+    t.string "source"
+    t.string "from_level"
+    t.string "to_level"
+    t.integer "window_size", default: 0, null: false
+    t.integer "favourable", default: 0, null: false
+    t.integer "too_hard_latest3", default: 0, null: false
+    t.date "newest_result_on"
+    t.datetime "created_at", null: false
+    t.index ["user_id"], name: "index_level_suggestion_events_on_user_id"
   end
 
   create_table "push_subscriptions", force: :cascade do |t|
@@ -377,6 +392,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_14_120000) do
   add_foreign_key "daily_responses", "daily_exercises"
   add_foreign_key "daily_responses", "users"
   add_foreign_key "featured_concepts", "users"
+  add_foreign_key "level_suggestion_events", "users"
   add_foreign_key "push_subscriptions", "users"
   add_foreign_key "review_follow_ups", "daily_responses"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

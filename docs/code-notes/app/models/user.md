@@ -56,6 +56,20 @@ time.
 A repeat leave is accepted because Setup's Leave control can outlive a track
 that an Exercise mix save has already ended.
 
+## `#record_track_level_changes` and `#finish_learning_track`
+
+A target moved between two rungs of `TrackGraduation::LADDER` (junior,
+mid_level, senior) records a cutoff at the destination rung, through the
+user's own today, so results from an earlier stay at that rung never count
+again. A move to or from principal_engineer records none, because no
+suggestion leaves or reaches it. The same callback asks
+`LevelSuggestionEvent.applied_rows` for one `applied` row per changed target;
+`after_save` inserts them, so they commit or roll back with the level change.
+A save that also changes `learning_track` (joining or leaving) writes neither.
+
+The track ends only when no target sits below senior in `KindDifficulty::LEVELS`
+order, so moving the last junior kind to mid_level keeps the account on it.
+
 ## `#recent_performance`
 
 It returns the last N sessions by count, which matches the "last 10 sessions"
