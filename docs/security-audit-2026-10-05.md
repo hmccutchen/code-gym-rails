@@ -76,7 +76,7 @@ sections, and that user's duck conversation.
 | L4 | Login | low | Rate limits fail open if the Solid Cache table errors | XS |
 | L5 | Sessions | low | Logout can't revoke other copies of the cookie (cookie store, 2-day rolling expiry); `config.hosts` unset | S |
 | L6 | Sessions | low | ActionCable connection and two jobs look users up without the `active` scope | XS |
-| K2 | API keys | low | The ignored legacy `api_key` column still holds an old encrypted key until it is dropped | XS (planned) |
+| K2 | API keys | low | Fixed 2026-10-14: `RemoveApiKeyFromUsers` dropped the ignored legacy `api_key` column | done |
 | I1 | Infra | low | `temp-user-reset` service still exists in the production project | XS (dashboard) |
 | I2 | Infra | low | bundler-audit is not in CI | XS |
 
@@ -300,6 +300,8 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
   (`user.rb:762-764`), but changing keys doesn't.
 - **Fix:** the migration CLAUDE.md already plans, dropping the column.
 - **Size:** XS.
+- **Resolved** 2026-10-14 by `RemoveApiKeyFromUsers`, after a production
+  check found no key held only in the old column.
 
 ### Inputs that reach the AI
 
