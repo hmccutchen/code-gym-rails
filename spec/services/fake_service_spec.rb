@@ -44,11 +44,11 @@ RSpec.describe FakeService do
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: problem_set,
                                         language: "ruby_rails", generated_at: Time.current)
 
-      expect(exercise.third_key).to eq("architecture")
+      expect(ExerciseSection.resolved_key(exercise.problem_set, ExerciseSection.thirds)).to eq("architecture")
     end
 
     it "resolves its fourth shapes to plan_review, since plan_review has top precedence" do
-      expect(ExerciseSection.resolved_fourth_key(described_class::EXERCISE_PROBLEM_SET)).to eq("plan_review")
+      expect(ExerciseSection.resolved_key(described_class::EXERCISE_PROBLEM_SET, ExerciseSection.fourths)).to eq("plan_review")
     end
 
     it "delivers no more sections than a day holds" do

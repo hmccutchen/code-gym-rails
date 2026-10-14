@@ -23,13 +23,4 @@ class ConceptReference < ApplicationRecord
   def fully_written?
     complete? && lesson?
   end
-
-  # Truncated on read as well as bounded on write, like DailyResponse.usable_difficulty.
-  def self.ladder_rungs(bucket:, concepts:, level:)
-    field = AiService::LADDER_FIELD_FOR.fetch(level)
-
-    where(language: bucket, concept: concepts).select(&:ladder?).to_h do |reference|
-      [ reference.concept, reference.public_send(field).truncate(AiService::MAX_LADDER_RUNG_LENGTH) ]
-    end
-  end
 end

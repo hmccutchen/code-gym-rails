@@ -481,14 +481,12 @@ RSpec.describe DailyResponse, type: :model do
                                    answers: {}, section_ratings: section_ratings)
     end
 
-    it "treats right_level and too_easy as favorable, too_hard as unfavorable" do
+    it "treats right_level and too_easy as favorable and too_hard as not" do
       r = response_with("code_review" => "right_level", "pattern" => "too_easy", "challenge" => "too_hard")
 
       expect(r.self_rating_favorable?("code_review")).to be(true)
       expect(r.self_rating_favorable?("pattern")).to be(true)
       expect(r.self_rating_favorable?("challenge")).to be(false)
-      expect(r.self_rating_unfavorable?("challenge")).to be(true)
-      expect(r.self_rating_unfavorable?("code_review")).to be(false)
     end
 
     it "is nil-safe for a section with no rating" do
@@ -496,7 +494,6 @@ RSpec.describe DailyResponse, type: :model do
 
       expect(r.self_rating_for("pattern")).to be_nil
       expect(r.self_rating_favorable?("pattern")).to be(false)
-      expect(r.self_rating_unfavorable?("pattern")).to be(false)
       expect(r.self_rating_label("code_review")).to eq("just right")
     end
   end

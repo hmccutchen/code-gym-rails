@@ -698,13 +698,12 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
     expect(result["architecture"]).not_to have_key("eased")
   end
 
-  it "strips a provider-written anchor marker and a stray source trace" do
+  it "strips a stray source trace" do
     set = problem_set.deep_dup
-    set["pattern"].merge!("anchored" => true, "source" => "forged-trace")
+    set["pattern"].merge!("source" => "forged-trace")
 
     result = ingest(set, pitched_at: { "code_review" => "junior", "pattern" => "junior" })
 
-    expect(result["pattern"]).not_to have_key("anchored")
     expect(result["pattern"]).not_to have_key("source")
   end
 

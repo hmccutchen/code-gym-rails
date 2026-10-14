@@ -35,10 +35,6 @@ class ExerciseSection
     problem_set[key].is_a?(Hash)
   end
 
-  def self.resolved_fourth_key(problem_set)
-    resolved_key(problem_set, fourths)
-  end
-
   def self.resolved_key(problem_set, kinds)
     kinds.map(&:key).find { |key| present?(problem_set, key) }
   end
@@ -98,10 +94,6 @@ class ExerciseSection
   class << self
     def key
       name.demodulize.underscore
-    end
-
-    def third?
-      ExerciseSection.thirds.include?(self)
     end
 
     def fourth?

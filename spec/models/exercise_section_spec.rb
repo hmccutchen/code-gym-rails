@@ -30,17 +30,8 @@ RSpec.describe ExerciseSection do
   end
 
   describe ".thirds" do
-    it "lists the third-slot kinds in the resolution precedence order DailyExercise#third_key relies on" do
+    it "lists the third-slot kinds in the resolution precedence order active_section_keys relies on" do
       expect(described_class.thirds.map(&:key)).to eq(%w[architecture security_review challenge parsons_problem])
-    end
-
-    it "marks only the third-slot kinds as third?" do
-      expect(described_class.find("code_review").third?).to be(false)
-      expect(described_class.find("pattern").third?).to be(false)
-      expect(described_class.find("challenge").third?).to be(true)
-      expect(described_class.find("architecture").third?).to be(true)
-      expect(described_class.find("security_review").third?).to be(true)
-      expect(described_class.find("parsons_problem").third?).to be(true)
     end
   end
 
@@ -63,7 +54,7 @@ RSpec.describe ExerciseSection do
       set = { "ambiguity_hunt" => { "q" => "?" }, "pseudocode_to_code" => { "q" => "?" },
               "plan_review" => { "q" => "?" } }
 
-      expect(described_class.resolved_fourth_key(set)).to eq("plan_review")
+      expect(described_class.resolved_key(set, described_class.fourths)).to eq("plan_review")
     end
   end
 

@@ -1,4 +1,4 @@
-# Hand-curated; keys must already be lowercase, since .lookup downcases only its input.
+# Hand-curated; keys must already be lowercase, since glossary_wrap downcases only the matched text.
 module Glossary
   TERMS = {
     "abstraction" => "Hiding the messy details behind a simpler interface so callers only need to know what something does, not how.",
@@ -201,10 +201,6 @@ module Glossary
     "xss prevention" => "Cross-Site Scripting — an attack where untrusted input is rendered as executable script in another user's browser, prevented by escaping output.",
     "yagni" => "You Aren't Gonna Need It — a reminder not to build functionality speculatively, before there's an actual requirement for it."
   }.freeze
-
-  def self.lookup(term)
-    TERMS[term.to_s.strip.downcase]
-  end
 
   def self.learn_text
     TERMS.transform_keys { |term| "glossary:#{term}" }

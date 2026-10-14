@@ -502,7 +502,7 @@ RSpec.describe ResponseReview do
       resp = submitted_response
       resp.update!(
         ai_review: { "code_review" => { "rating" => "solid" }, "pattern" => { "rating" => "developing" } },
-        review_errors: { "challenge" => { "code" => "rate_limit", "message" => "rate limited" } }
+        review_errors: { "challenge" => { "kind" => "short_rate_limit", "at" => Time.current.iso8601 } }
       )
       fake_service = instance_double(ClaudeService)
       allow(AiService).to receive(:for).with(user).and_return(fake_service)

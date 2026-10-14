@@ -48,16 +48,6 @@ class DailyExercise < ApplicationRecord
     ExerciseSection.fixed_sections_share?(problem_set, plan_notes["shared_concept"])
   end
 
-  # Checked on the value's shape: a provider can emit a third key holding null or a string beside the real one.
-  def third_key
-    ExerciseSection.resolved_key(problem_set, ExerciseSection.thirds) || "challenge"
-  end
-
-  # No fallback kind: an exercise from before the fourth slot existed correctly answers nil.
-  def fourth_key
-    ExerciseSection.resolved_fourth_key(problem_set)
-  end
-
   # The single authority for section counts; never problem_set.keys, which can hold unrendered alternates.
   def active_section_keys
     ExerciseSection.resolved_keys(problem_set)
