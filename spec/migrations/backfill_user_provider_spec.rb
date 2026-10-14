@@ -4,6 +4,14 @@ migration_path = Rails.root.join("db/migrate/20260712020000_backfill_user_provid
 require migration_path.to_s
 
 RSpec.describe BackfillUserProvider do
+  # RemoveApiKeyFromUsers dropped the column this migration reads; the test transaction rolls this back.
+  before do
+    ActiveRecord::Base.connection.add_column :users, :api_key, :text
+    [ described_class::LegacyUser, User ].each(&:reset_column_information)
+  end
+
+  after { [ described_class::LegacyUser, User ].each(&:reset_column_information) }
+
   # Writes the column this migration read, which User itself no longer maps.
   def legacy_key(user, key, provider: nil)
     described_class::LegacyUser.find(user.id).update!(api_key: key, provider: provider)

@@ -182,6 +182,12 @@ RSpec.describe PreviewSeed do
       expect(response.daily_exercise.challenge).to be_present
     end
 
+    it "records which provider wrote the seeded review, as every real review does" do
+      user = PreviewSeed.run!
+
+      expect(user.daily_responses.find_by(date: Date.current - 1).review_provider).to eq(user.provider)
+    end
+
     it "seeds a submitted-but-unreviewed day so the no-review branch is reachable" do
       user = PreviewSeed.run!
       response = user.daily_responses.find_by(date: Date.current - 3)

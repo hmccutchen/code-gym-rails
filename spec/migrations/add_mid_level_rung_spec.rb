@@ -45,20 +45,6 @@ RSpec.describe AddMidLevelRung do
     expect(defaults).to all(eq("junior"))
   end
 
-  it "keeps signups readable when an old process cached the previous default" do
-    old_user = Class.new(ActiveRecord::Base) { self.table_name = "users" }
-    stub_const("PreMigrationUser", old_user)
-    rerun_migration do
-      expect(old_user.new.skill_level).to eq("developing")
-    end
-
-    signup = old_user.create!(email: "overlap@example.com", name: "Overlap")
-    expect(old_user.where(id: signup.id).pick(:skill_level)).to eq("developing")
-    user = User.find(signup.id)
-    expect(user.skill_level).to eq("junior")
-    expect(user).to be_valid
-  end
-
   it "rolls back mid-level skills without downgrading other current levels" do
     users = KindDifficulty::LEVELS.map.with_index do |level, index|
       User.create!(email: "rollback#{index}@example.com", name: "Level", skill_level: level)

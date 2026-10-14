@@ -52,6 +52,7 @@ class PreviewSeed
       response.submitted_at   = Time.current
       response.section_ratings = { "code_review" => "right_level", "pattern" => "right_level", "challenge" => "right_level" }
       response.ai_review      = sample_review
+      response.review_provider = user.provider
     end
 
     seed_day(user, Date.current - 3, challenge_set) do |response|

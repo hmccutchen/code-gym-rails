@@ -11,14 +11,8 @@ class User < ApplicationRecord
   serialize :api_keys, coder: JSON
   encrypts :api_keys
 
-  self.ignored_columns += [ "api_key" ]
-
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
   SKILL_LEVELS = KindDifficulty::LEVELS
-
-  LEGACY_SKILL_LEVELS = {
-    "beginner" => "junior", "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer"
-  }.freeze
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
 
@@ -54,7 +48,6 @@ class User < ApplicationRecord
   before_save :bump_section_kind_preferences_version, if: :section_kind_preferences_changed?
   before_save :record_track_level_changes, if: -> { on_learning_track? && section_kind_levels_changed? }
   before_save :finish_learning_track, if: :on_learning_track?
-  before_update :record_provider_on_unlabelled_reviews, if: -> { will_save_change_to_provider? && provider_in_database.present? }
 
   scope :active, -> { where(anonymized_at: nil) }
 
@@ -174,7 +167,6 @@ class User < ApplicationRecord
       return false if anonymized?
 
       push_subscriptions.destroy_all
-      clear_legacy_api_key
 
       update!(
         email:                  "deleted-user-#{id}@anonymized.local",
@@ -235,11 +227,6 @@ class User < ApplicationRecord
   def suggests_track_moves? = on_learning_track? && track_suggestions?
 
   def applies_track_proposals_in_place? = track_proposals_answered < LearningTrack::IN_PLACE_ANSWERS
-
-  def skill_level
-    stored = super
-    LEGACY_SKILL_LEVELS.fetch(stored, stored)
-  end
 
   def first_run?
     persisted? && learning_track.nil? && !daily_exercises.exists?
@@ -539,15 +526,6 @@ class User < ApplicationRecord
     (locked_section_kinds - section_kind_levels.keys).each do |key|
       errors.add(:locked_section_kinds, "locks #{key} without a difficulty target")
     end
-  end
-
-  def clear_legacy_api_key
-    self.class.where(id: id).update_all(api_key: nil)
-  end
-
-  def record_provider_on_unlabelled_reviews
-    daily_responses.where(review_provider: nil).where.not(ai_review: [ nil, {} ])
-                   .update_all(review_provider: provider_in_database)
   end
 
   def api_keys_name_providers

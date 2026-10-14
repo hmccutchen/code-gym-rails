@@ -839,22 +839,6 @@ RSpec.describe User, type: :model do
       expect(user.errors[:api_keys]).to include("has a blank key for anthropic")
     end
 
-    it "records the old provider on unlabelled reviews before switching" do
-      user = create_user
-      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-one", "openai" => "sk-proj-two" })
-      exercise = user.daily_exercises.create!(date: Date.new(2026, 9, 28), problem_set: { "code_review" => {} }, generated_at: Time.current)
-      reviewed = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
-                                              ai_review: { "code_review" => { "rating" => "solid" } })
-      other_exercise = user.daily_exercises.create!(date: Date.new(2026, 9, 29), problem_set: { "code_review" => {} }, generated_at: Time.current)
-      unreviewed = user.daily_responses.create!(daily_exercise: other_exercise, date: other_exercise.date, submitted_at: Time.current)
-
-      user.update!(provider: "openai")
-
-      expect(reviewed.reload.review_provider).to eq("anthropic")
-      expect(reviewed.review_provider_label).to eq("Claude")
-      expect(unreviewed.reload.review_provider).to be_nil
-    end
-
     it "stores no keys as nil, so the batch's has-a-key query skips the account" do
       user = create_user
       user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-one" })
@@ -866,24 +850,6 @@ RSpec.describe User, type: :model do
   end
 
   describe "#skill_level" do
-    it "reads every legacy value an old process can still write during deployment" do
-      user = create_user
-
-      { "beginner" => "junior", "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer" }.each do |stored, read|
-        user.update_column(:skill_level, stored)
-        expect(user.reload.skill_level).to eq(read)
-      end
-    end
-
-    it "can save another field on a legacy row without changing its stored skill level" do
-      user = create_user
-      user.update_column(:skill_level, "solid")
-
-      user.reload.update!(name: "Renamed")
-
-      expect(User.where(id: user.id).pick(:skill_level)).to eq("solid")
-    end
-
     it "starts a new account at junior" do
       expect(create_user.reload.skill_level).to eq("junior")
     end
@@ -926,16 +892,6 @@ RSpec.describe User, type: :model do
   end
 
   describe "#anonymize!" do
-    it "clears the legacy api_key column the migration left populated" do
-      user = create_user(email: "legacy-key@example.com")
-      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-secret" })
-      ActiveRecord::Base.connection.execute("UPDATE users SET api_key = 'legacy-ciphertext' WHERE id = #{user.id}")
-
-      user.anonymize!
-
-      expect(ActiveRecord::Base.connection.select_value("SELECT api_key FROM users WHERE id = #{user.id}")).to be_nil
-    end
-
     it "replaces or clears every identifying field" do
       user = create_user(email: "real@example.com", name: "Real Person")
       user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-secret" })
