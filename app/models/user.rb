@@ -465,7 +465,7 @@ class User < ApplicationRecord
 
     before = section_kind_levels_in_database || {}
     moved = section_kind_levels.select do |key, level|
-      before[key] != level && TrackGraduation::LADDER.include?(level)
+      before[key] != level && LevelSuggestion::LADDER.include?(level)
     end
     return if moved.empty?
 
@@ -487,7 +487,7 @@ class User < ApplicationRecord
   end
 
   def finish_learning_track
-    return if section_kind_levels.values.intersect?(TrackGraduation::LADDER[0...-1])
+    return if section_kind_levels.values.intersect?(LevelSuggestion::LADDER[0...-1])
 
     self.learning_track = LearningTrack::OFF
   end

@@ -1,11 +1,11 @@
-class LearningTrackDismissalsController < ApplicationController
+class LevelSuggestionDismissalsController < ApplicationController
   ACTIONS_BY_REASON = { "not_now" => "dismissed", "removed" => "removed" }.freeze
 
   # Evidence can age before the lock; never move a current-level cutoff back.
   def create
     return head(:not_found) unless current_user.on_learning_track?
 
-    evidence = TrackGraduation::Evidence.for(current_user)
+    evidence = LevelSuggestion::Evidence.for(current_user)
     outcome = nil
     current_user.with_lock { outcome = record_cutoffs(params[:kinds], evidence) }
 
@@ -37,7 +37,7 @@ class LearningTrackDismissalsController < ApplicationController
   end
 
   def existing_cutoff(kind)
-    TrackGraduation.cutoff_date(current_user.track_evidence_cutoffs[kind], level: current_user.section_kind_levels[kind])
+    LevelSuggestion.cutoff_date(current_user.track_evidence_cutoffs[kind], level: current_user.section_kind_levels[kind])
   end
 
   def cutoff_for(kind, through)
@@ -47,7 +47,7 @@ class LearningTrackDismissalsController < ApplicationController
   def valid_kinds?(kinds)
     kinds.is_a?(Array) && kinds.any? && kinds.all? do |kind|
       kind.is_a?(String) && ExerciseSection.keys.include?(kind) &&
-        TrackGraduation::LADDER.include?(current_user.section_kind_levels[kind])
+        LevelSuggestion::LADDER.include?(current_user.section_kind_levels[kind])
     end
   end
 end

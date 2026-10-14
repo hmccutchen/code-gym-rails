@@ -13,7 +13,7 @@ class DashboardController < ApplicationController
     end
     @response = @exercise&.daily_response ||
                 @exercise && DailyResponse.new(user: current_user, daily_exercise: @exercise, date: Date.current)
-    @track_proposal = TrackGraduation.for(current_user) if current_user.suggests_track_moves? && @response&.submitted?
+    @level_suggestion = LevelSuggestion.for(current_user) if current_user.suggests_track_moves? && @response&.submitted?
     @size_change = SizeForecast.for(current_user, @exercise) if @response&.submitted?
 
     @trial_status = TrialStatus.for(current_user) if current_user.on_trial?

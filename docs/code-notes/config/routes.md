@@ -11,3 +11,7 @@ The subscription resource is not nested under `account`. A user makes one remind
 ## `responses#pseudocode_critique`
 
 This collection route takes no `:id` because it runs before submission, when today's response may not exist yet.
+
+## `learning_track/dismissal` and `learning_track/answer`
+
+These two paths route straight to the level suggestion controllers. A dashboard tab opened before the rename still posts to them, and `CodeGymRequest.send` reads any followed redirect as an expired session, so a redirect would show "your session expired" and save nothing. Remove them with the ignored `track_suggestions` and `track_evidence_cutoffs` columns, one release after the rename.

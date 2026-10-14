@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Learning track dismissal events", type: :request do
+RSpec.describe "Level suggestion dismissal events", type: :request do
   let(:json) { { "Content-Type" => "application/json", "Accept" => "application/json" } }
   let(:user) do
     create_user_with_key.tap do |account|
@@ -11,7 +11,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
   def dismiss(kinds, **extra)
-    post learning_track_dismissal_path, params: { kinds: kinds, **extra }.to_json, headers: json
+    post level_suggestion_dismissal_path, params: { kinds: kinds, **extra }.to_json, headers: json
   end
 
   it "records a Not now with the offered move and the evidence behind it when no reason is sent" do
@@ -116,7 +116,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
     login_as(user)
 
     expect { get root_path }.not_to change(LevelSuggestionEvent, :count)
-    expect(Nokogiri::HTML(response.body).at_css("#track-proposal")).to be_present
+    expect(Nokogiri::HTML(response.body).at_css("#level-suggestion")).to be_present
     expect(user.reload.track_evidence_cutoffs).to eq({})
   end
 end

@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe TrackGraduation do
+RSpec.describe LevelSuggestion do
   let(:today) { Date.new(2026, 10, 14) }
 
   def result(days_ago, level: "junior", ai: "solid", self_rating: "right_level")

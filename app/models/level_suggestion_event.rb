@@ -20,7 +20,7 @@ class LevelSuggestionEvent < ApplicationRecord
                                                         .reject { |kind, level| before_levels[kind].presence == level }
     return [] if changes.empty?
 
-    results = TrackGraduation::Evidence.for(user).results
+    results = LevelSuggestion::Evidence.for(user).results
     offered = suggestions_on ? offered_moves(before_levels, locked, results, cutoffs) : {}
     changes.map do |kind, level|
       { kind: kind, action: APPLIED, source: level && offered[kind] == level ? "suggestion" : "setup_edit",
@@ -38,14 +38,14 @@ class LevelSuggestionEvent < ApplicationRecord
   end
 
   def self.offered_moves(levels, locked, results, cutoffs)
-    proposal = TrackGraduation.proposal(levels: levels || {}, locked: locked || [], results: results, cutoffs: cutoffs)
+    proposal = LevelSuggestion.proposal(levels: levels || {}, locked: locked || [], results: results, cutoffs: cutoffs)
     (proposal&.steps || []).to_h { |step| [ step.kind, step.to ] }
   end
 
   def self.evidence(kind, level, results, cutoffs)
     return {} if KindDifficulty::LEVELS.exclude?(level)
 
-    TrackGraduation.summary(kind: kind, level: level, results: results, cutoffs: cutoffs).to_h
+    LevelSuggestion.summary(kind: kind, level: level, results: results, cutoffs: cutoffs).to_h
   end
 
   private_class_method :offered_moves, :evidence

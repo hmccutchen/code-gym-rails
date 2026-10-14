@@ -1,4 +1,4 @@
-// Design notes: docs/code-notes/app/javascript/controllers/track_proposal_controller.md
+// Design notes: docs/code-notes/app/javascript/controllers/level_suggestion_controller.md
 import { Controller } from "@hotwired/stimulus"
 import saveStatus from "code_gym/save_status"
 
@@ -72,7 +72,7 @@ export default class extends Controller {
   }
 
   removeStep(event) {
-    event.currentTarget.closest("[data-track-proposal-target~='step']").hidden = true
+    event.currentTarget.closest("[data-level-suggestion-target~='step']").hidden = true
     this.applyTarget.disabled = this.listed().length === 0
   }
 

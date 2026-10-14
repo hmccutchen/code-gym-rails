@@ -14,7 +14,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   end
 
   def qualifying_days
-    TrackGraduation::WINDOW.times { |ago| reviewed_day(Date.current - ago, level: user.section_kind_levels["code_review"]) }
+    LevelSuggestion::WINDOW.times { |ago| reviewed_day(Date.current - ago, level: user.section_kind_levels["code_review"]) }
   end
 
   def own_proposal(answered:)
@@ -22,7 +22,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
                  track_proposals_answered: answered)
     qualifying_days
     visit_as(user)
-    expect(page).to have_css("#track-proposal", text: "Try Code Review at mid-level?")
+    expect(page).to have_css("#level-suggestion", text: "Try Code Review at mid-level?")
   end
 
   def wait_for_saves
@@ -32,9 +32,9 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   it "counts an applied proposal" do
     own_proposal(answered: 0)
 
-    within("#track-proposal") { click_button "Apply" }
+    within("#level-suggestion") { click_button "Apply" }
 
-    expect(page).to have_css("#track-proposal", text: "Done. Your next sets use the new level.")
+    expect(page).to have_css("#level-suggestion", text: "Done. Your next sets use the new level.")
     wait_for_saves
     expect(user.reload.section_kind_levels["code_review"]).to eq("mid_level")
     expect(user.track_proposals_answered).to eq(1)
@@ -44,11 +44,11 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels.transform_values { "senior" }.merge("code_review" => "mid_level"))
     qualifying_days
     visit_as(user)
-    expect(page).to have_css("#track-proposal", text: "Try Code Review at senior?")
+    expect(page).to have_css("#level-suggestion", text: "Try Code Review at senior?")
 
-    within("#track-proposal") { click_button "Apply" }
+    within("#level-suggestion") { click_button "Apply" }
 
-    expect(page).to have_css("#track-proposal", text: "Done. Your next sets use the new level.")
+    expect(page).to have_css("#level-suggestion", text: "Done. Your next sets use the new level.")
     wait_for_saves
     expect(user.reload.learning_track).to eq("none")
     expect(page).to have_css("#save-status", visible: :hidden)
@@ -57,9 +57,9 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   it "counts a dismissed proposal" do
     own_proposal(answered: 0)
 
-    within("#track-proposal") { click_button "Not now" }
+    within("#level-suggestion") { click_button "Not now" }
 
-    expect(page).to have_css("#track-proposal", text: "Okay. This comes back once there's more to go on.")
+    expect(page).to have_css("#level-suggestion", text: "Okay. This comes back once there's more to go on.")
     wait_for_saves
     expect(user.reload.track_proposals_answered).to eq(1)
   end
@@ -67,7 +67,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   it "sends a later proposal to the Exercise mix, where the user makes the change" do
     own_proposal(answered: LearningTrack::IN_PLACE_ANSWERS)
 
-    within("#track-proposal") { click_link "Change it in Setup" }
+    within("#level-suggestion") { click_link "Change it in Setup" }
 
     expect(page).to have_css("#exercise-mix[open]")
     expect(page).to have_text("Code Gym suggested moving Code Review to mid-level.")
@@ -95,12 +95,12 @@ RSpec.describe "Learning track suggestion controls", type: :system do
         own_proposal(answered: 0)
         page.execute_script(<<~JS)
           const originalFetch = window.fetch;
-          window.fetch = (url, options) => url.endsWith(#{learning_track_answer_path.to_json})
+          window.fetch = (url, options) => url.endsWith(#{level_suggestion_answer_path.to_json})
             ? #{reply}
             : originalFetch(url, options);
         JS
 
-        within("#track-proposal") { click_button action }
+        within("#level-suggestion") { click_button action }
         wait_for_saves
 
         expected_level = action == "Apply" ? "mid_level" : "junior"
@@ -108,7 +108,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
         expect(user.track_evidence_cutoffs["code_review"]).to eq("level" => expected_level, "through" => Date.current.iso8601)
         expect(user.track_proposals_answered).to eq(0)
         confirmation = action == "Apply" ? "Done. Your next sets use the new level." : "Okay. This comes back once there's more to go on."
-        expect(page).to have_css("#track-proposal", text: confirmation)
+        expect(page).to have_css("#level-suggestion", text: confirmation)
         expect(page).to have_css("#save-status", text: "Your choice was saved, but we couldn't update the suggestion count. You don't need to repeat it.")
       end
     end
@@ -117,18 +117,18 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   it "counts a dismissal from a proposal that links to Setup" do
     own_proposal(answered: LearningTrack::IN_PLACE_ANSWERS)
 
-    within("#track-proposal") { click_button "Not now" }
+    within("#level-suggestion") { click_button "Not now" }
 
-    expect(page).to have_css("#track-proposal", text: "Okay. This comes back once there's more to go on.")
+    expect(page).to have_css("#level-suggestion", text: "Okay. This comes back once there's more to go on.")
     wait_for_saves
     expect(user.reload.track_proposals_answered).to eq(LearningTrack::IN_PLACE_ANSWERS + 1)
   end
 
   it "counts nothing when the dismissal fails" do
     own_proposal(answered: LearningTrack::IN_PLACE_ANSWERS)
-    fail_requests_to(learning_track_dismissal_path)
+    fail_requests_to(level_suggestion_dismissal_path)
 
-    within("#track-proposal") { click_button "Not now" }
+    within("#level-suggestion") { click_button "Not now" }
 
     expect(page).to have_button("Not now", disabled: false)
     expect(page).to have_link("Change it in Setup")

@@ -10,7 +10,7 @@ report (d).
 ## Counts come from the server
 
 `window_size`, `favourable`, `too_hard_latest3` and `newest_result_on` are
-`TrackGraduation.summary` at `from_level`, computed from stored results with
+`LevelSuggestion.summary` at `from_level`, computed from stored results with
 the cutoffs as they stood before the change. Nothing the browser sends is
 used. A kind with no previous target keeps the column defaults.
 

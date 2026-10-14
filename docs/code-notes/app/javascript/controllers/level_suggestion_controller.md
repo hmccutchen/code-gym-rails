@@ -1,4 +1,4 @@
-# app/javascript/controllers/track_proposal_controller.js
+# app/javascript/controllers/level_suggestion_controller.js
 
 ## What it owns
 

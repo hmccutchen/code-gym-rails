@@ -48,7 +48,7 @@ RSpec.describe LevelSuggestionEvent, type: :model do
     end
 
     it "builds nothing and reads no evidence when no target changed" do
-      expect(TrackGraduation::Evidence).not_to receive(:for)
+      expect(LevelSuggestion::Evidence).not_to receive(:for)
 
       expect(rows(before: { "code_review" => "junior" }, after: { "code_review" => "junior" })).to eq([])
     end

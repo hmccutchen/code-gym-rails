@@ -1,4 +1,4 @@
-class TrackGraduation
+class LevelSuggestion
   # Principal is only ever set by hand, so senior is the top step and no suggestion leaves or reaches it.
   LADDER = (KindDifficulty::LEVELS - [ "principal_engineer" ]).freeze
   WINDOW = 5

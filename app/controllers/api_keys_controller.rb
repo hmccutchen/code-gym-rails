@@ -32,7 +32,7 @@ class ApiKeysController < ApplicationController
   private
 
   def suggested_level
-    params[:suggested_level] if TrackGraduation::LADDER.include?(params[:suggested_level])
+    params[:suggested_level] if LevelSuggestion::LADDER.include?(params[:suggested_level])
   end
 
   def suggested_kinds

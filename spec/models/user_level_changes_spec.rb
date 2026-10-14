@@ -14,7 +14,7 @@ RSpec.describe User, "level changes on the learning track", type: :model do
   end
 
   def junior_proposal_for(account)
-    TrackGraduation.for(account)&.steps&.map(&:kind)
+    LevelSuggestion.for(account)&.steps&.map(&:kind)
   end
 
   describe "cutoffs" do
@@ -55,8 +55,8 @@ RSpec.describe User, "level changes on the learning track", type: :model do
         "level" => "junior", "through" => (local_today + 1).iso8601
       )
       expect(junior_proposal_for(user)).to be_nil
-      summary = TrackGraduation.summary(kind: "code_review", level: "junior",
-                                        results: TrackGraduation::Evidence.for(user).results,
+      summary = LevelSuggestion.summary(kind: "code_review", level: "junior",
+                                        results: LevelSuggestion::Evidence.for(user).results,
                                         cutoffs: user.track_evidence_cutoffs)
       expect(summary.window_size).to eq(0)
     end
@@ -71,8 +71,8 @@ RSpec.describe User, "level changes on the learning track", type: :model do
       expect(user.reload.track_evidence_cutoffs["code_review"]).to eq(
         "level" => "mid_level", "through" => (local_today + 2).iso8601
       )
-      summary = TrackGraduation.summary(kind: "code_review", level: "mid_level",
-                                        results: TrackGraduation::Evidence.for(user).results,
+      summary = LevelSuggestion.summary(kind: "code_review", level: "mid_level",
+                                        results: LevelSuggestion::Evidence.for(user).results,
                                         cutoffs: user.track_evidence_cutoffs)
       expect(summary.window_size).to eq(0)
     end

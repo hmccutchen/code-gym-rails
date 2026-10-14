@@ -17,7 +17,7 @@ RSpec.describe User, "learning track", type: :model do
   describe "track vocabulary and storage" do
     it "keeps joining decisions and target levels in separate closed lists" do
       expect(LearningTrack::VALUES).to eq(%w[junior none])
-      expect(TrackGraduation::LADDER).to eq(%w[junior mid_level senior])
+      expect(LevelSuggestion::LADDER).to eq(%w[junior mid_level senior])
     end
 
     it "derives a fresh junior preset from every registered kind" do
