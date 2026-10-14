@@ -42,19 +42,22 @@ RSpec.describe LevelSuggestionEvent, type: :model do
   describe ".applied_rows" do
     around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
+    def rows(before:, after:)
+      described_class.applied_rows(user, before_levels: before, after_levels: after,
+                                         locked: [], cutoffs: {}, suggestions_on: true)
+    end
+
     it "builds nothing and reads no evidence when no target changed" do
       expect(TrackGraduation::Evidence).not_to receive(:for)
 
-      expect(described_class.applied_rows(user, before: { "code_review" => "junior" },
-                                                after: { "code_review" => "junior" })).to eq([])
+      expect(rows(before: { "code_review" => "junior" }, after: { "code_review" => "junior" })).to eq([])
     end
 
     it "counts evidence at the level the kind moved from" do
       reviewed_level_days(user, "code_review", "junior", 3, self: "too_hard", ai: "developing")
       reviewed_level_day(user, Date.current - 5, { "code_review" => { rung: "mid_level" } })
 
-      row = described_class.applied_rows(user, before: { "code_review" => "junior" },
-                                               after: { "code_review" => "mid_level" }).sole
+      row = rows(before: { "code_review" => "junior" }, after: { "code_review" => "mid_level" }).sole
 
       expect(row).to include(kind: "code_review", action: "applied", source: "setup_edit",
                              from_level: "junior", to_level: "mid_level", window_size: 3,
@@ -62,7 +65,7 @@ RSpec.describe LevelSuggestionEvent, type: :model do
     end
 
     it "leaves counts at their defaults for a kind with no previous target" do
-      row = described_class.applied_rows(user, before: {}, after: { "pattern" => "senior" }).sole
+      row = rows(before: {}, after: { "pattern" => "senior" }).sole
 
       expect(row).to include(from_level: nil, to_level: "senior", source: "setup_edit")
       expect(row).not_to include(:window_size)

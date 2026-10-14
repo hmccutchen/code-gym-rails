@@ -49,6 +49,32 @@ RSpec.describe "Learning track dismissal events", type: :request do
     expect(user.reload.track_evidence_cutoffs["code_review"]["through"]).to eq((Date.current - 1).iso8601)
   end
 
+  it "writes no second row when the same Not now is sent again with no newer results" do
+    reviewed_level_days(user, "code_review", "junior", 5, ending: Date.current - 1)
+    login_as(user)
+
+    dismiss([ "code_review" ])
+    dismiss([ "code_review" ])
+
+    expect(response).to have_http_status(:ok)
+    expect(user.level_suggestion_events.count).to eq(1)
+  end
+
+  it "writes a new row when a newer reviewed day moves the cutoff forward" do
+    reviewed_level_days(user, "code_review", "junior", 5, ending: Date.current - 2)
+    login_as(user)
+    dismiss([ "code_review" ])
+
+    reviewed_level_days(user, "code_review", "junior", 1, ending: Date.current - 1)
+    dismiss([ "code_review" ])
+
+    expect(response).to have_http_status(:ok)
+    expect(user.level_suggestion_events.order(:id).pluck(:newest_result_on)).to eq(
+      [ Date.current - 2, Date.current - 1 ]
+    )
+    expect(user.reload.track_evidence_cutoffs["code_review"]["through"]).to eq((Date.current - 1).iso8601)
+  end
+
   [ "later", "", [ "not_now" ] ].each do |reason|
     it "refuses the reason #{reason.inspect} and writes nothing" do
       login_as(user)
@@ -63,6 +89,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
 
   it "dismisses a mid-level kind with a cutoff at its current target" do
     user.update!(section_kind_levels: user.section_kind_levels.merge("pattern" => "mid_level"))
+    travel 1.day
     login_as(user)
 
     dismiss([ "pattern" ])

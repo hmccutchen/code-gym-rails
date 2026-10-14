@@ -14,32 +14,31 @@ class LevelSuggestionEvent < ApplicationRecord
 
   def applied? = action == APPLIED
 
-  # Reads the database copies, since the proposal on screen was computed from the levels before this save.
-  def self.applied_rows(user, before:, after:)
-    changes = after.select { |kind, level| level.present? && before[kind] != level }
+  # The proposal on screen was computed from the state before the save, so the caller passes that state in.
+  def self.applied_rows(user, before_levels:, after_levels:, locked:, cutoffs:, suggestions_on:)
+    changes = (before_levels.keys | after_levels.keys).to_h { |kind| [ kind, after_levels[kind].presence ] }
+                                                        .reject { |kind, level| before_levels[kind].presence == level }
     return [] if changes.empty?
 
     results = TrackGraduation::Evidence.for(user).results
-    cutoffs = user.track_evidence_cutoffs_in_database || {}
-    offered = user.track_suggestions_in_database ? offered_moves(user, before, results, cutoffs) : {}
+    offered = suggestions_on ? offered_moves(before_levels, locked, results, cutoffs) : {}
     changes.map do |kind, level|
-      { kind: kind, action: APPLIED, source: offered[kind] == level ? "suggestion" : "setup_edit",
-        from_level: before[kind], to_level: level, **evidence(kind, before[kind], results, cutoffs) }
+      { kind: kind, action: APPLIED, source: level && offered[kind] == level ? "suggestion" : "setup_edit",
+        from_level: before_levels[kind], to_level: level, **evidence(kind, before_levels[kind], results, cutoffs) }
     end
   end
 
   def self.dismissal_rows(user, kinds:, action:, results:)
     levels = user.section_kind_levels
-    offered = offered_moves(user, levels, results, user.track_evidence_cutoffs)
+    offered = offered_moves(levels, user.locked_section_kinds, results, user.track_evidence_cutoffs)
     kinds.map do |kind|
       { kind: kind, action: action, from_level: levels[kind], to_level: offered[kind],
         **evidence(kind, levels[kind], results, user.track_evidence_cutoffs) }
     end
   end
 
-  def self.offered_moves(user, levels, results, cutoffs)
-    locked = user.locked_section_kinds_in_database || []
-    proposal = TrackGraduation.proposal(levels: levels || {}, locked: locked, results: results, cutoffs: cutoffs)
+  def self.offered_moves(levels, locked, results, cutoffs)
+    proposal = TrackGraduation.proposal(levels: levels || {}, locked: locked || [], results: results, cutoffs: cutoffs)
     (proposal&.steps || []).to_h { |step| [ step.kind, step.to ] }
   end
 

@@ -172,22 +172,22 @@ RSpec.describe User, "learning track", type: :model do
       expect(user.reload.track_evidence_cutoffs).to eq({})
     end
 
-    it "records nothing for a change to or from a level outside the track" do
+    it "records nothing for a move to principal engineer and a cutoff for the move back" do
       user = on_track
       user.update!(section_kind_levels: user.section_kind_levels.merge("pattern" => "principal_engineer"))
       expect(user.reload.track_evidence_cutoffs).to eq({})
 
       user.update!(section_kind_levels: user.section_kind_levels.merge("pattern" => "junior"))
-      expect(user.reload.track_evidence_cutoffs).to eq({})
+      expect(user.reload.track_evidence_cutoffs).to eq("pattern" => { "level" => "junior", "through" => "2026-10-14" })
     end
 
-    it "records nothing when removing a target or setting one for the first time" do
+    it "records nothing when removing a target and a cutoff when setting one for the first time" do
       user = on_track
       user.update!(section_kind_levels: user.section_kind_levels.except("pattern"))
       expect(user.reload.track_evidence_cutoffs).to eq({})
 
       user.update!(section_kind_levels: user.section_kind_levels.merge("pattern" => "senior"))
-      expect(user.reload.track_evidence_cutoffs).to eq({})
+      expect(user.reload.track_evidence_cutoffs).to eq("pattern" => { "level" => "senior", "through" => "2026-10-14" })
     end
 
     it "records nothing off the track" do

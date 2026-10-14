@@ -49,8 +49,9 @@ class User < ApplicationRecord
   before_save :bump_section_kind_preferences_version, if: :section_kind_preferences_changed?
   before_save :record_track_level_changes, if: -> { on_learning_track? && section_kind_levels_changed? }
   before_save :finish_learning_track, if: :on_learning_track?
-  after_save :insert_level_suggestion_events, if: -> { @level_suggestion_events.present? }
-  after_rollback { @level_suggestion_events = nil }
+  after_save :record_level_suggestion_events, if: -> {
+    learning_track_before_last_save == LearningTrack::ON && saved_change_to_section_kind_levels?
+  }
 
   scope :active, -> { where(anonymized_at: nil) }
 
@@ -463,9 +464,8 @@ class User < ApplicationRecord
     return if learning_track_changed?
 
     before = section_kind_levels_in_database || {}
-    @level_suggestion_events = LevelSuggestionEvent.applied_rows(self, before: before, after: section_kind_levels)
     moved = section_kind_levels.select do |key, level|
-      before[key] != level && TrackGraduation::LADDER.include?(level) && TrackGraduation::LADDER.include?(before[key])
+      before[key] != level && TrackGraduation::LADDER.include?(level)
     end
     return if moved.empty?
 
@@ -475,15 +475,19 @@ class User < ApplicationRecord
     )
   end
 
-  def insert_level_suggestion_events
-    rows = @level_suggestion_events
-    @level_suggestion_events = nil
-    level_suggestion_events.create!(rows)
+  def record_level_suggestion_events
+    level_suggestion_events.create!(LevelSuggestionEvent.applied_rows(
+      self,
+      before_levels: section_kind_levels_before_last_save || {},
+      after_levels: section_kind_levels,
+      locked: locked_section_kinds_before_last_save || [],
+      cutoffs: track_evidence_cutoffs_before_last_save || {},
+      suggestions_on: track_suggestions_before_last_save
+    ))
   end
 
   def finish_learning_track
-    below_graduation = KindDifficulty::LEVELS.take_while { |level| level != LearningTrack::GRADUATED_LEVEL }
-    return if section_kind_levels.values.intersect?(below_graduation)
+    return if section_kind_levels.values.intersect?(TrackGraduation::LADDER[0...-1])
 
     self.learning_track = LearningTrack::OFF
   end

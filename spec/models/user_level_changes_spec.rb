@@ -60,6 +60,22 @@ RSpec.describe User, "level changes on the learning track", type: :model do
                                         cutoffs: user.track_evidence_cutoffs)
       expect(summary.window_size).to eq(0)
     end
+    it "records a new cutoff when a kind returns to the ladder from principal engineer" do
+      move("code_review" => "mid_level")
+      reviewed_level_days(user, "code_review", "mid_level", 5, ending: local_today)
+      travel 1.day
+      move("code_review" => "principal_engineer")
+      travel 1.day
+      move("code_review" => "mid_level")
+
+      expect(user.reload.track_evidence_cutoffs["code_review"]).to eq(
+        "level" => "mid_level", "through" => (local_today + 2).iso8601
+      )
+      summary = TrackGraduation.summary(kind: "code_review", level: "mid_level",
+                                        results: TrackGraduation::Evidence.for(user).results,
+                                        cutoffs: user.track_evidence_cutoffs)
+      expect(summary.window_size).to eq(0)
+    end
   end
 
   describe "applied events" do
@@ -84,6 +100,18 @@ RSpec.describe User, "level changes on the learning track", type: :model do
       )
     end
 
+    it "records a reset to Default as a Setup edit with no destination" do
+      user.update_columns(section_kind_levels: user.section_kind_levels.merge("code_review" => "mid_level"))
+      reviewed_level_days(user, "code_review", "mid_level", 5, ending: local_today)
+
+      user.update!(section_kind_levels: user.section_kind_levels.except("code_review"))
+
+      expect(user.level_suggestion_events.sole).to have_attributes(
+        kind: "code_review", action: "applied", source: "setup_edit", from_level: "mid_level", to_level: nil,
+        window_size: 5
+      )
+    end
+
     it "labels every change a Setup edit while suggestions are switched off" do
       reviewed_level_days(user, "code_review", "junior", 5, ending: local_today - 1)
       user.update!(track_suggestions: false)
@@ -93,10 +121,37 @@ RSpec.describe User, "level changes on the learning track", type: :model do
       expect(user.level_suggestion_events.sole.source).to eq("setup_edit")
     end
 
-    it "writes nothing when the save that changes levels also leaves the track" do
-      user.update!(learning_track: "none", section_kind_levels: user.section_kind_levels.merge("pattern" => "senior"))
+    it "writes nothing for the save that joins the track" do
+      account = create_user_with_key(learning_track: nil)
+      account.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
+
+      expect(account.level_suggestion_events).to be_empty
+    end
+
+    it "writes nothing when Leave changes no level" do
+      user.update!(learning_track: "none")
 
       expect(user.level_suggestion_events).to be_empty
+    end
+
+    it "writes the row for the save that ends the track by moving the last kind to senior" do
+      user.update!(section_kind_levels: ExerciseSection.keys.index_with { "senior" }.merge("pattern" => "mid_level"))
+      user.level_suggestion_events.delete_all
+
+      move("pattern" => "senior")
+
+      expect(user.reload.learning_track).to eq("none")
+      expect(user.level_suggestion_events.sole).to have_attributes(kind: "pattern", from_level: "mid_level", to_level: "senior")
+    end
+
+    it "rolls back the level change and its cutoff when the row cannot be written" do
+      allow(LevelSuggestionEvent).to receive(:applied_rows).and_return([ { kind: "code_review", action: "ignored" } ])
+
+      expect { move("code_review" => "mid_level") }.to raise_error(ActiveRecord::RecordInvalid)
+
+      expect(user.reload.section_kind_levels["code_review"]).to eq("junior")
+      expect(user.track_evidence_cutoffs).to eq({})
+      expect(LevelSuggestionEvent.count).to eq(0)
     end
 
     it "writes nothing when the level save fails validation" do

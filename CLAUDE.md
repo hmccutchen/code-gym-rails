@@ -385,6 +385,7 @@ Every dashboard, /learn and /history load, any day of the week:
 | `InviteCode`    | code_digest (SHA-256 of the raw code, unique), label, seats, redeemed_count, expires_at, trial_days, daily_request_cap |
 | `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
 | `FeaturedConcept` | user_id, week_of (the Monday, in the user's zone), bucket, concept — unique on user_id and week_of; one row per week a user had a concept to feature |
+| `LevelSuggestionEvent` | user_id, kind, action (applied/dismissed/removed), source (suggestion/setup_edit, applied rows only), from_level, to_level, window_size, favourable, too_hard_latest3, newest_result_on |
 
 `ConceptReference` (not listed above — it has no `user_id`; see "The Learn tab"
 below) now also carries `guide_plain_language`, `guide_worked_example`,
@@ -499,8 +500,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   **A cutoff keeps the same work from proposing another move.**
   Not now records each kind's current level and the newest reviewed response
   date, falling back to the user's today, so an offer returns only on newer
-  results at that level, five of them for a step up. A move between two ladder levels, in either
-  direction and however it was saved, records the destination level and
+  results at that level, five of them for a step up. A move to a ladder level, from any level
+  or none and however it was saved, records the destination level and
   today's date in the user's zone, so results from an earlier stay at that
   level never count again. Evidence through a cutoff's date is ignored at its
   level, and results at any other level never count. The profile join check
@@ -524,7 +525,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   last junior kind to mid-level keeps the track. `level_suggestion_events`
   records `applied` rows (source `suggestion` or `setup_edit`), `dismissed`
   and `removed` rows, each with the evidence counts behind it, written only
-  by level-changing saves and the dismissal endpoint.
+  by level-changing saves and the dismissal endpoint, which writes a row only
+  for a kind whose cutoff moves forward.
 
   **Known gap:** a track account whose kinds all reach senior leaves the
   track, and with it every suggestion, step-backs included, until
@@ -3313,7 +3315,8 @@ always pull in the full suite — is stated once, in
 - `app/services/size_forecast.rb` — `SizeForecast`: whether tomorrow's Automatic set will be larger, or smaller because of the brake, than today's planned one, for the submitted dashboard's size lines.
 - `app/services/competency_gate/evidence.rb` — the gate's only query: every rubric-stamped reviewed day, oldest first, in batches, as `CompetencyGate::Day` values.
 - `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileController`.
-- `app/controllers/learning_track_dismissals_controller.rb` — records Not now cutoffs for the current user under the user-row lock.
+- `app/controllers/learning_track_dismissals_controller.rb` — records Not now and removed-kind cutoffs for the current user under the user-row lock, with a `dismissed` or `removed` event row for each kind whose cutoff moves forward.
+- `app/models/level_suggestion_event.rb` — `LevelSuggestionEvent`: one row per answer to a level suggestion (`applied`, `dismissed`, `removed`) with the evidence counts behind it; builds applied rows from the state `User` passes in from before the save.
 - `app/controllers/learning_track_answers_controller.rb` — counts an answered proposal, which decides whether the next one applies in place or links to Setup.
 - `app/views/dashboard/_track_proposal.html.erb` — submitted-day proposal with counts from the evidence, a removable list when several kinds share a destination, and in-place Apply/Not now saves.
 - `script/prepare_junior_ladders.rb` (+ `script/junior_ladder_preparation.rb`) — operator coverage report; explicit `--run` queues shared-reference refreshes using the operator's key.

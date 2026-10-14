@@ -24,6 +24,21 @@ Setup edit that happens to match a pending proposal is therefore labelled
 `suggestion`, since the suggestion is what it answers. With suggestions off no
 offer was on screen, so every change is `setup_edit`.
 
-Applied rows read `*_in_database` values because the save has already
-assigned the new levels by the time the callback runs. Dismissal rows read
-the reloaded row under the controller's lock, before its cutoffs change.
+`applied_rows` is a plain builder: it reads no dirty tracking. `User` calls
+it from one `after_save`, which runs when the account was on the track before
+the save and the save changed `section_kind_levels`, and passes the levels,
+locks, cutoffs and suggestion switch from `*_before_last_save`, since the
+save has already written the new values by then. The insert runs in the
+save's transaction, so a failed insert raises and rolls back the level change
+and its cutoff together. The join save writes nothing, a Leave that changes no
+level writes nothing, and the save that ends the track by moving the last kind
+to senior still writes its rows.
+
+## Dismissal rows
+
+Dismissal rows read the reloaded row under the controller's lock, before its
+cutoffs change. The endpoint writes a row only for a kind whose cutoff at its
+current level moves forward: one with no cutoff at that level, or one dated
+before the newest reviewed result (or today, with no results). A repeated Not
+now, from a double click or a retry with no newer results, leaves the cutoff
+where it was, writes no row and still answers with success.
