@@ -32,7 +32,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
   describe "the dashboard proposal" do
     it "applies in place and links to the off switch while the user has answered fewer than the threshold" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS - 1)
+      user = track_user(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS - 1)
       with_own_proposal(user)
 
       get root_path
@@ -45,7 +45,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     end
 
     it "sends the user to the Exercise mix with the suggested kinds once they have answered the threshold" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS)
+      user = track_user(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS)
       with_own_proposal(user)
 
       get root_path
@@ -58,7 +58,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     end
 
     it "offers no keep buttons on a card of several kinds that goes to Setup" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS)
+      user = track_user(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS)
       reviewed_days(user, { "code_review" => "junior", "pattern" => "junior" })
       login_as(user)
 
@@ -70,7 +70,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
     # An excluded kind's difficulty is disabled on Setup, so sending the user there would leave nothing to change.
     it "keeps applying in place when a proposed kind is excluded" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS,
+      user = track_user(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS,
                         excluded_section_kinds: [ "security_review" ])
       reviewed_days(user, { "code_review" => "junior", "security_review" => "junior" })
       login_as(user)
@@ -107,15 +107,15 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       expect(user.reload.track_proposals_answered).to eq(2)
     end
 
-    it "counts nothing for an account off the track, without refusing" do
+    it "counts an answer for an account off the track" do
       user = create_user_with_key
       login_as(user)
 
       post level_suggestion_answer_path, params: {}.to_json, headers: json
 
       expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)).to eq("answered" => 0)
-      expect(user.reload.track_proposals_answered).to eq(0)
+      expect(JSON.parse(response.body)).to eq("answered" => 1)
+      expect(user.reload.track_proposals_answered).to eq(1)
     end
   end
 
@@ -222,13 +222,13 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       end
     end
 
-    it "marks nothing for an account off the track" do
+    it "marks the suggested kinds for an account off the track" do
       login_as(create_user_with_key)
 
       get setup_path(suggested: [ "code_review" ], suggested_level: "senior")
 
-      expect(page_html.at_css("#exercise-mix")["open"]).to be_nil
-      expect(page_html.css(".mix-suggested")).to be_empty
+      expect(page_html.at_css("#exercise-mix")["open"]).not_to be_nil
+      expect(page_html.css(".mix-suggested").map { |row| row["data-kind"] }).to eq([ "code_review" ])
     end
   end
 end

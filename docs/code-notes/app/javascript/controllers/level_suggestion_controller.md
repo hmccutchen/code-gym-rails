@@ -2,7 +2,7 @@
 
 ## What it owns
 
-The dashboard's learning-track proposal: applying the proposed levels,
+The dashboard's level suggestion card: applying the proposed levels,
 removing kinds from a card that lists several, and dismissing the whole thing.
 
 ## Two writes, not one transaction

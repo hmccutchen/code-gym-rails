@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe User, "level changes on the learning track", type: :model do
+RSpec.describe User, "level changes", type: :model do
   let(:user) do
     create_user_with_key(time_zone: "America/Los_Angeles")
       .tap { |account| account.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels) }
@@ -100,14 +100,14 @@ RSpec.describe User, "level changes on the learning track", type: :model do
       )
     end
 
-    it "records a reset to Default as a Setup edit with no destination" do
+    it "records a reset to Default as a Setup edit to the skill level's rung" do
       user.update_columns(section_kind_levels: user.section_kind_levels.merge("code_review" => "mid_level"))
       reviewed_level_days(user, "code_review", "mid_level", 5, ending: local_today)
 
       user.update!(section_kind_levels: user.section_kind_levels.except("code_review"))
 
       expect(user.level_suggestion_events.sole).to have_attributes(
-        kind: "code_review", action: "applied", source: "setup_edit", from_level: "mid_level", to_level: nil,
+        kind: "code_review", action: "applied", source: "setup_edit", from_level: "mid_level", to_level: "junior",
         window_size: 5
       )
     end
@@ -158,6 +158,75 @@ RSpec.describe User, "level changes on the learning track", type: :model do
       expect { move("code_review" => "grandmaster") }.to raise_error(ActiveRecord::RecordInvalid)
 
       expect(LevelSuggestionEvent.count).to eq(0)
+    end
+  end
+
+  describe "accounts off the track" do
+    let(:account) do
+      create_user_with_key(time_zone: "America/Los_Angeles")
+        .tap { |user| user.update_columns(skill_level: "junior", section_kind_levels: { "pattern" => "senior" }) }
+    end
+    let(:untargeted) { ExerciseSection.keys - [ "pattern" ] }
+
+    it "records a cutoff and a Setup edit for a target edit" do
+      account.update!(section_kind_levels: { "pattern" => "mid_level" })
+
+      expect(account.reload.level_suggestion_cutoffs).to eq(
+        "pattern" => { "level" => "mid_level", "through" => local_today.iso8601 }
+      )
+      expect(account.level_suggestion_events.sole).to have_attributes(
+        kind: "pattern", source: "setup_edit", from_level: "senior", to_level: "mid_level"
+      )
+    end
+
+    it "records a cutoff for every untargeted kind when the skill level changes, and none for a targeted one" do
+      account.update!(skill_level: "mid_level")
+
+      expect(account.reload.level_suggestion_cutoffs.keys).to match_array(untargeted)
+      expect(account.level_suggestion_cutoffs.values.uniq).to eq([ { "level" => "mid_level", "through" => local_today.iso8601 } ])
+      expect(account.level_suggestion_events.pluck(:kind, :from_level, :to_level)).to match_array(
+        untargeted.map { |kind| [ kind, "junior", "mid_level" ] }
+      )
+    end
+
+    it "keeps results from an earlier stay at the new skill level out of the evidence" do
+      reviewed_level_days(account, "code_review", "mid_level", 5, ending: local_today - 10)
+
+      account.update!(skill_level: "mid_level")
+
+      expect(LevelSuggestion.for(account.reload)).to be_nil
+    end
+
+    it "records no cutoff when the skill level moves to principal engineer, and a row for each kind it moved" do
+      account.update!(skill_level: "principal_engineer")
+
+      expect(account.reload.level_suggestion_cutoffs).to eq({})
+      expect(account.level_suggestion_events.pluck(:to_level).uniq).to eq([ "principal_engineer" ])
+    end
+
+    it "records nothing when the skill level changes and every kind is targeted" do
+      account.update_columns(section_kind_levels: ExerciseSection.keys.index_with { "senior" })
+
+      account.update!(skill_level: "mid_level")
+
+      expect(account.reload.level_suggestion_cutoffs).to eq({})
+      expect(account.level_suggestion_events).to be_empty
+    end
+
+    it "labels a new target matching the pending suggestion as the suggestion" do
+      reviewed_level_days(account, "code_review", "junior", 5, ending: local_today - 1)
+
+      account.update!(section_kind_levels: { "pattern" => "senior", "code_review" => "mid_level" })
+
+      expect(account.level_suggestion_events.sole).to have_attributes(kind: "code_review", source: "suggestion")
+    end
+
+    it "writes nothing for a new account" do
+      created = User.create!(email: "new@example.com", name: "New", skill_level: "senior",
+                             section_kind_levels: { "pattern" => "mid_level" })
+
+      expect(created.level_suggestion_cutoffs).to eq({})
+      expect(created.level_suggestion_events).to be_empty
     end
   end
 

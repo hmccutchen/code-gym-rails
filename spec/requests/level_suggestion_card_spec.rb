@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Learning track proposals", type: :request do
+RSpec.describe "Level suggestion card", type: :request do
   let(:json) { { "Content-Type" => "application/json", "Accept" => "application/json" } }
 
   def track_user(levels = LearningTrack.preset_levels)
@@ -22,6 +22,11 @@ RSpec.describe "Learning track proposals", type: :request do
         { "rating" => section.fetch(:ai, "solid"), "correct" => "c", "rubric" => AiService::RUBRIC_VERSION }
       end
     )
+  end
+
+  # Columns are written directly so the setup itself records no level-change cutoff.
+  def account_off_track(**columns)
+    create_user_with_key.tap { |user| user.update_columns(columns) }
   end
 
   def reviewed_window(user, sections, ending: Date.current, count: LevelSuggestion::WINDOW)
@@ -196,7 +201,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
   it "sends a card of several kinds to Setup with every kind and their shared level" do
     user = track_user
-    user.update!(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS)
+    user.update!(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS)
     reviewed_window(user, { "code_review" => "junior", "pattern" => "junior" })
     login_as(user)
 
@@ -231,17 +236,66 @@ RSpec.describe "Learning track proposals", type: :request do
   end
 
   [ nil, "none" ].each do |track|
-    it "shows nothing with learning_track #{track.inspect}" do
-      user = create_user_with_key
+    it "offers an untargeted kind one rung past the skill level with learning_track #{track.inspect}" do
+      user = account_off_track(skill_level: "junior")
       user.update!(learning_track: track)
       reviewed_window(user, { "code_review" => "junior" })
       login_as(user)
-      expect(LevelSuggestion).not_to receive(:for)
 
       get root_path
 
-      expect(response.body).not_to include("level-suggestion")
+      expect(proposed_kinds).to eq([ "code_review" ])
+      expect(Nokogiri::HTML(response.body).at_css("#level-suggestion [data-step]")["data-to"]).to eq("mid_level")
     end
+  end
+
+  it "reads an untargeted kind at the skill level, not at junior" do
+    user = account_off_track(skill_level: "mid_level")
+    reviewed_window(user, { "code_review" => "mid_level", "pattern" => "junior" })
+    login_as(user)
+
+    get root_path
+
+    expect(proposed_kinds).to eq([ "code_review" ])
+    expect(Nokogiri::HTML(response.body).at_css("#level-suggestion [data-step]")["data-to"]).to eq("senior")
+  end
+
+  it "applies one target for an account off the track and leaves its skill level alone" do
+    user = account_off_track(skill_level: "junior")
+    reviewed_window(user, { "code_review" => "junior" })
+    login_as(user)
+    get root_path
+    expect(proposed_kinds).to eq([ "code_review" ])
+
+    apply_levels(user, { "code_review" => "mid_level" })
+
+    expect(user.reload.section_kind_levels).to eq("code_review" => "mid_level")
+    expect(user.skill_level).to eq("junior")
+    expect(user.level_suggestion_events.sole).to have_attributes(kind: "code_review", source: "suggestion",
+                                                                 from_level: "junior", to_level: "mid_level")
+    get root_path
+    expect(response.body).not_to include("level-suggestion")
+  end
+
+  it "offers nothing to an untargeted kind while the skill level is principal engineer" do
+    user = account_off_track(skill_level: "principal_engineer")
+    reviewed_window(user, { "code_review" => "principal_engineer" })
+    login_as(user)
+
+    get root_path
+
+    expect(response.body).not_to include("level-suggestion")
+  end
+
+  it "shows nothing to an account that turned suggestions off" do
+    user = account_off_track(level_suggestions: false)
+    reviewed_window(user, { "code_review" => "junior" })
+    login_as(user)
+    expect(LevelSuggestion).not_to receive(:for)
+
+    get root_path
+
+    expect(response.body).not_to include("level-suggestion")
   end
 
   it "does not flap across a senior to mid-level to senior cycle" do
@@ -353,17 +407,33 @@ RSpec.describe "Learning track proposals", type: :request do
       expect(user.reload.level_suggestion_cutoffs).to eq({})
     end
 
-    [ nil, "principal_engineer" ].each do |level|
-      it "refuses a kind targeted at #{level.inspect}" do
-        levels = LearningTrack.preset_levels.except("architecture")
-        levels["architecture"] = level if level
-        user = track_user(levels)
-        login_as(user)
-        dismiss(%w[pattern architecture])
+    it "refuses a kind targeted at principal engineer" do
+      user = track_user(LearningTrack.preset_levels.merge("architecture" => "principal_engineer"))
+      login_as(user)
+      dismiss(%w[pattern architecture])
 
-        expect(response).to have_http_status(:unprocessable_content)
-        expect(user.reload.level_suggestion_cutoffs).to eq({})
-      end
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
+    end
+
+    it "refuses an untargeted kind while the skill level is principal engineer" do
+      user = account_off_track(skill_level: "principal_engineer", section_kind_levels: { "pattern" => "junior" })
+      login_as(user)
+      dismiss(%w[pattern architecture])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
+    end
+
+    it "records an untargeted kind's cutoff at the skill level's rung" do
+      user = account_off_track(skill_level: "mid_level")
+      login_as(user)
+      dismiss([ "architecture" ])
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.level_suggestion_cutoffs).to eq(
+        "architecture" => { "level" => "mid_level", "through" => Date.current.iso8601 }
+      )
     end
 
     it "sets aside a kind at mid-level" do
@@ -376,11 +446,6 @@ RSpec.describe "Learning track proposals", type: :request do
       expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq("level" => "mid_level", "through" => Date.current.iso8601)
     end
 
-    it "is not found for a user off the track" do
-      login_as(create_user_with_key)
-      dismiss([ "code_review" ])
-      expect(response).to have_http_status(:not_found)
-    end
 
     it "requires authentication" do
       dismiss([ "code_review" ])
@@ -476,19 +541,18 @@ RSpec.describe "Learning track proposals", type: :request do
       end
     end
 
-    it "rechecks membership after another request leaves the track" do
-      user = track_user
+    it "rechecks the rung after another request changes the skill level" do
+      user = account_off_track(skill_level: "junior")
       login_as(user)
       allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
-        User.find(user.id).update!(learning_track: "none")
+        User.find(user.id).update!(skill_level: "principal_engineer")
         original.call(*args)
       end
 
       dismiss([ "pattern" ])
 
-      expect(response).to have_http_status(:not_found)
-      expect(user.reload.learning_track).to eq("none")
-      expect(user.level_suggestion_cutoffs).to eq({})
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
     end
 
     it "uses a target another request changed before taking the lock" do

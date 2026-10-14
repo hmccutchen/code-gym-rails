@@ -7,6 +7,7 @@ class LevelSuggestion
   VETO_TOO_HARD = 2
   STEP_BACK_WINDOW = 3
   STEP_BACK_TOO_HARD = 2
+  IN_PLACE_ANSWERS = 3
 
   Result = Data.define(:date, :level, :ai_rating, :self_rating) do
     def favourable? = ReviewedSectionResults.at_or_above?(ai_rating, ReviewedSectionResults::FAVOURABLE_BAR)
@@ -18,7 +19,7 @@ class LevelSuggestion
   Summary = Data.define(:window_size, :favourable, :too_hard_latest3, :newest_result_on)
 
   def self.for(user)
-    proposal(levels: user.section_kind_levels, locked: user.locked_section_kinds,
+    proposal(levels: user.kind_rungs, locked: KindDifficulty.for(user).locked_keys,
              results: Evidence.for(user).results, cutoffs: user.level_suggestion_cutoffs)
   end
 

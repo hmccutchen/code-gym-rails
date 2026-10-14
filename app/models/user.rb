@@ -50,10 +50,12 @@ class User < ApplicationRecord
   before_save { email.downcase! }
 
   before_save :bump_section_kind_preferences_version, if: :section_kind_preferences_changed?
-  before_save :record_track_level_changes, if: -> { on_learning_track? && section_kind_levels_changed? }
+  before_save :record_level_changes, if: -> {
+    persisted? && !joining_learning_track? && (section_kind_levels_changed? || skill_level_changed?)
+  }
   before_save :finish_learning_track, if: :on_learning_track?
   after_save :record_level_suggestion_events, if: -> {
-    learning_track_before_last_save == LearningTrack::ON && saved_change_to_section_kind_levels?
+    !previously_new_record? && !joined_learning_track? && (saved_change_to_section_kind_levels? || saved_change_to_skill_level?)
   }
 
   scope :active, -> { where(anonymized_at: nil) }
@@ -231,9 +233,9 @@ class User < ApplicationRecord
 
   def on_learning_track? = learning_track == LearningTrack::ON
 
-  def suggests_track_moves? = on_learning_track? && level_suggestions?
+  def applies_level_suggestions_in_place? = track_proposals_answered < LevelSuggestion::IN_PLACE_ANSWERS
 
-  def applies_track_proposals_in_place? = track_proposals_answered < LearningTrack::IN_PLACE_ANSWERS
+  def kind_rungs = KindDifficulty.for(self).rungs(skill_level: skill_level)
 
   def first_run?
     persisted? && learning_track.nil? && !daily_exercises.exists?
@@ -463,13 +465,10 @@ class User < ApplicationRecord
     self.section_kind_preferences_version += 1
   end
 
-  def record_track_level_changes
-    return if learning_track_changed?
-
-    before = section_kind_levels_in_database || {}
-    moved = section_kind_levels.select do |key, level|
-      before[key] != level && LevelSuggestion::LADDER.include?(level)
-    end
+  def record_level_changes
+    before = KindDifficulty.new(levels: section_kind_levels_in_database || {}, locked: [])
+                           .rungs(skill_level: skill_level_in_database)
+    moved = kind_rungs.select { |key, rung| before[key] != rung && LevelSuggestion::LADDER.include?(rung) }
     return if moved.empty?
 
     through = Time.use_zone(effective_time_zone) { Date.current }.iso8601
@@ -479,15 +478,21 @@ class User < ApplicationRecord
   end
 
   def record_level_suggestion_events
+    before = KindDifficulty.new(levels: section_kind_levels_before_last_save || {},
+                                locked: locked_section_kinds_before_last_save || [])
     level_suggestion_events.create!(LevelSuggestionEvent.applied_rows(
       self,
-      before_levels: section_kind_levels_before_last_save || {},
-      after_levels: section_kind_levels,
-      locked: locked_section_kinds_before_last_save || [],
+      before_rungs: before.rungs(skill_level: skill_level_before_last_save),
+      after_rungs: kind_rungs,
+      locked: before.locked_keys,
       cutoffs: level_suggestion_cutoffs_before_last_save || {},
       suggestions_on: level_suggestions_before_last_save
     ))
   end
+
+  def joining_learning_track? = learning_track_changed? && on_learning_track?
+
+  def joined_learning_track? = saved_change_to_learning_track? && on_learning_track?
 
   def finish_learning_track
     return if section_kind_levels.values.intersect?(LevelSuggestion::LADDER[0...-1])

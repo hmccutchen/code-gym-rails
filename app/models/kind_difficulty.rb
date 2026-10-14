@@ -41,6 +41,14 @@ class KindDifficulty
     targeted?(kind) && @locked.include?(kind.key)
   end
 
+  def rungs(skill_level:)
+    ExerciseSection.all.to_h { |kind| [ kind.key, rung_for(kind, skill_level: skill_level) ] }
+  end
+
+  def locked_keys
+    ExerciseSection.all.select { |kind| locked?(kind) }.map(&:key)
+  end
+
   def targeted_kinds
     ExerciseSection.all.select { |kind| targeted?(kind) }
   end

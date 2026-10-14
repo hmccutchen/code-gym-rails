@@ -1,7 +1,7 @@
 <%# One learning track proposal. Local: proposal (LevelSuggestion::Proposal). %>
 <% name = ->(key) { t("sections.#{key}.name") } %>
 <% level_name = ->(level) { t("exercise_mix.levels.#{level}").downcase } %>
-<% in_place = current_user.applies_track_proposals_in_place? || (proposal.steps.map(&:kind) & current_user.excluded_section_kinds).any? %>
+<% in_place = current_user.applies_level_suggestions_in_place? || (proposal.steps.map(&:kind) & current_user.excluded_section_kinds).any? %>
 <%= tag.div id: "level-suggestion", class: "mix-note level-suggestion",
       data: { controller: "level-suggestion",
               level_suggestion_levels_value: current_user.section_kind_levels.to_json,

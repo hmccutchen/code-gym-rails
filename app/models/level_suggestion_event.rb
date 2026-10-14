@@ -15,22 +15,21 @@ class LevelSuggestionEvent < ApplicationRecord
   def applied? = action == APPLIED
 
   # The proposal on screen was computed from the state before the save, so the caller passes that state in.
-  def self.applied_rows(user, before_levels:, after_levels:, locked:, cutoffs:, suggestions_on:)
-    changes = (before_levels.keys | after_levels.keys).to_h { |kind| [ kind, after_levels[kind].presence ] }
-                                                        .reject { |kind, level| before_levels[kind].presence == level }
+  def self.applied_rows(user, before_rungs:, after_rungs:, locked:, cutoffs:, suggestions_on:)
+    changes = after_rungs.reject { |kind, rung| before_rungs[kind] == rung }
     return [] if changes.empty?
 
     results = LevelSuggestion::Evidence.for(user).results
-    offered = suggestions_on ? offered_moves(before_levels, locked, results, cutoffs) : {}
-    changes.map do |kind, level|
-      { kind: kind, action: APPLIED, source: level && offered[kind] == level ? "suggestion" : "setup_edit",
-        from_level: before_levels[kind], to_level: level, **evidence(kind, before_levels[kind], results, cutoffs) }
+    offered = suggestions_on ? offered_moves(before_rungs, locked, results, cutoffs) : {}
+    changes.map do |kind, rung|
+      { kind: kind, action: APPLIED, source: offered[kind] == rung ? "suggestion" : "setup_edit",
+        from_level: before_rungs[kind], to_level: rung, **evidence(kind, before_rungs[kind], results, cutoffs) }
     end
   end
 
   def self.dismissal_rows(user, kinds:, action:, results:)
-    levels = user.section_kind_levels
-    offered = offered_moves(levels, user.locked_section_kinds, results, user.level_suggestion_cutoffs)
+    levels = user.kind_rungs
+    offered = offered_moves(levels, KindDifficulty.for(user).locked_keys, results, user.level_suggestion_cutoffs)
     kinds.map do |kind|
       { kind: kind, action: action, from_level: levels[kind], to_level: offered[kind],
         **evidence(kind, levels[kind], results, user.level_suggestion_cutoffs) }

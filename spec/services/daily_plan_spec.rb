@@ -671,9 +671,9 @@ RSpec.describe DailyPlan do
       expect(KindDifficulty).not_to receive(:new)
 
       untargeted = DailyPlan.for(user, language: "ruby_rails")
-      user.update!(section_kind_levels: { "code_review" => "senior", "challenge" => "junior" })
+      user.update_columns(section_kind_levels: { "code_review" => "senior", "challenge" => "junior" })
       targeted = DailyPlan.for(user.reload, language: "ruby_rails")
-      user.update!(locked_section_kinds: [ "code_review", "challenge" ])
+      user.update_columns(locked_section_kinds: [ "code_review", "challenge" ])
       locked = DailyPlan.for(user.reload, language: "ruby_rails")
 
       expect(targeted).to eq(untargeted)
