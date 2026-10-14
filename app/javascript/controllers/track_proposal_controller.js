@@ -66,9 +66,9 @@ export default class extends Controller {
     return saveStatus.save("POST", this.answerUrlValue, {}, "track_answer", this.countFailedTextValue)
   }
 
-  dismiss(kinds) {
+  dismiss(kinds, reason) {
     if (kinds.length === 0) return Promise.resolve({ ok: true })
-    return saveStatus.save("POST", this.dismissUrlValue, { kinds }, "track_dismissal")
+    return saveStatus.save("POST", this.dismissUrlValue, { kinds, reason }, "track_dismissal")
   }
 
   removeStep(event) {
@@ -88,7 +88,7 @@ export default class extends Controller {
     if (result && result.ok) {
       this.settle(this.appliedTextValue)
       this.answer()
-      this.dismiss(setAside)
+      this.dismiss(setAside, "removed")
       return
     }
     if (result && result.status === 409) return this.reloadWhenSaved()
@@ -97,7 +97,7 @@ export default class extends Controller {
 
   async notNow() {
     this.setBusy(true)
-    const result = await this.dismiss(this.stepTargets.map((element) => element.dataset.kind))
+    const result = await this.dismiss(this.stepTargets.map((element) => element.dataset.kind), "not_now")
     if (!result || !result.ok) return this.setBusy(false)
     this.answer()
     this.settle(this.dismissedTextValue)

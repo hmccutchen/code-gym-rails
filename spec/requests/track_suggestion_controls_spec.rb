@@ -10,16 +10,19 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     end
   end
 
-  def reviewed_day(user, date)
-    exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current,
-      problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "pitched_at" => "junior" } })
-    DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
-      answers: { "code_review" => "a" * 20 }, section_ratings: { "code_review" => "right_level" },
-      ai_review: { "code_review" => { "rating" => "solid", "correct" => "c" } })
+  def reviewed_days(user, sections)
+    TrackGraduation::WINDOW.times do |ago|
+      date = Date.current - ago
+      exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current,
+        problem_set: sections.transform_values { |rung| { "question" => "q", "snippet" => "s", "pitched_at" => rung } })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
+        answers: sections.transform_values { "a" * 20 }, section_ratings: sections.transform_values { "right_level" },
+        ai_review: sections.transform_values { { "rating" => "solid", "correct" => "c", "rubric" => AiService::RUBRIC_VERSION } })
+    end
   end
 
   def with_own_proposal(user)
-    [ 2, 1, 0 ].each { |ago| reviewed_day(user, Date.current - ago) }
+    reviewed_days(user, { "code_review" => "junior" })
     login_as(user)
   end
 
@@ -51,13 +54,12 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       expect(proposal.at_css("[data-not-now]")).to be_present
       link = proposal.at_css("[data-change-in-setup]")
       expect(link.text).to eq("Change it in Setup")
-      expect(link["href"]).to eq(setup_path(suggested: [ "code_review" ], suggested_level: "senior", anchor: "exercise-mix"))
+      expect(link["href"]).to eq(setup_path(suggested: [ "code_review" ], suggested_level: "mid_level", anchor: "exercise-mix"))
     end
 
-    it "offers no keep-at-junior buttons on a bundle that goes to Setup" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS,
-                        section_kind_levels: LearningTrack.preset_levels.merge("code_review" => "senior"))
-      reviewed_day(user, Date.current)
+    it "offers no keep buttons on a card of several kinds that goes to Setup" do
+      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS)
+      reviewed_days(user, { "code_review" => "junior", "pattern" => "junior" })
       login_as(user)
 
       get root_path
@@ -69,9 +71,8 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     # An excluded kind's difficulty is disabled on Setup, so sending the user there would leave nothing to change.
     it "keeps applying in place when a proposed kind is excluded" do
       user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS,
-                        section_kind_levels: LearningTrack.preset_levels.merge("code_review" => "senior"),
                         excluded_section_kinds: [ "security_review" ])
-      reviewed_day(user, Date.current)
+      reviewed_days(user, { "code_review" => "junior", "security_review" => "junior" })
       login_as(user)
 
       get root_path
@@ -90,7 +91,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
       user.update!(track_suggestions: true)
       get root_path
-      expect(proposal.text).to include("Move Code Review up to senior?")
+      expect(proposal.text).to include("Try Code Review at mid-level?")
     end
   end
 
@@ -164,10 +165,20 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       get setup_path(suggested: %w[code_review pattern], suggested_level: "junior")
 
       expect(page_html.at_css("#exercise-mix")["open"]).not_to be_nil
-      expect(page_html.at_css("#mix-suggested-note").text).to eq("Code Gym suggested moving Code Review and Pattern of the Month to Junior. Change their difficulty below.")
+      expect(page_html.at_css("#mix-suggested-note").text).to eq("Code Gym suggested moving Code Review and Pattern of the Month to junior. Change their difficulty below.")
       marked = page_html.css(".mix-difficulty.mix-suggested")
       expect(marked.map { |field| field["data-kind"] }).to match_array(%w[code_review pattern])
       expect(marked.map { |field| field["aria-describedby"] }.uniq).to eq([ "mix-suggested-note" ])
+    end
+
+    it "marks the suggested kinds for a move to mid-level" do
+      login_as(track_user)
+
+      get setup_path(suggested: %w[code_review pattern], suggested_level: "mid_level")
+
+      expect(page_html.at_css("#exercise-mix")["open"]).not_to be_nil
+      expect(page_html.at_css("#mix-suggested-note").text).to eq("Code Gym suggested moving Code Review and Pattern of the Month to mid-level. Change their difficulty below.")
+      expect(page_html.css(".mix-difficulty.mix-suggested").map { |field| field["data-kind"] }).to match_array(%w[code_review pattern])
     end
 
     it "ignores kinds that are not registered" do

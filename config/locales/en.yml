@@ -1,13 +1,12 @@
 en:
   learning_track:
     proposal:
-      own: "Your last three %{kind} sections were reviewed solid or better and none felt too hard. Move %{kind} up to senior?"
-      struggling: "Most of your recent %{kind} sections at senior felt too hard. Move %{kind} back to junior?"
-      led_heading: "Your %{kind} sections are now set to %{level}. These can move up to senior:"
-      led_no_results: "%{kind} — not enough sections to judge on its own yet"
-      led_with_results: "%{kind} — none of your recent sections felt too hard"
-      remove: "Keep at junior"
-      remove_label: "Keep %{kind} at junior"
+      own: "%{favourable} of your last %{window} %{kind} sections were reviewed solid or better. Try %{kind} at %{level}?"
+      own_heading: "These sections can move up to %{level}:"
+      own_item: "%{kind}: %{favourable} of your last %{window} were reviewed solid or better"
+      struggling: "%{too_hard} of your last %{window} %{kind} sections at %{level} felt too hard. Move %{kind} to %{lower}?"
+      remove: "Keep at %{level}"
+      remove_label: "Keep %{kind} at %{level}"
       apply: "Apply"
       not_now: "Not now"
       change_in_setup: "Change it in Setup"
