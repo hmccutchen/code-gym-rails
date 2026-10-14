@@ -44,7 +44,7 @@
     "controllers/profile_preferences_controller": "/assets/controllers/profile_preferences_controller-ae1eecf6.js",
     "controllers/pseudocode_round_controller": "/assets/controllers/pseudocode_round_controller-2525e08e.js",
     "controllers/pull_to_refresh_controller": "/assets/controllers/pull_to_refresh_controller-74e03c13.js",
-    "controllers/push_enable_controller": "/assets/controllers/push_enable_controller-98519283.js",
+    "controllers/push_enable_controller": "/assets/controllers/push_enable_controller-be46ef1f.js",
     "controllers/push_launch_controller": "/assets/controllers/push_launch_controller-a856cbb4.js",
     "controllers/review_alternates_controller": "/assets/controllers/review_alternates_controller-4e899575.js",
     "controllers/review_button_controller": "/assets/controllers/review_button_controller-ce9f39dc.js",
@@ -83,7 +83,7 @@
 <link rel="modulepreload" href="/assets/controllers/profile_preferences_controller-ae1eecf6.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/pseudocode_round_controller-2525e08e.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/pull_to_refresh_controller-74e03c13.js" nonce="NONCE">
-<link rel="modulepreload" href="/assets/controllers/push_enable_controller-98519283.js" nonce="NONCE">
+<link rel="modulepreload" href="/assets/controllers/push_enable_controller-be46ef1f.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/push_launch_controller-a856cbb4.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/review_alternates_controller-4e899575.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/review_button_controller-ce9f39dc.js" nonce="NONCE">
@@ -204,6 +204,7 @@
 
     .btn { display: inline-block; padding: .55rem 1.25rem; border-radius: 999px; font-size: .9rem; font-weight: 600; cursor: pointer; background: var(--surface-raised); color: var(--text); border: 1px solid var(--border); transition: background-color .15s, border-color .15s, color .15s, transform .1s; }
     .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn[hidden] { display: none; }
     .btn:not(:disabled):active, .rating-btn:active { transform: scale(.97); }
     .btn-primary { background: var(--button-bg); border-color: var(--button-bg); color: #fff; box-shadow: 0 2px 10px rgba(106, 87, 232, .35); }
     .btn-primary:hover { background: var(--button-bg-hover); border-color: var(--button-bg-hover); text-decoration: none; }

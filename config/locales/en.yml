@@ -729,6 +729,8 @@ en:
       nudges_label: "Also remind me during the day if today's set isn't finished (hourly, %{window})"
       save: "Save"
       turn_off: "Turn off daily reminders"
+      repair: "This device hasn't allowed notifications yet, so reminders won't reach it."
+      repair_button: "Allow notifications on this device"
       offer: "Get a notification on this device when each weekday's set is ready."
       turn_on: "Turn on daily reminders"
       home_screen_only: "On iPhone and iPad, notifications only work from the Home Screen app. Tap Share → Add to Home Screen, open %{app_name} from there, and turn reminders on again."
