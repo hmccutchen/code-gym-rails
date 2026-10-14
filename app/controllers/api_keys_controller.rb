@@ -3,7 +3,7 @@ class ApiKeysController < ApplicationController
 
   skip_before_action :require_provider
 
-  helper_method :suggested_kinds, :suggested_level
+  helper_method :suggested_kinds, :suggested_level, :open_exercise_mix?
 
   # GET /setup
   def edit
@@ -33,6 +33,10 @@ class ApiKeysController < ApplicationController
 
   def suggested_level
     params[:suggested_level] if LevelSuggestion::LADDER.include?(params[:suggested_level])
+  end
+
+  def open_exercise_mix?
+    suggested_kinds.any? || params[:show] == "level_suggestions"
   end
 
   def suggested_kinds

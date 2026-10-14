@@ -2,13 +2,6 @@
      data-learning-track-url-value="<%= profile_path %>"
      data-learning-track-left-text-value="<%= t("learning_track.setup.left") %>">
   <p class="hint"><%= t("learning_track.setup.on_track") %></p>
-  <label for="level-suggestions">
-    <input type="checkbox" id="level-suggestions" <%= "checked" if current_user.level_suggestions? %>
-           aria-describedby="level-suggestions-hint"
-           data-learning-track-target="suggestions" data-action="change->learning-track#toggleSuggestions">
-    <%= t("learning_track.setup.suggestions_label") %>
-  </label>
-  <p class="hint" id="level-suggestions-hint"><%= t("learning_track.setup.suggestions_hint") %></p>
   <button type="button" class="btn btn-ghost btn-sm" id="leave-learning-track"
           data-learning-track-target="leaveButton" data-action="click->learning-track#leave"><%= t("learning_track.setup.leave") %></button>
   <p class="hint"><%= t("learning_track.setup.leave_hint") %></p>

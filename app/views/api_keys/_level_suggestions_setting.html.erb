@@ -1,0 +1,10 @@
+<div class="mix-note" id="level-suggestions-setting" data-controller="level-suggestions-setting"
+     data-level-suggestions-setting-url-value="<%= profile_path %>">
+  <label for="level-suggestions">
+    <input type="checkbox" id="level-suggestions" <%= "checked" if current_user.level_suggestions? %>
+           aria-describedby="level-suggestions-hint"
+           data-level-suggestions-setting-target="checkbox" data-action="change->level-suggestions-setting#toggle">
+    <%= t("level_suggestions.setup.label") %>
+  </label>
+  <p class="hint" id="level-suggestions-hint"><%= t("level_suggestions.setup.hint") %></p>
+</div>

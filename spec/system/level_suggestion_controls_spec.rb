@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Learning track suggestion controls", type: :system do
+RSpec.describe "Level suggestion controls", type: :system do
   let(:user) { create_fake_provider_user }
 
   around { |example| travel_to(a_weekday + 12.hours) { example.run } }
@@ -139,7 +139,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   it "puts the switch back when its save fails" do
     user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
     visit_as(user)
-    visit setup_path
+    visit setup_path(show: "level_suggestions")
     fail_requests_to(profile_path)
 
     # Not uncheck: the failed save can put the box back before Playwright confirms the click changed it.
@@ -153,7 +153,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   it "returns the switch to the stored value when several quick saves all fail" do
     user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
     visit_as(user)
-    visit setup_path
+    visit setup_path(show: "level_suggestions")
     page.execute_script(<<~JS)
       const originalFetch = window.fetch;
       const held = [];
@@ -173,10 +173,17 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     expect(user.reload.level_suggestions).to be(true)
   end
 
-  it "turns suggestions off and on from Setup" do
-    user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
+  it "opens the switch from the card's Setup link" do
+    own_proposal(answered: 0)
+
+    within("#level-suggestion") { click_link "Setup" }
+
+    expect(page).to have_checked_field("Suggest level changes")
+  end
+
+  it "turns suggestions off and on from Setup for an account off the track" do
     visit_as(user)
-    visit setup_path
+    visit setup_path(show: "level_suggestions")
 
     uncheck "Suggest level changes"
     wait_for_saves

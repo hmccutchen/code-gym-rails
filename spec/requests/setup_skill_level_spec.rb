@@ -25,20 +25,20 @@ RSpec.describe "Setup skill level control", type: :request do
     expect(page_html.css("select#skill-level option").map(&:text)).to eq([ "Junior", "Mid-level", "Senior", "Principal engineer" ])
     expect(page_html.css("select#skill-level option").map(&:text))
       .to eq(User::SKILL_LEVELS.map { |level| I18n.t("exercise_mix.levels.#{level}") })
-    expect(page_html.text).to include("Junior suits early-career developers and career changers. Your ratings")
   end
 
   it "defaults a new account to Junior" do
     expect(User.new.skill_level).to eq("junior")
   end
 
-  it "says what the setting does and that ratings still adjust each set" do
+  it "says what the setting does and that only a suggestion the user accepts changes a level" do
     login_as(user)
 
     get setup_path
 
-    expect(page_html.text).to include("unless you've set a difficulty for that section in the Exercise mix below",
-                                     "Your ratings still nudge each day's set up or down")
+    expect(page_html.text).to include("The level every section uses unless you set one for it in Exercise mix.",
+                                     "It stays where you put it.",
+                                     "Code Gym suggests it, and you decide.")
   end
 
   it "sits above the Exercise mix, whose default options name it" do

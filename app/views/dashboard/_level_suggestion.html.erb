@@ -52,5 +52,5 @@
   <button type="button" class="btn btn-ghost btn-sm" data-not-now data-level-suggestion-target="notNow"
           data-action="click->level-suggestion#notNow"><%= t("learning_track.proposal.not_now") %></button>
   <p class="hint"><%= t("learning_track.proposal.turn_off_html",
-                        link: link_to(t("learning_track.proposal.turn_off_link"), setup_path(anchor: "learning-track"))) %></p>
+                        link: link_to(t("learning_track.proposal.turn_off_link"), setup_path(show: "level_suggestions", anchor: "level-suggestions"))) %></p>
 <% end %>

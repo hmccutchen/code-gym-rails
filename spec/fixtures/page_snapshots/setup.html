@@ -35,8 +35,9 @@
     "controllers/glossary_controller": "/assets/controllers/glossary_controller-17ceaab6.js",
     "controllers": "/assets/controllers/index-ee64e1f1.js",
     "controllers/learn_filter_controller": "/assets/controllers/learn_filter_controller-c43d1877.js",
-    "controllers/learning_track_controller": "/assets/controllers/learning_track_controller-e35334a4.js",
+    "controllers/learning_track_controller": "/assets/controllers/learning_track_controller-ceb200f4.js",
     "controllers/level_suggestion_controller": "/assets/controllers/level_suggestion_controller-2d782f86.js",
+    "controllers/level_suggestions_setting_controller": "/assets/controllers/level_suggestions_setting_controller-e00c1216.js",
     "controllers/loading_form_controller": "/assets/controllers/loading_form_controller-5de50653.js",
     "controllers/mermaid_controller": "/assets/controllers/mermaid_controller-9f63ddd8.js",
     "controllers/name_editor_controller": "/assets/controllers/name_editor_controller-70e467e0.js",
@@ -74,8 +75,9 @@
 <link rel="modulepreload" href="/assets/controllers/glossary_controller-17ceaab6.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/index-ee64e1f1.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/learn_filter_controller-c43d1877.js" nonce="NONCE">
-<link rel="modulepreload" href="/assets/controllers/learning_track_controller-e35334a4.js" nonce="NONCE">
+<link rel="modulepreload" href="/assets/controllers/learning_track_controller-ceb200f4.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/level_suggestion_controller-2d782f86.js" nonce="NONCE">
+<link rel="modulepreload" href="/assets/controllers/level_suggestions_setting_controller-e00c1216.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/loading_form_controller-5de50653.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/mermaid_controller-9f63ddd8.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/name_editor_controller-70e467e0.js" nonce="NONCE">
@@ -651,7 +653,7 @@
 <option value="mid_level">Mid-level</option>
 <option value="senior">Senior</option>
 <option value="principal_engineer">Principal engineer</option></select>
-    <p class="hint">How hard your sections start out, unless you&#39;ve set a difficulty for that section in the Exercise mix below. Junior suits early-career developers and career changers. Your ratings still nudge each day&#39;s set up or down.</p>
+    <p class="hint">The level every section uses unless you set one for it in Exercise mix. It stays where you put it. When your reviews show a section is ready to change, Code Gym suggests it, and you decide.</p>
   </div>
 
   <details class="form-field" id="exercise-mix"
@@ -663,6 +665,17 @@
            data-exercise-mix-version-value="0">
     <summary>Exercise mix</summary>
     <p class="hint">Bias how often each rotating section appears, and set how hard any section is pitched. Neither changes how many sections a day holds — that&#39;s the setting above. Changes save automatically.</p>
+    <div class="mix-note" id="level-suggestions-setting" data-controller="level-suggestions-setting"
+     data-level-suggestions-setting-url-value="/profile">
+  <label for="level-suggestions">
+    <input type="checkbox" id="level-suggestions" checked
+           aria-describedby="level-suggestions-hint"
+           data-level-suggestions-setting-target="checkbox" data-action="change->level-suggestions-setting#toggle">
+    Suggest level changes
+  </label>
+  <p class="hint" id="level-suggestions-hint">When this is off, the dashboard stops suggesting level changes. You can still change levels yourself below, and turn this back on at any time.</p>
+</div>
+
 
     <div class="mix-note">
       <strong>Excluding is a stronger, different action than turning a slider down.</strong>

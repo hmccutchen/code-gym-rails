@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Learning track proposal saves", type: :system do
+RSpec.describe "Level suggestion card saves", type: :system do
   let(:user) { create_fake_provider_user }
 
   around { |example| travel_to(a_weekday + 12.hours) { example.run } }

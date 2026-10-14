@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Learning track suggestion controls", type: :request do
+RSpec.describe "Level suggestion controls", type: :request do
   let(:json) { { "Content-Type" => "application/json", "Accept" => "application/json" } }
   def page_html = Nokogiri::HTML(response.body)
 
@@ -41,7 +41,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       expect(proposal.at_css("[data-change-in-setup]")).to be_nil
       expect(proposal["data-level-suggestion-answer-url-value"]).to eq(level_suggestion_answer_path)
       expect(proposal.text).to include("turn these suggestions off in Setup")
-      expect(proposal.at_css(%(a[href="#{setup_path(anchor: "learning-track")}"]))).to be_present
+      expect(proposal.at_css(%(a[href="#{setup_path(show: "level_suggestions", anchor: "level-suggestions")}"]))).to be_present
     end
 
     it "sends the user to the Exercise mix with the suggested kinds once they have answered the threshold" do
@@ -166,16 +166,35 @@ RSpec.describe "Learning track suggestion controls", type: :request do
   end
 
   describe "Setup" do
-    it "shows the suggestions switch with its current state and warns that leaving is final" do
+    it "shows the suggestions switch in the Exercise mix and warns that leaving the track is final" do
       user = track_user(level_suggestions: false)
       login_as(user)
 
       get setup_path
 
-      box = page_html.at_css("#level-suggestions")
+      box = page_html.at_css("#exercise-mix #level-suggestions")
       expect(box).to be_present
       expect(box["checked"]).to be_nil
+      expect(page_html.at_css("#learning-track #level-suggestions")).to be_nil
       expect(page_html.at_css("#learning-track").text).to include("You can't rejoin the track afterwards.")
+    end
+
+    it "shows the suggestions switch to an account off the track" do
+      login_as(create_user_with_key)
+
+      get setup_path
+
+      expect(page_html.at_css("#exercise-mix #level-suggestions")["checked"]).to be_present
+      expect(page_html.at_css("#exercise-mix")["open"]).to be_nil
+      expect(page_html.at_css("#learning-track")).to be_nil
+    end
+
+    it "opens the Exercise mix when the card's link asks for the switch" do
+      login_as(create_user_with_key)
+
+      get setup_path(show: "level_suggestions")
+
+      expect(page_html.at_css("#exercise-mix")["open"]).not_to be_nil
     end
 
     it "opens the Exercise mix and marks the suggested kinds" do
