@@ -3,10 +3,11 @@ require "rails_helper"
 RSpec.describe "Learning track isolation" do
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
-  def twin(email, learning_track, cutoffs: {})
+  def twin(email, learning_track, cutoffs: {}, suggestions: true)
     User.create!(
       email: email, name: "Twin", time_zone: "UTC", provider: "fake", api_keys: { "fake" => "fake-test-key" },
       language: "ruby_rails", learning_track: learning_track, level_suggestion_cutoffs: cutoffs,
+      level_suggestions: suggestions,
       section_kind_levels: LearningTrack.preset_levels
     )
   end
@@ -45,22 +46,31 @@ RSpec.describe "Learning track isolation" do
     on_track = twin("on@example.com", LearningTrack::ON,
                     cutoffs: { "code_review" => "2026-10-13" })
     opted_out = twin("off@example.com", LearningTrack::OFF)
+    suggestions_off = twin("quiet@example.com", LearningTrack::ON, suggestions: false)
 
-    [ on_track, opted_out ].each do |user|
+    [ on_track, opted_out, suggestions_off ].each do |user|
       actual = prompts_for(user)
       expect(actual).to eq(baseline), -> { first_difference(baseline, actual) }
     end
   end
 
-  it "keeps track state out of generation, review, judges and ConceptMastery" do
-    own = %w[app/services/level_suggestion.rb app/services/level_suggestion/evidence.rb]
-    files = Rails.root.glob("app/{services,jobs}/**/*.rb").map { |file| file.relative_path_from(Rails.root).to_s } +
-            %w[app/models/concept_mastery.rb app/models/judge_verdict.rb
-               app/models/review_prose_verdict.rb app/models/kind_difficulty.rb]
+  def generation_files
+    Rails.root.glob("app/{services,jobs}/**/*.rb").map { |file| file.relative_path_from(Rails.root).to_s } +
+      %w[app/models/concept_mastery.rb app/models/judge_verdict.rb
+         app/models/review_prose_verdict.rb app/models/kind_difficulty.rb]
+  end
 
-    readers = (files - own).select do |file|
-      File.read(Rails.root.join(file)).match?(/learning_track|level_suggestion_cutoffs|LearningTrack/)
-    end
-    expect(readers).to eq([])
+  def readers(files, pattern)
+    files.select { |file| File.read(Rails.root.join(file)).match?(pattern) }
+  end
+
+  it "keeps track state out of generation, review, judges and ConceptMastery, with no exemption" do
+    expect(readers(generation_files, /learning_track|track_evidence_cutoffs|track_suggestions|LearningTrack/)).to eq([])
+  end
+
+  it "keeps level suggestion state out of everything but the suggestion rule itself" do
+    own = %w[app/services/level_suggestion.rb app/services/level_suggestion/evidence.rb]
+
+    expect(readers(generation_files - own, /level_suggestion_cutoffs|level_suggestions|LevelSuggestion/)).to eq([])
   end
 end
