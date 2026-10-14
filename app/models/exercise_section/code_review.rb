@@ -7,10 +7,6 @@ class ExerciseSection::CodeReview < ExerciseSection
     false
   end
 
-  def self.leads_learning_track?
-    true
-  end
-
   def self.fixed?
     true
   end
