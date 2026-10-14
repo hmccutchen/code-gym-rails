@@ -35,3 +35,15 @@ choose between two sentences, never to decide what to attempt.
 `push.failure` stamps `readable` on the errors this controller raised itself.
 Anything without it is a browser or network error whose text must never reach
 the page, so it shows the generic failure sentence.
+
+## Repair mode, while the account is already on
+
+The Account page mounts this controller a second time, with `repair` set,
+beside the "reminders are on" controls. A reinstalled Home Screen app arrives
+with permission `default` while `reminder_level` is still on, so the page
+would otherwise show reminders as on with no way to grant permission short of
+turning them off and on. `offerRepair` reveals the button only for `default`,
+names the device setting for `denied`, and stays silent for `granted`, where
+the launch re-subscribe in `push-launch` already registers the endpoint. The
+button runs the same `enable`, so the permission request is still its first
+statement; enrolment leaves a level that is already on unchanged.

@@ -15,11 +15,15 @@ export default class extends Controller {
     waitingText: String,
     blockedText: String,
     notGrantedText: String,
-    failedText: String
+    failedText: String,
+    repair: Boolean,
+    repairText: String
   }
 
   // The button renders disabled: a click before connect would be lost, and the permission request cannot be replayed.
   connect() {
+    if (this.repairValue) return this.offerRepair()
+
     if (push.supported()) {
       this.buttonTarget.disabled = false
       return
@@ -46,8 +50,22 @@ export default class extends Controller {
       .then(() => window.location.reload())
       .catch((error) => {
         this.buttonTarget.disabled = false
+        if (this.repairValue && Notification.permission === "denied") this.buttonTarget.hidden = true
         this.say(error?.readable ? error.message : this.failedTextValue)
       })
+  }
+
+  // A reinstalled Home Screen app starts with no permission while the account is still on; "granted" is push-launch's job.
+  offerRepair() {
+    if (!push.supported()) return
+
+    if (Notification.permission === "default") {
+      this.buttonTarget.hidden = false
+      this.buttonTarget.disabled = false
+      this.say(this.repairTextValue)
+    } else if (Notification.permission === "denied") {
+      this.say(this.blockedTextValue)
+    }
   }
 
   say(message) {

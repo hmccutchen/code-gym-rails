@@ -3088,6 +3088,18 @@ concept-specific difficulty descriptions for future generation, not a new set.
   account clears both, since a home-screen install keeps its browser-side
   subscription after the account is gone.
 
+  **The setting is one per account; permission is per install.** Removing the
+  iOS Home Screen app and adding it again (which #373's new icons asked for)
+  leaves `reminder_level` on but gives the new install no permission, and the
+  launch re-subscribe cannot ask for one outside a tap, so it fails silently.
+  The Account page therefore checks this device's `Notification.permission`
+  while the account is on: `default` shows "Allow notifications on this
+  device", the same permission request and enrolment as Turn on, which leaves
+  the level as it was; `denied` names the device setting; `granted` shows
+  nothing, since the launch re-subscribe already registers the endpoint. The
+  old install's endpoint keeps receiving until Apple refuses it and
+  `PushDelivery` prunes it.
+
   **Both reminders are enqueued by `GenerateDailyExercisesJob`'s cron branch,
   not scheduled on their own.** "It is this user's 8am on a weekday" already
   has an owner and a second cron entry would be a second place for it to
