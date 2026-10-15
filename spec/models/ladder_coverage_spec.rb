@@ -59,17 +59,38 @@ RSpec.describe LadderCoverage do
     expect(buckets).to eq([ ConceptBucket::ARCHITECTURE ])
   end
 
-  it "deduplicates gaps shared by several kinds" do
-    gaps = described_class.for(user).gaps_for([ ExerciseSection::CodeReview, ExerciseSection::Pattern ])
+  it "reads an untargeted kind at the skill level, not across every rung" do
+    pairs = ->(skill_level) do
+      user.update!(skill_level: skill_level)
+      described_class.for(user.reload).for_kind(ExerciseSection::DesignComparison).pairs.map(&:first)
+    end
 
-    expect(gaps).to eq(gaps.uniq)
+    expect(pairs.call("principal_engineer")).to include("denormalization_tradeoffs")
+    expect(pairs.call("junior")).not_to include("denormalization_tradeoffs")
   end
 
-  it "names the targeted kinds a concept grounds" do
-    coverage = described_class.for(user)
-    kinds = [ ExerciseSection::Challenge, ExerciseSection::Architecture ]
+  it "deduplicates gaps shared by several kinds" do
+    gaps = described_class.for(user).gaps
 
-    expect(coverage.grounding_kinds(kinds, "n_plus_one", "ruby_rails")).to eq([ ExerciseSection::Challenge ])
+    expect(gaps).to eq(gaps.uniq)
+    expect(gaps).to include([ "n_plus_one", "ruby_rails" ])
+  end
+
+  it "names the kinds a concept grounds" do
+    kinds = described_class.for(user).grounding_kinds("n_plus_one", "ruby_rails")
+
+    expect(kinds).to include(ExerciseSection::CodeReview, ExerciseSection::Challenge)
+    expect(kinds).not_to include(ExerciseSection::Architecture)
+  end
+
+  it "leaves an excluded kind out of gaps and grounding, and keeps its entry for its coverage label" do
+    user.update!(excluded_section_kinds: [ "architecture" ])
+    coverage = described_class.for(user.reload)
+    architecture_only = coverage.for_kind(ExerciseSection::Architecture).gaps
+
+    expect(architecture_only).not_to be_empty
+    expect(coverage.gaps & architecture_only).to be_empty
+    expect(coverage.grounding_kinds(*architecture_only.first)).to be_empty
   end
 
   it "reads references in one query" do

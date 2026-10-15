@@ -505,7 +505,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   It writes nothing. Adding `--run` queues missing ladders through
   `GenerateConceptReferenceJob` with `refresh: true`, billed to that active
   operator's own key. A refresh rewrites the whole shared reference and guide,
-  including rows that already have a guide, for every user.
+  including rows that already have a guide, for every user. Since 2026-10-15
+  the report reads every kind at junior, the unsaved user's default skill
+  level, where it read the union of every rung before; the 2026-10-08 figures
+  below were measured the old way, and only design comparison differs. It is
+  no longer the only bulk path: Setup's "Prepare AI guidance" now covers every
+  section's level for any account with its own key (see "Difficulty targets
+  and locks").
 
   **Production coverage before any run, 2026-10-08.** The report step, run
   against production, grounded 5 of 90 code review pairs, 3 of 48 design
@@ -1123,7 +1129,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `can_host?` through the prompt's per-kind rungs, the kind-difficulty
   diagnostics, `ladders_for`); `DailyPlan` passes none and gets the strictest
   list; `ConceptHosts` unions every rung unless handed a `difficulty`, which
-  `LadderCoverage` passes so a targeted kind is read at its level. History
+  `LadderCoverage` passes so every kind is read at its rung. History
   records under the day's language bucket. Each concept-group guidance line
   for a group this kind hosts names its design_comparison idiom once;
   silent correctness and meta skill are not hosted, so their lines do not.
@@ -1533,7 +1539,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   spot forever. Decoupling slot frequency from pool size needs slots ranked by
   when the slot itself last filled, which is a change to how every day is
   shaped and not something this preference should drag in behind it.
-- **Difficulty targets and locks**: a user may set any section kind — code_review and pattern included, since a level needs no alternative candidate — to `junior` / `mid_level` / `senior` / `principal_engineer` (`KindDifficulty::LEVELS`, which `User::SKILL_LEVELS` reuses, and deliberately disjoint from the review grades). Unset follows `skill_level`; a target replaces it as that section's baseline, with tier annotations and rating adjustments still applying on top; a lock suppresses the `(reduced)` easing rule and both rating adjustments for that section, with no exceptions, including a concept's first exposure. That last part is a deliberate tradeoff: a kind locked at `principal_engineer` can present an unfamiliar concept at full difficulty on day one. Lock changes prompt text only — `DailyPlan`, `ConceptMastery` and `User#concepts_*` never read `KindDifficulty`, and specs pin it — so unlocking reads current evidence. The block is appended by `AiService#kind_difficulty_guidance`, grouped by level, and grounded by per-concept ladder rungs written in the same `#generate_concept_reference` call as the reference and guide. A retention check in a targeted section is pitched at that section's level; raising a target after mastery makes the next check harder than the evidence behind it, an accepted consequence. `LadderCoverage` answers how grounded each kind is; `POST /learn/prepare_ladders` rewrites the ungrounded concepts behind a user's targets, the one scoped exception to the Learn tab's no-bulk-rewrite rule, and since `ConceptReference` is shared, that rewrite reaches every teammate. Weights and difficulty share `section_kind_preferences_version`, so a stale tab is refused whichever half it touched. `AiService::MAX_LADDER_GUIDANCE_CHARS` bounds the block's worst case, every rung at its full length: it went from 48,000 to 54,000 on 2026-10-11, because the `mid_level` rung lets a day hold four kinds at four levels, and its spec measured 53,632.
+- **Difficulty targets and locks**: a user may set any section kind — code_review and pattern included, since a level needs no alternative candidate — to `junior` / `mid_level` / `senior` / `principal_engineer` (`KindDifficulty::LEVELS`, which `User::SKILL_LEVELS` reuses, and deliberately disjoint from the review grades). Unset follows `skill_level`; a target replaces it as that section's baseline, with tier annotations and rating adjustments still applying on top; a lock suppresses the `(reduced)` easing rule and both rating adjustments for that section, with no exceptions, including a concept's first exposure. That last part is a deliberate tradeoff: a kind locked at `principal_engineer` can present an unfamiliar concept at full difficulty on day one. Lock changes prompt text only — `DailyPlan`, `ConceptMastery` and `User#concepts_*` never read `KindDifficulty`, and specs pin it — so unlocking reads current evidence. The block is appended by `AiService#kind_difficulty_guidance`, grouped by level, and grounded by per-concept ladder rungs written in the same `#generate_concept_reference` call as the reference and guide. It lists every kind on the plan at its rung, the target or else the skill level, and a kind renders the same either way, so a target equal to the skill level changes nothing in the prompt (`level_suggestion_isolation_spec` pins it). Until 2026-10-15 it listed targeted kinds only, and an untargeted kind's level reached the model as the profile's "Skill level" line alone; every account's generation prompt changed when that ended. A retention check in any section is pitched at that section's level; raising a target after mastery makes the next check harder than the evidence behind it, an accepted consequence. `LadderCoverage` answers how grounded each kind is at its rung; `POST /learn/prepare_ladders` rewrites the ungrounded concepts behind every section's level, targeted or not, skipping kinds the user excluded, the one scoped exception to the Learn tab's no-bulk-rewrite rule, and since `ConceptReference` is shared, that rewrite reaches every teammate. One press queues one billed job per gap, which can be a hundred or so on an account that never prepared any; `PREPARE_PER_HOUR` counts presses, not jobs. A trial account is never offered it (`User#prepares_ladders?`), so a house key never funds a shared rewrite. The ladder text now reaches every account's generation prompt, and a retry carries only its own kind's rungs; the added input tokens are unmeasured, and `ApiUsage` rows under `purpose: "generate_exercise"` before and after 2026-10-15 are the way to measure them. Weights and difficulty share `section_kind_preferences_version`, so a stale tab is refused whichever half it touched. `AiService::MAX_LADDER_GUIDANCE_CHARS` bounds the block's worst case, every rung at its full length: it went from 48,000 to 54,000 on 2026-10-11, because the `mid_level` rung lets a day hold four kinds at four levels, and its spec measured 53,632; the block's reworded opening line brought that to 53,668 on 2026-10-15.
 - **Drills**: a user can mark one concept, or a whole Learn display group, as
   drilled from the Learn tab (`ConceptDrills`, `ConceptDrillsController`). A
   drilled concept leads `User#concepts_needing_reinforcement`, and since
@@ -2655,13 +2661,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   concepts with no row at all, on-demand regeneration — only when someone
   opens that concept's Learn entry — for a legacy row that has a reference but
   no guide, and `POST /learn/prepare_ladders`, which rewrites the ungrounded
-  concepts behind a user's difficulty targets (see "Difficulty targets and
-  locks" below). Bulk-rewriting legacy rows would change inline reference
+  concepts behind each section's level, its target or else the skill level
+  (see "Difficulty targets and locks" below). Bulk-rewriting legacy rows would change inline reference
   wording nobody asked to change; confining the first two to on-demand accepts
   that **an inline reference's wording can change once, for a concept someone
   deliberately opens.** `prepare_ladders` is the one scoped exception to that
-  rule: it rewrites rows on demand, but only for concepts behind a target the
-  user set, from a click whose own copy says the wording may change.
+  rule: it rewrites rows on demand, but only for concepts some section of the
+  user's is pitched at, from a click whose own copy says the wording may change.
 
   **The short lesson.** The same call also writes `lesson`: a definition, an
   everyday comparison and where it stops, the common mix-up, two to four
@@ -3507,7 +3513,7 @@ always pull in the full suite — is stated once, in
   concept in the user's slice (assigned or not), the per-concept detail page,
   and three generation triggers: a one-concept `#prepare_concept`, a
   slice-wide `#prepare` backfill, and `#prepare_ladders`, which rewrites
-  existing rows for the concepts behind a user's difficulty targets.
+  existing rows for the concepts behind each section's level.
 - `app/controllers/concerns/learn_scope.rb` — `LearnScope`: the user's slice
   of the vocabularies and the 404-on-unknown checks for a `:bucket`/`:concept`
   arriving from a URL, shared by `LearnController` and

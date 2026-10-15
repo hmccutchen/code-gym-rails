@@ -1,4 +1,4 @@
-# Derived from the registry generation reads; every rung unless `difficulty` narrows a targeted kind to its level.
+# Derived from the registry generation reads; every rung unless `difficulty` gives a kind a level, as LadderCoverage does.
 class ConceptHosts
   def self.for(user, difficulty: nil)
     languages = ConceptBucket.language_buckets_for(user.language)

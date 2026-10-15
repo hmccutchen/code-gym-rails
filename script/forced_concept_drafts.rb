@@ -53,7 +53,8 @@ class ForcedConceptDrafts
     plan       = DailyPlan.for(user, language: language)
     difficulty = KindDifficulty.new(levels: { KIND.key => rung }, locked: [ KIND.key ])
     kinds      = ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth, pattern: plan.pattern)
-    ladders    = service.send(:ladders_for, kinds, difficulty, language, plan.code_review_mode)
+    ladders    = service.send(:ladders_for, difficulty.rungs_for(kinds, skill_level: user.skill_level), language,
+                              plan.code_review_mode)
     history    = user.recent_performance
     options    = service.send(:exercise_prompt_options, plan, history, difficulty, ladders)
 

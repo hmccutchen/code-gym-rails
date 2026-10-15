@@ -17,7 +17,7 @@ module ExerciseMixLadders
   end
 
   def ladder_preparation
-    count = ladder_coverage.gaps_for(KindDifficulty.for(current_user).targeted_kinds).size
+    count = current_user.prepares_ladders? ? ladder_coverage.gaps.size : 0
     {
       count: count,
       button_label: t("exercise_mix.ladders_button", count: count),

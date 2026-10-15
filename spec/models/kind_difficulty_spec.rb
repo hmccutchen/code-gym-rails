@@ -61,11 +61,12 @@ RSpec.describe KindDifficulty do
     end
   end
 
-  describe "#targeted_kinds" do
-    it "lists only kinds with a valid level, in registry order" do
-      difficulty = described_class.new(levels: { "challenge" => "senior", "code_review" => "junior", "pattern" => "x" }, locked: [])
+  describe "#rungs_for" do
+    it "maps each kind given to its target, else the skill level, in the order given" do
+      difficulty = described_class.new(levels: { "challenge" => "senior", "pattern" => "x" }, locked: [])
 
-      expect(difficulty.targeted_kinds).to eq([ code_review, challenge ])
+      expect(difficulty.rungs_for([ challenge, code_review, ExerciseSection::Pattern ], skill_level: "mid_level"))
+        .to eq(challenge => "senior", code_review => "mid_level", ExerciseSection::Pattern => "mid_level")
     end
   end
 
