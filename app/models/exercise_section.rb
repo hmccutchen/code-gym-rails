@@ -15,10 +15,6 @@ class ExerciseSection
     all.map(&:key)
   end
 
-  def self.learning_track_lead
-    all.find(&:leads_learning_track?)
-  end
-
   def self.fixed
     all.select(&:fixed?)
   end
@@ -160,10 +156,6 @@ class ExerciseSection
 
     def fixed_rating(section:, answer:)
       nil
-    end
-
-    def leads_learning_track?
-      false
     end
 
     def judge_task

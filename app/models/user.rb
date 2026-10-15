@@ -6,6 +6,7 @@ class User < ApplicationRecord
   has_many :concept_masteries, dependent: :destroy
   has_many :push_subscriptions, dependent: :destroy
   has_many :featured_concepts, dependent: :destroy
+  has_many :level_suggestion_events, dependent: :destroy
   belongs_to :invite_code, optional: true
 
   serialize :api_keys, coder: JSON
@@ -48,6 +49,9 @@ class User < ApplicationRecord
   before_save :bump_section_kind_preferences_version, if: :section_kind_preferences_changed?
   before_save :record_track_level_changes, if: -> { on_learning_track? && section_kind_levels_changed? }
   before_save :finish_learning_track, if: :on_learning_track?
+  after_save :record_level_suggestion_events, if: -> {
+    learning_track_before_last_save == LearningTrack::ON && saved_change_to_section_kind_levels?
+  }
 
   scope :active, -> { where(anonymized_at: nil) }
 
@@ -461,7 +465,7 @@ class User < ApplicationRecord
 
     before = section_kind_levels_in_database || {}
     moved = section_kind_levels.select do |key, level|
-      before[key] != level && LearningTrack::LEVELS.include?(level) && LearningTrack::LEVELS.include?(before[key])
+      before[key] != level && TrackGraduation::LADDER.include?(level)
     end
     return if moved.empty?
 
@@ -471,8 +475,19 @@ class User < ApplicationRecord
     )
   end
 
+  def record_level_suggestion_events
+    level_suggestion_events.create!(LevelSuggestionEvent.applied_rows(
+      self,
+      before_levels: section_kind_levels_before_last_save || {},
+      after_levels: section_kind_levels,
+      locked: locked_section_kinds_before_last_save || [],
+      cutoffs: track_evidence_cutoffs_before_last_save || {},
+      suggestions_on: track_suggestions_before_last_save
+    ))
+  end
+
   def finish_learning_track
-    return if section_kind_levels.values.include?(LearningTrack::START_LEVEL)
+    return if section_kind_levels.values.intersect?(TrackGraduation::LADDER[0...-1])
 
     self.learning_track = LearningTrack::OFF
   end

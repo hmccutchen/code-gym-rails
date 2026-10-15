@@ -7,17 +7,25 @@ RSpec.describe "Learning track proposals", type: :request do
     create_user_with_key.tap { |user| user.update!(learning_track: "junior", section_kind_levels: levels) }
   end
 
+  # sections maps a kind to its rung, or to { rung:, ai:, self: } when a day needs other ratings.
   def reviewed_day(user, date, sections, too_hard: [])
+    sections = sections.transform_values { |section| section.is_a?(Hash) ? section : { rung: section } }
     exercise = DailyExercise.create!(
       user: user, date: date, generated_at: Time.current,
-      problem_set: sections.to_h { |key, rung| [ key, { "question" => "q", "snippet" => "s", "pitched_at" => rung } ] }
+      problem_set: sections.transform_values { |section| { "question" => "q", "snippet" => "s", "pitched_at" => section[:rung] } }
     )
     DailyResponse.create!(
       user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
-      answers: sections.keys.index_with { "a" * 20 },
-      section_ratings: sections.keys.index_with { |key| too_hard.include?(key) ? "too_hard" : "right_level" },
-      ai_review: sections.keys.index_with { { "rating" => "solid", "correct" => "c" } }
+      answers: sections.transform_values { "a" * 20 },
+      section_ratings: sections.to_h { |key, section| [ key, section[:self] || (too_hard.include?(key) ? "too_hard" : "right_level") ] },
+      ai_review: sections.transform_values do |section|
+        { "rating" => section.fetch(:ai, "solid"), "correct" => "c", "rubric" => AiService::RUBRIC_VERSION }
+      end
     )
+  end
+
+  def reviewed_window(user, sections, ending: Date.current, count: TrackGraduation::WINDOW)
+    count.times { |ago| reviewed_day(user, ending - ago, sections) }
   end
 
   def proposed_kinds
@@ -41,15 +49,22 @@ RSpec.describe "Learning track proposals", type: :request do
 
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
-  it "shows an own-result proposal after three favourable code reviews" do
+  def kind_name(key) = I18n.t("sections.#{key}.name")
+
+  it "offers one rung up after five code reviews, counting the favourable ones from the evidence" do
     user = track_user
-    [ 2, 1, 0 ].each { |ago| reviewed_day(user, Date.current - ago, { "code_review" => "junior" }) }
+    reviewed_day(user, Date.current - 4, { "code_review" => { rung: "junior", ai: "developing" } })
+    reviewed_window(user, { "code_review" => "junior" }, count: 4)
     login_as(user)
 
     get root_path
 
-    expect(proposal_text).to include("Move Code Review up to senior?")
+    expect(proposal_text).to include("4 of your last 5 Code Review sections were reviewed solid or better. " \
+                                     "Try Code Review at mid-level?")
     expect(proposed_kinds).to eq([ "code_review" ])
+    step = Nokogiri::HTML(response.body).at_css("#track-proposal [data-step]")
+    expect(step["data-to"]).to eq("mid_level")
+    expect(Nokogiri::HTML(response.body).css("#track-proposal [data-remove-step]")).to be_empty
     box = Nokogiri::HTML(response.body).at_css("#track-proposal")
     expect(JSON.parse(box["data-track-proposal-levels-value"])).to eq(user.section_kind_levels)
     expect(box["data-track-proposal-version-value"]).to eq(user.reload.section_kind_preferences_version.to_s)
@@ -57,70 +72,155 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(box["data-track-proposal-dismiss-url-value"]).to eq(learning_track_dismissal_path)
   end
 
-  it "bundles led kinds and names the registry's lead" do
-    user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
-    reviewed_day(user, Date.current, { "code_review" => "senior", "pattern" => "junior" })
+  it "offers nothing on four results, however good" do
+    user = track_user
+    reviewed_window(user, { "code_review" => "junior" }, count: TrackGraduation::WINDOW - 1)
     login_as(user)
 
     get root_path
 
-    expect(proposal_text).to include("Your Code Review sections are now set to senior.",
-                                    "not enough sections to judge on its own yet",
-                                    "none of your recent sections felt too hard")
-    expect(proposed_kinds).to match_array(ExerciseSection.keys - [ "code_review" ])
+    expect(response.body).not_to include("track-proposal")
   end
 
-  it "names each section in its keep-at-junior button's accessible name" do
-    user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
-    reviewed_day(user, Date.current, { "code_review" => "senior" })
-    login_as(user)
-
-    get root_path
-
-    labels = Nokogiri::HTML(response.body).css("#track-proposal [data-remove-step]").map { |button| button["aria-label"] }
-    expected = (ExerciseSection.keys - [ "code_review" ]).map { |key| "Keep #{I18n.t("sections.#{key}.name")} at junior" }
-    expect(labels).to match_array(expected)
-  end
-
-  it "derives the led heading from the registry rather than a named kind" do
-    user = track_user(LearningTrack.preset_levels.merge("pattern" => "senior"))
-    reviewed_day(user, Date.current, { "code_review" => "junior" })
-    login_as(user)
-    allow(ExerciseSection).to receive(:learning_track_lead).and_return(ExerciseSection::Pattern)
-
-    get root_path
-
-    expect(proposal_text).to include("Your Pattern of the Month sections are now set to senior.")
-  end
-
-  # A lead set to principal engineer by hand still leads, and the heading names its actual level.
-  it "names the lead's actual level when it was set to principal engineer by hand" do
-    user = track_user(LearningTrack.preset_levels.merge("code_review" => "principal_engineer"))
-    reviewed_day(user, Date.current, { "code_review" => "principal_engineer" })
-    login_as(user)
-
-    get root_path
-
-    expect(proposal_text).to include("Your Code Review sections are now set to principal engineer.")
-    expect(proposal_text).not_to include("moved up")
-  end
-
-  it "describes a back step honestly when only two results exist" do
-    user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
-    [ 1, 0 ].each do |ago|
-      reviewed_day(user, Date.current - ago, { "code_review" => "senior" }, too_hard: [ "code_review" ])
+  it "ignores results graded before the rubric" do
+    user = track_user
+    reviewed_window(user, { "code_review" => "junior" })
+    user.daily_responses.find_by!(date: Date.current - 4).tap do |day|
+      day.update!(ai_review: { "code_review" => day.ai_review["code_review"].except("rubric") })
     end
     login_as(user)
 
     get root_path
 
-    expect(proposal_text).to include("Most of your recent Code Review sections at senior felt too hard")
-    expect(proposal_text).to include("Move Code Review back to junior?")
+    expect(response.body).not_to include("track-proposal")
+  end
+
+  it "lists several kinds moving to the same level in one card, each with its own keep button" do
+    user = track_user
+    reviewed_window(user, { "code_review" => "junior", "pattern" => "junior" })
+    login_as(user)
+
+    get root_path
+
+    expect(proposal_text).to include("These sections can move up to mid-level:",
+                                     "Code Review: 5 of your last 5 were reviewed solid or better",
+                                     "Pattern of the Month: 5 of your last 5 were reviewed solid or better")
+    expect(proposed_kinds).to eq(%w[code_review pattern])
+    buttons = Nokogiri::HTML(response.body).css("#track-proposal [data-remove-step]")
+    expect(buttons.map(&:text)).to eq([ "Keep at junior", "Keep at junior" ])
+    expect(buttons.map { |button| button["aria-label"] }).to eq(
+      [ "Keep #{kind_name("code_review")} at junior", "Keep #{kind_name("pattern")} at junior" ]
+    )
+  end
+
+  it "offers a mid-level kind senior, and keeps kinds bound for another level out of its card" do
+    user = track_user(LearningTrack.preset_levels.merge("code_review" => "mid_level"))
+    reviewed_window(user, { "code_review" => "mid_level", "pattern" => "junior" })
+    login_as(user)
+
+    get root_path
+
+    expect(proposal_text).to include("5 of your last 5 Code Review sections were reviewed solid or better. " \
+                                     "Try Code Review at senior?")
+    expect(proposed_kinds).to eq([ "code_review" ])
+    expect(Nokogiri::HTML(response.body).at_css("#track-proposal [data-step]")["data-to"]).to eq("senior")
+  end
+
+  it "offers nothing to a senior kind with good results, since principal engineer is never suggested" do
+    user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
+    reviewed_window(user, { "code_review" => "senior" })
+    login_as(user)
+
+    get root_path
+
+    expect(response.body).not_to include("track-proposal")
+  end
+
+  it "lists no kind without five results of its own, even when another kind is targeted higher" do
+    user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
+    reviewed_window(user, { "code_review" => "senior", "pattern" => "junior" }, count: TrackGraduation::WINDOW - 1)
+    reviewed_day(user, Date.current - 4, { "code_review" => "senior" })
+    login_as(user)
+
+    get root_path
+
+    expect(response.body).not_to include("track-proposal")
+  end
+
+  it "describes a step back honestly when only two results exist" do
+    user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
+    [ 1, 0 ].each do |ago|
+      reviewed_day(user, Date.current - ago, { "code_review" => { rung: "senior", ai: "developing", self: "too_hard" } })
+    end
+    login_as(user)
+
+    get root_path
+
+    expect(proposal_text).to include("2 of your last 2 Code Review sections at senior felt too hard. " \
+                                     "Move Code Review to mid-level?")
+    expect(Nokogiri::HTML(response.body).at_css("#track-proposal [data-step]")["data-to"]).to eq("mid_level")
+  end
+
+  it "counts a step back over the latest three when more results exist" do
+    user = track_user(LearningTrack.preset_levels.merge("code_review" => "mid_level"))
+    reviewed_window(user, { "code_review" => { rung: "mid_level", ai: "developing", self: "too_hard" } }, count: 2)
+    reviewed_window(user, { "code_review" => "mid_level" }, ending: Date.current - 2, count: 3)
+    login_as(user)
+
+    get root_path
+
+    expect(proposal_text).to include("2 of your last 3 Code Review sections at mid-level felt too hard. " \
+                                     "Move Code Review to junior?")
+  end
+
+  it "offers no step back when the AI rated every too-hard result solid or better" do
+    user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
+    reviewed_window(user, { "code_review" => { rung: "senior", ai: "strong", self: "too_hard" } }, count: 2)
+    login_as(user)
+
+    get root_path
+
+    expect(response.body).not_to include("track-proposal")
+  end
+
+  it "offers no step up when two of the latest three felt too hard" do
+    user = track_user
+    reviewed_window(user, { "code_review" => { rung: "junior", self: "too_hard" } }, count: 2)
+    reviewed_window(user, { "code_review" => "junior" }, ending: Date.current - 2, count: 3)
+    login_as(user)
+
+    get root_path
+
+    expect(response.body).not_to include("track-proposal")
+  end
+
+  it "sends a card of several kinds to Setup with every kind and their shared level" do
+    user = track_user
+    user.update!(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS)
+    reviewed_window(user, { "code_review" => "junior", "pattern" => "junior" })
+    login_as(user)
+
+    get root_path
+
+    link = Nokogiri::HTML(response.body).at_css("#track-proposal [data-change-in-setup]")
+    expect(link["href"]).to eq(setup_path(suggested: %w[code_review pattern], suggested_level: "mid_level", anchor: "exercise-mix"))
+    expect(Nokogiri::HTML(response.body).css("#track-proposal [data-remove-step]")).to be_empty
+  end
+
+  it "does not offer a locked kind" do
+    user = track_user
+    user.update!(locked_section_kinds: [ "code_review" ])
+    reviewed_window(user, { "code_review" => "junior" })
+    login_as(user)
+
+    get root_path
+
+    expect(response.body).not_to include("track-proposal")
   end
 
   it "does not compute or render a proposal before submission" do
     user = track_user
-    [ 3, 2, 1, 0 ].each { |ago| reviewed_day(user, Date.current - ago, { "code_review" => "junior" }) }
+    reviewed_window(user, { "code_review" => "junior" })
     user.daily_responses.find_by!(date: Date.current).update!(submitted_at: nil, ai_review: {})
     login_as(user)
     expect(TrackGraduation).not_to receive(:for)
@@ -134,7 +234,7 @@ RSpec.describe "Learning track proposals", type: :request do
     it "shows nothing with learning_track #{track.inspect}" do
       user = create_user_with_key
       user.update!(learning_track: track)
-      [ 2, 1, 0 ].each { |ago| reviewed_day(user, Date.current - ago, { "code_review" => "junior" }) }
+      reviewed_window(user, { "code_review" => "junior" })
       login_as(user)
       expect(TrackGraduation).not_to receive(:for)
 
@@ -144,34 +244,32 @@ RSpec.describe "Learning track proposals", type: :request do
     end
   end
 
-  it "does not flap across a full senior to junior to senior cycle" do
-    levels = LearningTrack.preset_levels.merge("code_review" => "senior", "architecture" => "senior")
+  it "does not flap across a senior to mid-level to senior cycle" do
+    levels = LearningTrack.preset_levels.merge("architecture" => "senior")
     user = track_user(levels)
-    [ 5, 4 ].each do |ago|
-      reviewed_day(user, Date.current - ago, { "architecture" => "senior" }, too_hard: [ "architecture" ])
-    end
-    [ 3, 2, 1 ].each { |ago| reviewed_day(user, Date.current - ago, { "architecture" => "junior" }) }
+    reviewed_window(user, { "architecture" => "mid_level" }, ending: Date.current - 2)
+    reviewed_window(user, { "architecture" => { rung: "senior", ai: "developing", self: "too_hard" } }, count: 2)
     login_as(user)
-    apply_levels(user, levels.merge("architecture" => "junior"))
+    get root_path
+    expect(proposal_text).to include("Move #{kind_name("architecture")} to mid-level?")
+    apply_levels(user, levels.merge("architecture" => "mid_level"))
 
-    travel 1.day
-    reviewed_day(user, Date.current, { "code_review" => "senior", "architecture" => "junior" })
     get root_path
     expect(response).to have_http_status(:ok)
     expect(proposed_kinds).not_to include("architecture")
 
-    2.times do
+    TrackGraduation::WINDOW.times do
       travel 1.day
-      reviewed_day(user, Date.current, { "architecture" => "junior" })
+      reviewed_day(user, Date.current, { "architecture" => "mid_level" })
     end
     login_as(user)
     get root_path
-    expect(response).to have_http_status(:ok)
     expect(proposed_kinds).to eq([ "architecture" ])
+    expect(proposal_text).to include("Try #{kind_name("architecture")} at senior?")
     apply_levels(user, levels)
 
     travel 1.day
-    reviewed_day(user, Date.current, { "code_review" => "senior" })
+    reviewed_day(user, Date.current, { "code_review" => "junior" })
     get root_path
     expect(response).to have_http_status(:ok)
     expect(proposed_kinds).not_to include("architecture")
@@ -195,7 +293,7 @@ RSpec.describe "Learning track proposals", type: :request do
   end
 
   it "clears the track on the final Apply and keeps the senior targets" do
-    user = track_user(LearningTrack.preset_levels.transform_values { "senior" }.merge("pattern" => "junior"))
+    user = track_user(LearningTrack.preset_levels.transform_values { "senior" }.merge("pattern" => "mid_level"))
     login_as(user)
     apply_levels(user, user.section_kind_levels.merge("pattern" => "senior"))
 
@@ -268,6 +366,16 @@ RSpec.describe "Learning track proposals", type: :request do
       end
     end
 
+    it "sets aside a kind at mid-level" do
+      user = track_user(LearningTrack.preset_levels.merge("pattern" => "mid_level"))
+      login_as(user)
+
+      dismiss([ "pattern" ])
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.track_evidence_cutoffs["pattern"]).to eq("level" => "mid_level", "through" => Date.current.iso8601)
+    end
+
     it "is not found for a user off the track" do
       login_as(create_user_with_key)
       dismiss([ "code_review" ])
@@ -298,7 +406,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
     it "keeps a newer same-kind dismissal when an older evidence read finishes last" do
       user = track_user
-      reviewed_day(user, Date.current - 3, { "code_review" => "junior" })
+      reviewed_day(user, Date.current - TrackGraduation::WINDOW, { "code_review" => "junior" })
       login_as(user)
       other_tab = ActionDispatch::Integration::Session.new(Rails.application)
       other_tab.post login_path, params: { email: user.email }
@@ -308,7 +416,7 @@ RSpec.describe "Learning track proposals", type: :request do
         evidence = original.call(*args)
         unless advanced
           advanced = true
-          [ 2, 1, 0 ].each { |ago| reviewed_day(user, Date.current - ago, { "code_review" => "junior" }) }
+          reviewed_window(user, { "code_review" => "junior" })
           other_tab.post learning_track_dismissal_path, params: { kinds: [ "code_review" ] }.to_json, headers: json
           expect(other_tab.response).to have_http_status(:ok)
           expect(user.reload.track_evidence_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
@@ -387,9 +495,13 @@ RSpec.describe "Learning track proposals", type: :request do
       user = track_user
       reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
       login_as(user)
+      changed = false
       allow(TrackGraduation::Evidence).to receive(:for).and_wrap_original do |original, *args|
-        fresh = User.find(user.id)
-        fresh.update!(section_kind_levels: fresh.section_kind_levels.merge("pattern" => "senior"))
+        unless changed
+          changed = true
+          fresh = User.find(user.id)
+          fresh.update!(section_kind_levels: fresh.section_kind_levels.merge("pattern" => "senior"))
+        end
         original.call(*args)
       end
 

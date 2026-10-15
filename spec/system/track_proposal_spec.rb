@@ -5,14 +5,20 @@ RSpec.describe "Learning track proposal saves", type: :system do
 
   around { |example| travel_to(a_weekday + 12.hours) { example.run } }
 
+  def reviewed_day(date, kinds)
+    exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current,
+      problem_set: kinds.index_with { { "question" => "Find the issue", "snippet" => "def a; end", "pitched_at" => "junior" } })
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
+      answers: kinds.index_with { "An answer with sufficient detail" }, section_ratings: kinds.index_with { "right_level" },
+      ai_review: kinds.index_with { { "rating" => "solid", "correct" => "Correct", "rubric" => AiService::RUBRIC_VERSION } })
+  end
+
+  # Today holds only code review, so the dashboard renders one section while three kinds have five results each.
   before do
-    user.update!(learning_track: "junior",
-                 section_kind_levels: LearningTrack.preset_levels.merge("code_review" => "senior"))
-    exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
-      problem_set: { "code_review" => { "question" => "Find the issue", "snippet" => "def a; end", "pitched_at" => "senior" } })
-    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
-      answers: { "code_review" => "An answer with sufficient detail" }, section_ratings: { "code_review" => "right_level" },
-      ai_review: { "code_review" => { "rating" => "solid", "correct" => "Correct" } })
+    user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
+    reviewed_day(Date.current, [ "code_review" ])
+    (1...TrackGraduation::WINDOW).each { |ago| reviewed_day(Date.current - ago, %w[code_review pattern architecture]) }
+    reviewed_day(Date.current - TrackGraduation::WINDOW, %w[pattern architecture])
     visit_as(user)
     expect(page).to have_css("#track-proposal")
     page.execute_script("window.proposalPage = true")
@@ -26,7 +32,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
     expect(page.evaluate_script("window.proposalPage")).to be(true)
   end
 
-  it "applies only the listed bundle members and tracks the removed-member dismissal as pending" do
+  it "applies only the listed kinds and tracks the set-aside kind's dismissal as pending" do
     remove("architecture")
     page.execute_script(<<~JS)
       const originalFetch = window.fetch;
@@ -44,7 +50,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
 
     expect(page).to have_css("#track-proposal", text: "Done. Your next sets use the new level.")
     expect(user.reload.section_kind_levels).to eq(
-      LearningTrack.preset_levels.transform_values { "senior" }.merge("architecture" => "junior")
+      LearningTrack.preset_levels.merge("code_review" => "mid_level", "pattern" => "mid_level")
     )
     expect(user.track_evidence_cutoffs).not_to have_key("architecture")
     expect(page.evaluate_script("window.CodeGymSaveStatus.pending()")).to be(true)
@@ -52,6 +58,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
     page.execute_script("window.finishDismissal()")
     wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
     expect(user.reload.track_evidence_cutoffs["architecture"]).to eq("level" => "junior", "through" => Date.current.iso8601)
+    expect(user.level_suggestion_events.where(kind: "architecture").pluck(:action)).to eq([ "removed" ])
     expect_same_page
   end
 
@@ -66,7 +73,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
     expect(focused_text).to eq("status: Done. Your next sets use the new level.")
   end
 
-  it "sets aside the whole original bundle without changing levels or navigating" do
+  it "sets aside every kind the card listed without changing levels or navigating" do
     original_levels = user.section_kind_levels
     remove("architecture")
 
@@ -75,7 +82,10 @@ RSpec.describe "Learning track proposal saves", type: :system do
     expect(page).to have_css("#track-proposal", text: "Okay. This comes back once there's more to go on.")
     expect(focused_text).to eq("status: Okay. This comes back once there's more to go on.")
     expect(user.reload.section_kind_levels).to eq(original_levels)
-    expect(user.track_evidence_cutoffs.keys).to match_array(ExerciseSection.keys - [ "code_review" ])
+    expect(user.track_evidence_cutoffs.keys).to match_array(%w[code_review pattern architecture])
+    expect(user.level_suggestion_events.pluck(:kind, :action)).to match_array(
+      %w[code_review pattern architecture].map { |kind| [ kind, "dismissed" ] }
+    )
     expect_same_page
   end
 
