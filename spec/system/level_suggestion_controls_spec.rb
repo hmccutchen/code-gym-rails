@@ -250,4 +250,21 @@ RSpec.describe "Learning track suggestion controls", type: :system do
 
     expect(user.level_suggestion_events.find_by(kind: "code_review").source).to eq("suggestion")
   end
+
+  it "keeps a Setup suggestion when a save leaves the kind at the same rung" do
+    user.update!(skill_level: "junior", level_suggestion_answers: LevelSuggestion::IN_PLACE_ANSWERS)
+    LevelSuggestion::WINDOW.times { |ago| reviewed_day(Date.current - ago, level: "junior") }
+    visit_as(user)
+    within("#level-suggestion") { click_link "Change it in Setup" }
+    box = '.mix-difficulty.mix-suggested[data-kind="code_review"]'
+
+    within(box) { choose "Junior" }
+    wait_for_saves
+    expect(user.reload.section_kind_levels["code_review"]).to eq("junior")
+
+    within(box) { choose "Mid-level" }
+    wait_for_saves
+    expect(user.reload.section_kind_levels["code_review"]).to eq("mid_level")
+    expect(user.level_suggestion_events.where(kind: "code_review").pluck(:source)).to eq(%w[suggestion])
+  end
 end

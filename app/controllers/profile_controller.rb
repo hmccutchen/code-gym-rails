@@ -230,7 +230,7 @@ class ProfileController < ApplicationController
     return body unless preference_update?
 
     body.merge(section_kind_preferences_version: current_user.section_kind_preferences_version,
-               ladder_preparation: ladder_preparation)
+               ladder_preparation: ladder_preparation, kind_rungs: current_user.kind_rungs)
   end
 
   def preference_update?

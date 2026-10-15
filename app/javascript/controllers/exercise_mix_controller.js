@@ -17,22 +17,12 @@ export default class extends Controller {
   }
 
   connect() {
-    this.loadedLevels = this.renderedLevels()
     this.pending = null
     this.editRevision = 0
     this.probe = () => this.pending !== null
     saveStatus.watch(this.probe)
     this.lockLastInGroup()
     if (this.editedBeforeConnect()) this.adoptEarlyEdit()
-  }
-
-  renderedLevels() {
-    const levels = {}
-    this.difficultyTargets.forEach((box) => {
-      const radio = Array.from(box.querySelectorAll("input[type=radio]")).find((input) => input.defaultChecked)
-      levels[box.dataset.kind] = radio ? radio.value : ""
-    })
-    return levels
   }
 
   editedBeforeConnect() {
@@ -183,16 +173,17 @@ export default class extends Controller {
       .map((kind) => Object.assign({ kind }, this.suggestedValue[kind]))
   }
 
-  forgetMovedSuggestions(savedLevels) {
+  forgetMovedSuggestions(rungs) {
+    if (!rungs || typeof rungs !== "object") return
     const remaining = Object.assign({}, this.suggestedValue)
     Object.keys(remaining).forEach((kind) => {
-      if ((savedLevels[kind] || "") !== (this.loadedLevels[kind] || "")) delete remaining[kind]
+      if (rungs[kind] !== remaining[kind].from) delete remaining[kind]
     })
     this.suggestedValue = remaining
   }
 
   persist() {
-    const sent = { revision: undefined, levels: {} }
+    const sent = { revision: undefined }
     const payload = () => this.savePayload(sent)
 
     // Queued in order: a parallel save would post the version the one in flight is about to move, and 409 against itself.
@@ -202,8 +193,7 @@ export default class extends Controller {
   savePayload(sent) {
     sent.revision = this.editRevision
     const state = this.state()
-    sent.levels = state.section_kind_levels
-    const steps = this.shownSteps(sent.levels)
+    const steps = this.shownSteps(state.section_kind_levels)
     const body = { user: Object.assign(state, { section_kind_preferences_version: this.versionValue }) }
     if (steps.length > 0) body.level_suggestion_steps = steps
     return body
@@ -212,7 +202,7 @@ export default class extends Controller {
   reconcile(result, sent) {
     const reported = result.data && result.data.section_kind_preferences_version
     if (result.ok && typeof reported === "number") this.versionValue = reported
-    if (result.ok) this.forgetMovedSuggestions(sent.levels)
+    if (result.ok) this.forgetMovedSuggestions(result.data && result.data.kind_rungs)
     if (result.status === 409) this.suggestedValue = {}
     if (result.status === 409 && result.data && result.data.current) {
       this.applyServerState(result.data.current)

@@ -67,13 +67,16 @@ offered). When the user picks the offered level for that kind, the next save
 carries the step as `level_suggestion_steps`, so the server can label the
 change `suggestion` after checking its `from` against the stored rung.
 
-Once a save is confirmed, a step is forgotten for any kind whose saved choice
-differs from the one the page was rendered with (`renderedLevels`, read from
-the radios' `defaultChecked`): the suggested level, any other level, or
-Default. The kind's rung has moved, so resending the old `from` would get a
-409 and undo the user's valid edit. Kinds whose choice is unchanged keep
-their step. A 409 clears every step, since the page they were rendered for
-is out of date.
+Once a save is confirmed, a step is kept only while the kind's rung, as the
+save's reply reports it (`kind_rungs`), still equals the step's `from`. The
+reply carries the rungs so the page never restates the rule that a kind
+without a target follows the skill level. Choosing the suggested level, or
+any other level that moves the rung, drops the step, since resending the old
+`from` would get a 409 and undo the user's valid edit. A choice that keeps
+the rung, such as setting Junior explicitly on a kind that already followed
+a junior skill level, keeps the step, so a later pick of the suggested level
+is still labelled `suggestion`. A 409 clears every step, since the page they
+were rendered for is out of date.
 
 ## Early edits are read from the mix's own controls
 
