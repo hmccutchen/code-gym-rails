@@ -19,7 +19,7 @@ module SectionKindGuide
       summary: "Each one names a design pattern and why it exists, then asks how you'd apply it to a stated problem. " \
                "The answer box starts with headings for the parts a full answer covers.",
       example: "The setting is a gym log, where one button saves a workout, updates a streak and sends a message. " \
-               "You're asked how you'd organise that code using the day's pattern."
+               "You're asked how you'd structure the work using the day's pattern, and you describe it in words."
     },
     "challenge" => {
       summary: "Write working code for a small task the question describes. " \

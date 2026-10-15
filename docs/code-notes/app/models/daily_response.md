@@ -26,7 +26,12 @@ authority back without loading each exercise. Rows submitted before the slice
 (commit `76a7d5e`, 2026-10-10) can still carry a rating on a skipped section,
 which makes that kind count as answered early. The only reader is the answer
 form's "About" disclosure, which then hides a little sooner; that cost is
-accepted.
+accepted. The union runs in SQL, so the read returns at most one row per kind
+however many days have been submitted.
+
+A change to the rating slice in `ResponsesController#assign_draft_response`
+(`section_ratings.slice(*@response.answered_sections)`) changes what this
+method means, so check this reader with it.
 
 ## `.review_points`
 

@@ -41,8 +41,8 @@ class DailyResponse < ApplicationRecord
   end
 
   def self.answered_kinds_for(user)
-    submitted.where(user: user).pluck(:section_ratings)
-             .flat_map { |ratings| ratings.is_a?(Hash) ? ratings.keys : [] }.to_set
+    submitted.where(user: user).where("jsonb_typeof(section_ratings) = 'object'")
+             .distinct.pluck(Arel.sql("jsonb_object_keys(section_ratings)")).to_set
   end
 
   def self.review_points(value)
