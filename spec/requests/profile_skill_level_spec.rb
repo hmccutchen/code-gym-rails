@@ -29,15 +29,17 @@ RSpec.describe "PATCH /profile skill_level", type: :request do
     expect { patch_profile(skill_level: "principal_engineer") }.not_to(change { user.reload.section_kind_preferences_version })
   end
 
-  # A track choice writes only its own fields, so skill level cannot ride along.
-  it "is refused when sent with a learning track choice" do
+  # The welcome page's Experienced path sends its starting level with the choice; nothing else may ride along.
+  it "rides along with an Experienced choice, while other fields still refuse it" do
     user.update!(learning_track: nil)
-    original = user.reload.attributes
+
+    patch_profile(learning_track: "none", skill_level: "principal_engineer", name: "Not saved")
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(user.reload.skill_level).to eq("junior")
 
     patch_profile(learning_track: "none", skill_level: "principal_engineer")
-
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(user.reload.attributes).to eq(original)
+    expect(response).to have_http_status(:ok)
+    expect(user.reload.skill_level).to eq("principal_engineer")
   end
 
   [ "expert", "beginner", "developing", "", nil, [ "solid" ], { "level" => "solid" } ].each do |value|

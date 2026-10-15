@@ -1,0 +1,9 @@
+<%# Locals: key (a section kind key). Rendered on the answer form and in Setup's Exercise mix. %>
+<% guide = SectionKindGuide.for(key) %>
+<details class="kind-about" data-kind-about="<%= key %>">
+  <summary><%= t("responses.kind_about.summary", name: t("sections.#{key}.name")) %></summary>
+  <div class="kind-about-body">
+    <p><%= guide[:summary] %></p>
+    <p><strong><%= t("responses.kind_about.example_label") %></strong> <%= guide[:example] %></p>
+  </div>
+</details>

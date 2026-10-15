@@ -16,6 +16,18 @@ A prompt passes `locale: :en`, so text sent to a provider never follows the requ
 
 The labels are read at render time, so the request's locale chooses the wording.
 
+## `.answered_kinds_for`
+
+The kinds a user has answered on a submitted day, read from `section_ratings`
+keys. Submitting slices the ratings to `answered_sections`, and the submit
+gate requires every answered section to be rated, so on a submitted row the
+rating keys are exactly the answered sections. That reads the answered
+authority back without loading each exercise. Rows submitted before the slice
+(commit `76a7d5e`, 2026-10-10) can still carry a rating on a skipped section,
+which makes that kind count as answered early. The only reader is the answer
+form's "About" disclosure, which then hides a little sooner; that cost is
+accepted.
+
 ## `.review_points`
 
 Older reviews stored a single string instead of a list, so a non-array value is wrapped. This is a class method because mailer views don't include helpers.

@@ -444,9 +444,15 @@ concept-specific difficulty descriptions for future generation, not a new set.
   already decide every kind's rung, so the skill level changes only the
   generation prompt's profile line, never a rung. Nothing resets it: after a kind steps up to
   senior, or after leaving the track, the profile still says junior until
-  the user changes it on Setup. Experienced records
-  `"none"` without changing targets. Existing accounts are not enrolled or
-  prompted, and joining after the first-run choice is refused.
+  the user changes it on Setup. Experienced asks a second question, where
+  exercises should start (junior, mid-level or senior,
+  `WelcomeController::STARTING_LEVELS`), and records `"none"` with that
+  `skill_level` in one request, without changing targets. The step stays in
+  the browser because `first_run?` ends once any track is saved. Until
+  suggestions open to every account, an Experienced account gets no level
+  suggestions or step-backs, so its level moves only when the user changes it
+  on Setup. Existing accounts are not enrolled or prompted, and joining after
+  the first-run choice is refused.
 
   **Existing accounts are told apart by a backfill, not a date.**
   `AddLearningTrackToUsers` adds the nullable string with no default and the
@@ -2650,11 +2656,26 @@ concept-specific difficulty descriptions for future generation, not a new set.
   spec.** Generated lessons get `PLAIN_LANGUAGE_STANDARD` through their
   prompt; text written into code has no prompt.
   `HandWrittenLearnText::MODULES` lists every module of static reader-facing
-  text (`Glossary`, `ConceptBookSources`' pointers, `LearnLessons`), each
-  answering `.learn_text`, and `spec/models/hand_written_learn_text_spec.rb`
-  holds all of it to the standard's checkable rules: the placeholder phrases,
-  read from the standard itself, and no text whose every sentence opens with
-  the same word. The rest of the standard needs a reader's judgment.
+  text (`Glossary`, `ConceptBookSources`' pointers, `LearnLessons`,
+  `SectionKindGuide`), each answering `.learn_text`, and
+  `spec/models/hand_written_learn_text_spec.rb` holds all of it to the
+  standard's checkable rules: the placeholder phrases, read from the standard
+  itself, no text whose every sentence opens with the same word, and no
+  exclamation point, which is stricter than the standard's "rare emphasis".
+  The rest of the standard needs a reader's judgment.
+- **What each section kind is**: `SectionKindGuide` holds a hand-written
+  summary and a short example for every registered kind, shown in an "About"
+  disclosure. Setup's Exercise mix shows one for every kind, always. The
+  answer form shows one under a section's summary only until the user has
+  answered that kind on a submitted day (`DailyResponse.answered_kinds_for`,
+  read from submitted `section_ratings` keys, with no column of its own); the
+  submitted dashboard and History never show it. Like `ConceptBookSources` it
+  is never sent to a provider, and a spec fails if anything under
+  `app/services` or `app/jobs` names it. Each example says what the engineer
+  sees and is asked, never an answer, and the ambiguity hunt's names no gap
+  and no kind of gap, since the real ones are that section's hidden answer
+  key. Its keys must equal `ExerciseSection.keys`, so a new kind fails a spec
+  until it has copy.
 - **The weekly featured concept**: each user gets one concept a week, chosen
   from concepts they have met — `FeaturedConcept.for(user)`, read at the top
   of `/learn` and as a small callout on the dashboard ("This week's concept").
@@ -3422,6 +3443,7 @@ always pull in the full suite — is stated once, in
   array-valued, and never read by any prompt — extend it by adding a line
 - `app/models/concept_lesson.rb` — `ConceptLesson`: the Learn page's short-lesson sections, the limits on them, and the boundary check on a provider's lesson; pure. Rendered by `learn/_lesson`
 - `app/models/learn_lessons.rb` — `LearnLessons`: hand-written Learn-only lessons, outside every vocabulary; rendered by `LearnLessonsController` at `/learn/lessons/:lesson`
+- `app/models/section_kind_guide.rb` — `SectionKindGuide`: each kind's hand-written summary and example, rendered by `responses/_kind_about` in Setup and on the answer form
 - `app/models/hand_written_learn_text.rb` — `HandWrittenLearnText::MODULES`: every module of static reader-facing text, which the plain-language spec checks
 - `app/models/recognition_guide.rb` — `RecognitionGuide`: the cached "how to
   look for these" piece per recognition group, which groups have one, and

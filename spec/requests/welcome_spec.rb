@@ -43,6 +43,29 @@ RSpec.describe "Welcome", type: :request do
     expect(box["data-welcome-setup-url-value"]).to eq(setup_path)
   end
 
+  it "offers starting levels for Experienced in a hidden second step" do
+    login_as(new_account)
+    get "/welcome"
+
+    document = Nokogiri::HTML(response.body)
+    expect(response.body).to include("Pick the level your exercises start at next.")
+    expect(response.body).not_to include("regular difficulty")
+    step = document.at_css('[data-welcome-target="levelStep"]')
+    expect(step["hidden"]).not_to be_nil
+    heading = step.at_css("h2")
+    expect(heading.text).to eq("Where should your exercises start?")
+    expect(heading["tabindex"]).to eq("-1")
+    expect(step["aria-labelledby"]).to eq(heading["id"])
+    expect(step.css("[data-level]").map { |button| button["data-level"] }).to eq(WelcomeController::STARTING_LEVELS)
+    expect(step.css("[data-level]").map { |button| button.children.first.text.strip }).to eq(%w[Junior Mid-level Senior])
+    expect(step.at_css('[data-action="click->welcome#back"]').text.strip).to eq("Back")
+    expect(document.at_css('[data-track="none"]')["data-action"]).to eq("click->welcome#showLevels")
+  end
+
+  it "offers only levels a skill level can hold" do
+    expect(WelcomeController::STARTING_LEVELS - User::SKILL_LEVELS).to be_empty
+  end
+
   it "never asks a backfilled account with no exercises" do
     login_as(new_account(learning_track: "none", created_at: 1.year.ago))
 

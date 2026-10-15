@@ -23,6 +23,46 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
+  describe ".answered_kinds_for" do
+    let(:user) { User.create!(email: "kinds@example.com", name: "K") }
+
+    def response_on(date, ratings, submitted: true)
+      exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
+                                       problem_set: { "code_review" => { "question" => "q" } })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: date, section_ratings: ratings,
+                            submitted_at: (Time.current if submitted))
+    end
+
+    it "collects the rated kinds of submitted responses only" do
+      response_on(Date.current - 2, { "code_review" => "right_level", "pattern" => "too_hard" })
+      response_on(Date.current - 1, { "challenge" => "too_easy" }, submitted: false)
+
+      expect(DailyResponse.answered_kinds_for(user)).to eq(Set["code_review", "pattern"])
+    end
+
+    it "leaves out a skipped section, which a submitted response carries no rating for" do
+      response_on(Date.current - 1, { "code_review" => "right_level" })
+
+      expect(DailyResponse.answered_kinds_for(user)).not_to include("pattern")
+    end
+
+    it "ignores another user's answers" do
+      other = User.create!(email: "kinds-other@example.com", name: "O")
+      exercise = DailyExercise.create!(user: other, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                       problem_set: { "code_review" => { "question" => "q" } })
+      DailyResponse.create!(user: other, daily_exercise: exercise, date: Date.current,
+                            section_ratings: { "code_review" => "right_level" }, submitted_at: Time.current)
+
+      expect(DailyResponse.answered_kinds_for(user)).to be_empty
+    end
+
+    it "skips a stored value that is not a map" do
+      response_on(Date.current - 1, {}).update_column(:section_ratings, [ "code_review" ])
+
+      expect(DailyResponse.answered_kinds_for(user)).to be_empty
+    end
+  end
+
   describe "pseudocode rounds" do
     def response_for(rounds)
       user     = User.create!(email: "pseudo-#{SecureRandom.hex(4)}@example.com", name: "P")

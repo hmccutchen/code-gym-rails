@@ -289,7 +289,8 @@ end
 
 **Made:** 1a standalone module, 2a prose only, 3a amended by change 4, 4a, 5 yes, 6 as recommended, 7 `SectionKindGuide`.
 
-**New:**
+**Approved 2026-10-15:** 8a and 9 (hide once answered).
+
 8. **"Answered on a submitted day" source.**
    - (a) **Recommended:** `section_ratings` keys on submitted responses. This is answered-only and one small `pluck`, with the pre-2026-10-10 caveat above.
    - (b) `concept_tags` keys. Cheaper still, but these record *shown* sections, so a skipped kind would lose its About.
@@ -303,3 +304,20 @@ end
 - How `en.yml` merges against #390 until it lands.
 - PR 2's final scope beyond its plan.
 - How many production rows predate the 2026-10-10 rating slice. I won't read production data.
+
+## 12. Deviations found while implementing
+
+- **All 5 page snapshots also gain the `.kind-about` CSS lines.** The styles sit
+  in the layout's `<style>` because the partial renders on two pages, and every
+  page carries the layout. `dashboard_submitted`, `history` and `account`
+  therefore change by the digest and those lines, not by the digest alone.
+- **`profile_skill_level_spec` pinned the old rule** that a skill level cannot
+  ride with a track choice. The rule changes on purpose, so that example now
+  pins the new one: a skill level rides with `none`, and any other field still
+  refuses the request.
+- **A Leave may carry a skill level.** `TRACK_CHOICE_KEYS` lists keys per
+  choice, not per caller, so an on-track user posting `none` with a level is
+  accepted. Setup saves the same field on its own, so nothing new is reachable;
+  a request spec pins it.
+- **A failed welcome save puts focus back on the pressed button**, since
+  disabling it during the request dropped focus to the page.
