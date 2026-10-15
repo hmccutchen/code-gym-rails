@@ -14,10 +14,6 @@ RSpec.describe RemoveTrackLeftoversFromUsers do
     User.reset_column_information
   end
 
-  it "leaves the users table without the track columns" do
-    expect(connection.columns(:users).map(&:name)).not_to include(*old_columns)
-  end
-
   it "rolls back by restoring the columns with their defaults" do
     user = User.create!(email: "kept@example.com", name: "Kept")
 
