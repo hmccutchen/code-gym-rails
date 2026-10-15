@@ -386,9 +386,9 @@ RSpec.describe ConceptMastery, type: :model do
 
   describe "difficulty targets" do
     it "never reads KindDifficulty and moves tier the same way for a locked kind" do
+      user.update!(section_kind_levels: { "code_review" => "principal_engineer" }, locked_section_kinds: [ "code_review" ])
       expect(KindDifficulty).not_to receive(:for)
       expect(KindDifficulty).not_to receive(:new)
-      user.update!(section_kind_levels: { "code_review" => "principal_engineer" }, locked_section_kinds: [ "code_review" ])
 
       4.times { |i| review!(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current - (4 - i)) }
 

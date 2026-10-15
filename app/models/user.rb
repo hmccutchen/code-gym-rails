@@ -49,10 +49,13 @@ class User < ApplicationRecord
   before_save { email.downcase! }
 
   before_save :bump_section_kind_preferences_version, if: :section_kind_preferences_changed?
-  before_save :record_track_level_changes, if: -> { on_learning_track? && section_kind_levels_changed? }
+  before_save :record_level_changes, if: -> {
+    persisted? && !choosing_learning_track? && (section_kind_levels_changed? || skill_level_changed?)
+  }
   before_save :finish_learning_track, if: :on_learning_track?
   after_save :record_level_suggestion_events, if: -> {
-    learning_track_before_last_save == LearningTrack::ON && saved_change_to_section_kind_levels?
+    !previously_new_record? && !chose_learning_track? &&
+      (saved_change_to_section_kind_levels? || saved_change_to_skill_level?)
   }
 
   scope :active, -> { where(anonymized_at: nil) }
@@ -464,26 +467,31 @@ class User < ApplicationRecord
     self.section_kind_preferences_version += 1
   end
 
-  def record_track_level_changes
-    return if learning_track_changed?
+  def choosing_learning_track?
+    learning_track_changed? && (learning_track_in_database.nil? || on_learning_track?)
+  end
 
-    before = section_kind_levels_in_database || {}
-    moved = section_kind_levels.select do |key, level|
-      before[key] != level && LevelSuggestion::LADDER.include?(level)
-    end
+  def chose_learning_track?
+    saved_change_to_learning_track? && (learning_track_before_last_save.nil? || on_learning_track?)
+  end
+
+  def record_level_changes
+    before = KindDifficulty.new(levels: section_kind_levels_in_database || {}, locked: [])
+                           .rungs(skill_level: skill_level_in_database)
+    moved = kind_rungs.select { |key, rung| before[key] != rung && LevelSuggestion::LADDER.include?(rung) }
     return if moved.empty?
 
     through = Time.use_zone(effective_time_zone) { Date.current }.iso8601
     self.level_suggestion_cutoffs = level_suggestion_cutoffs.merge(
-      moved.to_h { |key, level| [ key, { "level" => level, "through" => through } ] }
+      moved.to_h { |key, rung| [ key, { "level" => rung, "through" => through } ] }
     )
   end
 
   def record_level_suggestion_events
     level_suggestion_events.create!(LevelSuggestionEvent.applied_rows(
       self,
-      before_levels: section_kind_levels_before_last_save || {},
-      after_levels: section_kind_levels,
+      before: { levels: section_kind_levels_before_last_save || {}, skill_level: skill_level_before_last_save },
+      after: { levels: section_kind_levels, skill_level: skill_level },
       locked: locked_section_kinds_before_last_save || [],
       cutoffs: level_suggestion_cutoffs_before_last_save || {},
       suggestions_on: level_suggestions_before_last_save

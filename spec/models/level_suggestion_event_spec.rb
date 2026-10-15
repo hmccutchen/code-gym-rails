@@ -10,6 +10,7 @@ RSpec.describe LevelSuggestionEvent, type: :model do
   it "accepts each closed action with the source rule" do
     expect(event(action: "applied", source: "suggestion")).to be_valid
     expect(event(action: "applied", source: "setup_edit")).to be_valid
+    expect(event(action: "applied", source: "skill_level_edit")).to be_valid
     expect(event(action: "dismissed")).to be_valid
     expect(event(action: "removed")).to be_valid
   end
@@ -23,6 +24,7 @@ RSpec.describe LevelSuggestionEvent, type: :model do
   it "requires a source on an applied row and refuses one elsewhere" do
     expect(event(action: "applied")).not_to be_valid
     expect(event(action: "dismissed", source: "suggestion")).not_to be_valid
+    expect(event(action: "removed", source: "skill_level_edit")).not_to be_valid
   end
 
   it "stores counts that default to zero and keeps only a creation time" do
@@ -42,15 +44,17 @@ RSpec.describe LevelSuggestionEvent, type: :model do
   describe ".applied_rows" do
     around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
-    def rows(before:, after:)
-      described_class.applied_rows(user, before_levels: before, after_levels: after,
+    def rows(before:, after:, before_skill: "junior", after_skill: "junior")
+      described_class.applied_rows(user, before: { levels: before, skill_level: before_skill },
+                                         after: { levels: after, skill_level: after_skill },
                                          locked: [], cutoffs: {}, suggestions_on: true)
     end
 
-    it "builds nothing and reads no evidence when no target changed" do
+    it "builds nothing and reads no evidence when no rung changed" do
       expect(LevelSuggestion::Evidence).not_to receive(:for)
 
       expect(rows(before: { "code_review" => "junior" }, after: { "code_review" => "junior" })).to eq([])
+      expect(rows(before: {}, after: { "code_review" => "junior" })).to eq([])
     end
 
     it "counts evidence at the level the kind moved from" do
@@ -64,11 +68,24 @@ RSpec.describe LevelSuggestionEvent, type: :model do
                              favourable: 0, too_hard_latest3: 3, newest_result_on: Date.current)
     end
 
-    it "leaves counts at their defaults for a kind with no previous target" do
+    it "reads a kind with no previous target at the skill level's rung" do
       row = rows(before: {}, after: { "pattern" => "senior" }).sole
 
-      expect(row).to include(from_level: nil, to_level: "senior", source: "setup_edit")
-      expect(row).not_to include(:window_size)
+      expect(row).to include(from_level: "junior", to_level: "senior", source: "setup_edit", window_size: 0)
+    end
+
+    it "labels a rung moved only by the skill level a skill level edit" do
+      kinds = rows(before: { "pattern" => "senior" }, after: { "pattern" => "senior" },
+                   before_skill: "junior", after_skill: "mid_level")
+
+      expect(kinds.map { |row| row[:kind] }).to match_array(ExerciseSection.keys - [ "pattern" ])
+      expect(kinds.map { |row| row[:source] }.uniq).to eq([ "skill_level_edit" ])
+    end
+
+    it "leaves counts at their defaults for a move from principal engineer" do
+      row = rows(before: { "pattern" => "principal_engineer" }, after: { "pattern" => "senior" }).sole
+
+      expect(row).to include(from_level: "principal_engineer", to_level: "senior", window_size: 0)
     end
   end
 end

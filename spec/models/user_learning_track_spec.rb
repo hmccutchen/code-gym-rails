@@ -190,11 +190,13 @@ RSpec.describe User, "learning track", type: :model do
       expect(user.reload.level_suggestion_cutoffs).to eq("pattern" => { "level" => "senior", "through" => "2026-10-14" })
     end
 
-    it "records nothing off the track" do
+    it "records a level change off the track too" do
       user = new_account(learning_track: "none", section_kind_levels: { "architecture" => "senior" })
-      user.update!(section_kind_levels: { "architecture" => "junior" })
+      user.update!(section_kind_levels: { "architecture" => "mid_level" })
 
-      expect(user.reload.level_suggestion_cutoffs).to eq({})
+      expect(user.reload.level_suggestion_cutoffs).to eq(
+        "architecture" => { "level" => "mid_level", "through" => "2026-10-14" }
+      )
     end
 
     it "records the last transition before finishing the track" do

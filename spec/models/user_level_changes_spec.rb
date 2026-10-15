@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe User, "level changes on the learning track", type: :model do
+RSpec.describe User, "level changes", type: :model do
   let(:user) do
     create_user_with_key(time_zone: "America/Los_Angeles")
       .tap { |account| account.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels) }
@@ -78,6 +78,60 @@ RSpec.describe User, "level changes on the learning track", type: :model do
     end
   end
 
+  describe "cutoffs on an account without targets" do
+    let(:user) { create_user_with_key(time_zone: "America/Los_Angeles", learning_track: "none") }
+
+    it "records a target edit at the new rung" do
+      move("code_review" => "mid_level")
+
+      expect(user.reload.level_suggestion_cutoffs).to eq(
+        "code_review" => { "level" => "mid_level", "through" => local_today.iso8601 }
+      )
+    end
+
+    it "records a skill level change for every untargeted kind and no targeted one" do
+      user.update!(section_kind_levels: { "pattern" => "senior" })
+      user.update_column(:level_suggestion_cutoffs, {})
+
+      user.update!(skill_level: "mid_level")
+
+      cutoffs = user.reload.level_suggestion_cutoffs
+      expect(cutoffs.keys).to match_array(ExerciseSection.keys - [ "pattern" ])
+      expect(cutoffs.values.uniq).to eq([ { "level" => "mid_level", "through" => local_today.iso8601 } ])
+    end
+
+    it "records nothing when a target matches the rung the skill level already gave" do
+      move("code_review" => "junior")
+
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
+    end
+
+    it "records the skill level's rung when a target is cleared" do
+      user.update!(section_kind_levels: { "code_review" => "senior" })
+
+      user.update!(section_kind_levels: {})
+
+      expect(user.reload.level_suggestion_cutoffs["code_review"]).to eq(
+        "level" => "junior", "through" => local_today.iso8601
+      )
+    end
+
+    it "records nothing for a skill level change to principal engineer" do
+      user.update!(skill_level: "principal_engineer")
+
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
+    end
+
+    it "records nothing for the first-run choice that sets the skill level" do
+      account = create_user_with_key(learning_track: nil)
+
+      account.update!(learning_track: "none", skill_level: "senior")
+
+      expect(account.reload.level_suggestion_cutoffs).to eq({})
+      expect(account.level_suggestion_events).to be_empty
+    end
+  end
+
   describe "applied events" do
     it "labels a change matching the pending proposal as the suggestion" do
       reviewed_level_days(user, "code_review", "junior", 5, ending: local_today - 1)
@@ -100,16 +154,48 @@ RSpec.describe User, "level changes on the learning track", type: :model do
       )
     end
 
-    it "records a reset to Default as a Setup edit with no destination" do
+    it "records a reset to Default as a Setup edit to the skill level's rung" do
       user.update_columns(section_kind_levels: user.section_kind_levels.merge("code_review" => "mid_level"))
       reviewed_level_days(user, "code_review", "mid_level", 5, ending: local_today)
 
       user.update!(section_kind_levels: user.section_kind_levels.except("code_review"))
 
       expect(user.level_suggestion_events.sole).to have_attributes(
-        kind: "code_review", action: "applied", source: "setup_edit", from_level: "mid_level", to_level: nil,
+        kind: "code_review", action: "applied", source: "setup_edit", from_level: "mid_level", to_level: "junior",
         window_size: 5
       )
+    end
+
+    it "writes nothing when a target matches the rung it already had" do
+      user.update!(section_kind_levels: user.section_kind_levels.except("code_review"))
+      user.level_suggestion_events.delete_all
+
+      move("code_review" => "junior")
+
+      expect(user.level_suggestion_events).to be_empty
+    end
+
+    it "labels each kind a skill level change moved as a skill level edit" do
+      user.update!(learning_track: "none", section_kind_levels: { "pattern" => "senior" })
+      user.level_suggestion_events.delete_all
+      reviewed_level_days(user, "code_review", "junior", 2, ending: local_today - 1)
+
+      user.update!(skill_level: "mid_level")
+
+      rows = user.level_suggestion_events
+      expect(rows.pluck(:kind)).to match_array(ExerciseSection.keys - [ "pattern" ])
+      expect(rows.pluck(:source, :from_level, :to_level).uniq).to eq([ %w[skill_level_edit junior mid_level] ])
+      expect(rows.find_by(kind: "code_review").window_size).to eq(2)
+    end
+
+    it "labels each kind by its own cause when one save changes a target and the skill level" do
+      user.update!(learning_track: "none", section_kind_levels: {})
+      user.level_suggestion_events.delete_all
+
+      user.update!(skill_level: "mid_level", section_kind_levels: { "pattern" => "senior" })
+
+      expect(user.level_suggestion_events.find_by(kind: "pattern").source).to eq("setup_edit")
+      expect(user.level_suggestion_events.find_by(kind: "code_review").source).to eq("skill_level_edit")
     end
 
     it "labels every change a Setup edit while suggestions are switched off" do
@@ -145,6 +231,7 @@ RSpec.describe User, "level changes on the learning track", type: :model do
     end
 
     it "rolls back the level change and its cutoff when the row cannot be written" do
+      user
       allow(LevelSuggestionEvent).to receive(:applied_rows).and_return([ { kind: "code_review", action: "ignored" } ])
 
       expect { move("code_review" => "mid_level") }.to raise_error(ActiveRecord::RecordInvalid)
