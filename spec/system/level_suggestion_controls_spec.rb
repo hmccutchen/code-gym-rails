@@ -145,7 +145,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   it "puts the switch back when its save fails" do
     user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
     visit_as(user)
-    visit setup_path
+    visit setup_path(show: "level_suggestions")
     fail_requests_to(profile_path)
 
     # Not uncheck: the failed save can put the box back before Playwright confirms the click changed it.
@@ -159,7 +159,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   it "returns the switch to the stored value when several quick saves all fail" do
     user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
     visit_as(user)
-    visit setup_path
+    visit setup_path(show: "level_suggestions")
     page.execute_script(<<~JS)
       const originalFetch = window.fetch;
       const held = [];
@@ -182,7 +182,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   it "turns suggestions off and on from Setup" do
     user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
     visit_as(user)
-    visit setup_path
+    visit setup_path(show: "level_suggestions")
 
     uncheck "Suggest level changes"
     wait_for_saves
@@ -191,5 +191,35 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     check "Suggest level changes"
     wait_for_saves
     expect(user.reload.level_suggestions).to be(true)
+  end
+
+  it "opens the Exercise mix at the switch and focuses it when the card's Setup link is followed" do
+    own_proposal(answered: 0)
+
+    within("#level-suggestion") { click_link "Setup" }
+
+    expect(page).to have_css("#exercise-mix[open]")
+    wait_for_js_condition("document.activeElement && document.activeElement.id === 'level-suggestions'")
+    uncheck "Suggest level changes"
+    wait_for_saves
+    expect(user.reload.level_suggestions).to be(false)
+  end
+
+  it "leaves focus alone on a plain visit to Setup" do
+    visit_as(user)
+    visit setup_path
+
+    expect(page).to have_css("#exercise-mix:not([open])")
+    expect(page.evaluate_script("document.activeElement.id")).not_to eq("level-suggestions")
+  end
+
+  it "shows the switch to an account that was never on the track" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    uncheck "Suggest level changes"
+    wait_for_saves
+    expect(user.reload.level_suggestions).to be(false)
   end
 end

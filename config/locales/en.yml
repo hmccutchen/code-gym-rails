@@ -20,6 +20,9 @@ en:
       invalid: "Those sections can't be set aside."
       invalid_steps: "That suggestion can't be applied. Reload the page to see the current one."
       stale: "Your levels changed since this suggestion was shown. Reload the page to see the current one."
+    setup:
+      label: "Suggest level changes"
+      hint: "When this is off, the dashboard stops suggesting level changes. You can still change levels yourself below, and turn this back on at any time."
   learning_track:
     welcome:
       title: "Before you start"
@@ -35,11 +38,9 @@ en:
         senior: "You review other people's work and weigh tradeoffs often."
       back: "Back"
     setup:
-      on_track: "You're on the junior track. Code Gym suggests moving each kind of exercise up as your reviews show you're ready."
+      on_track: "You're on the junior track, so every kind of exercise started at junior."
       leave: "Leave the track"
-      leave_hint: "Your current difficulty settings stay as they are. You can't rejoin the track afterwards."
-      suggestions_label: "Suggest level changes"
-      suggestions_hint: "When this is off, the dashboard stops suggesting level changes. You can still change levels yourself in Exercise mix, and turn this back on at any time."
+      leave_hint: "Your difficulty settings and level suggestions stay as they are. You can't rejoin the track afterwards."
       suggested: "Code Gym suggested moving %{kinds} to %{level}. Change their difficulty below."
       left: "You've left the junior track. Your difficulty settings stay as they are."
       key_guide:
@@ -784,7 +785,7 @@ en:
         hawaii: "Hawaii"
       time_zone_hint: 'Sets when your day rolls over and when your 8am exercise set is generated. Leave on "detect automatically" to use your browser''s zone.'
       skill_level_label: "Skill level"
-      skill_level_hint: "How hard your sections start out, unless you've set a difficulty for that section in the Exercise mix below. Junior suits early-career developers and career changers. Your ratings still nudge each day's set up or down."
+      skill_level_hint: "The level each section uses unless you set one for it in the Exercise mix below. Junior suits early-career developers and career changers. Your ratings nudge each day's set, but this setting changes only when you change it. When your reviews show a section is ready to move, Code Gym suggests a level for that section, and you decide."
   history:
     index:
       title: "History"

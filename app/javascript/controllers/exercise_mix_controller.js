@@ -26,7 +26,8 @@ export default class extends Controller {
   }
 
   editedBeforeConnect() {
-    return Array.from(this.element.querySelectorAll("input")).some((input) =>
+    const own = "[data-exercise-mix-target~='row'] input, [data-exercise-mix-target~='difficulty'] input"
+    return Array.from(this.element.querySelectorAll(own)).some((input) =>
       input.type === "range" ? input.value !== input.defaultValue : input.checked !== input.defaultChecked
     )
   }

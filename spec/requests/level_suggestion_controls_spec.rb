@@ -41,7 +41,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       expect(proposal.at_css("[data-change-in-setup]")).to be_nil
       expect(proposal["data-level-suggestion-answer-url-value"]).to eq(level_suggestion_answer_path)
       expect(proposal.text).to include("turn these suggestions off in Setup")
-      expect(proposal.at_css(%(a[href="#{setup_path(anchor: "learning-track")}"]))).to be_present
+      expect(proposal.at_css(%(a[href="#{setup_path(show: "level_suggestions", anchor: "level-suggestions")}"]))).to be_present
     end
 
     it "sends the user to the Exercise mix with the suggested kinds once they have answered the threshold" do
@@ -152,10 +152,40 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
       get setup_path
 
-      box = page_html.at_css("#track-suggestions")
+      box = page_html.at_css("#exercise-mix #level-suggestions")
       expect(box).to be_present
       expect(box["checked"]).to be_nil
-      expect(page_html.at_css("#learning-track").text).to include("You can't rejoin the track afterwards.")
+      expect(page_html.at_css("#learning-track #level-suggestions")).to be_nil
+      expect(page_html.at_css("#learning-track").text).to include("level suggestions stay as they are",
+                                                                   "You can't rejoin the track afterwards.")
+    end
+
+    it "shows the switch inside the Exercise mix to an account off the track" do
+      login_as(create_user_with_key)
+
+      get setup_path
+
+      expect(page_html.at_css("#exercise-mix #level-suggestions")["checked"]).not_to be_nil
+      expect(page_html.at_css("#exercise-mix")["open"]).to be_nil
+      expect(page_html.at_css("#level-suggestions-switch")["data-level-suggestions-switch-focus-value"]).to be_nil
+    end
+
+    it "opens the Exercise mix and asks for the switch to take focus when the card's link names it" do
+      login_as(create_user_with_key)
+
+      get setup_path(show: "level_suggestions")
+
+      expect(page_html.at_css("#exercise-mix")["open"]).not_to be_nil
+      expect(page_html.at_css("#level-suggestions-switch")["data-level-suggestions-switch-focus-value"]).to eq("true")
+    end
+
+    it "ignores any other show value" do
+      login_as(create_user_with_key)
+
+      get setup_path(show: "everything")
+
+      expect(page_html.at_css("#exercise-mix")["open"]).to be_nil
+      expect(page_html.at_css("#level-suggestions-switch")["data-level-suggestions-switch-focus-value"]).to be_nil
     end
 
     it "opens the Exercise mix and marks the suggested kinds" do

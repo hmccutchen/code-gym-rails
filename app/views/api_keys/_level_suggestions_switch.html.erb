@@ -1,0 +1,12 @@
+<%= tag.div id: "level-suggestions-switch", class: "mix-note",
+      data: { controller: "level-suggestions-switch",
+              level_suggestions_switch_url_value: profile_path,
+              level_suggestions_switch_focus_value: (true if show_level_suggestions?) } do %>
+  <label for="level-suggestions">
+    <input type="checkbox" id="level-suggestions" <%= "checked" if current_user.level_suggestions? %>
+           aria-describedby="level-suggestions-hint"
+           data-level-suggestions-switch-target="checkbox" data-action="change->level-suggestions-switch#toggle">
+    <%= t("level_suggestion.setup.label") %>
+  </label>
+  <p class="hint" id="level-suggestions-hint"><%= t("level_suggestion.setup.hint") %></p>
+<% end %>

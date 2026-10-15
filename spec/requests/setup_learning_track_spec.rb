@@ -49,7 +49,8 @@ RSpec.describe "Setup for a learning track user", type: :request do
     expect(page_html.at_css(".key-guide")).to be_nil
     track = page_html.at_css("#learning-track")
     expect(track).to be_present
-    expect(track.text).to include("You're on the junior track", "Your current difficulty settings stay as they are.")
+    expect(track.text).to include("You're on the junior track, so every kind of exercise started at junior.",
+                                  "Your difficulty settings and level suggestions stay as they are.")
     expect(page_html.css("#learning-track, #exercise-mix").map { |node| node["id"] }).to eq(%w[learning-track exercise-mix])
   end
 

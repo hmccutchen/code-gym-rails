@@ -3,7 +3,7 @@ class ApiKeysController < ApplicationController
 
   skip_before_action :require_provider
 
-  helper_method :suggested_kinds, :suggested_level, :suggested_steps
+  helper_method :suggested_kinds, :suggested_level, :suggested_steps, :show_level_suggestions?
 
   # GET /setup
   def edit
@@ -34,6 +34,8 @@ class ApiKeysController < ApplicationController
   def suggested_level
     params[:suggested_level] if LevelSuggestion::LADDER.include?(params[:suggested_level])
   end
+
+  def show_level_suggestions? = params[:show] == "level_suggestions"
 
   def suggested_steps
     rungs = current_user.kind_rungs

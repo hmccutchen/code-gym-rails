@@ -32,13 +32,14 @@ RSpec.describe "Setup skill level control", type: :request do
     expect(User.new.skill_level).to eq("junior")
   end
 
-  it "says what the setting does and that ratings still adjust each set" do
+  it "says what the setting does, that ratings still adjust each set, and that only the user changes it" do
     login_as(user)
 
     get setup_path
 
-    expect(page_html.text).to include("unless you've set a difficulty for that section in the Exercise mix below",
-                                     "Your ratings still nudge each day's set up or down")
+    expect(page_html.text).to include("The level each section uses unless you set one for it in the Exercise mix below.",
+                                     "Your ratings nudge each day's set, but this setting changes only when you change it.",
+                                     "Code Gym suggests a level for that section, and you decide.")
   end
 
   it "sits above the Exercise mix, whose default options name it" do
