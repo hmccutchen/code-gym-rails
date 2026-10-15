@@ -33,7 +33,6 @@ class ProfileController < ApplicationController
 
   DAILY_SECTION_COUNT_STRINGS = User::DAILY_SECTION_COUNTS.map(&:to_s).freeze
   PREFERENCE_KEYS = %i[section_kind_weights excluded_section_kinds section_kind_levels locked_section_kinds].freeze
-  LEVEL_SUGGESTION_KEYS = %i[level_suggestions track_suggestions].freeze
   LOCKED_KEYS = %i[learning_track skill_level section_kind_levels].freeze
 
   def invalid_daily_section_count?
@@ -136,7 +135,7 @@ class ProfileController < ApplicationController
   def invalid_level_suggestions?
     user_params = params.require(:user)
 
-    LEVEL_SUGGESTION_KEYS.any? { |key| user_params.key?(key) && [ true, false ].exclude?(user_params[key]) }
+    user_params.key?(:level_suggestions) && [ true, false ].exclude?(user_params[:level_suggestions])
   end
 
   def render_invalid_level_suggestions
@@ -239,14 +238,13 @@ class ProfileController < ApplicationController
   end
 
   def profile_params
-    permitted = params.require(:user).permit(:name, :time_zone, :daily_section_count, :learning_track, :skill_level, *LEVEL_SUGGESTION_KEYS,
+    permitted = params.require(:user).permit(:name, :time_zone, :daily_section_count, :learning_track, :skill_level, :level_suggestions,
                                              section_kind_weights: {}, excluded_section_kinds: [],
                                              section_kind_levels: {}, locked_section_kinds: [],
                                              display_preferences: {})
     permitted[:name] = permitted[:name].to_s.strip if permitted.key?(:name)
     permitted[:time_zone] = permitted[:time_zone].to_s.strip.presence if permitted.key?(:time_zone)
     permitted[:daily_section_count] = nil if permitted[:daily_section_count] == User::AUTOMATIC_SECTION_COUNT
-    permitted[:level_suggestions] = permitted.delete(:track_suggestions) if permitted.key?(:track_suggestions)
     # permit(x: {}) yields Parameters, which a jsonb column cannot serialize.
     %i[section_kind_weights section_kind_levels display_preferences].each do |key|
       permitted[key] = permitted[key].to_h if permitted.key?(key)

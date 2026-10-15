@@ -22,7 +22,7 @@ RSpec.describe NavigationHelper, type: :helper do
     end
 
     it "does not mark a destination whose path is only a prefix of the current one's name" do
-      at("/learning_track/answer")
+      at("/learning_things")
 
       expect(helper.nav_current?("/learn")).to be(false)
     end

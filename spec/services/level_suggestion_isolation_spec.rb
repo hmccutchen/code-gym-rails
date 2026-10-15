@@ -55,8 +55,7 @@ RSpec.describe "Learning track and level suggestion isolation" do
   end
 
   let(:state_readers) do
-    /learning_track|LearningTrack|level_suggestion|LevelSuggestion|track_evidence_cutoffs|
-     track_suggestions|track_proposals_answered|TrackGraduation|shown_level_suggestions/x
+    /learning_track|LearningTrack|level_suggestion|LevelSuggestion|TrackGraduation|shown_level_suggestions/x
   end
 
   it "keeps track and suggestion state out of generation, review, judges, ConceptMastery and KindDifficulty" do
@@ -71,8 +70,7 @@ RSpec.describe "Learning track and level suggestion isolation" do
 
   it "would catch a reader of each name it guards" do
     %w[learning_track LearningTrack level_suggestion_cutoffs level_suggestions LevelSuggestion
-       track_evidence_cutoffs track_suggestions track_proposals_answered TrackGraduation
-       shown_level_suggestions level_suggestion_answers].each do |name|
+       TrackGraduation shown_level_suggestions level_suggestion_answers].each do |name|
       expect("user.#{name}").to match(state_readers)
     end
   end

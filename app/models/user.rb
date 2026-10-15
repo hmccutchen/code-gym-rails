@@ -9,8 +9,6 @@ class User < ApplicationRecord
   has_many :level_suggestion_events, dependent: :destroy
   belongs_to :invite_code, optional: true
 
-  self.ignored_columns += %w[track_suggestions track_evidence_cutoffs track_proposals_answered]
-
   attr_accessor :shown_level_suggestions
 
   serialize :api_keys, coder: JSON
