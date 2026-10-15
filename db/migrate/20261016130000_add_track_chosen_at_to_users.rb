@@ -1,4 +1,4 @@
-# Ships a release before any code reads the column, so a worker on new code never meets a database without it.
+# Reasoning in docs/code-notes/db/migrate/20261016130000_add_track_chosen_at_to_users.md.
 class AddTrackChosenAtToUsers < ActiveRecord::Migration[8.1]
   def up
     add_column :users, :track_chosen_at, :datetime

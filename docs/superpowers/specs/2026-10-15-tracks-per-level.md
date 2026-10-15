@@ -2,7 +2,7 @@
 
 Read on `origin/main` at **9ecd83b**. This plan covers PR 2 (every kind's level in the prompt) and PR 1 (tracks per level) in full, then PRs 3–5 in brief.
 
-**Status.** PR 2 is implemented in the same pull request as this plan, and merges and deploys on its own before PR 1. PR 1 below is the revised plan, waiting for review: it adds the target-clearing rule to every track change.
+**Status.** PR 2 merged as #396. PR 1a, the migration alone, is #397. PR 1 below is approved and starts once 1a is deployed. Line numbers and snapshot counts in this plan were read on 9ecd83b; main has moved since.
 
 ## Decisions this plan follows
 
@@ -117,7 +117,8 @@ The revision adds scope item 10: every track change applies the target-clearing 
    - The Experienced step, its level step and Back are removed.
    - Principal engineer is not offered, and the page says it can be chosen in Setup.
 2. **The choice is recorded in a new column, `users.track_chosen_at`** (nullable datetime).
-   - `User#first_run?` becomes `persisted? && track_chosen_at.nil? && !daily_exercises.exists?`.
+   - `User#first_run?` becomes `persisted? && track_chosen_at.nil? && !daily_exercises.exists?`. For the one dual-write release it also requires `learning_track.nil?`, so an account that answered the old welcome page in the gap between PR 1's backfill re-run and its code taking traffic is not asked again.
+   - **`track_chosen_at` is a flag, not a clock.** Every account that predates it holds its creation time. A null value means no decision was recorded, which is not the same as "not yet asked": accounts the nightly batch generated for before they ever opened `/welcome` hold null and are past first run because they have exercises. No reader treats null as undecided on its own.
    - `learning_track` is no longer read. For one release, a track choice also writes `learning_track: "none"`, so rolled-back code doesn't send new accounts to `/welcome` again. A later cleanup PR drops the column (the repo's one-release pattern).
 3. **No presets.** The welcome choice writes no `section_kind_levels` and needs no `section_kind_preferences_version`. No migration touches existing targets; they change only through item 10.
 4. **Removed:**
@@ -168,7 +169,7 @@ The revision adds scope item 10: every track change applies the target-clearing 
 
 ### Files
 
-- `db/migrate/2026101xxxxxxx_add_track_chosen_at_to_users.rb`: add the column; backfill `track_chosen_at = created_at` where `learning_track IS NOT NULL`. That covers every backfilled `"none"` account and your `"junior"` account.
+- `db/migrate/20261016130000_add_track_chosen_at_to_users.rb` (#397, PR 1a): add the column; backfill `track_chosen_at = created_at` where `learning_track IS NOT NULL`. That covers every backfilled `"none"` account and your `"junior"` account. PR 1 adds a second data migration repeating that backfill with `AND track_chosen_at IS NULL`, so it never overwrites a value.
 - `app/models/user.rb`, `app/models/learning_track.rb` (deleted), `app/controllers/profile_controller.rb`.
 - `app/models/track_change.rb` (new), `app/models/level_suggestion_event.rb` (`source_for`).
 - `app/javascript/controllers/profile_preferences_controller.js` (applies a track save's reply and shows the kept line), `app/javascript/controllers/exercise_mix_controller.js` (listens for the server-state event), `app/views/api_keys/edit.html.erb` (the kept line's status element).
@@ -188,7 +189,8 @@ The revision adds scope item 10: every track change applies the target-clearing 
 ### Migration and rollback
 
 - **The migration ships ahead of the code (PR 1a, `AddTrackChosenAtToUsers`, built once PR 2 merged as #396).** Web and worker deploy separately, and the worker's pre-deploy waits only for a schema to exist, not for this migration. If PR 1's code reached a worker before the web pre-deploy migrated, every `User` save in a job would hit callbacks reading `track_chosen_at` and raise. So PR 1a is migration only: add the column and backfill, with no code reading it. PR 1 follows once 1a is deployed. This is the repo's existing add-then-read pattern.
-- **Up:** add `track_chosen_at` and backfill from `learning_track IS NOT NULL`. Reversible: the down removes the column. Accounts created between 1a and PR 1 come in with `learning_track` set by today's welcome flow, so PR 1's deploy re-runs the same backfill as an idempotent data step for rows still null with a non-null `learning_track`.
+- **Up:** add `track_chosen_at` and backfill from `learning_track IS NOT NULL`. Reversible: the down removes the column. Accounts created between 1a and PR 1 come in with `learning_track` set by today's welcome flow, so PR 1's deploy re-runs the same backfill, guarded by `track_chosen_at IS NULL`, as an idempotent data step.
+- **Follow-up, not in this sequence:** `SchemaWait` waits for a schema to exist, not for pending migrations. Making it also wait until no migration is pending would remove the need to ship columns a release early. The cost is that a failed migration holds the worker until the five-minute timeout.
 - **Code rollback after deploy:**
   - Old code reads `learning_track`, which still holds every old value.
   - Accounts created under PR 1 hold `"none"` through the dual write, so old code neither re-prompts them nor shows Leave.
