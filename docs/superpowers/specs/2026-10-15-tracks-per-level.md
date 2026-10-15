@@ -106,9 +106,9 @@ No migration. Rolling back the code restores the old prompts byte for byte, beca
 
 ---
 
-## PR 1: tracks per level (revised, for review)
+## PR 1: tracks per level (revised, approved)
 
-The revision adds scope item 10: every track change applies the target-clearing table, not only graduation.
+The revision adds scope item 10: every track change applies the target-clearing table, not only graduation. Approved on 2026-10-15, with an optional preview before a Setup track change saves ("This moves N sections; Pattern keeps Senior", Save and Cancel), built only if it stays inside the existing Setup controller and a small partial; otherwise it is a follow-up.
 
 ### Scope
 
@@ -187,7 +187,7 @@ The revision adds scope item 10: every track change applies the target-clearing 
 
 ### Migration and rollback
 
-- **The migration ships ahead of the code (PR 1a).** Web and worker deploy separately, and the worker's pre-deploy waits only for a schema to exist, not for this migration. If PR 1's code reached a worker before the web pre-deploy migrated, every `User` save in a job would hit callbacks reading `track_chosen_at` and raise. So PR 1a is migration only: add the column and backfill, with no code reading it. PR 1 follows once 1a is deployed. This is the repo's existing add-then-read pattern.
+- **The migration ships ahead of the code (PR 1a, `AddTrackChosenAtToUsers`, built once PR 2 merged as #396).** Web and worker deploy separately, and the worker's pre-deploy waits only for a schema to exist, not for this migration. If PR 1's code reached a worker before the web pre-deploy migrated, every `User` save in a job would hit callbacks reading `track_chosen_at` and raise. So PR 1a is migration only: add the column and backfill, with no code reading it. PR 1 follows once 1a is deployed. This is the repo's existing add-then-read pattern.
 - **Up:** add `track_chosen_at` and backfill from `learning_track IS NOT NULL`. Reversible: the down removes the column. Accounts created between 1a and PR 1 come in with `learning_track` set by today's welcome flow, so PR 1's deploy re-runs the same backfill as an idempotent data step for rows still null with a non-null `learning_track`.
 - **Code rollback after deploy:**
   - Old code reads `learning_track`, which still holds every old value.
@@ -343,7 +343,7 @@ No line names a job title or claims what the person is; each says what the exerc
 - Ignore, then drop `users.learning_track`.
 - Remove the dual write and the literal validation.
 
-## Open for review: the by-hand clearing rule (from the critical review)
+## The by-hand clearing rule (from the critical review; decided)
 
 The rule in item 10 clears an unlocked target equal to the old or new level on every track change. Once presets stop being written, a target equal to the old level is indistinguishable from one chosen on purpose. Example: on mid-level, someone deliberately holds pattern at mid-level; raising the track to senior in Setup clears it, and pattern jumps to senior with no preview and no one-click undo. Only a lock protects it. The review's alternatives:
 
@@ -351,7 +351,7 @@ The rule in item 10 clears an unlocked target equal to the old or new level on e
 - **B.** Apply `TrackChange` only to graduation, whose card previews it, and clear today's exact presets (every kind junior, unlocked, on a junior-track account) with a one-off script. Hand moves in Setup leave targets alone.
 - **C.** Keep the rule as decided, with the after-the-fact line only.
 
-I recommend **A**: it keeps your rule and adds the preview graduation already has. B is smaller but leaves hand moves inconsistent with graduation.
+**Decided:** the rule stays on every track change. The preview in A is built in PR 1 only if it stays inside the existing Setup controller and a small partial; otherwise PR 1 ships C and the preview becomes a follow-up.
 
 ## Decisions recorded
 

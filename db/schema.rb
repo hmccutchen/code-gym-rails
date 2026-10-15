@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_16_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -382,6 +382,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
     t.boolean "level_suggestions", default: true, null: false
     t.jsonb "level_suggestion_cutoffs", default: {}, null: false
     t.integer "level_suggestion_answers", default: 0, null: false
+    t.datetime "track_chosen_at"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["invite_code_id"], name: "index_users_on_invite_code_id"
   end
