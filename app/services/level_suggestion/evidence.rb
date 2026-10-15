@@ -1,4 +1,4 @@
-class TrackGraduation
+class LevelSuggestion
   class Evidence
     # Bounds reads only; skipped and eased sections don't count, so a rare kind may never fill a window.
     RESPONSE_WINDOW = 60

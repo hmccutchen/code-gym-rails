@@ -58,7 +58,7 @@ that an Exercise mix save has already ended.
 
 ## `#record_track_level_changes` and `#finish_learning_track`
 
-A target moved to a rung of `TrackGraduation::LADDER` (junior, mid_level,
+A target moved to a rung of `LevelSuggestion::LADDER` (junior, mid_level,
 senior) records a cutoff at that rung, through the user's own today, whatever
 it moved from: another rung, principal_engineer, or no target. Results from an
 earlier stay at that rung then never count again, even after a detour through
@@ -77,7 +77,7 @@ Leave that changes no level writes nothing; the save that ends the track by
 moving the last kind to senior still writes its rows.
 
 The track ends only when no target sits below the top of
-`TrackGraduation::LADDER`, so moving the last junior kind to mid_level keeps
+`LevelSuggestion::LADDER`, so moving the last junior kind to mid_level keeps
 the account on it.
 
 ## `#recent_performance`

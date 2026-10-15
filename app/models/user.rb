@@ -230,7 +230,7 @@ class User < ApplicationRecord
 
   def suggests_track_moves? = on_learning_track? && track_suggestions?
 
-  def applies_track_proposals_in_place? = track_proposals_answered < LearningTrack::IN_PLACE_ANSWERS
+  def applies_track_proposals_in_place? = track_proposals_answered < LevelSuggestion::IN_PLACE_ANSWERS
 
   def first_run?
     persisted? && learning_track.nil? && !daily_exercises.exists?
@@ -465,7 +465,7 @@ class User < ApplicationRecord
 
     before = section_kind_levels_in_database || {}
     moved = section_kind_levels.select do |key, level|
-      before[key] != level && TrackGraduation::LADDER.include?(level)
+      before[key] != level && LevelSuggestion::LADDER.include?(level)
     end
     return if moved.empty?
 
@@ -487,7 +487,7 @@ class User < ApplicationRecord
   end
 
   def finish_learning_track
-    return if section_kind_levels.values.intersect?(TrackGraduation::LADDER[0...-1])
+    return if section_kind_levels.values.intersect?(LevelSuggestion::LADDER[0...-1])
 
     self.learning_track = LearningTrack::OFF
   end

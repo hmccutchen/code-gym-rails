@@ -24,7 +24,7 @@ RSpec.describe "Learning track proposals", type: :request do
     )
   end
 
-  def reviewed_window(user, sections, ending: Date.current, count: TrackGraduation::WINDOW)
+  def reviewed_window(user, sections, ending: Date.current, count: LevelSuggestion::WINDOW)
     count.times { |ago| reviewed_day(user, ending - ago, sections) }
   end
 
@@ -74,7 +74,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
   it "offers nothing on four results, however good" do
     user = track_user
-    reviewed_window(user, { "code_review" => "junior" }, count: TrackGraduation::WINDOW - 1)
+    reviewed_window(user, { "code_review" => "junior" }, count: LevelSuggestion::WINDOW - 1)
     login_as(user)
 
     get root_path
@@ -138,7 +138,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
   it "lists no kind without five results of its own, even when another kind is targeted higher" do
     user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
-    reviewed_window(user, { "code_review" => "senior", "pattern" => "junior" }, count: TrackGraduation::WINDOW - 1)
+    reviewed_window(user, { "code_review" => "senior", "pattern" => "junior" }, count: LevelSuggestion::WINDOW - 1)
     reviewed_day(user, Date.current - 4, { "code_review" => "senior" })
     login_as(user)
 
@@ -196,7 +196,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
   it "sends a card of several kinds to Setup with every kind and their shared level" do
     user = track_user
-    user.update!(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS)
+    user.update!(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS)
     reviewed_window(user, { "code_review" => "junior", "pattern" => "junior" })
     login_as(user)
 
@@ -223,7 +223,7 @@ RSpec.describe "Learning track proposals", type: :request do
     reviewed_window(user, { "code_review" => "junior" })
     user.daily_responses.find_by!(date: Date.current).update!(submitted_at: nil, ai_review: {})
     login_as(user)
-    expect(TrackGraduation).not_to receive(:for)
+    expect(LevelSuggestion).not_to receive(:for)
 
     get root_path
 
@@ -236,7 +236,7 @@ RSpec.describe "Learning track proposals", type: :request do
       user.update!(learning_track: track)
       reviewed_window(user, { "code_review" => "junior" })
       login_as(user)
-      expect(TrackGraduation).not_to receive(:for)
+      expect(LevelSuggestion).not_to receive(:for)
 
       get root_path
 
@@ -258,7 +258,7 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(response).to have_http_status(:ok)
     expect(proposed_kinds).not_to include("architecture")
 
-    TrackGraduation::WINDOW.times do
+    LevelSuggestion::WINDOW.times do
       travel 1.day
       reviewed_day(user, Date.current, { "architecture" => "mid_level" })
     end
@@ -391,7 +391,7 @@ RSpec.describe "Learning track proposals", type: :request do
       user = track_user
       login_as(user)
       concurrent = { "architecture" => { "level" => "junior", "through" => Date.current.iso8601 } }
-      allow(TrackGraduation::Evidence).to receive(:for).and_wrap_original do |original, *args|
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
         User.find(user.id).update_column(:track_evidence_cutoffs, concurrent)
         original.call(*args)
       end
@@ -406,13 +406,13 @@ RSpec.describe "Learning track proposals", type: :request do
 
     it "keeps a newer same-kind dismissal when an older evidence read finishes last" do
       user = track_user
-      reviewed_day(user, Date.current - TrackGraduation::WINDOW, { "code_review" => "junior" })
+      reviewed_day(user, Date.current - LevelSuggestion::WINDOW, { "code_review" => "junior" })
       login_as(user)
       other_tab = ActionDispatch::Integration::Session.new(Rails.application)
       other_tab.post login_path, params: { email: user.email }
       other_tab.post verify_login_code_path, params: { code: user.generate_login_code! }
       advanced = false
-      allow(TrackGraduation::Evidence).to receive(:for).and_wrap_original do |original, *args|
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
         evidence = original.call(*args)
         unless advanced
           advanced = true
@@ -429,7 +429,7 @@ RSpec.describe "Learning track proposals", type: :request do
       expect(response).to have_http_status(:ok)
       aggregate_failures do
         expect(user.reload.track_evidence_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
-        expect(TrackGraduation.for(user)).to be_nil
+        expect(LevelSuggestion.for(user)).to be_nil
       end
     end
 
@@ -479,7 +479,7 @@ RSpec.describe "Learning track proposals", type: :request do
     it "rechecks membership after another request leaves the track" do
       user = track_user
       login_as(user)
-      allow(TrackGraduation::Evidence).to receive(:for).and_wrap_original do |original, *args|
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
         User.find(user.id).update!(learning_track: "none")
         original.call(*args)
       end
@@ -496,7 +496,7 @@ RSpec.describe "Learning track proposals", type: :request do
       reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
       login_as(user)
       changed = false
-      allow(TrackGraduation::Evidence).to receive(:for).and_wrap_original do |original, *args|
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
         unless changed
           changed = true
           fresh = User.find(user.id)

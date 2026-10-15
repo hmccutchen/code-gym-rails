@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe TrackGraduation do
+RSpec.describe LevelSuggestion do
   let(:today) { Date.new(2026, 10, 14) }
 
   def result(days_ago, level: "junior", ai: "solid", self_rating: "right_level")
@@ -40,12 +40,12 @@ RSpec.describe TrackGraduation do
   end
 
   describe "result ratings" do
-    it "is favourable on an AI rating of solid or better, whatever the self-rating" do
+    it "is ai_favourable on an AI rating of solid or better, whatever the self-rating" do
       %w[solid strong].product([ "too_easy", "right_level", "too_hard", nil ]).each do |ai, rating|
-        expect(result(0, ai: ai, self_rating: rating)).to be_favourable
+        expect(result(0, ai: ai, self_rating: rating)).to be_ai_favourable
       end
       [ "beginner", "developing", nil, "unknown" ].each do |ai|
-        expect(result(0, ai: ai)).not_to be_favourable
+        expect(result(0, ai: ai)).not_to be_ai_favourable
       end
     end
 

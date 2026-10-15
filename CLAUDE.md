@@ -447,7 +447,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   senior, or after leaving the track, the profile still says junior until
   the user changes it on Setup. Experienced asks a second question, where
   exercises should start (junior, mid-level or senior,
-  `TrackGraduation::LADDER`, the same list level suggestions move along), and records `"none"` with that
+  `LevelSuggestion::LADDER`, the same list level suggestions move along), and records `"none"` with that
   `skill_level` in one request, without changing targets. The step stays in
   the browser because `first_run?` ends once any track is saved. Until
   suggestions open to every account, an Experienced account gets no level
@@ -470,9 +470,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `create_fake_provider_user` default to `"none"`, standing for backfilled
   accounts; a first-run spec passes `learning_track: nil`.
 
-  **Suggestions use reviewed work, not mastery tiers.** `TrackGraduation`
+  **Suggestions use reviewed work, not mastery tiers.** `LevelSuggestion`
   moves an unlocked kind one rung along junior, mid-level and senior
-  (`TrackGraduation::LADDER`). Principal engineer is set only by hand, so no
+  (`LevelSuggestion::LADDER`). Principal engineer is set only by hand, so no
   suggestion leaves it or leads to it. A step up needs the kind's latest five
   results at its current level, at least four of them rated solid or better
   by the AI, and fewer than two of the latest three self-rated too hard: the
@@ -487,7 +487,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   kind without its own five results is never offered a step up. Locked kinds
   are omitted; exclusions remain a scheduling preference.
 
-  `TrackGraduation::Evidence` preloads exercises for the latest 60 submitted
+  `LevelSuggestion::Evidence` preloads exercises for the latest 60 submitted
   responses with stored review data. Only reviewed responses and answered,
   un-eased sections with a `pitched_at` stamp, an AI rating and the current
   `AiService::RUBRIC_VERSION` stamp contribute, because the AI rating now
@@ -515,7 +515,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   into the reloaded map under that same lock and keeps a later valid cutoff
   at the current level. Its earlier evidence read cannot undo a newer
   dismissal or level-change cutoff. A different-level or malformed entry is
-  replaced; `TrackGraduation.cutoff_date` is the shared reader for dismissal
+  replaced; `LevelSuggestion.cutoff_date` is the shared reader for dismissal
   and proposal filtering.
 
   **Setup and dashboard saves settle in place.** Apply changes only the kinds
@@ -545,7 +545,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   choice; its warning says the choice was saved and need not be repeated.
   Once an Apply finishes the track, the count endpoint returns success without
   incrementing, because there will be no later suggestion to route. Below
-  `LearningTrack::IN_PLACE_ANSWERS` (3) a proposal applies in place. From then
+  `LevelSuggestion::IN_PLACE_ANSWERS` (3) a proposal applies in place. From then
   on its main button links to Setup's Exercise mix with the proposed kinds
   marked and the level named (`?suggested[]=…&suggested_level=…`), and the
   user changes the level there, so they learn where the control lives. Not
@@ -2079,10 +2079,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   sections count: answered, graded from the closed rating list, and stamped
   with a rung. Eased sections are left out unless a caller asks for them,
   and each result says whether it was eased. It also states the rating
-  rules the gate and `TrackGraduation` read: `at_or_above?` reads
+  rules the gate and `LevelSuggestion` read: `at_or_above?` reads
   `ConceptMastery::AI_RATING_RANK`, `favourable?(bar:)` adds
   `DailyResponse::SELF_RATING_FAVORABLE`, and `too_hard?` reads
-  `DailyResponse::SELF_RATING_UNFAVORABLE`. `TrackGraduation::Result` asks
+  `DailyResponse::SELF_RATING_UNFAVORABLE`. `LevelSuggestion::Result` asks
   `at_or_above?` with `FAVOURABLE_BAR`, the lowest favourable rating, and
   `too_hard?` apart from it, since its AI rating decides without the
   self-rating's agreement; `CompetencyGate::BAR` is that same constant.
@@ -2091,7 +2091,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   change. A row whose
   review, answers, ratings or problem set is not a hash, or a section whose
   review is not one, is skipped rather than raised on, since the gate runs
-  on every plan, fixed settings included. `TrackGraduation::Evidence`
+  on every plan, fixed settings included. `LevelSuggestion::Evidence`
   delegates to it with its 60-response cap, eased sections left out and the
   rubric stamp required, so generation code never names track code.
   `CompetencyGate::Evidence` asks it for eased sections too, requires the
@@ -2313,7 +2313,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   evidence reader that compares ratings to a bar reads only stamped reviews.
   A stamp rather than a cutoff date, because grading knows which prompt it
   ran and a date misfiles a review retried across a deploy. The competency
-  gate and `TrackGraduation` read it; `ConceptMastery` and `RungLedger` read
+  gate and `LevelSuggestion` read it; `ConceptMastery` and `RungLedger` read
   all history on purpose. Going forward, a concept's
   first post-rubric review is compared with a pre-rubric `last_rating`, so
   that one comparison can read as improving or stagnant because the scale
@@ -3329,9 +3329,9 @@ always pull in the full suite — is stated once, in
 ## File Map
 
 - `app/models/learning_track.rb` — track values and preset levels.
-- `app/services/track_graduation.rb` — pure proposal rules: one-rung moves up and back along junior, mid-level and senior, each kind judged on its own results, and the evidence counts a card and an event row show.
-- `app/services/track_graduation/evidence.rb` — bounded, preloaded reviewed-response history projected into stamped, answered, rubric-graded results.
-- `app/services/reviewed_section_results.rb` — `ReviewedSectionResults`: which sections of one submitted, reviewed response count as evidence of work at a rung, optionally only under the current rubric. Pure over the response it is given; shared by `TrackGraduation::Evidence` and `CompetencyGate::Evidence`.
+- `app/services/level_suggestion.rb` — pure proposal rules: one-rung moves up and back along junior, mid-level and senior, each kind judged on its own results, and the evidence counts a card and an event row show.
+- `app/services/level_suggestion/evidence.rb` — bounded, preloaded reviewed-response history projected into stamped, answered, rubric-graded results.
+- `app/services/reviewed_section_results.rb` — `ReviewedSectionResults`: which sections of one submitted, reviewed response count as evidence of work at a rung, optionally only under the current rubric. Pure over the response it is given; shared by `LevelSuggestion::Evidence` and `CompetencyGate::Evidence`.
 - `app/services/competency_gate.rb` — `CompetencyGate`: the pure fold that earns a day's size from reviewed days, with the brake. `DailyPlan.size_for` calls it once per plan.
 - `app/services/day_size.rb` — `DaySize`: the day's planned count and its reason, from the Daily sections setting, the completion count and the gate's `Plan`. Pure; its `Decision` also answers whether the brake is on, for the coverage exception, and what the `[set_size]` line logs.
 - `app/services/size_forecast.rb` — `SizeForecast`: whether tomorrow's Automatic set will be larger, or smaller because of the brake, than today's planned one, for the submitted dashboard's size lines.

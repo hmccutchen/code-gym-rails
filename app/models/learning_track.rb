@@ -6,8 +6,6 @@ module LearningTrack
   START_LEVEL = "junior".freeze
   START_SKILL_LEVEL = "junior".freeze
 
-  IN_PLACE_ANSWERS = 3
-
   def self.preset_levels
     ExerciseSection.keys.index_with { START_LEVEL }
   end

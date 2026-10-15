@@ -17,8 +17,8 @@ RSpec.describe "Learning track proposal saves", type: :system do
   before do
     user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
     reviewed_day(Date.current, [ "code_review" ])
-    (1...TrackGraduation::WINDOW).each { |ago| reviewed_day(Date.current - ago, %w[code_review pattern architecture]) }
-    reviewed_day(Date.current - TrackGraduation::WINDOW, %w[pattern architecture])
+    (1...LevelSuggestion::WINDOW).each { |ago| reviewed_day(Date.current - ago, %w[code_review pattern architecture]) }
+    reviewed_day(Date.current - LevelSuggestion::WINDOW, %w[pattern architecture])
     visit_as(user)
     expect(page).to have_css("#track-proposal")
     page.execute_script("window.proposalPage = true")

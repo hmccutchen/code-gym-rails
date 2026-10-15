@@ -1,4 +1,4 @@
-class TrackGraduation
+class LevelSuggestion
   # Principal is only ever set by hand, so senior is the top step and no suggestion leaves or reaches it.
   LADDER = (KindDifficulty::LEVELS - [ "principal_engineer" ]).freeze
   WINDOW = 5
@@ -7,9 +7,11 @@ class TrackGraduation
   VETO_TOO_HARD = 2
   STEP_BACK_WINDOW = 3
   STEP_BACK_TOO_HARD = 2
+  IN_PLACE_ANSWERS = 3
 
   Result = Data.define(:date, :level, :ai_rating, :self_rating) do
-    def favourable? = ReviewedSectionResults.at_or_above?(ai_rating, ReviewedSectionResults::FAVOURABLE_BAR)
+    # The AI rating alone, unlike ReviewedSectionResults.favourable?: docs/code-notes/app/services/level_suggestion.md
+    def ai_favourable? = ReviewedSectionResults.at_or_above?(ai_rating, ReviewedSectionResults::FAVOURABLE_BAR)
     def too_hard? = ReviewedSectionResults.too_hard?(self_rating)
   end
 
@@ -52,7 +54,7 @@ class TrackGraduation
   def summary(key)
     at_level = evidence(key)
     window = at_level.first(WINDOW)
-    Summary.new(window_size: window.size, favourable: window.count(&:favourable?),
+    Summary.new(window_size: window.size, favourable: window.count(&:ai_favourable?),
                 too_hard_latest3: at_level.first(STEP_BACK_WINDOW).count(&:too_hard?),
                 newest_result_on: at_level.first&.date)
   end
@@ -81,7 +83,7 @@ class TrackGraduation
     at_level = evidence(key)
     window = at_level.first(WINDOW)
     too_hard = at_level.first(VETO_WINDOW).count(&:too_hard?)
-    return unless window.size == WINDOW && window.count(&:favourable?) >= FAVOURABLE_NEEDED && too_hard < VETO_TOO_HARD
+    return unless window.size == WINDOW && window.count(&:ai_favourable?) >= FAVOURABLE_NEEDED && too_hard < VETO_TOO_HARD
 
     step(key, LADDER[rank + 1], at_level, too_hard)
   end
@@ -93,14 +95,14 @@ class TrackGraduation
 
     at_level = evidence(key)
     hard = at_level.first(STEP_BACK_WINDOW).select(&:too_hard?)
-    return if hard.size < STEP_BACK_TOO_HARD || hard.all?(&:favourable?)
+    return if hard.size < STEP_BACK_TOO_HARD || hard.all?(&:ai_favourable?)
 
     step(key, LADDER[rank - 1], at_level, hard.size)
   end
 
   def step(key, to, at_level, too_hard)
     Step.new(kind: key, from: @levels[key], to: to, results_at_level: at_level.size,
-             favourable: at_level.first(WINDOW).count(&:favourable?), too_hard: too_hard)
+             favourable: at_level.first(WINDOW).count(&:ai_favourable?), too_hard: too_hard)
   end
 
   def evidence(key)

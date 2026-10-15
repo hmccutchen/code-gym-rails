@@ -49,7 +49,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(response.parsed_body).to eq("name" => user.name, "time_zone" => "UTC", "daily_section_count" => nil)
     end
 
-    TrackGraduation::LADDER.each do |level|
+    LevelSuggestion::LADDER.each do |level|
       it "records Experienced with the starting level #{level} and changes nothing else" do
         original = user.reload.attributes.except("learning_track", "skill_level", "updated_at")
 

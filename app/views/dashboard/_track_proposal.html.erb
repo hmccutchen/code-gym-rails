@@ -1,4 +1,4 @@
-<%# One learning track proposal. Local: proposal (TrackGraduation::Proposal). %>
+<%# One learning track proposal. Local: proposal (LevelSuggestion::Proposal). %>
 <% name = ->(key) { t("sections.#{key}.name") } %>
 <% level_name = ->(level) { t("exercise_mix.levels.#{level}").downcase } %>
 <% in_place = current_user.applies_track_proposals_in_place? || (proposal.steps.map(&:kind) & current_user.excluded_section_kinds).any? %>
@@ -19,11 +19,11 @@
     <p data-step data-track-proposal-target="step" data-kind="<%= step.kind %>" data-to="<%= step.to %>">
       <% if proposal.basis == :struggling %>
         <%= t("learning_track.proposal.struggling", kind: name.call(step.kind), too_hard: step.too_hard,
-              window: [ step.results_at_level, TrackGraduation::STEP_BACK_WINDOW ].min,
+              window: [ step.results_at_level, LevelSuggestion::STEP_BACK_WINDOW ].min,
               level: level_name.call(step.from), lower: level_name.call(step.to)) %>
       <% else %>
         <%= t("learning_track.proposal.own", kind: name.call(step.kind), favourable: step.favourable,
-              window: TrackGraduation::WINDOW, level: level_name.call(step.to)) %>
+              window: LevelSuggestion::WINDOW, level: level_name.call(step.to)) %>
       <% end %>
     </p>
   <% else %>
@@ -32,7 +32,7 @@
       <% proposal.steps.each do |step| %>
         <li data-step data-track-proposal-target="step" data-kind="<%= step.kind %>" data-to="<%= step.to %>">
           <%= t("learning_track.proposal.own_item", kind: name.call(step.kind), favourable: step.favourable,
-                window: TrackGraduation::WINDOW) %>
+                window: LevelSuggestion::WINDOW) %>
           <% if in_place %>
             <button type="button" class="btn btn-ghost btn-sm" data-remove-step data-action="click->track-proposal#removeStep"
                     aria-label="<%= t("learning_track.proposal.remove_label", kind: name.call(step.kind), level: level_name.call(step.from)) %>"><%= t("learning_track.proposal.remove", level: level_name.call(step.from)) %></button>

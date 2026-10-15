@@ -11,7 +11,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
   end
 
   def reviewed_days(user, sections)
-    TrackGraduation::WINDOW.times do |ago|
+    LevelSuggestion::WINDOW.times do |ago|
       date = Date.current - ago
       exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current,
         problem_set: sections.transform_values { |rung| { "question" => "q", "snippet" => "s", "pitched_at" => rung } })
@@ -32,7 +32,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
   describe "the dashboard proposal" do
     it "applies in place and links to the off switch while the user has answered fewer than the threshold" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS - 1)
+      user = track_user(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS - 1)
       with_own_proposal(user)
 
       get root_path
@@ -45,7 +45,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     end
 
     it "sends the user to the Exercise mix with the suggested kinds once they have answered the threshold" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS)
+      user = track_user(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS)
       with_own_proposal(user)
 
       get root_path
@@ -58,7 +58,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     end
 
     it "offers no keep buttons on a card of several kinds that goes to Setup" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS)
+      user = track_user(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS)
       reviewed_days(user, { "code_review" => "junior", "pattern" => "junior" })
       login_as(user)
 
@@ -70,7 +70,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
     # An excluded kind's difficulty is disabled on Setup, so sending the user there would leave nothing to change.
     it "keeps applying in place when a proposed kind is excluded" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS,
+      user = track_user(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS,
                         excluded_section_kinds: [ "security_review" ])
       reviewed_days(user, { "code_review" => "junior", "security_review" => "junior" })
       login_as(user)

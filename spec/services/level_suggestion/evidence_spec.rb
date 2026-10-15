@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe TrackGraduation::Evidence do
+RSpec.describe LevelSuggestion::Evidence do
   include AuthHelpers
 
   let(:user) { create_user_with_key }
@@ -92,7 +92,7 @@ RSpec.describe TrackGraduation::Evidence do
 
     result = described_class.for(user).results.fetch("code_review").sole
     expect(result.self_rating).to be_nil
-    expect(result).to be_favourable
+    expect(result).to be_ai_favourable
     expect(result).not_to be_too_hard
   end
 
@@ -163,18 +163,18 @@ RSpec.describe TrackGraduation::Evidence do
     expect(queries.first).to include("LIMIT")
   end
 
-  describe "TrackGraduation.for" do
+  describe "LevelSuggestion.for" do
     before { user.update!(section_kind_levels: { "code_review" => "junior" }) }
 
     it "delegates stored evidence and preferences to the proposal decision without writing" do
       5.times { |n| day(n) }
       attributes = user.attributes
 
-      proposal = TrackGraduation.for(user)
+      proposal = LevelSuggestion.for(user)
 
-      expect(proposal).to eq(TrackGraduation::Proposal.new(
+      expect(proposal).to eq(LevelSuggestion::Proposal.new(
         basis: :own,
-        steps: [ TrackGraduation::Step.new(kind: "code_review", from: "junior", to: "mid_level", results_at_level: 5,
+        steps: [ LevelSuggestion::Step.new(kind: "code_review", from: "junior", to: "mid_level", results_at_level: 5,
                                            favourable: 5, too_hard: 0) ]
       ))
       expect(user.reload.attributes).to eq(attributes)
@@ -183,16 +183,16 @@ RSpec.describe TrackGraduation::Evidence do
     it "passes locks and cutoffs to the proposal decision" do
       5.times { |n| day(n) }
       user.update!(locked_section_kinds: [ "code_review" ])
-      expect(TrackGraduation.for(user)).to be_nil
+      expect(LevelSuggestion.for(user)).to be_nil
 
       user.update!(locked_section_kinds: [], track_evidence_cutoffs: {
         "code_review" => { "level" => "junior", "through" => (today - 2).iso8601 }
       })
-      expect(TrackGraduation.for(user)).to be_nil
+      expect(LevelSuggestion.for(user)).to be_nil
     end
 
     it "returns no proposal when there is no evidence" do
-      expect(TrackGraduation.for(user)).to be_nil
+      expect(LevelSuggestion.for(user)).to be_nil
     end
   end
 end

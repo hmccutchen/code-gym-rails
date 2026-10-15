@@ -53,7 +53,7 @@ RSpec.describe "Learning track isolation" do
   end
 
   it "keeps track state out of generation, review, judges and ConceptMastery" do
-    own = %w[app/services/track_graduation.rb app/services/track_graduation/evidence.rb]
+    own = %w[app/services/level_suggestion.rb app/services/level_suggestion/evidence.rb]
     files = Rails.root.glob("app/{services,jobs}/**/*.rb").map { |file| file.relative_path_from(Rails.root).to_s } +
             %w[app/models/concept_mastery.rb app/models/judge_verdict.rb
                app/models/review_prose_verdict.rb app/models/kind_difficulty.rb]

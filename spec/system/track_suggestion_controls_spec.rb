@@ -14,7 +14,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   end
 
   def qualifying_days
-    TrackGraduation::WINDOW.times { |ago| reviewed_day(Date.current - ago, level: user.section_kind_levels["code_review"]) }
+    LevelSuggestion::WINDOW.times { |ago| reviewed_day(Date.current - ago, level: user.section_kind_levels["code_review"]) }
   end
 
   def own_proposal(answered:)
@@ -65,7 +65,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   end
 
   it "sends a later proposal to the Exercise mix, where the user makes the change" do
-    own_proposal(answered: LearningTrack::IN_PLACE_ANSWERS)
+    own_proposal(answered: LevelSuggestion::IN_PLACE_ANSWERS)
 
     within("#track-proposal") { click_link "Change it in Setup" }
 
@@ -115,17 +115,17 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   end
 
   it "counts a dismissal from a proposal that links to Setup" do
-    own_proposal(answered: LearningTrack::IN_PLACE_ANSWERS)
+    own_proposal(answered: LevelSuggestion::IN_PLACE_ANSWERS)
 
     within("#track-proposal") { click_button "Not now" }
 
     expect(page).to have_css("#track-proposal", text: "Okay. This comes back once there's more to go on.")
     wait_for_saves
-    expect(user.reload.track_proposals_answered).to eq(LearningTrack::IN_PLACE_ANSWERS + 1)
+    expect(user.reload.track_proposals_answered).to eq(LevelSuggestion::IN_PLACE_ANSWERS + 1)
   end
 
   it "counts nothing when the dismissal fails" do
-    own_proposal(answered: LearningTrack::IN_PLACE_ANSWERS)
+    own_proposal(answered: LevelSuggestion::IN_PLACE_ANSWERS)
     fail_requests_to(learning_track_dismissal_path)
 
     within("#track-proposal") { click_button "Not now" }
@@ -133,7 +133,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     expect(page).to have_button("Not now", disabled: false)
     expect(page).to have_link("Change it in Setup")
     wait_for_saves
-    expect(user.reload.track_proposals_answered).to eq(LearningTrack::IN_PLACE_ANSWERS)
+    expect(user.reload.track_proposals_answered).to eq(LevelSuggestion::IN_PLACE_ANSWERS)
   end
 
   it "puts the switch back when its save fails" do
