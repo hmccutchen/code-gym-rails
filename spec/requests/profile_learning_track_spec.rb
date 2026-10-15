@@ -60,6 +60,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
         expect(user.learning_track).to eq("none")
         expect(user.skill_level).to eq(level)
         expect(user.attributes.except("learning_track", "skill_level", "updated_at")).to eq(original)
+        expect(user.level_suggestion_events).to be_empty
         expect(user.first_run?).to be(false)
       end
     end

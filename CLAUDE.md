@@ -1637,9 +1637,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   and a stored value must be one of the levels. A
   legacy value posted to `PATCH /profile` is refused like any other value
   outside the list.
-  Setup's "Skill level" select is the only page
-  that edits `User#skill_level`, and it autosaves through `PATCH /profile`,
-  which refuses a value outside `User::SKILL_LEVELS` with a 422. It sets the
+  Setup's "Skill level" select and the Experienced step on `/welcome` are
+  the two pages that edit `User#skill_level`. Setup's autosaves through
+  `PATCH /profile`, and the Experienced step saves through it too. That
+  endpoint refuses a value outside `User::SKILL_LEVELS` with a 422. It sets the
   profile's prompt line and the rung of every kind without its own target
   (`KindDifficulty#rung_for`); scenario settings do not depend on it.
   Joining the junior track sets it to `junior`; nothing else changes it
