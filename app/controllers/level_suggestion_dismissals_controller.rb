@@ -6,8 +6,7 @@ class LevelSuggestionDismissalsController < ApplicationController
     return render_json_error(t("level_suggestion.card.invalid_steps"), status: :unprocessable_content) if invalid_steps?
 
     evidence = LevelSuggestion::Evidence.for(current_user)
-    outcome = nil
-    current_user.with_lock { outcome = record_cutoffs(params[:kinds], evidence) }
+    outcome = locked_record_cutoffs(evidence)
 
     case outcome
     when :invalid then render_json_error(t("level_suggestion.card.invalid"), status: :unprocessable_content)
@@ -17,6 +16,14 @@ class LevelSuggestionDismissalsController < ApplicationController
   end
 
   private
+
+  # Outside the lock, so the transaction rolls back the event rows before the refusal is answered.
+  def locked_record_cutoffs(evidence)
+    current_user.with_lock { record_cutoffs(params[:kinds], evidence) }
+  rescue ActiveRecord::RecordInvalid => error
+    Rails.logger.warn("[level_suggestion_dismissal] user=#{current_user.id} refused=#{error.class}")
+    :invalid
+  end
 
   # Kinds set aside from the card's removable list arrive after Apply changed the proposal, so validate current targets.
   def record_cutoffs(kinds, evidence)

@@ -119,4 +119,27 @@ RSpec.describe "Learning track dismissal events", type: :request do
     expect(Nokogiri::HTML(response.body).at_css("#level-suggestion")).to be_present
     expect(user.reload.level_suggestion_cutoffs).to eq({})
   end
+
+  describe "a refused write" do
+    it "builds a valid row for every kind and reason" do
+      ExerciseSection.keys.each do |kind|
+        %w[dismissed removed].each do |action|
+          rows = LevelSuggestionEvent.dismissal_rows(user, kinds: [ kind ], action: action, results: {})
+          expect(rows.map { |row| user.level_suggestion_events.build(row) }).to all(be_valid)
+        end
+      end
+    end
+
+    it "answers 422 and writes nothing when the user row no longer validates" do
+      login_as(user)
+      user.update_column(:skill_level, "developing")
+
+      dismiss([ "code_review" ])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to include("status" => "error")
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
+      expect(user.level_suggestion_events).to be_empty
+    end
+  end
 end
