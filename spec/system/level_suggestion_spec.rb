@@ -37,7 +37,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
     page.execute_script(<<~JS)
       const originalFetch = window.fetch;
       window.fetch = (url, options) => {
-        if (url.endsWith("/learning_track/dismissal")) {
+        if (url.endsWith("/level_suggestion/dismissal")) {
           return new Promise((resolve) => {
             window.finishDismissal = () => resolve(originalFetch(url, options));
           });
@@ -152,5 +152,25 @@ RSpec.describe "Learning track proposal saves", type: :system do
     wait_for_js_condition("window.proposalPage === undefined")
     expect(page).to have_css("#level-suggestion")
     expect(page).not_to have_css('#level-suggestion [data-kind="pattern"]')
+  end
+
+  it "reloads instead of saving when a kind's level moved after the card was shown" do
+    user.update_columns(section_kind_levels: user.section_kind_levels.merge("pattern" => "mid_level"))
+
+    within("#level-suggestion") { click_button "Apply" }
+
+    wait_for_js_condition("window.proposalPage === undefined")
+    expect(user.reload.section_kind_levels["code_review"]).to eq("junior")
+    expect(user.level_suggestion_events).to be_empty
+  end
+
+  it "reloads instead of setting aside when a kind's level moved after the card was shown" do
+    user.update_columns(section_kind_levels: user.section_kind_levels.merge("pattern" => "mid_level"))
+
+    within("#level-suggestion") { click_button "Not now" }
+
+    wait_for_js_condition("window.proposalPage === undefined")
+    expect(user.reload.level_suggestion_cutoffs).to eq({})
+    expect(user.level_suggestion_events).to be_empty
   end
 end

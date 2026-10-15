@@ -3,7 +3,7 @@ class ApiKeysController < ApplicationController
 
   skip_before_action :require_provider
 
-  helper_method :suggested_kinds, :suggested_level
+  helper_method :suggested_kinds, :suggested_level, :suggested_steps
 
   # GET /setup
   def edit
@@ -33,6 +33,12 @@ class ApiKeysController < ApplicationController
 
   def suggested_level
     params[:suggested_level] if LevelSuggestion::LADDER.include?(params[:suggested_level])
+  end
+
+  def suggested_steps
+    rungs = current_user.kind_rungs
+    suggested_kinds.filter_map { |kind| LevelSuggestionStep.new(kind: kind, from: rungs[kind], to: suggested_level) }
+                   .select(&:one_rung?).to_h { |step| [ step.kind, { from: step.from, to: step.to } ] }
   end
 
   def suggested_kinds

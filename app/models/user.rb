@@ -11,6 +11,8 @@ class User < ApplicationRecord
 
   self.ignored_columns += %w[track_suggestions track_evidence_cutoffs]
 
+  attr_accessor :shown_level_suggestions
+
   serialize :api_keys, coder: JSON
   encrypts :api_keys
 
@@ -492,9 +494,8 @@ class User < ApplicationRecord
       self,
       before: { levels: section_kind_levels_before_last_save || {}, skill_level: skill_level_before_last_save },
       after: { levels: section_kind_levels, skill_level: skill_level },
-      locked: locked_section_kinds_before_last_save || [],
-      cutoffs: level_suggestion_cutoffs_before_last_save || {},
-      suggestions_on: level_suggestions_before_last_save
+      shown: shown_level_suggestions || {},
+      cutoffs: level_suggestion_cutoffs_before_last_save || {}
     ))
   end
 

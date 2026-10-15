@@ -18,6 +18,8 @@ en:
       stranded: "Your settings changed in another tab, and another save on this page is still running. Reload once it finishes to see the current suggestion."
       reload: "Reload"
       invalid: "Those sections can't be set aside."
+      invalid_steps: "That suggestion can't be applied. Reload the page to see the current one."
+      stale: "Your levels changed since this suggestion was shown. Reload the page to see the current one."
   learning_track:
     welcome:
       title: "Before you start"

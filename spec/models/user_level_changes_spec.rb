@@ -133,8 +133,9 @@ RSpec.describe User, "level changes", type: :model do
   end
 
   describe "applied events" do
-    it "labels a change matching the pending proposal as the suggestion" do
+    it "labels a change matching the step the card showed as the suggestion" do
       reviewed_level_days(user, "code_review", "junior", 5, ending: local_today - 1)
+      user.shown_level_suggestions = { "code_review" => "mid_level" }
 
       move("code_review" => "mid_level")
 
@@ -198,9 +199,8 @@ RSpec.describe User, "level changes", type: :model do
       expect(user.level_suggestion_events.find_by(kind: "code_review").source).to eq("skill_level_edit")
     end
 
-    it "labels every change a Setup edit while suggestions are switched off" do
+    it "labels a change that matches a pending proposal a Setup edit when no step was shown" do
       reviewed_level_days(user, "code_review", "junior", 5, ending: local_today - 1)
-      user.update!(level_suggestions: false)
 
       move("code_review" => "mid_level")
 

@@ -12,7 +12,8 @@ export default class extends Controller {
     stops: Array,
     defaultStop: Number,
     labels: Array,
-    version: Number
+    version: Number,
+    suggested: Object
   }
 
   connect() {
@@ -165,17 +166,36 @@ export default class extends Controller {
     this.setDifficultyDisabled(box, excluded.indexOf(kind) !== -1)
   }
 
+  shownSteps(levels) {
+    return Object.keys(this.suggestedValue)
+      .filter((kind) => levels[kind] === this.suggestedValue[kind].to)
+      .map((kind) => Object.assign({ kind }, this.suggestedValue[kind]))
+  }
+
+  forgetSuggested(steps) {
+    const remaining = Object.assign({}, this.suggestedValue)
+    steps.forEach((step) => { delete remaining[step.kind] })
+    this.suggestedValue = remaining
+  }
+
   persist() {
     let revision
+    let steps = []
     const payload = () => {
       revision = this.editRevision
-      return { user: Object.assign(this.state(), { section_kind_preferences_version: this.versionValue }) }
+      const state = this.state()
+      steps = this.shownSteps(state.section_kind_levels)
+      const body = { user: Object.assign(state, { section_kind_preferences_version: this.versionValue }) }
+      if (steps.length > 0) body.level_suggestion_steps = steps
+      return body
     }
 
     // Queued in order: a parallel save would post the version the one in flight is about to move, and 409 against itself.
     return saveStatus.queue("exercise_mix", "PATCH", this.urlValue, payload).then((result) => {
       const reported = result.data && result.data.section_kind_preferences_version
       if (result.ok && typeof reported === "number") this.versionValue = reported
+      if (result.ok) this.forgetSuggested(steps)
+      if (result.status === 409) this.suggestedValue = {}
       if (result.status === 409 && result.data && result.data.current) {
         this.applyServerState(result.data.current)
         return revision === this.editRevision

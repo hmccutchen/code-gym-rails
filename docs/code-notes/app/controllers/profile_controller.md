@@ -33,3 +33,18 @@ tab opened before that deploy still posts the old key, so for one release the
 controller accepts either key, holds both to the same true-or-false check, and
 saves the old one under the new name. Remove `track_suggestions` from the list
 when the ignored track columns are dropped.
+
+## `level_suggestion_steps`, `moved_since_shown?` and `unsaved_shown_step?`
+
+An Apply from the dashboard card, and a Setup save opened from the card's
+link, send the moves the page showed as `level_suggestion_steps`
+(`LevelSuggestionStep`). A level suggestion is shown at a kind's rung, which
+for a kind without a target is the skill level, and a skill-level change does
+not bump `section_kind_preferences_version`. So the version alone cannot tell
+that a card is stale. Under the row lock, after the version check,
+`moved_since_shown?` compares each step's `from` with the stored rung and
+answers 409 when any has moved, saving nothing; the card already reloads on a
+409. `unsaved_shown_step?` then refuses, with a 422, a step this request does
+not actually save. The checked steps reach `User#shown_level_suggestions`, and
+the applied event rows label those moves `suggestion`. A posted step forces
+the locked path even without a version.

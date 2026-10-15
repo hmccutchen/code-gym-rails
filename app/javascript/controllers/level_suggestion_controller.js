@@ -26,7 +26,12 @@ export default class extends Controller {
   }
 
   removed() {
-    return this.stepTargets.filter((element) => element.hidden).map((element) => element.dataset.kind)
+    return this.stepTargets.filter((element) => element.hidden)
+  }
+
+  // The server checks each from against the stored level and refuses a card the levels have moved past.
+  shown(elements) {
+    return elements.map((element) => ({ kind: element.dataset.kind, from: element.dataset.from, to: element.dataset.to }))
   }
 
   setBusy(busy) {
@@ -66,9 +71,10 @@ export default class extends Controller {
     return saveStatus.save("POST", this.answerUrlValue, {}, "level_answer", this.countFailedTextValue)
   }
 
-  dismiss(kinds, reason) {
-    if (kinds.length === 0) return Promise.resolve({ ok: true })
-    return saveStatus.save("POST", this.dismissUrlValue, { kinds, reason }, "level_dismissal")
+  dismiss(elements, reason) {
+    if (elements.length === 0) return Promise.resolve({ ok: true })
+    const kinds = elements.map((element) => element.dataset.kind)
+    return saveStatus.save("POST", this.dismissUrlValue, { kinds, reason, steps: this.shown(elements) }, "level_dismissal")
   }
 
   removeStep(event) {
@@ -82,7 +88,8 @@ export default class extends Controller {
     this.listed().forEach((element) => { levels[element.dataset.kind] = element.dataset.to })
     const setAside = this.removed()
     const result = await saveStatus.save("PATCH", this.urlValue,
-      { user: { section_kind_levels: levels, section_kind_preferences_version: this.versionValue } },
+      { user: { section_kind_levels: levels, section_kind_preferences_version: this.versionValue },
+        level_suggestion_steps: this.shown(this.listed()) },
       "level_apply")
 
     if (result && result.ok) {
@@ -97,7 +104,8 @@ export default class extends Controller {
 
   async notNow() {
     this.setBusy(true)
-    const result = await this.dismiss(this.stepTargets.map((element) => element.dataset.kind), "not_now")
+    const result = await this.dismiss(this.stepTargets, "not_now")
+    if (result && result.status === 409) return this.reloadWhenSaved()
     if (!result || !result.ok) return this.setBusy(false)
     this.answer()
     this.settle(this.dismissedTextValue)

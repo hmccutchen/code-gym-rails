@@ -130,7 +130,8 @@
            data-exercise-mix-stops-value="<%= KindPreferences::MULTIPLIERS.to_json %>"
            data-exercise-mix-default-stop-value="<%= KindPreferences::DEFAULT_MULTIPLIER %>"
            data-exercise-mix-labels-value="<%= t("exercise_mix.stops").to_json %>"
-           data-exercise-mix-version-value="<%= current_user.section_kind_preferences_version %>">
+           data-exercise-mix-version-value="<%= current_user.section_kind_preferences_version %>"<% if suggested_steps.any? %>
+           data-exercise-mix-suggested-value="<%= suggested_steps.to_json %>"<% end %>>
     <summary><%= t("exercise_mix.summary") %></summary>
     <% if suggested_kinds.any? %>
       <style>.mix-difficulty.mix-suggested { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }</style>

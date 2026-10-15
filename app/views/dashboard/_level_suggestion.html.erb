@@ -16,7 +16,7 @@
               level_suggestion_reload_label_value: t("level_suggestion.card.reload") } do %>
   <% if proposal.steps.one? %>
     <% step = proposal.steps.first %>
-    <p data-step data-level-suggestion-target="step" data-kind="<%= step.kind %>" data-to="<%= step.to %>">
+    <p data-step data-level-suggestion-target="step" data-kind="<%= step.kind %>" data-from="<%= step.from %>" data-to="<%= step.to %>">
       <% if proposal.basis == :struggling %>
         <%= t("level_suggestion.card.struggling", kind: name.call(step.kind), too_hard: step.too_hard,
               window: [ step.results_at_level, LevelSuggestion::STEP_BACK_WINDOW ].min,
@@ -30,7 +30,7 @@
     <p><%= t("level_suggestion.card.own_heading", level: level_name.call(proposal.steps.first.to)) %></p>
     <ul>
       <% proposal.steps.each do |step| %>
-        <li data-step data-level-suggestion-target="step" data-kind="<%= step.kind %>" data-to="<%= step.to %>">
+        <li data-step data-level-suggestion-target="step" data-kind="<%= step.kind %>" data-from="<%= step.from %>" data-to="<%= step.to %>">
           <%= t("level_suggestion.card.own_item", kind: name.call(step.kind), favourable: step.favourable,
                 window: LevelSuggestion::WINDOW) %>
           <% if in_place %>

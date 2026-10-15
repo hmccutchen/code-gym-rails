@@ -44,10 +44,16 @@ RSpec.describe LevelSuggestionEvent, type: :model do
   describe ".applied_rows" do
     around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
-    def rows(before:, after:, before_skill: "junior", after_skill: "junior")
+    def rows(before:, after:, before_skill: "junior", after_skill: "junior", shown: {})
       described_class.applied_rows(user, before: { levels: before, skill_level: before_skill },
                                          after: { levels: after, skill_level: after_skill },
-                                         locked: [], cutoffs: {}, suggestions_on: true)
+                                         shown: shown, cutoffs: {})
+    end
+
+    it "labels a move the card or Setup showed as the suggestion" do
+      row = rows(before: {}, after: { "code_review" => "mid_level" }, shown: { "code_review" => "mid_level" }).sole
+
+      expect(row).to include(source: "suggestion", from_level: "junior", to_level: "mid_level")
     end
 
     it "builds nothing and reads no evidence when no rung changed" do

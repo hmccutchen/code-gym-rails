@@ -74,6 +74,12 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     within('.mix-difficulty.mix-suggested[data-kind="code_review"]') { choose "Mid-level" }
     wait_for_saves
     expect(user.reload.section_kind_levels["code_review"]).to eq("mid_level")
+    expect(user.level_suggestion_events.sole).to have_attributes(kind: "code_review", source: "suggestion")
+
+    within('.mix-difficulty.mix-suggested[data-kind="code_review"]') { choose "Senior" }
+    wait_for_saves
+    expect(user.reload.section_kind_levels["code_review"]).to eq("senior")
+    expect(user.level_suggestion_events.order(:id).last).to have_attributes(source: "setup_edit", to_level: "senior")
   end
 
   def fail_requests_to(path)

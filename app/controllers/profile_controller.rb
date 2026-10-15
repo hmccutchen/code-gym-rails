@@ -14,11 +14,13 @@ class ProfileController < ApplicationController
     return render_invalid_display   if invalid_display_preferences?
     return render_invalid_skill_level if invalid_skill_level?
     return render_invalid_level_suggestions if invalid_level_suggestions?
+    return render_invalid_shown_steps if invalid_shown_steps?
 
     saved = save_with_preference_precondition
 
     return render_stale_preferences if saved == :stale
     return render_invalid_learning_track if saved == :track_refused
+    return render_invalid_shown_steps if saved == :unsaved_step
 
     if saved
       render json: saved_body
@@ -144,19 +146,44 @@ class ProfileController < ApplicationController
   def save_with_preference_precondition
     user_params = params.require(:user)
     posted = user_params[:section_kind_preferences_version]
-    return current_user.update(profile_params) if posted.nil? && !user_params.key?(:learning_track)
+    return current_user.update(profile_params) if posted.nil? && !user_params.key?(:learning_track) && shown_steps.nil?
 
     outcome = nil
     current_user.with_lock do
       outcome = if invalid_learning_track_change?(user_params)
         :track_refused
-      elsif !posted.nil? && posted.to_s != current_user.section_kind_preferences_version.to_s
+      elsif (!posted.nil? && posted.to_s != current_user.section_kind_preferences_version.to_s) || moved_since_shown?
         :stale
+      elsif unsaved_shown_step?(user_params)
+        :unsaved_step
       else
+        current_user.shown_level_suggestions = shown_steps&.to_h { |step| [ step.kind, step.to ] }
         current_user.update(profile_params)
       end
     end
     outcome
+  end
+
+  def shown_steps
+    return if params[:level_suggestion_steps].nil?
+
+    @shown_steps ||= LevelSuggestionStep.parse_all(params[:level_suggestion_steps])
+  end
+
+  def invalid_shown_steps? = !params[:level_suggestion_steps].nil? && shown_steps.nil?
+
+  def render_invalid_shown_steps
+    render_json_error(t("level_suggestion.card.invalid_steps"), status: :unprocessable_content)
+  end
+
+  def moved_since_shown?
+    rungs = current_user.kind_rungs
+    shown_steps.to_a.any? { |step| rungs[step.kind] != step.from }
+  end
+
+  def unsaved_shown_step?(user_params)
+    levels = user_params[:section_kind_levels]
+    shown_steps.to_a.any? { |step| !levels.respond_to?(:to_unsafe_h) || levels.to_unsafe_h[step.kind] != step.to }
   end
 
   TRACK_CHOICE_KEYS = {

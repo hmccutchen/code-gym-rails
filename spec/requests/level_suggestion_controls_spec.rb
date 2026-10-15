@@ -95,7 +95,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     end
   end
 
-  describe "POST /learning_track/answer" do
+  describe "POST /level_suggestion/answer" do
     it "counts one answer per request" do
       user = track_user
       login_as(user)
