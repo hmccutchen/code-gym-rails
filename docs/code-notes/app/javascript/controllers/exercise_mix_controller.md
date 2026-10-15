@@ -65,10 +65,15 @@ When Setup was opened from a level suggestion card's link, the server renders
 each highlighted kind's step (`suggested`: the rung it is at and the rung
 offered). When the user picks the offered level for that kind, the next save
 carries the step as `level_suggestion_steps`, so the server can label the
-change `suggestion` after checking its `from` against the stored rung. A step
-is sent with the first save that carries it and then forgotten, because the
-kind's rung has moved and resending the old `from` would get a 409. A 409
-clears every step, since the page they were rendered for is out of date.
+change `suggestion` after checking its `from` against the stored rung.
+
+Once a save is confirmed, a step is forgotten for any kind whose saved choice
+differs from the one the page was rendered with (`renderedLevels`, read from
+the radios' `defaultChecked`): the suggested level, any other level, or
+Default. The kind's rung has moved, so resending the old `from` would get a
+409 and undo the user's valid edit. Kinds whose choice is unchanged keep
+their step. A 409 clears every step, since the page they were rendered for
+is out of date.
 
 ## Early edits are read from the mix's own controls
 

@@ -222,4 +222,32 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     wait_for_saves
     expect(user.reload.level_suggestions).to be(false)
   end
+
+  it "drops a Setup suggestion once a different level is saved for that kind, so a later pick saves" do
+    own_proposal(answered: LevelSuggestion::IN_PLACE_ANSWERS)
+    within("#level-suggestion") { click_link "Change it in Setup" }
+    box = '.mix-difficulty.mix-suggested[data-kind="code_review"]'
+
+    within(box) { choose "Senior" }
+    wait_for_saves
+    expect(user.reload.section_kind_levels["code_review"]).to eq("senior")
+
+    within(box) { choose "Mid-level" }
+    wait_for_saves
+    expect(user.reload.section_kind_levels["code_review"]).to eq("mid_level")
+    expect(page).not_to have_css("#save-status", text: /updated to match/i)
+    expect(user.level_suggestion_events.order(:id).pluck(:source)).to eq(%w[setup_edit setup_edit])
+  end
+
+  it "keeps a Setup suggestion for a kind whose level was not saved differently" do
+    own_proposal(answered: LevelSuggestion::IN_PLACE_ANSWERS)
+    within("#level-suggestion") { click_link "Change it in Setup" }
+
+    within('.mix-difficulty[data-kind="pattern"]') { choose "Senior" }
+    wait_for_saves
+    within('.mix-difficulty.mix-suggested[data-kind="code_review"]') { choose "Mid-level" }
+    wait_for_saves
+
+    expect(user.level_suggestion_events.find_by(kind: "code_review").source).to eq("suggestion")
+  end
 end

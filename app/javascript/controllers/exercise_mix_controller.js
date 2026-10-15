@@ -17,12 +17,22 @@ export default class extends Controller {
   }
 
   connect() {
+    this.loadedLevels = this.renderedLevels()
     this.pending = null
     this.editRevision = 0
     this.probe = () => this.pending !== null
     saveStatus.watch(this.probe)
     this.lockLastInGroup()
     if (this.editedBeforeConnect()) this.adoptEarlyEdit()
+  }
+
+  renderedLevels() {
+    const levels = {}
+    this.difficultyTargets.forEach((box) => {
+      const radio = Array.from(box.querySelectorAll("input[type=radio]")).find((input) => input.defaultChecked)
+      levels[box.dataset.kind] = radio ? radio.value : ""
+    })
+    return levels
   }
 
   editedBeforeConnect() {
@@ -173,19 +183,22 @@ export default class extends Controller {
       .map((kind) => Object.assign({ kind }, this.suggestedValue[kind]))
   }
 
-  forgetSuggested(steps) {
+  forgetMovedSuggestions(savedLevels) {
     const remaining = Object.assign({}, this.suggestedValue)
-    steps.forEach((step) => { delete remaining[step.kind] })
+    Object.keys(remaining).forEach((kind) => {
+      if ((savedLevels[kind] || "") !== (this.loadedLevels[kind] || "")) delete remaining[kind]
+    })
     this.suggestedValue = remaining
   }
 
   persist() {
     let revision
-    let steps = []
+    let savedLevels = {}
     const payload = () => {
       revision = this.editRevision
       const state = this.state()
-      steps = this.shownSteps(state.section_kind_levels)
+      savedLevels = state.section_kind_levels
+      const steps = this.shownSteps(savedLevels)
       const body = { user: Object.assign(state, { section_kind_preferences_version: this.versionValue }) }
       if (steps.length > 0) body.level_suggestion_steps = steps
       return body
@@ -195,7 +208,7 @@ export default class extends Controller {
     return saveStatus.queue("exercise_mix", "PATCH", this.urlValue, payload).then((result) => {
       const reported = result.data && result.data.section_kind_preferences_version
       if (result.ok && typeof reported === "number") this.versionValue = reported
-      if (result.ok) this.forgetSuggested(steps)
+      if (result.ok) this.forgetMovedSuggestions(savedLevels)
       if (result.status === 409) this.suggestedValue = {}
       if (result.status === 409 && result.data && result.data.current) {
         this.applyServerState(result.data.current)
