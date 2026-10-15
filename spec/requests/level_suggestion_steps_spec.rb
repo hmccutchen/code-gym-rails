@@ -156,4 +156,22 @@ RSpec.describe "Level suggestion steps the card showed", type: :request do
       expect(mix["data-exercise-mix-suggested-value"]).to be_nil
     end
   end
+
+  describe "a skill level save" do
+    it "takes the row lock, so a Not now written just before it survives" do
+      user.update_columns(section_kind_levels: { "pattern" => "senior" })
+      concurrent = { "pattern" => { "level" => "senior", "through" => "2026-10-13" } }
+      expect_any_instance_of(User).to receive(:with_lock).and_wrap_original do |original, *args, &block|
+        User.find(user.id).update_column(:level_suggestion_cutoffs, concurrent)
+        original.call(*args, &block)
+      end
+
+      patch profile_path, params: { user: { skill_level: "mid_level" } }.to_json, headers: json
+
+      expect(response).to have_http_status(:ok)
+      cutoffs = user.reload.level_suggestion_cutoffs
+      expect(cutoffs["code_review"]).to eq("level" => "mid_level", "through" => "2026-10-14")
+      expect(cutoffs["pattern"]).to eq(concurrent["pattern"])
+    end
+  end
 end

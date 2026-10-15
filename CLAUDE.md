@@ -568,8 +568,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   record nothing; leaving or finishing it records any rung it moves. So
   results from an earlier stay at a rung never count again. Evidence through
   a cutoff's date is ignored at its rung, and results at any other rung
-  never count. Versioned level changes run under the user-row lock, and so
-  does dismissal, which merges into the reloaded map and keeps a later valid
+  never count. Every save that touches a target or the skill level runs
+  under the user-row lock (`ProfileController#locked_save?`), and so does
+  dismissal, which merges into the reloaded map and keeps a later valid
   cutoff at the current rung. Its earlier evidence read cannot undo a newer
   dismissal or level-change cutoff. A different-level or malformed entry is
   replaced; `LevelSuggestion.cutoff_date` is the shared reader for dismissal

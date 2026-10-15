@@ -46,5 +46,14 @@ that a card is stale. Under the row lock, after the version check,
 answers 409 when any has moved, saving nothing; the card already reloads on a
 409. `unsaved_shown_step?` then refuses, with a 422, a step this request does
 not actually save. The checked steps reach `User#shown_level_suggestions`, and
-the applied event rows label those moves `suggestion`. A posted step forces
-the locked path even without a version.
+the applied event rows label those moves `suggestion`.
+
+## `locked_save?`
+
+A save takes the user-row lock when it carries a preference version, posted
+steps, a track choice, a skill level or targets. The last two matter even
+without a version: either can move a kind's rung, and `record_level_changes`
+then merges into `level_suggestion_cutoffs`, which the dismissal endpoint
+also writes under that lock. Without it, Setup's skill-level select, which
+sends no version, could write back a cutoff map read before a Not now
+committed and lose that cutoff.

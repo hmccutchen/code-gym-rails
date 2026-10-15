@@ -34,6 +34,7 @@ class ProfileController < ApplicationController
   DAILY_SECTION_COUNT_STRINGS = User::DAILY_SECTION_COUNTS.map(&:to_s).freeze
   PREFERENCE_KEYS = %i[section_kind_weights excluded_section_kinds section_kind_levels locked_section_kinds].freeze
   LEVEL_SUGGESTION_KEYS = %i[level_suggestions track_suggestions].freeze
+  LOCKED_KEYS = %i[learning_track skill_level section_kind_levels].freeze
 
   def invalid_daily_section_count?
     user_params = params.require(:user)
@@ -146,7 +147,7 @@ class ProfileController < ApplicationController
   def save_with_preference_precondition
     user_params = params.require(:user)
     posted = user_params[:section_kind_preferences_version]
-    return current_user.update(profile_params) if posted.nil? && !user_params.key?(:learning_track) && shown_steps.nil?
+    return current_user.update(profile_params) unless locked_save?(user_params, posted)
 
     outcome = nil
     current_user.with_lock do
@@ -162,6 +163,10 @@ class ProfileController < ApplicationController
       end
     end
     outcome
+  end
+
+  def locked_save?(user_params, posted)
+    !posted.nil? || !shown_steps.nil? || LOCKED_KEYS.any? { |key| user_params.key?(key) }
   end
 
   def shown_steps
