@@ -378,14 +378,14 @@ Every dashboard, /learn and /history load, any day of the week:
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `User`          | email, name, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), invite_code_id (nullable fk; the code that admitted the account), trial_started_at / trial_ends_at / trial_consented_at (nullable; a present trial_ends_at is the trial), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), track_evidence_cutoffs (non-null jsonb, default {}), track_suggestions (boolean, default true), track_proposals_answered (integer, default 0) |
+| `User`          | email, name, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), invite_code_id (nullable fk; the code that admitted the account), trial_started_at / trial_ends_at / trial_consented_at (nullable; a present trial_ends_at is the trial), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), level_suggestion_cutoffs (non-null jsonb, default {}), level_suggestions (boolean, default true), track_proposals_answered (integer, default 0); track_evidence_cutoffs and track_suggestions stay in the table, ignored, for one release |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at, dropped_sections (jsonb), plan_notes (jsonb, default {}: what the plan did — `coverage`, `shared_concept`) |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), review_provider (which provider wrote the review), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
 | `InviteCode`    | code_digest (SHA-256 of the raw code, unique), label, seats, redeemed_count, expires_at, trial_days, daily_request_cap |
 | `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
 | `FeaturedConcept` | user_id, week_of (the Monday, in the user's zone), bucket, concept — unique on user_id and week_of; one row per week a user had a concept to feature |
-| `LevelSuggestionEvent` | user_id, kind, action (applied/dismissed/removed), source (suggestion/setup_edit, applied rows only), from_level, to_level, window_size, favourable, too_hard_latest3, newest_result_on |
+| `LevelSuggestionEvent` | user_id, kind, action (applied/dismissed/removed), source (suggestion/setup_edit/skill_level_edit, applied rows only), from_level, to_level, window_size, favourable, too_hard_latest3, newest_result_on |
 
 `ConceptReference` (not listed above — it has no `user_id`; see "The Learn tab"
 below) now also carries `guide_plain_language`, `guide_worked_example`,
@@ -430,8 +430,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
 ## Key Design Decisions
 
-- **Junior learning track**: an optional first-run preset and suggestions to
-  change existing difficulty targets, with no separate generation policy.
+- **Junior learning track**: an optional first-run preset of difficulty
+  targets, with no separate generation policy and no hold on level
+  suggestions, which every account gets (see "Level suggestions" below).
   `User#first_run?` requires a saved, undecided account (`learning_track:
   nil`) with no exercise ever created. Dashboard and Setup send that account
   to `/welcome`. Junior sets every
@@ -449,11 +450,20 @@ concept-specific difficulty descriptions for future generation, not a new set.
   exercises should start (junior, mid-level or senior,
   `LevelSuggestion::LADDER`, the same list level suggestions move along), and records `"none"` with that
   `skill_level` in one request, without changing targets. The step stays in
-  the browser because `first_run?` ends once any track is saved. Until
-  suggestions open to every account, an Experienced account gets no level
-  suggestions or step-backs, so its level moves only when the user changes it
-  on Setup. Existing accounts are not enrolled or prompted, and joining after
-  the first-run choice is refused.
+  the browser because `first_run?` ends once any track is saved. Existing
+  accounts are not enrolled or prompted, and joining after the first-run
+  choice is refused.
+
+  **What the track still does.** `learning_track` decides the first-run
+  preset and its checks, `finish_learning_track` (a save that leaves no
+  target below senior records `"none"`, so moving the last junior kind to
+  mid-level keeps the track), Setup's on-track line and Leave button, and
+  Setup's API key guide for a track account with no exercises yet. So Leave
+  changes nothing about suggestions: it removes the on-track line and the
+  button, and for an account that has not generated a set, the key guide.
+  Leave preserves targets, locks, exclusions and pending Exercise mix edits,
+  and it is one-way, since joining after the first-run choice is refused; its
+  hint says so.
 
   **Existing accounts are told apart by a backfill, not a date.**
   `AddLearningTrackToUsers` adds the nullable string with no default and the
@@ -470,7 +480,50 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `create_fake_provider_user` default to `"none"`, standing for backfilled
   accounts; a first-run spec passes `learning_track: nil`.
 
-  **Suggestions use reviewed work, not mastery tiers.** `LevelSuggestion`
+  **The preview migration version is reconciled.** The PR app first added
+  these controls under `20261011040000`, which main then used for
+  `MakeDailyResponseExerciseUnique`. Renaming the controls migration to
+  `20261011050000` lets it run where the columns already exist, but Rails
+  still considers the response-index migration applied. The later
+  `ReconcileDailyResponseExerciseUnique` checks for the unique exercise index
+  and, only when absent, runs the original migration's duplicate cleanup and
+  index change. It keeps the original response-ranking rule in one place.
+  A database with the correct index is untouched; rolling back reconciliation
+  leaves the index in place, since the original migration owns its rollback.
+
+  The key guide appears only for a track account with no exercises. Its
+  copy remains scrollable: in Chromium at 390×844, the guide is about 893px
+  tall at default text, 1,321px at 125%, and 1,681px at 140%, measured in an
+  older headless Chromium once the OpenAI section was added (the same build
+  measured the guide without it at 711, 1,069 and 1,340). Even at default
+  size it extends below the initial viewport; enlarged text needs vertical
+  scrolling. There is no unconditional one-screen promise or hidden content.
+
+  **Operator preparation rewrites shared wording.** Run
+  `bin/rails runner script/prepare_junior_ladders.rb <operator_user_id>` first
+  for per-kind coverage and deduplicated gaps across both languages.
+  It writes nothing. Adding `--run` queues missing ladders through
+  `GenerateConceptReferenceJob` with `refresh: true`, billed to that active
+  operator's own key. A refresh rewrites the whole shared reference and guide,
+  including rows that already have a guide, for every user.
+
+  **Production coverage before any run, 2026-10-08.** The report step, run
+  against production, grounded 5 of 90 code review pairs, 3 of 48 design
+  comparison, 5 of 90 pattern, 5 of 90 challenge, 5 of 42 Parsons, and none
+  of architecture (0/15), security review (0/4), plan review (0/4), ambiguity
+  hunt (0/5) or pseudocode to code (0/8), leaving 117 concept and language
+  pairs without a ladder once duplicates across kinds are counted once. The
+  `--run` step has not been taken, so the billed cost and the coverage after
+  it stay unmeasured.
+- **Level suggestions**: every account with `users.level_suggestions` on
+  (default true) can be offered a one-rung move for a section kind on the
+  submitted dashboard, and nothing moves without an explicit Apply. A kind is
+  read at its rung (`User#kind_rungs`, from `KindDifficulty#rungs`): its
+  target when one is set, else the skill level, which is what generation
+  pitches it at. So an account with no targets is offered moves too, and
+  Apply then writes one target for that kind and leaves `skill_level` alone.
+
+  **The rule uses reviewed work, not mastery tiers.** `LevelSuggestion`
   moves an unlocked kind one rung along junior, mid-level and senior
   (`LevelSuggestion::LADDER`). Principal engineer is set only by hand, so no
   suggestion leaves it or leads to it. A step up needs the kind's latest five
@@ -504,19 +557,52 @@ concept-specific difficulty descriptions for future generation, not a new set.
   changes them in Setup.
 
   **A cutoff keeps the same work from proposing another move.**
-  Not now records each kind's current level and the newest reviewed response
+  Not now records each kind's current rung and the newest reviewed response
   date, falling back to the user's today, so an offer returns only on newer
-  results at that level, five of them for a step up. A move to a ladder level, from any level
-  or none and however it was saved, records the destination level and
-  today's date in the user's zone, so results from an earlier stay at that
-  level never count again. Evidence through a cutoff's date is ignored at its
-  level, and results at any other level never count. The profile join check
-  and versioned level changes run under the user-row lock; dismissal merges
-  into the reloaded map under that same lock and keeps a later valid cutoff
-  at the current level. Its earlier evidence read cannot undo a newer
+  results at that rung, five of them for a step up. Any change to a kind's
+  rung, for every account, records the destination rung and today's date in
+  the user's zone (`User#record_level_changes`): a target set, edited or
+  cleared, and a skill-level change, which moves every kind without a
+  target. A rung that did not move records nothing, and a move to principal
+  engineer records nothing. The first-run choice and joining the track
+  record nothing; leaving or finishing it records any rung it moves. So
+  results from an earlier stay at a rung never count again. Evidence through
+  a cutoff's date is ignored at its rung, and results at any other rung
+  never count. Versioned level changes run under the user-row lock, and so
+  does dismissal, which merges into the reloaded map and keeps a later valid
+  cutoff at the current rung. Its earlier evidence read cannot undo a newer
   dismissal or level-change cutoff. A different-level or malformed entry is
   replaced; `LevelSuggestion.cutoff_date` is the shared reader for dismissal
   and proposal filtering.
+
+  **The page posts the moves it showed, and the server checks them.** Apply,
+  Not now, a Keep set aside after Apply, and a Setup save opened from the
+  card's link send each move as a `LevelSuggestionStep`: the kind, the rung
+  it was shown at and the rung offered. `PATCH /profile` takes them as
+  `level_suggestion_steps` and the dismissal endpoint as `steps`. Under the
+  row lock, after the version check, each `from` must equal the kind's
+  stored rung, or the request gets the existing 409 and saves nothing; a
+  skill-level change bumps no `section_kind_preferences_version`, so without
+  this a card left open could move a kind down after the skill level rose in
+  another tab. A step the request does not save, or one that is not a
+  one-rung move, is a 422. The card reloads on a 409 once pending saves
+  clear, as it always did for a stale Apply.
+
+  **Event rows.** `level_suggestion_events` records `applied` rows with
+  source `suggestion` (a target change matching a checked step),
+  `setup_edit` (any other target change, Default included) or
+  `skill_level_edit` (a kind moved only because the skill level changed,
+  one row per kind, so a bulk move can be told apart), plus `dismissed` and
+  `removed` rows. `from_level` and `to_level` are rungs, so a reset to
+  Default records the skill level's rung, where #390 recorded nil. Each row
+  carries the evidence counts behind it, computed at write time, so they can
+  differ from the card's numbers when a review lands in between. Rows are
+  written only by rung-changing saves and the dismissal endpoint, which
+  writes a row only for a kind whose cutoff moves forward and labels it with
+  the `to` the card showed. A dismissal from a tab opened before steps were
+  sent falls back to the proposal recomputed at write time. A dismissal
+  whose user row fails validation answers the card's JSON 422 rather than
+  Rails' HTML error page.
 
   **Setup and dashboard saves settle in place.** Apply changes only the kinds
   still listed through the existing versioned profile endpoint, then
@@ -524,82 +610,55 @@ concept-specific difficulty descriptions for future generation, not a new set.
   That second request is tracked as pending, but the two writes are not
   atomic: its failure leaves the applied levels saved and the shared save
   error visible. Not now dismisses every kind the card listed, with reason
-  `not_now`. A stale Apply (409) reloads only after pending saves clear; a
-  save still pending after ten seconds cancels the reload. Leaving on Setup
-  preserves targets, locks, exclusions and pending Exercise mix edits. When
-  no target below senior remains, the save records `"none"`, so moving the
-  last junior kind to mid-level keeps the track. `level_suggestion_events`
-  records `applied` rows (source `suggestion` or `setup_edit`), `dismissed`
-  and `removed` rows, each with the evidence counts behind it, written only
-  by level-changing saves and the dismissal endpoint, which writes a row only
-  for a kind whose cutoff moves forward.
-
-  **Known gap:** a track account whose kinds all reach senior leaves the
-  track, and with it every suggestion, step-backs included, until
-  suggestions no longer depend on the track.
+  `not_now`. A stale Apply or Not now (409) reloads only after pending saves
+  clear; a save still pending after ten seconds cancels the reload.
 
   **After three answers, a proposal sends the user to Setup.**
   `users.track_proposals_answered` counts each Apply and Not now through
-  `POST /learning_track/answer`, which the dashboard sends once the save has
-  succeeded. A lost count delays the switch to Setup without undoing the
-  choice; its warning says the choice was saved and need not be repeated.
-  Once an Apply finishes the track, the count endpoint returns success without
-  incrementing, because there will be no later suggestion to route. Below
+  `POST /level_suggestion/answer`, for every account, which the dashboard
+  sends once the save has succeeded. A lost count delays the switch to Setup
+  without undoing the choice; its warning says the choice was saved and need
+  not be repeated. Below
   `LevelSuggestion::IN_PLACE_ANSWERS` (3) a proposal applies in place. From then
   on its main button links to Setup's Exercise mix with the proposed kinds
   marked and the level named (`?suggested[]=…&suggested_level=…`), and the
-  user changes the level there, so they learn where the control lives. Not
-  now still dismisses in place, and a card sent to Setup has no Keep
+  user changes the level there, so they learn where the control lives. Setup
+  renders each marked kind's step, and choosing the marked level sends it
+  once. Not now still dismisses in place, and a card sent to Setup has no Keep
   buttons, since the choice is made there. A proposal naming an
   excluded kind keeps applying in place, because Setup disables an excluded
   kind's difficulty and the user would have nothing to change. The threshold
   is a starting value, not a measured one.
 
-  **The preview migration version is reconciled.** The PR app first added
-  these controls under `20261011040000`, which main then used for
-  `MakeDailyResponseExerciseUnique`. Renaming the controls migration to
-  `20261011050000` lets it run where the columns already exist, but Rails
-  still considers the response-index migration applied. The later
-  `ReconcileDailyResponseExerciseUnique` checks for the unique exercise index
-  and, only when absent, runs the original migration's duplicate cleanup and
-  index change. It keeps the original response-ranking rule in one place.
-  A database with the correct index is untouched; rolling back reconciliation
-  leaves the index in place, since the original migration owns its rollback.
-
   **Suggestions can be turned off and back on.** Every proposal links to the
-  "Suggest level changes" switch on Setup, `users.track_suggestions` (default
-  true). While it is off the dashboard computes no proposal; turning it back
-  on resumes them with every cutoff as it was. Leaving the track is separate
-  and one-way, since joining after the first-run choice is refused, and its
-  hint says so.
+  "Suggest level changes" switch at the top of Setup's Exercise mix
+  (`/setup?show=level_suggestions#level-suggestions`, which renders the mix
+  open and moves focus to the switch). While it is off the dashboard
+  computes no proposal; turning it back on resumes them with every cutoff as
+  it was. The submitted dashboard's evidence read is capped at 60 responses,
+  so it stays about flat as history grows: about 32 ms at 60 reviewed days
+  and 38 ms at 250, measured in a development sandbox.
 
-  Generation, review, both judges and `ConceptMastery` never read track state;
-  `spec/services/learning_track_isolation_spec.rb` pins that separation and
-  byte-identical generation/judge calls for equal difficulty settings.
-  The key guide appears only for a track account with no exercises. Its
-  copy remains scrollable: in Chromium at 390×844, the guide is about 893px
-  tall at default text, 1,321px at 125%, and 1,681px at 140%, measured in an
-  older headless Chromium once the OpenAI section was added (the same build
-  measured the guide without it at 711, 1,069 and 1,340). Even at default
-  size it extends below the initial viewport; enlarged text needs vertical
-  scrolling. There is no unconditional one-screen promise or hidden content.
+  **Renamed from the track, with one release of overlap.** This was
+  `TrackGraduation`, for junior-track accounts only. The endpoints moved to
+  `POST /level_suggestion/dismissal` and `/answer`; the old
+  `/learning_track/…` paths route straight to the same controllers for one
+  release, since `request.js` reads a followed redirect as an expired
+  session. `AddLevelSuggestionColumnsToUsers` copied `track_suggestions` and
+  `track_evidence_cutoffs` into `level_suggestions` and
+  `level_suggestion_cutoffs`; the old columns stay in the table, ignored by
+  `User`, and `PATCH /profile` still takes the old `track_suggestions` key
+  for that release. A later change drops the old paths, the old key and the
+  old columns together. A dismissal or switch change written by old code
+  between the migration and the new code serving is not copied, and a code
+  rollback reads the old columns without anything written since; either
+  costs at most a repeat offer.
 
-  **Operator preparation rewrites shared wording.** Run
-  `bin/rails runner script/prepare_junior_ladders.rb <operator_user_id>` first
-  for per-kind coverage and deduplicated gaps across both languages.
-  It writes nothing. Adding `--run` queues missing ladders through
-  `GenerateConceptReferenceJob` with `refresh: true`, billed to that active
-  operator's own key. A refresh rewrites the whole shared reference and guide,
-  including rows that already have a guide, for every user.
-
-  **Production coverage before any run, 2026-10-08.** The report step, run
-  against production, grounded 5 of 90 code review pairs, 3 of 48 design
-  comparison, 5 of 90 pattern, 5 of 90 challenge, 5 of 42 Parsons, and none
-  of architecture (0/15), security review (0/4), plan review (0/4), ambiguity
-  hunt (0/5) or pseudocode to code (0/8), leaving 117 concept and language
-  pairs without a ladder once duplicates across kinds are counted once. The
-  `--run` step has not been taken, so the billed cost and the coverage after
-  it stay unmeasured.
+  Generation, review, both judges, `ConceptMastery` and `KindDifficulty`
+  never read track or suggestion state;
+  `spec/services/level_suggestion_isolation_spec.rb` pins that separation and
+  byte-identical generation/judge calls for equal difficulty settings, on or
+  off the track and with suggestions on or off.
 - **Invite codes and trials**: anyone can sign up with an email, as before,
   and bring their own key; no code is needed to use the app. An invite code
   starts a trial on a house key instead. `InviteCode` keeps only a SHA-256
@@ -3337,10 +3396,12 @@ always pull in the full suite — is stated once, in
 - `app/services/size_forecast.rb` — `SizeForecast`: whether tomorrow's Automatic set will be larger, or smaller because of the brake, than today's planned one, for the submitted dashboard's size lines.
 - `app/services/competency_gate/evidence.rb` — the gate's only query: every rubric-stamped reviewed day, oldest first, in batches, as `CompetencyGate::Day` values.
 - `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileController`.
-- `app/controllers/level_suggestion_dismissals_controller.rb` — records Not now and removed-kind cutoffs for the current user under the user-row lock, with a `dismissed` or `removed` event row for each kind whose cutoff moves forward.
-- `app/models/level_suggestion_event.rb` — `LevelSuggestionEvent`: one row per answer to a level suggestion (`applied`, `dismissed`, `removed`) with the evidence counts behind it; builds applied rows from the state `User` passes in from before the save.
+- `app/controllers/level_suggestion_dismissals_controller.rb` — records Not now and removed-kind cutoffs for the current user under the user-row lock, refusing a stale shown step with a 409, with a `dismissed` or `removed` event row for each kind whose cutoff moves forward.
+- `app/models/level_suggestion_step.rb` — `LevelSuggestionStep`: one move a card or Setup showed, and the boundary check on the steps they post.
+- `app/models/level_suggestion_event.rb` — `LevelSuggestionEvent`: one row per answer to a level suggestion (`applied`, `dismissed`, `removed`) with the evidence counts behind it; builds applied rows by rung, with `skill_level_edit` for a kind the skill level moved, from the state `User` passes in from before the save.
 - `app/controllers/level_suggestion_answers_controller.rb` — counts an answered proposal, which decides whether the next one applies in place or links to Setup.
 - `app/views/dashboard/_level_suggestion.html.erb` — submitted-day proposal with counts from the evidence, a removable list when several kinds share a destination, and in-place Apply/Not now saves.
+- `app/views/api_keys/_level_suggestions_switch.html.erb` — the "Suggest level changes" switch at the top of Setup's Exercise mix, for every account; its `level-suggestions-switch` controller takes focus when the card's link asks.
 - `script/prepare_junior_ladders.rb` (+ `script/junior_ladder_preparation.rb`) — operator coverage report; explicit `--run` queues shared-reference refreshes using the operator's key.
 - `spec/requests/existing_account_pages_spec.rb` — exact pre-track Dashboard, Setup, Account and History snapshots. `UPDATE_PAGE_SNAPSHOTS=1` intentionally rewrites fixtures; never use it to conceal a learning-track regression.
 - `app/services/ai_service.rb` — provider-agnostic base: prompts, each language's prompt wording (`LANGUAGE_PROMPTS`), JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read. Also owns the judge prompt, the single-section retry call, and the two-stage entry point: `#generate_judged_exercise` drafts, then hands the draft to `JudgedGeneration`

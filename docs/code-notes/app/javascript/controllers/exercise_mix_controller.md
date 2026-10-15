@@ -58,3 +58,21 @@ have done — the slider's `aria-valuetext` and output label, the slider's
 disabled state, each difficulty group's enablement and the last-in-group lock —
 and then saves. Without it the change sits unsaved until the user touches a
 control again.
+
+## A suggestion followed into Setup
+
+When Setup was opened from a level suggestion card's link, the server renders
+each highlighted kind's step (`suggested`: the rung it is at and the rung
+offered). When the user picks the offered level for that kind, the next save
+carries the step as `level_suggestion_steps`, so the server can label the
+change `suggestion` after checking its `from` against the stored rung. A step
+is sent with the first save that carries it and then forgotten, because the
+kind's rung has moved and resending the old `from` would get a 409. A 409
+clears every step, since the page they were rendered for is out of date.
+
+## Early edits are read from the mix's own controls
+
+`editedBeforeConnect` scans only inputs inside row and difficulty targets.
+The "Suggest level changes" switch sits inside the mix's `<details>` but has
+its own controller, and flipping it before the modules load must not start a
+mix save.

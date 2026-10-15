@@ -1,7 +1,7 @@
 # app/models/level_suggestion_event.rb
 
 One row per answer to a level suggestion: an applied target change, a Not now
-(`dismissed`), or a kind taken out of a bundle (`removed`). Nothing reads the
+(`dismissed`), or a kind set aside from a card after Apply (`removed`). Nothing reads the
 table yet. It exists so a later question, such as whether a dismissed kind
 stayed stuck, can be answered by joining a row to the kind's level and
 results afterwards. Design: `docs/superpowers/specs/2026-10-14-level-suggestions.md`,
@@ -11,28 +11,35 @@ report (d).
 
 `window_size`, `favourable`, `too_hard_latest3` and `newest_result_on` are
 `LevelSuggestion.summary` at `from_level`, computed from stored results with
-the cutoffs as they stood before the change. Nothing the browser sends is
-used. A kind with no previous target keeps the column defaults.
+the cutoffs as they stood before the change, at write time. Nothing the
+browser sends is used for them, so they can differ from the card's numbers
+when a review lands in between. A move from principal_engineer keeps the
+column defaults, since no summary is kept at that rung.
 
-## `source` on applied rows
+## Rows are per rung, and `source` says what moved it
 
-`User` detects every saved target change, whichever page sent it, so `source`
-is decided here rather than by the page. A change is `suggestion` when
-suggestions are switched on and the proposal computed from the levels in the
-database offers this kind this destination; otherwise it is `setup_edit`. A
-Setup edit that happens to match a pending proposal is therefore labelled
-`suggestion`, since the suggestion is what it answers. With suggestions off no
-offer was on screen, so every change is `setup_edit`.
+`applied_rows` compares each kind's rung before and after the save, so
+`from_level` and `to_level` are rungs. A reset to Default therefore records
+the skill level's rung as `to_level` (#390 recorded nil), and a target set to
+the rung the skill level already gave writes nothing.
 
-`applied_rows` is a plain builder: it reads no dirty tracking. `User` calls
-it from one `after_save`, which runs when the account was on the track before
-the save and the save changed `section_kind_levels`, and passes the levels,
-locks, cutoffs and suggestion switch from `*_before_last_save`, since the
-save has already written the new values by then. The insert runs in the
-save's transaction, so a failed insert raises and rolls back the level change
-and its cutoff together. The join save writes nothing, a Leave that changes no
-level writes nothing, and the save that ends the track by moving the last kind
-to senior still writes its rows.
+- `suggestion`: the kind's target changed and the move matches a step the
+  dashboard card or Setup posted, which `ProfileController` checked against
+  the stored rung under the row lock.
+- `setup_edit`: any other target change.
+- `skill_level_edit`: the target did not change, and the rung moved because
+  `skill_level` did. A skill-level change writes one such row per kind
+  without a target, so a bulk move can be found by `source` and grouped by
+  `created_at`, apart from per-kind edits.
+
+Before steps were posted, `source` came from recomputing the proposal at save
+time. That mislabelled three cases: a review landing between render and
+Apply, a kind set aside after Apply, and a Setup edit on an unsubmitted day
+that happened to match a pending proposal. Labels now come only from what a
+page showed.
+
+`applied_rows` is a plain builder: it reads no dirty tracking. `User` calls it
+from one `after_save` and passes the state from before the save.
 
 ## Dismissal rows
 
@@ -41,4 +48,7 @@ cutoffs change. The endpoint writes a row only for a kind whose cutoff at its
 current level moves forward: one with no cutoff at that level, or one dated
 before the newest reviewed result (or today, with no results). A repeated Not
 now, from a double click or a retry with no newer results, leaves the cutoff
-where it was, writes no row and still answers with success.
+where it was, writes no row and still answers with success. A row's
+`to_level` is the move the card posted for that kind; a dismissal from a tab
+opened before cards posted their steps falls back to the proposal recomputed
+at write time.
