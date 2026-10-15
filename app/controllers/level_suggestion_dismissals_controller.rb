@@ -37,17 +37,21 @@ class LevelSuggestionDismissalsController < ApplicationController
   end
 
   def existing_cutoff(kind)
-    LevelSuggestion.cutoff_date(current_user.level_suggestion_cutoffs[kind], level: current_user.section_kind_levels[kind])
+    LevelSuggestion.cutoff_date(current_user.level_suggestion_cutoffs[kind], level: rungs[kind])
   end
 
   def cutoff_for(kind, through)
-    { "level" => current_user.section_kind_levels[kind], "through" => [ existing_cutoff(kind), through ].compact.max.iso8601 }
+    { "level" => rungs[kind], "through" => [ existing_cutoff(kind), through ].compact.max.iso8601 }
   end
 
   def valid_kinds?(kinds)
     kinds.is_a?(Array) && kinds.any? && kinds.all? do |kind|
       kind.is_a?(String) && ExerciseSection.keys.include?(kind) &&
-        LevelSuggestion::LADDER.include?(current_user.section_kind_levels[kind])
+        LevelSuggestion::LADDER.include?(rungs[kind])
     end
+  end
+
+  def rungs
+    @rungs ||= current_user.kind_rungs
   end
 end

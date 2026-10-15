@@ -20,7 +20,7 @@ class LevelSuggestion
   Summary = Data.define(:window_size, :favourable, :too_hard_latest3, :newest_result_on)
 
   def self.for(user)
-    proposal(levels: user.section_kind_levels, locked: user.locked_section_kinds,
+    proposal(levels: user.kind_rungs, locked: user.locked_section_kinds,
              results: Evidence.for(user).results, cutoffs: user.level_suggestion_cutoffs)
   end
 

@@ -232,6 +232,8 @@ class User < ApplicationRecord
 
   def suggests_level_moves? = on_learning_track? && level_suggestions?
 
+  def kind_rungs = KindDifficulty.for(self).rungs(skill_level: skill_level)
+
   def applies_level_suggestions_in_place? = track_proposals_answered < LevelSuggestion::IN_PLACE_ANSWERS
 
   def first_run?

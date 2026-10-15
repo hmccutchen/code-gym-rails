@@ -195,4 +195,39 @@ RSpec.describe LevelSuggestion::Evidence do
       expect(LevelSuggestion.for(user)).to be_nil
     end
   end
+
+  describe "LevelSuggestion.for on an account without targets" do
+    it "reads an untargeted kind at the skill level" do
+      user.update_column(:skill_level, "mid_level")
+      5.times { |n| day(n, { "code_review" => { rung: "mid_level" } }) }
+
+      expect(LevelSuggestion.for(user).steps.map { |step| [ step.kind, step.from, step.to ] })
+        .to eq([ %w[code_review mid_level senior] ])
+    end
+
+    it "lets a target win over the skill level" do
+      user.update_columns(skill_level: "mid_level", section_kind_levels: { "code_review" => "junior" })
+      5.times { |n| day(n, { "code_review" => { rung: "mid_level" } }) }
+
+      expect(LevelSuggestion.for(user)).to be_nil
+    end
+
+    it "counts a cutoff only at the kind's rung" do
+      user.update_columns(skill_level: "mid_level", level_suggestion_cutoffs: {
+        "code_review" => { "level" => "junior", "through" => today.iso8601 }
+      })
+      5.times { |n| day(n, { "code_review" => { rung: "mid_level" } }) }
+      expect(LevelSuggestion.for(user)).not_to be_nil
+
+      user.update!(level_suggestion_cutoffs: { "code_review" => { "level" => "mid_level", "through" => today.iso8601 } })
+      expect(LevelSuggestion.for(user)).to be_nil
+    end
+
+    it "offers nothing at a principal engineer skill level" do
+      user.update_column(:skill_level, "principal_engineer")
+      5.times { |n| day(n, { "code_review" => { rung: "principal_engineer" } }) }
+
+      expect(LevelSuggestion.for(user)).to be_nil
+    end
+  end
 end

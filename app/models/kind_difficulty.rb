@@ -37,6 +37,10 @@ class KindDifficulty
     level_for(kind) || (LEVELS.include?(skill_level) ? skill_level : LEVELS.first)
   end
 
+  def rungs(skill_level:)
+    ExerciseSection.all.to_h { |kind| [ kind.key, rung_for(kind, skill_level: skill_level) ] }
+  end
+
   def locked?(kind)
     targeted?(kind) && @locked.include?(kind.key)
   end

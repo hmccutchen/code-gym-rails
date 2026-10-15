@@ -353,17 +353,32 @@ RSpec.describe "Learning track proposals", type: :request do
       expect(user.reload.level_suggestion_cutoffs).to eq({})
     end
 
-    [ nil, "principal_engineer" ].each do |level|
-      it "refuses a kind targeted at #{level.inspect}" do
-        levels = LearningTrack.preset_levels.except("architecture")
-        levels["architecture"] = level if level
-        user = track_user(levels)
-        login_as(user)
-        dismiss(%w[pattern architecture])
+    it "refuses a kind targeted at principal engineer" do
+      user = track_user(LearningTrack.preset_levels.merge("architecture" => "principal_engineer"))
+      login_as(user)
+      dismiss(%w[pattern architecture])
 
-        expect(response).to have_http_status(:unprocessable_content)
-        expect(user.reload.level_suggestion_cutoffs).to eq({})
-      end
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
+    end
+
+    it "refuses an untargeted kind whose skill level is principal engineer" do
+      user = track_user(LearningTrack.preset_levels.except("architecture"))
+      user.update_column(:skill_level, "principal_engineer")
+      login_as(user)
+      dismiss(%w[pattern architecture])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
+    end
+
+    it "sets aside an untargeted kind at the rung its skill level gives it" do
+      user = track_user(LearningTrack.preset_levels.except("architecture"))
+      login_as(user)
+      dismiss(%w[architecture])
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.level_suggestion_cutoffs["architecture"]).to include("level" => "junior")
     end
 
     it "sets aside a kind at mid-level" do
