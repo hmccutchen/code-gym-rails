@@ -378,7 +378,7 @@ Every dashboard, /learn and /history load, any day of the week:
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `User`          | email, name, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), invite_code_id (nullable fk; the code that admitted the account), trial_started_at / trial_ends_at / trial_consented_at (nullable; a present trial_ends_at is the trial), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), level_suggestion_cutoffs (non-null jsonb, default {}), level_suggestions (boolean, default true), track_proposals_answered (integer, default 0); track_evidence_cutoffs and track_suggestions stay in the table, ignored, for one release |
+| `User`          | email, name, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), invite_code_id (nullable fk; the code that admitted the account), trial_started_at / trial_ends_at / trial_consented_at (nullable; a present trial_ends_at is the trial), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), level_suggestion_cutoffs (non-null jsonb, default {}), level_suggestions (boolean, default true), level_suggestion_answers (integer, default 0); track_evidence_cutoffs, track_suggestions and track_proposals_answered stay in the table, ignored, until #394 |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at, dropped_sections (jsonb), plan_notes (jsonb, default {}: what the plan did — `coverage`, `shared_concept`) |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), review_provider (which provider wrote the review), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
@@ -619,7 +619,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   clear; a save still pending after ten seconds cancels the reload.
 
   **After three answers, a proposal sends the user to Setup.**
-  `users.track_proposals_answered` counts each Apply and Not now through
+  `users.level_suggestion_answers` counts each Apply and Not now through
   `POST /level_suggestion/answer`, for every account, which the dashboard
   sends once the save has succeeded. A lost count delays the switch to Setup
   without undoing the choice; its warning says the choice was saved and need
@@ -651,13 +651,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   release, since `request.js` reads a followed redirect as an expired
   session. `AddLevelSuggestionColumnsToUsers` copied `track_suggestions` and
   `track_evidence_cutoffs` into `level_suggestions` and
-  `level_suggestion_cutoffs`; the old columns stay in the table, ignored by
-  `User`, and `PATCH /profile` still takes the old `track_suggestions` key
-  for that release. A later change drops the old paths, the old key and the
-  old columns together. A dismissal or switch change written by old code
-  between the migration and the new code serving is not copied, and a code
-  rollback reads the old columns without anything written since; either
-  costs at most a repeat offer.
+  `level_suggestion_cutoffs`, and `AddLevelSuggestionAnswersToUsers` copied
+  `track_proposals_answered` into `level_suggestion_answers`; the old columns
+  stay in the table, ignored by `User`, and `PATCH /profile` still takes the
+  old `track_suggestions` key for that release. #394 drops the old paths, the
+  old key and the old columns together. A dismissal, switch change or answer
+  written by old code between the migration and the new code serving is not
+  copied, and a code rollback reads the old columns without anything written
+  since; either costs at most a repeat offer or a later switch to Setup.
 
   Generation, review, both judges, `ConceptMastery` and `KindDifficulty`
   never read track or suggestion state;

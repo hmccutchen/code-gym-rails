@@ -32,7 +32,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
   describe "the dashboard proposal" do
     it "applies in place and links to the off switch while the user has answered fewer than the threshold" do
-      user = track_user(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS - 1)
+      user = track_user(level_suggestion_answers: LevelSuggestion::IN_PLACE_ANSWERS - 1)
       with_own_proposal(user)
 
       get root_path
@@ -45,7 +45,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     end
 
     it "sends the user to the Exercise mix with the suggested kinds once they have answered the threshold" do
-      user = track_user(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS)
+      user = track_user(level_suggestion_answers: LevelSuggestion::IN_PLACE_ANSWERS)
       with_own_proposal(user)
 
       get root_path
@@ -58,7 +58,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     end
 
     it "offers no keep buttons on a card of several kinds that goes to Setup" do
-      user = track_user(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS)
+      user = track_user(level_suggestion_answers: LevelSuggestion::IN_PLACE_ANSWERS)
       reviewed_days(user, { "code_review" => "junior", "pattern" => "junior" })
       login_as(user)
 
@@ -70,7 +70,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
     # An excluded kind's difficulty is disabled on Setup, so sending the user there would leave nothing to change.
     it "keeps applying in place when a proposed kind is excluded" do
-      user = track_user(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS,
+      user = track_user(level_suggestion_answers: LevelSuggestion::IN_PLACE_ANSWERS,
                         excluded_section_kinds: [ "security_review" ])
       reviewed_days(user, { "code_review" => "junior", "security_review" => "junior" })
       login_as(user)
@@ -104,7 +104,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(JSON.parse(response.body)).to eq("answered" => 2)
-      expect(user.reload.track_proposals_answered).to eq(2)
+      expect(user.reload.level_suggestion_answers).to eq(2)
     end
 
     it "counts an answer from an account off the track" do
@@ -115,7 +115,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(JSON.parse(response.body)).to eq("answered" => 1)
-      expect(user.reload.track_proposals_answered).to eq(1)
+      expect(user.reload.level_suggestion_answers).to eq(1)
     end
   end
 

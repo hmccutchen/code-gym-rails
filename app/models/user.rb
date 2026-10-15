@@ -9,7 +9,7 @@ class User < ApplicationRecord
   has_many :level_suggestion_events, dependent: :destroy
   belongs_to :invite_code, optional: true
 
-  self.ignored_columns += %w[track_suggestions track_evidence_cutoffs]
+  self.ignored_columns += %w[track_suggestions track_evidence_cutoffs track_proposals_answered]
 
   attr_accessor :shown_level_suggestions
 
@@ -239,7 +239,7 @@ class User < ApplicationRecord
 
   def kind_rungs = KindDifficulty.for(self).rungs(skill_level: skill_level)
 
-  def applies_level_suggestions_in_place? = track_proposals_answered < LevelSuggestion::IN_PLACE_ANSWERS
+  def applies_level_suggestions_in_place? = level_suggestion_answers < LevelSuggestion::IN_PLACE_ANSWERS
 
   def first_run?
     persisted? && learning_track.nil? && !daily_exercises.exists?

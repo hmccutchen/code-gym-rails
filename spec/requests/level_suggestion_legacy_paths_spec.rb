@@ -27,7 +27,7 @@ RSpec.describe "Level suggestion paths from before the rename", type: :request d
 
     expect(response).to have_http_status(:ok)
     expect(response.parsed_body).to eq("answered" => 1)
-    expect(user.reload.track_proposals_answered).to eq(1)
+    expect(user.reload.level_suggestion_answers).to eq(1)
   end
 
   it "saves the switch's old track_suggestions key under level_suggestions" do

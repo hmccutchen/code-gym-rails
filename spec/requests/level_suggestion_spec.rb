@@ -196,7 +196,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
   it "sends a card of several kinds to Setup with every kind and their shared level" do
     user = track_user
-    user.update!(track_proposals_answered: LevelSuggestion::IN_PLACE_ANSWERS)
+    user.update!(level_suggestion_answers: LevelSuggestion::IN_PLACE_ANSWERS)
     reviewed_window(user, { "code_review" => "junior", "pattern" => "junior" })
     login_as(user)
 

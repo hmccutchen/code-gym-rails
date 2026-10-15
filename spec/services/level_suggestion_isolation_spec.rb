@@ -72,7 +72,7 @@ RSpec.describe "Learning track and level suggestion isolation" do
   it "would catch a reader of each name it guards" do
     %w[learning_track LearningTrack level_suggestion_cutoffs level_suggestions LevelSuggestion
        track_evidence_cutoffs track_suggestions track_proposals_answered TrackGraduation
-       shown_level_suggestions].each do |name|
+       shown_level_suggestions level_suggestion_answers].each do |name|
       expect("user.#{name}").to match(state_readers)
     end
   end

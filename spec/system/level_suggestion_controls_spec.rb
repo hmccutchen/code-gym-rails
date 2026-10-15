@@ -19,7 +19,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
 
   def own_proposal(answered:)
     user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels,
-                 track_proposals_answered: answered)
+                 level_suggestion_answers: answered)
     qualifying_days
     visit_as(user)
     expect(page).to have_css("#level-suggestion", text: "Try Code Review at mid-level?")
@@ -37,7 +37,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     expect(page).to have_css("#level-suggestion", text: "Done. Your next sets use the new level.")
     wait_for_saves
     expect(user.reload.section_kind_levels["code_review"]).to eq("mid_level")
-    expect(user.track_proposals_answered).to eq(1)
+    expect(user.level_suggestion_answers).to eq(1)
   end
 
   it "reports no failed save when Apply moves the last kind below senior up and ends the track" do
@@ -61,7 +61,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
 
     expect(page).to have_css("#level-suggestion", text: "Okay. This comes back once there's more to go on.")
     wait_for_saves
-    expect(user.reload.track_proposals_answered).to eq(1)
+    expect(user.reload.level_suggestion_answers).to eq(1)
   end
 
   it "sends a later proposal to the Exercise mix, where the user makes the change" do
@@ -112,7 +112,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
         expected_level = action == "Apply" ? "mid_level" : "junior"
         expect(user.reload.section_kind_levels["code_review"]).to eq(expected_level)
         expect(user.level_suggestion_cutoffs["code_review"]).to eq("level" => expected_level, "through" => Date.current.iso8601)
-        expect(user.track_proposals_answered).to eq(0)
+        expect(user.level_suggestion_answers).to eq(0)
         confirmation = action == "Apply" ? "Done. Your next sets use the new level." : "Okay. This comes back once there's more to go on."
         expect(page).to have_css("#level-suggestion", text: confirmation)
         expect(page).to have_css("#save-status", text: "Your choice was saved, but we couldn't update the suggestion count. You don't need to repeat it.")
@@ -127,7 +127,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
 
     expect(page).to have_css("#level-suggestion", text: "Okay. This comes back once there's more to go on.")
     wait_for_saves
-    expect(user.reload.track_proposals_answered).to eq(LevelSuggestion::IN_PLACE_ANSWERS + 1)
+    expect(user.reload.level_suggestion_answers).to eq(LevelSuggestion::IN_PLACE_ANSWERS + 1)
   end
 
   it "counts nothing when the dismissal fails" do
@@ -139,7 +139,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     expect(page).to have_button("Not now", disabled: false)
     expect(page).to have_link("Change it in Setup")
     wait_for_saves
-    expect(user.reload.track_proposals_answered).to eq(LevelSuggestion::IN_PLACE_ANSWERS)
+    expect(user.reload.level_suggestion_answers).to eq(LevelSuggestion::IN_PLACE_ANSWERS)
   end
 
   it "puts the switch back when its save fails" do

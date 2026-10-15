@@ -20,5 +20,5 @@ A dashboard tab opened before that deploy still posts to the old paths, so
 for one release they route straight to the new controllers. They are not
 redirects: `code_gym/request.js` treats any followed redirect as an expired
 session, so a redirect would show "your session expired" and save nothing.
-Remove both lines in the same change that drops the ignored
-`track_suggestions` and `track_evidence_cutoffs` columns.
+Remove both lines in the same change that drops the ignored track
+columns (#394).

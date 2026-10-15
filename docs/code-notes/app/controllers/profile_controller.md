@@ -32,7 +32,7 @@ assigning it would raise `ActiveModel::UnknownAttributeError`, a 500. A Setup
 tab opened before that deploy still posts the old key, so for one release the
 controller accepts either key, holds both to the same true-or-false check, and
 saves the old one under the new name. Remove `track_suggestions` from the list
-when the ignored track columns are dropped.
+when the ignored track columns are dropped (#394).
 
 ## `level_suggestion_steps`, `moved_since_shown?` and `unsaved_shown_step?`
 
