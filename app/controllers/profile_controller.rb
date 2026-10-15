@@ -13,7 +13,7 @@ class ProfileController < ApplicationController
     return render_invalid_lock      if invalid_locked_section_kinds?
     return render_invalid_display   if invalid_display_preferences?
     return render_invalid_skill_level if invalid_skill_level?
-    return render_invalid_track_suggestions if invalid_track_suggestions?
+    return render_invalid_level_suggestions if invalid_level_suggestions?
 
     saved = save_with_preference_precondition
 
@@ -31,6 +31,7 @@ class ProfileController < ApplicationController
 
   DAILY_SECTION_COUNT_STRINGS = User::DAILY_SECTION_COUNTS.map(&:to_s).freeze
   PREFERENCE_KEYS = %i[section_kind_weights excluded_section_kinds section_kind_levels locked_section_kinds].freeze
+  LEVEL_SUGGESTION_KEYS = %i[level_suggestions track_suggestions].freeze
 
   def invalid_daily_section_count?
     user_params = params.require(:user)
@@ -129,14 +130,14 @@ class ProfileController < ApplicationController
     render_json_error("Skill level must be one of #{User::SKILL_LEVELS.join(', ')}", status: :unprocessable_content)
   end
 
-  def invalid_track_suggestions?
+  def invalid_level_suggestions?
     user_params = params.require(:user)
 
-    user_params.key?(:track_suggestions) && [ true, false ].exclude?(user_params[:track_suggestions])
+    LEVEL_SUGGESTION_KEYS.any? { |key| user_params.key?(key) && [ true, false ].exclude?(user_params[key]) }
   end
 
-  def render_invalid_track_suggestions
-    render_json_error("Track suggestions must be true or false", status: :unprocessable_content)
+  def render_invalid_level_suggestions
+    render_json_error("Level suggestions must be true or false", status: :unprocessable_content)
   end
 
   # Check and write under one row lock; the track choice is checked after reload, since Experienced bumps no version.
@@ -206,13 +207,14 @@ class ProfileController < ApplicationController
   end
 
   def profile_params
-    permitted = params.require(:user).permit(:name, :time_zone, :daily_section_count, :learning_track, :skill_level, :track_suggestions,
+    permitted = params.require(:user).permit(:name, :time_zone, :daily_section_count, :learning_track, :skill_level, *LEVEL_SUGGESTION_KEYS,
                                              section_kind_weights: {}, excluded_section_kinds: [],
                                              section_kind_levels: {}, locked_section_kinds: [],
                                              display_preferences: {})
     permitted[:name] = permitted[:name].to_s.strip if permitted.key?(:name)
     permitted[:time_zone] = permitted[:time_zone].to_s.strip.presence if permitted.key?(:time_zone)
     permitted[:daily_section_count] = nil if permitted[:daily_section_count] == User::AUTOMATIC_SECTION_COUNT
+    permitted[:level_suggestions] = permitted.delete(:track_suggestions) if permitted.key?(:track_suggestions)
     # permit(x: {}) yields Parameters, which a jsonb column cannot serialize.
     %i[section_kind_weights section_kind_levels display_preferences].each do |key|
       permitted[key] = permitted[key].to_h if permitted.key?(key)

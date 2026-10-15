@@ -17,10 +17,10 @@ export default class extends Controller {
 
   async toggleSuggestions() {
     const wanted = this.suggestionsTarget.checked
-    const result = await saveStatus.queue("track_suggestions", "PATCH", this.urlValue,
-                                          { user: { track_suggestions: wanted } })
+    const result = await saveStatus.queue("level_suggestions", "PATCH", this.urlValue,
+                                          { user: { level_suggestions: wanted } })
     if (result.ok) this.savedSuggestions = wanted
-    if (!saveStatus.queued("track_suggestions")) this.suggestionsTarget.checked = this.savedSuggestions
+    if (!saveStatus.queued("level_suggestions")) this.suggestionsTarget.checked = this.savedSuggestions
   }
 
   async leave() {

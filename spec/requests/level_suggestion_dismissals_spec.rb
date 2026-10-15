@@ -40,13 +40,13 @@ RSpec.describe "Learning track dismissal events", type: :request do
 
   it "counts the evidence before this dismissal's cutoff" do
     reviewed_level_days(user, "code_review", "junior", 2, ending: Date.current - 1)
-    user.update!(track_evidence_cutoffs: { "code_review" => { "level" => "junior", "through" => (Date.current - 2).iso8601 } })
+    user.update!(level_suggestion_cutoffs: { "code_review" => { "level" => "junior", "through" => (Date.current - 2).iso8601 } })
     login_as(user)
 
     dismiss([ "code_review" ])
 
     expect(user.level_suggestion_events.sole.window_size).to eq(1)
-    expect(user.reload.track_evidence_cutoffs["code_review"]["through"]).to eq((Date.current - 1).iso8601)
+    expect(user.reload.level_suggestion_cutoffs["code_review"]["through"]).to eq((Date.current - 1).iso8601)
   end
 
   it "writes no second row when the same Not now is sent again with no newer results" do
@@ -72,7 +72,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
     expect(user.level_suggestion_events.order(:id).pluck(:newest_result_on)).to eq(
       [ Date.current - 2, Date.current - 1 ]
     )
-    expect(user.reload.track_evidence_cutoffs["code_review"]["through"]).to eq((Date.current - 1).iso8601)
+    expect(user.reload.level_suggestion_cutoffs["code_review"]["through"]).to eq((Date.current - 1).iso8601)
   end
 
   [ "later", "", [ "not_now" ] ].each do |reason|
@@ -83,7 +83,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(user.level_suggestion_events).to be_empty
-      expect(user.reload.track_evidence_cutoffs).to eq({})
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
     end
   end
 
@@ -95,7 +95,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
     dismiss([ "pattern" ])
 
     expect(response).to have_http_status(:ok)
-    expect(user.reload.track_evidence_cutoffs["pattern"]).to eq(
+    expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq(
       "level" => "mid_level", "through" => Date.current.iso8601
     )
     expect(user.level_suggestion_events.where(action: "dismissed").sole.from_level).to eq("mid_level")
@@ -117,6 +117,6 @@ RSpec.describe "Learning track dismissal events", type: :request do
 
     expect { get root_path }.not_to change(LevelSuggestionEvent, :count)
     expect(Nokogiri::HTML(response.body).at_css("#level-suggestion")).to be_present
-    expect(user.reload.track_evidence_cutoffs).to eq({})
+    expect(user.reload.level_suggestion_cutoffs).to eq({})
   end
 end

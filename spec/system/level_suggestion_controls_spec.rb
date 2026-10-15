@@ -105,7 +105,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
 
         expected_level = action == "Apply" ? "mid_level" : "junior"
         expect(user.reload.section_kind_levels["code_review"]).to eq(expected_level)
-        expect(user.track_evidence_cutoffs["code_review"]).to eq("level" => expected_level, "through" => Date.current.iso8601)
+        expect(user.level_suggestion_cutoffs["code_review"]).to eq("level" => expected_level, "through" => Date.current.iso8601)
         expect(user.track_proposals_answered).to eq(0)
         confirmation = action == "Apply" ? "Done. Your next sets use the new level." : "Okay. This comes back once there's more to go on."
         expect(page).to have_css("#level-suggestion", text: confirmation)
@@ -147,7 +147,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     wait_for_saves
 
     expect(page).to have_checked_field("Suggest level changes")
-    expect(user.reload.track_suggestions).to be(true)
+    expect(user.reload.level_suggestions).to be(true)
   end
 
   it "returns the switch to the stored value when several quick saves all fail" do
@@ -170,7 +170,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     wait_for_saves
 
     expect(page).to have_checked_field("Suggest level changes")
-    expect(user.reload.track_suggestions).to be(true)
+    expect(user.reload.level_suggestions).to be(true)
   end
 
   it "turns suggestions off and on from Setup" do
@@ -180,10 +180,10 @@ RSpec.describe "Learning track suggestion controls", type: :system do
 
     uncheck "Suggest level changes"
     wait_for_saves
-    expect(user.reload.track_suggestions).to be(false)
+    expect(user.reload.level_suggestions).to be(false)
 
     check "Suggest level changes"
     wait_for_saves
-    expect(user.reload.track_suggestions).to be(true)
+    expect(user.reload.level_suggestions).to be(true)
   end
 end

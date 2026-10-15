@@ -23,3 +23,13 @@ asked. The key is optional: Setup's Leave the track still posts `none`
 alone. The value goes through `#invalid_skill_level?` like any other skill
 level, and principal engineer is not refused here, since Setup already
 offers it through this endpoint.
+
+## `LEVEL_SUGGESTION_KEYS`
+
+The "Suggest level changes" switch saved as `track_suggestions` until the
+column became `level_suggestions`. `User` now ignores the old column, so
+assigning it would raise `ActiveModel::UnknownAttributeError`, a 500. A Setup
+tab opened before that deploy still posts the old key, so for one release the
+controller accepts either key, holds both to the same true-or-false check, and
+saves the old one under the new name. Remove `track_suggestions` from the list
+when the ignored track columns are dropped.

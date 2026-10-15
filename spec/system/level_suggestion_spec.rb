@@ -52,12 +52,12 @@ RSpec.describe "Learning track proposal saves", type: :system do
     expect(user.reload.section_kind_levels).to eq(
       LearningTrack.preset_levels.merge("code_review" => "mid_level", "pattern" => "mid_level")
     )
-    expect(user.track_evidence_cutoffs).not_to have_key("architecture")
+    expect(user.level_suggestion_cutoffs).not_to have_key("architecture")
     expect(page.evaluate_script("window.CodeGymSaveStatus.pending()")).to be(true)
     expect_same_page
     page.execute_script("window.finishDismissal()")
     wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
-    expect(user.reload.track_evidence_cutoffs["architecture"]).to eq("level" => "junior", "through" => Date.current.iso8601)
+    expect(user.reload.level_suggestion_cutoffs["architecture"]).to eq("level" => "junior", "through" => Date.current.iso8601)
     expect(user.level_suggestion_events.where(kind: "architecture").pluck(:action)).to eq([ "removed" ])
     expect_same_page
   end
@@ -82,7 +82,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
     expect(page).to have_css("#level-suggestion", text: "Okay. This comes back once there's more to go on.")
     expect(focused_text).to eq("status: Okay. This comes back once there's more to go on.")
     expect(user.reload.section_kind_levels).to eq(original_levels)
-    expect(user.track_evidence_cutoffs.keys).to match_array(%w[code_review pattern architecture])
+    expect(user.level_suggestion_cutoffs.keys).to match_array(%w[code_review pattern architecture])
     expect(user.level_suggestion_events.pluck(:kind, :action)).to match_array(
       %w[code_review pattern architecture].map { |kind| [ kind, "dismissed" ] }
     )

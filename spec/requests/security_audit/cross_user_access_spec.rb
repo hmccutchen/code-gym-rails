@@ -145,7 +145,7 @@ RSpec.describe "Cross-user access", type: :request do
           anonymized_at: Time.current.iso8601,
           paused_generation_at: Time.current.iso8601,
           reminder_level: "ready_and_nudges",
-          track_evidence_cutoffs: { "code_review" => { "level" => "junior" } },
+          level_suggestion_cutoffs: { "code_review" => { "level" => "junior" } },
           id: owner.id,
           user_id: owner.id
         }
@@ -160,7 +160,7 @@ RSpec.describe "Cross-user access", type: :request do
       expect(intruder.anonymized_at).to be_nil
       expect(intruder.paused_generation_at).to be_nil
       expect(intruder.reminder_level).to eq("none")
-      expect(intruder.track_evidence_cutoffs).to eq({})
+      expect(intruder.level_suggestion_cutoffs).to eq({})
       expect(owner.reload.name).to eq("Owner")
     end
   end

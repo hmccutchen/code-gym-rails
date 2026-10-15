@@ -6,7 +6,7 @@ RSpec.describe "Learning track isolation" do
   def twin(email, learning_track, cutoffs: {})
     User.create!(
       email: email, name: "Twin", time_zone: "UTC", provider: "fake", api_keys: { "fake" => "fake-test-key" },
-      language: "ruby_rails", learning_track: learning_track, track_evidence_cutoffs: cutoffs,
+      language: "ruby_rails", learning_track: learning_track, level_suggestion_cutoffs: cutoffs,
       section_kind_levels: LearningTrack.preset_levels
     )
   end
@@ -59,7 +59,7 @@ RSpec.describe "Learning track isolation" do
                app/models/review_prose_verdict.rb app/models/kind_difficulty.rb]
 
     readers = (files - own).select do |file|
-      File.read(Rails.root.join(file)).match?(/learning_track|track_evidence_cutoffs|LearningTrack/)
+      File.read(Rails.root.join(file)).match?(/learning_track|level_suggestion_cutoffs|LearningTrack/)
     end
     expect(readers).to eq([])
   end

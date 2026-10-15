@@ -30,10 +30,10 @@ class LevelSuggestionEvent < ApplicationRecord
 
   def self.dismissal_rows(user, kinds:, action:, results:)
     levels = user.section_kind_levels
-    offered = offered_moves(levels, user.locked_section_kinds, results, user.track_evidence_cutoffs)
+    offered = offered_moves(levels, user.locked_section_kinds, results, user.level_suggestion_cutoffs)
     kinds.map do |kind|
       { kind: kind, action: action, from_level: levels[kind], to_level: offered[kind],
-        **evidence(kind, levels[kind], results, user.track_evidence_cutoffs) }
+        **evidence(kind, levels[kind], results, user.level_suggestion_cutoffs) }
     end
   end
 

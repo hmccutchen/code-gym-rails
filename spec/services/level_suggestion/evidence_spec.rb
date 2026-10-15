@@ -185,7 +185,7 @@ RSpec.describe LevelSuggestion::Evidence do
       user.update!(locked_section_kinds: [ "code_review" ])
       expect(LevelSuggestion.for(user)).to be_nil
 
-      user.update!(locked_section_kinds: [], track_evidence_cutoffs: {
+      user.update!(locked_section_kinds: [], level_suggestion_cutoffs: {
         "code_review" => { "level" => "junior", "through" => (today - 2).iso8601 }
       })
       expect(LevelSuggestion.for(user)).to be_nil

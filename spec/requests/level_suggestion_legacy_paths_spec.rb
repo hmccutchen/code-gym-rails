@@ -19,7 +19,7 @@ RSpec.describe "Level suggestion paths from before the rename", type: :request d
 
     expect(response).to have_http_status(:ok)
     expect(response.parsed_body).to eq("dismissed" => [ "code_review" ])
-    expect(user.reload.track_evidence_cutoffs["code_review"]).to include("level" => "junior")
+    expect(user.reload.level_suggestion_cutoffs["code_review"]).to include("level" => "junior")
   end
 
   it "routes POST /learning_track/answer to the answer endpoint, without a redirect" do
@@ -28,6 +28,20 @@ RSpec.describe "Level suggestion paths from before the rename", type: :request d
     expect(response).to have_http_status(:ok)
     expect(response.parsed_body).to eq("answered" => 1)
     expect(user.reload.track_proposals_answered).to eq(1)
+  end
+
+  it "saves the switch's old track_suggestions key under level_suggestions" do
+    patch profile_path, params: { user: { track_suggestions: false } }.to_json, headers: json
+
+    expect(response).to have_http_status(:ok)
+    expect(user.reload.level_suggestions).to be(false)
+  end
+
+  it "refuses an old track_suggestions key that is not true or false" do
+    patch profile_path, params: { user: { track_suggestions: "false" } }.to_json, headers: json
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(user.reload.level_suggestions).to be(true)
   end
 
   it "answers the new paths the same way" do

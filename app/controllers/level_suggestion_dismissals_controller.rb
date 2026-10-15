@@ -30,14 +30,14 @@ class LevelSuggestionDismissalsController < ApplicationController
     current_user.level_suggestion_events.create!(
       LevelSuggestionEvent.dismissal_rows(current_user, kinds: advancing, action: action, results: evidence.results)
     )
-    current_user.update!(track_evidence_cutoffs: current_user.track_evidence_cutoffs.merge(
+    current_user.update!(level_suggestion_cutoffs: current_user.level_suggestion_cutoffs.merge(
       kinds.index_with { |kind| cutoff_for(kind, through) }
     ))
     :ok
   end
 
   def existing_cutoff(kind)
-    LevelSuggestion.cutoff_date(current_user.track_evidence_cutoffs[kind], level: current_user.section_kind_levels[kind])
+    LevelSuggestion.cutoff_date(current_user.level_suggestion_cutoffs[kind], level: current_user.section_kind_levels[kind])
   end
 
   def cutoff_for(kind, through)
