@@ -6,6 +6,13 @@ require migration_path.to_s
 RSpec.describe AddLevelSuggestionColumnsToUsers do
   let(:connection) { ActiveRecord::Base.connection }
 
+  # RemoveTrackLeftoversFromUsers dropped the columns this migration copies; the test transaction rolls these back.
+  before do
+    connection.add_column :users, :track_suggestions, :boolean, default: true, null: false
+    connection.add_column :users, :track_evidence_cutoffs, :jsonb, default: {}, null: false
+    User.reset_column_information
+  end
+
   after { User.reset_column_information }
 
   def migrate(direction)
@@ -53,10 +60,5 @@ RSpec.describe AddLevelSuggestionColumnsToUsers do
                                           "track_evidence_cutoffs" => '{"pattern": {"level": "senior"}}')
   ensure
     migrate(:up)
-  end
-
-  it "keeps the track columns out of User for one release" do
-    expect(User.column_names).not_to include("track_suggestions", "track_evidence_cutoffs")
-    expect(connection.column_exists?(:users, :track_suggestions)).to be(true)
   end
 end

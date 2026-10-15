@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_15_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -369,7 +369,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_15_140000) do
     t.datetime "updated_at", null: false
     t.jsonb "display_preferences", default: {}, null: false
     t.string "learning_track"
-    t.jsonb "track_evidence_cutoffs", default: {}, null: false
     t.integer "daily_section_count"
     t.text "api_keys"
     t.string "last_generation_failure"
@@ -380,8 +379,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_15_140000) do
     t.datetime "trial_started_at"
     t.datetime "trial_ends_at"
     t.datetime "trial_consented_at"
-    t.boolean "track_suggestions", default: true, null: false
-    t.integer "track_proposals_answered", default: 0, null: false
     t.boolean "level_suggestions", default: true, null: false
     t.jsonb "level_suggestion_cutoffs", default: {}, null: false
     t.integer "level_suggestion_answers", default: 0, null: false

@@ -6,6 +6,12 @@ require migration_path.to_s
 RSpec.describe AddLevelSuggestionAnswersToUsers do
   let(:connection) { ActiveRecord::Base.connection }
 
+  # RemoveTrackLeftoversFromUsers dropped the column this migration copies; the test transaction rolls it back.
+  before do
+    connection.add_column :users, :track_proposals_answered, :integer, default: 0, null: false
+    User.reset_column_information
+  end
+
   after { User.reset_column_information }
 
   def migrate(direction)
@@ -39,10 +45,5 @@ RSpec.describe AddLevelSuggestionAnswersToUsers do
     expect(old_count(user.id)).to eq(2)
   ensure
     migrate(:up)
-  end
-
-  it "keeps the old column out of User for one release" do
-    expect(User.column_names).not_to include("track_proposals_answered")
-    expect(connection.column_exists?(:users, :track_proposals_answered)).to be(true)
   end
 end
