@@ -11,7 +11,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
   end
 
   def reviewed_days(user, sections)
-    TrackGraduation::WINDOW.times do |ago|
+    LevelSuggestion::WINDOW.times do |ago|
       date = Date.current - ago
       exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current,
         problem_set: sections.transform_values { |rung| { "question" => "q", "snippet" => "s", "pitched_at" => rung } })
@@ -26,26 +26,26 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     login_as(user)
   end
 
-  def proposal = page_html.at_css("#track-proposal")
+  def proposal = page_html.at_css("#level-suggestion")
 
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
   describe "the dashboard proposal" do
     it "applies in place and links to the off switch while the user has answered fewer than the threshold" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS - 1)
+      user = track_user(level_suggestion_answers: LevelSuggestion::IN_PLACE_ANSWERS - 1)
       with_own_proposal(user)
 
       get root_path
 
       expect(proposal.at_css("[data-apply]")).to be_present
       expect(proposal.at_css("[data-change-in-setup]")).to be_nil
-      expect(proposal["data-track-proposal-answer-url-value"]).to eq(learning_track_answer_path)
+      expect(proposal["data-level-suggestion-answer-url-value"]).to eq(level_suggestion_answer_path)
       expect(proposal.text).to include("turn these suggestions off in Setup")
-      expect(proposal.at_css(%(a[href="#{setup_path(anchor: "learning-track")}"]))).to be_present
+      expect(proposal.at_css(%(a[href="#{setup_path(show: "level_suggestions", anchor: "level-suggestions")}"]))).to be_present
     end
 
     it "sends the user to the Exercise mix with the suggested kinds once they have answered the threshold" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS)
+      user = track_user(level_suggestion_answers: LevelSuggestion::IN_PLACE_ANSWERS)
       with_own_proposal(user)
 
       get root_path
@@ -58,7 +58,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     end
 
     it "offers no keep buttons on a card of several kinds that goes to Setup" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS)
+      user = track_user(level_suggestion_answers: LevelSuggestion::IN_PLACE_ANSWERS)
       reviewed_days(user, { "code_review" => "junior", "pattern" => "junior" })
       login_as(user)
 
@@ -70,7 +70,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
     # An excluded kind's difficulty is disabled on Setup, so sending the user there would leave nothing to change.
     it "keeps applying in place when a proposed kind is excluded" do
-      user = track_user(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS,
+      user = track_user(level_suggestion_answers: LevelSuggestion::IN_PLACE_ANSWERS,
                         excluded_section_kinds: [ "security_review" ])
       reviewed_days(user, { "code_review" => "junior", "security_review" => "junior" })
       login_as(user)
@@ -83,53 +83,53 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     end
 
     it "shows nothing while suggestions are off, and the same proposal once they are back on" do
-      user = track_user(track_suggestions: false)
+      user = track_user(level_suggestions: false)
       with_own_proposal(user)
 
       get root_path
       expect(proposal).to be_nil
 
-      user.update!(track_suggestions: true)
+      user.update!(level_suggestions: true)
       get root_path
       expect(proposal.text).to include("Try Code Review at mid-level?")
     end
   end
 
-  describe "POST /learning_track/answer" do
+  describe "POST /level_suggestion/answer" do
     it "counts one answer per request" do
       user = track_user
       login_as(user)
 
-      2.times { post learning_track_answer_path, params: {}.to_json, headers: json }
+      2.times { post level_suggestion_answer_path, params: {}.to_json, headers: json }
 
       expect(response).to have_http_status(:ok)
       expect(JSON.parse(response.body)).to eq("answered" => 2)
-      expect(user.reload.track_proposals_answered).to eq(2)
+      expect(user.reload.level_suggestion_answers).to eq(2)
     end
 
-    it "counts nothing for an account off the track, without refusing" do
+    it "counts an answer from an account off the track" do
       user = create_user_with_key
       login_as(user)
 
-      post learning_track_answer_path, params: {}.to_json, headers: json
+      post level_suggestion_answer_path, params: {}.to_json, headers: json
 
       expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)).to eq("answered" => 0)
-      expect(user.reload.track_proposals_answered).to eq(0)
+      expect(JSON.parse(response.body)).to eq("answered" => 1)
+      expect(user.reload.level_suggestion_answers).to eq(1)
     end
   end
 
-  describe "PATCH /profile track_suggestions" do
+  describe "PATCH /profile level_suggestions" do
     it "turns suggestions off and back on" do
       user = track_user
       login_as(user)
 
-      patch profile_path, params: { user: { track_suggestions: false } }.to_json, headers: json
+      patch profile_path, params: { user: { level_suggestions: false } }.to_json, headers: json
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_suggestions).to be(false)
+      expect(user.reload.level_suggestions).to be(false)
 
-      patch profile_path, params: { user: { track_suggestions: true } }.to_json, headers: json
-      expect(user.reload.track_suggestions).to be(true)
+      patch profile_path, params: { user: { level_suggestions: true } }.to_json, headers: json
+      expect(user.reload.level_suggestions).to be(true)
     end
 
     [ "false", nil, 0 ].each do |value|
@@ -137,25 +137,55 @@ RSpec.describe "Learning track suggestion controls", type: :request do
         user = track_user
         login_as(user)
 
-        patch profile_path, params: { user: { track_suggestions: value } }.to_json, headers: json
+        patch profile_path, params: { user: { level_suggestions: value } }.to_json, headers: json
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(user.reload.track_suggestions).to be(true)
+        expect(user.reload.level_suggestions).to be(true)
       end
     end
   end
 
   describe "Setup" do
     it "shows the suggestions switch with its current state and warns that leaving is final" do
-      user = track_user(track_suggestions: false)
+      user = track_user(level_suggestions: false)
       login_as(user)
 
       get setup_path
 
-      box = page_html.at_css("#track-suggestions")
+      box = page_html.at_css("#exercise-mix #level-suggestions")
       expect(box).to be_present
       expect(box["checked"]).to be_nil
-      expect(page_html.at_css("#learning-track").text).to include("You can't rejoin the track afterwards.")
+      expect(page_html.at_css("#learning-track #level-suggestions")).to be_nil
+      expect(page_html.at_css("#learning-track").text).to include("level suggestions stay as they are",
+                                                                   "You can't rejoin the track afterwards.")
+    end
+
+    it "shows the switch inside the Exercise mix to an account off the track" do
+      login_as(create_user_with_key)
+
+      get setup_path
+
+      expect(page_html.at_css("#exercise-mix #level-suggestions")["checked"]).not_to be_nil
+      expect(page_html.at_css("#exercise-mix")["open"]).to be_nil
+      expect(page_html.at_css("#level-suggestions-switch")["data-level-suggestions-switch-focus-value"]).to be_nil
+    end
+
+    it "opens the Exercise mix and asks for the switch to take focus when the card's link names it" do
+      login_as(create_user_with_key)
+
+      get setup_path(show: "level_suggestions")
+
+      expect(page_html.at_css("#exercise-mix")["open"]).not_to be_nil
+      expect(page_html.at_css("#level-suggestions-switch")["data-level-suggestions-switch-focus-value"]).to eq("true")
+    end
+
+    it "ignores any other show value" do
+      login_as(create_user_with_key)
+
+      get setup_path(show: "everything")
+
+      expect(page_html.at_css("#exercise-mix")["open"]).to be_nil
+      expect(page_html.at_css("#level-suggestions-switch")["data-level-suggestions-switch-focus-value"]).to be_nil
     end
 
     it "opens the Exercise mix and marks the suggested kinds" do
@@ -202,13 +232,13 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       end
     end
 
-    it "marks nothing for an account off the track" do
+    it "marks the suggested kinds for an account off the track" do
       login_as(create_user_with_key)
 
-      get setup_path(suggested: [ "code_review" ], suggested_level: "senior")
+      get setup_path(suggested: [ "code_review" ], suggested_level: "mid_level")
 
-      expect(page_html.at_css("#exercise-mix")["open"]).to be_nil
-      expect(page_html.css(".mix-suggested")).to be_empty
+      expect(page_html.at_css("#exercise-mix")["open"]).not_to be_nil
+      expect(page_html.css(".mix-suggested").map { |box| box["data-kind"] }).to eq([ "code_review" ])
     end
   end
 end

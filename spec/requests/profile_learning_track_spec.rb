@@ -35,7 +35,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(user.skill_level).to eq("junior")
       expect(user.section_kind_weights).to eq({})
       expect(user.excluded_section_kinds).to eq([])
-      expect(user.track_evidence_cutoffs).to eq({})
+      expect(user.level_suggestion_cutoffs).to eq({})
     end
 
     it "records Experienced as none and changes nothing else" do
@@ -49,7 +49,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(response.parsed_body).to eq("name" => user.name, "time_zone" => "UTC", "daily_section_count" => nil)
     end
 
-    TrackGraduation::LADDER.each do |level|
+    LevelSuggestion::LADDER.each do |level|
       it "records Experienced with the starting level #{level} and changes nothing else" do
         original = user.reload.attributes.except("learning_track", "skill_level", "updated_at")
 
@@ -185,7 +185,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(user.name).to eq("Dev")
       expect(user.section_kind_levels).to eq({})
       expect(user.section_kind_preferences_version).to eq(0)
-      expect(user.track_evidence_cutoffs).to eq({})
+      expect(user.level_suggestion_cutoffs).to eq({})
     end
 
     it "refuses a valid first-run choice with a stale preference version without saving anything" do
@@ -313,7 +313,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
         expect(user.reload.learning_track).to eq("junior")
         expect(user.section_kind_levels).to eq(LearningTrack.preset_levels.merge("pattern" => "senior"))
         expect(user.section_kind_preferences_version).to eq(version + 1)
-        expect(user.track_evidence_cutoffs).to eq("pattern" => { "level" => "senior", "through" => "2026-10-11" })
+        expect(user.level_suggestion_cutoffs).to eq("pattern" => { "level" => "senior", "through" => "2026-10-11" })
       end
     end
 
@@ -324,7 +324,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(response).to have_http_status(:ok)
       expect(user.reload.learning_track).to eq("none")
       expect(user.section_kind_levels).to eq(ExerciseSection.keys.index_with { "senior" })
-      expect(user.track_evidence_cutoffs).to eq(
+      expect(user.level_suggestion_cutoffs).to eq(
         ExerciseSection.keys.index_with { { "level" => "senior", "through" => Date.current.iso8601 } }
       )
     end

@@ -284,6 +284,15 @@ RSpec.describe "Profile", type: :request do
       )
     end
 
+    it "returns each kind's rung after the save, a target or else the skill level" do
+      login_as(user)
+
+      patch_profile(section_kind_levels: { "code_review" => "senior" })
+
+      expect(response.parsed_body["kind_rungs"]).to eq(user.reload.kind_rungs)
+      expect(response.parsed_body["kind_rungs"]).to include("code_review" => "senior", "pattern" => user.skill_level)
+    end
+
     it "returns no guidance gaps when the last target is cleared" do
       login_as(user)
       user.update!(section_kind_levels: { "challenge" => "junior" })

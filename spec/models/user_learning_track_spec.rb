@@ -17,7 +17,7 @@ RSpec.describe User, "learning track", type: :model do
   describe "track vocabulary and storage" do
     it "keeps joining decisions and target levels in separate closed lists" do
       expect(LearningTrack::VALUES).to eq(%w[junior none])
-      expect(TrackGraduation::LADDER).to eq(%w[junior mid_level senior])
+      expect(LevelSuggestion::LADDER).to eq(%w[junior mid_level senior])
     end
 
     it "derives a fresh junior preset from every registered kind" do
@@ -29,10 +29,10 @@ RSpec.describe User, "learning track", type: :model do
     it "defaults to no decision and an empty non-null cutoff object" do
       user = new_account.reload
       expect(user.learning_track).to be_nil
-      expect(user.track_evidence_cutoffs).to eq({})
+      expect(user.level_suggestion_cutoffs).to eq({})
       expect(User.columns_hash.fetch("learning_track").default).to be_nil
       expect(User.columns_hash.fetch("learning_track").null).to be true
-      expect(User.columns_hash.fetch("track_evidence_cutoffs").null).to be false
+      expect(User.columns_hash.fetch("level_suggestion_cutoffs").null).to be false
     end
 
     it "validates learning_track against the closed list" do
@@ -147,21 +147,21 @@ RSpec.describe User, "learning track", type: :model do
       user = on_track(LearningTrack.preset_levels.merge("architecture" => "senior"))
       user.update!(section_kind_levels: user.section_kind_levels.merge("architecture" => "junior"))
 
-      expect(user.reload.track_evidence_cutoffs).to eq("architecture" => { "level" => "junior", "through" => "2026-10-14" })
+      expect(user.reload.level_suggestion_cutoffs).to eq("architecture" => { "level" => "junior", "through" => "2026-10-14" })
     end
 
     it "records a senior cutoff dated today when a kind moves up" do
       user = on_track
       user.update!(section_kind_levels: user.section_kind_levels.merge("architecture" => "senior"))
 
-      expect(user.reload.track_evidence_cutoffs).to eq("architecture" => { "level" => "senior", "through" => "2026-10-14" })
+      expect(user.reload.level_suggestion_cutoffs).to eq("architecture" => { "level" => "senior", "through" => "2026-10-14" })
     end
 
     it "records nothing for the joining save" do
       user = new_account(skill_level: "principal_engineer")
       user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
 
-      expect(user.reload.track_evidence_cutoffs).to eq({})
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
       expect(user.skill_level).to eq("principal_engineer")
     end
 
@@ -169,32 +169,34 @@ RSpec.describe User, "learning track", type: :model do
       user = new_account(section_kind_levels: { "architecture" => "senior" })
       user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
 
-      expect(user.reload.track_evidence_cutoffs).to eq({})
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
     end
 
     it "records nothing for a move to principal engineer and a cutoff for the move back" do
       user = on_track
       user.update!(section_kind_levels: user.section_kind_levels.merge("pattern" => "principal_engineer"))
-      expect(user.reload.track_evidence_cutoffs).to eq({})
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
 
       user.update!(section_kind_levels: user.section_kind_levels.merge("pattern" => "junior"))
-      expect(user.reload.track_evidence_cutoffs).to eq("pattern" => { "level" => "junior", "through" => "2026-10-14" })
+      expect(user.reload.level_suggestion_cutoffs).to eq("pattern" => { "level" => "junior", "through" => "2026-10-14" })
     end
 
     it "records nothing when removing a target and a cutoff when setting one for the first time" do
       user = on_track
       user.update!(section_kind_levels: user.section_kind_levels.except("pattern"))
-      expect(user.reload.track_evidence_cutoffs).to eq({})
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
 
       user.update!(section_kind_levels: user.section_kind_levels.merge("pattern" => "senior"))
-      expect(user.reload.track_evidence_cutoffs).to eq("pattern" => { "level" => "senior", "through" => "2026-10-14" })
+      expect(user.reload.level_suggestion_cutoffs).to eq("pattern" => { "level" => "senior", "through" => "2026-10-14" })
     end
 
-    it "records nothing off the track" do
+    it "records a level change off the track too" do
       user = new_account(learning_track: "none", section_kind_levels: { "architecture" => "senior" })
-      user.update!(section_kind_levels: { "architecture" => "junior" })
+      user.update!(section_kind_levels: { "architecture" => "mid_level" })
 
-      expect(user.reload.track_evidence_cutoffs).to eq({})
+      expect(user.reload.level_suggestion_cutoffs).to eq(
+        "architecture" => { "level" => "mid_level", "through" => "2026-10-14" }
+      )
     end
 
     it "records the last transition before finishing the track" do
@@ -202,18 +204,18 @@ RSpec.describe User, "learning track", type: :model do
       user.update!(section_kind_levels: { "architecture" => "senior" })
 
       expect(user.reload.learning_track).to eq("none")
-      expect(user.track_evidence_cutoffs).to eq("architecture" => { "level" => "senior", "through" => "2026-10-14" })
+      expect(user.level_suggestion_cutoffs).to eq("architecture" => { "level" => "senior", "through" => "2026-10-14" })
     end
 
     it "replaces the moved kind's cutoff and preserves other cutoffs" do
       pattern_cutoff = { "level" => "junior", "through" => "2026-10-10" }
-      user = on_track(track_evidence_cutoffs: {
+      user = on_track(level_suggestion_cutoffs: {
         "pattern" => pattern_cutoff,
         "architecture" => { "level" => "junior", "through" => "2026-10-11" }
       })
       user.update!(section_kind_levels: user.section_kind_levels.merge("architecture" => "senior"))
 
-      expect(user.reload.track_evidence_cutoffs).to eq(
+      expect(user.reload.level_suggestion_cutoffs).to eq(
         "pattern" => pattern_cutoff,
         "architecture" => { "level" => "senior", "through" => "2026-10-14" }
       )
@@ -221,10 +223,10 @@ RSpec.describe User, "learning track", type: :model do
 
     it "preserves cutoffs when targets are unchanged" do
       cutoffs = { "pattern" => { "level" => "junior", "through" => "2026-10-10" } }
-      user = on_track(track_evidence_cutoffs: cutoffs)
+      user = on_track(level_suggestion_cutoffs: cutoffs)
       user.update!(name: "Renamed", section_kind_levels: LearningTrack.preset_levels)
 
-      expect(user.reload.track_evidence_cutoffs).to eq(cutoffs)
+      expect(user.reload.level_suggestion_cutoffs).to eq(cutoffs)
     end
   end
 
@@ -236,7 +238,7 @@ RSpec.describe User, "learning track", type: :model do
         user.update!(section_kind_levels: user.section_kind_levels.merge("architecture" => "junior"))
       end
 
-      expect(user.reload.track_evidence_cutoffs["architecture"]["through"]).to eq("2026-10-13")
+      expect(user.reload.level_suggestion_cutoffs["architecture"]["through"]).to eq("2026-10-13")
     end
   end
 end

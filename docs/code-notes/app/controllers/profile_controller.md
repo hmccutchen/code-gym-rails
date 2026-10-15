@@ -23,3 +23,37 @@ asked. The key is optional: Setup's Leave the track still posts `none`
 alone. The value goes through `#invalid_skill_level?` like any other skill
 level, and principal engineer is not refused here, since Setup already
 offers it through this endpoint.
+
+## `LEVEL_SUGGESTION_KEYS`
+
+The "Suggest level changes" switch saved as `track_suggestions` until the
+column became `level_suggestions`. `User` now ignores the old column, so
+assigning it would raise `ActiveModel::UnknownAttributeError`, a 500. A Setup
+tab opened before that deploy still posts the old key, so for one release the
+controller accepts either key, holds both to the same true-or-false check, and
+saves the old one under the new name. Remove `track_suggestions` from the list
+when the ignored track columns are dropped (#394).
+
+## `level_suggestion_steps`, `moved_since_shown?` and `unsaved_shown_step?`
+
+An Apply from the dashboard card, and a Setup save opened from the card's
+link, send the moves the page showed as `level_suggestion_steps`
+(`LevelSuggestionStep`). A level suggestion is shown at a kind's rung, which
+for a kind without a target is the skill level, and a skill-level change does
+not bump `section_kind_preferences_version`. So the version alone cannot tell
+that a card is stale. Under the row lock, after the version check,
+`moved_since_shown?` compares each step's `from` with the stored rung and
+answers 409 when any has moved, saving nothing; the card already reloads on a
+409. `unsaved_shown_step?` then refuses, with a 422, a step this request does
+not actually save. The checked steps reach `User#shown_level_suggestions`, and
+the applied event rows label those moves `suggestion`.
+
+## `locked_save?`
+
+A save takes the user-row lock when it carries a preference version, posted
+steps, a track choice, a skill level or targets. The last two matter even
+without a version: either can move a kind's rung, and `record_level_changes`
+then merges into `level_suggestion_cutoffs`, which the dismissal endpoint
+also writes under that lock. Without it, Setup's skill-level select, which
+sends no version, could write back a cutoff map read before a Not now
+committed and lose that cutoff.

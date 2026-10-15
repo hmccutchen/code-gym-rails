@@ -3,7 +3,7 @@ class LevelSuggestionEvent < ApplicationRecord
   belongs_to :user
 
   ACTIONS = %w[applied dismissed removed].freeze
-  SOURCES = %w[suggestion setup_edit].freeze
+  SOURCES = %w[suggestion setup_edit skill_level_edit].freeze
   APPLIED = "applied".freeze
 
   validates :action, inclusion: { in: ACTIONS }
@@ -14,39 +14,50 @@ class LevelSuggestionEvent < ApplicationRecord
 
   def applied? = action == APPLIED
 
-  # The proposal on screen was computed from the state before the save, so the caller passes that state in.
-  def self.applied_rows(user, before_levels:, after_levels:, locked:, cutoffs:, suggestions_on:)
-    changes = (before_levels.keys | after_levels.keys).to_h { |kind| [ kind, after_levels[kind].presence ] }
-                                                        .reject { |kind, level| before_levels[kind].presence == level }
-    return [] if changes.empty?
+  # shown maps a kind to the rung the card or Setup showed it moving to, already checked against this save.
+  def self.applied_rows(user, before:, after:, shown:, cutoffs:)
+    before_rungs = rungs(before)
+    moved = rungs(after).reject { |kind, rung| before_rungs[kind] == rung }
+    return [] if moved.empty?
 
-    results = TrackGraduation::Evidence.for(user).results
-    offered = suggestions_on ? offered_moves(before_levels, locked, results, cutoffs) : {}
-    changes.map do |kind, level|
-      { kind: kind, action: APPLIED, source: level && offered[kind] == level ? "suggestion" : "setup_edit",
-        from_level: before_levels[kind], to_level: level, **evidence(kind, before_levels[kind], results, cutoffs) }
+    results = LevelSuggestion::Evidence.for(user).results
+    moved.map do |kind, rung|
+      { kind: kind, action: APPLIED, source: source_for(kind, rung, before, after, shown),
+        from_level: before_rungs[kind], to_level: rung, **evidence(kind, before_rungs[kind], results, cutoffs) }
     end
   end
 
-  def self.dismissal_rows(user, kinds:, action:, results:)
-    levels = user.section_kind_levels
-    offered = offered_moves(levels, user.locked_section_kinds, results, user.track_evidence_cutoffs)
+  # A tab opened before cards posted their steps sends none, so its rows fall back to the proposal recomputed now.
+  def self.dismissal_rows(user, kinds:, action:, results:, shown: {})
+    levels = user.kind_rungs
+    offered = kinds.all? { |kind| shown.key?(kind) } ? {} :
+      offered_moves(levels, user.locked_section_kinds, results, user.level_suggestion_cutoffs)
     kinds.map do |kind|
-      { kind: kind, action: action, from_level: levels[kind], to_level: offered[kind],
-        **evidence(kind, levels[kind], results, user.track_evidence_cutoffs) }
+      { kind: kind, action: action, from_level: levels[kind], to_level: shown.fetch(kind) { offered[kind] },
+        **evidence(kind, levels[kind], results, user.level_suggestion_cutoffs) }
     end
+  end
+
+  def self.rungs(state)
+    KindDifficulty.new(levels: state[:levels] || {}, locked: []).rungs(skill_level: state[:skill_level])
+  end
+
+  def self.source_for(kind, rung, before, after, shown)
+    return "skill_level_edit" if before[:levels].to_h[kind].presence == after[:levels].to_h[kind].presence
+
+    shown[kind] == rung ? "suggestion" : "setup_edit"
   end
 
   def self.offered_moves(levels, locked, results, cutoffs)
-    proposal = TrackGraduation.proposal(levels: levels || {}, locked: locked || [], results: results, cutoffs: cutoffs)
+    proposal = LevelSuggestion.proposal(levels: levels || {}, locked: locked || [], results: results, cutoffs: cutoffs)
     (proposal&.steps || []).to_h { |step| [ step.kind, step.to ] }
   end
 
   def self.evidence(kind, level, results, cutoffs)
     return {} if KindDifficulty::LEVELS.exclude?(level)
 
-    TrackGraduation.summary(kind: kind, level: level, results: results, cutoffs: cutoffs).to_h
+    LevelSuggestion.summary(kind: kind, level: level, results: results, cutoffs: cutoffs).to_h
   end
 
-  private_class_method :offered_moves, :evidence
+  private_class_method :rungs, :source_for, :offered_moves, :evidence
 end

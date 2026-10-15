@@ -33,7 +33,7 @@
 
   <section data-welcome-target="levelStep" aria-labelledby="welcome-level-title" hidden>
     <h2 id="welcome-level-title" tabindex="-1" data-welcome-target="levelHeading"><%= t("learning_track.welcome.level_title") %></h2>
-    <% TrackGraduation::LADDER.each do |level| %>
+    <% LevelSuggestion::LADDER.each do |level| %>
       <button type="button" class="btn btn-ghost welcome-choice" data-level="<%= level %>"
               data-welcome-target="choice" data-action="click->welcome#chooseLevel">
         <%= t("exercise_mix.levels.#{level}") %>

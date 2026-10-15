@@ -12,7 +12,8 @@ export default class extends Controller {
     stops: Array,
     defaultStop: Number,
     labels: Array,
-    version: Number
+    version: Number,
+    suggested: Object
   }
 
   connect() {
@@ -25,7 +26,8 @@ export default class extends Controller {
   }
 
   editedBeforeConnect() {
-    return Array.from(this.element.querySelectorAll("input")).some((input) =>
+    const own = "[data-exercise-mix-target~='row'] input, [data-exercise-mix-target~='difficulty'] input"
+    return Array.from(this.element.querySelectorAll(own)).some((input) =>
       input.type === "range" ? input.value !== input.defaultValue : input.checked !== input.defaultChecked
     )
   }
@@ -165,28 +167,53 @@ export default class extends Controller {
     this.setDifficultyDisabled(box, excluded.indexOf(kind) !== -1)
   }
 
+  shownSteps(levels) {
+    return Object.keys(this.suggestedValue)
+      .filter((kind) => levels[kind] === this.suggestedValue[kind].to)
+      .map((kind) => Object.assign({ kind }, this.suggestedValue[kind]))
+  }
+
+  forgetMovedSuggestions(rungs) {
+    if (!rungs || typeof rungs !== "object") return
+    const remaining = Object.assign({}, this.suggestedValue)
+    Object.keys(remaining).forEach((kind) => {
+      if (rungs[kind] !== remaining[kind].from) delete remaining[kind]
+    })
+    this.suggestedValue = remaining
+  }
+
   persist() {
-    let revision
-    const payload = () => {
-      revision = this.editRevision
-      return { user: Object.assign(this.state(), { section_kind_preferences_version: this.versionValue }) }
-    }
+    const sent = { revision: undefined }
+    const payload = () => this.savePayload(sent)
 
     // Queued in order: a parallel save would post the version the one in flight is about to move, and 409 against itself.
-    return saveStatus.queue("exercise_mix", "PATCH", this.urlValue, payload).then((result) => {
-      const reported = result.data && result.data.section_kind_preferences_version
-      if (result.ok && typeof reported === "number") this.versionValue = reported
-      if (result.status === 409 && result.data && result.data.current) {
-        this.applyServerState(result.data.current)
-        return revision === this.editRevision
-      }
+    return saveStatus.queue("exercise_mix", "PATCH", this.urlValue, payload).then((result) => this.reconcile(result, sent))
+  }
 
-      if (result.ok && revision === this.editRevision) {
-        this.applyLadderPreparation(result.data.ladder_preparation)
-        return true
-      }
-      return false
-    })
+  savePayload(sent) {
+    sent.revision = this.editRevision
+    const state = this.state()
+    const steps = this.shownSteps(state.section_kind_levels)
+    const body = { user: Object.assign(state, { section_kind_preferences_version: this.versionValue }) }
+    if (steps.length > 0) body.level_suggestion_steps = steps
+    return body
+  }
+
+  reconcile(result, sent) {
+    const reported = result.data && result.data.section_kind_preferences_version
+    if (result.ok && typeof reported === "number") this.versionValue = reported
+    if (result.ok) this.forgetMovedSuggestions(result.data && result.data.kind_rungs)
+    if (result.status === 409) this.suggestedValue = {}
+    if (result.status === 409 && result.data && result.data.current) {
+      this.applyServerState(result.data.current)
+      return sent.revision === this.editRevision
+    }
+
+    if (result.ok && sent.revision === this.editRevision) {
+      this.applyLadderPreparation(result.data.ladder_preparation)
+      return true
+    }
+    return false
   }
 
   save() {

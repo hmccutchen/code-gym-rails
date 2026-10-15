@@ -1,13 +1,13 @@
 require "rails_helper"
 
-RSpec.describe "Learning track isolation" do
+RSpec.describe "Learning track and level suggestion isolation" do
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
-  def twin(email, learning_track, cutoffs: {})
+  def twin(email, learning_track, cutoffs: {}, suggestions: true)
     User.create!(
       email: email, name: "Twin", time_zone: "UTC", provider: "fake", api_keys: { "fake" => "fake-test-key" },
-      language: "ruby_rails", learning_track: learning_track, track_evidence_cutoffs: cutoffs,
-      section_kind_levels: LearningTrack.preset_levels
+      language: "ruby_rails", learning_track: learning_track, level_suggestion_cutoffs: cutoffs,
+      level_suggestions: suggestions, section_kind_levels: LearningTrack.preset_levels
     )
   end
 
@@ -40,27 +40,40 @@ RSpec.describe "Learning track isolation" do
       "Expected: #{expected[index].inspect}\nActual: #{actual[index].inspect}"
   end
 
-  it "sends byte-identical generation and judge prompts on and off the track" do
+  it "sends byte-identical generation and judge prompts on and off the track, with suggestions on or off" do
     baseline = prompts_for(twin("legacy@example.com", nil))
     on_track = twin("on@example.com", LearningTrack::ON,
-                    cutoffs: { "code_review" => "2026-10-13" })
+                    cutoffs: { "code_review" => { "level" => "junior", "through" => "2026-10-13" } })
     opted_out = twin("off@example.com", LearningTrack::OFF)
+    switched_off = twin("quiet@example.com", LearningTrack::OFF, suggestions: false,
+                        cutoffs: { "pattern" => { "level" => "junior", "through" => "2026-10-13" } })
 
-    [ on_track, opted_out ].each do |user|
+    [ on_track, opted_out, switched_off ].each do |user|
       actual = prompts_for(user)
       expect(actual).to eq(baseline), -> { first_difference(baseline, actual) }
     end
   end
 
-  it "keeps track state out of generation, review, judges and ConceptMastery" do
-    own = %w[app/services/track_graduation.rb app/services/track_graduation/evidence.rb]
+  let(:state_readers) do
+    /learning_track|LearningTrack|level_suggestion|LevelSuggestion|track_evidence_cutoffs|
+     track_suggestions|track_proposals_answered|TrackGraduation|shown_level_suggestions/x
+  end
+
+  it "keeps track and suggestion state out of generation, review, judges, ConceptMastery and KindDifficulty" do
+    own = %w[app/services/level_suggestion.rb app/services/level_suggestion/evidence.rb]
     files = Rails.root.glob("app/{services,jobs}/**/*.rb").map { |file| file.relative_path_from(Rails.root).to_s } +
             %w[app/models/concept_mastery.rb app/models/judge_verdict.rb
                app/models/review_prose_verdict.rb app/models/kind_difficulty.rb]
 
-    readers = (files - own).select do |file|
-      File.read(Rails.root.join(file)).match?(/learning_track|track_evidence_cutoffs|LearningTrack/)
-    end
+    readers = (files - own).select { |file| File.read(Rails.root.join(file)).match?(state_readers) }
     expect(readers).to eq([])
+  end
+
+  it "would catch a reader of each name it guards" do
+    %w[learning_track LearningTrack level_suggestion_cutoffs level_suggestions LevelSuggestion
+       track_evidence_cutoffs track_suggestions track_proposals_answered TrackGraduation
+       shown_level_suggestions level_suggestion_answers].each do |name|
+      expect("user.#{name}").to match(state_readers)
+    end
   end
 end

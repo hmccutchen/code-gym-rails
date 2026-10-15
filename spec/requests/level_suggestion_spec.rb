@@ -24,16 +24,16 @@ RSpec.describe "Learning track proposals", type: :request do
     )
   end
 
-  def reviewed_window(user, sections, ending: Date.current, count: TrackGraduation::WINDOW)
+  def reviewed_window(user, sections, ending: Date.current, count: LevelSuggestion::WINDOW)
     count.times { |ago| reviewed_day(user, ending - ago, sections) }
   end
 
   def proposed_kinds
-    Nokogiri::HTML(response.body).css("#track-proposal [data-kind]").map { |element| element["data-kind"] }
+    Nokogiri::HTML(response.body).css("#level-suggestion [data-kind]").map { |element| element["data-kind"] }
   end
 
   def proposal_text
-    Nokogiri::HTML(response.body).at_css("#track-proposal")&.text.to_s
+    Nokogiri::HTML(response.body).at_css("#level-suggestion")&.text.to_s
   end
 
   def apply_levels(user, levels)
@@ -44,7 +44,7 @@ RSpec.describe "Learning track proposals", type: :request do
   end
 
   def dismiss(kinds)
-    post learning_track_dismissal_path, params: { kinds: kinds }.to_json, headers: json
+    post level_suggestion_dismissal_path, params: { kinds: kinds }.to_json, headers: json
   end
 
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
@@ -62,24 +62,24 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(proposal_text).to include("4 of your last 5 Code Review sections were reviewed solid or better. " \
                                      "Try Code Review at mid-level?")
     expect(proposed_kinds).to eq([ "code_review" ])
-    step = Nokogiri::HTML(response.body).at_css("#track-proposal [data-step]")
+    step = Nokogiri::HTML(response.body).at_css("#level-suggestion [data-step]")
     expect(step["data-to"]).to eq("mid_level")
-    expect(Nokogiri::HTML(response.body).css("#track-proposal [data-remove-step]")).to be_empty
-    box = Nokogiri::HTML(response.body).at_css("#track-proposal")
-    expect(JSON.parse(box["data-track-proposal-levels-value"])).to eq(user.section_kind_levels)
-    expect(box["data-track-proposal-version-value"]).to eq(user.reload.section_kind_preferences_version.to_s)
-    expect(box["data-track-proposal-url-value"]).to eq(profile_path)
-    expect(box["data-track-proposal-dismiss-url-value"]).to eq(learning_track_dismissal_path)
+    expect(Nokogiri::HTML(response.body).css("#level-suggestion [data-remove-step]")).to be_empty
+    box = Nokogiri::HTML(response.body).at_css("#level-suggestion")
+    expect(JSON.parse(box["data-level-suggestion-levels-value"])).to eq(user.section_kind_levels)
+    expect(box["data-level-suggestion-version-value"]).to eq(user.reload.section_kind_preferences_version.to_s)
+    expect(box["data-level-suggestion-url-value"]).to eq(profile_path)
+    expect(box["data-level-suggestion-dismiss-url-value"]).to eq(level_suggestion_dismissal_path)
   end
 
   it "offers nothing on four results, however good" do
     user = track_user
-    reviewed_window(user, { "code_review" => "junior" }, count: TrackGraduation::WINDOW - 1)
+    reviewed_window(user, { "code_review" => "junior" }, count: LevelSuggestion::WINDOW - 1)
     login_as(user)
 
     get root_path
 
-    expect(response.body).not_to include("track-proposal")
+    expect(response.body).not_to include("level-suggestion")
   end
 
   it "ignores results graded before the rubric" do
@@ -92,7 +92,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
     get root_path
 
-    expect(response.body).not_to include("track-proposal")
+    expect(response.body).not_to include("level-suggestion")
   end
 
   it "lists several kinds moving to the same level in one card, each with its own keep button" do
@@ -106,7 +106,7 @@ RSpec.describe "Learning track proposals", type: :request do
                                      "Code Review: 5 of your last 5 were reviewed solid or better",
                                      "Pattern of the Month: 5 of your last 5 were reviewed solid or better")
     expect(proposed_kinds).to eq(%w[code_review pattern])
-    buttons = Nokogiri::HTML(response.body).css("#track-proposal [data-remove-step]")
+    buttons = Nokogiri::HTML(response.body).css("#level-suggestion [data-remove-step]")
     expect(buttons.map(&:text)).to eq([ "Keep at junior", "Keep at junior" ])
     expect(buttons.map { |button| button["aria-label"] }).to eq(
       [ "Keep #{kind_name("code_review")} at junior", "Keep #{kind_name("pattern")} at junior" ]
@@ -123,7 +123,7 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(proposal_text).to include("5 of your last 5 Code Review sections were reviewed solid or better. " \
                                      "Try Code Review at senior?")
     expect(proposed_kinds).to eq([ "code_review" ])
-    expect(Nokogiri::HTML(response.body).at_css("#track-proposal [data-step]")["data-to"]).to eq("senior")
+    expect(Nokogiri::HTML(response.body).at_css("#level-suggestion [data-step]")["data-to"]).to eq("senior")
   end
 
   it "offers nothing to a senior kind with good results, since principal engineer is never suggested" do
@@ -133,18 +133,18 @@ RSpec.describe "Learning track proposals", type: :request do
 
     get root_path
 
-    expect(response.body).not_to include("track-proposal")
+    expect(response.body).not_to include("level-suggestion")
   end
 
   it "lists no kind without five results of its own, even when another kind is targeted higher" do
     user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
-    reviewed_window(user, { "code_review" => "senior", "pattern" => "junior" }, count: TrackGraduation::WINDOW - 1)
+    reviewed_window(user, { "code_review" => "senior", "pattern" => "junior" }, count: LevelSuggestion::WINDOW - 1)
     reviewed_day(user, Date.current - 4, { "code_review" => "senior" })
     login_as(user)
 
     get root_path
 
-    expect(response.body).not_to include("track-proposal")
+    expect(response.body).not_to include("level-suggestion")
   end
 
   it "describes a step back honestly when only two results exist" do
@@ -158,7 +158,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
     expect(proposal_text).to include("2 of your last 2 Code Review sections at senior felt too hard. " \
                                      "Move Code Review to mid-level?")
-    expect(Nokogiri::HTML(response.body).at_css("#track-proposal [data-step]")["data-to"]).to eq("mid_level")
+    expect(Nokogiri::HTML(response.body).at_css("#level-suggestion [data-step]")["data-to"]).to eq("mid_level")
   end
 
   it "counts a step back over the latest three when more results exist" do
@@ -180,7 +180,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
     get root_path
 
-    expect(response.body).not_to include("track-proposal")
+    expect(response.body).not_to include("level-suggestion")
   end
 
   it "offers no step up when two of the latest three felt too hard" do
@@ -191,20 +191,20 @@ RSpec.describe "Learning track proposals", type: :request do
 
     get root_path
 
-    expect(response.body).not_to include("track-proposal")
+    expect(response.body).not_to include("level-suggestion")
   end
 
   it "sends a card of several kinds to Setup with every kind and their shared level" do
     user = track_user
-    user.update!(track_proposals_answered: LearningTrack::IN_PLACE_ANSWERS)
+    user.update!(level_suggestion_answers: LevelSuggestion::IN_PLACE_ANSWERS)
     reviewed_window(user, { "code_review" => "junior", "pattern" => "junior" })
     login_as(user)
 
     get root_path
 
-    link = Nokogiri::HTML(response.body).at_css("#track-proposal [data-change-in-setup]")
+    link = Nokogiri::HTML(response.body).at_css("#level-suggestion [data-change-in-setup]")
     expect(link["href"]).to eq(setup_path(suggested: %w[code_review pattern], suggested_level: "mid_level", anchor: "exercise-mix"))
-    expect(Nokogiri::HTML(response.body).css("#track-proposal [data-remove-step]")).to be_empty
+    expect(Nokogiri::HTML(response.body).css("#level-suggestion [data-remove-step]")).to be_empty
   end
 
   it "does not offer a locked kind" do
@@ -215,7 +215,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
     get root_path
 
-    expect(response.body).not_to include("track-proposal")
+    expect(response.body).not_to include("level-suggestion")
   end
 
   it "does not compute or render a proposal before submission" do
@@ -223,25 +223,54 @@ RSpec.describe "Learning track proposals", type: :request do
     reviewed_window(user, { "code_review" => "junior" })
     user.daily_responses.find_by!(date: Date.current).update!(submitted_at: nil, ai_review: {})
     login_as(user)
-    expect(TrackGraduation).not_to receive(:for)
+    expect(LevelSuggestion).not_to receive(:for)
 
     get root_path
 
-    expect(response.body).not_to include("track-proposal")
+    expect(response.body).not_to include("level-suggestion")
   end
 
   [ nil, "none" ].each do |track|
-    it "shows nothing with learning_track #{track.inspect}" do
+    it "suggests a move to an account with learning_track #{track.inspect} and no targets" do
       user = create_user_with_key
-      user.update!(learning_track: track)
+      user.update_columns(learning_track: track)
       reviewed_window(user, { "code_review" => "junior" })
       login_as(user)
-      expect(TrackGraduation).not_to receive(:for)
 
       get root_path
 
-      expect(response.body).not_to include("track-proposal")
+      expect(proposed_kinds).to eq([ "code_review" ])
+      step = Nokogiri::HTML(response.body).at_css("#level-suggestion [data-step]")
+      expect([ step["data-from"], step["data-to"] ]).to eq(%w[junior mid_level])
     end
+  end
+
+  it "keeps suggesting step-backs after every kind reaches senior and the track ends" do
+    user = track_user(LearningTrack.preset_levels.transform_values { "senior" }.merge("pattern" => "mid_level"))
+    login_as(user)
+    apply_levels(user, user.section_kind_levels.merge("pattern" => "senior"))
+    expect(user.reload.learning_track).to eq("none")
+    travel 2.days
+    reviewed_window(user, { "pattern" => { rung: "senior", ai: "developing", self: "too_hard" } }, count: 2)
+    login_as(user)
+
+    get root_path
+
+    expect(proposal_text).to include("Move #{kind_name("pattern")} to mid-level?")
+  end
+
+  it "shows the same suggestion before and after leaving the track" do
+    user = track_user
+    reviewed_window(user, { "code_review" => "junior" })
+    login_as(user)
+    get root_path
+    before_leaving = proposal_text
+
+    patch profile_path, params: { user: { learning_track: "none" } }.to_json, headers: json
+    get root_path
+
+    expect(user.reload.learning_track).to eq("none")
+    expect(proposal_text).to eq(before_leaving)
   end
 
   it "does not flap across a senior to mid-level to senior cycle" do
@@ -258,7 +287,7 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(response).to have_http_status(:ok)
     expect(proposed_kinds).not_to include("architecture")
 
-    TrackGraduation::WINDOW.times do
+    LevelSuggestion::WINDOW.times do
       travel 1.day
       reviewed_day(user, Date.current, { "architecture" => "mid_level" })
     end
@@ -289,7 +318,7 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(response).to have_http_status(:conflict)
     expect(user.reload.section_kind_levels["code_review"]).to eq("junior")
     expect(user.locked_section_kinds).to eq([ "pattern" ])
-    expect(user.track_evidence_cutoffs).to eq({})
+    expect(user.level_suggestion_cutoffs).to eq({})
   end
 
   it "clears the track on the final Apply and keeps the senior targets" do
@@ -308,17 +337,17 @@ RSpec.describe "Learning track proposals", type: :request do
       reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
       login_as(user)
 
-      post learning_track_dismissal_path, params: {
+      post level_suggestion_dismissal_path, params: {
         kinds: %w[code_review architecture], through: "2099-01-01", user_id: other.id
       }.to_json, headers: json
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to eq("dismissed" => %w[code_review architecture])
-      expect(user.reload.track_evidence_cutoffs).to eq(
+      expect(user.reload.level_suggestion_cutoffs).to eq(
         "code_review" => { "level" => "junior", "through" => (Date.current - 1).iso8601 },
         "architecture" => { "level" => "junior", "through" => (Date.current - 1).iso8601 }
       )
-      expect(other.reload.track_evidence_cutoffs).to eq({})
+      expect(other.reload.level_suggestion_cutoffs).to eq({})
     end
 
     it "uses the user's today when no reviewed evidence exists" do
@@ -329,7 +358,7 @@ RSpec.describe "Learning track proposals", type: :request do
       dismiss([ "pattern" ])
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_evidence_cutoffs.dig("pattern", "through")).to eq("2026-10-15")
+      expect(user.reload.level_suggestion_cutoffs.dig("pattern", "through")).to eq("2026-10-15")
     end
 
     [ nil, [], "pattern", [ nil ], [ {} ], [ "unknown" ], %w[pattern unknown] ].each do |kinds|
@@ -339,7 +368,7 @@ RSpec.describe "Learning track proposals", type: :request do
         dismiss(kinds)
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(user.reload.track_evidence_cutoffs).to eq({})
+        expect(user.reload.level_suggestion_cutoffs).to eq({})
       end
     end
 
@@ -350,20 +379,35 @@ RSpec.describe "Learning track proposals", type: :request do
       dismiss([ "unknown" ])
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(user.reload.track_evidence_cutoffs).to eq({})
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
     end
 
-    [ nil, "principal_engineer" ].each do |level|
-      it "refuses a kind targeted at #{level.inspect}" do
-        levels = LearningTrack.preset_levels.except("architecture")
-        levels["architecture"] = level if level
-        user = track_user(levels)
-        login_as(user)
-        dismiss(%w[pattern architecture])
+    it "refuses a kind targeted at principal engineer" do
+      user = track_user(LearningTrack.preset_levels.merge("architecture" => "principal_engineer"))
+      login_as(user)
+      dismiss(%w[pattern architecture])
 
-        expect(response).to have_http_status(:unprocessable_content)
-        expect(user.reload.track_evidence_cutoffs).to eq({})
-      end
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
+    end
+
+    it "refuses an untargeted kind whose skill level is principal engineer" do
+      user = track_user(LearningTrack.preset_levels.except("architecture"))
+      user.update_column(:skill_level, "principal_engineer")
+      login_as(user)
+      dismiss(%w[pattern architecture])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
+    end
+
+    it "sets aside an untargeted kind at the rung its skill level gives it" do
+      user = track_user(LearningTrack.preset_levels.except("architecture"))
+      login_as(user)
+      dismiss(%w[architecture])
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.level_suggestion_cutoffs["architecture"]).to include("level" => "junior")
     end
 
     it "sets aside a kind at mid-level" do
@@ -373,13 +417,16 @@ RSpec.describe "Learning track proposals", type: :request do
       dismiss([ "pattern" ])
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_evidence_cutoffs["pattern"]).to eq("level" => "mid_level", "through" => Date.current.iso8601)
+      expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq("level" => "mid_level", "through" => Date.current.iso8601)
     end
 
-    it "is not found for a user off the track" do
-      login_as(create_user_with_key)
+    it "sets aside a kind for a user off the track" do
+      user = create_user_with_key
+      login_as(user)
       dismiss([ "code_review" ])
-      expect(response).to have_http_status(:not_found)
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.level_suggestion_cutoffs["code_review"]).to include("level" => "junior")
     end
 
     it "requires authentication" do
@@ -391,35 +438,35 @@ RSpec.describe "Learning track proposals", type: :request do
       user = track_user
       login_as(user)
       concurrent = { "architecture" => { "level" => "junior", "through" => Date.current.iso8601 } }
-      allow(TrackGraduation::Evidence).to receive(:for).and_wrap_original do |original, *args|
-        User.find(user.id).update_column(:track_evidence_cutoffs, concurrent)
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
+        User.find(user.id).update_column(:level_suggestion_cutoffs, concurrent)
         original.call(*args)
       end
 
       dismiss([ "pattern" ])
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_evidence_cutoffs).to eq(
+      expect(user.reload.level_suggestion_cutoffs).to eq(
         concurrent.merge("pattern" => { "level" => "junior", "through" => Date.current.iso8601 })
       )
     end
 
     it "keeps a newer same-kind dismissal when an older evidence read finishes last" do
       user = track_user
-      reviewed_day(user, Date.current - TrackGraduation::WINDOW, { "code_review" => "junior" })
+      reviewed_day(user, Date.current - LevelSuggestion::WINDOW, { "code_review" => "junior" })
       login_as(user)
       other_tab = ActionDispatch::Integration::Session.new(Rails.application)
       other_tab.post login_path, params: { email: user.email }
       other_tab.post verify_login_code_path, params: { code: user.generate_login_code! }
       advanced = false
-      allow(TrackGraduation::Evidence).to receive(:for).and_wrap_original do |original, *args|
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
         evidence = original.call(*args)
         unless advanced
           advanced = true
           reviewed_window(user, { "code_review" => "junior" })
-          other_tab.post learning_track_dismissal_path, params: { kinds: [ "code_review" ] }.to_json, headers: json
+          other_tab.post level_suggestion_dismissal_path, params: { kinds: [ "code_review" ] }.to_json, headers: json
           expect(other_tab.response).to have_http_status(:ok)
-          expect(user.reload.track_evidence_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
+          expect(user.reload.level_suggestion_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
         end
         evidence
       end
@@ -428,8 +475,8 @@ RSpec.describe "Learning track proposals", type: :request do
 
       expect(response).to have_http_status(:ok)
       aggregate_failures do
-        expect(user.reload.track_evidence_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
-        expect(TrackGraduation.for(user)).to be_nil
+        expect(user.reload.level_suggestion_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
+        expect(LevelSuggestion.for(user)).to be_nil
       end
     end
 
@@ -442,21 +489,21 @@ RSpec.describe "Learning track proposals", type: :request do
       dismiss([ "pattern" ])
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_evidence_cutoffs["pattern"]).to eq(
+      expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq(
         "level" => "senior", "through" => Date.current.iso8601
       )
     end
 
     it "advances an older cutoff at the same level" do
       user = track_user
-      user.update!(track_evidence_cutoffs: { "pattern" => { "level" => "junior", "through" => "2026-10-12" } })
+      user.update!(level_suggestion_cutoffs: { "pattern" => { "level" => "junior", "through" => "2026-10-12" } })
       reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
       login_as(user)
 
       dismiss([ "pattern" ])
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_evidence_cutoffs["pattern"]).to eq("level" => "junior", "through" => "2026-10-13")
+      expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq("level" => "junior", "through" => "2026-10-13")
     end
 
     [ nil, "junk", [], {}, { "through" => "2099-01-01" }, { "level" => "junior" },
@@ -465,30 +512,30 @@ RSpec.describe "Learning track proposals", type: :request do
       { "level" => "senior", "through" => "2099-01-01" } ].each do |entry|
       it "replaces an inapplicable historical cutoff #{entry.inspect}" do
         user = track_user
-        user.update!(track_evidence_cutoffs: { "pattern" => entry })
+        user.update!(level_suggestion_cutoffs: { "pattern" => entry })
         reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
         login_as(user)
 
         dismiss([ "pattern" ])
 
         expect(response).to have_http_status(:ok)
-        expect(user.reload.track_evidence_cutoffs["pattern"]).to eq("level" => "junior", "through" => "2026-10-13")
+        expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq("level" => "junior", "through" => "2026-10-13")
       end
     end
 
-    it "rechecks membership after another request leaves the track" do
+    it "still sets aside a kind after another request leaves the track" do
       user = track_user
       login_as(user)
-      allow(TrackGraduation::Evidence).to receive(:for).and_wrap_original do |original, *args|
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
         User.find(user.id).update!(learning_track: "none")
         original.call(*args)
       end
 
       dismiss([ "pattern" ])
 
-      expect(response).to have_http_status(:not_found)
+      expect(response).to have_http_status(:ok)
       expect(user.reload.learning_track).to eq("none")
-      expect(user.track_evidence_cutoffs).to eq({})
+      expect(user.level_suggestion_cutoffs["pattern"]).to include("level" => "junior")
     end
 
     it "uses a target another request changed before taking the lock" do
@@ -496,7 +543,7 @@ RSpec.describe "Learning track proposals", type: :request do
       reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
       login_as(user)
       changed = false
-      allow(TrackGraduation::Evidence).to receive(:for).and_wrap_original do |original, *args|
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
         unless changed
           changed = true
           fresh = User.find(user.id)
@@ -508,8 +555,22 @@ RSpec.describe "Learning track proposals", type: :request do
       dismiss([ "pattern" ])
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.track_evidence_cutoffs.dig("pattern", "level")).to eq("senior")
-      expect(user.track_evidence_cutoffs.dig("pattern", "through")).to eq(Date.current.iso8601)
+      expect(user.reload.level_suggestion_cutoffs.dig("pattern", "level")).to eq("senior")
+      expect(user.level_suggestion_cutoffs.dig("pattern", "through")).to eq(Date.current.iso8601)
+    end
+
+    it "rechecks the rung after another request changes the skill level" do
+      user = create_user_with_key
+      login_as(user)
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
+        User.find(user.id).update!(skill_level: "principal_engineer")
+        original.call(*args)
+      end
+
+      dismiss([ "pattern" ])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
     end
   end
 end

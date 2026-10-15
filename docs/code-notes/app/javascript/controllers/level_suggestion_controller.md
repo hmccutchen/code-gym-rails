@@ -1,9 +1,19 @@
-# app/javascript/controllers/track_proposal_controller.js
+# app/javascript/controllers/level_suggestion_controller.js
 
 ## What it owns
 
-The dashboard's learning-track proposal: applying the proposed levels,
-removing kinds from a card that lists several, and dismissing the whole thing.
+The dashboard's level suggestion card, for every account: applying the
+proposed levels, removing kinds from a card that lists several, and
+dismissing the whole thing.
+
+## Each request carries the moves the card showed
+
+Apply sends `level_suggestion_steps` and a dismissal sends `steps`: each
+listed kind with the rung it was shown at (`data-from`) and the rung offered
+(`data-to`). The server compares `from` with the stored rung under the row
+lock. A skill-level change bumps no preference version, so this is what lets
+the server see that a card is stale, and it also decides which event rows are
+labelled `suggestion`.
 
 ## Two writes, not one transaction
 
@@ -20,8 +30,8 @@ why its failure text says the choice was saved.
 
 ## A conflict reloads; a hung save does not
 
-A 409 means the stored version moved, so the page is out of date and must be
-read again. Reloading over an unfinished save would lose it, so
+A 409 means the stored version or a shown rung moved, so the page is out of
+date and must be read again. Apply and Not now both handle it this way. Reloading over an unfinished save would lose it, so
 `reloadWhenSaved` polls `saveStatus.pending()` first. Past ten seconds it
 stops polling and offers a reload button instead, so a refused proposal can
 never leave the page stuck with no way forward.

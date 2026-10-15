@@ -3,24 +3,11 @@ import { Controller } from "@hotwired/stimulus"
 import saveStatus from "code_gym/save_status"
 
 export default class extends Controller {
-  static targets = ["suggestions", "leaveButton"]
+  static targets = ["leaveButton"]
 
   static values = {
     url: String,
     leftText: String
-  }
-
-  connect() {
-    this.savedSuggestions = this.suggestionsTarget.defaultChecked
-    if (this.suggestionsTarget.checked !== this.savedSuggestions) this.toggleSuggestions()
-  }
-
-  async toggleSuggestions() {
-    const wanted = this.suggestionsTarget.checked
-    const result = await saveStatus.queue("track_suggestions", "PATCH", this.urlValue,
-                                          { user: { track_suggestions: wanted } })
-    if (result.ok) this.savedSuggestions = wanted
-    if (!saveStatus.queued("track_suggestions")) this.suggestionsTarget.checked = this.savedSuggestions
   }
 
   async leave() {

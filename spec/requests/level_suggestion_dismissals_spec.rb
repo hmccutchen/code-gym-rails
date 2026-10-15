@@ -11,7 +11,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
   def dismiss(kinds, **extra)
-    post learning_track_dismissal_path, params: { kinds: kinds, **extra }.to_json, headers: json
+    post level_suggestion_dismissal_path, params: { kinds: kinds, **extra }.to_json, headers: json
   end
 
   it "records a Not now with the offered move and the evidence behind it when no reason is sent" do
@@ -40,13 +40,13 @@ RSpec.describe "Learning track dismissal events", type: :request do
 
   it "counts the evidence before this dismissal's cutoff" do
     reviewed_level_days(user, "code_review", "junior", 2, ending: Date.current - 1)
-    user.update!(track_evidence_cutoffs: { "code_review" => { "level" => "junior", "through" => (Date.current - 2).iso8601 } })
+    user.update!(level_suggestion_cutoffs: { "code_review" => { "level" => "junior", "through" => (Date.current - 2).iso8601 } })
     login_as(user)
 
     dismiss([ "code_review" ])
 
     expect(user.level_suggestion_events.sole.window_size).to eq(1)
-    expect(user.reload.track_evidence_cutoffs["code_review"]["through"]).to eq((Date.current - 1).iso8601)
+    expect(user.reload.level_suggestion_cutoffs["code_review"]["through"]).to eq((Date.current - 1).iso8601)
   end
 
   it "writes no second row when the same Not now is sent again with no newer results" do
@@ -72,7 +72,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
     expect(user.level_suggestion_events.order(:id).pluck(:newest_result_on)).to eq(
       [ Date.current - 2, Date.current - 1 ]
     )
-    expect(user.reload.track_evidence_cutoffs["code_review"]["through"]).to eq((Date.current - 1).iso8601)
+    expect(user.reload.level_suggestion_cutoffs["code_review"]["through"]).to eq((Date.current - 1).iso8601)
   end
 
   [ "later", "", [ "not_now" ] ].each do |reason|
@@ -83,7 +83,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(user.level_suggestion_events).to be_empty
-      expect(user.reload.track_evidence_cutoffs).to eq({})
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
     end
   end
 
@@ -95,7 +95,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
     dismiss([ "pattern" ])
 
     expect(response).to have_http_status(:ok)
-    expect(user.reload.track_evidence_cutoffs["pattern"]).to eq(
+    expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq(
       "level" => "mid_level", "through" => Date.current.iso8601
     )
     expect(user.level_suggestion_events.where(action: "dismissed").sole.from_level).to eq("mid_level")
@@ -116,7 +116,30 @@ RSpec.describe "Learning track dismissal events", type: :request do
     login_as(user)
 
     expect { get root_path }.not_to change(LevelSuggestionEvent, :count)
-    expect(Nokogiri::HTML(response.body).at_css("#track-proposal")).to be_present
-    expect(user.reload.track_evidence_cutoffs).to eq({})
+    expect(Nokogiri::HTML(response.body).at_css("#level-suggestion")).to be_present
+    expect(user.reload.level_suggestion_cutoffs).to eq({})
+  end
+
+  describe "a refused write" do
+    it "builds a valid row for every kind and reason" do
+      ExerciseSection.keys.each do |kind|
+        %w[dismissed removed].each do |action|
+          rows = LevelSuggestionEvent.dismissal_rows(user, kinds: [ kind ], action: action, results: {})
+          expect(rows.map { |row| user.level_suggestion_events.build(row) }).to all(be_valid)
+        end
+      end
+    end
+
+    it "answers 422 and writes nothing when the user row no longer validates" do
+      login_as(user)
+      user.update_column(:skill_level, "developing")
+
+      dismiss([ "code_review" ])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to include("status" => "error")
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
+      expect(user.level_suggestion_events).to be_empty
+    end
   end
 end

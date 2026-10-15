@@ -51,8 +51,10 @@ Rails.application.routes.draw do
 
   patch "profile", to: "profile#update", as: :profile
 
-  post "learning_track/dismissal", to: "learning_track_dismissals#create", as: :learning_track_dismissal
-  post "learning_track/answer", to: "learning_track_answers#create", as: :learning_track_answer
+  post "level_suggestion/dismissal", to: "level_suggestion_dismissals#create", as: :level_suggestion_dismissal
+  post "level_suggestion/answer", to: "level_suggestion_answers#create", as: :level_suggestion_answer
+  post "learning_track/dismissal", to: "level_suggestion_dismissals#create"
+  post "learning_track/answer", to: "level_suggestion_answers#create"
 
   post "regenerate", to: "daily_exercises#regenerate"
 
