@@ -122,6 +122,22 @@ RSpec.describe User, "level changes", type: :model do
       expect(user.reload.level_suggestion_cutoffs).to eq({})
     end
 
+    it "keeps results from an earlier stay at the new skill level out of the evidence" do
+      reviewed_level_days(user, "code_review", "mid_level", 5, ending: local_today - 10)
+
+      user.update!(skill_level: "mid_level")
+
+      expect(LevelSuggestion.for(user.reload)).to be_nil
+    end
+
+    it "writes nothing for a new account" do
+      created = User.create!(email: "new@example.com", name: "New", skill_level: "senior",
+                             section_kind_levels: { "pattern" => "mid_level" })
+
+      expect(created.reload.level_suggestion_cutoffs).to eq({})
+      expect(created.level_suggestion_events).to be_empty
+    end
+
     it "records nothing for the first-run choice that sets the skill level" do
       account = create_user_with_key(learning_track: nil)
 

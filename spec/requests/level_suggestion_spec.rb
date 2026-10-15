@@ -558,5 +558,19 @@ RSpec.describe "Learning track proposals", type: :request do
       expect(user.reload.level_suggestion_cutoffs.dig("pattern", "level")).to eq("senior")
       expect(user.level_suggestion_cutoffs.dig("pattern", "through")).to eq(Date.current.iso8601)
     end
+
+    it "rechecks the rung after another request changes the skill level" do
+      user = create_user_with_key
+      login_as(user)
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
+        User.find(user.id).update!(skill_level: "principal_engineer")
+        original.call(*args)
+      end
+
+      dismiss([ "pattern" ])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.level_suggestion_cutoffs).to eq({})
+    end
   end
 end

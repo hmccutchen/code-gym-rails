@@ -1709,7 +1709,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   profile's prompt line and the rung of every kind without its own target
   (`KindDifficulty#rung_for`); scenario settings do not depend on it.
   Joining the junior track sets it to `junior`; nothing else changes it
-  automatically, and daily ratings still nudge each set around it. It is not
+  automatically, and daily ratings still nudge each set around it. A level
+  suggestion's Apply adds a target instead, so the setting stays where the
+  user put it, which Setup's hint says. A change records a suggestion cutoff
+  and a `skill_level_edit` event row for every untargeted kind it moves,
+  under the user-row lock. It is not
   part of the Exercise mix, so it does not bump
   `section_kind_preferences_version`. The Exercise
   mix's default options name the stored level by its label and are renamed
