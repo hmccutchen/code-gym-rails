@@ -1,6 +1,6 @@
 # Level suggestions for every account (PR 2)
 
-Plan only. Read on `origin/main` at **cfcc234** (#390 merged). #391 is **open, not merged**; its head `e92a052` was read for the parts this plan touches.
+Plan only. Read on `origin/main` at **bcbfad6**, with #390 and #391 both merged. #391 merged with the same tree as the head `e92a052` this plan was first read against, and every claim below was re-checked on bcbfad6.
 
 This plan follows `2026-10-14-level-suggestions.md` ("PR 2" and "Changes requested at review") except where the request for this PR overrides it. Every claim is marked **Verified** (read in the code or fixtures named) or **Inferred** (follows from what was read, but not run).
 
@@ -14,7 +14,7 @@ This plan follows `2026-10-14-level-suggestions.md` ("PR 2" and "Changes request
 
 ## Starting conditions
 
-1. **#391 must merge first (decision A).** Its welcome view already renders the level step from `TrackGraduation::LADDER` (**Verified**, `app/views/welcome/show.html.erb` at `e92a052`), and the rename below changes that constant's name. Starting before it merges means a conflict in the welcome view, the profile controller and all five page snapshots.
+1. **#391 has merged (bcbfad6).** Its welcome view renders the level step from `TrackGraduation::LADDER` (**Verified**, `app/views/welcome/show.html.erb:36`), and `TRACK_CHOICE_KEYS[OFF]` now allows `skill_level` (**Verified**, `profile_controller.rb:163`). The rename below changes the welcome view's constant, and #391's `welcome_spec.rb` and `profile_learning_track_spec.rb` move with it.
 2. **There is no `WelcomeController::STARTING_LEVELS` to replace (Verified).** #391 reads the ladder constant directly, so the welcome levels and the suggestion ladder are already one list. The rename commit changes that one reference to `LevelSuggestion::LADDER`; a spec pins that the welcome step offers exactly `LevelSuggestion::LADDER`.
 3. **The Experienced hint is not touched.** #391 replaced it.
 
@@ -84,7 +84,7 @@ end
 ```
 
 - `User.ignored_columns += %w[track_suggestions track_evidence_cutoffs]`, the `api_key` precedent (`f63594b`, **Verified**). A later PR drops them.
-- `track_proposals_answered` keeps its name (decision F). Only `User`, the answer controller and the card read it.
+- `track_proposals_answered` keeps its name (decision E). Only `User`, the answer controller and the card read it.
 - The backfill copies every row, so an account that turned suggestions off on the track stays off, and every other account reads `true`, the column's default.
 
 **Rollback.**
@@ -120,7 +120,7 @@ The card's Apply is guarded by `section_kind_preferences_version`, but a skill-l
 
 This only exists once untargeted kinds get suggestions, so it belongs to this PR. The fix is the same request as the event-labelling fix below.
 
-### Event accuracy (decision B): the card posts what it showed
+### Event accuracy (decision A): the card posts what it showed
 
 **Recommended: the card posts the steps it displayed, and the server checks them under the row lock.** Documenting the limits instead would leave the stale-card bug above in place.
 
@@ -145,7 +145,7 @@ Trust: a client can still post a step that matches a real adjacent move and labe
 
 Cost of the change: the server no longer recomputes a proposal on every level-changing save. It still runs the evidence query once for the counts.
 
-### Skill-level changes write event rows (decision C)
+### Skill-level changes write event rows (decision B)
 
 A skill-level change can move up to ten untargeted kinds. **Recommended:** one `applied` row per kind whose rung moved, `source: setup_edit`, so later "stuck" analysis sees every rung change, however it was made. The alternative is no rows for skill-level changes, which would leave gaps in exactly the accounts this PR adds.
 
@@ -167,7 +167,7 @@ A skill-level change can move up to ten untargeted kinds. **Recommended:** one `
 ### Setup
 
 - **The switch** moves out of `api_keys/_learning_track` to the top of the Exercise mix, for every account, with id `level-suggestions`. It gets its own small Stimulus controller, `level-suggestions-switch`, holding the `toggleSuggestions` code that `learning_track_controller.js` has now. The Exercise mix controller owns the versioned preference save, and this switch doesn't bump the version, so keeping them apart keeps the 409 logic unchanged.
-- **Reaching it from the card (decision D).** The Exercise mix is a closed `<details>`. Whether a fragment link opens a closed `<details>` varies by browser (**Inferred**). The card's "Turn these suggestions off in Setup" link adds `?show=level_suggestions`, and Setup renders the mix `open` for it, as it already does for `suggested[]`.
+- **Reaching it from the card (decision C).** The Exercise mix is a closed `<details>`. Whether a fragment link opens a closed `<details>` varies by browser (**Inferred**). The card's "Turn these suggestions off in Setup" link adds `?show=level_suggestions`, and Setup renders the mix `open` for it, as it already does for `suggested[]`.
 - `_learning_track` keeps the on-track line and Leave, with copy that no longer ties suggestions to the track (below).
 
 ### Performance
@@ -235,13 +235,13 @@ TDD per piece; the scoped spec during each step, the unit suite at the end, then
 
 ## Snapshot counts
 
-Counted by reading the fixtures on cfcc234. Final numbers are confirmed by running after #391 merges, since #391 re-records all five pages too.
+Counted by reading the fixtures on bcbfad6, which carry #391's re-recorded pages. Final numbers are confirmed by running.
 
 - **Prompt snapshots: 0 of 72.** No prompt code changes. **Verified:** no file in `spec/fixtures/prompt_snapshots` mentions suggestions, tracks or cutoffs. **Inferred:** the run will match.
 - **Request snapshots: 0 of 15.** Same reasoning and check, on `spec/fixtures/request_snapshots`.
 - **Page snapshots: 5 of 5**, which differs from the original plan's 1 of 5.
   - **All five, importmap only (Verified):** every page lists every Stimulus controller with its digest, and all five list `track_proposal_controller` and `learning_track_controller` (lines 37/51 and 76/90; 38/52 and 77/91 in `setup.html`). Renaming one, editing the other, and adding `level_suggestions_switch_controller` changes the import map and preload lines on every page.
-  - **`setup.html` also changes in its body:** the switch inside the Exercise mix and the skill-level hint (line 654).
+  - **`setup.html` also changes in its body:** the switch inside the Exercise mix and the skill-level hint (line 660).
   - **`dashboard_submitted.html` keeps its body (Inferred):** the snapshot's review has no rubric stamp and its sections no `pitched_at` (**Verified**, `existing_account_pages_spec.rb:25-46`), so there is no evidence and no card.
   - `account`, `history` and `dashboard_unsubmitted` change only in the import map.
 
@@ -267,7 +267,7 @@ About 55.
 
 - **Renamed (with specs and code notes):** `app/services/track_graduation.rb`, `track_graduation/evidence.rb`, both dismissal and answer controllers, `dashboard/_track_proposal.html.erb`, `track_proposal_controller.js`, `spec/services/track_graduation_spec.rb`, `track_graduation/evidence_spec.rb`, `spec/requests/track_proposal_spec.rb`, `track_suggestion_controls_spec.rb`, `learning_track_dismissals_spec.rb`, `spec/system/track_proposal_spec.rb`, `track_suggestion_controls_spec.rb`, `learning_track_isolation_spec.rb`.
 - **New:** the migration and its spec, `level_suggestions_switch_controller.js` and its code note, `spec/requests/level_suggestion_legacy_paths_spec.rb`.
-- **Edited:** `app/models/user.rb`, `learning_track.rb`, `level_suggestion_event.rb`, `profile_controller.rb`, `api_keys_controller.rb`, `dashboard_controller.rb`, `config/routes.rb`, `config/locales/en.yml`, `api_keys/edit.html.erb`, `api_keys/_learning_track.html.erb`, `dashboard/_exercise.html.erb`, `welcome/show.html.erb` (one constant), `learning_track_controller.js`, `exercise_mix_controller.js`, `db/schema.rb`, `spec/models/user_level_changes_spec.rb`, `user_learning_track_spec.rb`, `level_suggestion_event_spec.rb`, `spec/db/one_result_per_kind_per_day_spec.rb`, `spec/requests/profile_learning_track_spec.rb`, `security_audit/cross_user_access_spec.rb`, the 5 page snapshots, `CLAUDE.md`, and code notes for `user`, `level_suggestion_event`, `profile_controller`, `system_test_helper`.
+- **Edited:** `app/models/user.rb`, `learning_track.rb`, `level_suggestion_event.rb`, `profile_controller.rb`, `api_keys_controller.rb`, `dashboard_controller.rb`, `config/routes.rb`, `config/locales/en.yml`, `api_keys/edit.html.erb`, `api_keys/_learning_track.html.erb`, `dashboard/_exercise.html.erb`, `welcome/show.html.erb` (one constant), `spec/requests/welcome_spec.rb`, `learning_track_controller.js`, `exercise_mix_controller.js`, `db/schema.rb`, `spec/models/user_level_changes_spec.rb`, `user_learning_track_spec.rb`, `level_suggestion_event_spec.rb`, `spec/db/one_result_per_kind_per_day_spec.rb`, `spec/requests/profile_learning_track_spec.rb`, `security_audit/cross_user_access_spec.rb`, the 5 page snapshots, `CLAUDE.md`, and code notes for `user`, `level_suggestion_event`, `profile_controller`, `system_test_helper`.
 
 ## Riskiest piece
 
@@ -277,9 +277,8 @@ Second: `ignored_columns`. Anything still assigning a `track_*` column raises at
 
 ## Decisions for you (recommendation first)
 
-- **A. Order.** Wait for #391 to merge, then branch from the new main. Alternative: start now and rebase, which conflicts in the welcome view, the profile controller and all five page snapshots.
-- **B. Event accuracy.** The card and Setup post the steps they showed, and the server checks them under the lock. This also fixes the stale-card step-down. Alternative: document the three limits in the code note and leave the stale-card bug open.
-- **C. Skill-level changes in the event table.** One `setup_edit` row per kind whose rung moved. Alternatives: no rows, or a new `source: skill_level`.
-- **D. Card link to the switch.** `?show=level_suggestions` opens the Exercise mix. Alternative: a fragment link alone, which may land on a closed `<details>`.
-- **E. Leave the track.** Keep it, with the hint saying suggestions continue. After this PR it changes only Setup's on-track line and the key guide; removing it is a separate decision.
-- **F. `track_proposals_answered`.** Keep the name in this PR; rename it with the column drop if you want the names to match.
+- **A. Event accuracy.** The card and Setup post the steps they showed, and the server checks them under the lock. This also fixes the stale-card step-down. Alternative: document the three limits in the code note and leave the stale-card bug open.
+- **B. Skill-level changes in the event table.** One `setup_edit` row per kind whose rung moved. Alternatives: no rows, or a new `source: skill_level`.
+- **C. Card link to the switch.** `?show=level_suggestions` opens the Exercise mix. Alternative: a fragment link alone, which may land on a closed `<details>`.
+- **D. Leave the track.** Keep it, with the hint saying suggestions continue. After this PR it changes only Setup's on-track line and the key guide; removing it is a separate decision.
+- **E. `track_proposals_answered`.** Keep the name in this PR; rename it with the column drop if you want the names to match.
