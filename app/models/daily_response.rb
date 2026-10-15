@@ -40,6 +40,11 @@ class DailyResponse < ApplicationRecord
     SELF_RATINGS.index_with { |rating| I18n.t("self_ratings.#{rating}") }
   end
 
+  def self.answered_kinds_for(user)
+    submitted.where(user: user).where("jsonb_typeof(section_ratings) = 'object'")
+             .distinct.pluck(Arel.sql("jsonb_object_keys(section_ratings)")).to_set
+  end
+
   def self.review_points(value)
     case value
     when Array then value.map { |v| v.to_s.strip }.reject(&:blank?)

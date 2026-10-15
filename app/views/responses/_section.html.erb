@@ -10,6 +10,9 @@
     <span class="section-status" data-status-for="<%= key %>"><%= section_status(response, key) %></span>
   <% end %>
   </summary>
+  <% if !submitted && kind_about_on_form?(key) %>
+    <%= render "responses/kind_about", key: key %>
+  <% end %>
   <% if data["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(data["scenario"]) %></div><% end %>
   <div class="question"><%= glossary_wrap(data["question"]) %></div>
 

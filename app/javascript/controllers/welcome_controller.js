@@ -3,7 +3,7 @@ import { Controller } from "@hotwired/stimulus"
 import saveStatus from "code_gym/save_status"
 
 export default class extends Controller {
-  static targets = ["choice"]
+  static targets = ["choice", "experienced", "trackStep", "levelStep", "levelHeading"]
 
   static values = {
     url: String,
@@ -13,9 +13,7 @@ export default class extends Controller {
     version: Number
   }
 
-  userFor(choice) {
-    if (choice !== "junior") return { learning_track: "none" }
-
+  juniorTrack() {
     return { learning_track: "junior",
              section_kind_levels: this.presetValue,
              skill_level: this.skillLevelValue,
@@ -26,12 +24,35 @@ export default class extends Controller {
     this.choiceTargets.forEach((button) => { button.disabled = busy })
   }
 
-  async choose(event) {
+  showLevels() {
+    this.trackStepTarget.hidden = true
+    this.levelStepTarget.hidden = false
+    this.levelHeadingTarget.focus()
+  }
+
+  back() {
+    this.levelStepTarget.hidden = true
+    this.trackStepTarget.hidden = false
+    this.experiencedTarget.focus()
+  }
+
+  choose(event) {
+    this.save(this.juniorTrack(), event.currentTarget)
+  }
+
+  chooseLevel(event) {
+    this.save({ learning_track: "none", skill_level: event.currentTarget.dataset.level }, event.currentTarget)
+  }
+
+  async save(user, pressed) {
     this.setBusy(true)
-    const user = this.userFor(event.currentTarget.dataset.track)
     const result = await saveStatus.save("PATCH", this.urlValue, { user }, "learning_track")
 
-    if (result && result.ok) window.location = this.setupUrlValue
-    else this.setBusy(false)
+    if (result && result.ok) {
+      window.location = this.setupUrlValue
+    } else {
+      this.setBusy(false)
+      pressed.focus()
+    }
   }
 }

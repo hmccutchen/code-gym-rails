@@ -1,8 +1,11 @@
 <style>
   .welcome-wrap { max-width: 480px; margin: 5rem auto; }
   .welcome-wrap h1 { margin-bottom: .5rem; }
+  .welcome-wrap h2 { font-size: 1.1rem; margin: 0 0 .5rem; }
+  .welcome-wrap h2:focus { outline: none; }
   .welcome-choice { display: block; width: 100%; text-align: left; margin-top: 1rem; }
   .welcome-choice .hint { display: block; font-size: .8rem; color: var(--muted); margin-top: .3rem; font-weight: normal; }
+  .welcome-back { margin-top: 1.25rem; }
 </style>
 
 <div class="welcome-wrap" id="welcome" data-controller="welcome"
@@ -12,17 +15,33 @@
      data-welcome-skill-level-value="<%= LearningTrack::START_SKILL_LEVEL %>"
      data-welcome-version-value="<%= current_user.section_kind_preferences_version %>">
   <h1><%= t("learning_track.welcome.title") %></h1>
-  <p><%= t("learning_track.welcome.question") %></p>
 
-  <button type="button" class="btn btn-primary welcome-choice" data-track="junior"
-          data-welcome-target="choice" data-action="click->welcome#choose">
-    <%= t("learning_track.welcome.junior") %>
-    <span class="hint"><%= t("learning_track.welcome.junior_hint") %></span>
-  </button>
-  <button type="button" class="btn btn-ghost welcome-choice" data-track="none"
-          data-welcome-target="choice" data-action="click->welcome#choose">
-    <%= t("learning_track.welcome.experienced") %>
-    <span class="hint"><%= t("learning_track.welcome.experienced_hint") %></span>
-  </button>
+  <div data-welcome-target="trackStep">
+    <p><%= t("learning_track.welcome.question") %></p>
+
+    <button type="button" class="btn btn-primary welcome-choice" data-track="junior"
+            data-welcome-target="choice" data-action="click->welcome#choose">
+      <%= t("learning_track.welcome.junior") %>
+      <span class="hint"><%= t("learning_track.welcome.junior_hint") %></span>
+    </button>
+    <button type="button" class="btn btn-ghost welcome-choice" data-track="none"
+            data-welcome-target="choice experienced" data-action="click->welcome#showLevels">
+      <%= t("learning_track.welcome.experienced") %>
+      <span class="hint"><%= t("learning_track.welcome.experienced_hint") %></span>
+    </button>
+  </div>
+
+  <section data-welcome-target="levelStep" aria-labelledby="welcome-level-title" hidden>
+    <h2 id="welcome-level-title" tabindex="-1" data-welcome-target="levelHeading"><%= t("learning_track.welcome.level_title") %></h2>
+    <% TrackGraduation::LADDER.each do |level| %>
+      <button type="button" class="btn btn-ghost welcome-choice" data-level="<%= level %>"
+              data-welcome-target="choice" data-action="click->welcome#chooseLevel">
+        <%= t("exercise_mix.levels.#{level}") %>
+        <span class="hint"><%= t("learning_track.welcome.level_hints.#{level}") %></span>
+      </button>
+    <% end %>
+    <button type="button" class="btn btn-sm welcome-back" data-welcome-target="choice" data-action="click->welcome#back">
+      <%= t("learning_track.welcome.back") %>
+    </button>
+  </section>
 </div>
-

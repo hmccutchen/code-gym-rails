@@ -24,7 +24,13 @@ en:
       junior: "Early in my career"
       junior_hint: "Exercises start at a junior level. As your reviews show you're ready, Code Gym suggests moving each kind of exercise up. You decide each time."
       experienced: "Experienced"
-      experienced_hint: "Exercises follow the regular difficulty. You can change difficulty per section later in Setup."
+      experienced_hint: "Pick the level your exercises start at next. Setup lets you change it any time, or set a level for each kind of section."
+      level_title: "Where should your exercises start?"
+      level_hints:
+        junior: "Experienced, but new to this language or stack, or want an easier start."
+        mid_level: "A few years in, and comfortable shipping features on your own."
+        senior: "You review other people's work and weigh tradeoffs often."
+      back: "Back"
     setup:
       on_track: "You're on the junior track. Code Gym suggests moving each kind of exercise up as your reviews show you're ready."
       leave: "Leave the track"
@@ -594,6 +600,9 @@ en:
       label: "%{slot} — %{name}"
       titled_label: "%{slot} — %{name}: %{title}"
       featured: "This week's concept"
+    kind_about:
+      summary: "About %{name}"
+      example_label: "Example:"
     answered:
       skipped: "(skipped)"
     section_status:

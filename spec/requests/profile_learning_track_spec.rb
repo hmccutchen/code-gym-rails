@@ -49,6 +49,33 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(response.parsed_body).to eq("name" => user.name, "time_zone" => "UTC", "daily_section_count" => nil)
     end
 
+    TrackGraduation::LADDER.each do |level|
+      it "records Experienced with the starting level #{level} and changes nothing else" do
+        original = user.reload.attributes.except("learning_track", "skill_level", "updated_at")
+
+        patch_profile(learning_track: "none", skill_level: level)
+
+        expect(response).to have_http_status(:ok)
+        user.reload
+        expect(user.learning_track).to eq("none")
+        expect(user.skill_level).to eq(level)
+        expect(user.attributes.except("learning_track", "skill_level", "updated_at")).to eq(original)
+        expect(user.level_suggestion_events).to be_empty
+        expect(user.first_run?).to be(false)
+      end
+    end
+
+    [ "beginner", "", nil, [ "senior" ] ].each do |value|
+      it "refuses Experienced with the skill level #{value.inspect}, saving nothing" do
+        original = user.reload.attributes
+
+        patch_profile(learning_track: "none", skill_level: value)
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(user.reload.attributes).to eq(original)
+      end
+    end
+
     it "refuses Junior without levels, saving nothing" do
       original = user.reload.attributes
 
@@ -228,6 +255,15 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(user.reload.learning_track).to eq("none")
       expect(user.section_kind_levels).to eq(LearningTrack.preset_levels)
       expect(user.attributes.except("learning_track", "updated_at")).to eq(original)
+    end
+
+    it "lets a Leave carry a skill level, which Setup could save on its own anyway" do
+      patch_profile(learning_track: "none", skill_level: "senior")
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.learning_track).to eq("none")
+      expect(user.skill_level).to eq("senior")
+      expect(user.section_kind_levels).to eq(LearningTrack.preset_levels)
     end
 
     it "refuses a Leave carrying other preferences, keeping the targets" do

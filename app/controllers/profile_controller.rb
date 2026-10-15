@@ -160,7 +160,7 @@ class ProfileController < ApplicationController
 
   TRACK_CHOICE_KEYS = {
     LearningTrack::ON  => %w[learning_track section_kind_levels skill_level section_kind_preferences_version],
-    LearningTrack::OFF => %w[learning_track]
+    LearningTrack::OFF => %w[learning_track skill_level]
   }.freeze
 
   def invalid_learning_track_change?(user_params)

@@ -49,7 +49,7 @@
     "controllers/review_button_controller": "/assets/controllers/review_button_controller-ce9f39dc.js",
     "controllers/time_zone_controller": "/assets/controllers/time_zone_controller-fb4f59c6.js",
     "controllers/track_proposal_controller": "/assets/controllers/track_proposal_controller-ee1639d8.js",
-    "controllers/welcome_controller": "/assets/controllers/welcome_controller-8f0cff0e.js",
+    "controllers/welcome_controller": "/assets/controllers/welcome_controller-541185ac.js",
     "controllers/write_up_control_controller": "/assets/controllers/write_up_control_controller-72a41eea.js",
     "code_gym/draft_store": "/assets/code_gym/draft_store-92a05e50.js",
     "code_gym/push": "/assets/code_gym/push-195f00c5.js",
@@ -88,7 +88,7 @@
 <link rel="modulepreload" href="/assets/controllers/review_button_controller-ce9f39dc.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/time_zone_controller-fb4f59c6.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/track_proposal_controller-ee1639d8.js" nonce="NONCE">
-<link rel="modulepreload" href="/assets/controllers/welcome_controller-8f0cff0e.js" nonce="NONCE">
+<link rel="modulepreload" href="/assets/controllers/welcome_controller-541185ac.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/write_up_control_controller-72a41eea.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/code_gym/draft_store-92a05e50.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/code_gym/push-195f00c5.js" nonce="NONCE">
@@ -306,10 +306,10 @@
     .section-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--slot-accent, var(--accent-text)); margin-bottom: .95rem; }
     details.section > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
     details.section > summary::-webkit-details-marker { display: none; }
-    details.section > summary::before, details.ref summary::before, details.hint summary::before,
+    details.section > summary::before, details.ref summary::before, details.hint summary::before, details.kind-about summary::before,
     details.review summary::before, details.answers summary::before, details.progress-group summary::before { content: ""; display: inline-block; flex-shrink: 0; width: .45rem; height: .45rem; margin-inline: .1rem .5rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-25%) rotate(45deg); transition: transform .2s; }
     details.section > summary::before { align-self: center; margin-inline-end: .15rem; }
-    details.section:not([open]) > summary::before, details.ref:not([open]) summary::before, details.hint:not([open]) summary::before,
+    details.section:not([open]) > summary::before, details.ref:not([open]) summary::before, details.hint:not([open]) summary::before, details.kind-about:not([open]) summary::before,
     details.review:not([open]) summary::before, details.answers:not([open]) summary::before, details.progress-group:not([open]) summary::before { transform: rotate(-45deg); }
     details.section:not([open]) > summary { margin-bottom: 0; }
     details.section > summary { padding-block: 12.5px; margin-top: -12.5px; margin-bottom: calc(.95rem - 12.5px); }
@@ -365,6 +365,11 @@
 
     details.hint { margin-bottom: 1rem; }
     details.hint summary { cursor: pointer; font-size: .85rem; color: var(--slot-accent, var(--accent-text)); padding: .4rem 0; list-style: none; }
+    details.kind-about { margin-bottom: .9rem; }
+    details.kind-about summary { cursor: pointer; font-size: .85rem; color: var(--muted); padding: .4rem 0; min-height: 24px; list-style: none; }
+    details.kind-about summary::-webkit-details-marker { display: none; }
+    .kind-about-body { font-size: .9rem; line-height: 1.6; margin-top: .3rem; }
+    .kind-about-body p { margin: 0 0 .5rem; }
     .hint-locked { font-size: .85rem; color: var(--muted); padding: .4rem 0; margin-bottom: 1rem; }
     .hint-body { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; border-radius: 0 6px 6px 0; margin-top: .5rem; line-height: 1.6; }
 
@@ -495,7 +500,7 @@
     @media (prefers-reduced-motion: reduce) {
       .spinner, .btn-loading::before, .pull-refresh.is-refreshing .spinner { animation: none; }
       .pull-refresh.is-settling, .pull-settling { transition: none; }
-      nav .nav-links a, .btn, details.section > summary::before, details.ref summary::before, details.hint summary::before,
+      nav .nav-links a, .btn, details.section > summary::before, details.ref summary::before, details.hint summary::before, details.kind-about summary::before,
       details.review summary::before, details.answers summary::before, details.progress-group summary::before { transition: none; }
       .btn:not(:disabled):active, .rating-btn:active { transform: none; }
     }
@@ -619,6 +624,14 @@
 </h2>
     <span class="section-status" data-status-for="code_review"></span>
   </summary>
+    <details class="kind-about" data-kind-about="code_review">
+  <summary>About Code Review</summary>
+  <div class="kind-about-body">
+    <p>Find the one problem in a short piece of code and say how you&#39;d fix it. This builds the habit of reading a change closely before you approve it.</p>
+    <p><strong>Example:</strong> You see a ten-line method from a library app that emails members about overdue books. The question asks what&#39;s wrong with it and how you&#39;d fix it. On some days the code is a test file or a database migration instead.</p>
+  </div>
+</details>
+
   
   <div class="question">Find the bug</div>
 
@@ -673,6 +686,14 @@
 </h2>
     <span class="section-status" data-status-for="pattern"></span>
   </summary>
+    <details class="kind-about" data-kind-about="pattern">
+  <summary>About Pattern of the Month</summary>
+  <div class="kind-about-body">
+    <p>This section names a design pattern and why it exists, then asks how you&#39;d apply it to a stated problem. The answer box starts with headings for the parts a full answer covers.</p>
+    <p><strong>Example:</strong> The setting is a gym log, where one button saves a workout, updates a streak and sends a message. You&#39;re asked how you&#39;d structure the work using the day&#39;s pattern, and you describe it in words.</p>
+  </div>
+</details>
+
   
   <div class="question">When?</div>
 
@@ -734,6 +755,14 @@ What would be easy to get wrong or worth testing:
 </h2>
     <span class="section-status" data-status-for="challenge"></span>
   </summary>
+    <details class="kind-about" data-kind-about="challenge">
+  <summary>About Coding Challenge</summary>
+  <div class="kind-about-body">
+    <p>Write working code for a small task the question describes. Some days you start from a skeleton, and other days from an empty box.</p>
+    <p><strong>Example:</strong> The task is a method that sorts a shopping list by aisle, with a sentence saying what it should return. You write the method in the answer box.</p>
+  </div>
+</details>
+
   
   <div class="question">Implement X</div>
 

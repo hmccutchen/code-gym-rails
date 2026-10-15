@@ -23,6 +23,11 @@ RSpec.describe HandWrittenLearnText do
     phrases.select { |phrase| normalized.include?(phrase) }
   end
 
+  # Stricter than the standard's "rare emphasis": static reference text never needs one.
+  def self.exclamation?(text)
+    text.include?("!")
+  end
+
   def self.same_opening?(text)
     openings = sentences(text).map { |sentence| opening_word(sentence) }
     openings.size > 1 && openings.uniq.size == 1
@@ -49,6 +54,11 @@ RSpec.describe HandWrittenLearnText do
       expect(self.class.same_opening?("You open the file. The name says enough.")).to be(false)
     end
 
+    it "catch an exclamation point and pass a plain sentence" do
+      expect(self.class.exclamation?("Fix the cache!")).to be(true)
+      expect(self.class.exclamation?("Fix the cache.")).to be(false)
+    end
+
     it "leave a single sentence alone" do
       expect(self.class.same_opening?("You open the file.")).to be(false)
     end
@@ -58,6 +68,10 @@ RSpec.describe HandWrittenLearnText do
     describe id do
       it "uses none of the standard's placeholder phrases" do
         expect(self.class.placeholder_hits(text, placeholder_phrases)).to be_empty
+      end
+
+      it "uses no exclamation point" do
+        expect(self.class.exclamation?(text)).to be(false)
       end
 
       it "does not start every sentence the same way" do

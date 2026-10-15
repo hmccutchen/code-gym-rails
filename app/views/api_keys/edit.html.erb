@@ -16,6 +16,7 @@
   .mix-group legend { font-size: .8rem; color: var(--muted); padding: 0 .35rem; }
   .mix-row { display: grid; grid-template-columns: 1fr auto; gap: .25rem .5rem; align-items: center; margin-bottom: .6rem; }
   .mix-row input[type="range"] { grid-column: 1 / -1; width: 100%; }
+  .mix-row .kind-about { grid-column: 1 / -1; margin-bottom: 0; }
   .mix-row output { font-size: .8rem; color: var(--muted); }
   .mix-row input[type="range"]:disabled { opacity: .4; }
   .mix-exclude { font-size: .8rem; color: var(--muted); }
@@ -157,6 +158,7 @@
         <div class="mix-row mix-row-fixed">
           <span><%= t("sections.#{kind.key}.name") %></span>
           <%= render "api_keys/difficulty_controls", kind: kind, excluded: false %>
+          <%= render "responses/kind_about", key: kind.key %>
         </div>
       <% end %>
     </fieldset>
@@ -166,6 +168,7 @@
         <div class="mix-row mix-row-fixed">
           <span><%= t("sections.#{kind.key}.name") %></span>
           <%= render "api_keys/difficulty_controls", kind: kind, excluded: false %>
+          <%= render "responses/kind_about", key: kind.key %>
         </div>
       </fieldset>
     <% end %>
@@ -193,6 +196,7 @@
               <%= t("exercise_mix.exclude_label") %>
             </label>
             <%= render "api_keys/difficulty_controls", kind: kind, excluded: excluded %>
+            <%= render "responses/kind_about", key: kind.key %>
           </div>
         <% end %>
 
