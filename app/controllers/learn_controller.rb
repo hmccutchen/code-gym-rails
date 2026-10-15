@@ -85,7 +85,7 @@ class LearnController < ApplicationController
 
   # POST /learn/prepare_ladders
   def prepare_ladders
-    gaps = LadderCoverage.for(current_user).gaps_for(ExerciseSection.all)
+    gaps = current_user.prepares_ladders? ? LadderCoverage.for(current_user).gaps : []
 
     gaps.each do |concept, bucket|
       GenerateConceptReferenceJob.perform_later(concept: concept, language: bucket, user_id: current_user.id, refresh: true)
@@ -114,9 +114,9 @@ class LearnController < ApplicationController
   end
 
   def ladder_targets_for(reference)
-    return [] unless reference&.guide? && !reference.ladder?
+    return [] unless current_user.prepares_ladders? && reference&.guide? && !reference.ladder?
 
-    LadderCoverage.for(current_user).grounding_kinds(ExerciseSection.all, reference.concept, reference.language)
+    LadderCoverage.for(current_user).grounding_kinds(reference.concept, reference.language)
                   .map { |kind| t("sections.#{kind.key}.name") }
   end
 

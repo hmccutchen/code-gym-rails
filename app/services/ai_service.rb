@@ -797,7 +797,7 @@ class AiService
     ingested = ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "problem set", log_raw: false),
       language: language, expected_keys: kinds.map(&:key), code_review_source: plan.code_review_source,
-      pitched_at: pitched_rungs(difficulty, user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
+      pitched_at: difficulty.rungs(skill_level: user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
     )
 
     log_unusable_sections(user, ingested.unusable_sections)
@@ -824,10 +824,6 @@ class AiService
       difficulty: difficulty, ladders: ladders }
   end
 
-  def pitched_rungs(difficulty, skill_level)
-    ExerciseSection.all.to_h { |kind| [ kind.key, difficulty.rung_for(kind, skill_level: skill_level) ] }
-  end
-
   def finish_generation(user, language, draft, set, dropped_concepts: {}, judge: nil, unhosted: [])
     plan = draft.plan
     record_suggested_concepts(draft.suggested_concepts)
@@ -851,7 +847,8 @@ class AiService
     result = call_and_log(
       user, purpose: "retry_section", read_timeout: RETRY_READ_TIMEOUT,
       system: build_system_prompt(language),
-      prompt: build_exercise_prompt(user, language, **draft.prompt_options, only: kind, fixed_concept: concept)
+      prompt: build_exercise_prompt(user, language, **draft.prompt_options.merge(ladders: retry_ladders(user, language, draft, kind)),
+                                    only: kind, fixed_concept: concept)
     )
 
     ProblemSetIngest.call(
@@ -861,6 +858,10 @@ class AiService
       pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
       eased_for: eased_concepts_for(draft.plan, draft.difficulty).slice(kind.key)
     ).problem_set[kind.key]
+  end
+
+  def retry_ladders(user, language, draft, kind)
+    ladders_for(draft.difficulty.rungs_for([ kind ], skill_level: user.skill_level), language, draft.plan.code_review_mode)
   end
 
   def normalize_optional_reference_fields!(reference)

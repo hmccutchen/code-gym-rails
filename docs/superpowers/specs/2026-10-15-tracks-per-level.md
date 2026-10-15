@@ -100,6 +100,7 @@ No migration. Rolling back the code restores the old prompts byte for byte, beca
 
 - The block's worst case measured 53,668 characters, up from 53,632, under the 54,000 bound.
 - `KindDifficulty#targeted_kinds` lost its last caller and was removed. `KindDifficulty#rungs_for(kinds, skill_level:)` is the one helper the call sites share.
+- After the critical review: ladder preparation skips kinds the user excluded (the plan can never pick them), is never offered to a trial account (`User#prepares_ladders?`, so a house key never funds a shared rewrite), and a one-section retry carries only that kind's ladder rungs. `LadderCoverage#gaps` and `#grounding_kinds` lost the kinds argument every caller passed as "all". One press can still queue about a hundred jobs, since `PREPARE_PER_HOUR` counts presses; capping jobs per press is left open.
 - `setup.html` changed as predicted: the preparation section shows, the button counts concepts, and the design comparison's coverage reads 0 of 20.
 - Specs that used "the control is hidden" as their signal for "no account with no targets" now check that the button is disabled while a save is pending, the property they were guarding. The retention spec that matched `/retention check/i` now matches the retention block's own heading, since the difficulty block always names retention checks.
 
@@ -153,7 +154,8 @@ The revision adds scope item 10: every track change applies the target-clearing 
 
     So a junior-to-senior move clears junior and senior targets and keeps a mid-level one, which sits between the two levels. That kind earned or chose its level, and the kept line names it so the person can clear it by hand.
 
-    - **Where it runs:** a `before_save` on `User`, when `skill_level` changes and the save is not the first track choice. It runs before `record_level_changes`, so cutoffs and event rows see the final rungs.
+    - **Where it runs:** a `before_save` on `User`, when `skill_level` changes and the save is not the first track choice. It is declared **ahead of `bump_section_kind_preferences_version`** (`user.rb:51`), not just ahead of `record_level_changes`. Callbacks run in declaration order and each `if:` is read when its callback is reached, so a skill-level-only save that clears targets must have cleared them before the bump checks `section_kind_levels_changed?`; otherwise the version stays put and another tab overwrites the cleared levels. A request spec saves `skill_level` alone and asserts the version moved.
+      - The cleared and kept kinds ride a transient attribute (`track_change`, holding the `TrackChange` result), as `shown_level_suggestions` does, so the after-save event hook and the controller reply read the same object.
       - A kind whose target was cleared and whose rung moves (a junior preset when the track goes to mid-level) gets a cutoff at its new rung and a `skill_level_edit` event row, like any kind the skill level moved.
       - A kind whose target equalled the new level keeps its rung, so it gets neither.
       - `LevelSuggestionEvent.source_for` learns that a target removed by `TrackChange` counts as `skill_level_edit`, not `setup_edit`; `User` hands it the cleared kinds.
@@ -185,7 +187,8 @@ The revision adds scope item 10: every track change applies the target-clearing 
 
 ### Migration and rollback
 
-- **Up:** add `track_chosen_at` and backfill from `learning_track IS NOT NULL`. Reversible: the down removes the column.
+- **The migration ships ahead of the code (PR 1a).** Web and worker deploy separately, and the worker's pre-deploy waits only for a schema to exist, not for this migration. If PR 1's code reached a worker before the web pre-deploy migrated, every `User` save in a job would hit callbacks reading `track_chosen_at` and raise. So PR 1a is migration only: add the column and backfill, with no code reading it. PR 1 follows once 1a is deployed. This is the repo's existing add-then-read pattern.
+- **Up:** add `track_chosen_at` and backfill from `learning_track IS NOT NULL`. Reversible: the down removes the column. Accounts created between 1a and PR 1 come in with `learning_track` set by today's welcome flow, so PR 1's deploy re-runs the same backfill as an idempotent data step for rows still null with a non-null `learning_track`.
 - **Code rollback after deploy:**
   - Old code reads `learning_track`, which still holds every old value.
   - Accounts created under PR 1 hold `"none"` through the dual write, so old code neither re-prompts them nor shows Leave.
@@ -339,6 +342,16 @@ No line names a job title or claims what the person is; each says what the exerc
 
 - Ignore, then drop `users.learning_track`.
 - Remove the dual write and the literal validation.
+
+## Open for review: the by-hand clearing rule (from the critical review)
+
+The rule in item 10 clears an unlocked target equal to the old or new level on every track change. Once presets stop being written, a target equal to the old level is indistinguishable from one chosen on purpose. Example: on mid-level, someone deliberately holds pattern at mid-level; raising the track to senior in Setup clears it, and pattern jumps to senior with no preview and no one-click undo. Only a lock protects it. The review's alternatives:
+
+- **A.** Keep the rule as decided, and show which sections would be cleared and kept before the Setup select saves (a confirm step), not only after.
+- **B.** Apply `TrackChange` only to graduation, whose card previews it, and clear today's exact presets (every kind junior, unlocked, on a junior-track account) with a one-off script. Hand moves in Setup leave targets alone.
+- **C.** Keep the rule as decided, with the after-the-fact line only.
+
+I recommend **A**: it keeps your rule and adds the preview graduation already has. B is smaller but leaves hand moves inconsistent with graduation.
 
 ## Decisions recorded
 

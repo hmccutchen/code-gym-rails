@@ -1426,9 +1426,7 @@ RSpec.describe AiService do
     it "omits the retention block entirely when nothing is due" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
                             reinforcement: [], due_checks: [])
-      expect(prompt).not_to include("Retention checks due today")
-      expect(prompt).not_to include("previously MASTERED")
-      expect(prompt).not_to match(/fresh scenario for these/i)
+      expect(prompt).not_to match(/Retention checks? due/)
     end
 
     it "annotates a language-bucket concept's legal sections for the architecture third" do
@@ -1544,7 +1542,7 @@ RSpec.describe AiService do
                             code_review_mode: :schema_review, reinforcement: [], due_checks: [ cm ])
 
       expect(prompt).not_to include("reading_for_intent ()")
-      expect(prompt).not_to include("Retention checks due today")
+      expect(prompt).not_to match(/Retention checks? due/)
     end
 
     it "withholds a parsons_problem third for a group that kind excludes" do
@@ -1708,6 +1706,21 @@ RSpec.describe AiService do
       user.update_columns(locked_section_kinds: [ "challenge" ])
 
       expect(render(difficulty: KindDifficulty.for(user.reload))).to eq(untargeted)
+    end
+
+    it "gives a one-section retry only that section's ladder rungs" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                               ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
+      ConceptReference.create!(concept: "scope_creep", language: ConceptBucket.for("plan_review", "ruby_rails"),
+                               ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
+      draft = AiService.const_get(:Draft).new(problem_set: {}, plan: Struct.new(:code_review_mode).new(:application_code),
+                                              kinds: [], difficulty: KindDifficulty.none, ladders: {}, history: [],
+                                              prompt_options: {}, suggested_concepts: [], unusable_sections: [])
+
+      expect(service.send(:retry_ladders, user, "ruby_rails", draft, ExerciseSection::Pattern))
+        .to eq("junior" => { "n_plus_one" => "j" })
+      expect(service.send(:retry_ladders, user, "ruby_rails", draft, ExerciseSection::PlanReview))
+        .to eq("junior" => { "scope_creep" => "j" })
     end
 
     describe "#ladders_for" do

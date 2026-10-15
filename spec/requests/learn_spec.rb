@@ -403,6 +403,15 @@ RSpec.describe "Learn", type: :request do
           .to include("generation_version" => guided.generation_version.to_s)
       end
 
+      it "is not offered to a trial account" do
+        login_as(create_trial_user(name: "Trial"))
+
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).not_to include(I18n.t("learn.write_ladder"))
+      end
+
       it "is not offered once the reference carries its ladder" do
         guided.update!(ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
 
@@ -635,7 +644,7 @@ RSpec.describe "Learn", type: :request do
     before { user.update!(language: "ruby_rails") }
 
     it "enqueues the gaps behind every kind's level for a user with no targets" do
-      expected = LadderCoverage.for(user).gaps_for(ExerciseSection.all)
+      expected = LadderCoverage.for(user).gaps
 
       expect { post prepare_learn_ladders_path }
         .to have_enqueued_job(GenerateConceptReferenceJob).exactly(expected.size).times
@@ -645,7 +654,7 @@ RSpec.describe "Learn", type: :request do
 
     it "enqueues one refreshing job per gap across every kind's level, deduplicated" do
       user.update!(section_kind_levels: { "code_review" => "senior", "challenge" => "junior" })
-      expected = LadderCoverage.for(user).gaps_for(ExerciseSection.all)
+      expected = LadderCoverage.for(user).gaps
       expect(expected.size).to be < ExerciseSection.all.sum { |kind| LadderCoverage.for(user).for_kind(kind).gaps.size }
 
       expect {
@@ -656,8 +665,16 @@ RSpec.describe "Learn", type: :request do
         .with(concept: expected.first.first, language: expected.first.last, user_id: user.id, refresh: true)
     end
 
+    it "enqueues nothing for a trial account, whose house key must not fund shared rewrites" do
+      trial = create_trial_user
+      login_as(trial)
+
+      expect { post prepare_learn_ladders_path }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+      expect(LadderCoverage.for(trial).gaps).not_to be_empty
+    end
+
     it "enqueues only what remains after a partial run" do
-      before_run = LadderCoverage.for(user).gaps_for(ExerciseSection.all)
+      before_run = LadderCoverage.for(user).gaps
       concept, bucket = before_run.first
       ConceptReference.create!(concept: concept, language: bucket,
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")

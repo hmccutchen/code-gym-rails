@@ -1,4 +1,4 @@
-# Coverage uses an unsaved mixed user so the operator's preferences cannot narrow the pool.
+# An unsaved mixed user keeps the operator's preferences out, and reads every kind at the default skill level, junior.
 class JuniorLadderPreparation
   def initialize(operator_id:, out: $stdout)
     @operator_id = operator_id
@@ -6,7 +6,7 @@ class JuniorLadderPreparation
   end
 
   def gaps
-    coverage.gaps_for(ExerciseSection.all)
+    coverage.gaps
   end
 
   def report

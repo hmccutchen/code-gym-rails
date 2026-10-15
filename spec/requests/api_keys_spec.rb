@@ -256,13 +256,21 @@ RSpec.describe "ApiKeys", type: :request do
       expect(response.body).not_to include(%(id="exclude-code_review"))
     end
 
+    it "hides the bulk button from a trial account" do
+      login_as(create_trial_user)
+
+      get setup_path
+
+      expect(Nokogiri::HTML(response.body).at_css("#mix-ladder-preparation[hidden]")).to be_present
+    end
+
     it "shows a bulk button while any section's level has gaps, targeted or not, and hides it once none do" do
       get setup_path
       expect(response.body).to include(prepare_learn_ladders_path)
       expect(Nokogiri::HTML(response.body).at_css("#mix-ladder-preparation[hidden]")).to be_nil
       expect(response.body).to include(ERB::Util.h(I18n.t("exercise_mix.ladders_explanation")))
 
-      LadderCoverage.for(user).gaps_for(ExerciseSection.all).each do |concept, bucket|
+      LadderCoverage.for(user).gaps.each do |concept, bucket|
         ConceptReference.create!(concept: concept, language: bucket, ladder_junior: "j", ladder_mid_level: "m",
                                  ladder_senior: "s", ladder_principal_engineer: "p")
       end

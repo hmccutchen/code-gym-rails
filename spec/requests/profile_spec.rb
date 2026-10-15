@@ -276,7 +276,7 @@ RSpec.describe "Profile", type: :request do
       patch_profile(section_kind_levels: { "code_review" => "senior", "challenge" => "junior" })
 
       coverage = LadderCoverage.for(user.reload)
-      count = coverage.gaps_for(ExerciseSection.all).size
+      count = coverage.gaps.size
       entry = coverage.for_kind(ExerciseSection::CodeReview)
       expect(response.parsed_body["ladder_preparation"]).to include(
         "count" => count, "button_label" => I18n.t("exercise_mix.ladders_button", count: count),
@@ -299,7 +299,7 @@ RSpec.describe "Profile", type: :request do
 
       patch_profile(section_kind_levels: {})
 
-      count = LadderCoverage.for(user.reload).gaps_for(ExerciseSection.all).size
+      count = LadderCoverage.for(user.reload).gaps.size
       expect(count).to be_positive
       expect(response.parsed_body.dig("ladder_preparation", "count")).to eq(count)
     end
@@ -311,7 +311,7 @@ RSpec.describe "Profile", type: :request do
 
       patch_profile(section_kind_levels: { "challenge" => "junior" }, section_kind_preferences_version: stale)
 
-      count = LadderCoverage.for(user.reload).gaps_for(ExerciseSection.all).size
+      count = LadderCoverage.for(user.reload).gaps.size
       expect(response).to have_http_status(:conflict)
       expect(response.parsed_body.dig("current", "ladder_preparation", "count")).to eq(count)
     end

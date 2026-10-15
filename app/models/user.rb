@@ -207,6 +207,9 @@ class User < ApplicationRecord
 
   def on_trial? = trial? && !api_key_present?
 
+  # Each prepared ladder is a billed rewrite of a shared reference, which a trial's house key must not fund.
+  def prepares_ladders? = !on_trial?
+
   def trial_ended? = on_trial? && !trial_active?
 
   def start_trial!(invite:, provider:, consented_at:, now: Time.current)
