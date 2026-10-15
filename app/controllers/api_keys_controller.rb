@@ -42,7 +42,7 @@ class ApiKeysController < ApplicationController
   end
 
   def suggested_kinds
-    return [] unless current_user.on_learning_track? && suggested_level
+    return [] unless suggested_level
 
     ExerciseSection.keys & Array(params[:suggested]).grep(String)
   end

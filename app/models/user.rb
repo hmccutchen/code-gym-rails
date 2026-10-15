@@ -235,7 +235,7 @@ class User < ApplicationRecord
 
   def on_learning_track? = learning_track == LearningTrack::ON
 
-  def suggests_level_moves? = on_learning_track? && level_suggestions?
+  def suggests_level_moves? = level_suggestions?
 
   def kind_rungs = KindDifficulty.for(self).rungs(skill_level: skill_level)
 

@@ -231,17 +231,46 @@ RSpec.describe "Learning track proposals", type: :request do
   end
 
   [ nil, "none" ].each do |track|
-    it "shows nothing with learning_track #{track.inspect}" do
+    it "suggests a move to an account with learning_track #{track.inspect} and no targets" do
       user = create_user_with_key
-      user.update!(learning_track: track)
+      user.update_columns(learning_track: track)
       reviewed_window(user, { "code_review" => "junior" })
       login_as(user)
-      expect(LevelSuggestion).not_to receive(:for)
 
       get root_path
 
-      expect(response.body).not_to include("level-suggestion")
+      expect(proposed_kinds).to eq([ "code_review" ])
+      step = Nokogiri::HTML(response.body).at_css("#level-suggestion [data-step]")
+      expect([ step["data-from"], step["data-to"] ]).to eq(%w[junior mid_level])
     end
+  end
+
+  it "keeps suggesting step-backs after every kind reaches senior and the track ends" do
+    user = track_user(LearningTrack.preset_levels.transform_values { "senior" }.merge("pattern" => "mid_level"))
+    login_as(user)
+    apply_levels(user, user.section_kind_levels.merge("pattern" => "senior"))
+    expect(user.reload.learning_track).to eq("none")
+    travel 2.days
+    reviewed_window(user, { "pattern" => { rung: "senior", ai: "developing", self: "too_hard" } }, count: 2)
+    login_as(user)
+
+    get root_path
+
+    expect(proposal_text).to include("Move #{kind_name("pattern")} to mid-level?")
+  end
+
+  it "shows the same suggestion before and after leaving the track" do
+    user = track_user
+    reviewed_window(user, { "code_review" => "junior" })
+    login_as(user)
+    get root_path
+    before_leaving = proposal_text
+
+    patch profile_path, params: { user: { learning_track: "none" } }.to_json, headers: json
+    get root_path
+
+    expect(user.reload.learning_track).to eq("none")
+    expect(proposal_text).to eq(before_leaving)
   end
 
   it "does not flap across a senior to mid-level to senior cycle" do
@@ -391,10 +420,13 @@ RSpec.describe "Learning track proposals", type: :request do
       expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq("level" => "mid_level", "through" => Date.current.iso8601)
     end
 
-    it "is not found for a user off the track" do
-      login_as(create_user_with_key)
+    it "sets aside a kind for a user off the track" do
+      user = create_user_with_key
+      login_as(user)
       dismiss([ "code_review" ])
-      expect(response).to have_http_status(:not_found)
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.level_suggestion_cutoffs["code_review"]).to include("level" => "junior")
     end
 
     it "requires authentication" do
@@ -491,7 +523,7 @@ RSpec.describe "Learning track proposals", type: :request do
       end
     end
 
-    it "rechecks membership after another request leaves the track" do
+    it "still sets aside a kind after another request leaves the track" do
       user = track_user
       login_as(user)
       allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
@@ -501,9 +533,9 @@ RSpec.describe "Learning track proposals", type: :request do
 
       dismiss([ "pattern" ])
 
-      expect(response).to have_http_status(:not_found)
+      expect(response).to have_http_status(:ok)
       expect(user.reload.learning_track).to eq("none")
-      expect(user.level_suggestion_cutoffs).to eq({})
+      expect(user.level_suggestion_cutoffs["pattern"]).to include("level" => "junior")
     end
 
     it "uses a target another request changed before taking the lock" do

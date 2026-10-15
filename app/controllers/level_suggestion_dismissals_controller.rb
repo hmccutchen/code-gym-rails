@@ -3,7 +3,6 @@ class LevelSuggestionDismissalsController < ApplicationController
 
   # Evidence can age before the lock; never move a current-level cutoff back.
   def create
-    return head(:not_found) unless current_user.on_learning_track?
     return render_json_error(t("level_suggestion.card.invalid_steps"), status: :unprocessable_content) if invalid_steps?
 
     evidence = LevelSuggestion::Evidence.for(current_user)
@@ -11,7 +10,6 @@ class LevelSuggestionDismissalsController < ApplicationController
     current_user.with_lock { outcome = record_cutoffs(params[:kinds], evidence) }
 
     case outcome
-    when :not_found then head(:not_found)
     when :invalid then render_json_error(t("level_suggestion.card.invalid"), status: :unprocessable_content)
     when :stale then render_json_error(t("level_suggestion.card.stale"), status: :conflict)
     else render json: { dismissed: params[:kinds] }
@@ -22,8 +20,6 @@ class LevelSuggestionDismissalsController < ApplicationController
 
   # Kinds set aside from the card's removable list arrive after Apply changed the proposal, so validate current targets.
   def record_cutoffs(kinds, evidence)
-    return :not_found unless current_user.on_learning_track?
-
     action = ACTIONS_BY_REASON[params.fetch(:reason, "not_now")]
     return :invalid unless action && valid_kinds?(kinds)
     return :stale if shown_steps.to_a.any? { |step| rungs[step.kind] != step.from }
