@@ -6,7 +6,7 @@ The poll asks the browser a question every 50ms. A page that navigates
 between two of those asks destroys the execution context the next one lands
 in, and Playwright raises rather than answering. The condition is usually
 about the page being arrived at, so the right answer is to ask again until
-the deadline; `track_proposal_spec` waits on exactly that shape and failed
+the deadline; `level_suggestion_spec` waits on exactly that shape and failed
 about three times in a hundred navigations before this.
 
 Only the navigation messages are swallowed. A `ReferenceError` in the

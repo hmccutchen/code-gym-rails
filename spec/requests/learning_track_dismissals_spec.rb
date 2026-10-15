@@ -116,7 +116,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
     login_as(user)
 
     expect { get root_path }.not_to change(LevelSuggestionEvent, :count)
-    expect(Nokogiri::HTML(response.body).at_css("#track-proposal")).to be_present
+    expect(Nokogiri::HTML(response.body).at_css("#level-suggestion")).to be_present
     expect(user.reload.track_evidence_cutoffs).to eq({})
   end
 end

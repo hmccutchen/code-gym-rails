@@ -26,7 +26,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
     login_as(user)
   end
 
-  def proposal = page_html.at_css("#track-proposal")
+  def proposal = page_html.at_css("#level-suggestion")
 
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
@@ -39,7 +39,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
       expect(proposal.at_css("[data-apply]")).to be_present
       expect(proposal.at_css("[data-change-in-setup]")).to be_nil
-      expect(proposal["data-track-proposal-answer-url-value"]).to eq(learning_track_answer_path)
+      expect(proposal["data-level-suggestion-answer-url-value"]).to eq(learning_track_answer_path)
       expect(proposal.text).to include("turn these suggestions off in Setup")
       expect(proposal.at_css(%(a[href="#{setup_path(anchor: "learning-track")}"]))).to be_present
     end

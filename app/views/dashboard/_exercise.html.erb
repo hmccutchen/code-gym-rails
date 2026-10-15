@@ -45,8 +45,8 @@
   <% elsif @size_change&.direction == :smaller %>
     <p class="hint"><%= t("dashboard.size_change.smaller", count: @size_change.count) %></p>
   <% end %>
-  <% if @track_proposal %>
-    <%= render "dashboard/track_proposal", proposal: @track_proposal %>
+  <% if @level_suggestion %>
+    <%= render "dashboard/level_suggestion", proposal: @level_suggestion %>
   <% end %>
 <% else %>
   <% submit_blocker = response.submit_blocker %>

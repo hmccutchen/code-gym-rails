@@ -1,6 +1,6 @@
 en:
-  learning_track:
-    proposal:
+  level_suggestion:
+    card:
       own: "%{favourable} of your last %{window} %{kind} sections were reviewed solid or better. Try %{kind} at %{level}?"
       own_heading: "These sections can move up to %{level}:"
       own_item: "%{kind}: %{favourable} of your last %{window} were reviewed solid or better"
@@ -18,6 +18,7 @@ en:
       stranded: "Your settings changed in another tab, and another save on this page is still running. Reload once it finishes to see the current suggestion."
       reload: "Reload"
       invalid: "Those sections can't be set aside."
+  learning_track:
     welcome:
       title: "Before you start"
       question: "How much experience do you have as a software engineer?"

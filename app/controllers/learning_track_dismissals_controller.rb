@@ -11,7 +11,7 @@ class LearningTrackDismissalsController < ApplicationController
 
     case outcome
     when :not_found then head(:not_found)
-    when :invalid then render_json_error(t("learning_track.proposal.invalid"), status: :unprocessable_content)
+    when :invalid then render_json_error(t("level_suggestion.card.invalid"), status: :unprocessable_content)
     else render json: { dismissed: params[:kinds] }
     end
   end

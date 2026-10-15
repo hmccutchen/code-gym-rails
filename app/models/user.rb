@@ -228,9 +228,9 @@ class User < ApplicationRecord
 
   def on_learning_track? = learning_track == LearningTrack::ON
 
-  def suggests_track_moves? = on_learning_track? && track_suggestions?
+  def suggests_level_moves? = on_learning_track? && track_suggestions?
 
-  def applies_track_proposals_in_place? = track_proposals_answered < LevelSuggestion::IN_PLACE_ANSWERS
+  def applies_level_suggestions_in_place? = track_proposals_answered < LevelSuggestion::IN_PLACE_ANSWERS
 
   def first_run?
     persisted? && learning_track.nil? && !daily_exercises.exists?
