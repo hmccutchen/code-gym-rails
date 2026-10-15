@@ -566,7 +566,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   target. A rung that did not move records nothing, and a move to principal
   engineer records nothing. The first-run choice and joining the track
   record nothing; leaving or finishing it records any rung it moves. So
-  results from an earlier stay at a rung never count again. Evidence through
+  results from an earlier stay at a rung never count again. Moves made before
+  these cutoffs existed left no trace, so `SeedLevelSuggestionCutoffs` gave
+  every existing account a cutoff for each kind at its rung on the migration
+  day, keeping any cutoff it already had: each account starts from five new
+  results, and no card appears for at least five reviewed days after deploy. Evidence through
   a cutoff's date is ignored at its rung, and results at any other rung
   never count. Every save that touches a target or the skill level runs
   under the user-row lock (`ProfileController#locked_save?`), and so does
