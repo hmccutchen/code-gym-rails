@@ -19,7 +19,9 @@ returns to the first step without a request.
 Opening the level step moves focus to its heading, and Back returns it to
 the Experienced button, so a screen reader user lands where the content
 changed. A failed save puts focus back on the button that was pressed, since
-disabling it while the request ran dropped focus to the page.
+disabling it while the request ran dropped focus to the page. The pressed
+button comes from the click event, since Safari does not focus a button on
+click.
 
 ## The whole preset is posted, not a flag
 

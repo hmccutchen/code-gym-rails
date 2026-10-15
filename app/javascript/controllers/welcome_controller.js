@@ -36,16 +36,15 @@ export default class extends Controller {
     this.experiencedTarget.focus()
   }
 
-  choose() {
-    this.save(this.juniorTrack())
+  choose(event) {
+    this.save(this.juniorTrack(), event.currentTarget)
   }
 
   chooseLevel(event) {
-    this.save({ learning_track: "none", skill_level: event.currentTarget.dataset.level })
+    this.save({ learning_track: "none", skill_level: event.currentTarget.dataset.level }, event.currentTarget)
   }
 
-  async save(user) {
-    const pressed = document.activeElement
+  async save(user, pressed) {
     this.setBusy(true)
     const result = await saveStatus.save("PATCH", this.urlValue, { user }, "learning_track")
 
@@ -53,7 +52,7 @@ export default class extends Controller {
       window.location = this.setupUrlValue
     } else {
       this.setBusy(false)
-      if (this.choiceTargets.includes(pressed)) pressed.focus()
+      pressed.focus()
     }
   }
 }

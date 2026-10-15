@@ -67,6 +67,18 @@ RSpec.describe "Welcome choices", type: :system do
     expect(user.reload.skill_level).to eq("senior")
   end
 
+  it "returns focus to the pressed level button after a failed save, even when the click did not focus it" do
+    visit_as(user)
+    find('[data-track="none"]').click
+    page.execute_script("window.originalFetch = window.fetch; window.fetch = () => Promise.reject(new Error('offline'))")
+
+    page.execute_script("document.querySelector('[data-level=\"mid_level\"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))")
+
+    expect(page).to have_css("#save-status", text: /couldn't save/i)
+    expect(page).to have_css("[data-level]:not(:disabled)", count: 3)
+    expect(page.evaluate_script("document.activeElement.dataset.level")).to eq("mid_level")
+  end
+
   it "reports a failed save and lets the user retry without leaving the question" do
     visit_as(user)
     expect(page).to have_current_path(welcome_path)
