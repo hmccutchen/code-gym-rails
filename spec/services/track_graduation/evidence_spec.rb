@@ -19,7 +19,8 @@ RSpec.describe TrackGraduation::Evidence do
       answers: sections.transform_values { |section| section.fetch(:answered, true) ? "a" * 20 : "" },
       section_ratings: sections.transform_values { |section| section.fetch(:self, "right_level") }.compact,
       ai_review: sections.reject { |_, section| section[:unreviewed] }.transform_values do |section|
-        { "rating" => section.fetch(:ai, "solid"), "correct" => "c" }.compact
+        rubric = AiService::RUBRIC_VERSION unless section[:unstamped]
+        { "rating" => section.fetch(:ai, "solid"), "correct" => "c", "rubric" => rubric }.compact
       end,
       **attributes
     )
@@ -50,6 +51,21 @@ RSpec.describe TrackGraduation::Evidence do
     expect(described_class.for(user).results).to eq({})
   end
 
+  it "leaves out a review graded before the rubric" do
+    day(1, { "code_review" => { rung: "junior", unstamped: true }, "pattern" => { rung: "junior" } })
+
+    expect(described_class.for(user).results.keys).to eq([ "pattern" ])
+  end
+
+  it "gives each kind at most one result per day" do
+    sections = { "code_review" => { rung: "junior" }, "design_comparison" => { rung: "junior" } }
+    (0..4).each { |days_ago| day(days_ago, sections) }
+
+    described_class.for(user).results.each_value do |results|
+      expect(results.map(&:date)).to eq(results.map(&:date).uniq)
+    end
+  end
+
   it "accepts historical stamps without an eased field" do
     response = day(1)
     expect(response.daily_exercise.problem_set["code_review"]).not_to have_key("eased")
@@ -71,12 +87,13 @@ RSpec.describe TrackGraduation::Evidence do
     expect(described_class.for(user).results).to eq({})
   end
 
-  it "retains a missing self-rating as unfavourable evidence" do
+  it "retains a result with no self-rating, judged on its AI rating alone" do
     day(1, { "code_review" => { rung: "junior", self: nil } })
 
     result = described_class.for(user).results.fetch("code_review").sole
     expect(result.self_rating).to be_nil
-    expect(result).not_to be_favourable
+    expect(result).to be_favourable
+    expect(result).not_to be_too_hard
   end
 
   it "reads only the active alternate sections, even when others have answers and ratings" do
@@ -150,20 +167,21 @@ RSpec.describe TrackGraduation::Evidence do
     before { user.update!(section_kind_levels: { "code_review" => "junior" }) }
 
     it "delegates stored evidence and preferences to the proposal decision without writing" do
-      3.times { |n| day(n) }
+      5.times { |n| day(n) }
       attributes = user.attributes
 
       proposal = TrackGraduation.for(user)
 
       expect(proposal).to eq(TrackGraduation::Proposal.new(
         basis: :own,
-        steps: [ TrackGraduation::Step.new(kind: "code_review", from: "junior", to: "senior", results_at_level: 3) ]
+        steps: [ TrackGraduation::Step.new(kind: "code_review", from: "junior", to: "mid_level", results_at_level: 5,
+                                           favourable: 5, too_hard: 0) ]
       ))
       expect(user.reload.attributes).to eq(attributes)
     end
 
     it "passes locks and cutoffs to the proposal decision" do
-      3.times { |n| day(n) }
+      5.times { |n| day(n) }
       user.update!(locked_section_kinds: [ "code_review" ])
       expect(TrackGraduation.for(user)).to be_nil
 
@@ -173,7 +191,7 @@ RSpec.describe TrackGraduation::Evidence do
       expect(TrackGraduation.for(user)).to be_nil
     end
 
-    it "returns no proposal when there is no evidence to advance the lead" do
+    it "returns no proposal when there is no evidence" do
       expect(TrackGraduation.for(user)).to be_nil
     end
   end

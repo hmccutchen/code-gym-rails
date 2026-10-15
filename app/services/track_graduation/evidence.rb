@@ -1,6 +1,6 @@
 class TrackGraduation
   class Evidence
-    # Bounds reads only; skipped and eased sections don't count, so a rare kind may still need the lead path.
+    # Bounds reads only; skipped and eased sections don't count, so a rare kind may never fill a window.
     RESPONSE_WINDOW = 60
 
     attr_reader :results, :newest_date
@@ -14,7 +14,7 @@ class TrackGraduation
 
     def initialize(responses)
       @newest_date = responses.first&.date
-      @results = responses.flat_map { |response| ReviewedSectionResults.for(response) }
+      @results = responses.flat_map { |response| ReviewedSectionResults.for(response, require_rubric: true) }
                           .group_by(&:kind).transform_values { |results| results.map { |result| track_result(result) } }
     end
 

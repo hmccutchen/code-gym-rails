@@ -1,5 +1,6 @@
 <%# One learning track proposal. Local: proposal (TrackGraduation::Proposal). %>
 <% name = ->(key) { t("sections.#{key}.name") } %>
+<% level_name = ->(level) { t("exercise_mix.levels.#{level}").downcase } %>
 <% in_place = current_user.applies_track_proposals_in_place? || (proposal.steps.map(&:kind) & current_user.excluded_section_kinds).any? %>
 <%= tag.div id: "track-proposal", class: "mix-note track-proposal",
       data: { controller: "track-proposal",
@@ -13,27 +14,32 @@
               track_proposal_count_failed_text_value: t("learning_track.proposal.count_failed"),
               track_proposal_stranded_text_value: t("learning_track.proposal.stranded"),
               track_proposal_reload_label_value: t("learning_track.proposal.reload") } do %>
-  <% if proposal.basis == :led %>
-    <% lead = ExerciseSection.learning_track_lead.key %>
-    <p><%= t("learning_track.proposal.led_heading", kind: name.call(lead),
-             level: t("exercise_mix.levels.#{current_user.section_kind_levels[lead]}").downcase) %></p>
+  <% if proposal.steps.one? %>
+    <% step = proposal.steps.first %>
+    <p data-step data-track-proposal-target="step" data-kind="<%= step.kind %>" data-to="<%= step.to %>">
+      <% if proposal.basis == :struggling %>
+        <%= t("learning_track.proposal.struggling", kind: name.call(step.kind), too_hard: step.too_hard,
+              window: [ step.results_at_level, TrackGraduation::STEP_BACK_WINDOW ].min,
+              level: level_name.call(step.from), lower: level_name.call(step.to)) %>
+      <% else %>
+        <%= t("learning_track.proposal.own", kind: name.call(step.kind), favourable: step.favourable,
+              window: TrackGraduation::WINDOW, level: level_name.call(step.to)) %>
+      <% end %>
+    </p>
+  <% else %>
+    <p><%= t("learning_track.proposal.own_heading", level: level_name.call(proposal.steps.first.to)) %></p>
     <ul>
       <% proposal.steps.each do |step| %>
         <li data-step data-track-proposal-target="step" data-kind="<%= step.kind %>" data-to="<%= step.to %>">
-          <%= t(step.results_at_level.zero? ? "learning_track.proposal.led_no_results" : "learning_track.proposal.led_with_results",
-                kind: name.call(step.kind)) %>
+          <%= t("learning_track.proposal.own_item", kind: name.call(step.kind), favourable: step.favourable,
+                window: TrackGraduation::WINDOW) %>
           <% if in_place %>
             <button type="button" class="btn btn-ghost btn-sm" data-remove-step data-action="click->track-proposal#removeStep"
-                    aria-label="<%= t("learning_track.proposal.remove_label", kind: name.call(step.kind)) %>"><%= t("learning_track.proposal.remove") %></button>
+                    aria-label="<%= t("learning_track.proposal.remove_label", kind: name.call(step.kind), level: level_name.call(step.from)) %>"><%= t("learning_track.proposal.remove", level: level_name.call(step.from)) %></button>
           <% end %>
         </li>
       <% end %>
     </ul>
-  <% else %>
-    <% step = proposal.steps.first %>
-    <p data-step data-track-proposal-target="step" data-kind="<%= step.kind %>" data-to="<%= step.to %>">
-      <%= t("learning_track.proposal.#{proposal.basis}", kind: name.call(step.kind)) %>
-    </p>
   <% end %>
   <% if in_place %>
     <button type="button" class="btn btn-primary btn-sm" data-apply data-track-proposal-target="apply"
@@ -48,4 +54,3 @@
   <p class="hint"><%= t("learning_track.proposal.turn_off_html",
                         link: link_to(t("learning_track.proposal.turn_off_link"), setup_path(anchor: "learning-track"))) %></p>
 <% end %>
-

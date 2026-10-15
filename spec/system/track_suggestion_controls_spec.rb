@@ -5,20 +5,24 @@ RSpec.describe "Learning track suggestion controls", type: :system do
 
   around { |example| travel_to(a_weekday + 12.hours) { example.run } }
 
-  def reviewed_day(date)
+  def reviewed_day(date, level:)
     exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current,
-      problem_set: { "code_review" => { "question" => "Find the issue", "snippet" => "def a; end", "pitched_at" => "junior" } })
+      problem_set: { "code_review" => { "question" => "Find the issue", "snippet" => "def a; end", "pitched_at" => level } })
     DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
       answers: { "code_review" => "An answer with sufficient detail" }, section_ratings: { "code_review" => "right_level" },
-      ai_review: { "code_review" => { "rating" => "solid", "correct" => "Correct" } })
+      ai_review: { "code_review" => { "rating" => "solid", "correct" => "Correct", "rubric" => AiService::RUBRIC_VERSION } })
+  end
+
+  def qualifying_days
+    TrackGraduation::WINDOW.times { |ago| reviewed_day(Date.current - ago, level: user.section_kind_levels["code_review"]) }
   end
 
   def own_proposal(answered:)
     user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels,
                  track_proposals_answered: answered)
-    [ 2, 1, 0 ].each { |ago| reviewed_day(Date.current - ago) }
+    qualifying_days
     visit_as(user)
-    expect(page).to have_css("#track-proposal", text: "Move Code Review up to senior?")
+    expect(page).to have_css("#track-proposal", text: "Try Code Review at mid-level?")
   end
 
   def wait_for_saves
@@ -32,15 +36,15 @@ RSpec.describe "Learning track suggestion controls", type: :system do
 
     expect(page).to have_css("#track-proposal", text: "Done. Your next sets use the new level.")
     wait_for_saves
-    expect(user.reload.section_kind_levels["code_review"]).to eq("senior")
+    expect(user.reload.section_kind_levels["code_review"]).to eq("mid_level")
     expect(user.track_proposals_answered).to eq(1)
   end
 
-  it "reports no failed save when Apply moves the last junior kind up and ends the track" do
-    user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels.transform_values { "senior" }.merge("code_review" => "junior"))
-    [ 2, 1, 0 ].each { |ago| reviewed_day(Date.current - ago) }
+  it "reports no failed save when Apply moves the last kind below senior up and ends the track" do
+    user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels.transform_values { "senior" }.merge("code_review" => "mid_level"))
+    qualifying_days
     visit_as(user)
-    expect(page).to have_css("#track-proposal", text: "Move Code Review up to senior?")
+    expect(page).to have_css("#track-proposal", text: "Try Code Review at senior?")
 
     within("#track-proposal") { click_button "Apply" }
 
@@ -66,10 +70,10 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     within("#track-proposal") { click_link "Change it in Setup" }
 
     expect(page).to have_css("#exercise-mix[open]")
-    expect(page).to have_text("Code Gym suggested moving Code Review to Senior.")
-    within('.mix-difficulty.mix-suggested[data-kind="code_review"]') { choose "Senior" }
+    expect(page).to have_text("Code Gym suggested moving Code Review to mid-level.")
+    within('.mix-difficulty.mix-suggested[data-kind="code_review"]') { choose "Mid-level" }
     wait_for_saves
-    expect(user.reload.section_kind_levels["code_review"]).to eq("senior")
+    expect(user.reload.section_kind_levels["code_review"]).to eq("mid_level")
   end
 
   def fail_requests_to(path)
@@ -99,7 +103,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
         within("#track-proposal") { click_button action }
         wait_for_saves
 
-        expected_level = action == "Apply" ? "senior" : "junior"
+        expected_level = action == "Apply" ? "mid_level" : "junior"
         expect(user.reload.section_kind_levels["code_review"]).to eq(expected_level)
         expect(user.track_evidence_cutoffs["code_review"]).to eq("level" => expected_level, "through" => Date.current.iso8601)
         expect(user.track_proposals_answered).to eq(0)

@@ -385,6 +385,7 @@ Every dashboard, /learn and /history load, any day of the week:
 | `InviteCode`    | code_digest (SHA-256 of the raw code, unique), label, seats, redeemed_count, expires_at, trial_days, daily_request_cap |
 | `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
 | `FeaturedConcept` | user_id, week_of (the Monday, in the user's zone), bucket, concept — unique on user_id and week_of; one row per week a user had a concept to feature |
+| `LevelSuggestionEvent` | user_id, kind, action (applied/dismissed/removed), source (suggestion/setup_edit, applied rows only), from_level, to_level, window_size, favourable, too_hard_latest3, newest_result_on |
 
 `ConceptReference` (not listed above — it has no `user_id`; see "The Learn tab"
 below) now also carries `guide_plain_language`, `guide_worked_example`,
@@ -470,47 +471,72 @@ concept-specific difficulty descriptions for future generation, not a new set.
   accounts; a first-run spec passes `learning_track: nil`.
 
   **Suggestions use reviewed work, not mastery tiers.** `TrackGraduation`
-  checks unlocked kinds in registry order: first a step back from senior when
-  at least two of the latest three senior results are `too_hard` (two of two
-  qualifies), then a step forward after three consecutive favourable junior results.
-  Favourable means both the existing AI and self-rating rules agree. Otherwise,
-  a lead already targeted above junior can propose the remaining junior kinds
-  as one removable bundle. `ExerciseSection.leads_learning_track?` owns which
-  kind leads (currently code review); any unfavourable result in a member's
-  latest three junior results vetoes that member. No own results is allowed.
-  Locked kinds are omitted; exclusions remain a scheduling preference.
+  moves an unlocked kind one rung along junior, mid-level and senior
+  (`TrackGraduation::LADDER`). Principal engineer is set only by hand, so no
+  suggestion leaves it or leads to it. A step up needs the kind's latest five
+  results at its current level, at least four of them rated solid or better
+  by the AI, and fewer than two of the latest three self-rated too hard: the
+  AI rating proposes and the engineer's own rating can veto. A step back
+  mirrors it: at least two of the latest three self-rated too hard (two of
+  two qualifies) propose one rung down, and the AI vetoes it when it rated
+  every one of those solid or better. A step back is shown alone, before any
+  step up. Step ups for several kinds share one card when they start from the
+  same level, so every kind it lists moves to the same one; registry order
+  picks that level, and the other kinds wait for a later card. Each kind is
+  judged on its own results only: there is no lead kind and no bundle, so a
+  kind without its own five results is never offered a step up. Locked kinds
+  are omitted; exclusions remain a scheduling preference.
 
   `TrackGraduation::Evidence` preloads exercises for the latest 60 submitted
   responses with stored review data. Only reviewed responses and answered,
-  un-eased sections with a `pitched_at` stamp and an AI rating contribute.
-  Historical unstamped work contributes nothing. The read cap bounds queries;
-  rare kinds may need the lead-based suggestion. The AI rating's calibration
-  for these moves is unverified, and a higher lead target is not proof of
-  ability in another kind. Suggestions require an explicit Apply.
+  un-eased sections with a `pitched_at` stamp, an AI rating and the current
+  `AiService::RUBRIC_VERSION` stamp contribute, because the AI rating now
+  decides alone and only a rubric grade rates against the stated level.
+  Raising `RUBRIC_VERSION` restarts suggestion evidence, as it does for the
+  competency gate. The AI rating's calibration for these moves is unverified,
+  and suggestions require an explicit Apply.
 
-  **A cutoff prevents the same work immediately proposing another move.**
+  **Rare kinds may never qualify.** A kind appears at most once a day, so five
+  results take at least five days with it. On a two-section day only code
+  review and design comparison can reach five within the 60-response read,
+  and on a three-section day an optional kind needs about 70% of its
+  appearances answered and un-eased; the others move only when the user
+  changes them in Setup.
+
+  **A cutoff keeps the same work from proposing another move.**
   Not now records each kind's current level and the newest reviewed response
-  date, falling back to the user's today. Moving between junior and senior in
-  either direction records the destination level and today's date in the
-  user's zone. Evidence through that date is ignored at that level; a
-  lead-based proposal after a cutoff also needs three fresh favourable lead
-  results. The profile join check and versioned level changes run under the
-  user-row lock; dismissal merges into the reloaded map under that same lock
-  and keeps a later valid cutoff at the current level. Its earlier evidence
-  read cannot undo a newer dismissal or level-change cutoff. A different-level
-  or malformed entry is replaced; `TrackGraduation.cutoff_date` is the shared
-  reader for dismissal and proposal filtering.
+  date, falling back to the user's today, so an offer returns only on newer
+  results at that level, five of them for a step up. A move to a ladder level, from any level
+  or none and however it was saved, records the destination level and
+  today's date in the user's zone, so results from an earlier stay at that
+  level never count again. Evidence through a cutoff's date is ignored at its
+  level, and results at any other level never count. The profile join check
+  and versioned level changes run under the user-row lock; dismissal merges
+  into the reloaded map under that same lock and keeps a later valid cutoff
+  at the current level. Its earlier evidence read cannot undo a newer
+  dismissal or level-change cutoff. A different-level or malformed entry is
+  replaced; `TrackGraduation.cutoff_date` is the shared reader for dismissal
+  and proposal filtering.
 
-  **Setup and dashboard saves settle in place.** Apply changes only listed
-  bundle members through the existing versioned profile endpoint, then
-  dismisses removed members separately. That second request is tracked as
-  pending, but the two writes are not atomic: its failure leaves the applied
-  levels saved and the shared save error visible. Not now dismisses the whole
-  original bundle. A stale Apply (409) reloads only after pending saves clear;
-  a save still pending after ten seconds cancels the reload. Leaving on Setup
-  preserves targets, locks, exclusions and pending Exercise mix edits.
-  No junior targets remaining automatically records `"none"`; the track
-  does not keep proposing steps back after completion or leaving.
+  **Setup and dashboard saves settle in place.** Apply changes only the kinds
+  still listed through the existing versioned profile endpoint, then
+  dismisses the ones set aside with Keep separately, with reason `removed`.
+  That second request is tracked as pending, but the two writes are not
+  atomic: its failure leaves the applied levels saved and the shared save
+  error visible. Not now dismisses every kind the card listed, with reason
+  `not_now`. A stale Apply (409) reloads only after pending saves clear; a
+  save still pending after ten seconds cancels the reload. Leaving on Setup
+  preserves targets, locks, exclusions and pending Exercise mix edits. When
+  no target below senior remains, the save records `"none"`, so moving the
+  last junior kind to mid-level keeps the track. `level_suggestion_events`
+  records `applied` rows (source `suggestion` or `setup_edit`), `dismissed`
+  and `removed` rows, each with the evidence counts behind it, written only
+  by level-changing saves and the dismissal endpoint, which writes a row only
+  for a kind whose cutoff moves forward.
+
+  **Known gap:** a track account whose kinds all reach senior leaves the
+  track, and with it every suggestion, step-backs included, until
+  suggestions no longer depend on the track.
 
   **After three answers, a proposal sends the user to Setup.**
   `users.track_proposals_answered` counts each Apply and Not now through
@@ -523,8 +549,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   on its main button links to Setup's Exercise mix with the proposed kinds
   marked and the level named (`?suggested[]=…&suggested_level=…`), and the
   user changes the level there, so they learn where the control lives. Not
-  now still dismisses in place, and a bundle sent to Setup has no Keep at
-  junior buttons, since the choice is made there. A proposal naming an
+  now still dismisses in place, and a card sent to Setup has no Keep
+  buttons, since the choice is made there. A proposal naming an
   excluded kind keeps applying in place, because Setup disables an excluded
   kind's difficulty and the user would have nothing to change. The threshold
   is a starting value, not a measured one.
@@ -2056,16 +2082,17 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `ConceptMastery::AI_RATING_RANK`, `favourable?(bar:)` adds
   `DailyResponse::SELF_RATING_FAVORABLE`, and `too_hard?` reads
   `DailyResponse::SELF_RATING_UNFAVORABLE`. `TrackGraduation::Result` asks
-  the same rules with `FAVOURABLE_BAR`, the lowest favourable rating, so its
-  answers are unchanged, and `CompetencyGate::BAR` is that same constant.
+  `at_or_above?` with `FAVOURABLE_BAR`, the lowest favourable rating, and
+  `too_hard?` apart from it, since its AI rating decides without the
+  self-rating's agreement; `CompetencyGate::BAR` is that same constant.
   `ConceptMastery.record_review!` and `RungLedger` predate the class and
   still read the rating lists directly; folding them in is a separate
   change. A row whose
   review, answers, ratings or problem set is not a hash, or a section whose
   review is not one, is skipped rather than raised on, since the gate runs
   on every plan, fixed settings included. `TrackGraduation::Evidence`
-  delegates to it with its 60-response cap and results unchanged (eased
-  still left out), so generation code never names track code.
+  delegates to it with its 60-response cap, eased sections left out and the
+  rubric stamp required, so generation code never names track code.
   `CompetencyGate::Evidence` asks it for eased sections too, requires the
   current `RUBRIC_VERSION` stamp, and reads every rubric-stamped day with no cap, in
   batches ordered by date and id. A cap would forget a size whose earning days
@@ -2284,9 +2311,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   was graded with no rubric, so its rating answers a different question; an
   evidence reader that compares ratings to a bar reads only stamped reviews.
   A stamp rather than a cutoff date, because grading knows which prompt it
-  ran and a date misfiles a review retried across a deploy. Only the
-  competency gate reads it; `ConceptMastery`, `RungLedger` and
-  `TrackGraduation` read all history on purpose. Going forward, a concept's
+  ran and a date misfiles a review retried across a deploy. The competency
+  gate and `TrackGraduation` read it; `ConceptMastery` and `RungLedger` read
+  all history on purpose. Going forward, a concept's
   first post-rubric review is compared with a pre-rubric `last_rating`, so
   that one comparison can read as improving or stagnant because the scale
   moved rather than the engineer.
@@ -3301,17 +3328,18 @@ always pull in the full suite — is stated once, in
 ## File Map
 
 - `app/models/learning_track.rb` — track values and preset levels.
-- `app/services/track_graduation.rb` — pure proposal rules: own-result moves, struggling moves and a lead-based bundle.
-- `app/services/track_graduation/evidence.rb` — bounded, preloaded reviewed-response history projected into stamped, answered results.
+- `app/services/track_graduation.rb` — pure proposal rules: one-rung moves up and back along junior, mid-level and senior, each kind judged on its own results, and the evidence counts a card and an event row show.
+- `app/services/track_graduation/evidence.rb` — bounded, preloaded reviewed-response history projected into stamped, answered, rubric-graded results.
 - `app/services/reviewed_section_results.rb` — `ReviewedSectionResults`: which sections of one submitted, reviewed response count as evidence of work at a rung, optionally only under the current rubric. Pure over the response it is given; shared by `TrackGraduation::Evidence` and `CompetencyGate::Evidence`.
 - `app/services/competency_gate.rb` — `CompetencyGate`: the pure fold that earns a day's size from reviewed days, with the brake. `DailyPlan.size_for` calls it once per plan.
 - `app/services/day_size.rb` — `DaySize`: the day's planned count and its reason, from the Daily sections setting, the completion count and the gate's `Plan`. Pure; its `Decision` also answers whether the brake is on, for the coverage exception, and what the `[set_size]` line logs.
 - `app/services/size_forecast.rb` — `SizeForecast`: whether tomorrow's Automatic set will be larger, or smaller because of the brake, than today's planned one, for the submitted dashboard's size lines.
 - `app/services/competency_gate/evidence.rb` — the gate's only query: every rubric-stamped reviewed day, oldest first, in batches, as `CompetencyGate::Day` values.
 - `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileController`.
-- `app/controllers/learning_track_dismissals_controller.rb` — records Not now cutoffs for the current user under the user-row lock.
+- `app/controllers/learning_track_dismissals_controller.rb` — records Not now and removed-kind cutoffs for the current user under the user-row lock, with a `dismissed` or `removed` event row for each kind whose cutoff moves forward.
+- `app/models/level_suggestion_event.rb` — `LevelSuggestionEvent`: one row per answer to a level suggestion (`applied`, `dismissed`, `removed`) with the evidence counts behind it; builds applied rows from the state `User` passes in from before the save.
 - `app/controllers/learning_track_answers_controller.rb` — counts an answered proposal, which decides whether the next one applies in place or links to Setup.
-- `app/views/dashboard/_track_proposal.html.erb` — submitted-day proposal, removable bundle and in-place Apply/Not now saves.
+- `app/views/dashboard/_track_proposal.html.erb` — submitted-day proposal with counts from the evidence, a removable list when several kinds share a destination, and in-place Apply/Not now saves.
 - `script/prepare_junior_ladders.rb` (+ `script/junior_ladder_preparation.rb`) — operator coverage report; explicit `--run` queues shared-reference refreshes using the operator's key.
 - `spec/requests/existing_account_pages_spec.rb` — exact pre-track Dashboard, Setup, Account and History snapshots. `UPDATE_PAGE_SNAPSHOTS=1` intentionally rewrites fixtures; never use it to conceal a learning-track regression.
 - `app/services/ai_service.rb` — provider-agnostic base: prompts, each language's prompt wording (`LANGUAGE_PROMPTS`), JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read. Also owns the judge prompt, the single-section retry call, and the two-stage entry point: `#generate_judged_exercise` drafts, then hands the draft to `JudgedGeneration`

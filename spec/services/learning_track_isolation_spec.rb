@@ -43,7 +43,7 @@ RSpec.describe "Learning track isolation" do
   it "sends byte-identical generation and judge prompts on and off the track" do
     baseline = prompts_for(twin("legacy@example.com", nil))
     on_track = twin("on@example.com", LearningTrack::ON,
-                    cutoffs: { ExerciseSection.learning_track_lead.key => "2026-10-13" })
+                    cutoffs: { "code_review" => "2026-10-13" })
     opted_out = twin("off@example.com", LearningTrack::OFF)
 
     [ on_track, opted_out ].each do |user|
