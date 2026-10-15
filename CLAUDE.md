@@ -447,7 +447,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   senior, or after leaving the track, the profile still says junior until
   the user changes it on Setup. Experienced asks a second question, where
   exercises should start (junior, mid-level or senior,
-  `WelcomeController::STARTING_LEVELS`), and records `"none"` with that
+  `TrackGraduation::LADDER`, the same list level suggestions move along), and records `"none"` with that
   `skill_level` in one request, without changing targets. The step stays in
   the browser because `first_run?` ends once any track is saved. Until
   suggestions open to every account, an Experienced account gets no level

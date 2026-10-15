@@ -80,7 +80,7 @@ end
    - S: "Two pieces of code both work, and you pick the one that suits the system described. Then you name the fact from the scenario or question that decides it."
    - E: "A grocery list app will add new kinds of items later. Piece A and Piece B both save an item today, built two different ways. You choose one and point to the sentence that settles it."
 3. **Pattern of the Month**
-   - S: "Each one names a design pattern and why it exists, then asks how you'd apply it to a stated problem. The answer box starts with headings for the parts a full answer covers."
+   - S: "Each day's section names a design pattern and why it exists, then asks how you'd apply it to a stated problem. The answer box starts with headings for the parts a full answer covers."
    - E: "The setting is a gym log, where one button saves a workout, updates a streak and sends a message. You're asked how you'd structure the work using the day's pattern, and you describe it in words. (Revised after review: the pattern section shows no code.)"
 4. **Coding Challenge**
    - S: "Write working code for a small task the question describes. Some days you start from a skeleton, and other days from an empty box."

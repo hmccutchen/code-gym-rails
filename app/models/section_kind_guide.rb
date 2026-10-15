@@ -16,7 +16,7 @@ module SectionKindGuide
                "You choose one and point to the sentence that settles it."
     },
     "pattern" => {
-      summary: "Each one names a design pattern and why it exists, then asks how you'd apply it to a stated problem. " \
+      summary: "Each day's section names a design pattern and why it exists, then asks how you'd apply it to a stated problem. " \
                "The answer box starts with headings for the parts a full answer covers.",
       example: "The setting is a gym log, where one button saves a workout, updates a streak and sends a message. " \
                "You're asked how you'd structure the work using the day's pattern, and you describe it in words."

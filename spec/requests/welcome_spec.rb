@@ -56,14 +56,14 @@ RSpec.describe "Welcome", type: :request do
     expect(heading.text).to eq("Where should your exercises start?")
     expect(heading["tabindex"]).to eq("-1")
     expect(step["aria-labelledby"]).to eq(heading["id"])
-    expect(step.css("[data-level]").map { |button| button["data-level"] }).to eq(WelcomeController::STARTING_LEVELS)
+    expect(step.css("[data-level]").map { |button| button["data-level"] }).to eq(TrackGraduation::LADDER)
     expect(step.css("[data-level]").map { |button| button.children.first.text.strip }).to eq(%w[Junior Mid-level Senior])
     expect(step.at_css('[data-action="click->welcome#back"]').text.strip).to eq("Back")
     expect(document.at_css('[data-track="none"]')["data-action"]).to eq("click->welcome#showLevels")
   end
 
   it "offers only levels a skill level can hold" do
-    expect(WelcomeController::STARTING_LEVELS - User::SKILL_LEVELS).to be_empty
+    expect(TrackGraduation::LADDER - User::SKILL_LEVELS).to be_empty
   end
 
   it "never asks a backfilled account with no exercises" do

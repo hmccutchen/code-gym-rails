@@ -1,6 +1,4 @@
 class WelcomeController < ApplicationController
-  STARTING_LEVELS = %w[junior mid_level senior].freeze
-
   skip_before_action :require_provider
 
   # GET /welcome
