@@ -192,35 +192,38 @@ export default class extends Controller {
   }
 
   persist() {
-    let revision
-    let savedLevels = {}
-    const payload = () => {
-      revision = this.editRevision
-      const state = this.state()
-      savedLevels = state.section_kind_levels
-      const steps = this.shownSteps(savedLevels)
-      const body = { user: Object.assign(state, { section_kind_preferences_version: this.versionValue }) }
-      if (steps.length > 0) body.level_suggestion_steps = steps
-      return body
-    }
+    const sent = { revision: undefined, levels: {} }
+    const payload = () => this.savePayload(sent)
 
     // Queued in order: a parallel save would post the version the one in flight is about to move, and 409 against itself.
-    return saveStatus.queue("exercise_mix", "PATCH", this.urlValue, payload).then((result) => {
-      const reported = result.data && result.data.section_kind_preferences_version
-      if (result.ok && typeof reported === "number") this.versionValue = reported
-      if (result.ok) this.forgetMovedSuggestions(savedLevels)
-      if (result.status === 409) this.suggestedValue = {}
-      if (result.status === 409 && result.data && result.data.current) {
-        this.applyServerState(result.data.current)
-        return revision === this.editRevision
-      }
+    return saveStatus.queue("exercise_mix", "PATCH", this.urlValue, payload).then((result) => this.reconcile(result, sent))
+  }
 
-      if (result.ok && revision === this.editRevision) {
-        this.applyLadderPreparation(result.data.ladder_preparation)
-        return true
-      }
-      return false
-    })
+  savePayload(sent) {
+    sent.revision = this.editRevision
+    const state = this.state()
+    sent.levels = state.section_kind_levels
+    const steps = this.shownSteps(sent.levels)
+    const body = { user: Object.assign(state, { section_kind_preferences_version: this.versionValue }) }
+    if (steps.length > 0) body.level_suggestion_steps = steps
+    return body
+  }
+
+  reconcile(result, sent) {
+    const reported = result.data && result.data.section_kind_preferences_version
+    if (result.ok && typeof reported === "number") this.versionValue = reported
+    if (result.ok) this.forgetMovedSuggestions(sent.levels)
+    if (result.status === 409) this.suggestedValue = {}
+    if (result.status === 409 && result.data && result.data.current) {
+      this.applyServerState(result.data.current)
+      return sent.revision === this.editRevision
+    }
+
+    if (result.ok && sent.revision === this.editRevision) {
+      this.applyLadderPreparation(result.data.ladder_preparation)
+      return true
+    }
+    return false
   }
 
   save() {
