@@ -1426,7 +1426,9 @@ RSpec.describe AiService do
     it "omits the retention block entirely when nothing is due" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
                             reinforcement: [], due_checks: [])
-      expect(prompt).not_to match(/retention check/i)
+      expect(prompt).not_to include("Retention checks due today")
+      expect(prompt).not_to include("previously MASTERED")
+      expect(prompt).not_to match(/fresh scenario for these/i)
     end
 
     it "annotates a language-bucket concept's legal sections for the architecture third" do
@@ -1542,7 +1544,7 @@ RSpec.describe AiService do
                             code_review_mode: :schema_review, reinforcement: [], due_checks: [ cm ])
 
       expect(prompt).not_to include("reading_for_intent ()")
-      expect(prompt).not_to match(/retention check/i)
+      expect(prompt).not_to include("Retention checks due today")
     end
 
     it "withholds a parsons_problem third for a group that kind excludes" do
@@ -1630,9 +1632,26 @@ RSpec.describe AiService do
 
     let(:untargeted) { render(difficulty: KindDifficulty.none) }
 
-    it "renders nothing new for a user with no targets" do
-      expect(render(difficulty: KindDifficulty.new(levels: {}, locked: []))).to eq(untargeted)
-      expect(untargeted).not_to include("Difficulty targets")
+    it "pitches every section at the skill level for a user with no targets" do
+      expect(user.skill_level).to eq("junior")
+      expect(untargeted).to include("Difficulty by section. Pitch each section named below at its level")
+      expect(untargeted).to include("Sections at junior: code_review, design_comparison, pattern, challenge, plan_review")
+      expect(untargeted).to include("A junior problem is: #{KindDifficulty::LEVEL_DEFINITIONS['junior']}")
+      expect(untargeted).not_to include("Locked (")
+    end
+
+    it "renders a target equal to the skill level exactly as no target" do
+      preset = KindDifficulty.new(levels: ExerciseSection.keys.index_with { "junior" }, locked: [])
+      ladders = { "junior" => { "n_plus_one" => "one visible query in a loop" } }
+
+      expect(render(difficulty: preset, ladders: ladders)).to eq(render(difficulty: KindDifficulty.none, ladders: ladders))
+    end
+
+    it "lists a targeted kind at its own level and the rest at the skill level" do
+      prompt = render(difficulty: KindDifficulty.new(levels: { "challenge" => "senior" }, locked: []))
+
+      expect(prompt).to include("Sections at junior: code_review, design_comparison, pattern, plan_review")
+      expect(prompt).to include("Sections at senior: challenge")
     end
 
     it "renders nothing new when the targeted kinds are not on today's plan" do
@@ -1669,14 +1688,16 @@ RSpec.describe AiService do
                                       locked: [ "challenge" ])
       prompt = render(difficulty: difficulty)
 
-      expect(prompt).to include("Unlocked (code_review): tier annotations and rating adjustments above still apply")
+      expect(prompt).to include("Unlocked (code_review, design_comparison, pattern, plan_review): tier annotations and " \
+                                "rating adjustments above still apply")
       expect(prompt).to include("Locked (challenge): for these sections, ignore the `(reduced)` easing rule")
       expect(prompt).to include("including a concept the engineer has never seen")
     end
 
     it "omits the lock line when nothing is locked, and the unlocked line when everything is" do
-      unlocked = render(difficulty: KindDifficulty.new(levels: { "challenge" => "senior" }, locked: []))
-      locked   = render(difficulty: KindDifficulty.new(levels: { "challenge" => "senior" }, locked: [ "challenge" ]))
+      every_kind = ExerciseSection.keys.index_with { "senior" }
+      unlocked = render(difficulty: KindDifficulty.new(levels: every_kind, locked: []))
+      locked   = render(difficulty: KindDifficulty.new(levels: every_kind, locked: every_kind.keys))
 
       expect(unlocked).not_to include("Locked (")
       expect(locked).not_to include("Unlocked (")
@@ -1690,16 +1711,15 @@ RSpec.describe AiService do
     end
 
     describe "#ladders_for" do
-      it "loads each targeted kind's rungs for the day's mode and merges them by level" do
+      it "loads each kind's rungs at its level for the day's mode and merges them by level" do
         ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
                                  ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
         schema_concept = ConceptVocabulary::DATA_MODELING_CONCEPTS.first
         ConceptReference.create!(concept: schema_concept, language: "ruby_rails",
                                  ladder_junior: "j2", ladder_mid_level: "m", ladder_senior: "s2", ladder_principal_engineer: "p2")
-        kinds = ExerciseSection.for_plan(third: :challenge, fourth: nil)
-        difficulty = KindDifficulty.new(levels: { "code_review" => "senior", "challenge" => "senior" }, locked: [])
+        rungs = { ExerciseSection::CodeReview => "senior", ExerciseSection::Challenge => "senior" }
 
-        ladders = service.send(:ladders_for, kinds, difficulty, "ruby_rails", :schema_review)
+        ladders = service.send(:ladders_for, rungs, "ruby_rails", :schema_review)
 
         expect(ladders.keys).to eq([ "senior" ])
         expect(ladders["senior"]).to include("n_plus_one" => "s", schema_concept => "s2")
@@ -1709,10 +1729,8 @@ RSpec.describe AiService do
         ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
                                  ladder_junior: "x" * 500, ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
         ConceptReference.create!(concept: "caching", language: "ruby_rails", ladder_junior: "j")
-        kinds = ExerciseSection.for_plan(third: :challenge, fourth: nil)
-        difficulty = KindDifficulty.new(levels: { "code_review" => "junior" }, locked: [])
-
-        rungs = service.send(:ladders_for, kinds, difficulty, "ruby_rails", :application_code)["junior"]
+        rungs = service.send(:ladders_for, { ExerciseSection::CodeReview => "junior" }, "ruby_rails",
+                             :application_code)["junior"]
 
         expect(rungs.fetch("n_plus_one").length).to eq(AiService::MAX_LADDER_RUNG_LENGTH)
         expect(rungs).not_to have_key("caching")
@@ -1730,7 +1748,7 @@ RSpec.describe AiService do
             (acc[level] ||= {}).merge!(vocabulary.index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
           end
 
-          service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
+          service.send(:kind_difficulty_guidance, placed.to_h, difficulty, ladders).length
         end.max + lock_subsets(kinds).map { |locked| lock_instruction_length(kinds, locked) }.max -
           lock_instruction_length(kinds, kinds)
       end
@@ -1774,7 +1792,8 @@ RSpec.describe AiService do
           (acc[levels.fetch(kind.key)] ||= {}).merge!(vocabulary.index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
         end
         difficulty = KindDifficulty.new(levels: levels, locked: [ "code_review" ])
-        mixed = service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
+        mixed = service.send(:kind_difficulty_guidance, kinds.to_h { |kind| [ kind, levels.fetch(kind.key) ] },
+                             difficulty, ladders).length
 
         expect(largest_block_for("javascript", :application_code, kinds)).to be >= mixed
       end
@@ -1787,10 +1806,11 @@ RSpec.describe AiService do
           targets = kinds.map(&:key).zip(levels).to_h
           [ {}, rungs ].each do |ladders|
             all_locked = KindDifficulty.new(levels: targets, locked: targets.keys)
-            baseline = service.send(:kind_difficulty_guidance, kinds, all_locked, ladders).length
+            placed = kinds.zip(levels).to_h
+            baseline = service.send(:kind_difficulty_guidance, placed, all_locked, ladders).length
             lock_subsets(kinds).each do |locked|
               difficulty = KindDifficulty.new(levels: targets, locked: locked.map(&:key))
-              actual = service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
+              actual = service.send(:kind_difficulty_guidance, placed, difficulty, ladders).length
               expected = baseline + lock_instruction_length(kinds, locked) - lock_instruction_length(kinds, kinds)
 
               expect(actual).to eq(expected)
@@ -2459,15 +2479,17 @@ RSpec.describe AiService do
       expect(payload["requested"]["scenario_flavor"]).to eq("everyday")
     end
 
-    it "omits difficulty fields when nothing targeted is on the plan" do
+    it "logs every planned kind at the skill level when nothing targeted is on the plan" do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       user.update!(section_kind_levels: { "architecture" => "senior" })
 
       payload = diagnostics_payload(double_class.new(canned_text: full_problem_set.to_json))
+      logged = payload["requested"]["kind_difficulty"]
 
-      expect(payload["requested"]).not_to have_key("kind_difficulty")
-      expect(payload["requested"]).not_to have_key("kind_difficulty_chars")
+      expect(logged.keys).to eq(%w[code_review design_comparison challenge plan_review])
+      expect(logged.values.map { |entry| entry.values_at("level", "targeted", "locked") }.uniq)
+        .to eq([ [ "junior", false, false ] ])
     end
 
     it "logs level, lock, coverage, the chosen concept, and the block's length" do
@@ -2482,8 +2504,8 @@ RSpec.describe AiService do
       payload = diagnostics_payload(double_class.new(canned_text: set.to_json))
       vocabulary = ConceptVocabulary.selectable_for_section("challenge", "ruby_rails", mode: :application_code)
 
-      expect(payload["requested"]["kind_difficulty"]).to eq(
-        "challenge" => { "level" => "principal_engineer", "locked" => true,
+      expect(payload["requested"]["kind_difficulty"]).to include(
+        "challenge" => { "level" => "principal_engineer", "targeted" => true, "locked" => true,
                          "ladder_coverage" => "1/#{vocabulary.size}",
                          "chosen_concept" => "n_plus_one", "chosen_grounded" => true }
       )

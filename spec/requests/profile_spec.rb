@@ -269,14 +269,14 @@ RSpec.describe "Profile", type: :request do
       expect(user.locked_section_kinds).to eq([ "challenge" ])
     end
 
-    it "returns deduplicated guidance preparation details for the saved targets" do
+    it "returns deduplicated guidance preparation details for every kind's level after the save" do
       login_as(user)
       expect(AiService).not_to receive(:for)
 
       patch_profile(section_kind_levels: { "code_review" => "senior", "challenge" => "junior" })
 
       coverage = LadderCoverage.for(user.reload)
-      count = coverage.gaps_for(KindDifficulty.for(user).targeted_kinds).size
+      count = coverage.gaps_for(ExerciseSection.all).size
       entry = coverage.for_kind(ExerciseSection::CodeReview)
       expect(response.parsed_body["ladder_preparation"]).to include(
         "count" => count, "button_label" => I18n.t("exercise_mix.ladders_button", count: count),
@@ -293,13 +293,15 @@ RSpec.describe "Profile", type: :request do
       expect(response.parsed_body["kind_rungs"]).to include("code_review" => "senior", "pattern" => user.skill_level)
     end
 
-    it "returns no guidance gaps when the last target is cleared" do
+    it "counts the cleared kind at the skill level when the last target is cleared" do
       login_as(user)
-      user.update!(section_kind_levels: { "challenge" => "junior" })
+      user.update!(section_kind_levels: { "challenge" => "senior" })
 
       patch_profile(section_kind_levels: {})
 
-      expect(response.parsed_body.dig("ladder_preparation", "count")).to eq(0)
+      count = LadderCoverage.for(user.reload).gaps_for(ExerciseSection.all).size
+      expect(count).to be_positive
+      expect(response.parsed_body.dig("ladder_preparation", "count")).to eq(count)
     end
 
     it "returns guidance preparation for the restored server state on a conflict" do
@@ -309,7 +311,7 @@ RSpec.describe "Profile", type: :request do
 
       patch_profile(section_kind_levels: { "challenge" => "junior" }, section_kind_preferences_version: stale)
 
-      count = LadderCoverage.for(user.reload).gaps_for(KindDifficulty.for(user).targeted_kinds).size
+      count = LadderCoverage.for(user.reload).gaps_for(ExerciseSection.all).size
       expect(response).to have_http_status(:conflict)
       expect(response.parsed_body.dig("current", "ladder_preparation", "count")).to eq(count)
     end

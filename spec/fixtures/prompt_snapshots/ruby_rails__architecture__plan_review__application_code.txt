@@ -57,6 +57,13 @@ Instructions:
 
 
 
+Difficulty by section. Pitch each section named below at its level; where it differs from the skill level in the engineer profile above, the section's level wins.
+
+Sections at junior: code_review, design_comparison, pattern, architecture, plan_review
+Pitch these problems at this level. A junior problem is: one clearly visible instance of the concept in a small scenario.
+
+A retention check or established concept placed in one of these sections is pitched at that section's level, with no easing.
+Unlocked (code_review, design_comparison, pattern, architecture, plan_review): tier annotations and rating adjustments above still apply to these sections, eased or raised from the section's level rather than from the profile's skill level.
 - Concepts most recently rated "too easy" must not repeat within the same week.
 - Concepts most recently rated "right level" have no special weighting.
 

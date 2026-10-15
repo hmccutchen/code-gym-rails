@@ -3,11 +3,11 @@ require "rails_helper"
 RSpec.describe "Learning track and level suggestion isolation" do
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
-  def twin(email, learning_track, cutoffs: {}, suggestions: true)
+  def twin(email, learning_track, cutoffs: {}, suggestions: true, levels: LearningTrack.preset_levels)
     User.create!(
       email: email, name: "Twin", time_zone: "UTC", provider: "fake", api_keys: { "fake" => "fake-test-key" },
       language: "ruby_rails", learning_track: learning_track, level_suggestion_cutoffs: cutoffs,
-      level_suggestions: suggestions, section_kind_levels: LearningTrack.preset_levels
+      level_suggestions: suggestions, section_kind_levels: levels
     )
   end
 
@@ -52,6 +52,13 @@ RSpec.describe "Learning track and level suggestion isolation" do
       actual = prompts_for(user)
       expect(actual).to eq(baseline), -> { first_difference(baseline, actual) }
     end
+  end
+
+  it "sends byte-identical calls for targets equal to the skill level and for no targets" do
+    preset = prompts_for(twin("preset@example.com", LearningTrack::ON))
+    following = prompts_for(twin("following@example.com", LearningTrack::OFF, levels: {}))
+
+    expect(following).to eq(preset), -> { first_difference(preset, following) }
   end
 
   let(:state_readers) do

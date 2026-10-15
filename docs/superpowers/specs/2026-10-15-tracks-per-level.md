@@ -1,6 +1,8 @@
 # Tracks per level
 
-Read on `origin/main` at **9ecd83b**. This plan covers PR 2 (every kind's level in the prompt) and PR 1 (tracks per level) in full, then PRs 3–5 in brief. No application code is written until it is reviewed.
+Read on `origin/main` at **9ecd83b**. This plan covers PR 2 (every kind's level in the prompt) and PR 1 (tracks per level) in full, then PRs 3–5 in brief.
+
+**Status.** PR 2 is implemented in the same pull request as this plan, and merges and deploys on its own before PR 1. PR 1 below is the revised plan, waiting for review: it adds the target-clearing rule to every track change.
 
 ## Decisions this plan follows
 
@@ -11,15 +13,15 @@ Read on `origin/main` at **9ecd83b**. This plan covers PR 2 (every kind's level 
 - **5a.** Principal engineer is set by hand in Setup. Senior is the highest track graduation reaches, and the copy and CLAUDE.md say so.
 - **6.** The per-kind evidence read stays at the latest 60 responses.
 - "Leave the track" is removed. Graduation follows the "Suggest level changes" switch.
-- The target-clearing table from the investigation stands as written.
+- The target-clearing table from the investigation stands as written, and applies to every track change, by hand in Setup as well as by graduation.
+- **Q1** yes: ladder preparation follows every section's level. **Q2**: senior needs all but one reachable area. **Q3**: a mixed-language account covers an area in either language. **Q4**: graduation reads only reviews dated after PR 4 shipped.
 
 ## Sequencing
 
-**Recommendation: both options together.** PR 2 merges and deploys on its own first. PR 1 then leaves every existing target untouched, with no data migration of targets, then or later.
+**Decided: PR 2 merges and deploys on its own first.** PR 1 runs no data migration of targets. Existing targets change only when the track changes, through the rule in PR 1's scope item 10.
 
 - **PR 2 first.** It makes a target that equals the skill level render byte-identically to no target. After it, a junior preset and "no target at skill level junior" send the same generation and judge calls, and a spec pins that. PR 1 can then stop writing presets without any account's prompt changing.
-- **PR 1 never clears targets.** Existing preset targets stay, but they no longer change anything in a prompt. They matter again only when the track moves, and graduation's clearing table removes them then: unlocked targets equal to the old or new level are cleared. A migration that clears them now would be a one-way data change for no prompt difference.
-- **Your junior account's one visible difference** until graduation: if you change the track by hand in Setup, its preset kinds stay at junior, because a target does not follow the track. Each kind's "Default" option in the Exercise mix clears one, or a one-off console update clears them all. I would leave them for graduation.
+- **PR 1 runs no target migration.** Existing preset targets stay, and after PR 2 they no longer change anything in a prompt. They matter again only when the track moves, and every track change, by hand or by graduation, then clears the unlocked ones equal to the old or new level.
 
 Why not ship both in one deploy: PR 2 changes every account's prompt and all 72 prompt snapshots, while PR 1 changes onboarding and Setup. Separate deploys keep each rollback independent. The only ordering risk is a new junior-track account created under PR 1 before PR 2 is live, which would get the weaker prompt. Merging PR 2 first removes that risk.
 
@@ -94,13 +96,18 @@ No migration. Rolling back the code restores the old prompts byte for byte, beca
 - **Medium.** Every account's generation prompt changes. The new text says what the profile line and the stamped rung already meant, so the intended pitch doesn't move, but the model now reads an explicit level definition for every section. That can shift how hard untargeted sections come out. Nothing measures this beyond `[difficulty_diagnostics]` and the ratings that follow.
 - **Prompt size.** An untargeted account with no grounded ladders adds a few hundred characters. One whose concepts have ladders adds up to the existing bound. That costs more input tokens per generation by an unmeasured amount.
 
-### Open question
+### As built
 
-**Q1. Should ladder preparation follow every section's level (item 5)?** It widens `prepare_ladders`, a rewrite of shared references, from "concepts behind targets you set" to "concepts behind every section's level". The click still says the wording may change and still bills only the person who clicks. I recommend including it; otherwise junior-track accounts lose the control after PR 1. Dropping it makes PR 2 change 0 page snapshots.
+- The block's worst case measured 53,668 characters, up from 53,632, under the 54,000 bound.
+- `KindDifficulty#targeted_kinds` lost its last caller and was removed. `KindDifficulty#rungs_for(kinds, skill_level:)` is the one helper the call sites share.
+- `setup.html` changed as predicted: the preparation section shows, the button counts concepts, and the design comparison's coverage reads 0 of 20.
+- Specs that used "the control is hidden" as their signal for "no account with no targets" now check that the button is disabled while a save is pending, the property they were guarding. The retention spec that matched `/retention check/i` now matches the retention block's own heading, since the difficulty block always names retention checks.
 
 ---
 
-## PR 1: tracks per level
+## PR 1: tracks per level (revised, for review)
+
+The revision adds scope item 10: every track change applies the target-clearing table, not only graduation.
 
 ### Scope
 
@@ -111,7 +118,7 @@ No migration. Rolling back the code restores the old prompts byte for byte, beca
 2. **The choice is recorded in a new column, `users.track_chosen_at`** (nullable datetime).
    - `User#first_run?` becomes `persisted? && track_chosen_at.nil? && !daily_exercises.exists?`.
    - `learning_track` is no longer read. For one release, a track choice also writes `learning_track: "none"`, so rolled-back code doesn't send new accounts to `/welcome` again. A later cleanup PR drops the column (the repo's one-release pattern).
-3. **No presets.** The welcome choice writes no `section_kind_levels` and needs no `section_kind_preferences_version`. Existing targets are untouched (see Sequencing).
+3. **No presets.** The welcome choice writes no `section_kind_levels` and needs no `section_kind_preferences_version`. No migration touches existing targets; they change only through item 10.
 4. **Removed:**
    - `LearningTrack.preset_levels`, `START_LEVEL`, `START_SKILL_LEVEL`, then the `LearningTrack` module itself. The validation moves to a literal list for the one release, then goes with the column.
    - `User#on_learning_track?`, `#learning_track_change_allowed?`, `#finish_learning_track` and its `before_save`.
@@ -130,11 +137,39 @@ No migration. Rolling back the code restores the old prompts byte for byte, beca
    - Update the File Map: `learning_track.rb` goes; `welcome_controller.rb` stays.
    - Change the spec-helper note (`create_user_with_key` defaults to a chosen track).
    - Add the line: "Senior is the highest track graduation reaches; principal engineer is set by hand in Setup."
+   - State the target-clearing rule in the Tracks bullet, once, with `TrackChange` as its authority.
+10. **Every track change clears the targets the track now covers.** One rule, `TrackChange` (`app/models/track_change.rb`, pure over plain values), applied whenever `skill_level` changes after the first choice: by hand in Setup now, and by graduation in PR 5.
+
+    | Target | On a track change | Why |
+    | --- | --- | --- |
+    | Equal to the old or new level, unlocked | Cleared | Redundant; the kind rejoins the track |
+    | Above the new level | Kept | The kind earned more |
+    | Below the old level | Kept | The kind stepped back |
+    | Locked | Kept | The user asked for it |
+
+    The table assumes a one-rung move. A hand move in Setup can skip a rung (junior to senior), so the rule is stated by level rather than by rung distance:
+    - an unlocked target equal to the old or the new level is cleared;
+    - every other target is kept, and so are locked ones.
+
+    So a junior-to-senior move clears junior and senior targets and keeps a mid-level one, which sits between the two levels. That kind earned or chose its level, and the kept line names it so the person can clear it by hand.
+
+    - **Where it runs:** a `before_save` on `User`, when `skill_level` changes and the save is not the first track choice. It runs before `record_level_changes`, so cutoffs and event rows see the final rungs.
+      - A kind whose target was cleared and whose rung moves (a junior preset when the track goes to mid-level) gets a cutoff at its new rung and a `skill_level_edit` event row, like any kind the skill level moved.
+      - A kind whose target equalled the new level keeps its rung, so it gets neither.
+      - `LevelSuggestionEvent.source_for` learns that a target removed by `TrackChange` counts as `skill_level_edit`, not `setup_edit`; `User` hands it the cleared kinds.
+    - **Version:** clearing targets changes `section_kind_levels`, so `section_kind_preferences_version` bumps. Another open Setup tab gets the existing 409 on its next Exercise mix save and re-syncs from the server.
+    - **Setup in the same tab:**
+      - A track save's reply also carries `section_kind_levels`, `locked_section_kinds`, `section_kind_preferences_version`, `kind_rungs`, `ladder_preparation` and `kept_own_level` (the kinds `TrackChange` kept, with their levels).
+      - `profile_preferences_controller.js` hands the server state to the Exercise mix through its existing `applyServerState`, sent as a Stimulus event rather than a reach into the other controller. Cleared kinds then show "Your track (…)" and kept ones their level.
+      - A status line under the select names the kinds that kept their own level, and is empty when none did.
+    - **Graduation (PR 5)** builds the same `TrackChange` to show the card's "keeps its own level" list before Apply, and its Apply goes through the same `before_save`. The rule has one statement.
 
 ### Files
 
 - `db/migrate/2026101xxxxxxx_add_track_chosen_at_to_users.rb`: add the column; backfill `track_chosen_at = created_at` where `learning_track IS NOT NULL`. That covers every backfilled `"none"` account and your `"junior"` account.
 - `app/models/user.rb`, `app/models/learning_track.rb` (deleted), `app/controllers/profile_controller.rb`.
+- `app/models/track_change.rb` (new), `app/models/level_suggestion_event.rb` (`source_for`).
+- `app/javascript/controllers/profile_preferences_controller.js` (applies a track save's reply and shows the kept line), `app/javascript/controllers/exercise_mix_controller.js` (listens for the server-state event), `app/views/api_keys/edit.html.erb` (the kept line's status element).
 - `app/views/welcome/show.html.erb`, `app/javascript/controllers/welcome_controller.js`.
 - `app/views/api_keys/edit.html.erb`; `app/views/api_keys/_learning_track.html.erb` and `app/javascript/controllers/learning_track_controller.js` deleted.
 - `config/locales/en.yml`:
@@ -145,7 +180,7 @@ No migration. Rolling back the code restores the old prompts byte for byte, beca
   - so the `learning_track` namespace goes.
 - `app/views/api_keys/_key_guide.html.erb`: 23 key lookups, renamed only.
 - `spec/support/auth_helpers.rb`: helpers take `track_chosen_at:`, defaulting to a time; a first-run spec passes `nil`.
-- Code notes: `docs/code-notes/app/models/user.md`, `app/controllers/profile_controller.md`, `app/javascript/controllers/welcome_controller.md`; `learning_track_controller.md` deleted.
+- Code notes: `docs/code-notes/app/models/user.md`, `app/controllers/profile_controller.md`, `app/javascript/controllers/welcome_controller.md`, `app/models/track_change.md` (new); `learning_track_controller.md` deleted.
 - `CLAUDE.md`, as in scope item 9.
 
 ### Migration and rollback
@@ -160,7 +195,7 @@ No migration. Rolling back the code restores the old prompts byte for byte, beca
 
 ### Snapshots (counted on 9ecd83b)
 
-- **Page: 5 of 5 change.** Every page's import map lists each Stimulus controller with its digest. PR 1 deletes `learning_track_controller.js` and edits `welcome_controller.js`, so all five change there. `setup.html` also changes in the track label, the hint and the Exercise mix's default-option label.
+- **Page: 5 of 5 change.** Every page's import map lists each Stimulus controller with its digest. PR 1 deletes `learning_track_controller.js` and edits `welcome_controller.js`, `profile_preferences_controller.js` and `exercise_mix_controller.js`, so all five change there. `setup.html` also changes in the track label, the hint, the Exercise mix's default-option label and the empty kept line.
 - **Prompt: 0 of 72.** The profile line still reads "Skill level: …" and keys on the level only.
 - **Request: 0 of 15.**
 
@@ -178,6 +213,21 @@ No migration. Rolling back the code restores the old prompts byte for byte, beca
 - `first_run?` for not chosen with no exercise, chosen, and has exercises;
 - no `finish_learning_track` behavior remains;
 - a skill-level change after the choice still records cutoffs and events.
+
+**`spec/models/track_change_spec.rb`** (new, no database), the table row by row:
+- unlocked targets at the old level and at the new level are cleared;
+- a target above the new level is kept, and so is one below the old level;
+- a locked target at the old level is kept;
+- a two-rung move (junior to senior) keeps a mid-level target;
+- `kept` lists exactly the kinds that keep a target.
+
+**`spec/requests/profile_track_change_spec.rb`** (new), through `PATCH /profile` with `skill_level`:
+- **your account's case:** every kind preset at junior, one locked and one at senior; the track moves to mid_level. Afterwards no unlocked kind holds a junior target, the locked kind keeps junior, and the senior kind keeps senior;
+- the cleared kinds get a cutoff at mid_level and a `skill_level_edit` event row each; a kind whose target equalled the new level gets neither;
+- `section_kind_preferences_version` bumps, and a stale Exercise mix save from another tab gets the 409;
+- the reply carries the levels, the version and `kept_own_level`.
+
+**`spec/system/setup_track_change_spec.rb`** (new): changing the select to Mid-level shows the cleared kinds' radios at "Your track (Mid-level)" without a reload, and the status line names the kept kinds; the next Exercise mix edit saves with no 409.
 
 **`spec/requests/welcome_spec.rb`, `spec/system/welcome_spec.rb`:**
 - three buttons, no Experienced, no principal;
@@ -224,12 +274,14 @@ No line names a job title or claims what the person is; each says what the exerc
 - Label: "Track"
 - Hint, for PR 1, before graduation exists: "The level every section uses unless you set one for it in the Exercise mix below. When your reviewed answers show a section is ready to move, Code Gym suggests a level for that section, and you decide. Principal engineer is set only here; Code Gym never suggests it." PR 5 adds the sentence about suggesting the next track.
 - `exercise_mix.level_default`: "Your track (%{skill_level})", replacing "Your skill level (…)".
+- Kept line, after a track change that kept some kinds: "These sections kept their own level: Pattern (Senior), Challenge (Junior, locked). Choose Your track for any of them in the Exercise mix to have it follow the track."
+- A sentence added to the hint: "Changing your track also moves any section set to your old or new level, unless it is locked."
 
 ### Risk
 
-- **Low to medium.** Onboarding and Setup only, with no prompt change.
-- The main risk is a stale tab, handled by the 422.
-- The second is a rollback window, handled by the dual write.
+- **Medium.** Onboarding and Setup, with no prompt change of its own. A track change now rewrites targets, which a person can't undo with one click; the kept line and the hint say what happened.
+- A stale tab is handled by the 422, and an open Exercise mix by the version bump and its existing 409.
+- The rollback window is handled by the dual write. Targets cleared by a track change before a rollback stay cleared, which old code reads as following the skill level, its own meaning.
 
 ---
 
@@ -251,9 +303,7 @@ No line names a job title or claims what the person is; each says what the exerc
   - areas only the rare language-independent kinds can reach are left out, so complexity cause is excluded.
 - **Evidence:** `ReviewedSectionResults::Result` gains `concept`. A new reader takes rubric-stamped, answered, un-eased results at the current track's level, grouped by area. An area counts when 2 of its latest 3 results are solid or better.
 - **The spec simulates the 2-of-latest-3 rule.** A seeded simulation uses the real `SectionRotation`, vocabularies and mode weights, as in the investigation. It records the share of accounts that qualify at 2, 3 and 4 sections over 22, 43 and 60 weekdays. It asserts the rule is reachable at two sections within 60 weekdays for an account answering everything at a 70% solid rate. The table goes in the code note, and the bound is set from the first run.
-- **Open, for your review:**
-  - **Q2.** Senior has 5 reachable areas for Rails and 4 for JavaScript. Is the bar 4 of 5 and 3 of 4, or "all but one"? I recommend all but one.
-  - **Q3.** A "mixed" account has two language buckets. I recommend an area counts if it is covered in either.
+- **Decided:** senior needs all but one reachable area (4 of 5 for Rails, 3 of 4 for JavaScript; mid-level stays 4 of 6), and a mixed-language account covers an area in either language.
 
 ### PR 4: level-specific grader expectations
 
@@ -268,14 +318,14 @@ No line names a job title or claims what the person is; each says what the exerc
 - **Snapshots:** 0 of 72, 0 of 15, 0 of 5.
 - **Specs:** about 15 `grading_note` references across 4 spec files, plus the "notes never restate the levels" spec.
 - **Calibration:** a billed re-run with mid and senior fixtures added. You run it.
-- **Known effect:** mid-level and senior results graded before PR 4 sit beside stricter ones graded after. 3c accepts this. Graduation (PR 5) should ship only after a few weeks of post-PR 4 reviews, or read only reviews after PR 4's date. I recommend the date.
+- **Known effect:** mid-level and senior results graded before PR 4 sit beside stricter ones graded after. 3c accepts this. Decided: graduation reads only reviews dated after PR 4 shipped.
 
 ### PR 5: graduation suggestion
 
 - A card on the submitted dashboard, one at a time: per-kind step-back, then graduation, then per-kind step-ups.
 - **It offers the next track up to Senior,** never Principal. It shows nothing at Senior or Principal.
 - **It follows the "Suggest level changes" switch.**
-- **Apply** goes through `PATCH /profile` with a graduation step, checked under the row lock against the current `skill_level`. It applies the target-clearing table as written, and the card names the kinds that keep their own level.
+- **Apply** goes through `PATCH /profile` with a graduation step, checked under the row lock against the current `skill_level`. The skill-level change runs PR 1's `TrackChange`, and the card names the kinds it would keep before Apply.
 - **Not now** adds an `"overall"` entry to `level_suggestion_cutoffs`. Nothing validates that map's keys today (checked).
 - **Events:**
   - `level_suggestion_events.kind` accepts `"overall"`;
@@ -290,9 +340,10 @@ No line names a job title or claims what the person is; each says what the exerc
 - Ignore, then drop `users.learning_track`.
 - Remove the dual write and the literal validation.
 
-## Open questions for review
+## Decisions recorded
 
-- **Q1.** Ladder preparation follows every section's level (PR 2, item 5). Recommended: yes.
-- **Q2.** Senior area threshold. Recommended: all but one reachable area.
-- **Q3.** Mixed-language accounts. Recommended: an area counts if covered in either language.
-- **Q4.** PR 5 reads reviews dated after PR 4 shipped. Recommended: yes.
+- **Q1.** Ladder preparation follows every section's level: yes, built in PR 2.
+- **Q2.** Senior area threshold: all but one reachable area.
+- **Q3.** Mixed-language accounts: an area counts if covered in either language.
+- **Q4.** PR 5 reads only reviews dated after PR 4 shipped.
+- Every track change applies the target-clearing rule (PR 1, item 10).

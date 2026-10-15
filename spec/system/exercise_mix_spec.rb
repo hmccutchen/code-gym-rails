@@ -161,7 +161,7 @@ RSpec.describe "Exercise mix", type: :system do
     changes.each do |kind, level, expected|
       find(".mix-difficulty[data-kind='#{kind}'] input[value='#{level}']").click
       expect(difficulty_after_save(expected, [])).to eq([ expected, [] ])
-      count = LadderCoverage.for(user).gaps_for(KindDifficulty.for(user).targeted_kinds).size
+      count = LadderCoverage.for(user).gaps_for(ExerciseSection.all).size
       if count.positive?
         expect(page).to have_button(I18n.t("exercise_mix.ladders_button", count: count), disabled: false)
       else
@@ -216,17 +216,18 @@ RSpec.describe "Exercise mix", type: :system do
     expect(find(".mix-difficulty[data-kind='pattern'] .mix-coverage")).to have_text(/of \d+ concepts have AI difficulty guidance/)
   end
 
-  it "makes the optional AI guidance control available after a first target without closing the settings" do
+  it "offers the optional AI guidance control before any target, and keeps it after one without closing the settings" do
     visit_as(user)
     visit setup_path
     find("#exercise-mix summary").click
 
-    expect(page).not_to have_css(".mix-ladders")
+    expect(page).to have_css(".mix-ladders", visible: true)
 
     find(".mix-difficulty[data-kind='pattern'] input[value='junior']").click
 
-    expect(page).to have_css(".mix-ladders", visible: true)
-    expect(user.reload.section_kind_levels).to eq("pattern" => "junior")
+    expect(difficulty_after_save({ "pattern" => "junior" }, [])).to eq([ { "pattern" => "junior" }, [] ])
+    count = LadderCoverage.for(user.reload).gaps_for(ExerciseSection.all).size
+    expect(page).to have_button(I18n.t("exercise_mix.ladders_button", count: count), disabled: false)
     expect(find("#exercise-mix")).to match_css("[open]")
     expect(page).to have_content(I18n.t("exercise_mix.ladders_explanation"))
   end
@@ -244,7 +245,7 @@ RSpec.describe "Exercise mix", type: :system do
     expect(find(".mix-difficulty[data-kind='pattern'] input[value='senior']")).to be_checked
     expect(find("#lock-pattern")).to be_checked
     expect(find(".mix-difficulty[data-kind='code_review'] input[value='']")).to be_checked
-    count = LadderCoverage.for(user.reload).gaps_for(KindDifficulty.for(user).targeted_kinds).size
+    count = LadderCoverage.for(user.reload).gaps_for(ExerciseSection.all).size
     expect(page).to have_button(I18n.t("exercise_mix.ladders_button", count: count), disabled: false)
   end
 
@@ -302,7 +303,7 @@ RSpec.describe "Exercise mix", type: :system do
       end
 
       wait_for_mix_responses(2)
-      expect(page).not_to have_css(".mix-ladders", visible: true)
+      expect(page).to have_button("prepare-ladders", disabled: true)
       page.execute_script("window.mixResponses[1]()")
 
       expect(page).to have_css(".mix-ladders", visible: true)

@@ -784,7 +784,7 @@ class AiService
     history    = user.recent_performance
     difficulty = KindDifficulty.for(user)
     kinds      = ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth, pattern: plan.pattern)
-    ladders    = ladders_for(kinds, difficulty, language, plan.code_review_mode)
+    ladders    = ladders_for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode)
     options    = exercise_prompt_options(plan, history, difficulty, ladders)
 
     result = call_and_log(
@@ -1065,7 +1065,8 @@ class AiService
       size: plan.size.diagnostics,
       recent_performance: history
     }
-    requested.merge!(kind_difficulty_diagnostics(kinds, difficulty, ladders, language, plan.code_review_mode, problem_set))
+    rungs = difficulty.rungs_for(kinds, skill_level: user.skill_level)
+    requested.merge!(kind_difficulty_diagnostics(rungs, difficulty, ladders, language, plan.code_review_mode, problem_set))
 
     payload = {
       event: "generation",
@@ -1098,20 +1099,17 @@ class AiService
     entries.select { |h| h[:tier] == "reduced" }.map { |h| h[:concept] }
   end
 
-  def kind_difficulty_diagnostics(kinds, difficulty, ladders, language, mode, problem_set)
-    targeted = kinds & difficulty.targeted_kinds
-    return {} if targeted.empty?
-
-    per_kind = targeted.to_h do |kind|
-      vocabulary = ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: difficulty.level_for(kind))
-      grounded   = vocabulary & ladders.fetch(difficulty.level_for(kind), {}).keys
+  def kind_difficulty_diagnostics(rungs, difficulty, ladders, language, mode, problem_set)
+    per_kind = rungs.to_h do |kind, rung|
+      vocabulary = ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: rung)
+      grounded   = vocabulary & ladders.fetch(rung, {}).keys
       chosen     = problem_set.dig(kind.key, "concept")
-      [ kind.key, { level: difficulty.level_for(kind), locked: difficulty.locked?(kind),
+      [ kind.key, { level: rung, targeted: difficulty.targeted?(kind), locked: difficulty.locked?(kind),
                     ladder_coverage: "#{grounded.size}/#{vocabulary.size}",
                     chosen_concept: chosen, chosen_grounded: grounded.include?(chosen) } ]
     end
 
-    { kind_difficulty: per_kind, kind_difficulty_chars: kind_difficulty_guidance(kinds, difficulty, ladders).length }
+    { kind_difficulty: per_kind, kind_difficulty_chars: kind_difficulty_guidance(rungs, difficulty, ladders).length }
   end
 
   def without_answer_key(problem_set)
@@ -1189,7 +1187,7 @@ class AiService
 
     kinds = only ? [ only ] : ExerciseSection.for_plan(third: third, fourth: fourth, pattern: pattern)
 
-    rungs = kinds.index_with { |kind| difficulty.rung_for(kind, skill_level: user.skill_level) }
+    rungs = difficulty.rungs_for(kinds, skill_level: user.skill_level)
     annotated_due_checks = due_checks.filter_map { |cm| annotate_retention_concept(cm, kinds, language, code_review_mode, rungs) }
 
     retention_block =
@@ -1315,7 +1313,7 @@ class AiService
       #{retention_block}
       #{established_block}
       #{fourth_retention_block}
-      #{fourth_established_block}#{kind_difficulty_guidance(kinds, difficulty, ladders)}
+      #{fourth_established_block}#{kind_difficulty_guidance(rungs, difficulty, ladders)}
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
@@ -1466,14 +1464,10 @@ class AiService
       "it IS the answer rather than describing it."
   end
 
-  def ladders_for(kinds, difficulty, language, code_review_mode)
-    targeted = kinds & difficulty.targeted_kinds
-    return {} if targeted.empty?
-
-    requests = targeted.map do |kind|
-      { level: difficulty.level_for(kind), bucket: ConceptBucket.for(kind.key, language),
-        concepts: ConceptVocabulary.selectable_for_section(kind.key, language, mode: code_review_mode,
-                                                             rung: difficulty.level_for(kind)) }
+  def ladders_for(rungs, language, code_review_mode)
+    requests = rungs.map do |kind, rung|
+      { level: rung, bucket: ConceptBucket.for(kind.key, language),
+        concepts: ConceptVocabulary.selectable_for_section(kind.key, language, mode: code_review_mode, rung: rung) }
     end
     pairs = requests.flat_map { |request| request[:concepts].map { |concept| [ request[:bucket], concept ] } }.uniq
 
@@ -1491,18 +1485,15 @@ class AiService
     end
   end
 
-  def kind_difficulty_guidance(kinds, difficulty, ladders)
-    targeted = kinds & difficulty.targeted_kinds
-    return "" if targeted.empty?
-
-    locked, unlocked = targeted.partition { |kind| difficulty.locked?(kind) }
+  def kind_difficulty_guidance(rungs, difficulty, ladders)
+    locked, unlocked = rungs.keys.partition { |kind| difficulty.locked?(kind) }
     paragraphs = KindDifficulty::LEVELS.filter_map do |level|
-      at_level = targeted.select { |kind| difficulty.level_for(kind) == level }
+      at_level = rungs.select { |_kind, rung| rung == level }.keys
       level_difficulty_paragraph(level, at_level, ladders.fetch(level, {})) if at_level.any?
     end
 
-    [ "", "Difficulty targets. For each section named below, its level replaces the skill level in the " \
-          "engineer profile above, for that section only.",
+    [ "", "Difficulty by section. Pitch each section named below at its level; where it differs from the " \
+          "skill level in the engineer profile above, the section's level wins.",
       *paragraphs, "",
       "A retention check or established concept placed in one of these sections is pitched at that " \
       "section's level, with no easing.",

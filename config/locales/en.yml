@@ -378,7 +378,7 @@ en:
     write_guide: "Write this up"
     writing_guide: "Writing it up — this takes a few seconds."
     write_guide_failed: "Still working on it. Reload this page in a minute to check."
-    ladder_offer: "Optional: prepare concept-specific guidance to help the AI apply your %{targets} difficulty target. Your target works without it. This uses your API key and may change the shared reference's wording."
+    ladder_offer: "Optional: prepare concept-specific guidance to help the AI pitch this concept at each section's level in %{targets}. Generation works without it. This uses your API key and may change the shared reference's wording."
     write_ladder: "Prepare AI guidance"
     ladder_missing: "The reference was rewritten, but the AI difficulty guidance didn't come back. You can try again."
     code_examples: "Code examples"
@@ -506,10 +506,10 @@ en:
     ladders_button:
       one: "Prepare AI guidance for 1 concept"
       other: "Prepare AI guidance for %{count} concepts"
-    ladders_explanation: "Optional: prepare concept-specific guidance that tells the AI what problems at each difficulty level should look like. Your targets work without it. The count is the concepts behind your targets that still need guidance; this does not generate a new exercise set."
+    ladders_explanation: "Optional: prepare concept-specific guidance that tells the AI what problems at each section's level should look like. Your levels work without it. The count is the concepts behind your sections' levels that still need guidance; this does not generate a new exercise set."
     ladders_cost: "One provider call per concept, on your API key. What it writes is shared with everyone on the team, and rewrites those concepts' references, so their wording may change."
     ladders_preparing:
-      zero: "AI difficulty guidance is already prepared for your targeted concepts."
+      zero: "AI difficulty guidance is already prepared for the concepts behind your sections' levels."
       one: "Preparing AI guidance for one concept. Reload this page later to see updated coverage."
       other: "Preparing AI guidance for %{count} concepts. Reload this page later to see updated coverage."
     stops:

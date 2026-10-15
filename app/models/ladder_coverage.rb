@@ -1,11 +1,12 @@
-# Every kind gets an entry whether or not it is targeted; callers filter for targets themselves.
+# Each kind is read at its rung, its target or else the skill level, since the prompt grounds every kind at it.
 class LadderCoverage
   Entry = Data.define(:kind, :pairs, :grounded) do
     def gaps = pairs - grounded
   end
 
   def self.for(user)
-    pairs_by_kind = ConceptHosts.for(user, difficulty: KindDifficulty.for(user)).pairs_by_kind
+    at_rungs = KindDifficulty.new(levels: user.kind_rungs, locked: [])
+    pairs_by_kind = ConceptHosts.for(user, difficulty: at_rungs).pairs_by_kind
     grounded = laddered_pairs(pairs_by_kind.values.flatten(1).uniq)
 
     new(pairs_by_kind.to_h { |kind, pairs| [ kind, Entry.new(kind: kind, pairs: pairs, grounded: pairs & grounded) ] })

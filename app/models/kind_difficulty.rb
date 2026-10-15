@@ -41,11 +41,11 @@ class KindDifficulty
     ExerciseSection.all.to_h { |kind| [ kind.key, rung_for(kind, skill_level: skill_level) ] }
   end
 
-  def locked?(kind)
-    targeted?(kind) && @locked.include?(kind.key)
+  def rungs_for(kinds, skill_level:)
+    kinds.index_with { |kind| rung_for(kind, skill_level: skill_level) }
   end
 
-  def targeted_kinds
-    ExerciseSection.all.select { |kind| targeted?(kind) }
+  def locked?(kind)
+    targeted?(kind) && @locked.include?(kind.key)
   end
 end
