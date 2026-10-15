@@ -27,7 +27,7 @@ en:
       experienced_hint: "Pick the level your exercises start at next. Setup lets you change it any time, or set a level for each kind of section."
       level_title: "Where should your exercises start?"
       level_hints:
-        junior: "New to working in a team's codebase, or changing careers."
+        junior: "Experienced, but new to this language or stack, or want an easier start."
         mid_level: "A few years in, and comfortable shipping features on your own."
         senior: "You review other people's work and weigh tradeoffs often."
       back: "Back"

@@ -16,7 +16,7 @@ module SectionKindGuide
                "You choose one and point to the sentence that settles it."
     },
     "pattern" => {
-      summary: "Each day's section names a design pattern and why it exists, then asks how you'd apply it to a stated problem. " \
+      summary: "This section names a design pattern and why it exists, then asks how you'd apply it to a stated problem. " \
                "The answer box starts with headings for the parts a full answer covers.",
       example: "The setting is a gym log, where one button saves a workout, updates a streak and sends a message. " \
                "You're asked how you'd structure the work using the day's pattern, and you describe it in words."
@@ -42,7 +42,7 @@ module SectionKindGuide
     },
     "parsons_problem" => {
       summary: "Put shuffled pieces of code back in the order that works. " \
-               "Drag them, or move one with Ctrl (Command on a Mac) and the up or down arrow.",
+               "Drag them into place, or move them with the keyboard.",
       example: "A short method that totals a gym member's weekly workouts arrives in a random order. " \
                "You arrange the pieces until the method would run and give the right total."
     },

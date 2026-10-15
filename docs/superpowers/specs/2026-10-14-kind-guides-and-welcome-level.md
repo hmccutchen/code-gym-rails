@@ -8,7 +8,7 @@
    - Fixed ambiguity hunt: "what you'd need clarified" instead of "list the questions".
    - Fixed plan review: the plan is written as if by an AI assistant, not a teammate.
    - Fixed design comparison: the deciding fact can be in the question as well as the scenario.
-   - Fixed Parsons: it reorders blocks, and Command works as well as Ctrl.
+   - Fixed Parsons: it reorders blocks. The keys are left to the section's own hint (§12).
 2. **"planted" removed** from Code Review. None of the other nine used it. I also dropped "spec" from the ambiguity hunt example.
 3. **Example domains:**
    - gym: 3 (pattern, Parsons, plan review)
@@ -80,7 +80,7 @@ end
    - S: "Two pieces of code both work, and you pick the one that suits the system described. Then you name the fact from the scenario or question that decides it."
    - E: "A grocery list app will add new kinds of items later. Piece A and Piece B both save an item today, built two different ways. You choose one and point to the sentence that settles it."
 3. **Pattern of the Month**
-   - S: "Each day's section names a design pattern and why it exists, then asks how you'd apply it to a stated problem. The answer box starts with headings for the parts a full answer covers."
+   - S: "This section names a design pattern and why it exists, then asks how you'd apply it to a stated problem. The answer box starts with headings for the parts a full answer covers."
    - E: "The setting is a gym log, where one button saves a workout, updates a streak and sends a message. You're asked how you'd structure the work using the day's pattern, and you describe it in words. (Revised after review: the pattern section shows no code.)"
 4. **Coding Challenge**
    - S: "Write working code for a small task the question describes. Some days you start from a skeleton, and other days from an empty box."
@@ -92,7 +92,7 @@ end
    - S: "Find the one weakness someone could exploit in a short piece of code, and say how you'd close it. It trains you to read code the way an attacker would."
    - E: "You see a short controller action that shows a shared shopping list. The question asks what someone could exploit here and how you'd stop it."
 7. **Parsons Problem**
-   - S: "Put shuffled pieces of code back in the order that works. Drag them, or move one with Ctrl (Command on a Mac) and the up or down arrow."
+   - S: "Put shuffled pieces of code back in the order that works. Drag them into place, or move them with the keyboard."
    - E: "A short method that totals a gym member's weekly workouts arrives in a random order. You arrange the pieces until the method would run and give the right total."
 8. **Plan Review**
    - S: "Read an implementation plan, written as if by an AI assistant, before any code exists. Say what you'd push back on, since a problem costs less to fix in a plan than in finished code."
@@ -169,7 +169,7 @@ end
 - `experienced_hint`: "Pick the level your exercises start at next. Setup lets you change it any time, or set a level for each kind of section."
 - `level_title`: "Where should your exercises start?"
 - Level names reuse `exercise_mix.levels.*` (**Verified**). Each gets a hint:
-  - junior: "New to working in a team's codebase, or changing careers."
+  - junior: "Experienced, but new to this language or stack, or want an easier start."
   - mid_level: "A few years in, and comfortable shipping features on your own."
   - senior: "You review other people's work and weigh tradeoffs often."
 - `back`: "Back".
@@ -321,3 +321,9 @@ end
   a request spec pins it.
 - **A failed welcome save puts focus back on the pressed button**, since
   disabling it during the request dropped focus to the page.
+- **Three copy changes after the second critical review.** The Parsons summary
+  no longer names the keys, because the section's own hint already does and two
+  copies could drift apart. The pattern summary says "This section", since a
+  two-section day has no pattern section. The welcome step's junior hint
+  describes experienced people who want an easier start, so it no longer
+  describes the people "Early in my career" is meant for.
