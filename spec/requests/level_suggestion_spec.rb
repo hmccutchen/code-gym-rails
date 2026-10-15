@@ -44,7 +44,7 @@ RSpec.describe "Learning track proposals", type: :request do
   end
 
   def dismiss(kinds)
-    post learning_track_dismissal_path, params: { kinds: kinds }.to_json, headers: json
+    post level_suggestion_dismissal_path, params: { kinds: kinds }.to_json, headers: json
   end
 
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
@@ -69,7 +69,7 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(JSON.parse(box["data-level-suggestion-levels-value"])).to eq(user.section_kind_levels)
     expect(box["data-level-suggestion-version-value"]).to eq(user.reload.section_kind_preferences_version.to_s)
     expect(box["data-level-suggestion-url-value"]).to eq(profile_path)
-    expect(box["data-level-suggestion-dismiss-url-value"]).to eq(learning_track_dismissal_path)
+    expect(box["data-level-suggestion-dismiss-url-value"]).to eq(level_suggestion_dismissal_path)
   end
 
   it "offers nothing on four results, however good" do
@@ -308,7 +308,7 @@ RSpec.describe "Learning track proposals", type: :request do
       reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
       login_as(user)
 
-      post learning_track_dismissal_path, params: {
+      post level_suggestion_dismissal_path, params: {
         kinds: %w[code_review architecture], through: "2099-01-01", user_id: other.id
       }.to_json, headers: json
 
@@ -417,7 +417,7 @@ RSpec.describe "Learning track proposals", type: :request do
         unless advanced
           advanced = true
           reviewed_window(user, { "code_review" => "junior" })
-          other_tab.post learning_track_dismissal_path, params: { kinds: [ "code_review" ] }.to_json, headers: json
+          other_tab.post level_suggestion_dismissal_path, params: { kinds: [ "code_review" ] }.to_json, headers: json
           expect(other_tab.response).to have_http_status(:ok)
           expect(user.reload.track_evidence_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
         end

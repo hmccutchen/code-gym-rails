@@ -3337,9 +3337,9 @@ always pull in the full suite — is stated once, in
 - `app/services/size_forecast.rb` — `SizeForecast`: whether tomorrow's Automatic set will be larger, or smaller because of the brake, than today's planned one, for the submitted dashboard's size lines.
 - `app/services/competency_gate/evidence.rb` — the gate's only query: every rubric-stamped reviewed day, oldest first, in batches, as `CompetencyGate::Day` values.
 - `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileController`.
-- `app/controllers/learning_track_dismissals_controller.rb` — records Not now and removed-kind cutoffs for the current user under the user-row lock, with a `dismissed` or `removed` event row for each kind whose cutoff moves forward.
+- `app/controllers/level_suggestion_dismissals_controller.rb` — records Not now and removed-kind cutoffs for the current user under the user-row lock, with a `dismissed` or `removed` event row for each kind whose cutoff moves forward.
 - `app/models/level_suggestion_event.rb` — `LevelSuggestionEvent`: one row per answer to a level suggestion (`applied`, `dismissed`, `removed`) with the evidence counts behind it; builds applied rows from the state `User` passes in from before the save.
-- `app/controllers/learning_track_answers_controller.rb` — counts an answered proposal, which decides whether the next one applies in place or links to Setup.
+- `app/controllers/level_suggestion_answers_controller.rb` — counts an answered proposal, which decides whether the next one applies in place or links to Setup.
 - `app/views/dashboard/_level_suggestion.html.erb` — submitted-day proposal with counts from the evidence, a removable list when several kinds share a destination, and in-place Apply/Not now saves.
 - `script/prepare_junior_ladders.rb` (+ `script/junior_ladder_preparation.rb`) — operator coverage report; explicit `--run` queues shared-reference refreshes using the operator's key.
 - `spec/requests/existing_account_pages_spec.rb` — exact pre-track Dashboard, Setup, Account and History snapshots. `UPDATE_PAGE_SNAPSHOTS=1` intentionally rewrites fixtures; never use it to conceal a learning-track regression.

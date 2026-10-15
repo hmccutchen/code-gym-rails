@@ -11,7 +11,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
   def dismiss(kinds, **extra)
-    post learning_track_dismissal_path, params: { kinds: kinds, **extra }.to_json, headers: json
+    post level_suggestion_dismissal_path, params: { kinds: kinds, **extra }.to_json, headers: json
   end
 
   it "records a Not now with the offered move and the evidence behind it when no reason is sent" do

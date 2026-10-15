@@ -1,4 +1,4 @@
-class LearningTrackDismissalsController < ApplicationController
+class LevelSuggestionDismissalsController < ApplicationController
   ACTIONS_BY_REASON = { "not_now" => "dismissed", "removed" => "removed" }.freeze
 
   # Evidence can age before the lock; never move a current-level cutoff back.

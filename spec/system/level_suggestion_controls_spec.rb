@@ -95,7 +95,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
         own_proposal(answered: 0)
         page.execute_script(<<~JS)
           const originalFetch = window.fetch;
-          window.fetch = (url, options) => url.endsWith(#{learning_track_answer_path.to_json})
+          window.fetch = (url, options) => url.endsWith(#{level_suggestion_answer_path.to_json})
             ? #{reply}
             : originalFetch(url, options);
         JS
@@ -126,7 +126,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
 
   it "counts nothing when the dismissal fails" do
     own_proposal(answered: LevelSuggestion::IN_PLACE_ANSWERS)
-    fail_requests_to(learning_track_dismissal_path)
+    fail_requests_to(level_suggestion_dismissal_path)
 
     within("#level-suggestion") { click_button "Not now" }
 

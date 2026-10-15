@@ -39,7 +39,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
       expect(proposal.at_css("[data-apply]")).to be_present
       expect(proposal.at_css("[data-change-in-setup]")).to be_nil
-      expect(proposal["data-level-suggestion-answer-url-value"]).to eq(learning_track_answer_path)
+      expect(proposal["data-level-suggestion-answer-url-value"]).to eq(level_suggestion_answer_path)
       expect(proposal.text).to include("turn these suggestions off in Setup")
       expect(proposal.at_css(%(a[href="#{setup_path(anchor: "learning-track")}"]))).to be_present
     end
@@ -100,7 +100,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       user = track_user
       login_as(user)
 
-      2.times { post learning_track_answer_path, params: {}.to_json, headers: json }
+      2.times { post level_suggestion_answer_path, params: {}.to_json, headers: json }
 
       expect(response).to have_http_status(:ok)
       expect(JSON.parse(response.body)).to eq("answered" => 2)
@@ -111,7 +111,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       user = create_user_with_key
       login_as(user)
 
-      post learning_track_answer_path, params: {}.to_json, headers: json
+      post level_suggestion_answer_path, params: {}.to_json, headers: json
 
       expect(response).to have_http_status(:ok)
       expect(JSON.parse(response.body)).to eq("answered" => 0)
