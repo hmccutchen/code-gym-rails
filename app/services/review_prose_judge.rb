@@ -1,4 +1,4 @@
-# Off unless REVIEW_PROSE_JUDGE is exactly "1"; turning it on must pass CLAUDE.md's activation gate first.
+# Off unless REVIEW_PROSE_JUDGE is exactly "1"; enabling it or changing its prompt or route must pass the gate in docs/decisions/review-prose-judge.md.
 module ReviewProseJudge
   ENV_KEY = "REVIEW_PROSE_JUDGE"
 

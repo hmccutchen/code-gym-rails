@@ -148,7 +148,8 @@ The comment rules in CLAUDE.md's Code Style section are never waived: each
 comment is one line, attached to the code directly below it (or trailing it),
 and a file holds at most 5. RuboCop enforces those three in Ruby
 files and `bin/comment-check` in ERB, JavaScript, CSS, YAML and Python. Business
-decisions belong in CLAUDE.md or `docs/` (a file's own notes in `docs/code-notes/`),
+decisions belong in CLAUDE.md, `.claude/rules/` or `docs/` (a design decision's full
+text in `docs/decisions/`, a file's own notes in `docs/code-notes/`),
 never in a comment.
 
 Some comments read as obvious but carry something real and must survive: a
@@ -310,8 +311,8 @@ claiming a test exists that doesn't, claiming a check passed that wasn't run,
 and describing a behavior the code doesn't implement.
 
 **Does the PR deviate from an established in-repo pattern without saying why?**
-The patterns this codebase has deliberately adopted are listed under "Standards
-and Authorities" in `CLAUDE.md`. Deviating is allowed; doing it silently is
+The patterns this codebase has deliberately adopted are listed in
+`.claude/rules/patterns.md`. Deviating is allowed; doing it silently is
 not.
 
 **Which specs to run.** Map each changed file to its spec by convention and run
@@ -322,7 +323,7 @@ blast radius, and a scoped run beats a full suite that nobody waits for. It is
 `ExerciseSection`, `ProblemSetIngest`, `DailyPlan`, `ConceptVocabulary`,
 `ConceptBucket`, `DailyResponse`, `RealSource`, or
 `DailyExercise#active_section_keys`. Those are
-named under "Standards and Authorities" in `CLAUDE.md` because everything
+the shared authorities because everything
 downstream derives from them, so a diff touching one runs the full suite.
 
 **Say what you did not verify.** A review that ran a subset of the specs, took

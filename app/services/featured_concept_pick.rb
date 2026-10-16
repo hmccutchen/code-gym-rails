@@ -1,4 +1,4 @@
-# Pure: which met concept a user is shown this week. Design: CLAUDE.md "The weekly featured concept".
+# Pure: which met concept a user is shown this week. Design: docs/decisions/the-weekly-featured-concept.md.
 class FeaturedConceptPick
   # met: [concept, bucket] pairs in slice order; last_featured: pair => latest week shown; previous: last week's pair.
   def self.pick(met:, ledger:, last_featured:, previous: nil)

@@ -1,0 +1,43 @@
+# What a usage row records
+
+every provider call writes one `ApiUsage`
+row through `AiService#log_usage`, and that row now carries enough to price
+it. `model` is the model `#call` routed to (`MODEL_FOR_PURPOSE` /
+`DEFAULT_ROUTE`), so it matches those tables and any price list keyed the
+same way; the provider is not stored separately because the model name
+already says it. `cache_read_tokens` and `cache_write_tokens` are kept apart
+from `tokens_in` because Claude's `input_tokens` excludes both and each is
+billed at its own rate. On every provider, then, `tokens_in` is ordinary
+uncached input, excluding cache writes. OpenAI's `input_tokens` includes
+both `input_tokens_details.cached_tokens` and
+`input_tokens_details.cache_write_tokens`, so `OpenaiService` subtracts both
+and records them separately. Its routed models cache implicitly, regardless
+of `cache_system:`, and cache writes cost 1.25 times ordinary input;
+`cache_system: false` does not disable that provider default. OpenAI's
+`output_tokens` already includes reasoning. Gemini's `total_input_tokens` includes the cached part (a
+live repeat of a 14,199-token prompt reported `total_input_tokens` 14,199
+with `total_cached_tokens` 8,171), so `GeminiService` subtracts it; Gemini
+reports no cache write, so it records 0. Gemini's `tokens_out` is
+`total_output_tokens + total_thought_tokens`: its usage reports thinking
+apart from output (a live response gave `total_tokens` 736 = 25 input + 193
+output + 518 thought), and thinking is billed as output.
+Gemini rows from before this under-count output by however much the model
+thought and over-count input by whatever was cached, and every row from
+before this has a null model and null cache counts: unknown, not zero, and
+nothing backfills them, since a user's provider can change.
+
+**A row also records the call's outcome.** `provider` names the provider
+class the row was written by (backfilled from `model` for older rows, since
+every model name identifies its provider), `http_status` is the reply's
+status, `failure` is one of `ApiUsage::FAILURES` or null when the reply was
+used, `quota_id` is the limit a 429 named in the provider's own vocabulary
+(Gemini's `QuotaFailure.violations[].quotaId`; the first
+`anthropic-ratelimit-*-remaining` header reading zero on Claude; the first
+`x-ratelimit-remaining-*` reading zero, else the error code, on OpenAI), and
+`house_key` says whether a house key paid for it, false until trial mode
+arrives. A call that fails before a reply arrives writes one row with zero
+tokens, through the same `#log_usage`, from `call_and_log`'s rescue: one row
+per call, whatever faraday-retry did inside it, and the write never changes
+the error the caller sees. A refusal or truncation is marked on the row its
+tokens were billed to. `AiService.failure_code_for` is the one map from an
+error class to a code.
