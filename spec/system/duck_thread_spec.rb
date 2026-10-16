@@ -16,7 +16,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     duck.find(".duck-send").click
   end
 
-  it "answers a question, keeps the thread client-side, and enforces the cap" do
+  it "answers a question and enforces the cap" do
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
@@ -96,13 +96,12 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
       # Resolve in-page with a canned payload so Clear runs mid-flight deterministically, with no network involved.
       page.execute_script(<<~JS)
-        window.__release = null;
-        window.fetch = () => new Promise((resolve) => {
-          window.__release = () => resolve(new Response(
-            JSON.stringify({ status: "ok", answer: "RELEASED-ANSWER" }),
-            { status: 200, headers: { "Content-Type": "application/json" } }
-          ));
-        });
+        window.__held = [];
+        window.__release = () => window.__held.splice(0).forEach((resolve) => resolve(new Response(
+          JSON.stringify({ status: "ok", answer: "RELEASED-ANSWER", version: 1 }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )));
+        window.fetch = () => new Promise((resolve) => window.__held.push(resolve));
       JS
 
       ask(duck, "hold this one open")
@@ -120,6 +119,75 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       expect(duck).to have_no_content("RELEASED-ANSWER")
       expect(duck.find(".duck-send")).not_to be_disabled
       expect(duck.find(".duck-input")).not_to be_disabled
+    end
+  end
+
+  def reopen_duck
+    visit root_path
+    expect(page).to have_content(/Code Review/i, wait: 10)
+    duck = first(".duck-thread[data-duck-thread-section-value='code_review']")
+    duck.find(".duck-toggle").click
+    duck
+  end
+
+  it "restores the thread after a reload, and the duck still answers from it" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      ask(open_duck(user), "before the reload")
+      expect(page).to have_css(".duck-turn.duck-assistant", count: 1, wait: 10)
+
+      duck = reopen_duck
+      expect(duck).to have_css(".duck-turn.duck-user", text: "before the reload")
+      expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT)
+
+      ask(duck, "after the reload")
+      expect(duck).to have_css(".duck-turn.duck-user", count: 2, wait: 10)
+      expect(duck).to have_no_content(/out of step/i)
+    end
+  end
+
+  it "keeps the cap across a reload, and Clear still gives it back" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+      ResponsesController::MAX_DUCK_TURNS_PER_SECTION.times do |i|
+        ask(duck, "stuck #{i}")
+        expect(duck).to have_css(".duck-turn.duck-user", count: i + 1, wait: 10)
+      end
+
+      duck = reopen_duck
+      expect(duck).to have_content(/used all #{ResponsesController::MAX_DUCK_TURNS_PER_SECTION} messages/i)
+      expect(duck.find(".duck-send")).to be_disabled
+
+      duck.find(".duck-clear").click
+      expect(duck.find(".duck-send")).not_to be_disabled
+      ask(duck, "a fresh start")
+      expect(duck).to have_css(".duck-turn.duck-user", count: 1, wait: 10)
+      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT)
+    end
+  end
+
+  it "keeps a cleared thread cleared after a reload, and answers the next message" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+      ask(duck, "soon cleared")
+      expect(duck).to have_css(".duck-turn.duck-assistant", count: 1, wait: 10)
+
+      duck.find(".duck-clear").click
+      cleared = -> { DuckThread.first.reload.stored_turns("code_review").empty? }
+      50.times { cleared.call ? break : sleep(0.2) }
+      expect(cleared.call).to be(true)
+
+      duck = reopen_duck
+      expect(duck).to have_no_css(".duck-turn")
+
+      ask(duck, "after clearing and reloading")
+      expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(duck).to have_no_content(/out of step/i)
     end
   end
 

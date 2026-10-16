@@ -14,12 +14,20 @@ export default class extends Controller {
     thinkingText: String,
     cappedText: String,
     userSpeaker: String,
-    assistantSpeaker: String
+    assistantSpeaker: String,
+    turns: Array,
+    version: Number
   }
 
   connect() {
-    this.thread = []
+    this.thread = this.turnsValue.map((turn) => ({ role: turn.role, content: turn.content }))
+    this.version = this.versionValue
     this.generation = 0
+    this.clearing = Promise.resolve()
+    if (this.thread.length > 0) {
+      this.renderTurns()
+      this.refreshCap()
+    }
   }
 
   toggle() {
@@ -36,30 +44,46 @@ export default class extends Controller {
   }
 
   clear() {
+    const cleared = this.thread
     this.generation += 1
     this.thread = []
     // input.value is left alone: after a failed send it holds text to retry, and Clear names the conversation.
     this.statusTarget.textContent = ""
     this.renderTurns()
     this.refreshCap()
+    this.clearing = this.clearStored(cleared)
+  }
+
+  async clearStored(cleared) {
+    const result = await request.send("DELETE", this.urlValue, { section: this.sectionValue },
+      { fallback: this.sendFailedTextValue })
+    if (result.ok && typeof result.data?.version === "number") {
+      this.version = result.data.version
+      return
+    }
+    this.thread = cleared
+    this.renderTurns()
+    this.refreshCap()
+    this.statusTarget.textContent = result.message || this.sendFailedTextValue
   }
 
   async ask(explicitMessage) {
     const message = explicitMessage || this.inputTarget.value.trim()
     if (!message || this.sendTarget.disabled) return
 
-    const priorThread = this.thread.slice()
     const generation = this.generation
     this.disableControls(true)
     this.statusTarget.textContent = this.thinkingTextValue
 
+    await this.clearing
     const result = await request.send("POST", this.urlValue,
-      { section: this.sectionValue, message: message, thread: priorThread },
+      { section: this.sectionValue, message: message, version: this.version },
       { fallback: this.sendFailedTextValue })
     // Clear ran while this was in flight; dropping the reply keeps a cleared thread cleared.
     if (generation !== this.generation) return
 
     if (result.ok && result.data) {
+      this.version = result.data.version
       this.thread.push({ role: "user", content: message }, { role: "assistant", content: result.data.answer })
       this.renderTurns()
       if (!explicitMessage) this.inputTarget.value = ""

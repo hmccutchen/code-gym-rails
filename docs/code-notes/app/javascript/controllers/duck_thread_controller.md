@@ -34,10 +34,30 @@ otherwise, and because it ran in the send path's `finally`, that wiped every
 error message right after the `catch` set it, so failures were silent. Callers
 that want the status cleared clear it themselves.
 
+## connect
+
+A thread restored from the server is drawn and capped on connect, so a reload
+at the cap shows the cap text and disabled controls, as before the reload.
+With no stored thread it touches nothing.
+
+## clear and clearing
+
+Clear empties the page at once, as it always has, then sends the DELETE. The
+pending request is kept as `clearing`, and `ask` waits for it before sending,
+so an ask doesn't carry a version the Clear is about to retire. A failed clear
+puts the thread back on the page before it shows the send-failed text, since
+the server still holds it; leaving the page empty would hide history the duck
+still answers from. Both requests go
+through `request.send` rather than the save queue; the decision doc says why.
+
 ## ask
 
 An explicit message, the Explain button's, bypasses the input entirely. An
 empty input box is the normal case for it, not a reason to do nothing.
+
+Each ask sends the version from the last reply, or the one rendered onto the
+page. The server refuses a version that has moved, which is how two devices
+or a Clear mid-flight are kept apart.
 
 `generation` counts Clears. A reply that comes back after one is dropped,
 which is what keeps a cleared thread cleared; Clear has already left the

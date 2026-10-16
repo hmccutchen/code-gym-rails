@@ -56,6 +56,7 @@ class ResponsesController < ApplicationController
     return redirect_to root_path, alert: t("flash.responses.start_over_not_today") unless @response.date == Date.current
     return redirect_to root_path, alert: t("flash.responses.start_over_while_reviewing") if blocker == :reviewing
 
+    @response.daily_exercise.duck_thread&.destroy
     @response.destroy
     redirect_to root_path, notice: t("flash.responses.answers_cleared")
   end
@@ -143,40 +144,31 @@ class ResponsesController < ApplicationController
 
   # POST /responses/duck_thread
   def duck_thread
-    exercise = current_user.daily_exercises.for_date.first
-    return render_json_error(t("errors.no_exercise_today"), status: :not_found) unless exercise
+    exercise, section, message = load_duck_turn
+    return unless exercise
+    return legacy_duck_thread(exercise, section, message) if legacy_duck_request?
 
-    section = params[:section].to_s
-    return render_section_error(t("errors.section_not_in_exercise")) unless exercise.active_section_keys.include?(section)
+    store = DuckThread.for(exercise)
+    refusal = stored_thread_refusal(store, section)
+    return render_section_error(refusal) if refusal
 
-    existing = current_user.daily_responses.find_by(daily_exercise: exercise, date: Date.current)
-    return render_section_error(t("errors.responses.duck_after_submit")) if existing&.submitted?
+    answer  = AiService.for(current_user).duck_response(current_user, exercise, section: section, message: message,
+                                                        thread: store.turns_for(section))
+    version = DuckThread.append!(exercise, section, message: message, answer: answer,
+                                 expected_version: store.version_for(section), expected_scope: exercise.draft_scope)
+    return render_section_error(t("errors.responses.conversation_out_of_step")) unless version
 
-    message = UserText.normalize(params[:message]).strip
-    return render_section_error(t("errors.responses.message_blank")) if message.blank?
-    if message.length > MAX_DUCK_MESSAGE_LENGTH
-      return render_section_error(t("errors.responses.message_too_long", max: MAX_DUCK_MESSAGE_LENGTH))
-    end
-
-    thread = duck_thread_param
-    if thread.size > MAX_DUCK_THREAD_ENTRIES ||
-       thread.sum { |turn| turn[:content].bytesize } > MAX_DUCK_THREAD_BYTES
-      return render_section_error(t("errors.responses.conversation_too_long"))
-    end
-    unless well_formed_thread?(thread)
-      return render_section_error(t("errors.responses.conversation_out_of_step"))
-    end
-    if thread.count { |turn| turn[:role] == "user" } >= MAX_DUCK_TURNS_PER_SECTION
-      return render_section_error(t("duck.turns_used", count: MAX_DUCK_TURNS_PER_SECTION))
-    end
-
-    answer = AiService.for(current_user).duck_response(
-      current_user, exercise, section: section, message: message, thread: thread
-    )
-
-    render json: { status: "ok", answer: answer }
+    render json: { status: "ok", answer: answer, version: version }
   rescue AiService::Error => e
     render_provider_failure(e, :duck)
+  end
+
+  # DELETE /responses/duck_thread
+  def clear_duck_thread
+    exercise, section = load_duck_section
+    return unless exercise
+
+    render json: { status: "ok", version: DuckThread.clear!(exercise, section) }
   end
 
   # POST /responses/pseudocode_critique
@@ -290,6 +282,68 @@ class ResponsesController < ApplicationController
         end
       end
     end
+  end
+
+  def load_duck_section
+    exercise = current_user.daily_exercises.for_date.first
+    return duck_refusal(t("errors.no_exercise_today"), status: :not_found) unless exercise
+
+    section = params[:section].to_s
+    return duck_refusal(t("errors.section_not_in_exercise")) unless exercise.active_section_keys.include?(section)
+
+    existing = current_user.daily_responses.find_by(daily_exercise: exercise, date: Date.current)
+    return duck_refusal(t("errors.responses.duck_after_submit")) if existing&.submitted?
+
+    [ exercise, section ]
+  end
+
+  def load_duck_turn
+    exercise, section = load_duck_section
+    return unless exercise
+
+    message = UserText.normalize(params[:message]).strip
+    return duck_refusal(t("errors.responses.message_blank")) if message.blank?
+    if message.length > MAX_DUCK_MESSAGE_LENGTH
+      return duck_refusal(t("errors.responses.message_too_long", max: MAX_DUCK_MESSAGE_LENGTH))
+    end
+
+    [ exercise, section, message ]
+  end
+
+  # Checked before the paid call: a page whose version is behind would only have its reply refused after it.
+  def stored_thread_refusal(store, section)
+    if params[:version].to_i != store.version_for(section)
+      t("errors.responses.conversation_out_of_step")
+    elsif store.byte_size(section) > MAX_DUCK_THREAD_BYTES
+      t("errors.responses.conversation_too_long")
+    elsif store.user_turn_count(section) >= MAX_DUCK_TURNS_PER_SECTION
+      t("duck.turns_used", count: MAX_DUCK_TURNS_PER_SECTION)
+    end
+  end
+
+  def duck_refusal(message, status: :unprocessable_content)
+    render_json_error(message, status: status)
+    nil
+  end
+
+  # A page loaded before duck threads were stored still posts its own thread; remove with #duck_thread_param.
+  def legacy_duck_request? = params.key?(:thread) && !params.key?(:version)
+
+  def legacy_duck_thread(exercise, section, message)
+    Rails.logger.info("[duck] legacy thread shape user #{current_user.id}")
+    thread = duck_thread_param
+    if thread.size > MAX_DUCK_THREAD_ENTRIES ||
+       thread.sum { |turn| turn[:content].bytesize } > MAX_DUCK_THREAD_BYTES
+      return render_section_error(t("errors.responses.conversation_too_long"))
+    end
+    return render_section_error(t("errors.responses.conversation_out_of_step")) unless well_formed_thread?(thread)
+    if thread.count { |turn| turn[:role] == "user" } >= MAX_DUCK_TURNS_PER_SECTION
+      return render_section_error(t("duck.turns_used", count: MAX_DUCK_TURNS_PER_SECTION))
+    end
+
+    answer = AiService.for(current_user).duck_response(current_user, exercise, section: section, message: message,
+                                                       thread: thread)
+    render json: { status: "ok", answer: answer }
   end
 
   def duck_thread_param

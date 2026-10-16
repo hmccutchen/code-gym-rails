@@ -2,6 +2,7 @@
 class User < ApplicationRecord
   has_many :daily_exercises, dependent: :destroy
   has_many :daily_responses, dependent: :destroy, inverse_of: :user
+  has_many :duck_threads,    dependent: :delete_all
   has_many :api_usages,      dependent: :destroy
   has_many :concept_masteries, dependent: :destroy
   has_many :push_subscriptions, dependent: :destroy
@@ -178,6 +179,7 @@ class User < ApplicationRecord
       return false if anonymized?
 
       push_subscriptions.destroy_all
+      duck_threads.delete_all
 
       update!(
         email:                  "deleted-user-#{id}@anonymized.local",

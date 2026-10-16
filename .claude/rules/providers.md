@@ -51,6 +51,18 @@ read it before changing that area.
   `provider_request_characterization_spec` and the single-shot group hold. Of
   the two, only the duck's profile sets `cache_system: true`. Gemini still
   flattens history via `#flatten_history`, a known forgery gap.
+- **The duck thread is stored** (`docs/decisions/the-duck-thread-is-stored.md`):
+  `DuckThread`, one row per exercise keyed by section, is the one authority for
+  a section's turns, user-turn count and version; generation, review, the
+  judges, mastery and planning never read it (`duck_thread_isolation_spec`).
+  A page behind the stored version is refused before the call; the append is
+  stored after the reply under `with_response_locked` and the row lock, and
+  refused if the day was submitted, the set regenerated or the version moved.
+  Every Clear moves the version, and counts itself when it emptied turns. The
+  cap is six user turns a thread, counted on the server. A request with
+  `thread` and no `version` takes the old path for one release and touches no
+  row. Threads are kept 365 days (`SweepDuckThreadsJob`), deleted on start over
+  and account deletion, and never rendered after submit.
 - **Per-user request limits** (`docs/decisions/per-user-request-limits.md`):
   Limits guard a trial's house key, so own-key accounts skip them
   (`ApplicationController#own_key?`). Every endpoint billing one provider call
