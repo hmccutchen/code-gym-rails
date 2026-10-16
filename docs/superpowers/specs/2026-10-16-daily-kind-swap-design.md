@@ -559,7 +559,9 @@ over five seeds.
 
 The model has no exclusions, default weights and every day a weekday. It has
 no retention-driven coverage, and for counts 3 and 4 no coverage exception at
-all. "Wait" is the number of days between two appearances of a kind. The
+all. The two-section rows ran one pair per group, because the coverage gap
+rule there is deterministic and depends only on how many optional kinds the
+pair leaves. "Wait" is the number of days between two appearances of a kind. The
 script is in the PR description, so it can be re-run.
 
 | Day size | Pairs | Longest wait of any optional kind | Comment |
