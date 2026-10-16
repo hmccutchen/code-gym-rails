@@ -1,6 +1,6 @@
 # File Map
 
-What each listed file does, in full. CLAUDE.md keeps one line per file.
+What each listed file does.
 
 - `app/models/track_change.rb` — `TrackChange`: which per-kind targets a track change clears, the one statement of the rule; pure.
 - `app/services/level_suggestion.rb` — pure proposal rules: one-rung moves up and back along junior, mid-level and senior, each kind judged on its own results, and the evidence counts a card and an event row show.
@@ -109,8 +109,8 @@ What each listed file does, in full. CLAUDE.md keeps one line per file.
 - `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PreviewEnvironment.active?`
 - `app/services/preview_mail.rb` — inline mail delivery in preview apps, gated on `PreviewEnvironment.active?`, so login never needs a worker
 - `app/controllers/concerns/preview_auto_login.rb` — preview-only auto-login callback, registered only when `PreviewEnvironment.active?`
-- `lib/boot/database_pool.rb` — `DatabasePool.size`: the pool `config/database.yml` asks for, sized for the judge fan-out on a Solid Queue worker (see "Railway Deployment"); outside the autoload path, because `database.yml` is read before `app/` can load
-- `lib/boot/app_host.rb` — `AppHost.resolve`: `APP_HOST` then `RAILWAY_PUBLIC_DOMAIN`, with that order inverted on a preview app (see "Host resolution" above); outside the autoload path
+- `lib/boot/database_pool.rb` — `DatabasePool.size`: the pool `config/database.yml` asks for, sized for the judge fan-out on a Solid Queue worker (see `.claude/rules/deployment.md`); outside the autoload path, because `database.yml` is read before `app/` can load
+- `lib/boot/app_host.rb` — `AppHost.resolve`: `APP_HOST` then `RAILWAY_PUBLIC_DOMAIN`, with that order inverted on a preview app (see "Host resolution" in `.claude/rules/accounts.md`); outside the autoload path
 - `app/services/fake_service.rb` — deterministic, zero-cost AiService provider for tests (`provider: "fake"`); overrides only `#call`/`#build_connection`, so every other AiService code path runs for real against its canned output. `AiService.for` refuses it outside a local environment.
 - `app/controllers/learn_controller.rb` — the `/learn` library: lists every
   concept in the user's slice (assigned or not), the per-concept detail page,

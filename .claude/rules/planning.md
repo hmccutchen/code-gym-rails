@@ -8,6 +8,12 @@ paths:
   - "app/views/api_keys/**"
   - "app/javascript/controllers/exercise_mix_controller.js"
   - "spec/**/*{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,concept_mastery,kind_preferences,kind_difficulty,concept_drills,accounts,user_spec,exercise_mix}*"
+  - "app/controllers/dashboard_controller.rb"
+  - "app/views/dashboard/**"
+  - "app/jobs/{generate_daily_exercises_job,regenerate_exercise_job}.rb"
+  - "app/models/daily_response.rb"
+  - "spec/**/competency_gate/**"
+  - "spec/**/*{weighted_roll,daily_exercise}*"
 ---
 
 # Day planning, sizing and mastery

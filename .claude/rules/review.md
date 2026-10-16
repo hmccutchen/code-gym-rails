@@ -8,6 +8,8 @@ paths:
   - "app/views/review_mailer/**"
   - "spec/fixtures/{review_calibration,review_judge}/**"
   - "spec/**/*{review,rubric,grading}*"
+  - "app/models/exercise_section/**"
+  - "app/models/{concept_mastery,rung_ledger}.rb"
 ---
 
 # Review and grading

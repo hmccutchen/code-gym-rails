@@ -323,7 +323,7 @@ blast radius, and a scoped run beats a full suite that nobody waits for. It is
 `ExerciseSection`, `ProblemSetIngest`, `DailyPlan`, `ConceptVocabulary`,
 `ConceptBucket`, `DailyResponse`, `RealSource`, or
 `DailyExercise#active_section_keys`. Those are
-named in `.claude/rules/patterns.md` because everything
+the shared authorities because everything
 downstream derives from them, so a diff touching one runs the full suite.
 
 **Say what you did not verify.** A review that ran a subset of the specs, took

@@ -17,6 +17,8 @@ paths:
   - "public/**"
   - "script/generate_icons.py"
   - "spec/**/*{pwa,push,display,palette,pull_to_refresh,history,highlight,icon,nav,focus_ring}*"
+  - "app/jobs/generate_daily_exercises_job.rb"
+  - "spec/**/*save_status*"
 ---
 
 # Layout, display, the installed app and push

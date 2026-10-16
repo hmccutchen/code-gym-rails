@@ -164,7 +164,9 @@ outcomes at the HTTP edge, claims and lock order, the server decides and the
 page shows its answer, page behavior as Stimulus controllers, one way to send
 a request, and domain data kept off provider classes.
 `.claude/rules/patterns.md` states each one and loads with any file under
-`app/`, `lib/`, `spec/`, `config/`, `script/` or `db/`.
+`app/`, `lib/`, `spec/`, `config/`, `script/` or `db/`. Deviating from one is
+allowed, but the PR description must say why; an unexplained departure is
+treated as an oversight and blocks review.
 
 ### Rules that block review
 
@@ -187,6 +189,19 @@ rather than only catching it afterward:
   `ProblemSetIngest`.
 - No new behavior without a test; no assertion weakened to make one pass.
 - No comment left false by the change that touched it.
+- No read across an isolation boundary. Each is pinned by a spec:
+  - Nothing under `app/services` or `app/jobs`, and neither the mastery nor
+    the verdict models, reads trial state (`trial_isolation_spec`).
+  - Generation, review, both judges, `ConceptMastery` and `KindDifficulty`
+    never read track or suggestion state (`level_suggestion_isolation_spec`).
+  - `SectionKindGuide` and `ConceptBookSources` never reach a provider prompt.
+  - `#assess_difficulty` is handed no response or history, and
+    `#explain_concept_differently`, `#generate_concept_reference` and
+    `#generate_recognition_guide` no exercise or response; their signatures
+    hold this. `CONCEPT_REFERENCE_FIELDS` stays unwidened.
+  - Answer-key fields (`ExerciseSection.all_answer_key_fields`) never reach
+    the page, a pre-submission AI context or a log before review.
+  - No page shows or implies `ConceptMastery` tier.
 - New methods stay under 25 lines (excluding heredoc bodies), new `app/` files
   under 300 — or the PR says why not. Nothing enforces this mechanically;
   `Metrics` is disabled.
@@ -220,7 +235,7 @@ advisory signal; it is not evidence that anything was verified.
 - At 8am on weekdays the Solid Queue cron runs `GenerateDailyExercisesJob`,
   which builds the day's set from the user's recent performance. A dashboard
   opened with no set generates one on demand and polls `GET /dashboard/status`.
-- A day holds 2-4 sections: `code_review` and `design_comparison` always, and
+- A day holds 2-4 sections: `code_review` and `design_comparison` always planned, and
   `DaySize` and `SectionRotation` fill the rest.
 - `ResponsesController#create` autosaves answers and ratings; a successful
   submit chains into `#review` (`ResponseReview`), which lands back on the
@@ -237,6 +252,8 @@ The design decisions live in path-scoped files under `.claude/rules/`. Each
 loads when Claude reads or edits a file matching its `paths:` globs; read one
 directly when a task touches its area before any matching file is open. The
 full reasoning behind an entry is in the `docs/decisions/` doc it names.
+`config/locales/en.yml` holds keys several areas own; read the rule for the
+area whose copy you change.
 
 - `.claude/rules/generation.md`: the generation prompt and pipeline, the judge, the ingest boundary, section kinds, concept vocabularies.
 - `.claude/rules/planning.md`: how a day's size, kinds, reinforcement and retention checks are chosen, user preferences that steer them, pausing.

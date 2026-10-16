@@ -26,6 +26,16 @@ paths:
 - Database pool: `config/database.yml` takes its size from `DatabasePool.size` (`lib/boot/database_pool.rb`), the larger of `RAILS_MAX_THREADS` (default 5) and what one Solid Queue worker process can need while judging: a connection per worker thread in `config/queue.yml`, one more per section for each of those threads' judge fan-out (`DatabasePool::SECTIONS_PER_DAY`, restated because `database.yml` is read before `app/` loads, and held equal to `ExerciseSection::MAX_SECTIONS` by a spec), and two for Solid Queue's polling and heartbeat — 17 today. Nothing needs setting on Railway, and `spec/lib/database_pool_spec.rb` fails if the pool falls below that sum. Connections open only when a thread asks for one, so the web service, which reads the same file, opens none of the extra ceiling unless it uses them. The sizing is so the fan-out never waits for a connection: each judge and retry thread checks one out only to write its `ApiUsage` row, and a pool too small for them would make that write wait out the checkout timeout
 - Env vars already set in Railway: `RAILS_ENV`, `RAILS_MASTER_KEY`, all three `ACTIVE_RECORD_ENCRYPTION_*` keys, `DATABASE_URL` (references postgres service)
 
+## Migrations
+
+- The worker's pre-deploy waits for a schema, not for pending migrations, so
+  a new column ships a release before any code reads it, and a column being
+  removed is ignored by the model for one release before a migration drops
+  it (`docs/decisions/tracks.md`, `docs/decisions/per-user-api-keys.md`).
+- Never rename a migration that has been pushed: the PR app has already run
+  it under its old version (see "The preview migration version is
+  reconciled" in `docs/decisions/tracks.md`).
+
 ## What Still Needs Work
 1. ~~Email (login code emails won't work yet)~~ — production delivers via Resend's HTTP API (`delivery_method = :resend`; Railway blocks SMTP below Pro). Needs `RESEND_API_KEY`, `MAIL_FROM`, `APP_HOST` on both Railway services: see `docs/deploy/railway-smtp-setup.md`. Sending to teammates requires a verified domain in Resend.
 2. ~~`config/environments/production.rb`~~ — done. Resend delivery, `default_url_options`, and `raise_delivery_errors` are wired up from `ENV`.

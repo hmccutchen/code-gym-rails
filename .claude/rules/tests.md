@@ -8,22 +8,13 @@ paths:
 
 # Tests
 
-
 RSpec (`spec/` — models, requests, services, jobs, mailers). Run with:
 
 ```bash
 bundle exec rspec
 ```
 
-**What to run when.** During a TDD step, run the spec file you are changing.
-When a task is done, run the unit suite once
-(`bundle exec rspec --exclude-pattern "system/**/*_spec.rb"`). Before opening
-a PR, run `spec/system` once. CI runs everything on every PR. A diff that
-touches one of the shared authorities named in
-`.github/copilot-instructions.md` still runs the full unit suite, not just the
-changed file. After a failing run, `bundle exec rspec --only-failures` re-runs
-only what failed; RSpec records each example's result in `spec/examples.txt`
-(gitignored).
+CLAUDE.md says what to run when.
 
 **Parallel runs.** `parallel_tests` splits the suite across processes, each
 with its own test database (`code_gym_rails_test`, `code_gym_rails_test2`,

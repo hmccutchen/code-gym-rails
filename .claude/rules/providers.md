@@ -10,6 +10,10 @@ paths:
   - "script/{probe_gemini_capacity,gemini_capacity_probe,check_gemini_structured_output,gemini_structured_output_check}.rb"
   - "spec/fixtures/provider_errors/**"
   - "spec/**/*{_service,provider,api_usage,model_routing,request_characterization,request_module,server_message}*"
+  - "app/controllers/{dashboard,learn}_controller.rb"
+  - "app/jobs/{generate_daily_exercises_job,generate_concept_reference_job}.rb"
+  - "app/views/dashboard/_generation_failed.html.erb"
+  - "app/services/response_review.rb"
 ---
 
 # Providers, keys, usage and failures

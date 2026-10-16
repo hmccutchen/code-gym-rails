@@ -110,7 +110,7 @@ This goes in the review under Design as implemented, so the author can check you
 The lenses are prompts, not a checklist. Report any design problem you find.
 
 * **Fit to problem.** Does the design solve what the issue and spec describe, at the right size? Flag over-building (options, layers, or configuration with one caller) and under-building. Does it contradict a decision recorded in the issue or spec without saying why?
-* **Responsibility and dependency direction.** Is each responsibility owned by the layer CLAUDE.md assigns it to? Flag domain logic in controllers or views, jobs that re-implement service logic, pass-through layers, and missing seams.
+* **Responsibility and dependency direction.** Is each responsibility owned by the layer CLAUDE.md or its `.claude/rules/` files assign it to? Flag domain logic in controllers or views, jobs that re-implement service logic, pass-through layers, and missing seams.
 * **Data model and invariants.** Is each invariant enforced where it cannot be bypassed? An invariant held only by a model validation or a service can be broken by any other writer. Name those writers. Where two writers touch the same state, is there one source of truth?
 * **Consistency, concurrency, and failure.** Transaction boundaries versus the unit of work. What happens on a concurrent request, a retried job, a double-submit, a stale tab, or a crash between two writes? Is each path idempotent or guarded? Do failures leave a state a user can see and recover from, or a silent intermediate one?
 * **Deploy, migration, and rollback.** Can this deploy while old code and old queued jobs are running? The web and worker services deploy separately, so can the worker run new code before the migration, or old code after it? Is the order add, backfill, switch readers, then drop? What does rollback leave behind?
@@ -126,7 +126,7 @@ Before publishing a finding, answer:
 
 1. What concrete cost does this impose: a bug class, a future change it makes expensive, an operational risk, or a second pattern to maintain?
 2. Is there a specific alternative, and is it simpler overall rather than just moving the complexity?
-3. Does CLAUDE.md, the spec, or the issue already decide this? If so, do not reverse it without explaining why its rationale no longer holds.
+3. Does CLAUDE.md, a `.claude/rules/` file, the spec, or the issue already decide this? If so, do not reverse it without explaining why its rationale no longer holds.
 4. Could it have been written from the diff alone? If so, drop it.
 5. Did I open the code that makes this true? If not, mark it Unverified or drop it.
 6. Was it raised in an earlier round?

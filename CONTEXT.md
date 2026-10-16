@@ -39,7 +39,8 @@ customer-facing surface to design around.
 
 ## Relationship to CLAUDE.md
 
-`CLAUDE.md` is the engineering reference — stack, architecture, models, key
-technical decisions. This file is the "why" behind it: who it's for and what
+`CLAUDE.md` is the engineering reference — stack, architecture and code style,
+with each area's technical decisions in `.claude/rules/` and `docs/decisions/`.
+This file is the "why" behind it: who it's for and what
 problem it's solving. Update this file when the product intent changes;
-update `CLAUDE.md` when the implementation does.
+update `CLAUDE.md` and those files when the implementation does.

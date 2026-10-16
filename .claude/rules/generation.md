@@ -10,6 +10,13 @@ paths:
   - "script/{compare_models,model_comparison,forced_concept_drafts,solve_agreement,report_answer_positions,answer_position_balance}.rb"
   - "spec/fixtures/judge/**"
   - "spec/**/*{ai_service,judged_generation,problem_set_ingest,exercise_section,real_source,judge_verdict,code_format,concept_vocabulary,generate_daily_exercises,regenerate_exercise}*"
+  - "app/services/{daily_plan,section_rotation,section_count,day_hosts}.rb"
+  - "app/models/exercise_history_entry.rb"
+  - "app/views/responses/answers/_design_comparison.html.erb"
+  - "app/views/responses/_answered_sections.html.erb"
+  - "app/javascript/controllers/comparison_answer_controller.js"
+  - "spec/**/exercise_section/**"
+  - "spec/**/*{design_comparison,generation_prompt,section_count,section_rotation}*"
 ---
 
 # Generation, judging and section kinds

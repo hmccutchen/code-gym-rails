@@ -58,8 +58,9 @@ Make changes on a branch and open a pull request into `main`. CI runs the
 tests, RuboCop and the security scans on every pull request, and each one gets
 a preview app with demo data.
 
-[`CLAUDE.md`](CLAUDE.md) is the reference for everything else: architecture,
-design decisions, code style and what reviews check for.
+[`CLAUDE.md`](CLAUDE.md) is the reference for everything else: code style,
+what reviews check for and an outline of the architecture. Each area's design
+decisions are in `.claude/rules/`, with the full reasoning in `docs/decisions/`.
 
 ## Running it
 

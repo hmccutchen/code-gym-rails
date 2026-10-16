@@ -10,8 +10,8 @@ paths:
 
 # Patterns this codebase has deliberately adopted
 
-**Patterns this codebase has deliberately adopted.** These are settled
-decisions, not defaults that drifted into place:
+These are settled decisions, not defaults that drifted into place. CLAUDE.md
+says what a deviation from one requires.
 
 - **Template method for providers** — `AiService` owns prompts, parsing, and
   usage logging; subclasses implement `#call` and
@@ -91,8 +91,3 @@ decisions, not defaults that drifted into place:
 - **Domain data stays off provider classes** — lists and tables the domain
   owns live in a module of their own (`ConceptVocabulary`), and `AiService`
   reads them; it keeps only what is about talking to a provider.
-
-**Deviating from an established in-repo pattern requires stating why in the PR
-description.** Deviation is allowed — patterns outlive their reasons sometimes
-— but silent deviation is not. An unexplained departure is treated as an
-oversight and blocks review.

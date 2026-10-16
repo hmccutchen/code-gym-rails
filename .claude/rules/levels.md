@@ -10,6 +10,9 @@ paths:
   - "app/javascript/controllers/{level_suggestion,level_suggestions_switch,welcome,exercise_mix,profile_preferences}_controller.js"
   - "script/{prepare_junior_ladders,junior_ladder_preparation}.rb"
   - "spec/**/*{level_suggestion,track,welcome,skill_level,profile}*"
+  - "app/controllers/dashboard_controller.rb"
+  - "spec/**/level_suggestion/**"
+  - "spec/**/*{api_keys,user_level_changes}*"
 ---
 
 # Tracks, skill level and level suggestions
@@ -37,7 +40,9 @@ read it before changing that area.
   cutoff under the user-row lock (`User#record_level_changes`), except a move
   to principal engineer and the first-run track choice, which record none.
   Posted `LevelSuggestionStep`s whose `from` differs from the stored rung get
-  a 409.
+  a 409. Generation, review, both judges, `ConceptMastery` and
+  `KindDifficulty` never read track or suggestion state
+  (`level_suggestion_isolation_spec`).
 - **Skill level control** (`docs/decisions/skill-level-control.md`): Skill
   level choices are `KindDifficulty::LEVELS` (`User::SKILL_LEVELS`), edited
   only from Setup's Track select and the welcome page through `PATCH

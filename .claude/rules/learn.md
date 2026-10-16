@@ -11,6 +11,7 @@ paths:
   - "app/views/responses/{_featured_marker,_kind_about}.html.erb"
   - "app/javascript/controllers/{concept_alternates,learn_filter,write_up_control,glossary}_controller.js"
   - "spec/**/*{learn,concept_reference,featured,progress,rung_ledger,recognition,lesson,book_source,kind_guide,glossary,hand_written}*"
+  - "app/models/concept_vocabulary.rb"
 ---
 
 # Learn, Progress and the featured concept
