@@ -1,0 +1,109 @@
+---
+paths:
+  - "app/services/{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,reviewed_section_results,weighted_roll}.rb"
+  - "app/services/{competency_gate,coverage_exception}/**"
+  - "app/models/{concept_mastery,kind_preferences,kind_difficulty,concept_drills,concept_hosts,ladder_coverage,exercise_history_entry,user,daily_exercise}.rb"
+  - "app/controllers/{concept_drills,accounts,profile,api_keys}_controller.rb"
+  - "app/controllers/concerns/exercise_mix_ladders.rb"
+  - "app/views/api_keys/**"
+  - "app/javascript/controllers/exercise_mix_controller.js"
+  - "spec/**/*{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,concept_mastery,kind_preferences,kind_difficulty,concept_drills,accounts,user_spec,exercise_mix}*"
+---
+
+# Day planning, sizing and mastery
+
+Each entry states what a change must not break. An entry that names a
+`docs/decisions/` doc has its full reasoning, measurements and history there;
+read it before changing that area.
+
+- **Section kind weight preferences**
+  (`docs/decisions/section-kind-weight-preferences.md`): A per-kind multiplier
+  (`KindPreferences::MULTIPLIERS`) leans only `SectionRotation#pick_kind`'s
+  roll, after the starvation guarantee, and never touches `slot_staleness`.
+  Exclusion removes a kind from the pool everywhere, `slot_staleness`
+  included; validation refuses one that empties a slot. Storage is sparse, so
+  an untouched user stays byte-identical to pre-feature behavior.
+- **Difficulty targets and locks**
+  (`docs/decisions/difficulty-targets-and-locks.md`): Per-kind level targets
+  (`KindDifficulty::LEVELS`) and locks; an unset kind follows `skill_level`
+  through `KindDifficulty#rung_for`. A lock suppresses `(reduced)` easing and
+  both rating adjustments, first exposure included. Targets and locks change
+  prompt text only: `DailyPlan`, `ConceptMastery` and `User#concepts_*` never
+  read `KindDifficulty`. Weights and difficulty share
+  `section_kind_preferences_version`. `POST /learn/prepare_ladders` is the one
+  scoped exception to Learn's no-bulk-rewrite rule, reaches every teammate
+  through the shared `ConceptReference`, and is never offered to a trial
+  account (`User#prepares_ladders?`). `AiService::MAX_LADDER_GUIDANCE_CHARS`
+  bounds the ladder block.
+- **Drills** (`docs/decisions/drills.md`): A drill (`ConceptDrills`) only
+  moves a concept to the front of `User#concepts_needing_reinforcement`; it
+  never touches rotation, weights or `KindDifficulty`. It clears on the same
+  co-favourable rating that sets mastery to standard.
+  `ConceptDrills::MAX_CONCURRENT` caps drills, a group counting as one, with
+  `#can_start?`/`#can_start_group?` as the one statement of it. Drills are
+  offered only where `DayHosts` says today can tag them.
+- **Daily sections setting** (`docs/decisions/daily-sections-setting.md`):
+  `User#daily_section_count` is Automatic (nil) or a count in
+  `User::DAILY_SECTION_COUNTS`. `DaySize.for` returns a fixed count before
+  completion or the gate, and a fixed count never gains a coverage section.
+  `ProfileController` accepts only `"automatic"` or a listed count and 422s
+  anything else, since Active Record's integer cast would misread it. It is
+  not part of the Exercise mix version.
+- **What the plan did, on the row**
+  (`docs/decisions/what-the-plan-did-on-the-row.md`):
+  `daily_exercises.plan_notes` records the planned size and reason on every
+  plan, plus coverage and shared concept when they applied
+  (`DailyPlan::Result#notes`). It is server-owned, written with the row from
+  the plan that produced it and never recomputed while rendering; the size
+  excludes any coverage addition, and `RegenerateExerciseJob` rewrites it from
+  the new plan.
+- **Shared concept on a real struggle**
+  (`docs/decisions/shared-concept-on-a-real-struggle.md`):
+  `SharedConcept.pick` puts a reduced-tier reinforcement concept that every
+  fixed kind can tag (via `DayHosts`) into both fixed sections, only on a host
+  nothing else needed (`SharedConcept.placeable?`), so it never evicts a drill
+  or reinforcement entry. It is advisory prompt text, never enforced through
+  `fixed_concepts:`. The dashboard line shows only when both delivered
+  sections carry it, and it gives no reason, since saying why would expose the
+  mastery tier.
+- **Waiting retention checks** (`docs/decisions/waiting-retention-checks.md`):
+  `DailyPlan` reads due checks for every bucket in the user's slice plus the
+  generated language's bucket in one query
+  (`User#concepts_due_for_retention_check_in`);
+  `ConceptMastery.due_for_retention_check` is the one definition of due. A
+  check is selected or reserved only when a section today can tag it
+  (`DayHosts`); the rest land on `Result#waiting_checks` as `no_slot` or
+  `no_host` and are logged.
+- **Coverage exception** (`docs/decisions/coverage-exception.md`):
+  `CoverageException` (pure) adds one optional section to a two-section
+  Automatic day when the brake is off and no exercise on the previous
+  `CAP_WEEKDAYS` weekdays has `plan_notes["coverage"]`, picking a kind for an
+  overdue check or one unseen for `GAP_WEEKDAYS`. It respects exclusions,
+  reads hosting through `DayHosts`, and gives up the addition when the check
+  would not land in it.
+- **Competency gate** (`docs/decisions/competency-gate.md`): `CompetencyGate`
+  earns an Automatic day's size from rubric-stamped reviews; `DaySize` takes
+  the lower of it and completion, and a fixed setting wins outright. The fold
+  is pure and runs forward, moves one step a day, resets to two on the brake
+  (which empties the growth windows), and reads levels from `pitched_at`.
+  Eased sections stay out of growth, but their too-hard rating counts toward
+  the brake. `ReviewedSectionResults` decides which sections count, and
+  `CompetencyGate::Evidence` reads every stamped day with no cap, since a cap
+  would forget an earned size.
+- **Pausing generation** (`docs/decisions/pausing-generation.md`):
+  `User#paused_generation_at` stops only generation the user didn't ask for
+  (cron and the dashboard auto-trigger), never submit or review. `PATCH
+  /account/toggle_generation` is the only pause control, and its buttons post
+  the state they want. A held unsubmitted set and its draft response move to
+  today (`User#carry_held_set_forward!`, `#recover_held_set`) under
+  `DailyExercise#with_response_locked`, clearing both regeneration columns; a
+  submitted response ends the move, and it is skipped when today already has a
+  set. At most one set carries forward, so an older stray still breaks
+  `#current_streak`, and re-pausing never moves the `#held_exercise` floor.
+- **Personalization loop** (`docs/decisions/personalization-loop.md`):
+  `User#recent_performance` feeds the last 10 sessions into the generation
+  prompt. A skipped section's AI grade is never skill evidence: ratings,
+  `ConceptMastery.record_review!` and reinforcement read
+  `DailyResponse#answered_concept_tags`. A skipped, due retention check is
+  deferred one interval without changing tier, streak or rating, and only for
+  a concept answered nowhere on that response.

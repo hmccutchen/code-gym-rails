@@ -1,6 +1,6 @@
 require "active_support/configuration_file"
 
-# Sized so a judge fan-out never waits for a connection; see CLAUDE.md, "Railway Deployment".
+# Sized so a judge fan-out never waits for a connection; see .claude/rules/deployment.md.
 module DatabasePool
   # Restates ExerciseSection::MAX_SECTIONS, which cannot autoload at boot; a spec holds the two equal.
   SECTIONS_PER_DAY = 4

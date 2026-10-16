@@ -70,7 +70,7 @@ You review by reading. Do not edit files, commit, push, merge, or change the PR 
 2. Read the PR title, description, commits, and the full diff.
 3. Find the linked issue (`#N` in the description or branch name) and read it and its comments with `gh issue view`. Take the stated constraints, non-goals, and any comment that records a decision about the approach.
 4. Read the design spec for this change if one exists on the branch under `docs/superpowers/specs/`. Specs are committed to the feature branch before implementation, so the spec is the author's stated intent.
-5. Read `CLAUDE.md`. It is the authority on architecture and review rules. Read any other architecture doc it points to for the area being changed.
+5. Read `CLAUDE.md` and the `.claude/rules/` files for the area being changed. Together they are the authority on architecture and review rules. Read any other architecture doc it points to for the area being changed.
 6. Read every changed file and the code that calls into or is called by it.
 7. Search the codebase for an existing implementation of the same capability: services, concerns, jobs, providers, section kinds, or patterns that already solve part of the problem.
 8. Collect earlier rounds of this review. Reviews posted with `gh` carry the author's own login, so you cannot tell a round, or a reply, by who wrote it. Recognise a round by its marker line, `<!-- critical-review -->`, at the end of the body, and recognise an inline thread by a first comment that names a finding title from a round. Use `gh pr view --json reviews,comments` for bodies. For inline threads, read every page of the PR's review threads with their resolution state and comments, through a read-only GraphQL query:
