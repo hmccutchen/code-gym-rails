@@ -8,11 +8,15 @@ No `code_review`, pattern or third section can host a fourth bucket's concepts, 
 
 The plan chooses the day's concepts so the caller can compare what was offered with what the provider used (`AiService#log_retention`).
 
+## `.concept_tracks`
+
+The fourth track takes the day's fourth kind from the planned kinds, so a daily fourth and a rotated fourth are planned the same way. Under the pair's layout a day never holds two.
+
 ## `.main_track`
 
 Reinforcement is truncated to today's hosts because the prompt demands every concept it lists.
 
-The capacity count (every non-fourth kind) is deliberately approximate: on some days the fixed kinds host fewer concepts than that, and placement is advisory anyway.
+The capacity count (every non-fourth kind) is deliberately approximate: on some days the daily kinds host fewer concepts than that, and placement is advisory anyway.
 
 ## `.code_review_source_for`
 

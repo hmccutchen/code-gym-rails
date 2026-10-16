@@ -41,7 +41,9 @@ says what a deviation from one requires.
   key in the profiles that use it.
 - **Registry for section kinds** — `ExerciseSection` and its subclasses answer
   every per-kind question (which are thirds, which scaffold, what the prompt
-  says). Adding a kind is adding a class.
+  says). Adding a kind is adding a class. Which kinds are daily is a per-user
+  value (`DailyKinds`), so slot questions go through
+  `ExerciseSection.layout(daily:)`.
 - **Pure decision objects** — `DailyPlan` decides the day's shape before any
   provider is contacted; `ProblemSetIngest` normalizes provider output and
   writes nothing, returning a `Result` instead. `ProblemSetIngest` is pure, so
@@ -52,7 +54,7 @@ says what a deviation from one requires.
   same holds for `CompetencyGate` (how many sections reviewed work has
   earned), `DaySize` (the day's planned count from the setting, completion
   and the gate), `CoverageException` (whether a two-section day gains a
-  section), `SharedConcept` (which concept both fixed sections take) and
+  section), `SharedConcept` (which concept both daily sections take) and
   `DayHosts` (which kinds can tag a concept today). Keep the collaborators
   that way.
 - **Single authority per fact** — `DailyExercise#active_section_keys` for how

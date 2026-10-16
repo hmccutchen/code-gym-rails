@@ -48,6 +48,15 @@ read it before changing that area.
   `ConceptDrills::MAX_CONCURRENT` caps drills, a group counting as one, with
   `#can_start?`/`#can_start_group?` as the one statement of it. Drills are
   offered only where `DayHosts` says today can tag them.
+- **Daily kinds** (`docs/decisions/daily-kinds.md`): `DailyKinds` is the one
+  authority for which kinds every set holds. `users.daily_section_kinds` is
+  sparse (empty means `DailyKinds::DEFAULT`) and normalized on read; each day
+  records its pair in `plan_notes["daily_kinds"]`, and a row without it reads
+  as the default. Every slot reader takes the pair through
+  `ExerciseSection.layout(daily:)` or `.optional_slots(daily:)`; never
+  re-introduce a global slot list. A default account must stay byte-identical,
+  which the prompt, page and request snapshots hold. A daily fourth takes the
+  fourth slot out of rotation. `CompetencyGate` still reads `DEFAULT`.
 - **Daily sections setting** (`docs/decisions/daily-sections-setting.md`):
   `User#daily_section_count` is Automatic (nil) or a count in
   `User::DAILY_SECTION_COUNTS`. `DaySize.for` returns a fixed count before
@@ -58,15 +67,15 @@ read it before changing that area.
 - **What the plan did, on the row**
   (`docs/decisions/what-the-plan-did-on-the-row.md`):
   `daily_exercises.plan_notes` records the planned size and reason on every
-  plan, plus coverage and shared concept when they applied
-  (`DailyPlan::Result#notes`). It is server-owned, written with the row from
+  plan and the day's daily kinds (`daily_kinds`), plus coverage and shared
+  concept when they applied (`DailyPlan::Result#notes`). It is server-owned, written with the row from
   the plan that produced it and never recomputed while rendering; the size
   excludes any coverage addition, and `RegenerateExerciseJob` rewrites it from
   the new plan.
 - **Shared concept on a real struggle**
   (`docs/decisions/shared-concept-on-a-real-struggle.md`):
   `SharedConcept.pick` puts a reduced-tier reinforcement concept that every
-  fixed kind can tag (via `DayHosts`) into both fixed sections, only on a host
+  daily kind can tag (via `DayHosts`) into both daily sections, only on a host
   nothing else needed (`SharedConcept.placeable?`), so it never evicts a drill
   or reinforcement entry. It is advisory prompt text, never enforced through
   `fixed_concepts:`. The dashboard line shows only when both delivered
@@ -81,9 +90,9 @@ read it before changing that area.
   (`DayHosts`); the rest land on `Result#waiting_checks` as `no_slot` or
   `no_host` and are logged.
 - **Coverage exception** (`docs/decisions/coverage-exception.md`):
-  `CoverageException` (pure) adds one optional section to a two-section
-  Automatic day when the brake is off and no exercise on the previous
-  `CAP_WEEKDAYS` weekdays has `plan_notes["coverage"]`, picking a kind for an
+  `CoverageException` (pure) adds one optional section, from the pair's
+  optional slots, to a two-section Automatic day when the brake is off and
+  no exercise on the previous `CAP_WEEKDAYS` weekdays has `plan_notes["coverage"]`, picking a kind for an
   overdue check or one unseen for `GAP_WEEKDAYS`. It respects exclusions,
   reads hosting through `DayHosts`, and gives up the addition when the check
   would not land in it.

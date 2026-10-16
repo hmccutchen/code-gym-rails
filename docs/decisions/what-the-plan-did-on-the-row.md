@@ -2,7 +2,9 @@
 
 `daily_exercises.plan_notes` (jsonb,
 default `{}`, null false) records `{"size" => count, "size_reason" =>
-"setting" | "completion" | "gate" | "brake"}` on every plan, and
+"setting" | "completion" | "gate" | "brake"}` and `{"daily_kinds" =>
+[key, key]}` (the pair the plan used, `docs/decisions/daily-kinds.md`) on
+every plan, and
 `{"coverage" => kind_key, "coverage_reason" => "gap" | "due_check"}` and
 `{"shared_concept" => concept}`, each only when it applied
 (`DailyPlan::Result#notes`). The size is the planned count before any

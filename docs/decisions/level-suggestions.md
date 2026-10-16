@@ -35,8 +35,8 @@ competency gate. The AI rating's calibration for these moves is unverified,
 and suggestions require an explicit Apply.
 
 **Rare kinds may never qualify.** A kind appears at most once a day, so five
-results take at least five days with it. On a two-section day only code
-review and design comparison can reach five within the 60-response read,
+results take at least five days with it. On a two-section day only the
+two daily kinds (code review and design comparison by default) can reach five within the 60-response read,
 and on a three-section day an optional kind needs about 70% of its
 appearances answered and un-eased; the others move only when the user
 changes them in Setup.

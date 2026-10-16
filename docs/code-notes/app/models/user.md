@@ -193,5 +193,7 @@ name a provider while holding no keys.
 
 ## `#every_slot_keeps_a_kind`
 
-It reads the slot roster from `ExerciseSection.slots`, so a future slot that
-holds several kinds needs no edit here. Single-kind slots are skipped.
+It reads the slot roster from `ExerciseSection.optional_slots` for the
+user's own pair (`DailyKinds.for`), so a future slot that holds several
+kinds needs no edit here, and it also runs when the pair changes, since a
+new daily kind can leave its old slot holding only excluded kinds. Single-kind slots are skipped.

@@ -31,9 +31,10 @@ read it before changing that area.
   keep, edit prose (`.prose_fields` only, never code or the planted defect) or
   reject. Weekend sets and `RegenerateExerciseJob` stay single-stage.
   `JudgeVerdict.parse` is the boundary, and evidence is deliberately not
-  matched against the section text. A rejection buys `.judge_retries` retries
-  with the concept fixed, then a drop recorded in `dropped_sections`; a judge
-  failure keeps the draft; a day with every section dropped raises
+  matched against the section text. A rejection buys
+  `DailyPlan::Result#judge_retries` retries (two for a daily kind, one
+  otherwise) with the concept fixed, then a drop recorded in
+  `dropped_sections`; a judge failure keeps the draft; a day with every section dropped raises
   `AllSectionsRejectedError` and writes no row. A dropped kind still counts as
   scheduled, and nothing in the rotation compensates, on purpose; a day's
   credit never exceeds the sections it delivered. The judge sees one section
@@ -51,7 +52,7 @@ read it before changing that area.
   and `RealSource` entries are appended, never inserted.
 - **Design comparison, the second fixed section**
   (`docs/decisions/design-comparison-the-second-fixed-section.md`): The second
-  fixed kind (`ExerciseSection::DesignComparison`): two working pieces that
+  default daily kind (`ExerciseSection::DesignComparison`): two working pieces that
   differ on one principle; the engineer picks one and names the deciding fact.
   The server rolls A/B order in `.arrange!`. `answer_key` never reaches the
   page, the judge, the duck (which gains only `piece_a` and `piece_b`) or the
@@ -61,7 +62,7 @@ read it before changing that area.
   stay out of its vocabulary; `.rejudge_edits?` is true only here;
   `REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL` stays false until a person has read
   the disagreements; its reference stays closed until opened. A day still
-  holds at most `ExerciseSection::MAX_SECTIONS`, fixed kinds first.
+  holds at most `ExerciseSection::MAX_SECTIONS`, daily kinds first.
 - **Scenario flavor** (`docs/decisions/scenario-flavor.md`): Each day's
   scenario setting comes from one prompt line offering a pool from
   `AiService::SCENARIO_POOLS`, rolled once a day by `DailyPlan`
@@ -88,8 +89,9 @@ read it before changing that area.
   and a wrong planted count is not a failure.
 - **Which sections count** (`docs/decisions/which-sections-count.md`):
   `DailyExercise#active_section_keys` (through
-  `ExerciseSection.resolved_keys`) is the single authority for which sections
-  a day has; every denominator, the answered count, the submit gate, param
+  `ExerciseSection.resolved_keys`, given the row's own pair from
+  `DailyExercise#daily_kinds`) is the single authority for which sections a
+  day has; every denominator, the answered count, the submit gate, param
   slices, the duck guard and the review fan-out derive from it. Never count
   `problem_set.keys` or `answers.keys`. `dropped_sections` records why a
   judged day is short.
