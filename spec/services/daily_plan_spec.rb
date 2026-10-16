@@ -1182,3 +1182,33 @@ RSpec.describe DailyPlan, "the coverage exception" do
     described_class.for(user, language: "ruby_rails")
   end
 end
+
+RSpec.describe DailyPlan, "reinforcement no section can host" do
+  let(:user) { User.create!(email: "plan-unhosted@example.com", name: "Plan") }
+
+  before { allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil) }
+
+  def struggled_with(concept)
+    exercise = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: { "code_review" => { "concept" => concept } })
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current - 1, submitted_at: Time.current,
+                          answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
+                          concept_tags: { "code_review" => concept }, ai_review: { "code_review" => { "rating" => "developing" } })
+  end
+
+  it "skips a meta-skill concept on a two-section schema-review day, where neither section can tag it" do
+    pin_code_review_mode(:schema_review)
+    struggled_with("reading_for_intent")
+
+    expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |entry| entry[:concept] })
+      .not_to include("reading_for_intent")
+  end
+
+  it "keeps it on a day whose code review can tag it" do
+    pin_code_review_mode(:application_code)
+    struggled_with("reading_for_intent")
+
+    expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |entry| entry[:concept] })
+      .to include("reading_for_intent")
+  end
+end

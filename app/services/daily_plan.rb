@@ -108,10 +108,9 @@ class DailyPlan
   private_class_method :waiting_checks
 
   def self.main_track(user, language, kinds:, hosts:, due:)
-    hostable      = hostable_buckets(language, kinds: kinds)
-    reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
-                                                        hostable: drill_host_test(kinds: kinds, hosts: hosts))
-                        .select { |h| hostable.include?(h[:bucket]) }
+    hostable      = host_test(kinds: kinds, hosts: hosts)
+    reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS, hostable: hostable)
+                        .select { |h| hostable.call(h[:concept], h[:bucket]) }
     capacity      = kinds.count { |kind| !kind.fourth? }
     reinforcement = share_hosts(reinforcement, capacity)
     slots         = capacity - reinforcement.size
@@ -142,12 +141,12 @@ class DailyPlan
   end
   private_class_method :share_hosts
 
-  def self.drill_host_test(kinds:, hosts:)
+  def self.host_test(kinds:, hosts:)
     candidates = kinds.reject(&:fourth?)
 
     ->(concept, bucket) { hosts.hosts(candidates, concept, bucket).any? }
   end
-  private_class_method :drill_host_test
+  private_class_method :host_test
 
   def self.fourth_track(user, fourth, due:)
     return NO_FOURTH_TRACK if fourth.nil?
