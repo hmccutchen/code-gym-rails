@@ -5,8 +5,11 @@ class DailyExercise < ApplicationRecord
   # Excludes "mixed": a stored "mixed" would flow back into generation through RegenerateExerciseJob.
   LANGUAGES = %w[ruby_rails javascript].freeze
 
-  # Must exceed AiService::GENERATION_READ_TIMEOUT plus job pickup, or a healthy job looks abandoned.
-  REGENERATION_STALE_AFTER = 6.minutes
+  JOB_PICKUP_MARGIN = 60.seconds
+
+  # The draft's worst case, retries included: a shorter claim makes a healthy job look abandoned.
+  REGENERATION_STALE_AFTER =
+    AiService.worst_case_call_seconds(AiService::GENERATION_READ_TIMEOUT).seconds + JOB_PICKUP_MARGIN
 
   include Claimable
   claim :regenerating, column: :regenerating_since, stale_after: REGENERATION_STALE_AFTER

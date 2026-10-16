@@ -1266,6 +1266,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(JSON.parse(response.body)["status"]).to eq("pending")
     end
 
+    it "still reports pending seven minutes into a regeneration" do
+      claimed_exercise.update!(regenerating_since: 7.minutes.ago)
+
+      get dashboard_status_path
+
+      expect(JSON.parse(response.body)["status"]).to eq("pending")
+    end
+
     it "reports ready once the claim is released" do
       exercise = claimed_exercise
       exercise.update!(regenerating_since: nil)
