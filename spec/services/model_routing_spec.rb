@@ -44,7 +44,7 @@ RSpec.describe "per-purpose model routing" do
 
   # An unlisted purpose falls back silently, so a misspelled key would route nothing.
   [ ClaudeService, GeminiService, OpenaiService ].each do |service_class|
-    it "routes only purposes #{service_class} actually logs" do
+    it "routes only purposes with a call profile for #{service_class}" do
       expect(service_class::MODEL_FOR_PURPOSE.keys - purposes_in_use).to be_empty
     end
 

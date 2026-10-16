@@ -183,7 +183,7 @@ RSpec.describe AiService do
       judge_review
     ].freeze
 
-    it "covers every purpose except the two conversational ones" do
+    it "covers every profiled purpose except the two conversational ones" do
       all_purposes = AiService::CALL_PROFILES.keys
 
       expect(all_purposes).to contain_exactly(*SINGLE_SHOT_PURPOSES, "review_follow_up", "duck_thread")

@@ -168,6 +168,15 @@ RSpec.describe AiService, "request values" do
       end
     end
 
+    call_site_settings.each_key do |purpose|
+      it "sends #{purpose} a system prompt the oracle marker table maps back to it" do
+        system = request_sent_for(purpose) { drive(purpose) }.system
+        shares_generation_prompt = purpose == "retry_section"
+
+        expect(purpose_for(system)).to eq(shares_generation_prompt ? "generate_exercise" : purpose)
+      end
+    end
+
     it "sends a blocking generation on the synchronous timeout" do
       request = request_sent_for("generate_exercise") { service.generate_exercise(user, blocking: true) }
 

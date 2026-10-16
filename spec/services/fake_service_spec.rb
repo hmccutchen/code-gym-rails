@@ -139,7 +139,7 @@ RSpec.describe FakeService do
     end
 
     it "holds one reply per purpose and no other" do
-      expect(described_class::REPLIES.keys).to eq(ApiUsage::PURPOSES)
+      expect(described_class::REPLIES.keys.sort).to eq(ApiUsage::PURPOSES.sort)
     end
 
     ApiUsage::PURPOSES.each do |purpose|
@@ -169,7 +169,7 @@ RSpec.describe FakeService do
     it "names the system-prompt marker of every purpose, each a phrase AiService's prompts carry" do
       source = Rails.root.join("app/services/ai_service.rb").read
 
-      expect(FakeReplies::SYSTEM_PROMPT_MARKERS.keys).to eq(ApiUsage::PURPOSES)
+      expect(FakeReplies::SYSTEM_PROMPT_MARKERS.keys.sort).to eq(ApiUsage::PURPOSES.sort)
       FakeReplies::SYSTEM_PROMPT_MARKERS.each_value { |marker| expect(source).to include(marker) }
     end
 

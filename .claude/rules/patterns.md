@@ -20,8 +20,8 @@ says what a deviation from one requires.
   posts the body with the request's timeout and retry context, raises on a
   failed status, parses the reply and maps a Faraday error the same way for
   every provider. Subclasses implement `request_body`, `read_result`,
-  `raise_for_status`, `provider_name` and `build_connection` behind it, keep a
-  private `route_for`, and own the model each purpose routes to
+  `raise_for_status`, `provider_name` and `build_connection` behind it,
+  define the `API_URL` it posts to, keep a private `route_for`, and own the model each purpose routes to
   (`DEFAULT_ROUTE` / `MODEL_FOR_PURPOSE`). A subclass overrides
   `long_running?` only when its retry rule differs, as `OpenaiService` does.
   Adding a provider is adding a subclass and listing it in `AiProvider.all`,

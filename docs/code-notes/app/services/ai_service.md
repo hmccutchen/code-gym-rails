@@ -144,9 +144,13 @@ A purpose's token cap, read timeout, caching, single attempt and allowed
 truncation are facts about the purpose, so they live in one row per purpose
 instead of at each call site. The values are the named constants above, so
 the timeout budget specs and the notes on each constant still apply.
-`ai_service_request_spec` holds the keys equal to `ApiUsage::PURPOSES`, and
+`ai_service_request_spec` holds the keys equal to `ApiUsage::PURPOSES`.
 `provider_request_characterization_spec` fails if a row changes the body its
-purpose sends to any provider.
+purpose sends to any provider, which covers the token cap and caching. The
+read timeout, single attempt and allowed truncation appear in no body, so
+`ai_service_request_spec` pins them, by driving each purpose's real caller and
+comparing the request it sends with the settings its call site passed before
+the profiles existed.
 
 ## `.request_for`
 
