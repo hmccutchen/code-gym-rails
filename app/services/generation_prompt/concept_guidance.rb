@@ -1,0 +1,126 @@
+module GenerationPrompt::ConceptGuidance
+  private
+
+  def data_modeling_idiom_guidance
+    "- The data-modeling concepts (#{ConceptVocabulary::DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section whose own " \
+      "vocabulary list above includes them. " \
+      "Only a schema-review code_review presents a schema artifact to review — anywhere else, express the " \
+      "concept in that section's own idiom: a pattern question about wrong_cardinality asks how the " \
+      "relationship should be modeled and what the wrong shape costs the code that uses it, not for a " \
+      "migration to review; a design_comparison shows two ways to store or query the same data that behave the " \
+      "same, such as with and without an index, and asks which one the stated access pattern should use."
+  end
+
+  def meta_skill_framing_guidance
+    "- The meta-skill concepts (#{ConceptVocabulary::META_SKILL_CONCEPTS.join(', ')}) name HOW to reason " \
+      "about a problem, not a topic to write about. A section tagged with one must still " \
+      "contain exactly one specific, findable issue and be gradeable against it — the " \
+      "concept shapes only how the question is framed, never whether there is a right " \
+      "answer. A code_review tagged reading_for_intent plants one real divergence between " \
+      "what the code is evidently for and what it does, and asks the engineer to name both; " \
+      "it never asks an open question about the code's purpose. A challenge tagged " \
+      "separating_symptom_from_cause states a failing behavior whose obvious fix treats " \
+      "the symptom, and is graded on whether the submitted implementation addresses the " \
+      "cause; it never asks for an essay about how to debug. Where no code is shown " \
+      "(pattern), express the concept against the described design instead: what the " \
+      "proposed approach takes for granted, or which layer the real cause sits at."
+  end
+
+  def code_smell_naming_guidance
+    "- The code-smell concepts (#{ConceptVocabulary::CODE_SMELL_CONCEPTS.join(', ')}) name a shape to recognize, not a single " \
+      "broken line. When one is a section's tagged concept, the code must exhibit it at a scale where it is " \
+      "visible — a class doing four jobs, a change that would touch six call sites — and the answer is naming " \
+      "and locating the smell and saying what it costs, never patching one line. Express it in the host " \
+      "section's own idiom: on a test-file code_review, a god_object is a bloated test class; a " \
+      "design_comparison shows one piece with the smell and one without it, behaving the same, and the " \
+      "scenario states how the code changes, which decides what the smell costs. The challenge " \
+      "section is the exception to the answer shape, since its answer is code: there the exercise is a " \
+      "refactor — starter_code exhibits the smell at that scale and the question asks the engineer to " \
+      "restructure it, so writing the better shape IS the answer rather than describing it."
+  end
+
+  def oo_design_violation_guidance
+    "- The OO design-principle concepts (#{ConceptVocabulary::OO_DESIGN_CONCEPTS.join(', ')}) name a rule the code breaks, not a " \
+      "topic to discuss. A section tagged with one must contain exactly one specific, findable violation of that " \
+      "rule and be gradeable against it, and the answer is naming the violation and saying which future change it " \
+      "makes hard, rather than a rewrite of the class. Express it in the host section's own idiom: a code_review " \
+      "tagged open_closed shows a conditional that must be edited every time a variant is added; a pattern, which " \
+      "shows no code, describes a hierarchy built for reuse and asks what the composed shape would be and what it " \
+      "costs; a design_comparison shows one piece that follows the principle and one that breaks it, behaving " \
+      "the same, and the scenario states the change that makes the difference matter; " \
+      "on a test-file code_review the planted test smell must BE the violation rather than sit beside it, " \
+      "which every principle in the group can express — a dependency_inversion violation is a test that can only " \
+      "reach its subject by stubbing one hard-coded collaborator, an open_closed violation is a conditional " \
+      "inside the test that gains a branch for every case added, and a composition_over_inheritance violation is " \
+      "a test-case base class whose subclasses inherit setup they do not use. " \
+      "The challenge section is the exception to the answer shape, since its answer is code: there the " \
+      "starter_code violates the principle — a behavior that cannot be tested without reaching through a " \
+      "hard-coded collaborator, for dependency_inversion — and the question asks for the version that satisfies " \
+      "it, so writing the corrected design IS the answer rather than describing it."
+  end
+
+  def module_design_depth_guidance
+    "- The module-design concepts (#{ConceptVocabulary::MODULE_DESIGN_CONCEPTS.join(', ')}) name what a module's interface costs " \
+      "every caller, not a bug in what it computes. A section tagged with one must contain exactly one specific, " \
+      "findable instance of that shape and be gradeable against it, and the answer is naming the instance and " \
+      "saying which future change its interface makes expensive, rather than a rewrite of the module. Express it " \
+      "in the host section's own idiom: a code_review tagged pass_through_method shows a method whose entire body " \
+      "forwards its arguments to one collaborator; on a test-file code_review, a shallow_module is a test helper " \
+      "whose setup arguments spell out the very state it claims to hide; a pattern, which shows no code, " \
+      "describes a module's interface and asks what it actually hides and what it forces every caller to know " \
+      "anyway; a design_comparison shows a deep and a shallow version of the same interface, behaving the " \
+      "same, and the scenario states how callers use it. The challenge section is " \
+      "the exception to the answer shape, since its answer is code: there the starter_code exhibits the shape — " \
+      "for temporal_decomposition, a flow split into objects that exist only because they run in that order — and " \
+      "the question asks for the version organized around information instead, so writing the deeper module IS " \
+      "the answer rather than describing it."
+  end
+
+  def silent_correctness_guidance
+    "- The silent-correctness concepts (#{ConceptVocabulary::SILENT_CORRECTNESS_CONCEPTS.join(', ')}) name a broken invariant that " \
+      "looks like a working result. A section tagged with one must show code that runs clean — no exception, no " \
+      "type or schema error, nothing a passing test would catch — and still produce a wrong answer, and the " \
+      "engineer's job is to say which invariant it breaks and on what input. Calibrate to one specific defect at " \
+      "this severity: an allocation_rounding split whose parts don't sum back to the total, or one that " \
+      "distributes an input its own scenario makes meaningless — no buckets to split across, or a negative total " \
+      "in a domain where only positive quantities exist — instead of rejecting it; a semantic_input_validation " \
+      "boundary where an unrecognized unit falls through a lookup default and is stored as the canonical one, " \
+      "right type and plausible magnitude, wrong meaning; a cache_key_completeness key naming one of the two " \
+      "dimensions its value varies on, so every other request reads the first one cached; a " \
+      "deterministic_ordering sort or comparator with no secondary key, so re-running the same query or " \
+      "re-sorting the same list returns tied entries in a different order and a paginated pass repeats or skips " \
+      "them. Two neighbours to stay clear of: cache_key_completeness is about the key's correctness, never about " \
+      "whether to cache at all — that is the caching concept — and semantic_input_validation is about a value " \
+      "whose meaning is wrong, never about one that is absent or malformed, which is validations. Express it in " \
+      "the host section's own idiom: a pattern, which shows no code, describes the computation and asks which " \
+      "inputs the result actually varies on and what the missing one costs; on a test-file code_review the " \
+      "planted test smell must BE the silent defect rather than sit beside it — a test whose expected value is " \
+      "computed the same wrong way as the subject, so it passes and proves nothing. The challenge section is the " \
+      "exception to the answer shape, since its answer is code: there starter_code carries the defect and the " \
+      "question asks for the version that holds the invariant, so writing the correct distribution, key, or " \
+      "ordering IS the answer."
+  end
+
+  def domain_modeling_guidance
+    "- The domain-modeling concepts (#{ConceptVocabulary::DOMAIN_MODELING_CONCEPTS.join(', ')}) name what the model calls things and " \
+      "which things must change together, not a defect in what the code computes. A section tagged with one must " \
+      "contain exactly one specific, findable instance and be gradeable against it, and the answer is naming the " \
+      "instance and saying which future change it makes wrong or expensive, rather than a rewrite of the model. " \
+      "For ubiquitous_language the scenario must establish the domain's own word before the code contradicts it — " \
+      "a stated booking process whose model is called Order, or one word covering two different things — and the " \
+      "code must otherwise do exactly what its names claim, which is what keeps this apart from reading_for_intent " \
+      "(code diverging from its evident purpose) and from primitive_obsession (a missing type, not a wrong word). " \
+      "For aggregate_boundaries plant one write path that leaves two rows disagreeing because no single object " \
+      "owns the set, or a caller reaching past the owner to update a member directly; it is never about whether a " \
+      "transaction was opened, which is transaction_safety, nor about which service owns the data, which is " \
+      "data_ownership. Express it in the host section's own idiom: a pattern, which shows no code, describes the " \
+      "model in the domain's words and asks which name is overloaded or which writes must not be separable; a " \
+      "design_comparison shows two models with the same behavior, only one named or bounded the way the stated " \
+      "domain is; on a " \
+      "test-file code_review the planted test smell must BE the instance rather than sit beside it — a test whose " \
+      "own setup names the same thing two ways, or one that builds a member row the aggregate's rules forbid on " \
+      "its own. The challenge section is the exception to the answer shape, since its answer is code: there " \
+      "starter_code carries the instance and the question asks for the renamed or re-bounded version, so writing " \
+      "it IS the answer rather than describing it."
+  end
+end

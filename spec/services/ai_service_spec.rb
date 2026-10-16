@@ -153,6 +153,10 @@ RSpec.describe AiService do
 
   let(:service) { double_class.new }
 
+  def guidance_line(prompt, group)
+    prompt[/^- The #{Regexp.escape(group)} concepts \(.*$/]
+  end
+
   def full_problem_set(overrides = {})
     base = ExerciseSection.keys.index_with { {} }
     base["design_comparison"] = design_comparison_section
@@ -420,23 +424,23 @@ RSpec.describe AiService do
     end
   end
 
-  describe "#exercise_schema_for" do
+  describe "the generation schema" do
     it "defaults to ruby_rails when no language is given" do
-      expect(service.send(:exercise_schema_for)).to eq(service.send(:exercise_schema_for, "ruby_rails"))
+      expect(generation_schema(user)).to eq(generation_schema(user, "ruby_rails"))
     end
 
     it "defaults to the challenge third and the plan_review fourth" do
-      schema = JSON.parse(service.send(:exercise_schema_for, "ruby_rails"))
+      schema = JSON.parse(generation_schema(user, "ruby_rails"))
       expect(schema.keys).to eq(%w[code_review design_comparison pattern challenge plan_review])
     end
 
     it "threads the day's language label into the kinds that take one" do
-      expect(service.send(:exercise_schema_for, "ruby_rails", third: :security_review)).to include("Ruby/Rails code")
-      expect(service.send(:exercise_schema_for, "javascript", third: :security_review)).to include("JavaScript/React code")
+      expect(generation_schema(user, "ruby_rails", third: :security_review)).to include("Ruby/Rails code")
+      expect(generation_schema(user, "javascript", third: :security_review)).to include("JavaScript/React code")
     end
 
     it "assembles the rolled third and fourth in slot order" do
-      schema = JSON.parse(service.send(:exercise_schema_for, "ruby_rails", third: :architecture, fourth: :ambiguity_hunt))
+      schema = JSON.parse(generation_schema(user, "ruby_rails", third: :architecture, fourth: :ambiguity_hunt))
       expect(schema.keys).to eq(%w[code_review design_comparison pattern architecture ambiguity_hunt])
     end
   end
@@ -445,8 +449,7 @@ RSpec.describe AiService do
     let(:user) { User.create!(email: "short@example.com", name: "Short") }
 
     it "asks for only the chosen sections in the schema" do
-      schema = JSON.parse(service.send(:exercise_schema_for, "ruby_rails", third: :challenge,
-                                       fourth: nil, pattern: nil))
+      schema = JSON.parse(generation_schema(user, "ruby_rails", third: :challenge, fourth: nil, pattern: nil))
 
       expect(schema.keys).to eq(%w[code_review design_comparison challenge])
     end
@@ -498,60 +501,52 @@ RSpec.describe AiService do
     end
   end
 
-  describe "#code_smell_naming_guidance" do
+  describe "code-smell naming guidance in the generation prompt" do
     let(:user) { User.create!(email: "smells@example.com", name: "Smells") }
-    let(:service) { FakeService.new("fake-key") }
+    let(:prompt) { generation_prompt(user, "ruby_rails") }
+    let(:guidance) { guidance_line(prompt, "code-smell") }
 
     it "names the group from the constant and asks for recognition, not a patch" do
-      guidance = service.send(:code_smell_naming_guidance)
-
       expect(guidance).to include(*ConceptVocabulary::CODE_SMELL_CONCEPTS)
       expect(guidance).to match(/naming and locating/i)
     end
 
     it "is stated once in the generation prompt" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
-
       expect(prompt.scan("god_object").size).to be >= 1
-      expect(prompt).to include(service.send(:code_smell_naming_guidance))
+      expect(prompt.scan("- The code-smell concepts (").size).to eq(1)
     end
 
     it "gives challenge a refactoring shape rather than a prose answer, since its answer is code" do
-      guidance = service.send(:code_smell_naming_guidance)
-
       expect(guidance).to match(/challenge/i)
       expect(guidance).to match(/restructur/i)
     end
   end
 
-  describe "#oo_design_violation_guidance" do
+  describe "OO design-principle guidance in the generation prompt" do
     let(:user) { User.create!(email: "principles@example.com", name: "Principles") }
-    let(:service) { FakeService.new("fake-key") }
+    let(:prompt) { generation_prompt(user, "ruby_rails") }
+    let(:guidance) { guidance_line(prompt, "OO design-principle") }
 
     it "names the group from the constant" do
-      expect(service.send(:oo_design_violation_guidance)).to include(*ConceptVocabulary::OO_DESIGN_CONCEPTS)
+      expect(guidance).to include(*ConceptVocabulary::OO_DESIGN_CONCEPTS)
     end
 
     it "requires one findable violation the section can be graded against" do
-      guidance = service.send(:oo_design_violation_guidance)
-
       expect(guidance).to match(/exactly one specific, findable violation/i)
       expect(guidance).to match(/gradeable/i)
     end
 
     it "asks the discussion sections for the violation named rather than rewritten" do
-      expect(service.send(:oo_design_violation_guidance)).to match(/rather than a rewrite/i)
+      expect(guidance).to match(/rather than a rewrite/i)
     end
 
     it "gives challenge a corrected-design shape rather than a prose answer, since its answer is code" do
-      guidance = service.send(:oo_design_violation_guidance)
-
       expect(guidance).to match(/challenge section is the exception/i)
       expect(guidance).to match(/writing the corrected design IS the answer/i)
     end
 
     it "gives every selectable design principle a test-file idiom" do
-      clause = service.send(:oo_design_violation_guidance)[/on a test-file code_review.*?(?=The challenge section)/m]
+      clause = guidance[/on a test-file code_review.*?(?=The challenge section)/m]
 
       expect(clause).to be_present
       ConceptVocabulary::OO_DESIGN_CONCEPTS.each do |concept|
@@ -560,111 +555,90 @@ RSpec.describe AiService do
     end
 
     it "requires the planted test smell to be the violation itself" do
-      expect(service.send(:oo_design_violation_guidance)).to match(/rather than sit beside it/i)
+      expect(guidance).to match(/rather than sit beside it/i)
     end
 
     it "is stated once in the generation prompt, for every section rather than per kind" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
-
-      expect(prompt).to include(service.send(:oo_design_violation_guidance))
-      expect(prompt.scan("The OO design-principle concepts").size).to eq(1)
+      expect(prompt.scan("- The OO design-principle concepts (").size).to eq(1)
     end
   end
 
-  describe "#module_design_depth_guidance" do
+  describe "module-design depth guidance in the generation prompt" do
     let(:user) { User.create!(email: "modules@example.com", name: "Modules") }
-    let(:service) { FakeService.new("fake-key") }
+    let(:prompt) { generation_prompt(user, "ruby_rails") }
+    let(:guidance) { guidance_line(prompt, "module-design") }
 
     it "names the group from the constant" do
-      expect(service.send(:module_design_depth_guidance)).to include(*ConceptVocabulary::MODULE_DESIGN_CONCEPTS)
+      expect(guidance).to include(*ConceptVocabulary::MODULE_DESIGN_CONCEPTS)
     end
 
     it "requires one findable instance the section can be graded against" do
-      guidance = service.send(:module_design_depth_guidance)
-
       expect(guidance).to match(/exactly one specific, findable/i)
       expect(guidance).to match(/gradeable/i)
     end
 
     it "asks the discussion sections for the shape named rather than rewritten" do
-      expect(service.send(:module_design_depth_guidance)).to match(/rather than a rewrite/i)
+      expect(guidance).to match(/rather than a rewrite/i)
     end
 
     it "gives challenge a deepened-module shape rather than a prose answer, since its answer is code" do
-      guidance = service.send(:module_design_depth_guidance)
-
       expect(guidance).to match(/challenge section is the exception/i)
       expect(guidance).to match(/writing the deeper module IS the answer/i)
     end
 
     it "says what the shape looks like on a test-file code_review" do
-      expect(service.send(:module_design_depth_guidance)).to match(/test-file code_review/i)
+      expect(guidance).to match(/test-file code_review/i)
     end
 
     it "is stated once in the generation prompt, for every section rather than per kind" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
-
-      expect(prompt).to include(service.send(:module_design_depth_guidance))
-      expect(prompt.scan("The module-design concepts").size).to eq(1)
+      expect(prompt.scan("- The module-design concepts (").size).to eq(1)
     end
   end
 
-  describe "#silent_correctness_guidance" do
+  describe "silent-correctness guidance in the generation prompt" do
     let(:user) { User.create!(email: "invariants@example.com", name: "Invariants") }
-    let(:service) { FakeService.new("fake-key") }
+    let(:prompt) { generation_prompt(user, "ruby_rails") }
+    let(:guidance) { guidance_line(prompt, "silent-correctness") }
 
     it "names the group from the constant" do
-      expect(service.send(:silent_correctness_guidance)).to include(*ConceptVocabulary::SILENT_CORRECTNESS_CONCEPTS)
+      expect(guidance).to include(*ConceptVocabulary::SILENT_CORRECTNESS_CONCEPTS)
     end
 
     it "requires code that runs clean and still answers wrongly" do
-      guidance = service.send(:silent_correctness_guidance)
-
       expect(guidance).to match(/runs clean/i)
       expect(guidance).to match(/no exception/i)
       expect(guidance).to match(/still produce a wrong answer/i)
     end
 
     it "draws the line between cache_key_completeness and the caching concept" do
-      expect(service.send(:silent_correctness_guidance))
-        .to match(/never about whether to cache at all/i)
+      expect(guidance).to match(/never about whether to cache at all/i)
     end
 
     it "draws the line between semantic_input_validation and the validations concept, since mastery is keyed on the tag" do
-      expect(service.send(:silent_correctness_guidance))
-        .to match(/never about one that is absent or malformed, which is validations/i)
+      expect(guidance).to match(/never about one that is absent or malformed, which is validations/i)
     end
 
     it "leaves whether a negative total is meaningless to the scenario's domain" do
-      guidance = service.send(:silent_correctness_guidance)
-
       expect(guidance).to match(/an input its own scenario makes meaningless/i)
       expect(guidance).to match(/in a domain where only positive quantities exist/i)
     end
 
     it "says what the defect looks like on a test-file code_review" do
-      guidance = service.send(:silent_correctness_guidance)
-
       expect(guidance).to match(/test-file code_review/i)
       expect(guidance).to match(/computed the same wrong way as the subject/i)
     end
 
     it "calibrates deterministic_ordering for a comparator as well as a query, since the group is in JS_CONCEPTS too" do
-      expect(service.send(:silent_correctness_guidance)).to match(/sort or comparator/i)
+      expect(guidance).to match(/sort or comparator/i)
     end
 
     it "gives pattern and challenge their own answer shapes" do
-      guidance = service.send(:silent_correctness_guidance)
-
       expect(guidance).to match(/a pattern, which shows no code/i)
       expect(guidance).to match(/challenge section is the exception/i)
     end
 
     it "is stated once in the generation prompt, for every section rather than per kind" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
-
-      expect(prompt).to include(service.send(:silent_correctness_guidance))
-      expect(prompt.scan("The silent-correctness concepts").size).to eq(1)
+      expect(prompt.scan("- The silent-correctness concepts (").size).to eq(1)
     end
   end
 
@@ -717,53 +691,43 @@ RSpec.describe AiService do
     end
   end
 
-  describe "#domain_modeling_guidance" do
+  describe "domain-modeling guidance in the generation prompt" do
     let(:user) { User.create!(email: "domain@example.com", name: "Domain") }
-    let(:service) { FakeService.new("fake-key") }
+    let(:prompt) { generation_prompt(user, "ruby_rails") }
+    let(:guidance) { guidance_line(prompt, "domain-modeling") }
 
     it "names the group from the constant" do
-      expect(service.send(:domain_modeling_guidance)).to include(*ConceptVocabulary::DOMAIN_MODELING_CONCEPTS)
+      expect(guidance).to include(*ConceptVocabulary::DOMAIN_MODELING_CONCEPTS)
     end
 
     it "requires one specific findable instance rather than a topic to discuss" do
-      guidance = service.send(:domain_modeling_guidance)
-
       expect(guidance).to match(/exactly one specific, findable instance/i)
       expect(guidance).to match(/gradeable against it/i)
     end
 
     it "requires the scenario to establish the domain's word before the code contradicts it" do
-      expect(service.send(:domain_modeling_guidance))
-        .to match(/establish the domain's own word before the code contradicts it/i)
+      expect(guidance).to match(/establish the domain's own word before the code contradicts it/i)
     end
 
     it "draws the line between ubiquitous_language and reading_for_intent, since mastery is keyed on the tag" do
-      expect(service.send(:domain_modeling_guidance))
-        .to match(/keeps this apart from reading_for_intent/i)
+      expect(guidance).to match(/keeps this apart from reading_for_intent/i)
     end
 
     it "draws the line between aggregate_boundaries and transaction_safety" do
-      expect(service.send(:domain_modeling_guidance))
-        .to match(/never about whether a transaction was opened, which is transaction_safety/i)
+      expect(guidance).to match(/never about whether a transaction was opened, which is transaction_safety/i)
     end
 
     it "gives pattern and challenge their own answer shapes" do
-      guidance = service.send(:domain_modeling_guidance)
-
       expect(guidance).to match(/a pattern, which shows no code/i)
       expect(guidance).to match(/challenge section is the exception/i)
     end
 
     it "gives the test-file code_review mode its own idiom" do
-      expect(service.send(:domain_modeling_guidance))
-        .to match(/on a test-file code_review the planted test smell must BE the instance/i)
+      expect(guidance).to match(/on a test-file code_review the planted test smell must BE the instance/i)
     end
 
     it "is stated once in the generation prompt, for every section rather than per kind" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
-
-      expect(prompt).to include(service.send(:domain_modeling_guidance))
-      expect(prompt.scan("The domain-modeling concepts").size).to eq(1)
+      expect(prompt.scan("- The domain-modeling concepts (").size).to eq(1)
     end
   end
 
@@ -1761,18 +1725,25 @@ RSpec.describe AiService do
             (acc[level] ||= {}).merge!(vocabulary.index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
           end
 
-          service.send(:kind_difficulty_guidance, placed.to_h, difficulty, ladders).length
-        end.max + lock_subsets(kinds).map { |locked| lock_instruction_length(kinds, locked) }.max -
-          lock_instruction_length(kinds, kinds)
+          difficulty_block(placed.to_h, difficulty, ladders).length
+        end.max + lock_subsets(kinds).map { |locked| lock_overhead(kinds, locked) }.max
+      end
+
+      def difficulty_block(rungs, difficulty, ladders)
+        GenerationPrompt::DifficultyGuidance.render(rungs: rungs, difficulty: difficulty, ladders: ladders)
       end
 
       def lock_subsets(kinds)
         (0..kinds.size).flat_map { |count| kinds.combination(count).to_a }
       end
 
-      def lock_instruction_length(kinds, locked)
-        [ service.send(:unlocked_difficulty_line, kinds - locked),
-          service.send(:locked_difficulty_line, locked) ].compact.sum { |line| line.length + 1 }
+      def lock_overhead(kinds, locked)
+        rungs      = kinds.index_with { KindDifficulty::LEVELS.first }
+        targets    = rungs.transform_keys(&:key)
+        all_locked = KindDifficulty.new(levels: targets, locked: targets.keys)
+        difficulty = KindDifficulty.new(levels: targets, locked: locked.map(&:key))
+
+        difficulty_block(rungs, difficulty, {}).length - difficulty_block(rungs, all_locked, {}).length
       end
 
       def day_shapes
@@ -1805,8 +1776,7 @@ RSpec.describe AiService do
           (acc[levels.fetch(kind.key)] ||= {}).merge!(vocabulary.index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
         end
         difficulty = KindDifficulty.new(levels: levels, locked: [ "code_review" ])
-        mixed = service.send(:kind_difficulty_guidance, kinds.to_h { |kind| [ kind, levels.fetch(kind.key) ] },
-                             difficulty, ladders).length
+        mixed = difficulty_block(kinds.to_h { |kind| [ kind, levels.fetch(kind.key) ] }, difficulty, ladders).length
 
         expect(largest_block_for("javascript", :application_code, kinds)).to be >= mixed
       end
@@ -1820,13 +1790,12 @@ RSpec.describe AiService do
           [ {}, rungs ].each do |ladders|
             all_locked = KindDifficulty.new(levels: targets, locked: targets.keys)
             placed = kinds.zip(levels).to_h
-            baseline = service.send(:kind_difficulty_guidance, placed, all_locked, ladders).length
+            baseline = difficulty_block(placed, all_locked, ladders).length
             lock_subsets(kinds).each do |locked|
               difficulty = KindDifficulty.new(levels: targets, locked: locked.map(&:key))
-              actual = service.send(:kind_difficulty_guidance, placed, difficulty, ladders).length
-              expected = baseline + lock_instruction_length(kinds, locked) - lock_instruction_length(kinds, kinds)
+              actual = difficulty_block(placed, difficulty, ladders).length
 
-              expect(actual).to eq(expected)
+              expect(actual).to eq(baseline + lock_overhead(kinds, locked))
             end
           end
         end

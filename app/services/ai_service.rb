@@ -697,6 +697,12 @@ class AiService
     ReviewProseVerdict.parse(raw, projection: projection)
   end
 
+  def self.config_for(language)
+    LANGUAGE_PROMPTS.fetch(language) do
+      raise Error, "Unsupported generation language: #{language.inspect}"
+    end
+  end
+
   def self.error_code_for(error)
     case error
     when AuthenticationError  then "authentication"
@@ -978,11 +984,7 @@ class AiService
 
   def require_supported_language!(language) = config_for(language)
 
-  def config_for(language)
-    LANGUAGE_PROMPTS.fetch(language) do
-      raise Error, "Unsupported generation language: #{language.inspect}"
-    end
-  end
+  def config_for(language) = self.class.config_for(language)
 
   def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs)
     hosts = kinds.filter_map do |kind|
@@ -1083,10 +1085,6 @@ class AiService
     Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
   end
 
-  def annotate_reinforcement(entry)
-    "#{entry[:concept]} (#{[ entry[:tier], ("drilled" if entry[:drilled]) ].compact.join(', ')})"
-  end
-
   def eased_concepts_for(plan, difficulty)
     reduced_main   = reduced_concepts(plan.reinforcement)
     reduced_fourth = reduced_concepts(plan.fourth_reinforcement)
@@ -1110,7 +1108,8 @@ class AiService
                     chosen_concept: chosen, chosen_grounded: grounded.include?(chosen) } ]
     end
 
-    { kind_difficulty: per_kind, kind_difficulty_chars: kind_difficulty_guidance(rungs, difficulty, ladders).length }
+    { kind_difficulty: per_kind,
+      kind_difficulty_chars: GenerationPrompt::DifficultyGuidance.render(rungs: rungs, difficulty: difficulty, ladders: ladders).length }
   end
 
   def without_answer_key(problem_set)
@@ -1143,17 +1142,13 @@ class AiService
   end
 
   def exercise_schema_for(language = "ruby_rails", third: :challenge, fourth: :plan_review, pattern: :pattern, only: nil)
-    label = config_for(language)[:label]
+    plan = DailyPlan::Result.new(
+      pattern: pattern, third: third, fourth: fourth, reinforcement: [], due_checks: [], established: [],
+      fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [], code_review_mode: :application_code,
+      code_review_source: nil, scenario_flavor: :general, shared_concept: nil, coverage: nil, waiting_checks: nil, size: nil)
 
-    kinds = only ? [ only ] : ExerciseSection.for_plan(third: third, fourth: fourth, pattern: pattern)
-    sections = kinds.map { |kind| kind.schema_fragment(label: label) }
-                    .join(",\n  ")
-
-    <<~SCHEMA
-      {
-        #{sections}
-      }
-    SCHEMA
+    GenerationPrompt.new(nil, language, plan: plan, history: [], difficulty: KindDifficulty.none, ladders: {},
+                         retention_annotation: method(:annotate_retention_concept)).schema(only: only)
   end
 
   def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, pattern: :pattern,
@@ -1164,305 +1159,17 @@ class AiService
                             scenario_flavor: :general, shared_concept: nil,
                             difficulty: KindDifficulty.none, ladders: {},
                             only: nil, fixed_concept: nil)
-    history_text = if history.empty?
-      "No history yet — this is their first exercise set."
-    else
-      history.map { |h|
-        pairs = h[:concepts].respond_to?(:each_pair) ? h[:concepts].each_pair.filter_map { |section, concept|
-          next if concept.blank?
-          self_r  = h[:self_ratings][section].presence || "unrated"
-          skipped = h[:answered_sections] && !h[:answered_sections].include?(section)
-          ai_r    = skipped ? "skipped" : (h[:ai_ratings][section].presence || "unreviewed")
-          "#{section}→#{concept} (self: #{self_r}, ai: #{ai_r})"
-        } : []
-        concept_text = pairs.any? ? " | #{pairs.join(', ')}" : ""
-        framings     = h[:scenarios].presence || []
-        framing_text = framings.any? ? " | framings: #{framings.join('; ')}" : ""
-        "#{h[:date]}: #{h[:sections_answered]}/#{h[:sections_total]} answered#{concept_text}#{framing_text}"
-      }.join("\n")
-    end
+    plan = DailyPlan::Result.new(
+      pattern: pattern, third: third,
+      reinforcement: reinforcement || user.concepts_needing_reinforcement(exclude_buckets: DailyPlan::FOURTH_BUCKETS),
+      due_checks: due_checks, established: established, fourth: fourth, fourth_reinforcement: fourth_reinforcement,
+      fourth_due_checks: fourth_due_checks, fourth_established: fourth_established, code_review_mode: code_review_mode,
+      code_review_source: code_review_source, scenario_flavor: scenario_flavor, shared_concept: shared_concept,
+      coverage: nil, waiting_checks: nil, size: nil)
 
-    reinforcement_list = reinforcement || user.concepts_needing_reinforcement(exclude_buckets: DailyPlan::FOURTH_BUCKETS)
-    reinforcement_text = reinforcement_list.any? ?
-      reinforcement_list.map { |h| annotate_reinforcement(h) }.join(", ") : "none"
-
-    kinds = only ? [ only ] : ExerciseSection.for_plan(third: third, fourth: fourth, pattern: pattern)
-
-    rungs = difficulty.rungs_for(kinds, skill_level: user.skill_level)
-    annotated_due_checks = due_checks.filter_map { |cm| annotate_retention_concept(cm, kinds, language, code_review_mode, rungs) }
-
-    retention_block =
-      if annotated_due_checks.any?
-        <<~RET.chomp
-
-          Retention checks due today: #{annotated_due_checks.join(', ')}
-          - These are concepts the engineer previously MASTERED. Each is annotated with the section(s) it may occupy — work it into one of those in the schema below, alongside the reinforcement concepts.
-          - Use a completely FRESH scenario for these — a new business domain, new class and method names, a new narrative. Never reuse any framing listed above. This tests whether they retained the idea, not whether they recognize a memorized example.
-          - Pitch these at FULL difficulty. Do NOT ease them, add scaffolding, or write a more direct teaching_note the way you would for a `(reduced)` concept — the engineer is not struggling with these, and making them easier defeats the point of checking.
-        RET
-      else
-        ""
-      end
-
-    established_block =
-      if established.any?
-        <<~EST.chomp
-
-          Established concepts (well past first mastery — survived a retention check): #{established.map(&:concept).join(', ')}
-          - If you were already going to select one of these for a section's concept, keep that section's teaching_note minimal (a single short sentence, or an empty string is fine).
-          - Pitch at full difficulty — do not ease, simplify, or add scaffolding for these, the same as you would not for a retention check.
-          - This is advisory, like every other concept instruction here: it does not force you to select one of these concepts, only shapes the section if you do.
-        EST
-      else
-        ""
-      end
-
-    fourth_reinforcement_text = fourth_reinforcement.any? ?
-      fourth_reinforcement.map { |h| annotate_reinforcement(h) }.join(", ") : "none"
-
-    fourth_reinforcement_line =
-      if fourth
-        "Fourth-section (#{fourth}) concept needing reinforcement: #{fourth_reinforcement_text}"
-      else
-        ""
-      end
-
-    fourth_retention_block =
-      if fourth_due_checks.any?
-        <<~RET.chomp
-
-          Retention check due for the fourth section today: #{fourth_due_checks.map(&:concept).join(', ')} (#{fourth} bucket).
-          - This is a concept the engineer previously MASTERED in this skill. Work it into the fourth section as its concept.
-          - Use a completely FRESH scenario — never reuse a prior framing. Pitch at FULL difficulty, no extra scaffolding — the engineer is not struggling with this, making it easier defeats the point of checking.
-        RET
-      else
-        ""
-      end
-
-    fourth_established_block =
-      if fourth_established.any?
-        <<~EST.chomp
-
-          Established fourth-section concept (well past first mastery, survived a retention check): #{fourth_established.map(&:concept).join(', ')}
-          - If you were already going to select this for the fourth section's concept, keep the teaching_note minimal and pitch at full difficulty, the same as you would for any other established concept.
-        EST
-      else
-        ""
-      end
-
-    ts_guidance =
-      if language == "javascript"
-        "- If a section's tagged concept is one of #{ConceptVocabulary::TYPESCRIPT_FLAVORED_CONCEPTS.join(", ")}, write that section's code using real TypeScript syntax and type annotations. Every other section stays plain JavaScript — do not switch the whole set to TypeScript just because one section calls for it.\n"
-      else
-        ""
-      end
-
-    fixed_concept_line = fixed_concept ?
-      "\n- This section's concept must be exactly `#{fixed_concept}`: it replaces a section that was rejected on wording alone, and the day's plan already placed this concept here." :
-      ""
-    shared_concept_line = only ? "" : shared_concept_guidance(shared_concept)
-
-    config = config_for(language)
-    label  = config[:label]
-    focus  = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
-
-    sections_guidance = kinds.map { |kind|
-      mode = code_review_mode if kind == ExerciseSection::CodeReview
-      generation_guidance_for(kind, language, mode: mode, source: code_review_source, rung: rungs[kind])
-    }.join("\n")
-
-    <<~PROMPT
-      Generate a daily Code Gym exercise set for this engineer.
-
-      Engineer profile:
-      - Name: #{UserText.tagged(user.name, blank: "(not given)", inline: true,
-                                limit: UserText::MAX_NAME_LENGTH)}
-      - Skill level: #{user.skill_level} (#{User::SKILL_LEVELS.join(" → ")})
-      - Priority focus areas: #{focus}
-
-      Recent performance (last 10 sessions):
-      #{history_text}
-
-      Concepts needing reinforcement right now: #{reinforcement_text}
-      #{fourth_reinforcement_line}
-
-      Instructions:
-      - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
-      - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
-      - Prioritize focus areas they've missed or rated hard recently.
-      - Rotate between topics across sessions — avoid the same pattern two days in a row.
-      - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
-      #{ts_guidance}
-      #{scenario_flavor_guidance(scenario_flavor)}
-      - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
-      - answer_scaffold (#{scaffolded_kinds_clause} only): #{ExerciseSection::MAX_SCAFFOLD_LABELS} labels at most, #{ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH} characters at most each, ending in a colon. These pre-fill the answer box, so write them for THIS question specifically — name the parts a complete answer to it must cover, in the order someone should think them through (e.g. for a caching decision: "Which option, and why:", "How you'd handle a stale entry:"). Generic prompts that would fit any question of this kind are a wasted scaffold. Each is a heading the engineer writes UNDER, so it must ask for something, never state or hint at the answer — the teaching_note rules apply here too.
-      - Every "diagram" field is Mermaid source using ONLY `flowchart TD` or `graph LR`. Maximum 8 nodes. No styling directives, no subgraphs, no click handlers, no classDef — narrow syntax parses reliably, clever syntax does not. Node labels must be short (a few words); use quoted labels like A["Order service"] when a label contains spaces or punctuation.
-      - A section's "diagram" depicts ONLY the structure its scenario or snippet already describes — the components, calls, state, and consumers as written, in the order they happen. Never diagram the fix, the corrected structure, or the answer, and never annotate a node as the problem, the bug, or the bottleneck. The engineer sees this BEFORE answering, so showing the shape of a problem must never reveal its solution.
-      - When the snippet or scenario contains a loop, iteration, or repeated invocation that wraps the flow being diagrammed (e.g. a method called inside `each`/`for`/`while`), the diagram must make that repetition visible — either an explicit loop/iteration node in the call's path, or a labeled edge stating the per-item cardinality (e.g. "once per customer", "for each order"). A flat one-time call chain is not accurate for code that actually repeats. Do not manufacture a loop or cardinality label when the snippet has none.
-      - Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
-      #{sections_guidance}
-      #{data_modeling_idiom_guidance}
-      #{meta_skill_framing_guidance}
-      #{code_smell_naming_guidance}
-      #{oo_design_violation_guidance}
-      #{module_design_depth_guidance}
-      #{silent_correctness_guidance}
-      #{domain_modeling_guidance}
-      - Reduced-tier concepts: for any concept whose annotation includes `reduced` (alone or as `(reduced, drilled)`), keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
-      - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
-      - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.#{fixed_concept_line}#{shared_concept_line}
-      #{retention_block}
-      #{established_block}
-      #{fourth_retention_block}
-      #{fourth_established_block}#{kind_difficulty_guidance(rungs, difficulty, ladders)}
-      - Concepts most recently rated "too easy" must not repeat within the same week.
-      - Concepts most recently rated "right level" have no special weighting.
-
-      Return JSON matching this schema exactly:
-      #{exercise_schema_for(language, third: third, fourth: fourth, pattern: pattern, only: only)}
-    PROMPT
-  end
-
-  def shared_concept_guidance(concept)
-    return "" if concept.nil?
-
-    sections = ExerciseSection.fixed.map(&:key).to_sentence
-    "\n- The #{sections} sections share `#{concept}` as their concept today. It is one concept needing reinforcement, looked at from different sides: each section tests it in its own way and its own scenario, following its own rules above."
-  end
-
-  def scenario_flavor_guidance(flavor)
-    pool    = SCENARIO_POOLS.fetch(flavor)
-    flavors = (pool[:domains] - %w[legacy_graphql_maintenance]).map { |d| d.tr("_", " ") }.join(", ")
-
-    [
-      "- Prefer drawing each section's business-domain scenario from #{pool[:intro]} like: #{flavors} " \
-        "(adapt any flavor to fit the day's stack — e.g. #{pool[:adaptation]}).",
-      pool[:rule],
-      pool[:legacy]
-    ].compact.join(" ")
-  end
-
-  def data_modeling_idiom_guidance
-    "- The data-modeling concepts (#{ConceptVocabulary::DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section whose own " \
-      "vocabulary list above includes them. " \
-      "Only a schema-review code_review presents a schema artifact to review — anywhere else, express the " \
-      "concept in that section's own idiom: a pattern question about wrong_cardinality asks how the " \
-      "relationship should be modeled and what the wrong shape costs the code that uses it, not for a " \
-      "migration to review; a design_comparison shows two ways to store or query the same data that behave the " \
-      "same, such as with and without an index, and asks which one the stated access pattern should use."
-  end
-
-  def meta_skill_framing_guidance
-    "- The meta-skill concepts (#{ConceptVocabulary::META_SKILL_CONCEPTS.join(', ')}) name HOW to reason " \
-      "about a problem, not a topic to write about. A section tagged with one must still " \
-      "contain exactly one specific, findable issue and be gradeable against it — the " \
-      "concept shapes only how the question is framed, never whether there is a right " \
-      "answer. A code_review tagged reading_for_intent plants one real divergence between " \
-      "what the code is evidently for and what it does, and asks the engineer to name both; " \
-      "it never asks an open question about the code's purpose. A challenge tagged " \
-      "separating_symptom_from_cause states a failing behavior whose obvious fix treats " \
-      "the symptom, and is graded on whether the submitted implementation addresses the " \
-      "cause; it never asks for an essay about how to debug. Where no code is shown " \
-      "(pattern), express the concept against the described design instead: what the " \
-      "proposed approach takes for granted, or which layer the real cause sits at."
-  end
-
-  def code_smell_naming_guidance
-    "- The code-smell concepts (#{ConceptVocabulary::CODE_SMELL_CONCEPTS.join(', ')}) name a shape to recognize, not a single " \
-      "broken line. When one is a section's tagged concept, the code must exhibit it at a scale where it is " \
-      "visible — a class doing four jobs, a change that would touch six call sites — and the answer is naming " \
-      "and locating the smell and saying what it costs, never patching one line. Express it in the host " \
-      "section's own idiom: on a test-file code_review, a god_object is a bloated test class; a " \
-      "design_comparison shows one piece with the smell and one without it, behaving the same, and the " \
-      "scenario states how the code changes, which decides what the smell costs. The challenge " \
-      "section is the exception to the answer shape, since its answer is code: there the exercise is a " \
-      "refactor — starter_code exhibits the smell at that scale and the question asks the engineer to " \
-      "restructure it, so writing the better shape IS the answer rather than describing it."
-  end
-
-  def oo_design_violation_guidance
-    "- The OO design-principle concepts (#{ConceptVocabulary::OO_DESIGN_CONCEPTS.join(', ')}) name a rule the code breaks, not a " \
-      "topic to discuss. A section tagged with one must contain exactly one specific, findable violation of that " \
-      "rule and be gradeable against it, and the answer is naming the violation and saying which future change it " \
-      "makes hard, rather than a rewrite of the class. Express it in the host section's own idiom: a code_review " \
-      "tagged open_closed shows a conditional that must be edited every time a variant is added; a pattern, which " \
-      "shows no code, describes a hierarchy built for reuse and asks what the composed shape would be and what it " \
-      "costs; a design_comparison shows one piece that follows the principle and one that breaks it, behaving " \
-      "the same, and the scenario states the change that makes the difference matter; " \
-      "on a test-file code_review the planted test smell must BE the violation rather than sit beside it, " \
-      "which every principle in the group can express — a dependency_inversion violation is a test that can only " \
-      "reach its subject by stubbing one hard-coded collaborator, an open_closed violation is a conditional " \
-      "inside the test that gains a branch for every case added, and a composition_over_inheritance violation is " \
-      "a test-case base class whose subclasses inherit setup they do not use. " \
-      "The challenge section is the exception to the answer shape, since its answer is code: there the " \
-      "starter_code violates the principle — a behavior that cannot be tested without reaching through a " \
-      "hard-coded collaborator, for dependency_inversion — and the question asks for the version that satisfies " \
-      "it, so writing the corrected design IS the answer rather than describing it."
-  end
-
-  def module_design_depth_guidance
-    "- The module-design concepts (#{ConceptVocabulary::MODULE_DESIGN_CONCEPTS.join(', ')}) name what a module's interface costs " \
-      "every caller, not a bug in what it computes. A section tagged with one must contain exactly one specific, " \
-      "findable instance of that shape and be gradeable against it, and the answer is naming the instance and " \
-      "saying which future change its interface makes expensive, rather than a rewrite of the module. Express it " \
-      "in the host section's own idiom: a code_review tagged pass_through_method shows a method whose entire body " \
-      "forwards its arguments to one collaborator; on a test-file code_review, a shallow_module is a test helper " \
-      "whose setup arguments spell out the very state it claims to hide; a pattern, which shows no code, " \
-      "describes a module's interface and asks what it actually hides and what it forces every caller to know " \
-      "anyway; a design_comparison shows a deep and a shallow version of the same interface, behaving the " \
-      "same, and the scenario states how callers use it. The challenge section is " \
-      "the exception to the answer shape, since its answer is code: there the starter_code exhibits the shape — " \
-      "for temporal_decomposition, a flow split into objects that exist only because they run in that order — and " \
-      "the question asks for the version organized around information instead, so writing the deeper module IS " \
-      "the answer rather than describing it."
-  end
-
-  def silent_correctness_guidance
-    "- The silent-correctness concepts (#{ConceptVocabulary::SILENT_CORRECTNESS_CONCEPTS.join(', ')}) name a broken invariant that " \
-      "looks like a working result. A section tagged with one must show code that runs clean — no exception, no " \
-      "type or schema error, nothing a passing test would catch — and still produce a wrong answer, and the " \
-      "engineer's job is to say which invariant it breaks and on what input. Calibrate to one specific defect at " \
-      "this severity: an allocation_rounding split whose parts don't sum back to the total, or one that " \
-      "distributes an input its own scenario makes meaningless — no buckets to split across, or a negative total " \
-      "in a domain where only positive quantities exist — instead of rejecting it; a semantic_input_validation " \
-      "boundary where an unrecognized unit falls through a lookup default and is stored as the canonical one, " \
-      "right type and plausible magnitude, wrong meaning; a cache_key_completeness key naming one of the two " \
-      "dimensions its value varies on, so every other request reads the first one cached; a " \
-      "deterministic_ordering sort or comparator with no secondary key, so re-running the same query or " \
-      "re-sorting the same list returns tied entries in a different order and a paginated pass repeats or skips " \
-      "them. Two neighbours to stay clear of: cache_key_completeness is about the key's correctness, never about " \
-      "whether to cache at all — that is the caching concept — and semantic_input_validation is about a value " \
-      "whose meaning is wrong, never about one that is absent or malformed, which is validations. Express it in " \
-      "the host section's own idiom: a pattern, which shows no code, describes the computation and asks which " \
-      "inputs the result actually varies on and what the missing one costs; on a test-file code_review the " \
-      "planted test smell must BE the silent defect rather than sit beside it — a test whose expected value is " \
-      "computed the same wrong way as the subject, so it passes and proves nothing. The challenge section is the " \
-      "exception to the answer shape, since its answer is code: there starter_code carries the defect and the " \
-      "question asks for the version that holds the invariant, so writing the correct distribution, key, or " \
-      "ordering IS the answer."
-  end
-
-  def domain_modeling_guidance
-    "- The domain-modeling concepts (#{ConceptVocabulary::DOMAIN_MODELING_CONCEPTS.join(', ')}) name what the model calls things and " \
-      "which things must change together, not a defect in what the code computes. A section tagged with one must " \
-      "contain exactly one specific, findable instance and be gradeable against it, and the answer is naming the " \
-      "instance and saying which future change it makes wrong or expensive, rather than a rewrite of the model. " \
-      "For ubiquitous_language the scenario must establish the domain's own word before the code contradicts it — " \
-      "a stated booking process whose model is called Order, or one word covering two different things — and the " \
-      "code must otherwise do exactly what its names claim, which is what keeps this apart from reading_for_intent " \
-      "(code diverging from its evident purpose) and from primitive_obsession (a missing type, not a wrong word). " \
-      "For aggregate_boundaries plant one write path that leaves two rows disagreeing because no single object " \
-      "owns the set, or a caller reaching past the owner to update a member directly; it is never about whether a " \
-      "transaction was opened, which is transaction_safety, nor about which service owns the data, which is " \
-      "data_ownership. Express it in the host section's own idiom: a pattern, which shows no code, describes the " \
-      "model in the domain's words and asks which name is overloaded or which writes must not be separable; a " \
-      "design_comparison shows two models with the same behavior, only one named or bounded the way the stated " \
-      "domain is; on a " \
-      "test-file code_review the planted test smell must BE the instance rather than sit beside it — a test whose " \
-      "own setup names the same thing two ways, or one that builds a member row the aggregate's rules forbid on " \
-      "its own. The challenge section is the exception to the answer shape, since its answer is code: there " \
-      "starter_code carries the instance and the question asks for the renamed or re-bounded version, so writing " \
-      "it IS the answer rather than describing it."
+    GenerationPrompt.new(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders,
+                         retention_annotation: method(:annotate_retention_concept))
+                    .render(only: only, fixed_concept: fixed_concept)
   end
 
   def ladders_for(rungs, language, code_review_mode)
@@ -1484,65 +1191,6 @@ class AiService
       end.to_h
       (ladders[request[:level]] ||= {}).merge!(rungs)
     end
-  end
-
-  def kind_difficulty_guidance(rungs, difficulty, ladders)
-    locked, unlocked = rungs.keys.partition { |kind| difficulty.locked?(kind) }
-    paragraphs = KindDifficulty::LEVELS.filter_map do |level|
-      at_level = rungs.select { |_kind, rung| rung == level }.keys
-      level_difficulty_paragraph(level, at_level, ladders.fetch(level, {})) if at_level.any?
-    end
-
-    [ "", "Difficulty by section. Pitch each section named below at its level; where it differs from the " \
-          "skill level in the engineer profile above, the section's level wins.",
-      *paragraphs, "",
-      "A retention check or established concept placed in one of these sections is pitched at that " \
-      "section's level, with no easing.",
-      unlocked_difficulty_line(unlocked), locked_difficulty_line(locked) ].compact.join("\n")
-  end
-
-  def level_difficulty_paragraph(level, kinds, rungs)
-    definition = KindDifficulty::LEVEL_DEFINITIONS.fetch(level)
-    lines = [ "", "Sections at #{level}: #{kinds.map(&:key).join(', ')}" ]
-    return (lines << "Pitch these problems at this level. A #{level} problem is: #{definition}").join("\n") if rungs.empty?
-
-    lines << "Pitch these problems at this level for whichever concept you choose:"
-    lines.concat(rungs.sort.map { |concept, rung| "- #{concept}: #{rung}" })
-    (lines << "For a concept not listed, a #{level} problem is: #{definition}").join("\n")
-  end
-
-  def unlocked_difficulty_line(kinds)
-    return if kinds.empty?
-
-    "Unlocked (#{kinds.map(&:key).join(', ')}): tier annotations and rating adjustments above still apply to " \
-      "these sections, eased or raised from the section's level rather than from the profile's skill level."
-  end
-
-  def locked_difficulty_line(kinds)
-    return if kinds.empty?
-
-    "Locked (#{kinds.map(&:key).join(', ')}): for these sections, ignore the `(reduced)` easing rule and both " \
-      "the \"too easy\" and \"too hard\" rating adjustments above, whichever concept they carry — including a " \
-      "concept the engineer has never seen. Where a locked section has an answer scaffold or starter code, " \
-      "write it at its level, not easier."
-  end
-
-  def scaffolded_kinds_clause
-    ExerciseSection.all.select(&:scaffolded?).map(&:key).to_sentence(last_word_connector: " and ")
-  end
-
-  def generation_guidance_for(kind, language, mode: nil, source: nil, rung: nil)
-    config = config_for(language)
-
-    kind.generation_guidance(
-      vocabulary:     ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: rung),
-      label:          config[:label],
-      mode:           mode,
-      artifact:       config[:schema_artifact],
-      test_framework: config[:test_framework],
-      source:         source,
-      rung:           rung
-    )
   end
 
   def build_review_day_context(coach, exercise, daily_response)
