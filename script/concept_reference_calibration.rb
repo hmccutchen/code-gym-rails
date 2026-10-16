@@ -137,9 +137,9 @@ class ConceptReferenceCalibration
     timeout = @timeout
 
     Class.new(@provider_class) do
-      define_method(:call) do |**options|
-        options[:read_timeout] = timeout if options[:purpose] == PURPOSE
-        super(**options)
+      define_method(:call) do |request|
+        request = request.with(read_timeout: timeout) if request.purpose == PURPOSE
+        super(request)
       end
       define_method(:build_connection) { super().tap { |conn| conn.builder.use(AttemptCounter, probe) } }
       define_method(:log_usage) do |_user, result, purpose:|

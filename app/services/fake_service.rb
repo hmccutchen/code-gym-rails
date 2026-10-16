@@ -296,20 +296,20 @@ class FakeService < AiService
   private
 
   # Raises bare RuntimeErrors because the job turns AiService::Error into a user-facing message that hides the bug.
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
+  def call(request)
     text =
-      case system
+      case request.system
       when /editing the prose of one section's code review/
         { "status" => "keep" }.to_json
       when /generating personalized daily exercise sets/
         EXERCISE_PROBLEM_SET.to_json
       when /giving direct, specific feedback/
-        section = prompt[/Grade ONLY the "(\w+)" section/, 1]
+        section = request.prompt[/Grade ONLY the "(\w+)" section/, 1]
         raise "FakeService could not extract the section key from the review prompt" if section.blank?
 
         REVIEW_SECTION.to_json
       when /rating how hard/
-        difficulty_assessment(prompt).to_json
+        difficulty_assessment(request.prompt).to_json
       when /writing a concise, durable reference/
         CONCEPT_REFERENCE.to_json
       when /how to recognize one category of problem/
@@ -327,9 +327,9 @@ class FakeService < AiService
       when /TRANSCRIBER, not a reviewer/
         PSEUDOCODE_TRANSLATION
       when /checking one section of a generated coding exercise/
-        judge_verdict(prompt).to_json
+        judge_verdict(request.prompt).to_json
       else
-        raise "FakeService received an unrecognized system prompt: #{system.inspect}"
+        raise "FakeService received an unrecognized system prompt: #{request.system.inspect}"
       end
 
     { text: text, input_tokens: 0, output_tokens: 0, model: "fake", cache_read_tokens: 0, cache_write_tokens: 0 }

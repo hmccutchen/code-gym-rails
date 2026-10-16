@@ -102,9 +102,9 @@ RSpec.describe "Security hardening targets", type: :request do
       resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => { "missed" => [] } })
       service = FakeService.new(user)
       sent = nil
-      allow(service).to receive(:call).and_wrap_original do |original, **kwargs|
-        sent = kwargs[:history]
-        original.call(**kwargs)
+      allow(service).to receive(:call).and_wrap_original do |original, request|
+        sent = request.history
+        original.call(request)
       end
 
       service.answer_follow_up(user, exercise, resp, section: "code_review", question: "Why?",

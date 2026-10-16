@@ -116,7 +116,7 @@ RSpec.describe FakeService do
       service = described_class.new(user.api_key)
 
       expect {
-        service.send(:call, system: "You are a senior Rails engineer giving direct, specific feedback", prompt: "no section marker here")
+        service.send(:call, AiService::Request.build(system: "You are a senior Rails engineer giving direct, specific feedback", prompt: "no section marker here"))
       }.to raise_error(/could not extract the section key/)
     end
   end

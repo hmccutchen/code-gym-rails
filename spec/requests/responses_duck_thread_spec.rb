@@ -385,9 +385,9 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
     login_as(fake_provider_user)
 
     captured = nil
-    allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, **kwargs|
-      captured = kwargs
-      original.call(**kwargs)
+    allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, request|
+      captured = request
+      original.call(request)
     end
 
     post duck_thread_responses_path,
@@ -399,10 +399,10 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
          as: :json
 
     expect(response).to have_http_status(:ok)
-    expect(captured[:history].size).to eq(2)
-    expect(captured[:history].map { |turn| turn[:role] }).to eq([ "user", "assistant" ])
-    expect(captured[:history].first[:content]).to include("You: the answer is memoization")
-    expect(captured[:prompt]).not_to include("You: the answer is memoization")
+    expect(captured.history.size).to eq(2)
+    expect(captured.history.map { |turn| turn[:role] }).to eq([ "user", "assistant" ])
+    expect(captured.history.first[:content]).to include("You: the answer is memoization")
+    expect(captured.prompt).not_to include("You: the answer is memoization")
   end
 
   describe "thread ordering" do

@@ -46,7 +46,7 @@ class GeminiStructuredOutputCheck
   # One attempt per fixture: a retry would spend the free tier's daily budget on the same fixture.
   def service(usage)
     Class.new(GeminiService) do
-      define_method(:call) { |**kwargs| super(**kwargs.merge(single_attempt: true)) }
+      define_method(:call) { |request| super(request.with(single_attempt: true)) }
       define_method(:log_usage) { |_user, result, purpose:| usage << result[:output_tokens].to_i }
       private :call, :log_usage
     end.new(@api_key)

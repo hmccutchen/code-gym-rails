@@ -34,27 +34,24 @@ class GeminiService < AiService
 
   private
 
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
+  def provider_name = "Gemini"
+
+  def request_body(request)
     body = {
-      model:              MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)[:model],
-      system_instruction: system,
-      input:              flatten_history(history, prompt),
+      model:              route_for(request.purpose)[:model],
+      system_instruction: request.system,
+      input:              flatten_history(request.history, request.prompt),
       store:              false
     }
     # The cap and minimal thinking go together under generation_config; the API ignores a top-level max_output_tokens.
-    if max_tokens
-      body[:generation_config] = { max_output_tokens: max_tokens, thinking_level: MINIMAL_THINKING_LEVEL }
+    if request.max_tokens
+      body[:generation_config] = { max_output_tokens: request.max_tokens, thinking_level: MINIMAL_THINKING_LEVEL }
     end
-    body[:response_format] = json_format(response_schema) if response_schema
+    body[:response_format] = json_format(request.response_schema) if request.response_schema
+    body
+  end
 
-    resp = @conn.post(API_URL, body.to_json) do |req|
-      req.options.timeout = read_timeout
-      req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT, single_attempt: single_attempt)
-    end
-
-    raise_for_status(resp) unless resp.success?
-
-    parsed       = parse_provider_envelope(resp.body, provider: "Gemini")
+  def read_result(parsed, request)
     model_output = Array(parsed["steps"]).find { |s| s["type"] == "model_output" }
     text_parts   = Array(model_output && model_output["content"]).select { |c| c["type"] == "text" }.map { |c| c["text"] }
     usage        = parsed["usage"] || {}
@@ -65,15 +62,11 @@ class GeminiService < AiService
       text:          text_parts.join,
       input_tokens:  usage["total_input_tokens"].to_i - cached_tokens,
       output_tokens: output_tokens.to_i + usage["total_thought_tokens"].to_i,
-      model:         body[:model],
+      model:         routed_model(request.purpose),
       cache_read_tokens:  cached_tokens,
       cache_write_tokens: 0,
-      truncated: parsed["status"] == "incomplete",
-      http_status: resp.status
+      truncated: parsed["status"] == "incomplete"
     }
-  rescue Faraday::Error => e
-    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::NetworkError
-    raise error_class, "Network error calling Gemini: #{e.message}"
   end
 
   # An invalid key arrives as a 400 with API_KEY_INVALID; never log these bodies, since they can echo the key.
@@ -122,7 +115,11 @@ class GeminiService < AiService
     retry_after_seconds(resp)
   end
 
-  def routed_model(purpose) = MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)[:model]
+  def routed_model(purpose) = route_for(purpose)[:model]
+
+  def route_for(purpose)
+    MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)
+  end
 
   def json_format(schema)
     { type: "text", mime_type: "application/json", schema: schema }

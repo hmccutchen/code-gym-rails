@@ -40,28 +40,25 @@ class ClaudeService < AiService
 
   private
 
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-    route = route_for(purpose)
+  def provider_name = "Claude"
+
+  def request_body(request)
+    route = route_for(request.purpose)
     body = {
       model:      route[:model],
-      max_tokens: max_tokens || MAX_TOKENS,
-      system:     cache_system ? [ { type: "text", text: system, cache_control: { type: "ephemeral" } } ] : system,
-      messages:   history.map { |turn| { role: turn[:role], content: turn[:content] } } +
-                  [ { role: "user", content: prompt } ]
+      max_tokens: request.max_tokens || MAX_TOKENS,
+      system:     request.cache_system ? [ { type: "text", text: request.system, cache_control: { type: "ephemeral" } } ] : request.system,
+      messages:   request.history.map { |turn| { role: turn[:role], content: turn[:content] } } +
+                  [ { role: "user", content: request.prompt } ]
     }
-    body[:thinking] = thinking_off_for(route[:model]) if max_tokens
-    output_config = { effort: route[:effort], format: json_format(response_schema) }.compact
+    body[:thinking] = thinking_off_for(route[:model]) if request.max_tokens
+    output_config = { effort: route[:effort], format: json_format(request.response_schema) }.compact
     body[:output_config] = output_config if output_config.any?
+    body
+  end
 
-    resp = @conn.post(API_URL, body.to_json) do |req|
-      req.options.timeout = read_timeout
-      req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT, single_attempt: single_attempt)
-    end
-
-    raise_for_status(resp) unless resp.success?
-
-    parsed = parse_provider_envelope(resp.body, provider: "Claude")
-    usage  = parsed["usage"] || {}
+  def read_result(parsed, request)
+    usage = parsed["usage"] || {}
     # A leading thinking block means the text block is not reliably content[0].
     text_block = (parsed["content"] || []).find { |block| block["type"] == "text" }
 
@@ -69,16 +66,12 @@ class ClaudeService < AiService
       text:          text_block&.dig("text"),
       input_tokens:  usage["input_tokens"],
       output_tokens: usage["output_tokens"],
-      model:         route[:model],
+      model:         routed_model(request.purpose),
       cache_read_tokens:  usage["cache_read_input_tokens"].to_i,
       cache_write_tokens: usage["cache_creation_input_tokens"].to_i,
       truncated:     parsed["stop_reason"] == "max_tokens",
-      refusal:       refusal_category(parsed),
-      http_status:   resp.status
+      refusal:       refusal_category(parsed)
     }
-  rescue Faraday::Error => e
-    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::NetworkError
-    raise error_class, "Network error calling Claude: #{e.message}"
   end
 
   SPEND_LIMIT_MESSAGE = /\A(You have reached your specified|Your credit balance)/

@@ -36,36 +36,24 @@ class OpenaiService < AiService
 
   private
 
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-    route = route_for(purpose)
-    body  = request_body(route, system: system, prompt: prompt, history: history, max_tokens: max_tokens, response_schema: response_schema)
+  def provider_name = "OpenAI"
 
-    # A call reasoning within an allowance can spend most of it before timing out, so its timeout is not retried.
-    final_timeout = read_timeout > READ_TIMEOUT || route.key?(:reasoning_allowance)
-    resp = @conn.post(API_URL, body.to_json) do |req|
-      req.options.timeout = read_timeout
-      req.options.context = (req.options.context || {}).merge(long_running: final_timeout, single_attempt: single_attempt)
-    end
-    raise_for_status(resp) unless resp.success?
+  # A call reasoning within an allowance can spend most of it before timing out, so its timeout is not retried.
+  def long_running?(request) = super || route_for(request.purpose).key?(:reasoning_allowance)
 
-    read_result(parse_provider_envelope(resp.body, provider: "OpenAI"), route).merge(http_status: resp.status)
-  rescue Faraday::Error => e
-    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::NetworkError
-    raise error_class, "Network error calling OpenAI: #{e.message}"
-  end
-
-  def request_body(route, system:, prompt:, history:, max_tokens:, response_schema:)
+  def request_body(request)
+    route = route_for(request.purpose)
     body = {
       model:        route[:model],
-      instructions: system,
-      input:        history.map { |turn| { role: turn[:role], content: turn[:content] } } +
-                    [ { role: "user", content: response_schema ? "#{prompt}\n\n#{JSON_MODE_REQUEST}" : prompt } ],
+      instructions: request.system,
+      input:        request.history.map { |turn| { role: turn[:role], content: turn[:content] } } +
+                    [ { role: "user", content: request.response_schema ? "#{request.prompt}\n\n#{JSON_MODE_REQUEST}" : request.prompt } ],
       store:        false,
-      reasoning:    { effort: effort_for(route, capped: max_tokens.present?) }
+      reasoning:    { effort: effort_for(route, capped: request.max_tokens.present?) }
     }
-    body[:max_output_tokens] = max_tokens + route.fetch(:reasoning_allowance, 0) if max_tokens
+    body[:max_output_tokens] = request.max_tokens + route.fetch(:reasoning_allowance, 0) if request.max_tokens
     # JSON mode, since strict schemas forbid VerdictSchema's root anyOf and optional fields; .parse still holds the shape.
-    body[:text] = { format: { type: "json_object" } } if response_schema
+    body[:text] = { format: { type: "json_object" } } if request.response_schema
     body
   end
 
@@ -101,8 +89,8 @@ class OpenaiService < AiService
 
   def routed_model(purpose) = route_for(purpose)[:model]
 
-  def read_result(parsed, route)
-    usage = read_usage(parsed["usage"] || {}, route)
+  def read_result(parsed, request)
+    usage = read_usage(parsed["usage"] || {}, route_for(request.purpose))
     unless %w[completed incomplete].include?(parsed["status"])
       return usage.merge(error: "OpenAI did not complete its response. Try again.")
     end

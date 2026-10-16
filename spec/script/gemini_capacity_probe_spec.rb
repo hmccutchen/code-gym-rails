@@ -31,7 +31,7 @@ RSpec.describe GeminiCapacityProbe, type: :model do
         if refuse_after && posted.size > refuse_after
           [ 429, { "retry-after" => "39" }, refusal ]
         else
-          [ 200, {}, reply(fake.send(:call, system: body["system_instruction"], prompt: body["input"])[:text]) ]
+          [ 200, {}, reply(fake.send(:call, AiService::Request.build(system: body["system_instruction"], prompt: body["input"]))[:text]) ]
         end
       end
     end
@@ -109,7 +109,7 @@ RSpec.describe GeminiCapacityProbe, type: :model do
         body = JSON.parse(env.body)
         posted << body
         case posted.size
-        when 1 then [ 200, {}, reply(fake.send(:call, system: body["system_instruction"], prompt: body["input"])[:text]) ]
+        when 1 then [ 200, {}, reply(fake.send(:call, AiService::Request.build(system: body["system_instruction"], prompt: body["input"]))[:text]) ]
         when 5 then [ 400, {}, key_invalid_body ]
         else [ 503, {}, "<html>down</html>" ]
         end
@@ -149,7 +149,7 @@ RSpec.describe GeminiCapacityProbe, type: :model do
         posted << body
         raise Faraday::TimeoutError, "read timeout" if posted.size == 4
 
-        [ 200, {}, reply(fake.send(:call, system: body["system_instruction"], prompt: body["input"])[:text]) ]
+        [ 200, {}, reply(fake.send(:call, AiService::Request.build(system: body["system_instruction"], prompt: body["input"]))[:text]) ]
       end
     end
     records = described_class.new(api_key: "AIzaProbe", user: user, out: out, output_dir: output_dir,
@@ -233,7 +233,7 @@ RSpec.describe GeminiCapacityProbe, type: :model do
         if body["system_instruction"].to_s.include?("writing a concise, durable reference")
           [ 200, {}, reply("not json") ]
         else
-          [ 200, {}, reply(fake.send(:call, system: body["system_instruction"], prompt: body["input"])[:text]) ]
+          [ 200, {}, reply(fake.send(:call, AiService::Request.build(system: body["system_instruction"], prompt: body["input"]))[:text]) ]
         end
       end
     end

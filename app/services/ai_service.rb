@@ -1131,9 +1131,38 @@ class AiService
     end
   end
 
-  # Abstract: returns text, token and cache counts, model, truncated, refusal and http_status; history holds prior turns.
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-    raise NotImplementedError, "#{self.class} must implement #call"
+  def call(request)
+    resp = post(request_body(request), request)
+    raise_for_status(resp) unless resp.success?
+    read_result(parse_provider_envelope(resp.body, provider: provider_name), request).merge(http_status: resp.status)
+  rescue Faraday::Error => e
+    raise (e.is_a?(Faraday::TimeoutError) ? TimeoutError : NetworkError), "Network error calling #{provider_name}: #{e.message}"
+  end
+
+  def post(body, request)
+    @conn.post(self.class::API_URL, body.to_json) do |req|
+      req.options.timeout = request.read_timeout
+      req.options.context = (req.options.context || {}).merge(long_running: long_running?(request), single_attempt: request.single_attempt)
+    end
+  end
+
+  def long_running?(request) = request.read_timeout > READ_TIMEOUT
+
+  # Abstract pair: request_body is the provider's JSON body; read_result returns text, token and cache counts, model, truncated and refusal from the parsed reply.
+  def request_body(_request)
+    raise NotImplementedError, "#{self.class} must implement #request_body"
+  end
+
+  def read_result(_parsed, _request)
+    raise NotImplementedError, "#{self.class} must implement #read_result"
+  end
+
+  def provider_name
+    raise NotImplementedError, "#{self.class} must implement #provider_name"
+  end
+
+  def raise_for_status(_resp)
+    raise NotImplementedError, "#{self.class} must implement #raise_for_status"
   end
 
   # Subclasses must implement: returns a configured Faraday::Connection.
@@ -1558,9 +1587,7 @@ class AiService
   def call_and_log(user, request)
     TrialAllowance.check!(user, provider: self.class) if house_key?
     begin
-      result = call(system: request.system, prompt: request.prompt, cache_system: request.cache_system,
-                    read_timeout: request.read_timeout, max_tokens: request.max_tokens, history: request.history,
-                    purpose: request.purpose, response_schema: request.response_schema, single_attempt: request.single_attempt)
+      result = call(request)
     rescue Error => e
       e.provider ||= self.class.provider_key
       log_usage(user, failed_call_result(e, request.purpose), purpose: request.purpose)

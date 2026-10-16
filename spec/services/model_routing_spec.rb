@@ -23,7 +23,7 @@ RSpec.describe "per-purpose model routing" do
       end
     end
     service.instance_variable_set(:@conn, conn)
-    service.send(:call, system: "sys", prompt: "p", **kwargs)
+    call_provider(service, system: "sys", prompt: "p", **kwargs)
   end
 
   def posted_body(service_class, **kwargs)
@@ -38,7 +38,7 @@ RSpec.describe "per-purpose model routing" do
       end
     end
     service.instance_variable_set(:@conn, conn)
-    service.send(:call, system: "sys", prompt: "p", **kwargs)
+    call_provider(service, system: "sys", prompt: "p", **kwargs)
     bodies.sole
   end
 

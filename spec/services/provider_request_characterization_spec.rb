@@ -15,34 +15,34 @@ RSpec.describe "provider request characterization" do
     "routed_generation"     => { purpose: "generate_exercise", read_timeout: AiService::GENERATION_READ_TIMEOUT }
   }.freeze
 
-  # Each purpose's call-site keywords to #call; the purpose itself is the key minus any "_blocking" suffix.
+  # Each purpose's per-call values; its settings come from CALL_PROFILES, so a snapshot proves the profile matches its call site.
   PURPOSE_SHAPES = {
-    "generate_exercise"           => { read_timeout: AiService::GENERATION_READ_TIMEOUT },
-    "generate_exercise_blocking"  => { read_timeout: AiService::SYNC_GENERATION_READ_TIMEOUT },
-    "retry_section"               => { read_timeout: AiService::RETRY_READ_TIMEOUT },
-    "review_response"             => { cache_system: true, read_timeout: AiService::REVIEW_READ_TIMEOUT },
-    "assess_difficulty"           => { max_tokens: AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS },
-    "generate_concept_reference"  => { read_timeout: AiService::CONCEPT_REFERENCE_READ_TIMEOUT },
-    "generate_recognition_guide"  => { read_timeout: AiService::CONCEPT_REFERENCE_READ_TIMEOUT },
-    "explain_concept_differently" => { max_tokens: AiService::CONCEPT_ALTERNATE_MAX_TOKENS },
+    "generate_exercise"           => {},
+    "generate_exercise_blocking"  => { blocking: true },
+    "retry_section"               => {},
+    "review_response"             => {},
+    "assess_difficulty"           => {},
+    "generate_concept_reference"  => {},
+    "generate_recognition_guide"  => {},
+    "explain_concept_differently" => {},
     "explain_differently"         => {},
     "review_follow_up"            => { history: REQUEST_SNAPSHOT_HISTORY },
-    "duck_thread"                 => { max_tokens: AiService::DUCK_RESPONSE_MAX_TOKENS, cache_system: true,
-                                       history: REQUEST_SNAPSHOT_HISTORY },
-    "pseudocode_critique"         => { max_tokens: AiService::PSEUDOCODE_CRITIQUE_MAX_TOKENS },
+    "duck_thread"                 => { history: REQUEST_SNAPSHOT_HISTORY },
+    "pseudocode_critique"         => {},
     "pseudocode_translate"        => {},
-    "judge_section"               => { max_tokens: AiService::JUDGE_MAX_TOKENS,
-                                       response_schema: JudgeVerdict.schema_for(ExerciseSection::CodeReview) },
-    "judge_review"                => { max_tokens: AiService::REVIEW_JUDGE_MAX_TOKENS,
-                                       read_timeout: AiService::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true,
-                                       response_schema: ReviewProseVerdict.schema }
+    "judge_section"               => { response_schema: JudgeVerdict.schema_for(ExerciseSection::CodeReview) },
+    "judge_review"                => { response_schema: ReviewProseVerdict.schema }
   }.freeze
 
-  REQUEST_SNAPSHOT_SHAPES = KEYWORD_SHAPES.merge(
-    PURPOSE_SHAPES.to_h { |shape, settings|
-      [ "purpose__#{shape}", { purpose: shape.delete_suffix("_blocking"), **settings } ]
-    }
-  ).freeze
+  REQUEST_SNAPSHOT_SHAPES = (KEYWORD_SHAPES.keys + PURPOSE_SHAPES.keys.map { |shape| "purpose__#{shape}" }).freeze
+
+  def snapshot_request(shape)
+    per_call = { system: "SYSTEM TEXT", prompt: "PROMPT TEXT" }
+    return AiService::Request.build(**per_call, **KEYWORD_SHAPES.fetch(shape)) unless shape.start_with?("purpose__")
+
+    purpose_shape = shape.delete_prefix("purpose__")
+    AiService.request_for(purpose_shape.delete_suffix("_blocking"), **per_call, **PURPOSE_SHAPES.fetch(purpose_shape))
+  end
 
   # Captures the posted body without a network call. Returns [service, bodies].
   def recording(service_class)
@@ -67,11 +67,11 @@ RSpec.describe "provider request characterization" do
   REQUEST_SNAPSHOT_PROVIDERS.each do |service_class|
     provider = service_class.name.sub("Service", "").downcase
 
-    REQUEST_SNAPSHOT_SHAPES.each do |shape, kwargs|
+    REQUEST_SNAPSHOT_SHAPES.each do |shape|
       context "#{provider} / #{shape}" do
         let(:body) do
           service, bodies = recording(service_class)
-          service.send(:call, system: "SYSTEM TEXT", prompt: "PROMPT TEXT", **kwargs)
+          service.send(:call, snapshot_request(shape))
           raise "expected exactly one request, got #{bodies.size}" unless bodies.size == 1
 
           # Pretty-printed so a diff reads line by line while still failing on key order.
@@ -104,7 +104,7 @@ RSpec.describe "provider request characterization" do
   it "has no snapshot left behind for a shape that no longer exists" do
     expected = REQUEST_SNAPSHOT_PROVIDERS.flat_map { |service_class|
       provider = service_class.name.sub("Service", "").downcase
-      REQUEST_SNAPSHOT_SHAPES.keys.map { |shape| snapshot_path(provider, shape).basename.to_s }
+      REQUEST_SNAPSHOT_SHAPES.map { |shape| snapshot_path(provider, shape).basename.to_s }
     }
 
     expect(Dir.children(REQUEST_SNAPSHOT_DIR).sort).to eq(expected.sort)
