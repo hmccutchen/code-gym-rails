@@ -132,6 +132,10 @@ export default class extends Controller {
     })
   }
 
+  adoptTrackChange(event) {
+    this.applyServerState(event.detail)
+  }
+
   applyServerState(current) {
     const excluded = current.excluded_section_kinds || []
     const weights = current.section_kind_weights || {}

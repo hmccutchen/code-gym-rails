@@ -1,12 +1,13 @@
 require "rails_helper"
 
-RSpec.describe "Learning track and level suggestion isolation" do
+RSpec.describe "Track choice and level suggestion isolation" do
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
-  def twin(email, learning_track, cutoffs: {}, suggestions: true, levels: LearningTrack.preset_levels)
+  def twin(email, chosen, cutoffs: {}, suggestions: true, levels: ExerciseSection.keys.index_with { "junior" })
     User.create!(
       email: email, name: "Twin", time_zone: "UTC", provider: "fake", api_keys: { "fake" => "fake-test-key" },
-      language: "ruby_rails", learning_track: learning_track, level_suggestion_cutoffs: cutoffs,
+      language: "ruby_rails", track_chosen_at: (Time.current if chosen), learning_track: ("none" if chosen),
+      level_suggestion_cutoffs: cutoffs,
       level_suggestions: suggestions, section_kind_levels: levels
     )
   end
@@ -40,29 +41,29 @@ RSpec.describe "Learning track and level suggestion isolation" do
       "Expected: #{expected[index].inspect}\nActual: #{actual[index].inspect}"
   end
 
-  it "sends byte-identical generation and judge prompts on and off the track, with suggestions on or off" do
-    baseline = prompts_for(twin("legacy@example.com", nil))
-    on_track = twin("on@example.com", LearningTrack::ON,
-                    cutoffs: { "code_review" => { "level" => "junior", "through" => "2026-10-13" } })
-    opted_out = twin("off@example.com", LearningTrack::OFF)
-    switched_off = twin("quiet@example.com", LearningTrack::OFF, suggestions: false,
+  it "sends byte-identical generation and judge prompts with or without a track choice, with suggestions on or off" do
+    baseline = prompts_for(twin("legacy@example.com", false))
+    chosen = twin("on@example.com", true,
+                  cutoffs: { "code_review" => { "level" => "junior", "through" => "2026-10-13" } })
+    switched_off = twin("quiet@example.com", true, suggestions: false,
                         cutoffs: { "pattern" => { "level" => "junior", "through" => "2026-10-13" } })
 
-    [ on_track, opted_out, switched_off ].each do |user|
+    [ chosen, switched_off ].each do |user|
       actual = prompts_for(user)
       expect(actual).to eq(baseline), -> { first_difference(baseline, actual) }
     end
   end
 
   it "sends byte-identical calls for targets equal to the skill level and for no targets" do
-    preset = prompts_for(twin("preset@example.com", LearningTrack::ON))
-    following = prompts_for(twin("following@example.com", LearningTrack::OFF, levels: {}))
+    preset = prompts_for(twin("preset@example.com", true))
+    following = prompts_for(twin("following@example.com", true, levels: {}))
 
     expect(following).to eq(preset), -> { first_difference(preset, following) }
   end
 
   let(:state_readers) do
-    /learning_track|LearningTrack|level_suggestion|LevelSuggestion|TrackGraduation|shown_level_suggestions/x
+    /learning_track|track_chosen|choose_track|track_change|TrackChange|level_suggestion|LevelSuggestion|TrackGraduation|
+     shown_level_suggestions/x
   end
 
   it "keeps track and suggestion state out of generation, review, judges, ConceptMastery and KindDifficulty" do
@@ -76,8 +77,8 @@ RSpec.describe "Learning track and level suggestion isolation" do
   end
 
   it "would catch a reader of each name it guards" do
-    %w[learning_track LearningTrack level_suggestion_cutoffs level_suggestions LevelSuggestion
-       TrackGraduation shown_level_suggestions level_suggestion_answers].each do |name|
+    %w[learning_track track_chosen_at choose_track track_change TrackChange level_suggestion_cutoffs
+       level_suggestions LevelSuggestion TrackGraduation shown_level_suggestions level_suggestion_answers].each do |name|
       expect("user.#{name}").to match(state_readers)
     end
   end

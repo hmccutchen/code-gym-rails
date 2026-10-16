@@ -84,3 +84,14 @@ were rendered for is out of date.
 The "Suggest level changes" switch sits inside the mix's `<details>` but has
 its own controller, and flipping it before the modules load must not start a
 mix save.
+
+## A track change saved elsewhere on the page
+
+`adoptTrackChange` takes the preference state Setup's track select received
+and applies it with `applyServerState`, the method a 409 already uses, so a
+cleared target shows "Your track (…)" and the version matches the server
+without a reload. An edit made in the mix less than 400 ms before the track
+select's reply arrives is replaced by the server's state, and the delayed save
+then sends that state, so the edit is lost and the page shows what is stored.
+That takes two edits in under half a second across two controls, and was
+accepted rather than merged.

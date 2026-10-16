@@ -19,27 +19,17 @@ RSpec.describe "PATCH /profile skill_level", type: :request do
     end
   end
 
-  it "returns the same body other profile saves do" do
+  it "returns the profile fields plus the preference state a track change leaves, for Setup's Exercise mix" do
     patch_profile(skill_level: "senior")
 
-    expect(response.parsed_body).to eq("name" => "Dev", "time_zone" => "UTC", "daily_section_count" => nil)
+    body = response.parsed_body
+    expect(body).to include("name" => "Dev", "time_zone" => "UTC", "daily_section_count" => nil, "kept_own_level" => "")
+    expect(body["kind_rungs"]).to eq(user.reload.kind_rungs)
+    expect(body["preferences"]).to include("section_kind_levels" => {}, "section_kind_preferences_version" => 0)
   end
 
-  it "leaves the preference version alone, since skill level is not part of the Exercise mix" do
+  it "leaves the preference version alone when the track change clears no target" do
     expect { patch_profile(skill_level: "principal_engineer") }.not_to(change { user.reload.section_kind_preferences_version })
-  end
-
-  # The welcome page's Experienced path sends its starting level with the choice; nothing else may ride along.
-  it "rides along with an Experienced choice, while other fields still refuse it" do
-    user.update!(learning_track: nil)
-
-    patch_profile(learning_track: "none", skill_level: "principal_engineer", name: "Not saved")
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(user.reload.skill_level).to eq("junior")
-
-    patch_profile(learning_track: "none", skill_level: "principal_engineer")
-    expect(response).to have_http_status(:ok)
-    expect(user.reload.skill_level).to eq("principal_engineer")
   end
 
   [ "expert", "beginner", "developing", "", nil, [ "solid" ], { "level" => "solid" } ].each do |value|

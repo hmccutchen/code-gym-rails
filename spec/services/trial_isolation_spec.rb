@@ -6,7 +6,7 @@ RSpec.describe "Trial isolation", type: :model do
 
   def own_key_twin
     User.create!(email: "own@example.com", name: "Twin", time_zone: "UTC", provider: "fake",
-                 api_keys: { "fake" => "fake-test-key" }, language: "ruby_rails", learning_track: LearningTrack::OFF)
+                 api_keys: { "fake" => "fake-test-key" }, language: "ruby_rails", track_chosen_at: Time.current)
   end
 
   def trial_twin

@@ -378,7 +378,7 @@ Every dashboard, /learn and /history load, any day of the week:
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `User`          | email, name, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), invite_code_id (nullable fk; the code that admitted the account), trial_started_at / trial_ends_at / trial_consented_at (nullable; a present trial_ends_at is the trial), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), level_suggestion_cutoffs (non-null jsonb, default {}), level_suggestions (boolean, default true), level_suggestion_answers (integer, default 0), track_chosen_at (nullable datetime: set when the welcome decision is recorded; for accounts that predate it, their creation time, so it is a flag, not a clock; null means no decision was recorded, not that the account is undecided) |
+| `User`          | email, name, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), invite_code_id (nullable fk; the code that admitted the account), trial_started_at / trial_ends_at / trial_consented_at (nullable; a present trial_ends_at is the trial), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; written as "none" by a track choice and read only by `first_run?`, until a cleanup release drops it), level_suggestion_cutoffs (non-null jsonb, default {}), level_suggestions (boolean, default true), level_suggestion_answers (integer, default 0), track_chosen_at (nullable datetime: set when the welcome track choice is recorded; for accounts that predate it, their creation time, so it is a flag, not a clock; null means no decision was recorded, not that the account is undecided) |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at, dropped_sections (jsonb), plan_notes (jsonb, default {}: what the plan did — `coverage`, `shared_concept`) |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), review_provider (which provider wrote the review), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
@@ -430,55 +430,73 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
 ## Key Design Decisions
 
-- **Junior learning track**: an optional first-run preset of difficulty
-  targets, with no separate generation policy and no hold on level
-  suggestions, which every account gets (see "Level suggestions" below).
-  `User#first_run?` requires a saved, undecided account (`learning_track:
-  nil`) with no exercise ever created. Dashboard and Setup send that account
-  to `/welcome`. Junior sets every
-  registered kind to `junior` through `PATCH /profile` with the existing
-  preference version. Under the user-row lock, the endpoint requires both
-  that version and the exact registry-derived preset; an incomplete or
-  mismatched choice saves nothing. The new-account targets are unlocked so
-  ordinary easing still applies. Junior also sets `skill_level` to
-  `LearningTrack::START_SKILL_LEVEL` (`junior`), and the endpoint refuses a
-  junior choice without it, like any other mismatch with the preset. Targets
-  already decide every kind's rung, so the skill level changes only the
-  generation prompt's profile line, never a rung. Nothing resets it: after a kind steps up to
-  senior, or after leaving the track, the profile still says junior until
-  the user changes it on Setup. Experienced asks a second question, where
-  exercises should start (junior, mid-level or senior,
-  `LevelSuggestion::LADDER`, the same list level suggestions move along), and records `"none"` with that
-  `skill_level` in one request, without changing targets. The step stays in
-  the browser because `first_run?` ends once any track is saved. Existing
-  accounts are not enrolled or prompted, and joining after the first-run
-  choice is refused.
+- **Tracks**: a track is the person's overall level, and it is
+  `skill_level` itself; nothing stores it a second time. Every kind follows
+  it unless that kind has a target of its own, earned through a level
+  suggestion or set in the Exercise mix. The welcome page at `/welcome` asks
+  once, offering one track per rung of `LevelSuggestion::LADDER` (Junior,
+  Mid-level, Senior), each described by what its exercises are like rather
+  than by a job title. A choice posts `choose_track: true` with its level to
+  `PATCH /profile`, which checks it under the user-row lock: exactly those two
+  keys, a level on the ladder, and `User#first_run?` still true, or a 422 that
+  saves nothing. `User#choose_track` sets `skill_level` and `track_chosen_at`.
+  No preset targets are written: since 2026-10-15 the generation prompt
+  states every kind's level whether or not it has a target, so a target equal
+  to the skill level would change nothing. **Senior is the highest track
+  graduation reaches; principal engineer is set by hand in Setup**, and both
+  pages say so.
 
-  **What the track still does.** `learning_track` decides the first-run
-  preset and its checks, `finish_learning_track` (a save that leaves no
-  target below senior records `"none"`, so moving the last junior kind to
-  mid-level keeps the track), Setup's on-track line and Leave button, and
-  Setup's API key guide for a track account with no exercises yet. So Leave
-  changes nothing about suggestions: it removes the on-track line and the
-  button, and for an account that has not generated a set, the key guide.
-  Leave preserves targets, locks, exclusions and pending Exercise mix edits,
-  and it is one-way, since joining after the first-run choice is refused; its
-  hint says so.
+  **`track_chosen_at` is a flag, not a clock.** `User#first_run?` is a saved
+  account with no `track_chosen_at`, no `learning_track` and no exercise.
+  `AddTrackChosenAtToUsers` shipped a release before any code read the
+  column, because the worker's pre-deploy waits for a schema, not for pending
+  migrations; it and `RepeatTrackChosenAtBackfill` set it to `created_at` for
+  every account with a `learning_track`, so accounts that predate it hold their
+  creation time. A null value means no choice was recorded, which is not the
+  same as undecided: accounts the nightly batch generated for before they
+  opened `/welcome` hold null and are past first run because they have
+  exercises. The exercise check also keeps the preview app's seeded account
+  from being asked.
 
-  **Existing accounts are told apart by a backfill, not a date.**
-  `AddLearningTrackToUsers` adds the nullable string with no default and the
-  jsonb map; `BackfillLearningTrackForExistingUsers` then sets every row it
-  finds to `"none"`, so an account that predates the track is never asked. A
-  `"none"` posted by an account already at `"none"` is accepted and changes
-  nothing, so a repeat Leave does not error; joining stays refused. The backfill
-  cannot be undone, since its rows look like any other `"none"`. The exercise
-  check in `first_run?` is what keeps the preview app's seeded account, created
-  after migrations run, from being asked. One gap is accepted: an account
-  created while the migration has run but the old code still serves arrives
-  as `nil` with no exercises and is asked once the new code is live, which is
-  right for an account that new. In specs, `create_user_with_key` and
-  `create_fake_provider_user` default to `"none"`, standing for backfilled
-  accounts; a first-run spec passes `learning_track: nil`.
+  **`learning_track` is kept for one release.** A choice
+  writes `learning_track: "none"` when it is blank (`User::TRACK_CHOICE_MARKER`),
+  so code rolled back to before tracks per level neither re-asks the account
+  nor shows the old Leave control, and `first_run?` still reads it so an
+  account that answered the old welcome page in the deploy gap is not asked
+  again. A post that carries `learning_track` comes from a page rendered before
+  tracks per level and gets a 422 asking for a reload (`tracks.stale_page`).
+  The validation accepts the legacy values `junior` and `none`. A cleanup
+  release drops the column, the write and the validation. Leave the track,
+  `finish_learning_track` and the junior preset are gone: the "Suggest level
+  changes" switch is the way to stop suggestions, and graduation will follow
+  it. In specs, `create_user_with_key` and `create_fake_provider_user` stand
+  for accounts that chose a track; a first-run spec passes
+  `track_chosen: false`.
+
+  **Every track change clears the targets the track now covers.**
+  `TrackChange` is the one statement of the rule: an unlocked target equal to
+  the old or the new level is cleared, so that kind follows the track again;
+  every other target stays, including a locked one and, on a two-rung move,
+  one between the two levels. `User#apply_track_change` runs before every save
+  and holds the change for a save that moves the track after the first
+  choice. It is declared ahead of `bump_section_kind_preferences_version`, so
+  a skill-level-only save that clears targets also bumps the version and an
+  Exercise mix open in another tab gets the usual 409. A cleared kind whose rung
+  moves gets a cutoff and a `skill_level_edit` event row, like any kind the
+  skill level moved. Setup's track select saves through the same endpoint; the
+  reply carries the preference state the Exercise mix adopts in place (the
+  `profile-preferences:trackSaved` event) and one sentence naming the sections
+  that kept their own level. Once presets stop being written, a target equal to
+  the old level can't be told apart from one chosen on purpose, so a deliberate
+  target at the old level is cleared too and only a lock protects it; that was
+  decided on 2026-10-15. Showing what a change will do before the select saves
+  is a follow-up, and graduation's card will show it from the same `TrackChange`.
+
+  **Existing accounts were told apart by a backfill, not a date.**
+  `AddLearningTrackToUsers` added the nullable string and
+  `BackfillLearningTrackForExistingUsers` set every row it found to `"none"`,
+  so an account that predates the old junior track was never asked; the
+  `track_chosen_at` backfill carried that forward.
 
   **The preview migration version is reconciled.** The PR app first added
   these controls under `20261011040000`, which main then used for
@@ -491,8 +509,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   A database with the correct index is untouched; rolling back reconciliation
   leaves the index in place, since the original migration owns its rollback.
 
-  The key guide appears only for a track account with no exercises. Its
-  copy remains scrollable: in Chromium at 390×844, the guide is about 893px
+  Setup shows the key guide to an account with no key of its own and no
+  exercise yet, and to an ended trial. Its copy remains scrollable: in Chromium at 390×844, the guide is about 893px
   tall at default text, 1,321px at 125%, and 1,681px at 140%, measured in an
   older headless Chromium once the OpenAI section was added (the same build
   measured the guide without it at 711, 1,069 and 1,340). Even at default
@@ -570,8 +588,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   the user's zone (`User#record_level_changes`): a target set, edited or
   cleared, and a skill-level change, which moves every kind without a
   target. A rung that did not move records nothing, and a move to principal
-  engineer records nothing. The first-run choice and joining the track
-  record nothing; leaving or finishing it records any rung it moves. So
+  engineer records nothing. The first-run track choice records nothing. So
   results from an earlier stay at a rung never count again. Moves made before
   these cutoffs existed left no trace, so `SeedLevelSuggestionCutoffs` gave
   every existing account a cutoff for each kind at its rung on the migration
@@ -1704,22 +1721,21 @@ concept-specific difficulty descriptions for future generation, not a new set.
   and a stored value must be one of the levels. A
   legacy value posted to `PATCH /profile` is refused like any other value
   outside the list.
-  Setup's "Skill level" select and the Experienced step on `/welcome` are
-  the two pages that edit `User#skill_level`. Setup's autosaves through
-  `PATCH /profile`, and the Experienced step saves through it too. That
+  Setup's "Track" select and the welcome page's choice are the two pages that
+  edit `User#skill_level` (see "Tracks"). Setup's autosaves through
+  `PATCH /profile`, and the welcome choice saves through it too. That
   endpoint refuses a value outside `User::SKILL_LEVELS` with a 422. It sets the
   profile's prompt line and the rung of every kind without its own target
-  (`KindDifficulty#rung_for`); scenario settings do not depend on it.
-  Joining the junior track sets it to `junior`; nothing else changes it
-  automatically, and daily ratings still nudge each set around it. A level
-  suggestion's Apply adds a target instead, so the setting stays where the
-  user put it, which Setup's hint says. A change records a suggestion cutoff
-  and a `skill_level_edit` event row for every untargeted kind it moves,
-  under the user-row lock. It is not
-  part of the Exercise mix, so it does not bump
-  `section_kind_preferences_version`. The Exercise
-  mix's default options name the stored level by its label and are renamed
-  in place once a save lands.
+  (`KindDifficulty#rung_for`); scenario settings do not depend on it. Nothing
+  changes it automatically, and daily ratings still nudge each set around it.
+  A level suggestion's Apply adds a target instead, so the setting stays where
+  the user put it, which Setup's hint says. A change clears the targets
+  `TrackChange` says the track now covers, and records a suggestion cutoff and
+  a `skill_level_edit` event row for every kind it moves, under the user-row
+  lock. It is not part of the Exercise mix, so it bumps
+  `section_kind_preferences_version` only when it clears a target. The Exercise
+  mix's default options name the stored level by its label ("Your track
+  (…)") and are renamed in place once a save lands.
 - **What a usage row records**: every provider call writes one `ApiUsage`
   row through `AiService#log_usage`, and that row now carries enough to price
   it. `model` is the model `#call` routed to (`MODEL_FOR_PURPOSE` /
@@ -3399,7 +3415,7 @@ always pull in the full suite — is stated once, in
 
 ## File Map
 
-- `app/models/learning_track.rb` — track values and preset levels.
+- `app/models/track_change.rb` — `TrackChange`: which per-kind targets a track change clears, the one statement of the rule; pure.
 - `app/services/level_suggestion.rb` — pure proposal rules: one-rung moves up and back along junior, mid-level and senior, each kind judged on its own results, and the evidence counts a card and an event row show.
 - `app/services/level_suggestion/evidence.rb` — bounded, preloaded reviewed-response history projected into stamped, answered, rubric-graded results.
 - `app/services/reviewed_section_results.rb` — `ReviewedSectionResults`: which sections of one submitted, reviewed response count as evidence of work at a rung, optionally only under the current rubric. Pure over the response it is given; shared by `LevelSuggestion::Evidence` and `CompetencyGate::Evidence`.

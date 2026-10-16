@@ -3,7 +3,7 @@ import { Controller } from "@hotwired/stimulus"
 import saveStatus from "code_gym/save_status"
 
 export default class extends Controller {
-  static targets = ["timeZone", "dailySections", "skillLevel"]
+  static targets = ["timeZone", "dailySections", "skillLevel", "keptOwnLevel"]
 
   static values = {
     url: String,
@@ -44,6 +44,10 @@ export default class extends Controller {
     const level = select.value
     const result = await this.queueSave("skill_level", { skill_level: level })
     if (!result.ok) return
+
+    // A track change can clear targets; the Exercise mix adopts the saved state rather than keep its own copy.
+    this.dispatch("trackSaved", { target: document, detail: result.data.preferences })
+    this.keptOwnLevelTarget.textContent = result.data.kept_own_level
 
     const levelLabel = Array.from(select.options).find((option) => option.value === level).textContent
     document.querySelectorAll("[data-skill-level-label]").forEach((label) => {

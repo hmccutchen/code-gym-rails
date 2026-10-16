@@ -40,7 +40,7 @@
   <p><%= t("api_keys.edit.intro") %></p>
   <% if current_user.on_trial? && current_user.trial_active? %>
     <%= render "api_keys/trial_note" %>
-  <% elsif current_user.trial_ended? || (current_user.on_learning_track? && !current_user.daily_exercises.exists?) %>
+  <% elsif current_user.trial_ended? || (!current_user.api_key_present? && !current_user.daily_exercises.exists?) %>
     <%= render "api_keys/key_guide" %>
   <% end %>
 
@@ -119,13 +119,12 @@
           id: "skill-level",
           data: { profile_preferences_target: "skillLevel", action: "change->profile-preferences#saveSkillLevel" } %>
     <p class="hint"><%= t("api_keys.edit.skill_level_hint") %></p>
+    <p class="hint" role="status" data-profile-preferences-target="keptOwnLevel"></p>
   </div>
 
-  <% if current_user.on_learning_track? %>
-    <%= render "api_keys/learning_track" %>
-  <% end %>
   <details class="form-field" id="exercise-mix"<%= " open" if suggested_kinds.any? || show_level_suggestions? %>
            data-controller="exercise-mix"
+           data-action="profile-preferences:trackSaved@document->exercise-mix#adoptTrackChange"
            data-exercise-mix-url-value="<%= profile_path %>"
            data-exercise-mix-stops-value="<%= KindPreferences::MULTIPLIERS.to_json %>"
            data-exercise-mix-default-stop-value="<%= KindPreferences::DEFAULT_MULTIPLIER %>"
@@ -135,7 +134,7 @@
     <summary><%= t("exercise_mix.summary") %></summary>
     <% if suggested_kinds.any? %>
       <style>.mix-difficulty.mix-suggested { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }</style>
-      <p class="mix-note" id="mix-suggested-note"><%= t("learning_track.setup.suggested",
+      <p class="mix-note" id="mix-suggested-note"><%= t("level_suggestion.setup_suggested",
                                                      kinds: suggested_kinds.map { |key| t("sections.#{key}.name") }.to_sentence,
                                                      level: t("exercise_mix.levels.#{suggested_level}").downcase) %></p>
     <% end %>

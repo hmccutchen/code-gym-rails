@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Skill level on Setup", type: :system do
+RSpec.describe "Track select on Setup", type: :system do
   let(:user) { create_fake_provider_user }
 
   def default_labels
@@ -12,11 +12,11 @@ RSpec.describe "Skill level on Setup", type: :system do
     visit setup_path
   end
 
-  it "saves a new skill level and renames the Exercise mix default options to match" do
-    select "Senior", from: "Skill level"
+  it "saves a new track and renames the Exercise mix default options to match" do
+    select "Senior", from: "Track"
 
-    expect(page).to have_css("[data-skill-level-label]", text: "Your skill level (Senior)", visible: :all)
-    expect(default_labels).to eq([ "Your skill level (Senior)" ])
+    expect(page).to have_css("[data-skill-level-label]", text: "Your track (Senior)", visible: :all)
+    expect(default_labels).to eq([ "Your track (Senior)" ])
     expect(user.reload.skill_level).to eq("senior")
     expect(page).to have_current_path(setup_path)
   end
@@ -33,24 +33,24 @@ RSpec.describe "Skill level on Setup", type: :system do
       };
     JS
 
-    select "Senior", from: "Skill level"
+    select "Senior", from: "Track"
     wait_for_js_condition("typeof window.releaseSenior === 'function'")
-    select "Principal engineer", from: "Skill level"
+    select "Principal engineer", from: "Track"
     page.driver.with_playwright_page { |pw| pw.wait_for_timeout(300) }
     page.execute_script("window.releaseSenior()")
     wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
 
     expect(user.reload.skill_level).to eq("principal_engineer")
-    expect(default_labels).to eq([ "Your skill level (Principal engineer)" ])
+    expect(default_labels).to eq([ "Your track (Principal engineer)" ])
   end
 
   it "reports a failed save and keeps the labels naming the stored level" do
     page.execute_script("window.fetch = () => Promise.reject(new Error('offline'))")
 
-    select "Principal engineer", from: "Skill level"
+    select "Principal engineer", from: "Track"
 
     expect(page).to have_css("#save-status", text: /couldn't save/i)
-    expect(default_labels).to eq([ "Your skill level (Junior)" ])
+    expect(default_labels).to eq([ "Your track (Junior)" ])
     expect(user.reload.skill_level).to eq("junior")
   end
 end

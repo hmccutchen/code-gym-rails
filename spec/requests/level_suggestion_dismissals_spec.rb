@@ -4,7 +4,7 @@ RSpec.describe "Learning track dismissal events", type: :request do
   let(:json) { { "Content-Type" => "application/json", "Accept" => "application/json" } }
   let(:user) do
     create_user_with_key.tap do |account|
-      account.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
+      account.update!(section_kind_levels: ExerciseSection.keys.index_with { "junior" })
     end
   end
 

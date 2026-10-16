@@ -18,7 +18,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   end
 
   def own_proposal(answered:)
-    user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels,
+    user.update!(section_kind_levels: ExerciseSection.keys.index_with { "junior" },
                  level_suggestion_answers: answered)
     qualifying_days
     visit_as(user)
@@ -41,7 +41,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   end
 
   it "reports no failed save when Apply moves the last kind below senior up and ends the track" do
-    user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels.transform_values { "senior" }.merge("code_review" => "mid_level"))
+    user.update_columns(section_kind_levels: ExerciseSection.keys.index_with { "senior" }.merge("code_review" => "mid_level"))
     qualifying_days
     visit_as(user)
     expect(page).to have_css("#level-suggestion", text: "Try Code Review at senior?")
@@ -143,7 +143,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   end
 
   it "puts the switch back when its save fails" do
-    user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
+    user.update!(section_kind_levels: ExerciseSection.keys.index_with { "junior" })
     visit_as(user)
     visit setup_path(show: "level_suggestions")
     fail_requests_to(profile_path)
@@ -157,7 +157,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   end
 
   it "returns the switch to the stored value when several quick saves all fail" do
-    user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
+    user.update!(section_kind_levels: ExerciseSection.keys.index_with { "junior" })
     visit_as(user)
     visit setup_path(show: "level_suggestions")
     page.execute_script(<<~JS)
@@ -180,7 +180,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
   end
 
   it "turns suggestions off and on from Setup" do
-    user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
+    user.update!(section_kind_levels: ExerciseSection.keys.index_with { "junior" })
     visit_as(user)
     visit setup_path(show: "level_suggestions")
 

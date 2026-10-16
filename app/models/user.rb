@@ -9,7 +9,7 @@ class User < ApplicationRecord
   has_many :level_suggestion_events, dependent: :destroy
   belongs_to :invite_code, optional: true
 
-  attr_accessor :shown_level_suggestions
+  attr_accessor :shown_level_suggestions, :track_change
 
   serialize :api_keys, coder: JSON
   encrypts :api_keys
@@ -18,6 +18,9 @@ class User < ApplicationRecord
   SKILL_LEVELS = KindDifficulty::LEVELS
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
+
+  LEGACY_LEARNING_TRACKS = %w[junior none].freeze
+  TRACK_CHOICE_MARKER = "none".freeze
 
   DAILY_SECTION_COUNTS = (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
   AUTOMATIC_SECTION_COUNT = "automatic".freeze
@@ -31,7 +34,7 @@ class User < ApplicationRecord
   validate :api_keys_name_providers, if: :api_keys_changed?
   validate :provider_has_a_stored_key, if: -> { provider_changed? || api_keys_changed? }
   validates :language, inclusion: { in: LANGUAGES }
-  validates :learning_track, inclusion: { in: LearningTrack::VALUES }, allow_nil: true
+  validates :learning_track, inclusion: { in: LEGACY_LEARNING_TRACKS }, allow_nil: true
   validate :time_zone_must_be_loadable
   validate :section_kind_weights_name_rotatable_kinds,   if: :section_kind_weights_changed?
   validate :excluded_section_kinds_name_rotatable_kinds, if: :excluded_section_kinds_changed?
@@ -48,13 +51,15 @@ class User < ApplicationRecord
 
   before_save { email.downcase! }
 
+  # Ahead of the version bump, which reads section_kind_levels_changed? when it is reached.
+  before_save :apply_track_change
   before_save :bump_section_kind_preferences_version, if: :section_kind_preferences_changed?
   before_save :record_level_changes, if: -> {
-    persisted? && !choosing_learning_track? && (section_kind_levels_changed? || skill_level_changed?)
+    persisted? && !choosing_track? && (section_kind_levels_changed? || skill_level_changed?)
   }
-  before_save :finish_learning_track, if: :on_learning_track?
+  before_save(if: :choosing_track?) { self.learning_track ||= TRACK_CHOICE_MARKER }
   after_save :record_level_suggestion_events, if: -> {
-    !previously_new_record? && !chose_learning_track? &&
+    !previously_new_record? && !chose_track? &&
       (saved_change_to_section_kind_levels? || saved_change_to_skill_level?)
   }
 
@@ -207,7 +212,6 @@ class User < ApplicationRecord
 
   def on_trial? = trial? && !api_key_present?
 
-  # Each prepared ladder is a billed rewrite of a shared reference, which a trial's house key must not fund.
   def prepares_ladders? = !on_trial?
 
   def trial_ended? = on_trial? && !trial_active?
@@ -234,8 +238,6 @@ class User < ApplicationRecord
     self.provider = provider
   end
 
-  def on_learning_track? = learning_track == LearningTrack::ON
-
   def suggests_level_moves? = level_suggestions?
 
   def kind_rungs = KindDifficulty.for(self).rungs(skill_level: skill_level)
@@ -243,15 +245,12 @@ class User < ApplicationRecord
   def applies_level_suggestions_in_place? = level_suggestion_answers < LevelSuggestion::IN_PLACE_ANSWERS
 
   def first_run?
-    persisted? && learning_track.nil? && !daily_exercises.exists?
+    persisted? && track_chosen_at.nil? && learning_track.nil? && !daily_exercises.exists?
   end
 
-  def learning_track_change_allowed?(value)
-    case value
-    when LearningTrack::ON then first_run?
-    when LearningTrack::OFF then first_run? || on_learning_track? || learning_track == LearningTrack::OFF
-    else false
-    end
+  def choose_track(level)
+    self.track_chosen_at = Time.current
+    self.skill_level = level
   end
 
   def recent_performance(limit: 10)
@@ -470,13 +469,21 @@ class User < ApplicationRecord
     self.section_kind_preferences_version += 1
   end
 
-  def choosing_learning_track?
-    learning_track_changed? && (learning_track_in_database.nil? || on_learning_track?)
+  def choosing_track?
+    track_chosen_at_changed? && track_chosen_at_in_database.nil?
   end
 
-  def chose_learning_track?
-    saved_change_to_learning_track? && (learning_track_before_last_save.nil? || on_learning_track?)
+  def chose_track?
+    saved_change_to_track_chosen_at? && track_chosen_at_before_last_save.nil?
   end
+
+  def apply_track_change
+    self.track_change = (TrackChange.new(levels: section_kind_levels, locked: locked_section_kinds,
+                                         from: skill_level_in_database, to: skill_level) if track_changing?)
+    self.section_kind_levels = track_change.levels if track_change
+  end
+
+  def track_changing? = persisted? && !choosing_track? && skill_level_changed?
 
   def record_level_changes
     before = KindDifficulty.new(levels: section_kind_levels_in_database || {}, locked: [])
@@ -496,14 +503,9 @@ class User < ApplicationRecord
       before: { levels: section_kind_levels_before_last_save || {}, skill_level: skill_level_before_last_save },
       after: { levels: section_kind_levels, skill_level: skill_level },
       shown: shown_level_suggestions || {},
-      cutoffs: level_suggestion_cutoffs_before_last_save || {}
+      cutoffs: level_suggestion_cutoffs_before_last_save || {},
+      cleared: track_change&.cleared || []
     ))
-  end
-
-  def finish_learning_track
-    return if section_kind_levels.values.intersect?(LevelSuggestion::LADDER[0...-1])
-
-    self.learning_track = LearningTrack::OFF
   end
 
   def rotatable_keys

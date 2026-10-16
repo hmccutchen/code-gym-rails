@@ -103,7 +103,7 @@ RSpec.describe "Focusable controls are large enough not to trigger iOS zoom", ty
 
   it "renders no undersized control on the setup page, including the timezone select" do
     setup_user = User.create!(email: "no-key-#{SecureRandom.hex(4)}@example.com", name: "No Key", time_zone: "UTC",
-                              learning_track: "none")
+                              learning_track: "none", track_chosen_at: Time.current)
     visit_as(setup_user)
     visit setup_path
     expect(page).to have_css("#tz-select", wait: 10)

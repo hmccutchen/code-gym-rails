@@ -15,7 +15,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
 
   # Today holds only code review, so the dashboard renders one section while three kinds have five results each.
   before do
-    user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
+    user.update!(section_kind_levels: ExerciseSection.keys.index_with { "junior" })
     reviewed_day(Date.current, [ "code_review" ])
     (1...LevelSuggestion::WINDOW).each { |ago| reviewed_day(Date.current - ago, %w[code_review pattern architecture]) }
     reviewed_day(Date.current - LevelSuggestion::WINDOW, %w[pattern architecture])
@@ -50,7 +50,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
 
     expect(page).to have_css("#level-suggestion", text: "Done. Your next sets use the new level.")
     expect(user.reload.section_kind_levels).to eq(
-      LearningTrack.preset_levels.merge("code_review" => "mid_level", "pattern" => "mid_level")
+      ExerciseSection.keys.index_with { "junior" }.merge("code_review" => "mid_level", "pattern" => "mid_level")
     )
     expect(user.level_suggestion_cutoffs).not_to have_key("architecture")
     expect(page.evaluate_script("window.CodeGymSaveStatus.pending()")).to be(true)

@@ -3,7 +3,7 @@
 ## What it owns
 
 Setup's three standalone preference controls: the time zone select, the Daily
-sections radio group, and the Skill level select. Each one PATCHes
+sections radio group, and the Track select (`skill_level`). Each one PATCHes
 `/profile` on change.
 
 ## One key per control, one URL for all of them
@@ -15,7 +15,7 @@ rather than deriving it from the URL.
 
 ## Why the skill-level label is rewritten here
 
-Each difficulty fieldset shows "Follow my skill level (junior)" as its
+Each difficulty fieldset shows "Your track (Junior)" as its
 default option. That text names the stored skill level, so changing the level
 leaves every one of those labels stale until the page reloads. The controller
 rewrites them from `labelTemplateValue`, whose `__LEVEL__` placeholder the
@@ -35,3 +35,14 @@ bound until `connect()`, which waits on the deferred module graph. So
 default-selected option for a select, `defaultChecked` for the sections
 radio — and queues the save the missing listener would have sent. Without it
 the choice sits on screen unsaved until the user touches the control again.
+
+## A track change hands the Exercise mix the saved state
+
+A track change can clear targets (`TrackChange`) and bump the preference
+version, so the Exercise mix's radios and version would otherwise be stale and
+its next save refused. The reply carries the same preference state a 409 sends,
+and this controller dispatches it as `profile-preferences:trackSaved` on the
+document, which the Exercise mix's element listens for. An event rather than a
+reach into the other controller keeps each controller's state its own. The
+reply's `kept_own_level` sentence, written by the server, fills the status line
+under the select; it is empty when no target was kept.

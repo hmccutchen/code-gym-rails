@@ -6,31 +6,39 @@ These follow the same rule as `#invalid_section_kind_weights?`: a value of the
 wrong shape must fail with a 422. Strong params would otherwise drop it, and
 the request would return 200 having saved nothing.
 
-## `#saved_body`
+## `#saved_body` and `#track_body`
 
-The response includes `section_kind_preferences_version` and the ladder
-preparation only when the request touched a preference, so the body every
-other caller receives is unchanged.
+The response includes `section_kind_preferences_version`, `kind_rungs` and the
+ladder preparation only when the request touched a preference or the track,
+so the body every other caller receives is unchanged. A track change can clear
+targets (`TrackChange`), so its reply also carries the saved levels and locks
+and `kept_own_level`: Setup hands them to the Exercise mix so its radios and
+version match the server without a reload, and names the sections that kept
+their own level.
 
-## `TRACK_CHOICE_KEYS`
+## `TRACK_CHOICE_KEYS` and `#invalid_track_choice?`
 
-A track choice may carry only the keys listed for it; anything else refuses
-the whole request. `none` lists `skill_level` so the welcome page's
-Experienced path can save the starting level in the same request as the
-choice. The first-run gate (`User#first_run?`) ends as soon as any
-`learning_track` is saved, so a second request for the level would never be
-asked. The key is optional: Setup's Leave the track still posts `none`
-alone. The value goes through `#invalid_skill_level?` like any other skill
-level, and principal engineer is not refused here, since Setup already
-offers it through this endpoint.
+The welcome page posts `choose_track: true` with a `skill_level` and nothing
+else; any other key refuses the whole request. The level must be one
+`LevelSuggestion::LADDER` holds: principal engineer is set by hand in Setup,
+never chosen at first run. The choice is checked after the row lock reloads
+the user, because a choice bumps no preference version, so only
+`User#first_run?` read under the lock stops a second tab from choosing twice.
+
+## `#render_stale_track_page`
+
+A post that carries `learning_track` comes from a page rendered before tracks
+per level: the old welcome page, whose junior choice would save presets
+without recording a choice, or Setup's old Leave control. It gets a 422 asking
+for a reload and saves nothing.
 
 ## `level_suggestion_steps`, `moved_since_shown?` and `unsaved_shown_step?`
 
 An Apply from the dashboard card, and a Setup save opened from the card's
 link, send the moves the page showed as `level_suggestion_steps`
 (`LevelSuggestionStep`). A level suggestion is shown at a kind's rung, which
-for a kind without a target is the skill level, and a skill-level change does
-not bump `section_kind_preferences_version`. So the version alone cannot tell
+for a kind without a target is the skill level, and a skill-level change bumps
+`section_kind_preferences_version` only when it clears a target. So the version alone cannot tell
 that a card is stale. Under the row lock, after the version check,
 `moved_since_shown?` compares each step's `from` with the stored rung and
 answers 409 when any has moved, saving nothing; the card already reloads on a
