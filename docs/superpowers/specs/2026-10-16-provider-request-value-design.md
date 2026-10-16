@@ -338,15 +338,18 @@ stay as they are. Two additions make the settings side explicit:
 
 - A resolved-settings example per purpose that drives the real application
   caller (`judge_review_prose`, `duck_response`, `generate_concept_reference`
-  and so on) on a no-network subclass whose `post` records the request it
-  received, and asserts `read_timeout`, `max_tokens`, `cache_system`,
-  `single_attempt` and `allow_truncated` equal today's call-site settings.
-  This captures the settings through the caller, not through a
-  reconstruction of the profile.
+  and so on) on a no-network provider double, with a spy around
+  `call_and_log(user, request)` that records the request and delegates to
+  the original method. It asserts `read_timeout`, `max_tokens`,
+  `cache_system`, `single_attempt` and `allow_truncated` equal today's
+  call-site settings. This captures the settings through the caller,
+  not through a reconstruction of the profile. These examples land in
+  step 1: the providers still call `@conn.post` directly then, and their
+  keyword interface does not receive `allow_truncated`.
 - Transport examples per provider that send one request with a long
   timeout and one with `single_attempt: true` and assert the Faraday
   context and attempt count, which today's provider specs assert through
-  kwargs.
+  kwargs. These land in step 2 with the shared `post` implementation.
 
 ### The full caller inventory
 
@@ -358,23 +361,25 @@ Every item migrates in the same step as the interface it depends on.
 | Today | Where | Count | After |
 |---|---|---|---|
 | `def call(system:, prompt:, cache_system: ..., single_attempt: false)` doubles with the full nine-keyword signature | `ai_service_spec.rb` (18, at lines 110, 135, 196, 2955, 2980, 3097, 3124, 3220, 3266, 3312, 3340, 3399, 3595, 4031, 4299, 4542, 5902, 6054), `review_grading_spec.rb:151`, `forced_concept_drafts_spec.rb:81` | 20 | `def call(request)` reading `request.system`, `.prompt`, `.read_timeout`, `.max_tokens`, `.purpose`; the `double_class` keeps recording `read_timeouts_by_purpose` from the request |
-| `receive(:call)` spies that stub or wrap `#call` | `ai_service_spec.rb` (about 12), `review_grading_spec.rb`, `model_comparison_spec.rb` (2), request and job specs (5), `deferred_module_spec.rb` | about 21 | the same stubs; a `with(hash_including(prompt: ...))` matcher becomes `with(having_attributes(prompt: ...))` or a block reading the request |
-| `receive(:call_and_log).and_wrap_original { \|m, *args, **kw\| captured = kw; ... }` spies, including the judge-isolation group at `ai_service_spec.rb:4849-4938` that asserts answer keys and server stamps never reach the judge, and the trial and isolation specs | `ai_service_spec.rb` (about 19), `ai_service_trial_spec.rb` (2), `level_suggestion_isolation_spec.rb`, `trial_isolation_spec.rb`, `generate_concept_reference_job_spec.rb`, `learn_spec.rb`, `responses_duck_thread_spec.rb`, `responses_pseudocode_spec.rb`, `hardening_targets_spec.rb` | about 25 | `captured = args.last` and `captured.purpose`, `captured.max_tokens`, `captured.system`, `captured.prompt`; every assertion on what the judge, the duck or the generator sends stays word for word |
+| `receive(:call)` expectations, stubs and wrappers | `ai_service_spec.rb` (15), `review_grading_spec.rb` (3), `model_comparison_spec.rb` (2), `ai_service_trial_spec.rb` (2), `level_suggestion_isolation_spec.rb:22`, `trial_isolation_spec.rb:25`, `generate_concept_reference_job_spec.rb:223`, `learn_spec.rb:526`, `responses_duck_thread_spec.rb:388`, `responses_pseudocode_spec.rb:311`, `hardening_targets_spec.rb:105`, `deferred_module_spec.rb` | 30 | migrate in step 2; keep stubbed results, capture the positional request in wrappers, and replace `with(hash_including(prompt: ...))` with `with(having_attributes(prompt: ...))` or a block reading the request |
+| `receive(:call_and_log)` stubs and wrappers, including the judge-isolation group at `ai_service_spec.rb:4849-4938` that asserts answer keys and server stamps never reach the judge | `ai_service_spec.rb` | 16 | migrate in step 1; keep stubbed results, and change wrappers to `captured = args.last` and `captured.purpose`, `captured.max_tokens`, `captured.system`, `captured.prompt`; preserve every assertion's expected values and meaning |
 | `send(:call, system:, prompt:, **kwargs)` | `claude_service_spec` 39, `gemini_service_spec` 32, `openai_service_spec` 18, `gemini_capacity_probe_spec` 4 | 93 | `send(:call, AiService::Request.build(system:, prompt:, **kwargs))`, through a support helper so each site changes only its head |
 | `send(:call_and_log, user, purpose:, system:, prompt:, ...)` | `ai_service_spec.rb` 7, `ai_service_trial_spec.rb` 2, `gemini_truncation_spec.rb` 1, others 2 | 12 | `send(:call_and_log, user, AiService::Request.build(purpose:, system:, prompt:, **settings))`. These tests pass settings that are not the purpose's profile on purpose: `ai_service_spec.rb:316-324` sends `duck_thread` with `allow_truncated` left false to see `TruncatedResponseError` and a `failure: "truncated"` row, and `gemini_truncation_spec.rb:29` caps `explain_differently` at 60. Through `request_for` they would get the duck's `allow_truncated: true` and no cap, and their assertions would have to change. They use `Request.build` and keep their assertions; the profiles are tested separately |
 | `openai_service_spec`'s `logged_call(body, **kwargs)` helper | 1 helper, 2 examples | | `Request.build` with the `allow_truncated:` it is given |
 | The single-shot group's `spy_class` and its source scan | `ai_service_spec.rb:170-215` | 1 | `call(request)` recording `request.history`; purposes from `CALL_PROFILES.keys` |
 | `model_routing_spec`'s `purposes_in_use` source scan | `model_routing_spec.rb:5` | 1 | `AiService::CALL_PROFILES.keys` |
-| The HTTP-stub oracle specs | the four files above | 6 sites | `purpose_for(system)` from the marker table, then `Request.build` |
-| `fake_service_spec` | 1 send | | drives `call(request)` by purpose, one example per purpose |
+| The HTTP-stub oracle specs | the four files above | 6 sites | step 2 wraps the existing system and prompt in `Request.build`, with no purpose required while the fake still matches text; step 3 adds `purpose_for(system)` from the marker table |
+| `fake_service_spec` | 1 send | | step 2 converts the direct send to `Request.build` with the same system and prompt; step 3 drives it by purpose and adds one example per purpose |
 | The two script overrides and `ModelComparison#route_for` | `script/` | 3 | as in "Scripts" above; their specs unchanged |
 | Request snapshot spec | 15 fixtures | | 15 legacy shapes through `Request.build`, plus 45 per-purpose shapes through `request_for` |
 
 Every assertion in those files about error bodies, status codes, retries,
 quota ids, refusals, truncation, usage rows, what reaches the judge and
-what the duck sends stays. Only how the call is made or captured changes.
-No assertion is changed to accommodate the factory; where a test's
-settings are not a profile, the test says so by using `Request.build`.
+what the duck sends keeps its expected values and meaning. Mechanical
+accessor and matcher changes, such as `captured[:purpose]` to
+`captured.purpose`, are allowed. No expectation is weakened to accommodate
+the factory; where a test's settings are not a profile, the test says so
+by using `Request.build`.
 
 New examples: `CALL_PROFILES.keys == ApiUsage::PURPOSES`; `request_for`
 raises on an unknown purpose and on `blocking: true` for a purpose without
@@ -416,23 +421,29 @@ the specs that read them fail rather than pass.
    `call_and_log(user, request)` unpacks the request into today's nine
    keywords for `#call`. In the same commit: the 14 call sites, the 12
    `call_and_log` sends (through `Request.build` where their settings are
-   not the profile), every `receive(:call_and_log)` spy (about 25), the two
+   not the profile), the 16 `receive(:call_and_log)` stubs and wrappers, the two
    purpose scans, the profile-equality examples and the resolved-settings
-   examples. The nine-keyword `#call` is untouched, so every `#call` double
-   and provider spec stays green.
+   examples capturing at `call_and_log`. The nine-keyword `#call` is
+   untouched, so every `#call` double and provider spec stays green.
 2. **Providers and every `#call` double take the request.** The template
    `#call(request)` on `AiService`; `request_body`, `read_result`,
    `provider_name` and `route_for` on each real provider; `post` with the
    context rule and OpenAI's override. In the same commit, because they all
    break the moment `#call` takes a positional request: `FakeService#call`'s
    signature (its `case system` body unchanged for this step), the 20
-   keyword doubles, the 21 `receive(:call)` spies, the 93 `send(:call`
-   sites through the support helper, the two script overrides, the
-   transport examples, and the request snapshot spec's builder. Request
+   keyword doubles, the 30 `receive(:call)` expectations, stubs and wrappers,
+   the 93 `send(:call` sites through the support helper, the six HTTP-oracle
+   calls and the direct `fake_service_spec` call through `Request.build`,
+   the two script overrides, the transport examples, and the request
+   snapshot spec's builder. The oracle and fake-service test calls keep
+   their existing system and prompt, with no purpose required yet. Request
    snapshots, old and new, unchanged.
 3. **The fake picks by purpose.** The reply table replaces the `case
    system`, the marker table lands in test support, and the four oracle
-   specs and `fake_service_spec` move to it.
+   specs start setting the purpose on their requests through that table.
+   `fake_service_spec` switches its direct request to a purpose and adds
+   coverage for every purpose. All request-signature conversions already
+   landed in step 2.
 4. **Docs.** The rule files, decision docs, code notes and file map above.
 
 ## Risks
@@ -462,11 +473,13 @@ the specs that read them fail rather than pass.
 - **The fake's oracle specs.** Recommendation 1 keeps them green with one
   support table. If the user prefers option 2, the fake keeps text
   matching and the spec says so.
-- **Spec churn.** About 180 sites in specs and scripts change shape (93
-  sends, 20 doubles, 46 spies, 12 `call_and_log` sends, 3 scripts and the
-  snapshot builder). The support helper keeps each `send` change to the
-  call's head; the doubles and spies read the request instead of keywords;
-  the assertions do not move.
+- **Spec churn.** About 180 sites in specs and scripts need review (93
+  provider sends, 7 oracle and fake sends, 20 doubles, 46 expectations,
+  stubs and wrappers, 12 `call_and_log` sends, 3 scripts and the snapshot
+  builder). The support helper keeps each `send` change to the call's
+  head; the doubles and spies read the request instead of keywords.
+  Mechanical accessor and matcher changes preserve the expected values
+  and meaning of each assertion.
 - **Scripts without specs for the changed line.** The two script overrides
   are covered by their HTTP-level specs, which run in the suite; the
   `route_for` override is covered by `model_comparison_spec`'s pinned
@@ -482,9 +495,11 @@ the specs that read them fail rather than pass.
    `spec/fixtures/request_snapshots` is empty.
 2. The provider specs, `ai_service_spec`, `review_grading_spec`,
    `model_routing_spec`, `fake_service_spec`, the three script specs, the
-   job and request specs that spy on `call_and_log`, both isolation specs,
+   job and request specs that spy on `#call` or `call_and_log`, both isolation specs,
    the trial spec and the truncation spec after each of steps 1 to 3, with
-   `git diff` showing no assertion line changed in any of them.
+   `git diff` reviewed for unchanged expected values and equivalent
+   assertions. Accessor and matcher conversions are allowed; weakening an
+   assertion to match new defaults is not.
 3. The full unit suite once after step 4; system specs once; `bin/rubocop`,
    `bin/comment-check`, `bin/rails zeitwerk:check`.
 4. Grep gates: no `def call(system:` anywhere under `app/`, `spec/` or
