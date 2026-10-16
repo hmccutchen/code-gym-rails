@@ -208,10 +208,23 @@ The reply's sentence is chosen by the server from these cases:
 - **Default:** "Saved. This starts with your next set."
 - **Paused:** "Saved. This starts with your next set. Generation is paused, so
   that's the next set you generate or the first one after you resume."
-- **Today's set is unsubmitted and regeneration is still available** (no
-  `regenerated_at`, no `replace_blocker`): the reply adds one line pointing at
-  the existing button, "Want it today? Generate a new set (this replaces
-  today's answers)."
+- **"Want it today?"**: one more line, pointing at the existing "Generate new
+  set" button: "Want it in today's set? Generate a new set. This replaces
+  every answer you've typed so far." The line names its cost every time it
+  appears.
+  - **When it shows:** only when regeneration is available *and* nothing is
+    submitted. That is stricter than the button. In
+    `dashboard/_exercise.html.erb` the button shows unless the response is
+    reviewed, `regenerated_at` is set, or the trial has ended, so it still
+    shows on a submitted but unreviewed set. Offering "apply it today" there
+    would mean throwing away submitted work, so the line also requires that
+    today's response is absent or has no `submitted_at`.
+  - **One source for the shared part.** The button's three conditions move
+    out of the view into one helper, `regeneration_offered?(exercise,
+    response)`. The button reads it, and the line reads it plus "not
+    submitted", so the two can't drift.
+  - **The button is unchanged.** It keeps its own conditions and its confirm
+    (`regenerate_confirm_with_progress`).
 
 None of these says "tomorrow". The copy uses "your next set" everywhere.
 
@@ -450,9 +463,9 @@ current behaviour lands with PR 1b.
   "Saving…".
 - **Saved:** the reply carries the sentence from section 3. The picker
   closes, the sentence is announced, and focus returns to the trigger. When
-  regeneration is still available, the "Want it today?" line appears under
-  the sentence, as a link to the existing "Generate new set" button, which
-  keeps its own confirm.
+  regeneration is offered and nothing is submitted (section 3), the "Want it
+  in today's set?" line appears under the sentence, cost included, as a link
+  to the existing "Generate new set" button.
 - **Error:** the reply comes from `render_json_error`, the message shows in the
   save-status banner, the picker stays open and focus stays on Confirm.
 
@@ -522,7 +535,9 @@ daily_kind_swaps
   place          integer  not null   # 0-based index into the daily list
   from_kind      string   not null
   to_kind        string   not null
-  today_section  string   not null   # unanswered | answered | submitted
+  today_section  string   not null   # unanswered | answered | submitted | no_set
+  planned_size   integer             # today's set's plan_notes["size"]; null when no_set
+  size_setting   integer             # users.daily_section_count at the swap; null = Automatic
   created_at     datetime not null
 ```
 
@@ -530,19 +545,53 @@ daily_kind_swaps
   "starts with your next set", so a column naming that effect would hold a
   single value. The in-place design's `today` (`replacing | tomorrow`),
   `reason` and `outcome` columns are dropped (Appendix A has them).
-- **`today_section` records the outgoing section's state in the set on screen
-  when the swap was made.** It answers the question the scope decision left
+- **`today_section` records the state of the outgoing section in today's set
+  when the swap is saved.** It answers the question the scope decision left
   open: how often an in-place swap would have replaced something.
-  `unanswered` on a set that wasn't submitted is the case in-place would have
+  `unanswered` on an unsubmitted set is the case in-place would have
   changed. It is read through `DailyResponse#answered?` and `#submitted?`,
   the existing authorities.
+- **`no_set`** is recorded when the user has no set for today: a weekend
+  without "Generate anyway", or a paused account with nothing held.
+  - The control lives on a card, so this mostly comes from a page left open
+    across midnight. A dashboard loaded Friday evening can post a swap on
+    Saturday morning.
+  - The server reads today's set when it saves, never the set the page was
+    showing, so that swap records `no_set` and doesn't count as evidence that
+    someone wanted today's section replaced.
+  - Without the value, those rows would be null or would read as
+    `unanswered`.
+- **`planned_size` and `size_setting` let the table answer "do people swap
+  while on two sections?"**
+  - `planned_size` copies today's set's `plan_notes["size"]`, the count the
+    plan chose before any coverage addition.
+  - `size_setting` copies `users.daily_section_count`, so a fixed 2 can be
+    told from an Automatic 2. That matters, because under a fixed 2 the
+    swapped-out kind never comes back.
+- **Copied, not linked.** The other way would be a `daily_exercise_id`
+  foreign key that reads the size from the row. I'd rather copy:
+  - **Point in time.** A link reads the row as it is now. A regeneration
+    later the same day rewrites `plan_notes`, including `size`, and the
+    setting can change at any time. The question is what the user was on
+    when they swapped, and only a copy keeps that.
+  - **It covers `no_set`,** where there is no row to link.
+  - **It matches the table it is modelled on.** `level_suggestion_events`
+    copies its evidence (`window_size`, `favourable`, `too_hard_latest3`)
+    rather than linking to results.
+  - **No foreign key** to keep consistent when exercises are deleted with an
+    account.
+  - The cost is two integer columns, and losing anything else on the row,
+    such as the pair the set was generated with. If a later question needs
+    that, a link can be added then.
 - **A refused request** (invalid kind, a second fourth, stale page) writes
   nothing.
 - **Demand for "apply now"** is measurable without another column: a swap
   row followed by a regeneration of the same set (`regenerated_at` after the
   row's `created_at`, same date).
 - **Validations** follow `LevelSuggestionEvent`: kinds in
-  `ExerciseSection.keys` and `today_section` with an `inclusion` check.
+  `ExerciseSection.keys`, `today_section` with an `inclusion` check,
+  `planned_size` present unless `today_section` is `no_set`, and
+  `size_setting` in `User::DAILY_SECTION_COUNTS` when present.
 
 ## Decisions
 
@@ -568,7 +617,7 @@ daily_kind_swaps
 | Order | PR | What it holds |
 |---|---|---|
 | 1 | **A. Derive the regeneration claim window** | A bug on main, independent of this feature (below). It can merge first and on its own |
-| 2 | **0. Schema** | `users.daily_section_kinds` (`jsonb`, default `[]`, not null) and `daily_kind_swaps` (section 8). Nothing reads either. It ships a release ahead, because the worker's pre-deploy waits for a schema, not for pending migrations (`tracks.md`). It must not share a release with the `learning_track` column drop |
+| 2 | **0. Schema** | `users.daily_section_kinds` (`jsonb`, default `[]`, not null) and `daily_kind_swaps` with the columns in section 8. Nothing reads either. It ships a release ahead, because the worker's pre-deploy waits for a schema, not for pending migrations (`tracks.md`). It must not share a release with the `learning_track` column drop |
 | 3 | **1. Per-user layout, no visible change** | Covers `DailyKinds` (with its sparse default and on-read normalization), `ExerciseSection.layout(daily:)`, `plan_notes["daily_kinds"]`, row-aware `resolved_keys`, every reader in section 2, `judge_retries` moving onto the plan, text from the pair, Setup's groups and the validations. It also covers the `FLOOR == DailyKinds::COUNT` spec, the grep spec for `ExerciseSection.slots` / `.fixed`, and the rotation simulation spec. `CompetencyGate` reads `DailyKinds::DEFAULT`, which is today's pair. A default account stays byte-identical, and the existing prompt, page and request snapshots prove it with no update. Docs: `generation.md`, `design-comparison-the-second-fixed-section.md`, `planning.md`, `coverage-exception.md`, `shared-concept-on-a-real-struggle.md`, `level-suggestions.md:37-42`, `request-flow.md:37`, `patterns.md:55`, `file-map.md`, and a new `docs/decisions/daily-kinds.md` with its entry in `planning.md` |
 | 4 | **1b. Per-day pairs in `CompetencyGate`** | `Day` carries the row's pair, entries are tagged daily, growth reads tagged entries, and `Evidence#optional_state` uses the row's pair (section 5). Nothing can swap yet, so every stored day holds the default pair, and the interim state between PR 1 and PR 1b is main's behaviour. It carries three specs. **Before and after:** `CompetencyGate.plans` over production-shaped fixtures gives identical counts, reasons and evidence, for accounts with and without a growth or a brake. **A changing pair:** a hand-built history whose pair changes partway neither reclassifies earlier days nor resets an earned size. **The two-section hold:** the spec from the separate note, pinning today's behaviour. Docs: `competency-gate.md` |
 | 5 | **2. The swap, server side** | Covers `PATCH /daily_kinds/:place` (`DailyKindsController#update`), the `DailyKindSwap` outcome object (`saved` or a refusal reason), the save under the user-row lock with the version bump, the event row with `today_section`, and the reply sentence from section 3. The request spec keeps one example per outcome |
