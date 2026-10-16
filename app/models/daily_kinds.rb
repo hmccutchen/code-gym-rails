@@ -12,7 +12,7 @@ class DailyKinds
   def self.recorded(plan_notes)
     return DEFAULT unless plan_notes.key?("daily_kinds")
 
-    Array(plan_notes["daily_kinds"]).filter_map { |key| ExerciseSection.find(key) }.uniq.presence&.freeze || DEFAULT
+    Array(plan_notes["daily_kinds"]).filter_map { |key| ExerciseSection.find(key) }.uniq.freeze
   end
 
   def self.normalize(keys)

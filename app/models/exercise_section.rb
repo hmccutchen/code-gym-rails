@@ -40,7 +40,7 @@ class ExerciseSection
   end
 
   def self.daily_sections_share?(problem_set, concept, daily:)
-    concept.present? && daily.all? { |kind| present?(problem_set, kind.key) && problem_set[kind.key]["concept"] == concept }
+    concept.present? && daily.any? && daily.all? { |kind| present?(problem_set, kind.key) && problem_set[kind.key]["concept"] == concept }
   end
 
   def self.layout(daily:)

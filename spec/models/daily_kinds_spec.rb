@@ -64,6 +64,10 @@ RSpec.describe DailyKinds do
       expect(described_class.recorded("daily_kinds" => %w[challenge retired_kind])).to eq(kinds("challenge"))
     end
 
+    it "reads a pair whose every key has since been retired as empty, never as the default pair" do
+      expect(described_class.recorded("daily_kinds" => %w[retired_kind other_retired_kind])).to eq([])
+    end
+
     it "reads a row planned before the pair was recorded as the default pair" do
       expect(described_class.recorded({})).to eq(described_class::DEFAULT)
       expect(described_class.recorded("size" => 3)).to eq(described_class::DEFAULT)
