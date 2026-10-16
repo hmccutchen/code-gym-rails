@@ -3,18 +3,19 @@ require "rails_helper"
 RSpec.describe CompetencyGate, "with each day's own pair" do
   let(:default_pair) { %w[code_review design_comparison] }
 
-  def result(kind, ai: "solid", self_rating: "right_level")
-    ReviewedSectionResults::Result.new(date: nil, kind: kind, level: "senior", ai_rating: ai, self_rating: self_rating, eased: false)
+  def result(kind, ai: "solid", self_rating: "right_level", level: "senior")
+    ReviewedSectionResults::Result.new(date: nil, kind: kind, level: level, ai_rating: ai, self_rating: self_rating, eased: false)
   end
 
-  def good(kind) = result(kind)
+  def good(kind, level: "senior") = result(kind, level: level)
   def poor(kind) = result(kind, ai: "developing")
+  def too_hard(kind) = result(kind, self_rating: "too_hard")
 
   def day(*results, daily: default_pair, optional: :none)
     CompetencyGate::Day.new(results: results, optional: optional, daily: daily)
   end
 
-  # Recorded from the gate before days carried a pair; the PR that added this spec holds the recording script.
+  # Recorded from the gate before days carried a pair by script/record_competency_gate_fixture.rb; see competency-gate.md.
   describe "a history that only ever held the default pair" do
     fixture = JSON.parse(Rails.root.join("spec/fixtures/competency_gate/default_pair_histories.json").read)
 
@@ -62,6 +63,30 @@ RSpec.describe CompetencyGate, "with each day's own pair" do
 
       expect(described_class.plans(held_by_optional).map(&:count)).to all(eq(2))
       expect(described_class.plans(grown_by_daily).map(&:count).last).to eq(3)
+    end
+
+    it "drops a kind's daily results when a level change reaches it on a day it was optional" do
+      first_daily = Array.new(3) { day(good("pattern"), good("challenge"), daily: swapped) }
+      optional    = [ day(good("code_review"), good("pattern", level: "junior")) ]
+      daily_again = [ day(good("pattern", level: "junior"), good("challenge"), daily: swapped) ]
+
+      window = described_class.plan(first_daily + optional + daily_again).evidence.fetch(:to_four)
+
+      expect(window.fetch(:by_kind)).to eq("challenge" => 4, "pattern" => 1, "code_review" => 1)
+    end
+
+    it "brakes on a swapped-out kind's too-hard results, and the brake empties the new pair's growth" do
+      after_swap = Array.new(2) { day(good("pattern"), good("challenge"), too_hard("code_review"), daily: swapped) }
+
+      plan = described_class.plan(earned_three + after_swap)
+
+      expect(plan).to have_attributes(count: 2, reason: :brake)
+      expect(plan.evidence.fetch(:to_three)).to include(available: 0)
+    end
+
+    it "refuses a day whose pair is not a list of section keys" do
+      expect { day(good("code_review"), daily: nil) }.to raise_error(ArgumentError, /daily must be a list/)
+      expect { day(good("code_review"), daily: [ ExerciseSection::CodeReview ]) }.to raise_error(ArgumentError)
     end
   end
 

@@ -40,6 +40,7 @@ What each listed file does.
 - `app/controllers/trials_controller.rb` — `/trial/start` for someone signed out and `/trial` for a keyless account: the code, the provider, the data notice and consent, and a trial's standing once it has begun
 - `app/models/trial_status.rb` — `TrialStatus`: a trial's standing for its pages: days left, today's calls against the cap, the day it ended
 - `script/mint_invite_code.rb` — mints one invite code and prints it once
+- `script/record_competency_gate_fixture.rb` — rebuilds `spec/fixtures/competency_gate/default_pair_histories.json` from the gate as it stands; run only for a deliberate gate change
 - `app/models/provider_failure.rb` — `ProviderFailure`: the kind of failure a page can explain, from the error the boundary rescued; pure
 - `app/models/reset_clock.rb` — `ResetClock`: when a failed call's limit lifts, for the sentence's reset time; pure
 - `app/models/provider_failure_text.rb` — `ProviderFailureText`: one failure as a sentence for a person, from the `provider_failures` locale table, in the reader's zone and against the clock; `#full` for a page, `#brief` for a status line

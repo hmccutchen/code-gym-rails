@@ -108,9 +108,9 @@ read it before changing that area.
   Eased sections stay out of growth, but their too-hard rating counts toward
   the brake. Growth counts a result only when its kind was daily on its own
   day (`Day#daily`, from the row's `plan_notes`), so a change of pair never
-  reclassifies past days or resets an earned size. `ReviewedSectionResults` decides which sections count, and
-  `CompetencyGate::Evidence` reads every stamped day with no cap, since a cap
-  would forget an earned size.
+  reclassifies past days or resets an earned size. `ReviewedSectionResults`
+  decides which sections count, and `CompetencyGate::Evidence` reads every
+  stamped day with no cap, since a cap would forget an earned size.
 - **Pausing generation** (`docs/decisions/pausing-generation.md`):
   `User#paused_generation_at` stops only generation the user didn't ask for
   (cron and the dashboard auto-trigger), never submit or review. `PATCH

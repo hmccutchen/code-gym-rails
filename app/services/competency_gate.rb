@@ -20,6 +20,8 @@ class CompetencyGate
     def initialize(results:, optional:, daily:)
       raise ArgumentError, "optional must be one of #{OPTIONAL_STATES.inspect}, not #{optional.inspect}" unless
         OPTIONAL_STATES.include?(optional)
+      raise ArgumentError, "daily must be a list of section keys, not #{daily.inspect}" unless
+        daily.is_a?(Array) && daily.all?(String)
 
       super
     end

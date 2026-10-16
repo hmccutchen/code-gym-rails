@@ -124,6 +124,24 @@ RSpec.describe CompetencyGate::Evidence do
     expect(CompetencyGate.plan(days.last(60)).count).to eq(2)
   end
 
+  describe "growth to four after a change of pair" do
+    let(:swapped) { { "daily_kinds" => %w[pattern plan_review] } }
+
+    before { 6.times { |n| day(n) } }
+
+    it "reads a swapped-out kind as optional on the rows planned after the swap" do
+      [ 6, 7 ].each { |n| day(n, { "pattern" => {}, "plan_review" => {}, "code_review" => {} }, plan_notes: swapped) }
+
+      expect(CompetencyGate.for(user).count).to eq(4)
+    end
+
+    it "holds at three when that optional kind goes unanswered, even though the new pair was answered" do
+      [ 6, 7 ].each { |n| day(n, { "pattern" => {}, "plan_review" => {}, "code_review" => { answered: false } }, plan_notes: swapped) }
+
+      expect(CompetencyGate.for(user).count).to eq(3)
+    end
+  end
+
   describe "CompetencyGate.for" do
     it "folds the user's history, each day with its own pair" do
       5.times { |n| day(n) }
