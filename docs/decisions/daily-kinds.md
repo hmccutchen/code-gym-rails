@@ -114,7 +114,9 @@ sections. `AiService::JUDGED_GENERATION_BUDGET` reads the larger of the two.
 
 `ExerciseSection.pickable(daily:)` is the set of kinds a plan can hold for a
 pair: the pair plus every kind in its optional slots. `KindPreferences#offered`
-removes excluded optional kinds from it. A daily kind counts as offered even
+removes excluded optional kinds from it through `KindPreferences#eligible`,
+the same rule rotation uses: exclusion narrows a slot, and a slot it would
+empty keeps every kind, because rotation still fills it. A daily kind counts as offered even
 when an exclusion is stored on it, since every set holds it, and a daily
 fourth's siblings never count. `LadderCoverage` (which concepts guidance
 preparation covers), the Progress page's "not offered" standing and the
