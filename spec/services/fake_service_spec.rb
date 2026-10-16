@@ -116,8 +116,71 @@ RSpec.describe FakeService do
       service = described_class.new(user.api_key)
 
       expect {
-        service.send(:call, AiService::Request.build(system: "You are a senior Rails engineer giving direct, specific feedback", prompt: "no section marker here"))
+        service.send(:call, AiService.request_for("review_response", system: "s", prompt: "no section marker here"))
       }.to raise_error(/could not extract the section key/)
+    end
+  end
+
+  describe "#call" do
+    let(:service) { described_class.new(user.api_key) }
+    # The purposes whose AiService caller hands the reply to parse_json_object; every other caller reads it as prose.
+    let(:json_purposes) do
+      %w[generate_exercise retry_section review_response assess_difficulty generate_concept_reference
+         generate_recognition_guide pseudocode_critique judge_section judge_review]
+    end
+    let(:prompts_with_markers) do
+      { "review_response"   => 'Grade ONLY the "code_review" section from the day\'s context above.',
+        "assess_difficulty" => "## code_review\nThe section's context",
+        "judge_section"     => "Section kind: code_review" }
+    end
+
+    def reply_for(purpose)
+      service.send(:call, AiService.request_for(purpose, system: "s", prompt: prompts_with_markers.fetch(purpose, "p")))
+    end
+
+    it "holds one reply per purpose and no other" do
+      expect(described_class::REPLIES.keys).to eq(ApiUsage::PURPOSES)
+    end
+
+    ApiUsage::PURPOSES.each do |purpose|
+      it "answers #{purpose} with a zero-cost reply its caller can read" do
+        result = reply_for(purpose)
+
+        expect(result).to include(input_tokens: 0, output_tokens: 0, model: "fake", cache_read_tokens: 0, cache_write_tokens: 0)
+        if json_purposes.include?(purpose)
+          expect(JSON.parse(result[:text])).to be_a(Hash)
+        else
+          expect(result[:text]).to be_present
+          expect { JSON.parse(result[:text]) }.to raise_error(JSON::ParserError)
+        end
+      end
+    end
+
+    it "raises a bare RuntimeError naming a purpose it has no reply for" do
+      expect { service.send(:call, AiService::Request.build(purpose: "write_poem", system: "s", prompt: "p")) }
+        .to raise_error { |error|
+          expect(error.class).to eq(RuntimeError)
+          expect(error.message).to eq('FakeService has no reply for purpose: "write_poem"')
+        }
+    end
+  end
+
+  describe FakeReplies do
+    it "names the system-prompt marker of every purpose, each a phrase AiService's prompts carry" do
+      source = Rails.root.join("app/services/ai_service.rb").read
+
+      expect(FakeReplies::SYSTEM_PROMPT_MARKERS.keys).to eq(ApiUsage::PURPOSES)
+      FakeReplies::SYSTEM_PROMPT_MARKERS.each_value { |marker| expect(source).to include(marker) }
+    end
+
+    it "finds the purpose whose marker a real system prompt carries" do
+      expect(purpose_for(AiService::DUCK_SYSTEM_PROMPT)).to eq("duck_thread")
+      expect(purpose_for(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT)).to eq("judge_review")
+      expect(purpose_for(FakeService.new(user.api_key).send(:build_system_prompt, "ruby_rails"))).to eq("generate_exercise")
+    end
+
+    it "raises naming a system prompt no marker matches" do
+      expect { purpose_for("You are a poet") }.to raise_error(RuntimeError, /no marker matching the system prompt: "You are a poet"/)
     end
   end
 
