@@ -28,6 +28,7 @@ RSpec.describe SectionRotation, "over every reachable pair" do
         seen_on[key] = day
       end
     end
+    seen_on.each { |key, last| longest[key] = [ longest[key], days - last ].max }
     [ longest, seen_on.keys ]
   ensure
     srand(previous)

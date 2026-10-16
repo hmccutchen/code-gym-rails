@@ -24,7 +24,7 @@ The real-source choice is a second roll inside the mode, so `CODE_REVIEW_MODE_WE
 
 ## `.hostable_buckets`
 
-Both retention callers share this list, so reserving a slot and filling it read the same eligibility rule.
+Both retention callers share this list, so reserving a slot and filling it read the same eligibility rule. The buckets come from the day's non-fourth kinds, through `ConceptBucket.for`, rather than always including the language. A pair whose only regular section is architecture (with a daily fourth) can't host a language concept, so reinforcement must not pick one for it. For the default pair the list is unchanged: the language first, then `architecture` when that kind is planned.
 
 ## `.retention_checks_for`
 

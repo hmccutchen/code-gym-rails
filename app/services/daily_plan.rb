@@ -198,9 +198,7 @@ class DailyPlan
   private_class_method :overdue_retention_check_pending_for_bucket?
 
   def self.hostable_buckets(language, kinds:)
-    buckets = [ language ]
-    buckets << "architecture" if kinds.include?(ExerciseSection::Architecture)
-    buckets
+    kinds.reject(&:fourth?).map { |kind| ConceptBucket.for(kind.key, language) }.uniq
   end
   private_class_method :hostable_buckets
 

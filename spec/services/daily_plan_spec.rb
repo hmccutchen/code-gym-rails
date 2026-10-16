@@ -167,8 +167,8 @@ RSpec.describe DailyPlan do
         queries += 1 unless payload[:name].to_s =~ /SCHEMA|TRANSACTION/
       end
 
-      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", kinds: [ ExerciseSection::Architecture ],
-                              reinforcement: [], due_checks: [])
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails",
+                              kinds: [ ExerciseSection::CodeReview, ExerciseSection::Architecture ], reinforcement: [], due_checks: [])
       result.map(&:concept)
 
       expect(queries).to eq(1)
@@ -1190,5 +1190,41 @@ RSpec.describe DailyPlan, "the coverage exception" do
     expect(CoverageException::History).not_to receive(:recent_coverage_dates)
 
     described_class.for(user, language: "ruby_rails")
+  end
+end
+
+RSpec.describe DailyPlan, "a pair whose only regular section is architecture" do
+  let(:user) do
+    User.create!(email: "plan-architecture-pair@example.com", name: "Plan", daily_section_kinds: %w[architecture plan_review])
+  end
+
+  before do
+    pin_code_review_mode(:application_code)
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, code_review: nil, design_comparison: nil)
+  end
+
+  def struggled_with(concept, bucket)
+    exercise = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: { "code_review" => { "concept" => concept } })
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current - 1, submitted_at: Time.current,
+                          answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
+                          concept_tags: { "code_review" => concept }, ai_review: { "code_review" => { "rating" => "developing" } })
+    user.concept_masteries.create!(concept: concept, language: bucket, tier: :reduced)
+  end
+
+  it "reads only the buckets its planned sections can host" do
+    expect(DailyPlan.send(:hostable_buckets, "ruby_rails", kinds: [ ExerciseSection::Architecture, ExerciseSection::PlanReview ]))
+      .to eq(%w[architecture])
+    expect(DailyPlan.send(:hostable_buckets, "ruby_rails", kinds: DailyKinds::DEFAULT + [ ExerciseSection::Architecture ]))
+      .to eq(%w[ruby_rails architecture])
+  end
+
+  it "never gives the one regular section a language concept it cannot host" do
+    struggled_with("n_plus_one", "ruby_rails")
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.kinds).to eq([ ExerciseSection::Architecture, ExerciseSection::PlanReview ])
+    expect(plan.reinforcement.map { |entry| entry[:bucket] }).not_to include("ruby_rails")
   end
 end
