@@ -454,6 +454,49 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(user.reload.skill_level).to eq("mid_level")
   end
 
+  it "leaves focus where the user moved it during a track save" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes("skill_level")) {
+          return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 1200));
+        }
+        return send(url, options);
+      };
+      const select = document.getElementById("skill-level");
+      select.focus();
+      select.value = "mid_level";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      document.getElementById("weight-security_review").focus();
+    JS
+
+    expect(page).to have_css("#skill-level:not([disabled])", wait: 5)
+    expect(page.evaluate_script(%(document.activeElement.id))).to eq("weight-security_review")
+  end
+
+  it "re-enables the track select when its save fails" do
+    visit_as(user)
+    visit setup_path
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes("skill_level")) return Promise.reject(new TypeError("offline"));
+        return send(url, options);
+      };
+    JS
+
+    find("#skill-level").select("Mid-level")
+
+    expect(page).to have_css("#save-status", text: /couldn't save/i, wait: 5)
+    expect(page).to have_css("#skill-level:not([disabled])")
+    expect(user.reload.skill_level).to eq("junior")
+  end
+
   def guide_measurement
     page.evaluate_script(<<~JS)
       (() => {

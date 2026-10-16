@@ -48,7 +48,8 @@ export default class extends Controller {
       await this.sendTrack(select, select.value)
     } finally {
       select.disabled = false
-      if (focused) select.focus()
+      const lost = document.activeElement === null || document.activeElement === document.body
+      if (focused && lost) select.focus({ preventScroll: true })
     }
   }
 

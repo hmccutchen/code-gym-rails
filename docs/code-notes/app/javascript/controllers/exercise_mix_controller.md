@@ -145,7 +145,9 @@ can queue ahead of a frozen save, and the server applies the track change after
 the frozen edits. When the save is sent, those edits are laid over `saved`
 as it is then (`frozenState`, through `withEdits`), and the version and the
 shown suggestions are read then too. So an edit made after the track change
-cannot ride in the save that goes out ahead of it.
+cannot ride in the save that goes out ahead of it. This needs the mix to be
+connected when the track save starts; an edit typed before the mix module loaded
+goes out after the track save instead, through `adoptEarlyEdit`.
 A mix save queued after the track save is not frozen, since it has to read the
 form once the track reply has been applied, or it would send targets the track
 change cleared. Edits are saved in

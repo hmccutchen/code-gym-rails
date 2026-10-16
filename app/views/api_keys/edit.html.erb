@@ -116,7 +116,7 @@
     <label for="skill-level"><%= t("api_keys.edit.skill_level_label") %></label>
     <%= select_tag "skill_level",
           options_for_select(User::SKILL_LEVELS.map { |level| [ t("exercise_mix.levels.#{level}"), level ] }, current_user.skill_level),
-          id: "skill-level",
+          id: "skill-level", autocomplete: "off",
           data: { profile_preferences_target: "skillLevel", action: "change->profile-preferences#saveSkillLevel" } %>
     <p class="hint"><%= t("api_keys.edit.skill_level_hint") %></p>
     <p class="hint" role="status" data-profile-preferences-target="keptOwnLevel"></p>
