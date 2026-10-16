@@ -71,7 +71,7 @@ grows linearly with post-rubric history.
 **The rule.** The gate starts at two and folds over the user's reviewed
 days, oldest first. After each day: two `too_hard` self-ratings among the
 latest four results of any kind (`BRAKE`) return it to two; otherwise, at
-two, 4 favourable of the latest 5 fixed-kind results (`GROW_TO_THREE`)
+two, 4 favourable of the latest 5 daily-kind results (`GROW_TO_THREE`)
 grow it to three; at three, 8 of the latest 10 (`GROW_TO_FOUR`) grow it to
 four, but only when the optional sections were all answered on each of the
 last `OPTIONAL_RUN` days that had any. Otherwise it holds. A window with
@@ -82,13 +82,34 @@ shape `RungLedger` uses, because the AI rating's level calibration is
 unverified. These values are a starting policy, not thresholds history
 has validated.
 
-**A brake restarts growth.** On every day the brake holds, the fixed-kind
+**A brake restarts growth.** On every day the brake holds, the daily-kind
 growth windows start empty, so growing again needs a full window of
 results that came after it. Without that, a user who struggles only on
 optional sections would swing from three to two and straight back to
-three on fixed-kind results earned before the struggle. The brake's own
+three on daily-kind results earned before the struggle. The brake's own
 window is untouched, so the reason stays `:brake` while the too-hard
 results remain in it.
+
+**Growth reads the kinds that were daily that day.** Each `Day` carries
+the pair its row was planned with (`DailyExercise#daily_kinds`, so a row
+from before the pair was recorded reads as the default). A result enters the
+growth windows only when its kind was daily on its own day, and the brake
+still reads every kind. The fold runs forward over every stamped day, so a
+change of pair never reclassifies earlier days: a size earned under one pair
+stays earned, results from a kind's daily days keep counting after it is
+swapped out, and its later optional results never enter growth.
+`Evidence#optional_state` reads the row's pair the same way. A history that
+only ever held the default pair plans exactly as it did when the gate read
+one global pair, which `competency_gate_daily_pairs_spec` checks against
+plans recorded from that gate over seeded histories that grow, brake and
+hold. Re-reading all history with today's pair would quietly change sizes
+users have already earned, which is why the pair is read per day.
+
+**Two sections can hold.** On a two-section day the daily kinds' results are
+the only growth input, so a daily kind that is never favourable keeps the day
+at two. This is today's behaviour, pinned by the same spec and recorded as an
+open product question in
+`docs/superpowers/specs/2026-10-16-two-section-gate-hold-note.md`.
 
 **Eased sections reach the brake only.** An eased section answered an
 easier question than its rung, so its AI rating stays out of the growth

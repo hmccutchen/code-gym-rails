@@ -13,16 +13,16 @@ RSpec.describe CompetencyGate do
     result(kind, level: level, self_rating: "too_hard", eased: eased)
   end
 
-  def day(*results, optional: :none)
-    CompetencyGate::Day.new(results: results, optional: optional)
+  def day(*results, optional: :none, daily: fixed)
+    CompetencyGate::Day.new(results: results, optional: optional, daily: daily)
   end
 
   def counts(days)
-    described_class.plans(days, fixed_kinds: fixed).map(&:count)
+    described_class.plans(days).map(&:count)
   end
 
   it "starts at two with zero evidence" do
-    plan = described_class.plan([], fixed_kinds: fixed)
+    plan = described_class.plan([])
 
     expect(plan.count).to eq(2)
     expect(plan.reason).to eq(:held)
@@ -80,7 +80,7 @@ RSpec.describe CompetencyGate do
       eased = Array.new(5) { day(result(eased: true)) }
 
       expect(counts(eased)).to all(eq(2))
-      expect(described_class.plan(eased, fixed_kinds: fixed).evidence[:to_three]).to include(available: 0)
+      expect(described_class.plan(eased).evidence[:to_three]).to include(available: 0)
     end
 
     it "moves at most one step a day" do
@@ -130,7 +130,7 @@ RSpec.describe CompetencyGate do
     def earned_three = Array.new(5) { day(good) }
 
     it "returns to two when 2 of the latest 4 results are too hard" do
-      plans = described_class.plans(earned_three + [ day(too_hard), day(too_hard) ], fixed_kinds: fixed)
+      plans = described_class.plans(earned_three + [ day(too_hard), day(too_hard) ])
 
       expect(plans.map(&:count)).to eq([ 2, 2, 2, 2, 3, 3, 2 ])
       expect(plans.last.reason).to eq(:brake)
@@ -141,7 +141,7 @@ RSpec.describe CompetencyGate do
     end
 
     it "needs four eligible results, so two too-hard results of three hold" do
-      plans = described_class.plans([ day(too_hard), day(too_hard), day(good) ], fixed_kinds: fixed)
+      plans = described_class.plans([ day(too_hard), day(too_hard), day(good) ])
 
       expect(plans.map(&:reason)).to all(eq(:held))
     end
@@ -156,8 +156,8 @@ RSpec.describe CompetencyGate do
       grows = Array.new(5) { day(good) }
       days = Array.new(3) { day(good) } + Array.new(2) { day(good, too_hard("pattern")) }
 
-      expect(described_class.plan(grows, fixed_kinds: fixed).count).to eq(3)
-      expect(described_class.plan(days, fixed_kinds: fixed)).to have_attributes(count: 2, reason: :brake)
+      expect(described_class.plan(grows).count).to eq(3)
+      expect(described_class.plan(days)).to have_attributes(count: 2, reason: :brake)
     end
 
     # Otherwise struggling only on optional sections would swing the day 3, 2, 3.
@@ -166,11 +166,11 @@ RSpec.describe CompetencyGate do
       days = earned_three + [ day(too_hard("pattern"), too_hard("challenge")) ] + Array.new(4) { both.call }
 
       expect(counts(days)).to eq([ 2, 2, 2, 2, 3, 2, 2, 2, 2, 3 ])
-      expect(described_class.plans(days, fixed_kinds: fixed).map(&:reason).last(5)).to eq(%i[brake brake held held grew])
+      expect(described_class.plans(days).map(&:reason).last(5)).to eq(%i[brake brake held held grew])
     end
 
     it "restarts the growth window on every day the brake holds" do
-      plan = described_class.plan(earned_three + [ day(too_hard), day(too_hard) ], fixed_kinds: fixed)
+      plan = described_class.plan(earned_three + [ day(too_hard), day(too_hard) ])
 
       expect(plan.evidence[:to_three]).to include(available: 0, favourable: 0)
       expect(plan.evidence[:brake]).to include(available: 4, too_hard: 2)
@@ -179,13 +179,13 @@ RSpec.describe CompetencyGate do
     it "reads an eased section's too-hard self-rating" do
       days = earned_three + [ day(too_hard(eased: true)), day(too_hard("pattern", eased: true)) ]
 
-      expect(described_class.plan(days, fixed_kinds: fixed)).to have_attributes(count: 2, reason: :brake)
+      expect(described_class.plan(days)).to have_attributes(count: 2, reason: :brake)
     end
 
     it "holds a later day at two while the too-hard results stay in the window" do
       days = earned_three + [ day(too_hard), day(too_hard), day(good) ]
 
-      expect(described_class.plan(days, fixed_kinds: fixed).reason).to eq(:brake)
+      expect(described_class.plan(days).reason).to eq(:brake)
     end
   end
 
@@ -210,7 +210,7 @@ RSpec.describe CompetencyGate do
         day(good)
       ]
 
-      plans = described_class.plans(days, fixed_kinds: fixed, evidence: true)
+      plans = described_class.plans(days, evidence: true)
       expect(plans.map(&:count)).to eq([ 2, 2, 2, 3 ])
       expect(plans.last.evidence[:to_three][:by_kind]).to eq("code_review" => 4, "design_comparison" => 1)
       expect(plans.last.evidence[:levels]).to eq("code_review" => "senior", "design_comparison" => "junior")
@@ -221,8 +221,8 @@ RSpec.describe CompetencyGate do
     days = Array.new(5) { day(good) } + [ day(too_hard), day(too_hard(level: "junior")) ]
 
     days.size.times do |n|
-      expect(described_class.plans(days.first(n), fixed_kinds: fixed))
-        .to eq(described_class.plans(days, fixed_kinds: fixed).first(n))
+      expect(described_class.plans(days.first(n)))
+        .to eq(described_class.plans(days).first(n))
     end
   end
 
@@ -236,13 +236,13 @@ RSpec.describe CompetencyGate do
         day(result(ai: "developing"))
       ]
 
-      expect(described_class.plan(days, fixed_kinds: fixed).evidence[:to_three])
+      expect(described_class.plan(days).evidence[:to_three])
         .to eq(required: 5, available: 5, bar_met: 4, favourable: 3, by_kind: { "code_review" => 5 })
     end
 
     it "never counts a missing or invalid self-rating as favourable" do
       days = [ nil, "meh", "Right_level", nil, "meh" ].map { |rating| day(result(self_rating: rating)) }
-      plan = described_class.plan(days, fixed_kinds: fixed)
+      plan = described_class.plan(days)
 
       expect(plan.evidence[:to_three]).to include(bar_met: 5, favourable: 0)
       expect(plan.count).to eq(2)
@@ -252,7 +252,7 @@ RSpec.describe CompetencyGate do
   it "reports the optional run it read" do
     days = [ day(good, optional: :complete), day(good, optional: :incomplete), day(good) ]
 
-    expect(described_class.plan(days, fixed_kinds: fixed).evidence[:optional])
+    expect(described_class.plan(days).evidence[:optional])
       .to eq(required: 2, available: 2, complete: 1)
   end
 
@@ -263,16 +263,16 @@ RSpec.describe CompetencyGate do
   it "builds evidence only for the plans asked for" do
     days = Array.new(6) { day(good) }
 
-    expect(described_class.plans(days, fixed_kinds: fixed).map(&:evidence)).to all(be_nil)
-    expect(described_class.plans(days, fixed_kinds: fixed, evidence: true).map(&:evidence)).to all(include(:to_three))
-    expect(described_class.plan(days, fixed_kinds: fixed).evidence).to include(:to_three)
+    expect(described_class.plans(days).map(&:evidence)).to all(be_nil)
+    expect(described_class.plans(days, evidence: true).map(&:evidence)).to all(include(:to_three))
+    expect(described_class.plan(days).evidence).to include(:to_three)
   end
 
   it "folds the same way one day at a time" do
     days = Array.new(5) { day(good) } + [ day(too_hard), day(too_hard) ]
-    gate = described_class.new(fixed_kinds: fixed)
+    gate = described_class.new
 
-    expect(days.map { |each_day| gate.add(each_day).plan(evidence: false) }).to eq(described_class.plans(days, fixed_kinds: fixed))
-    expect(gate.plan).to eq(described_class.plan(days, fixed_kinds: fixed))
+    expect(days.map { |each_day| gate.add(each_day).plan(evidence: false) }).to eq(described_class.plans(days))
+    expect(gate.plan).to eq(described_class.plan(days))
   end
 end

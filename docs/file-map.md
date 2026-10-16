@@ -9,7 +9,7 @@ What each listed file does.
 - `app/services/competency_gate.rb` — `CompetencyGate`: the pure fold that earns a day's size from reviewed days, with the brake. `DailyPlan.size_for` calls it once per plan.
 - `app/services/day_size.rb` — `DaySize`: the day's planned count and its reason, from the Daily sections setting, the completion count and the gate's `Plan`. Pure; its `Decision` also answers whether the brake is on, for the coverage exception, and what the `[set_size]` line logs.
 - `app/services/size_forecast.rb` — `SizeForecast`: whether tomorrow's Automatic set will be larger, or smaller because of the brake, than today's planned one, for the submitted dashboard's size lines.
-- `app/services/competency_gate/evidence.rb` — the gate's only query: every rubric-stamped reviewed day, oldest first, in batches, as `CompetencyGate::Day` values.
+- `app/services/competency_gate/evidence.rb` — the gate's only query: every rubric-stamped reviewed day, oldest first, in batches, as `CompetencyGate::Day` values, each carrying the pair its row was planned with.
 - `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileController`.
 - `app/controllers/level_suggestion_dismissals_controller.rb` — records Not now and removed-kind cutoffs for the current user under the user-row lock, refusing a stale shown step with a 409, with a `dismissed` or `removed` event row for each kind whose cutoff moves forward.
 - `app/models/level_suggestion_step.rb` — `LevelSuggestionStep`: one move a card or Setup showed, and the boundary check on the steps they post.

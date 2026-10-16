@@ -170,9 +170,10 @@ pair can therefore leave its old slot with every kind excluded, and the save
 still goes through, because `SectionRotation.eligible` falls back to the whole
 slot in that case.
 
-## What still reads the default pair
+## The competency gate
 
-`CompetencyGate.for` and `CompetencyGate::Evidence` read
-`DailyKinds::DEFAULT`, not each day's pair. Every stored day holds the
-default pair until swapping ships, so this matches the stored history.
-Tagging each day with its own pair is the next PR (1b).
+`CompetencyGate` reads each day's own pair: a `Day` carries
+`DailyExercise#daily_kinds`, growth counts a result only when its kind was
+daily that day, and `Evidence#optional_state` uses the row's pair. A change
+of pair neither reclassifies earlier days nor resets an earned size. See
+`docs/decisions/competency-gate.md`.
