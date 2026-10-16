@@ -16,3 +16,7 @@ they have exercises.
 Accounts that answer the old welcome page after this deploy get
 `learning_track` and no `track_chosen_at`. The PR that starts reading the
 column repeats this backfill, guarded by `track_chosen_at IS NULL`.
+
+`RepeatTrackChosenAtBackfill` is that repeat. Its down does nothing: the rows
+it marks hold a `learning_track` either way, and rolled-back code reads only
+that column.

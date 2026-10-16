@@ -96,6 +96,16 @@ raise the banner. Both still queue, under `name` and `time_zone`, so an older
 write can't land after a newer one; Setup's time-zone select shares the
 `time_zone` key with the detection.
 
+`line` puts a save on another key's queue while its failures still report
+under its own key. Setup's track select saves on the exercise mix's line
+(`line: "exercise_mix"`): a track change can clear targets and move the
+version, so a mix save sent beside it would carry the old version and get a
+409. On one line the two go out in turn, and a mix save waiting behind the
+track reads its body after the reply has been applied. `queued(key)` names a
+line, so `queued("exercise_mix")` also counts a waiting track save. `latest` collapses only
+into a waiting save of the same key, so one control never replaces another's
+body.
+
 ## `report()` and `clear()`
 
 A failure that is not a save, such as a refused submission, still belongs in

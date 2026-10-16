@@ -149,7 +149,7 @@ RSpec.describe "Trials", type: :request do
   end
 
   describe "signed in, on an account with no key" do
-    let(:user) { User.create!(email: "keyless@example.com", name: "Keyless", time_zone: "America/New_York", learning_track: LearningTrack::OFF) }
+    let(:user) { User.create!(email: "keyless@example.com", name: "Keyless", time_zone: "America/New_York", track_chosen_at: Time.current) }
 
     def redeem(code, provider: "fake", consent: "1")
       post trial_path, params: { invite_code: code, provider: provider, consent: consent }

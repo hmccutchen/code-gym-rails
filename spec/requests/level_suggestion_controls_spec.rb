@@ -6,7 +6,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
   def track_user(**attributes)
     create_user_with_key.tap do |user|
-      user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels, **attributes)
+      user.update!(section_kind_levels: ExerciseSection.keys.index_with { "junior" }, **attributes)
     end
   end
 
@@ -146,7 +146,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
   end
 
   describe "Setup" do
-    it "shows the suggestions switch with its current state and warns that leaving is final" do
+    it "shows the suggestions switch with its current state, and no Leave control" do
       user = track_user(level_suggestions: false)
       login_as(user)
 
@@ -155,9 +155,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       box = page_html.at_css("#exercise-mix #level-suggestions")
       expect(box).to be_present
       expect(box["checked"]).to be_nil
-      expect(page_html.at_css("#learning-track #level-suggestions")).to be_nil
-      expect(page_html.at_css("#learning-track").text).to include("level suggestions stay as they are",
-                                                                   "You can't rejoin the track afterwards.")
+      expect(page_html.css("#learning-track, #leave-learning-track")).to be_empty
     end
 
     it "shows the switch inside the Exercise mix to an account off the track" do

@@ -9,29 +9,33 @@ module AuthHelpers
     invite, _code = mint_trial_code(cap: cap, days: days)
     stub_env(HouseKeys.variable(provider, "API_KEY") => house_key)
     User.create!(email: email || "trial-#{SecureRandom.hex(4)}@example.com", name: name,
-                 time_zone: time_zone, learning_track: LearningTrack::OFF).tap do |user|
+                 time_zone: time_zone, **chosen_track(true)).tap do |user|
       user.start_trial!(invite: invite, provider: provider, consented_at: Time.current)
     end
   end
 
-  # The learning track backfill marked existing accounts "none"; a first-run spec passes learning_track: nil.
-  def create_user_with_key(email: "dev@example.com", name: "Dev", time_zone: "UTC", learning_track: LearningTrack::OFF)
-    user = User.create!(email: email, name: name, time_zone: time_zone, learning_track: learning_track)
+  # Accounts have chosen a track, as the dual-write release writes it, unless a first-run spec passes track_chosen: false.
+  def create_user_with_key(email: "dev@example.com", name: "Dev", time_zone: "UTC", track_chosen: true)
+    user = User.create!(email: email, name: name, time_zone: time_zone, **chosen_track(track_chosen))
     user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test-key" })
     user
   end
 
   # Every system spec logs in as this fake-provider user; a new account starts at the gate's two-section floor.
-  def create_fake_provider_user(email: nil, name: "Fake User", time_zone: "UTC", learning_track: LearningTrack::OFF,
+  def create_fake_provider_user(email: nil, name: "Fake User", time_zone: "UTC", track_chosen: true,
                                 daily_section_count: nil)
     User.create!(
       email: email || "fake-user-#{SecureRandom.hex(4)}@example.com",
       name: name,
       time_zone: time_zone,
-      learning_track: learning_track,
+      **chosen_track(track_chosen),
       daily_section_count: daily_section_count,
       provider: "fake", api_keys: { "fake" => "fake-test-key" }
     )
+  end
+
+  def chosen_track(chosen)
+    chosen ? { track_chosen_at: Time.current, learning_track: User::TRACK_CHOICE_MARKER } : { track_chosen_at: nil, learning_track: nil }
   end
 
   # The code is minted after the POST because #authenticate_login_code reads the current digest.

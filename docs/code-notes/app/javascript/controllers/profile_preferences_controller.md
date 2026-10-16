@@ -3,7 +3,7 @@
 ## What it owns
 
 Setup's three standalone preference controls: the time zone select, the Daily
-sections radio group, and the Skill level select. Each one PATCHes
+sections radio group, and the Track select (`skill_level`). Each one PATCHes
 `/profile` on change.
 
 ## One key per control, one URL for all of them
@@ -15,7 +15,7 @@ rather than deriving it from the URL.
 
 ## Why the skill-level label is rewritten here
 
-Each difficulty fieldset shows "Follow my skill level (junior)" as its
+Each difficulty fieldset shows "Your track (Junior)" as its
 default option. That text names the stored skill level, so changing the level
 leaves every one of those labels stale until the page reloads. The controller
 rewrites them from `labelTemplateValue`, whose `__LEVEL__` placeholder the
@@ -35,3 +35,42 @@ bound until `connect()`, which waits on the deferred module graph. So
 default-selected option for a select, `defaultChecked` for the sections
 radio — and queues the save the missing listener would have sent. Without it
 the choice sits on screen unsaved until the user touches the control again.
+
+## A track change hands the Exercise mix the saved state
+
+A track change can clear targets (`TrackChange`) and bump the preference
+version, so the Exercise mix's radios and version would otherwise be stale and
+its next save refused. The reply carries the same preference state a 409 sends,
+and this controller dispatches it, with the reply's `kind_rungs`, as
+`profile-preferences:trackSaved` on the document, which the Exercise mix's element listens for. It also tells
+`code_gym/track_reply` when a track save starts and finishes, with the reply on
+success, for a mix that has not connected yet. A reply without preference
+state, such as a 200 from a proxy page that is not JSON, counts as a failure, so
+the in-flight count always comes back down. The track save goes on
+the mix's queue line (`line: "exercise_mix"`), so it and a mix save never
+travel together and the mix never posts the version the track change moved
+past. Just before queueing, it dispatches `profile-preferences:trackSaving`,
+so the mix sends any edit still inside its delay first and the two land in the
+order the user made them. A failed track save dispatches
+`profile-preferences:trackFailed` instead, so the mix can settle its prepare
+button. An event rather than a
+reach into the other controller keeps each controller's state its own. The
+reply's `kept_own_level` sentence, written by the server, fills the status line
+under the select; it is empty when no target was kept.
+
+## One track save at a time
+
+`saveSkillLevel` disables the Track select until its save finishes, success or
+failure. If the select had focus and focus is still on the page body when the
+save ends, it gets focus back; a user who moved to another control meanwhile
+keeps their place. `autocomplete="off"` stops a browser that restores form state
+on reload from bringing the select back disabled. Two track changes in flight
+at once let a mix save frozen by the second one go out after the first track
+reply, carrying a target that reply had cleared; each fix for that case opened
+another. With one track save at a time, every frozen mix save goes out ahead of
+the track save that froze it. The cost is that the select cannot be changed for
+the length of one save: a second arrow key pressed during it does nothing.
+
+The guarantee depends on `sendTrack` dispatching `trackSaving` before it calls
+`queueSave`, so the mix's frozen saves are on the queue line first. Keep that
+order.

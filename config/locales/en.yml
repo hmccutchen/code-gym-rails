@@ -1,5 +1,6 @@
 en:
   level_suggestion:
+    setup_suggested: "Code Gym suggested moving %{kinds} to %{level}. Change their difficulty below."
     card:
       own: "%{favourable} of your last %{window} %{kind} sections were reviewed solid or better. Try %{kind} at %{level}?"
       own_heading: "These sections can move up to %{level}:"
@@ -23,51 +24,19 @@ en:
     setup:
       label: "Suggest level changes"
       hint: "When this is off, the dashboard stops suggesting level changes. You can still change levels yourself below, and turn this back on at any time."
-  learning_track:
-    welcome:
-      title: "Before you start"
-      question: "How much experience do you have as a software engineer?"
-      junior: "Early in my career"
-      junior_hint: "Exercises start at a junior level. As your reviews show you're ready, Code Gym suggests moving each kind of exercise up. You decide each time."
-      experienced: "Experienced"
-      experienced_hint: "Pick the level your exercises start at next. Setup lets you change it any time, or set a level for each kind of section."
-      level_title: "Where should your exercises start?"
-      level_hints:
-        junior: "Experienced, but new to this language or stack, or want an easier start."
-        mid_level: "A few years in, and comfortable shipping features on your own."
-        senior: "You review other people's work and weigh tradeoffs often."
-      back: "Back"
-    setup:
-      on_track: "You're on the junior track, so every kind of exercise started at junior."
-      leave: "Leave the track"
-      leave_hint: "Your difficulty settings and level suggestions stay as they are. You can't rejoin the track afterwards."
-      suggested: "Code Gym suggested moving %{kinds} to %{level}. Change their difficulty below."
-      left: "You've left the junior track. Your difficulty settings stay as they are."
-      key_guide:
-        title: "Getting an API key"
-        intro: "Code Gym uses your own AI key to write your exercises and review your answers. You pay the provider directly, or use Gemini's free tier."
-        anthropic: "Anthropic (Claude)"
-        anthropic_guide_html: "Follow Anthropic's guide, %{link}."
-        anthropic_guide_link: "Get your Claude API key"
-        anthropic_credits_html: "Buy credits before you use the key: the API is prepaid. Anthropic explains how in %{link}"
-        anthropic_credits_link: "How do I pay for my Claude API usage?"
-        anthropic_paste_html: "Paste the key below. It starts with %{prefix}."
-        gemini: "Google Gemini"
-        gemini_guide_html: "Follow Google's %{link} to create a key."
-        gemini_guide_link: "Gemini API quickstart"
-        gemini_paste_html: "Paste the key below. New keys start with %{prefix}"
-        gemini_caveats: "Before you pick Gemini"
-        gemini_limits: "The free tier allowed about 20 requests a day when we tested it, and Google can change that. A normal day here uses about 10, more if you use Learn or the thinking partner."
-        gemini_privacy: "On the free tier, Google may use what you send, including your answers, to improve its products, and people at Google may read it."
-        gemini_quality: "The step that checks each new exercise for problems works less reliably on Gemini. A second step that tidies up review wording doesn't run on Gemini yet."
-        openai: "OpenAI (GPT)"
-        openai_guide_html: "Create a key on OpenAI's %{link} page."
-        openai_guide_link: "API keys"
-        openai_credits: "Add credits to your OpenAI account before you use the key: the API is prepaid."
-        openai_paste_html: "Paste the key below. It starts with %{prefix}."
-        openai_quality: "The step that tidies up review wording doesn't run on OpenAI yet."
-        cost_heading: "What it costs."
-        cost: "It depends on how many sections your day has, how often you use Learn, follow-up questions and the thinking partner, and your provider's current prices."
+  welcome:
+    title: "Before you start"
+    question: "Where should your exercises start?"
+    hints:
+      junior: "One clearly visible problem in a small scenario. A good start if you're early in your career, changing careers, or new to this stack."
+      mid_level: "Problems that don't point at themselves, so you find them by reading closely."
+      senior: "A problem alongside a real constraint or a second issue, where the right answer depends on context."
+    note: "You can change this any time in Setup, and set a level for each kind of section. Senior is the highest level Code Gym suggests; choose Principal engineer in Setup if you want it."
+  tracks:
+    stale_page: "This page is out of date. Reload it to continue."
+    kept_own_level: "These sections kept their own level: %{sections}. Choose Your track for any of them in the Exercise mix to have it follow the track."
+    kept_section: "%{name} (%{level})"
+    kept_locked_section: "%{name} (%{level}, locked)"
   app_name: "Code Gym"
   sessions:
     new:
@@ -493,7 +462,7 @@ en:
     last_in_slot: "At least one section in this group has to stay in rotation."
     conflict: "Your exercise mix was changed in another tab. This page has been updated to match."
     difficulty_legend: "Difficulty target"
-    level_default: "Your skill level (%{skill_level})"
+    level_default: "Your track (%{skill_level})"
     levels:
       junior: "Junior"
       mid_level: "Mid-level"
@@ -752,6 +721,31 @@ en:
       not_granted: "Permission wasn't granted."
       failed: "Couldn't turn on reminders — try again."
   api_keys:
+    key_guide:
+      title: "Getting an API key"
+      intro: "Code Gym uses your own AI key to write your exercises and review your answers. You pay the provider directly, or use Gemini's free tier."
+      anthropic: "Anthropic (Claude)"
+      anthropic_guide_html: "Follow Anthropic's guide, %{link}."
+      anthropic_guide_link: "Get your Claude API key"
+      anthropic_credits_html: "Buy credits before you use the key: the API is prepaid. Anthropic explains how in %{link}"
+      anthropic_credits_link: "How do I pay for my Claude API usage?"
+      anthropic_paste_html: "Paste the key below. It starts with %{prefix}."
+      gemini: "Google Gemini"
+      gemini_guide_html: "Follow Google's %{link} to create a key."
+      gemini_guide_link: "Gemini API quickstart"
+      gemini_paste_html: "Paste the key below. New keys start with %{prefix}"
+      gemini_caveats: "Before you pick Gemini"
+      gemini_limits: "The free tier allowed about 20 requests a day when we tested it, and Google can change that. A normal day here uses about 10, more if you use Learn or the thinking partner."
+      gemini_privacy: "On the free tier, Google may use what you send, including your answers, to improve its products, and people at Google may read it."
+      gemini_quality: "The step that checks each new exercise for problems works less reliably on Gemini. A second step that tidies up review wording doesn't run on Gemini yet."
+      openai: "OpenAI (GPT)"
+      openai_guide_html: "Create a key on OpenAI's %{link} page."
+      openai_guide_link: "API keys"
+      openai_credits: "Add credits to your OpenAI account before you use the key: the API is prepaid."
+      openai_paste_html: "Paste the key below. It starts with %{prefix}."
+      openai_quality: "The step that tidies up review wording doesn't run on OpenAI yet."
+      cost_heading: "What it costs."
+      cost: "It depends on how many sections your day has, how often you use Learn, follow-up questions and the thinking partner, and your provider's current prices."
     edit:
       title: "Settings"
       heading: "Add your API key"
@@ -784,8 +778,8 @@ en:
         alaska: "Alaska"
         hawaii: "Hawaii"
       time_zone_hint: 'Sets when your day rolls over and when your 8am exercise set is generated. Leave on "detect automatically" to use your browser''s zone.'
-      skill_level_label: "Skill level"
-      skill_level_hint: "The level each section uses unless you set one for it in the Exercise mix below. Junior suits early-career developers and career changers. Your ratings nudge each day's set, but this setting changes only when you change it. When your reviews show a section is ready to move, Code Gym suggests a level for that section, and you decide."
+      skill_level_label: "Track"
+      skill_level_hint: "The level every section uses unless you set one for it in the Exercise mix below. Your ratings nudge each day's set around it. Changing your track also moves any section set to your old or new level, unless it is locked. When your reviewed answers show a section is ready to move, Code Gym suggests a level for that section, and you decide. Principal engineer is set only here; Code Gym never suggests it."
   history:
     index:
       title: "History"

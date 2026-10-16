@@ -51,12 +51,41 @@ returns without overwriting `anonymized_at`.
 The list follows registry order, so Setup lists providers the same way every
 time.
 
-## `#learning_track_change_allowed?`
+## `#first_run?`, `#choose_track` and the dual write
 
-A repeat leave is accepted because Setup's Leave control can outlive a track
-that an Exercise mix save has already ended.
+`#first_run?` is true for a saved account with no `track_chosen_at`, no
+`learning_track` and no exercise. The `learning_track` check is for one
+release: an account that answered the old welcome page between the backfill
+and this code taking traffic has a `learning_track` and no `track_chosen_at`,
+and is not asked again. The exercise check keeps the preview seed account and
+accounts the nightly batch generated for out of `/welcome`. A null
+`track_chosen_at` means no decision was recorded, not that the account is
+undecided.
 
-## `#kind_rungs`, `#record_level_changes` and `#finish_learning_track`
+`#choose_track` records the welcome choice and its level. For one release a
+choice also writes `learning_track: "none"` when it is blank, so code rolled
+back to before tracks per level neither sends the account to `/welcome` again
+nor shows the old Leave control. The cleanup that drops `learning_track` drops
+this write too.
+
+## `#prepares_ladders?`
+
+Each prepared ladder is a billed rewrite of a shared reference. A trial
+account's calls run on a house key, so a trial is never offered the control
+and the endpoint queues nothing for one.
+
+## `#apply_track_change`
+
+Runs before every save and holds the `TrackChange` for a save that moves the
+track, or nil, so a later save on the same object never reads a stale one. It
+is declared ahead of `bump_section_kind_preferences_version`: callbacks run in
+declaration order and each `if:` is read when its callback is reached, so a
+skill-level-only save must clear its targets before the bump checks
+`section_kind_levels_changed?`. Otherwise the version would stay put and
+another tab could write the cleared levels back. The first track choice is not
+a track change.
+
+## `#kind_rungs`, `#record_level_changes` and `#record_level_suggestion_events`
 
 `#kind_rungs` is each kind's rung, its target or else the skill level, read
 through `KindDifficulty#rungs`, the same reading generation uses. Level
@@ -65,35 +94,26 @@ account with no targets is handled the same way as one with a target for
 every kind.
 
 `#record_level_changes` runs before any save that changes
-`section_kind_levels` or `skill_level`, for every account. It compares each
-kind's rung before the save (`*_in_database`) with its rung after, and
-records a cutoff at the new rung through the user's own today for each kind
-that moved onto `LevelSuggestion::LADDER` (junior, mid_level, senior). A
-target set, edited or cleared counts, and so does a skill-level change, which
-moves every kind without a target. Results from an earlier stay at that rung
-then never count again, even after a detour through principal_engineer. A
-rung that did not move records nothing, and a move to principal_engineer
-records nothing, because no suggestion reaches it.
-
-`#choosing_learning_track?` and `#chose_learning_track?` skip the first-run
-choice (a save from `nil`) and joining the track (a save to `junior`): the
-welcome page's junior preset and Experienced level are choices, not moves,
-and there are no results yet to cut off. Leaving or finishing the track still
-records any rung the same save moves. `finish_learning_track` runs after
-`record_level_changes`, so the save that ends the track is not mistaken for a
-track choice.
+`section_kind_levels` or `skill_level`, for every account, after
+`#apply_track_change`. It compares each kind's rung before the save
+(`*_in_database`) with its rung after, and records a cutoff at the new rung
+through the user's own today for each kind that moved onto
+`LevelSuggestion::LADDER` (junior, mid_level, senior). A target set, edited or
+cleared counts, and so does a skill-level change, which moves every kind
+without a target and every kind whose target the track change cleared. Results
+from an earlier stay at that rung then never count again, even after a detour
+through principal_engineer. A rung that did not move records nothing, and a
+move to principal_engineer records nothing, because no suggestion reaches it.
+The first track choice records nothing: there are no results yet to cut off.
 
 `#record_level_suggestion_events` runs in `after_save` under the same
 conditions. It passes `LevelSuggestionEvent.applied_rows` the levels and skill
 level from before and after the save (`*_before_last_save`), the cutoffs as
-they stood before, and `shown_level_suggestions`, the moves a page posted and
-`ProfileController` checked under the row lock. The insert runs in the save's
+they stood before, `shown_level_suggestions`, the moves a page posted and
+`ProfileController` checked under the row lock, and the kinds the track change
+cleared, which are labelled `skill_level_edit`. The insert runs in the save's
 transaction, so a failed insert raises and rolls back the level change and
 its cutoff together.
-
-The track ends only when no target sits below the top of
-`LevelSuggestion::LADDER`, so moving the last junior kind to mid_level keeps
-the account on it. Ending it no longer ends suggestions.
 
 ## `#recent_performance`
 

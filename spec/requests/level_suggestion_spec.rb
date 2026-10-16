@@ -1,10 +1,11 @@
 require "rails_helper"
 
-RSpec.describe "Learning track proposals", type: :request do
+RSpec.describe "Level suggestion proposals", type: :request do
   let(:json) { { "Content-Type" => "application/json", "Accept" => "application/json" } }
 
-  def track_user(levels = LearningTrack.preset_levels)
-    create_user_with_key.tap { |user| user.update!(learning_track: "junior", section_kind_levels: levels) }
+  # Seeded without a save's cutoffs, so no cutoff hides the evidence the examples build.
+  def track_user(levels = ExerciseSection.keys.index_with { "junior" })
+    create_user_with_key.tap { |user| user.update_columns(section_kind_levels: levels) }
   end
 
   # sections maps a kind to its rung, or to { rung:, ai:, self: } when a day needs other ratings.
@@ -114,7 +115,7 @@ RSpec.describe "Learning track proposals", type: :request do
   end
 
   it "offers a mid-level kind senior, and keeps kinds bound for another level out of its card" do
-    user = track_user(LearningTrack.preset_levels.merge("code_review" => "mid_level"))
+    user = track_user(ExerciseSection.keys.index_with { "junior" }.merge("code_review" => "mid_level"))
     reviewed_window(user, { "code_review" => "mid_level", "pattern" => "junior" })
     login_as(user)
 
@@ -127,7 +128,7 @@ RSpec.describe "Learning track proposals", type: :request do
   end
 
   it "offers nothing to a senior kind with good results, since principal engineer is never suggested" do
-    user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
+    user = track_user(ExerciseSection.keys.index_with { "junior" }.merge("code_review" => "senior"))
     reviewed_window(user, { "code_review" => "senior" })
     login_as(user)
 
@@ -137,7 +138,7 @@ RSpec.describe "Learning track proposals", type: :request do
   end
 
   it "lists no kind without five results of its own, even when another kind is targeted higher" do
-    user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
+    user = track_user(ExerciseSection.keys.index_with { "junior" }.merge("code_review" => "senior"))
     reviewed_window(user, { "code_review" => "senior", "pattern" => "junior" }, count: LevelSuggestion::WINDOW - 1)
     reviewed_day(user, Date.current - 4, { "code_review" => "senior" })
     login_as(user)
@@ -148,7 +149,7 @@ RSpec.describe "Learning track proposals", type: :request do
   end
 
   it "describes a step back honestly when only two results exist" do
-    user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
+    user = track_user(ExerciseSection.keys.index_with { "junior" }.merge("code_review" => "senior"))
     [ 1, 0 ].each do |ago|
       reviewed_day(user, Date.current - ago, { "code_review" => { rung: "senior", ai: "developing", self: "too_hard" } })
     end
@@ -162,7 +163,7 @@ RSpec.describe "Learning track proposals", type: :request do
   end
 
   it "counts a step back over the latest three when more results exist" do
-    user = track_user(LearningTrack.preset_levels.merge("code_review" => "mid_level"))
+    user = track_user(ExerciseSection.keys.index_with { "junior" }.merge("code_review" => "mid_level"))
     reviewed_window(user, { "code_review" => { rung: "mid_level", ai: "developing", self: "too_hard" } }, count: 2)
     reviewed_window(user, { "code_review" => "mid_level" }, ending: Date.current - 2, count: 3)
     login_as(user)
@@ -174,7 +175,7 @@ RSpec.describe "Learning track proposals", type: :request do
   end
 
   it "offers no step back when the AI rated every too-hard result solid or better" do
-    user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
+    user = track_user(ExerciseSection.keys.index_with { "junior" }.merge("code_review" => "senior"))
     reviewed_window(user, { "code_review" => { rung: "senior", ai: "strong", self: "too_hard" } }, count: 2)
     login_as(user)
 
@@ -230,10 +231,9 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(response.body).not_to include("level-suggestion")
   end
 
-  [ nil, "none" ].each do |track|
-    it "suggests a move to an account with learning_track #{track.inspect} and no targets" do
-      user = create_user_with_key
-      user.update_columns(learning_track: track)
+  [ true, false ].each do |chosen|
+    it "suggests a move to an account with no targets, #{chosen ? "with" : "without"} a recorded track choice" do
+      user = create_user_with_key(track_chosen: chosen)
       reviewed_window(user, { "code_review" => "junior" })
       login_as(user)
 
@@ -245,11 +245,10 @@ RSpec.describe "Learning track proposals", type: :request do
     end
   end
 
-  it "keeps suggesting step-backs after every kind reaches senior and the track ends" do
-    user = track_user(LearningTrack.preset_levels.transform_values { "senior" }.merge("pattern" => "mid_level"))
+  it "keeps suggesting step-backs after every kind reaches senior" do
+    user = track_user(ExerciseSection.keys.index_with { "senior" }.merge("pattern" => "mid_level"))
     login_as(user)
     apply_levels(user, user.section_kind_levels.merge("pattern" => "senior"))
-    expect(user.reload.learning_track).to eq("none")
     travel 2.days
     reviewed_window(user, { "pattern" => { rung: "senior", ai: "developing", self: "too_hard" } }, count: 2)
     login_as(user)
@@ -259,22 +258,8 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(proposal_text).to include("Move #{kind_name("pattern")} to mid-level?")
   end
 
-  it "shows the same suggestion before and after leaving the track" do
-    user = track_user
-    reviewed_window(user, { "code_review" => "junior" })
-    login_as(user)
-    get root_path
-    before_leaving = proposal_text
-
-    patch profile_path, params: { user: { learning_track: "none" } }.to_json, headers: json
-    get root_path
-
-    expect(user.reload.learning_track).to eq("none")
-    expect(proposal_text).to eq(before_leaving)
-  end
-
   it "does not flap across a senior to mid-level to senior cycle" do
-    levels = LearningTrack.preset_levels.merge("architecture" => "senior")
+    levels = ExerciseSection.keys.index_with { "junior" }.merge("architecture" => "senior")
     user = track_user(levels)
     reviewed_window(user, { "architecture" => "mid_level" }, ending: Date.current - 2)
     reviewed_window(user, { "architecture" => { rung: "senior", ai: "developing", self: "too_hard" } }, count: 2)
@@ -321,13 +306,12 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(user.level_suggestion_cutoffs).to eq({})
   end
 
-  it "clears the track on the final Apply and keeps the senior targets" do
-    user = track_user(LearningTrack.preset_levels.transform_values { "senior" }.merge("pattern" => "mid_level"))
+  it "keeps the senior targets on the final Apply" do
+    user = track_user(ExerciseSection.keys.index_with { "senior" }.merge("pattern" => "mid_level"))
     login_as(user)
     apply_levels(user, user.section_kind_levels.merge("pattern" => "senior"))
 
-    expect(user.reload.learning_track).to eq("none")
-    expect(user.section_kind_levels.values.uniq).to eq([ "senior" ])
+    expect(user.reload.section_kind_levels.values.uniq).to eq([ "senior" ])
   end
 
   describe "Not now" do
@@ -383,7 +367,7 @@ RSpec.describe "Learning track proposals", type: :request do
     end
 
     it "refuses a kind targeted at principal engineer" do
-      user = track_user(LearningTrack.preset_levels.merge("architecture" => "principal_engineer"))
+      user = track_user(ExerciseSection.keys.index_with { "junior" }.merge("architecture" => "principal_engineer"))
       login_as(user)
       dismiss(%w[pattern architecture])
 
@@ -392,7 +376,7 @@ RSpec.describe "Learning track proposals", type: :request do
     end
 
     it "refuses an untargeted kind whose skill level is principal engineer" do
-      user = track_user(LearningTrack.preset_levels.except("architecture"))
+      user = track_user(ExerciseSection.keys.index_with { "junior" }.except("architecture"))
       user.update_column(:skill_level, "principal_engineer")
       login_as(user)
       dismiss(%w[pattern architecture])
@@ -402,7 +386,7 @@ RSpec.describe "Learning track proposals", type: :request do
     end
 
     it "sets aside an untargeted kind at the rung its skill level gives it" do
-      user = track_user(LearningTrack.preset_levels.except("architecture"))
+      user = track_user(ExerciseSection.keys.index_with { "junior" }.except("architecture"))
       login_as(user)
       dismiss(%w[architecture])
 
@@ -411,7 +395,7 @@ RSpec.describe "Learning track proposals", type: :request do
     end
 
     it "sets aside a kind at mid-level" do
-      user = track_user(LearningTrack.preset_levels.merge("pattern" => "mid_level"))
+      user = track_user(ExerciseSection.keys.index_with { "junior" }.merge("pattern" => "mid_level"))
       login_as(user)
 
       dismiss([ "pattern" ])
@@ -521,21 +505,6 @@ RSpec.describe "Learning track proposals", type: :request do
         expect(response).to have_http_status(:ok)
         expect(user.reload.level_suggestion_cutoffs["pattern"]).to eq("level" => "junior", "through" => "2026-10-13")
       end
-    end
-
-    it "still sets aside a kind after another request leaves the track" do
-      user = track_user
-      login_as(user)
-      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
-        User.find(user.id).update!(learning_track: "none")
-        original.call(*args)
-      end
-
-      dismiss([ "pattern" ])
-
-      expect(response).to have_http_status(:ok)
-      expect(user.reload.learning_track).to eq("none")
-      expect(user.level_suggestion_cutoffs["pattern"]).to include("level" => "junior")
     end
 
     it "uses a target another request changed before taking the lock" do

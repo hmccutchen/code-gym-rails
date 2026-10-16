@@ -6,6 +6,7 @@ class ProfileController < ApplicationController
 
   # PATCH /profile
   def update
+    return render_stale_track_page if params.require(:user).key?(:learning_track)
     return render_invalid_daily_section_count if invalid_daily_section_count?
     return render_invalid_weight    if invalid_section_kind_weights?
     return render_invalid_exclusion if invalid_excluded_section_kinds?
@@ -13,13 +14,14 @@ class ProfileController < ApplicationController
     return render_invalid_lock      if invalid_locked_section_kinds?
     return render_invalid_display   if invalid_display_preferences?
     return render_invalid_skill_level if invalid_skill_level?
+    return render_mixed_track_save if mixed_track_save?
     return render_invalid_level_suggestions if invalid_level_suggestions?
     return render_invalid_shown_steps if invalid_shown_steps?
 
     saved = save_with_preference_precondition
 
     return render_stale_preferences if saved == :stale
-    return render_invalid_learning_track if saved == :track_refused
+    return render_invalid_track_choice if saved == :track_refused
     return render_invalid_shown_steps if saved == :unsaved_step
 
     if saved
@@ -33,7 +35,17 @@ class ProfileController < ApplicationController
 
   DAILY_SECTION_COUNT_STRINGS = User::DAILY_SECTION_COUNTS.map(&:to_s).freeze
   PREFERENCE_KEYS = %i[section_kind_weights excluded_section_kinds section_kind_levels locked_section_kinds].freeze
-  LOCKED_KEYS = %i[learning_track skill_level section_kind_levels].freeze
+  LOCKED_KEYS = %i[choose_track skill_level section_kind_levels].freeze
+  TRACK_CHOICE_KEYS = %w[choose_track skill_level].freeze
+
+  def mixed_track_save?
+    user_params = params.require(:user)
+    user_params.key?(:skill_level) && !user_params.key?(:choose_track) && PREFERENCE_KEYS.any? { |key| user_params.key?(key) }
+  end
+
+  def render_mixed_track_save
+    render_json_error("Change the track and the exercise mix in separate saves.", status: :unprocessable_content)
+  end
 
   def invalid_daily_section_count?
     user_params = params.require(:user)
@@ -142,7 +154,7 @@ class ProfileController < ApplicationController
     render_json_error("Level suggestions must be true or false", status: :unprocessable_content)
   end
 
-  # Check and write under one row lock; the track choice is checked after reload, since Experienced bumps no version.
+  # Check and write under one row lock; the track choice is checked after reload, since a choice bumps no version.
   def save_with_preference_precondition
     user_params = params.require(:user)
     posted = user_params[:section_kind_preferences_version]
@@ -150,7 +162,7 @@ class ProfileController < ApplicationController
 
     outcome = nil
     current_user.with_lock do
-      outcome = if invalid_learning_track_change?(user_params)
+      outcome = if invalid_track_choice?(user_params)
         :track_refused
       elsif (!posted.nil? && posted.to_s != current_user.section_kind_preferences_version.to_s) || moved_since_shown?
         :stale
@@ -158,6 +170,7 @@ class ProfileController < ApplicationController
         :unsaved_step
       else
         current_user.shown_level_suggestions = shown_steps&.to_h { |step| [ step.kind, step.to ] }
+        current_user.choose_track(user_params[:skill_level]) if user_params.key?(:choose_track)
         current_user.update(profile_params)
       end
     end
@@ -190,46 +203,59 @@ class ProfileController < ApplicationController
     shown_steps.to_a.any? { |step| !levels.respond_to?(:to_unsafe_h) || levels.to_unsafe_h[step.kind] != step.to }
   end
 
-  TRACK_CHOICE_KEYS = {
-    LearningTrack::ON  => %w[learning_track section_kind_levels skill_level section_kind_preferences_version],
-    LearningTrack::OFF => %w[learning_track skill_level]
-  }.freeze
+  def invalid_track_choice?(user_params)
+    return false unless user_params.key?(:choose_track)
 
-  def invalid_learning_track_change?(user_params)
-    return false unless user_params.key?(:learning_track)
-    return true unless current_user.learning_track_change_allowed?(user_params[:learning_track])
-    return true if (user_params.keys - TRACK_CHOICE_KEYS.fetch(user_params[:learning_track])).any?
-    return false unless user_params[:learning_track] == LearningTrack::ON
-    return true if user_params[:section_kind_preferences_version].nil?
-    return true unless user_params[:skill_level] == LearningTrack::START_SKILL_LEVEL
-
-    levels = user_params[:section_kind_levels]
-    !levels.respond_to?(:to_unsafe_h) || levels.to_unsafe_h != LearningTrack.preset_levels
+    user_params[:choose_track] != true || (user_params.keys - TRACK_CHOICE_KEYS).any? ||
+      LevelSuggestion::LADDER.exclude?(user_params[:skill_level]) || !current_user.first_run?
   end
 
-  def render_invalid_learning_track
-    render_json_error("That learning track change isn't available.", status: :unprocessable_content)
+  def render_invalid_track_choice
+    render_json_error("That track choice isn't available.", status: :unprocessable_content)
+  end
+
+  def render_stale_track_page
+    render_json_error(t("tracks.stale_page"), status: :unprocessable_content)
   end
 
   def render_stale_preferences
-    render_json_error(t("exercise_mix.conflict"), status: :conflict,
-      current: {
-        section_kind_weights:             current_user.section_kind_weights,
-        excluded_section_kinds:           current_user.excluded_section_kinds,
-        section_kind_levels:              current_user.section_kind_levels,
-        locked_section_kinds:             current_user.locked_section_kinds,
-        section_kind_preferences_version: current_user.section_kind_preferences_version,
-        ladder_preparation:               ladder_preparation
-      })
+    render_json_error(t("exercise_mix.conflict"), status: :conflict, current: preference_state)
+  end
+
+  def preference_state
+    {
+      section_kind_weights:             current_user.section_kind_weights,
+      excluded_section_kinds:           current_user.excluded_section_kinds,
+      section_kind_levels:              current_user.section_kind_levels,
+      locked_section_kinds:             current_user.locked_section_kinds,
+      section_kind_preferences_version: current_user.section_kind_preferences_version,
+      ladder_preparation:               ladder_preparation
+    }
   end
 
   def saved_body
     body = { name: current_user.name, time_zone: current_user.time_zone,
              daily_section_count: current_user.daily_section_count }
-    return body unless preference_update?
+    return body unless preference_update? || track_update?
 
     body.merge(section_kind_preferences_version: current_user.section_kind_preferences_version,
-               ladder_preparation: ladder_preparation, kind_rungs: current_user.kind_rungs)
+               ladder_preparation: ladder_preparation, kind_rungs: current_user.kind_rungs, **track_body)
+  end
+
+  def track_update? = params.require(:user).key?(:skill_level)
+
+  def track_body
+    return {} unless track_update?
+
+    { preferences: preference_state, kept_own_level: kept_own_level }
+  end
+
+  def kept_own_level
+    kept = current_user.section_kind_levels.map do |kind, level|
+      key = current_user.locked_section_kinds.include?(kind) ? "tracks.kept_locked_section" : "tracks.kept_section"
+      t(key, name: t("sections.#{kind}.name"), level: t("exercise_mix.levels.#{level}"))
+    end
+    kept.empty? ? "" : t("tracks.kept_own_level", sections: kept.to_sentence)
   end
 
   def preference_update?
@@ -238,7 +264,7 @@ class ProfileController < ApplicationController
   end
 
   def profile_params
-    permitted = params.require(:user).permit(:name, :time_zone, :daily_section_count, :learning_track, :skill_level, :level_suggestions,
+    permitted = params.require(:user).permit(:name, :time_zone, :daily_section_count, :skill_level, :level_suggestions,
                                              section_kind_weights: {}, excluded_section_kinds: [],
                                              section_kind_levels: {}, locked_section_kinds: [],
                                              display_preferences: {})

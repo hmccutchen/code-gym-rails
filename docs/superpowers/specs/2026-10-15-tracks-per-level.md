@@ -2,7 +2,7 @@
 
 Read on `origin/main` at **9ecd83b**. This plan covers PR 2 (every kind's level in the prompt) and PR 1 (tracks per level) in full, then PRs 3–5 in brief.
 
-**Status.** PR 2 merged as #396. PR 1a, the migration alone, is #397. PR 1 below is approved and starts once 1a is deployed. Line numbers and snapshot counts in this plan were read on 9ecd83b; main has moved since.
+**Status.** PR 2 merged as #396. PR 1a, the migration alone, merged as #397. PR 1 below is built; its "As built" notes list where it differs from this plan. Line numbers and snapshot counts in this plan were read on 9ecd83b; main has moved since.
 
 ## Decisions this plan follows
 
@@ -166,6 +166,14 @@ The revision adds scope item 10: every track change applies the target-clearing 
       - `profile_preferences_controller.js` hands the server state to the Exercise mix through its existing `applyServerState`, sent as a Stimulus event rather than a reach into the other controller. Cleared kinds then show "Your track (…)" and kept ones their level.
       - A status line under the select names the kinds that kept their own level, and is empty when none did.
     - **Graduation (PR 5)** builds the same `TrackChange` to show the card's "keeps its own level" list before Apply, and its Apply goes through the same `before_save`. The rule has one statement.
+
+### As built
+
+- **The preview before a Setup track change is a follow-up.** The server owns the rule, so a preview needs either a new preview request or preview data kept fresh as Exercise mix edits land; both add a change, preview, confirm or cancel flow to the Setup controller, past the "small" line. PR 1 ships the after-the-fact kept line. Graduation's card will build its preview from `TrackChange`.
+- **The key guide shows to an account with no key of its own and no exercise yet**, not to every account with no exercise. The guide is about getting a key, and an account that already has one has no use for it.
+- **The kept line is one sentence the server writes** (`kept_own_level`), and the track reply carries the full preference state a 409 already sends, since the Exercise mix's `applyServerState` also resets weights and exclusions.
+- **`first_run?` also requires `learning_track` to be blank**, for the dual-write release only.
+- **Removed spec cases:** Leave, `finish_learning_track` and the junior preset checks. Specs that seeded preset targets through the old track-join save, which recorded no cutoffs, now seed them with `update_columns`.
 
 ### Files
 

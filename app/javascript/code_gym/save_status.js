@@ -77,30 +77,31 @@ export function save(method, url, body, key, failureMessage = null) {
 
 // A body given as a function is read when the save is sent; returning null drops that save.
 export function queue(key, method, url, body, options) {
-  const line = queues.get(key) ?? { busy: false, waiting: [] };
-  queues.set(key, line);
+  const lineKey = options?.line ?? key;
+  const line = queues.get(lineKey) ?? { busy: false, waiting: [] };
+  queues.set(lineKey, line);
   return new Promise((resolve) => {
     const last = line.waiting[line.waiting.length - 1];
-    if (options?.latest && last) {
+    if (options?.latest && last && last.key === key) {
       last.body = body;
       last.resolvers.push(resolve);
     } else {
-      line.waiting.push({ method: method, url: url, body: body, quiet: Boolean(options?.quiet),
+      line.waiting.push({ key: key, method: method, url: url, body: body, quiet: Boolean(options?.quiet),
                           offline: options?.offline ?? null, resolvers: [resolve] });
     }
-    drain(key, line);
+    drain(line);
   });
 }
 
-async function drain(key, line) {
+async function drain(line) {
   if (line.busy || line.waiting.length === 0) return;
   line.busy = true;
   const next = line.waiting.shift();
-  const result = await sendRetryingUnreached(key, next);
+  const result = await sendRetryingUnreached(next.key, next);
   line.busy = false;
   next.resolvers.forEach((resolve) => resolve(result));
   // A task, not a microtask: the reply's handlers update state the next save is built from.
-  setTimeout(() => drain(key, line), 0);
+  setTimeout(() => drain(line), 0);
 }
 
 function bodyOf(next) {

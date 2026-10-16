@@ -15,14 +15,14 @@ class LevelSuggestionEvent < ApplicationRecord
   def applied? = action == APPLIED
 
   # shown maps a kind to the rung the card or Setup showed it moving to, already checked against this save.
-  def self.applied_rows(user, before:, after:, shown:, cutoffs:)
+  def self.applied_rows(user, before:, after:, shown:, cutoffs:, cleared: [])
     before_rungs = rungs(before)
     moved = rungs(after).reject { |kind, rung| before_rungs[kind] == rung }
     return [] if moved.empty?
 
     results = LevelSuggestion::Evidence.for(user).results
     moved.map do |kind, rung|
-      { kind: kind, action: APPLIED, source: source_for(kind, rung, before, after, shown),
+      { kind: kind, action: APPLIED, source: source_for(kind, rung, before, after, shown, cleared),
         from_level: before_rungs[kind], to_level: rung, **evidence(kind, before_rungs[kind], results, cutoffs) }
     end
   end
@@ -42,8 +42,9 @@ class LevelSuggestionEvent < ApplicationRecord
     KindDifficulty.new(levels: state[:levels] || {}, locked: []).rungs(skill_level: state[:skill_level])
   end
 
-  def self.source_for(kind, rung, before, after, shown)
-    return "skill_level_edit" if before[:levels].to_h[kind].presence == after[:levels].to_h[kind].presence
+  # A target TrackChange cleared moved because the track did, so it counts like the skill level moving it.
+  def self.source_for(kind, rung, before, after, shown, cleared)
+    return "skill_level_edit" if cleared.include?(kind) || before[:levels].to_h[kind].presence == after[:levels].to_h[kind].presence
 
     shown[kind] == rung ? "suggestion" : "setup_edit"
   end

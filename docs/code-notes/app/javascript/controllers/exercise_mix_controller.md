@@ -11,8 +11,9 @@ under them.
 Every edit posts the whole mix, including
 `section_kind_preferences_version`. Two saves in flight would both post the
 version the first is about to move, and the second would 409 against its own
-predecessor. `saveStatus.queue` with a single key is what prevents that: the
-queue sends one at a time and reads each body when it is sent, so the second
+predecessor. `saveStatus.queue` on the `exercise_mix` line is what prevents
+that, and Setup's track select saves on the same line: the queue sends one at
+a time and reads each save's version when it is sent, so the second
 save picks up the version the first stored.
 
 A 409 means another tab moved the version. The reply carries the server's
@@ -84,3 +85,99 @@ were rendered for is out of date.
 The "Suggest level changes" switch sits inside the mix's `<details>` but has
 its own controller, and flipping it before the modules load must not start a
 mix save.
+
+## A track change saved elsewhere on the page
+
+`adoptTrackChange` takes the preference state Setup's track select received
+and applies it with `applyServerState`, the method a 409 already uses, so a
+cleared target shows "Your track (…)" and the version matches the server
+without a reload.
+
+A mix edit can still be waiting to save when that reply arrives: the 400 ms
+delay, or a save queued behind another. Applying the reply alone would put the
+server's levels back in the form, and the delayed save would then send them,
+so the edit would be lost with no notice. So the controller keeps `saved`, the
+state the server last confirmed. It starts from the values the server rendered
+(`state({ rendered: true })`, read from `defaultValue` and `defaultChecked`),
+so an edit the browser restored or made before connect still counts as unsent,
+and it moves on every applied server state and every successful save.
+
+When an edit is unsent, each field (weight, exclusion, level or lock) of each
+kind that differs from `saved` is an edit (`editsSince`), and so is each field
+the user touched since the track save started (`touchedSinceTrack`, recorded by
+the edit handlers through `touch`), even if it ended where it began: a level
+changed and then set back to the old one is a choice the reply must not clear. The reply is applied
+and only those fields are set back (`withEdits`). The rebase is per field, not
+per kind: moving a kind's weight must not bring back a level target the track
+change cleared on that kind. A lock the edit turns on also brings back the
+level it was ticked on: the user locked the level they saw, and the track
+change may have cleared it on the server meanwhile. A lock left without a
+level after the merge is dropped, since the server refuses a lock on an
+untargeted kind. The pending
+save sends the result under the reply's version, and `saved` stays the reply's
+state so a later comparison still sees the edit as unsent.
+
+The reply also carries `kind_rungs`, and `forgetMovedSuggestions` drops any
+level-suggestion step whose starting rung the track change moved. Otherwise
+the pending save would post a step the server no longer recognizes and get a
+409.
+
+The track select saves on this controller's queue line (`line:` in
+`code_gym/save_status`). Just before it queues its save it dispatches
+`profile-preferences:trackSaving`, which runs `holdForTrackSave`. That does two
+things.
+
+It disables the prepare button, since preparing guidance while the levels are
+changing would bill jobs for the old ones. `settlePrepareButton` keeps it
+disabled while `code_gym/track_reply` reports a track save in flight, which also
+covers a mix that connected mid-save and never saw the event.
+
+It also queues a mix edit still inside its 400 ms delay at once, ahead of the
+track save. Every mix save that will go out ahead of the track save, the
+flushed one and any already waiting in the queue (`waitingSaves`), is frozen to
+the edits the form holds at this moment, and the edit revision. A field counts
+as edited when the form differs from any state the server might end up with
+before this save lands: `saved`, the save on the wire (`onTheWire`), or a frozen
+save still queued (`editsFromAnyPending`). Comparing with one of them alone
+loses something: `saved` alone misses a weight moved back while its first change
+is in flight, and the wire save alone drops a change that save carried if it
+then fails. Counting extra fields is safe because a frozen save always goes
+out ahead of the one track save that froze it: the track select is disabled
+while its save is in flight (`profile_preferences`), so no second track save
+can queue ahead of a frozen save, and the server applies the track change after
+the frozen edits. When the save is sent, those edits are laid over `saved`
+as it is then (`frozenState`, through `withEdits`), and the version and the
+shown suggestions are read then too. So an edit made after the track change
+cannot ride in the save that goes out ahead of it. This needs the mix to be
+connected when the track save starts; an edit typed before the mix module loaded
+goes out after the track save instead, through `adoptEarlyEdit`.
+A mix save queued after the track save is not frozen, since it has to read the
+form once the track reply has been applied, or it would send targets the track
+change cleared. Edits are saved in
+the order the user made them: a lock set just before a track change reaches the
+server first, so `TrackChange` keeps the target it protects, and a target picked
+after the track change, while earlier saves are still queued, stays out of the
+pre-track save. That later edit still differs from `saved` when the track
+reply arrives, so the rebase keeps it.
+
+The rebase
+above is for what is left: an edit made while the track save is in flight, and
+an edit made before both controllers connected when `profile-preferences`
+connected first and saved the track from its `connect` before this controller
+was listening. A track reply that arrived before this controller connected at
+all is kept in `code_gym/track_reply`, and `connect` takes and adopts it,
+treating an edit made before connect as unsent. Connect order follows module load order, so either can come
+first; when this controller connects first, `adoptEarlyEdit` has already set
+`pending` and `holdForTrackSave` sends that edit ahead of the track save.
+
+`settlePrepareButton` is the one statement of when the prepare button is
+enabled: the latest mix save succeeded (`savedLatest`), no edit is waiting and
+nothing is queued on the line. A mix save that replied while a track save
+waited behind it saw the line busy and left the button disabled, so the button
+is settled again once the track save ends: `adoptTrackChange` on success, which
+also sets `savedLatest` since the form now matches the server, and
+`profile-preferences:trackFailed` on failure.
+
+One case is left. A save that failed for another reason is no longer pending,
+so a later track reply replaces its edit; the save banner already reports that
+failure.

@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Level suggestion steps the card showed", type: :request do
   let(:json) { { "Content-Type" => "application/json", "Accept" => "application/json" } }
-  let(:user) { create_user_with_key(learning_track: "none") }
+  let(:user) { create_user_with_key }
 
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
@@ -88,7 +88,7 @@ RSpec.describe "Level suggestion steps the card showed", type: :request do
   end
 
   describe "dismissal" do
-    before { user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels) }
+    before { user.update!(section_kind_levels: ExerciseSection.keys.index_with { "junior" }) }
 
     it "stores the move the card showed" do
       dismiss([ "code_review" ], [ step("code_review", "junior", "mid_level") ])
@@ -129,7 +129,7 @@ RSpec.describe "Level suggestion steps the card showed", type: :request do
   end
 
   describe "Setup opened from the card's link" do
-    before { user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels) }
+    before { user.update!(section_kind_levels: ExerciseSection.keys.index_with { "junior" }) }
 
     def mix = Nokogiri::HTML(response.body).at_css("#exercise-mix")
 

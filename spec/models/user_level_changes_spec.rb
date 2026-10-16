@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe User, "level changes", type: :model do
   let(:user) do
     create_user_with_key(time_zone: "America/Los_Angeles")
-      .tap { |account| account.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels) }
+      .tap { |account| account.update!(section_kind_levels: ExerciseSection.keys.index_with { "junior" }) }
   end
   let(:local_today) { Date.new(2026, 10, 13) }
 
@@ -36,7 +36,7 @@ RSpec.describe User, "level changes", type: :model do
     end
 
     it "records nothing when the same target is saved again" do
-      user.update!(section_kind_levels: LearningTrack.preset_levels)
+      user.update!(section_kind_levels: ExerciseSection.keys.index_with { "junior" })
 
       expect(user.reload.level_suggestion_cutoffs).to eq({})
       expect(user.level_suggestion_events).to be_empty
@@ -79,7 +79,7 @@ RSpec.describe User, "level changes", type: :model do
   end
 
   describe "cutoffs on an account without targets" do
-    let(:user) { create_user_with_key(time_zone: "America/Los_Angeles", learning_track: "none") }
+    let(:user) { create_user_with_key(time_zone: "America/Los_Angeles") }
 
     it "records a target edit at the new rung" do
       move("code_review" => "mid_level")
@@ -139,9 +139,10 @@ RSpec.describe User, "level changes", type: :model do
     end
 
     it "records nothing for the first-run choice that sets the skill level" do
-      account = create_user_with_key(learning_track: nil)
+      account = create_user_with_key(track_chosen: false)
 
-      account.update!(learning_track: "none", skill_level: "senior")
+      account.choose_track("senior")
+      account.save!
 
       expect(account.reload.level_suggestion_cutoffs).to eq({})
       expect(account.level_suggestion_events).to be_empty
@@ -193,7 +194,7 @@ RSpec.describe User, "level changes", type: :model do
     end
 
     it "labels each kind a skill level change moved as a skill level edit" do
-      user.update!(learning_track: "none", section_kind_levels: { "pattern" => "senior" })
+      user.update!(section_kind_levels: { "pattern" => "senior" })
       user.level_suggestion_events.delete_all
       reviewed_level_days(user, "code_review", "junior", 2, ending: local_today - 1)
 
@@ -206,7 +207,7 @@ RSpec.describe User, "level changes", type: :model do
     end
 
     it "labels each kind by its own cause when one save changes a target and the skill level" do
-      user.update!(learning_track: "none", section_kind_levels: {})
+      user.update!(section_kind_levels: {})
       user.level_suggestion_events.delete_all
 
       user.update!(skill_level: "mid_level", section_kind_levels: { "pattern" => "senior" })
@@ -223,26 +224,19 @@ RSpec.describe User, "level changes", type: :model do
       expect(user.level_suggestion_events.sole.source).to eq("setup_edit")
     end
 
-    it "writes nothing for the save that joins the track" do
-      account = create_user_with_key(learning_track: nil)
-      account.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
+    it "writes nothing for targets equal to the rung each kind already had" do
+      account = create_user_with_key(track_chosen: false)
+      account.update!(section_kind_levels: ExerciseSection.keys.index_with { "junior" })
 
       expect(account.level_suggestion_events).to be_empty
     end
 
-    it "writes nothing when Leave changes no level" do
-      user.update!(learning_track: "none")
-
-      expect(user.level_suggestion_events).to be_empty
-    end
-
-    it "writes the row for the save that ends the track by moving the last kind to senior" do
+    it "writes the row for a single kind's move to senior" do
       user.update!(section_kind_levels: ExerciseSection.keys.index_with { "senior" }.merge("pattern" => "mid_level"))
       user.level_suggestion_events.delete_all
 
       move("pattern" => "senior")
 
-      expect(user.reload.learning_track).to eq("none")
       expect(user.level_suggestion_events.sole).to have_attributes(kind: "pattern", from_level: "mid_level", to_level: "senior")
     end
 
@@ -264,32 +258,14 @@ RSpec.describe User, "level changes", type: :model do
     end
   end
 
-  describe "finishing the track" do
-    it "stays on the track when the last junior kind moves to mid-level" do
-      user.update!(section_kind_levels: ExerciseSection.keys.index_with { "senior" }.merge("pattern" => "junior"))
+  it "records a move to principal engineer as a setup edit with no cutoff" do
+    user.update!(section_kind_levels: { "pattern" => "mid_level" })
 
-      move("pattern" => "mid_level")
+    move("pattern" => "principal_engineer")
 
-      expect(user.reload.learning_track).to eq("junior")
-    end
-
-    it "ends the track once every target is senior" do
-      user.update!(section_kind_levels: ExerciseSection.keys.index_with { "senior" }.merge("pattern" => "mid_level"))
-
-      move("pattern" => "senior")
-
-      expect(user.reload.learning_track).to eq("none")
-    end
-
-    it "counts a principal engineer target as not below senior" do
-      user.update!(section_kind_levels: ExerciseSection.keys.index_with { "senior" }.merge("pattern" => "mid_level"))
-
-      move("pattern" => "principal_engineer")
-
-      expect(user.reload.learning_track).to eq("none")
-      expect(user.level_suggestion_events.where(kind: "pattern").last).to have_attributes(
-        from_level: "mid_level", to_level: "principal_engineer", source: "setup_edit"
-      )
-    end
+    expect(user.level_suggestion_events.where(kind: "pattern").last).to have_attributes(
+      from_level: "mid_level", to_level: "principal_engineer", source: "setup_edit"
+    )
+    expect(user.reload.level_suggestion_cutoffs["pattern"]).to include("level" => "mid_level")
   end
 end

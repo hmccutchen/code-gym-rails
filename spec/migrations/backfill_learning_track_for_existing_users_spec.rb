@@ -6,7 +6,7 @@ require migration_path.to_s
 RSpec.describe BackfillLearningTrackForExistingUsers do
   # A junior account needs a junior target, or the track ends itself on save.
   def account(email, learning_track)
-    levels = learning_track == "junior" ? LearningTrack.preset_levels : {}
+    levels = learning_track == "junior" ? ExerciseSection.keys.index_with { "junior" } : {}
     User.create!(email: email, name: "Account", learning_track: learning_track, section_kind_levels: levels)
   end
 
