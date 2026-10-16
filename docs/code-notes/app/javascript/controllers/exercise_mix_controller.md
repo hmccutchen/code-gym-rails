@@ -118,8 +118,10 @@ the pending save would post a step the server no longer recognizes and get a
 
 The track select saves on this controller's queue line (`line:` in
 `code_gym/save_status`), and just before it queues its save it dispatches
-`profile-preferences:trackSaving`, which runs `flush`: a mix edit still inside
-its 400 ms delay is queued at once, ahead of the track save. Edits are saved in
+`profile-preferences:trackSaving`, which runs `holdForTrackSave`. That disables
+the prepare button until the track save ends, since preparing guidance while
+the levels are changing would bill jobs for the old ones, and queues a mix edit
+still inside its 400 ms delay at once, ahead of the track save. Edits are saved in
 the order the user made them, so a lock set just before a track change reaches
 the server first and `TrackChange` keeps the target it protects. The rebase
 above is for what is left: an edit made while the track save is in flight, and
@@ -127,7 +129,7 @@ an edit made before both controllers connected when `profile-preferences`
 connected first and saved the track from its `connect` before this controller
 was listening. Connect order follows module load order, so either can come
 first; when this controller connects first, `adoptEarlyEdit` has already set
-`pending` and the flush sends that edit ahead of the track save.
+`pending` and `holdForTrackSave` sends that edit ahead of the track save.
 
 `settlePrepareButton` is the one statement of when the prepare button is
 enabled: the latest mix save succeeded (`savedLatest`), no edit is waiting and

@@ -162,6 +162,29 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(user.reload.skill_level).to eq("junior")
   end
 
+  it "keeps Prepare AI guidance disabled while a track-only save is in flight" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all)
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes("skill_level")) {
+          return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 1500));
+        }
+        return send(url, options);
+      };
+    JS
+
+    find("#skill-level").select("Mid-level")
+
+    expect(page).to have_css("#mix-ladder-preparation button[disabled]", visible: :all)
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 5)
+    expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all)
+  end
+
   def guide_measurement
     page.evaluate_script(<<~JS)
       (() => {

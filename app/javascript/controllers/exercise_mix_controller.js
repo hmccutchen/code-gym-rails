@@ -283,7 +283,8 @@ export default class extends Controller {
     this.pending = setTimeout(() => this.sendNow(), SAVE_DELAY_MS)
   }
 
-  flush() {
+  holdForTrackSave() {
+    this.prepareButtonTarget.disabled = true
     if (this.pending === null) return
     clearTimeout(this.pending)
     this.sendNow()
