@@ -1,6 +1,6 @@
 # Swap which kinds fill the daily places
 
-Status: proposed, not implemented. D1 to D4 decided on 2026-10-16.
+Status: proposed, not implemented. D1 to D4 decided on 2026-10-16. Open: in-place swap or tomorrow-only (last section).
 Date: 2026-10-16. Checked against `origin/main` at `abf0892` (#404).
 
 ## Goal
@@ -30,7 +30,7 @@ The design works with what is on main and does not work around these points.
 | "The graduation rubric" is planned work to align with | No graduation rubric, "breadth" rule or "both daily kinds" rule is written anywhere in `docs/`, `.claude/` or git history. Graduation shows up only in passing: `tracks.md` says it will reuse `TrackChange` and follow the suggestions switch | Section 5 states what graduation should read. There is nothing on main to change |
 | Daily places will grow "as the section count grows" | Nothing on main plans more than two. `SectionCount::FLOOR = 2` equals `ExerciseSection.fixed.size` by convention only, and `CompetencyGate::FLOOR`, `User::DAILY_SECTION_COUNTS` and the Setup hint ("%{lowest} gives you only %{fixed_sections}") all depend on that | The count is derived, never stored, and a spec asserts `FLOOR == DailyKinds::COUNT` (section 2) |
 | A daily place can hold any kind | `ExerciseSection.slots` groups the kinds, and a group resolves to **one** kind per day: `third` covers architecture, security review, challenge and Parsons, and `fourth` covers plan review, ambiguity hunt and pseudocode to code. `resolved_keys` keeps the first present key in each group | If the stored pair simply replaced `fixed?`, pinning architecture as daily would keep the other three thirds off every day. Worse, a stored row holding two thirds would lose one from `active_section_keys`. Section 2 introduces a per-user layout to fix this. Fourth kinds are limited to one daily kind (D1, decided) |
-| Swaps are "free and unlimited" | Main has no cap on daily generations for own-key accounts. `/regenerate` is once a day, `/generate` is 3 an hour. Trial accounts are being turned off, so every account will be own-key | Choosing a kind stays unlimited. Generating today's replacement right away is rate-limited per hour, the only guard on swap spend, and a refused generation still saves the choice (section 4, D3) |
+| Swaps are "free and unlimited" | Main has no cap on daily generations for own-key accounts. `/regenerate` is once a day, `/generate` is 3 an hour. Trial accounts are being turned off, so every account will be own-key | Changed by decision on 2026-10-16: today's replacement is allowed once per daily set, the way regeneration is once a day. Choosing a kind for tomorrow stays unlimited (section 4, D3) |
 
 ## 1. How the daily kinds are decided today
 
@@ -180,6 +180,7 @@ the usual 409. What happens to today's row depends on its state:
 |---|---|---|
 | No row for today (weekend, or paused with nothing held) | None. The pair applies from the next generation | Nothing to replace |
 | Generating, regenerating or another swap running (`regenerating_since` fresh, or the first generation queued) | None. The pair applies tomorrow (`reason: busy`) | The in-flight work already chose its kinds, and the claim allows one paid rewrite of the row at a time |
+| This set's one swap is already used (`swapped_at` set) | None. The pair applies tomorrow (`reason: set_swapped`) | One replacement per set (section 4) |
 | Response submitted, reviewing or reviewed | None. The pair applies tomorrow | Submitted work is never replaced (`one-reviewed-response-invariant`) |
 | Not submitted, and the outgoing section **answered** (`DailyResponse#answered?`) | None. The pair applies tomorrow | Your choice: finished work is not replaced |
 | Not submitted, outgoing section **unanswered**, and the incoming kind is **already in today's set** as an optional section | None, and nothing is generated. The pair applies tomorrow | Generating would duplicate a section the user already has. Promoting the existing section without removing the outgoing one would leave the day's daily places in a state no plan produced |
@@ -279,13 +280,16 @@ exercise row; that order exists only in `carry_held_set_forward!`.
    bump the version and write the event row. Release the lock.
 2. **Controller, under `exercise.with_response_locked`:** check the table above
    (row dated today, not submitted, outgoing section unanswered, incoming kind
-   absent, no fresh claim). If the swap goes ahead, take the claim. Release.
+   absent, no fresh claim, `swapped_at` nil). If the swap goes ahead, take the
+   claim with `claim_regenerating!(swapped_at: nil)`, the same conditional
+   update `/regenerate` makes with `regenerated_at: nil`. Release.
 3. **Job:** the paid call, outside any lock.
 4. **Job, under `exercise.with_response_locked`:** re-check the claim token and
    every condition from step 2. The user may have answered the outgoing
    section or submitted while the call ran.
-   - If they all still hold, write `problem_set`, `plan_notes["daily_kinds"]`
-     and the response's three maps, then release the claim.
+   - If they all still hold, write `problem_set`, `plan_notes["daily_kinds"]`,
+     `swapped_at` and the response's three maps, then release the claim, all
+     in one update.
    - If any changed, release the claim and drop the generated section. The
      cost is spent, and the usage row records it.
 
@@ -390,11 +394,26 @@ rewrite holds it:
 - **The outgoing section can't be answered while it is being replaced.** It
   isn't on the page, and `ResponsesController` refuses a save for that key
   while the swap claim holds, with the existing `render_section_error` path.
-  The server's `submit_blocker` gains one reason, "A section is being
-  replaced", so submit waits for the swap; the page shows the server's answer
-  as it does for every other blocker. Every other card answers and autosaves
-  as usual. `RegenerateExerciseJob`'s and the controller's existing claim
-  checks still keep a regeneration out.
+  Every other card answers and autosaves as usual. `RegenerateExerciseJob`'s
+  and the controller's existing claim checks still keep a regeneration out.
+- **Submit is not blocked.** The user may submit while a swap is pending.
+  `submit_blocker` is unchanged, so it counts the pending place as an
+  unanswered section, as it would any skipped one. Submit and the job's final
+  write both run under `with_response_locked`, so whichever takes the lock
+  first wins:
+  - **Submit first:** the job's re-check finds the response submitted,
+    abandons the section, releases the claim and records `outcome: failed`.
+    `swapped_at` stays nil, but the set is submitted, so that doesn't matter.
+    The submitted day holds the outgoing section, unanswered, which is what
+    the user saw when they submitted.
+  - **The swap first:** the day now holds the incoming section, unanswered.
+    The submit that follows counts it as unanswered, which matches the page
+    the user submitted from, since that page showed the pending card in that
+    place.
+
+  Either way the submitted dashboard renders what was submitted and ignores
+  a claim that is still fresh. Neither order loses an answer: the outgoing
+  section couldn't take one, and the incoming one never reached the page.
 - **Longest takeover of the card:** typically 20-55 s, about 3 minutes with
   both retry cycles, and never more than `SWAP_DEADLINE` (497 s, about 8
   minutes) from the claim while the worker is alive. If the worker dies, the
@@ -409,66 +428,106 @@ What main has today:
 - **No per-user cap on daily generations for own-key accounts.**
   `ProviderCallLimits` (60 an hour, 300 a day) covers the conversational calls
   only and is skipped for own-key accounts. `/generate` is 3 an hour for
-  everyone, and `/regenerate` is once a day.
+  everyone, and `/regenerate` is once a day, enforced by
+  `claim_regenerating!(regenerated_at: nil)`.
 - **Trial (house-key) accounts** are being turned off, so every account will
-  be own-key. Until then, `TrialAllowance` wraps their calls unchanged.
+  be own-key. Until then, `TrialAllowance` wraps their calls unchanged, and the
+  swap adds no trial-specific path.
 - **`ApiUsage` writes one row per call**, but regeneration logs as
   `generate_exercise`, so it can't be told apart today.
 
-Proposal:
+### One swap per daily set (D3, decided)
 
-- **Choosing a kind is unlimited.** It saves a row and calls no provider.
-- **Generating today's replacement is limited to `SWAP_GENERATIONS_PER_HOUR`
-  (4, decided under D3).** The count is the user's `daily_kind_swaps` rows with
-  `today: "replacing"` in the past hour, read and written under the same
-  user-row lock as the pair. That makes the events table the one authority
-  and keeps the check race-free. Rails' `rate_limit` macro would count every
-  request to the action, including swaps that never generate. When the limit
-  is hit, the pair is still saved, today is untouched, the row records
-  `today: "tomorrow", reason: "limited"`, and the reply says: "Saved. You've
-  replaced 4 sections in the last hour, so today's section stays as it is and
-  the change starts tomorrow." The number comes from the constant. That keeps
-  "swaps are free and unlimited" true for the choice, and bounds the spend from
-  a stuck or scripted client.
-- **This limit is the only guard on swap spend.** Own-key accounts skip
-  `ProviderCallLimits`, and every account will be own-key, so the user's own
-  key pays for every call.
-- **Recommended value: 4 an hour** (down from the 6 proposed for a one-call
-  swap):
-  - At 4, the worst case is 4 × 7 = 28 calls an hour and the typical case 8.
-    At 6 it would be 42 worst and 12 typical.
-  - For scale, `/generate` at 3 an hour allows about 54 worst-case calls an
-    hour. That counts a judged four-section day at about 18 calls: one draft,
-    four judges, two retry cycles for each of the two daily kinds, one for each
-    optional kind, and one re-judge.
-  - Swaps also serialize on the claim. A second swap while one is generating
-    saves its pair and reports "busy", so a person who is weighing kinds moves
-    one replacement at a time. Four covers trying a few kinds in a sitting.
-  - **In a degraded state, serialization and the deadline bound spend more
-    tightly than the limit:**
-    - Serialization allows at most 3,600 s ÷ (time each claim is held)
-      replacements an hour. That is tighter than 4 whenever a claim is held
-      past 15 minutes. A crashed worker is that case: its claim holds for the
-      full 17-minute window, so at most 3 swaps can start in that hour,
-      whatever the limit says.
-    - With a slow provider, the deadline cuts each swap from up to 7 calls to
-      as few as 2 (draft and judge) before it stops.
-    - So 28 calls an hour is reachable only when the provider is fast and
-      every judgment rejects, the case where the calls are also cheapest in
-      time.
-  - Swapping back and forth faster than that mostly pays for sections nobody
-    answers.
-  - The limit counts swap requests that would generate. It is checked before
-    the claim, so a request refused for any other reason doesn't use one up.
-- **A swap does not count against `/regenerate`'s once a day,** and regenerating
-  doesn't use up swaps.
-- **No trial-specific path.** Trial accounts are being turned off, so the
-  swap adds nothing for them. `TrialAllowance.check!` still runs first inside
-  `AiService#call_and_log` for any house-key account, so it wraps every swap
-  call (draft, judge, retry) exactly as it wraps first generation. The swap
-  leaves it as it is and doesn't extend it.
-- **A failed call mid-swap leaves today intact.** The swap reads the
-  `JudgedGeneration` outcome as described in section 3:
+Today's replacement is allowed once per daily set. The user answers the set
+they have, or swaps once and answers that. Choosing a kind for tomorrow
+stays unlimited, because it saves a row and calls no provider.
+
+- **Worst-case spend is 7 calls per set.** That is the judged swap's worst
+  case from "Calls and time" (a design comparison rejected twice whose last
+  retry is edited and re-judged); any other kind tops out at 6. A set gets at
+  most one swap that lands, so a user can't run up 28 calls an hour by
+  swapping repeatedly.
+  - A failed swap doesn't use the allowance, so the true bound is 7 calls per
+    *attempt*, with attempts one at a time. See "A failed swap" below.
+- **The allowance belongs to the exercise row, as a column:
+  `daily_exercises.swapped_at`** (nullable), next to `swapping_place` and
+  `swapping_kind`.
+  - The controller takes the claim with `claim_regenerating!(swapped_at:
+    nil)`. That is one conditional `UPDATE` on the exercise row, the same
+    shape as `/regenerate`'s `regenerated_at: nil`.
+  - The job sets `swapped_at` in the same `with_response_locked` update that
+    lands the section.
+  - So the check and the write both sit on the row and the lock that already
+    order the job.
+  - Counting the exercise's `daily_kind_swaps` rows instead would mean
+    reading a user-scoped table inside the exercise lock, and counting
+    `outcome: landed`, a value the job writes later. That is a second place
+    for the rule to live.
+- **A held set carried forward keeps its allowance.**
+  - `User#carry_forward` moves the row's date and clears `regenerated_at`
+    and `regenerating_since`. It does **not** clear `swapped_at`.
+  - A set that was never swapped keeps its one swap across the weekend. A
+    set that was swapped on Friday stays swapped on Monday.
+  - This is a deliberate difference from regeneration, which is once per
+    *calendar day*, and `carry_forward` resets that on purpose
+    (`pausing-generation.md`). The swap is once per *set*, and carrying a set
+    forward doesn't make it a new set.
+- **A failed swap does not use the allowance, matching regeneration
+  exactly.**
+  - `RegenerateExerciseJob` sets `regenerated_at` only in the update that
+    lands the new set.
+  - On an `AiService::Error` or an invalid record, `#release` frees the claim
+    and leaves `regenerated_at` untouched. Its comment says "regenerated_at
+    stays untouched so a failed attempt doesn't use up the day's one
+    regeneration".
+  - A superseded run and a run that finds the set reviewed also leave it nil.
+  - The swap does the same. `swapped_at` is written only when the section
+    lands. A provider error, a judge fallback, a drop, a deadline stop, a
+    superseded claim or a re-check that finds the section answered or the day
+    submitted all leave it nil.
+  - **Whether that is right.** For a provider error it is: the user didn't
+    get what they asked for and shouldn't lose the chance. There is one gap,
+    and it is larger for the swap than for today's regeneration:
+    - A failed single-stage regeneration costs at most 1 call.
+    - A judged swap that fails because the judge rejected the draft and both
+      retries can cost the full 7 calls. It can then be retried, at 7 again.
+    - Attempts run one at a time, and each costs at least one draft and one
+      judge, so this is bounded by how fast the user clicks, not by any rule.
+    - PR 4 opens the same gap for judged regeneration (an
+      `AllSectionsRejectedError` leaves `regenerated_at` nil).
+  - I recommend keeping the two rules identical, as asked, and adding one
+    narrow exception to both later if the logs show repeats: a run that ended
+    because the judge rejected everything uses the allowance, and every other
+    failure doesn't. The `[swap_section] outcome=failed reason=` log and the
+    `outcome` column make that measurable before deciding.
+- **The swap's allowance is separate from regeneration's.** A set can take one
+  regeneration and one swap, in either order.
+  - **Swap, then regenerate.** Regeneration rewrites the same row, so the
+    new set inherits `swapped_at` and can't be swapped again. Regeneration
+    leaves `swapped_at` alone, so the row's limit stays at one of each.
+  - **Regenerate, then swap.** The regenerated set was planned from the
+    current pair, and the swap is still available.
+  - **What this lets through.**
+    - The worst case for one set becomes one swap (7 calls) plus one
+      regeneration: 1 call today, or a judged day's worst case of about 18
+      after PR 4.
+    - A user can change both daily places in one day: swap place 1 (it
+      lands), save a new kind for place 2 (it saves for tomorrow), then
+      regenerate. Regeneration plans from the saved pair, so today gets
+      both new kinds. That spends the day's regeneration and throws away
+      every answer, as regeneration always does, so I don't think it needs
+      closing.
+    - I don't see anything else the separation lets through.
+- **No swap-specific rate limit.** The claim already serializes swaps, and the
+  per-set allowance bounds them, so `SWAP_GENERATIONS_PER_HOUR`, the hourly
+  count and its copy are gone.
+- **When the set's swap is used,** a later swap still saves the pair, and the
+  event row records `today: "tomorrow", reason: "set_swapped"`. The reply
+  says: "Saved for tomorrow. Today's set has already had its one swap." The
+  card's trigger stays enabled, because choosing for tomorrow still works.
+  The picker shows that line above the options before the user picks.
+- **A failed call mid-swap leaves today intact,** under the judged-keep rule in
+  section 3:
 
   | Failed call | What the code does today | Swap outcome |
   |---|---|---|
@@ -479,19 +538,16 @@ Proposal:
   | A design comparison's edit re-judge | Reverts to the unedited draft that the first judgment kept | **Lands.** It was judged |
 
   In every "not replaced" case the job releases the claim and leaves
-  `problem_set`, `plan_notes` and the response untouched. The pair is already
-  saved, in its own transaction before the claim. The page shows the failure
-  through the same wording path as regeneration
+  `problem_set`, `plan_notes`, `swapped_at` and the response untouched. The
+  pair is already saved, in its own transaction before the claim. The page
+  shows the failure through the same wording path as regeneration
   (`what-a-person-is-told-when-a-provider-fails`), with a new
-  `provider_failures.outcomes.swap`: "today's section wasn't replaced; your new
-  choice starts tomorrow, and this still counts as one of your 4 replacements
-  this hour." The number comes from `SWAP_GENERATIONS_PER_HOUR`. The swap
-  counts because its row was written as `replacing` before the call, and the
-  calls it made were paid for. A deadline stop uses the same sentence. The
-  calls made before the failure keep their usage rows.
-- **The new purpose** makes the volume measurable:
+  `provider_failures.outcomes.swap`: "today's section wasn't replaced. Your
+  new choice starts tomorrow, and you can still swap this set once." A
+  deadline stop uses the same sentence. The calls made before the failure
+  keep their usage rows.
+- **The `swap_section` purpose** makes the volume measurable:
   `ApiUsage.where(purpose: "swap_section")`.
-
 
 ## 5. Evidence after a swap
 
@@ -604,7 +660,54 @@ Two edges carry over from today's rules:
 - **A fixed Daily sections setting of 2** gives a day of only the daily kinds,
   whatever they are, so the Setup hint names the user's pair.
 - **The coverage exception** still adds an optional kind to a two-section
-  Automatic day, now from the user's optional groups.
+  Automatic day, now from the user's optional groups. It never adds one to a
+  fixed setting of 2 (`CoverageException.applies_to_day?` requires
+  `fixed.nil?`), so under that setting a swapped-out kind does not come back
+  at all.
+
+### Gate growth at two sections
+
+I checked whether a swap can trap an Automatic account at two sections. On a
+two-section day the only results are the daily pair's, and those are the only
+results growth reads (section 5).
+
+- **No deadlock.** Growth from 2 to 3 needs 4 favourable results in the
+  latest 5 daily-tagged, un-eased ones (`GROW_TO_THREE`). A two-section day
+  adds 2 such results, so the window refills in 3 answered days after a
+  swap or a brake. Entries tagged daily under the old pair stay in the window
+  until newer ones push them out, so a swap neither empties the window nor
+  resets an earned size. Eased results stay out of growth, as today, so a
+  newly swapped-in kind on reduced-tier concepts fills the window more
+  slowly, not wrongly.
+- **One real trap: a daily kind the user keeps finding hard.**
+  - Suppose one daily kind is non-favourable every day. Any 5 consecutive
+    daily results then include at least 2 from that kind, so at most 3 are
+    favourable, and 4 of 5 can't be reached. The day stays at 2 for as long
+    as the kind stays hard.
+  - If it is also rated too hard, `BRAKE` (2 too-hard in the latest 4) fires
+    every other day and keeps emptying the growth window.
+  - At two sections, the other kinds appear only through coverage (about
+    once every 6-8 weeks per kind). So the user mostly sees the hard pair.
+  - Main has the same loop for code review and design comparison. The swap
+    makes it more reachable, because a user can put a kind they haven't
+    practised into the gate's only input.
+- **The exits already exist, and none needs new code:**
+  - The per-kind level suggestion. Its step-back fires on 2 too-hard among
+    the latest 3 results at the current level, about 2 days at two sections.
+    Applying it is a level change, which restarts that kind's runs in the
+    gate.
+  - Swapping the kind back out (once this set, or any time for tomorrow).
+  - A fixed Daily sections setting.
+  - The weak exit is the first one: it needs the "Suggest level changes"
+    switch on and an explicit Apply. A user with suggestions off has only
+    the manual exits.
+- **Recommendation: no change to the gate.** Pin the behaviour with a pure
+  `CompetencyGate.plans` spec: a two-section history where one daily kind is
+  non-favourable every day stays at 2, and growth resumes within 3 days of
+  that kind becoming favourable. The trap is a product question, not a
+  defect: the gate is doing what it was designed to do with the pair it was
+  given. The picker copy below tells the user the pair decides when their
+  days grow.
 
 ## 7. UI
 
@@ -672,12 +775,27 @@ Two edges carry over from today's rules:
   - *A kind the user excluded*: "You turned Challenge off in Exercise mix. As a
     daily section it will be in every set anyway. The setting applies again if
     you swap it out."
-  - *The outgoing kind, when the user's planned size today is 2* (from the
-    row's `plan_notes["size"]`): "On two-section days, Code review will come
-    back only about once every 8 weeks while it isn't a daily section." This
-    comes from the simulation in section 6. It is rendered from the coverage
-    constants (`GAP_WEEKDAYS`, `CAP_WEEKDAYS`) and the optional-kind count, not
-    written as a number.
+  - *The outgoing kind, at two sections.* This is the strongest consequence,
+    so it is shown as a visible warning paragraph directly above Confirm,
+    not only as option description text, and Confirm points at it with
+    `aria-describedby`. Its wording depends on why the day has two
+    sections:
+    - **The Daily sections setting is fixed at 2:** "Your Daily sections
+      setting is 2, so after this swap Code review won't appear at all. Swap
+      it back, or raise the setting in Setup, to see it again." This is
+      exact, because coverage never runs on a fixed setting.
+    - **Automatic, and today's planned size is 2** (the row's
+      `plan_notes["size"]`): "Your sets have two sections right now, so after
+      this swap Code review will appear about once every 8 weeks, as an extra
+      section. Swap it back to have it every day."
+      - The figure is computed from `CoverageException::GAP_WEEKDAYS`,
+        `CAP_WEEKDAYS` and the number of optional kinds the new pair leaves,
+        and rounded to whole weeks. It isn't a stored number.
+      - A second sentence follows: "Your two daily sections are also what
+        decides when your sets grow." This is the gate-growth point above,
+        stated without exposing any rating or tier.
+    - **Three or more sections:** no warning. Section 6's simulation puts
+      every optional kind within 11 days there.
 - **Confirming** opens the picker without a pre-selection change. Confirm
   stays disabled until a different kind is picked. When today's outgoing
   section has a typed but unanswered draft, the server renders the confirm
@@ -690,8 +808,8 @@ Two edges carry over from today's rules:
   section 3, which polls `/dashboard/status` and reloads when the swap lands
   or fails.
 - **Saved for tomorrow:** the reply says `tomorrow` with a sentence naming why
-  (answered, submitted, already in today's set, busy, or over the hourly
-  limit). The picker
+  (answered, submitted, already in today's set, busy, or this set's one swap
+  already used). The picker
   closes, the sentence is announced, and focus returns to the trigger.
 - **Error:** the reply comes from `render_json_error`, the message shows in the
   save-status banner, the picker stays open and focus stays on Confirm.
@@ -764,7 +882,7 @@ daily_kind_swaps
   from_kind   string   not null
   to_kind     string   not null
   today       string   not null   # replacing | tomorrow
-  reason      string             # for tomorrow: answered | submitted | in_set | no_set | busy | limited
+  reason      string             # for tomorrow: answered | submitted | in_set | no_set | busy | set_swapped
   outcome     string             # for replacing, written by the job: landed | superseded | failed
   created_at  datetime not null
 ```
@@ -791,8 +909,8 @@ daily_kind_swaps
   - one column, null to a value, once;
   - made by the one job that owns the claim, inside the lock that already
     orders it against every other writer of that exercise;
-  - read by no app behaviour except the hourly count, which reads `today`,
-    not `outcome`.
+  - read by no app behaviour at all. The per-set allowance lives on
+    `daily_exercises.swapped_at`, not in this table.
 
   A lost write (a worker killed after the call) leaves null. Null reads as
   "unknown", never as "landed", so counts of successful replacements can't be
@@ -813,11 +931,11 @@ daily_kind_swaps
 - **D2. Decided: a swap generates even while generation is paused.**
   Pausing stops generation the user didn't ask for, and a swap is asked for.
   A carried-forward row is treated like any other row dated today.
-- **D3. Decided: 4 replacements an hour,** against a worst case of 7 calls per
-  judged swap (section 4), with the choice always saved. It is the only guard
-  on swap spend once every account is own-key. In a degraded state,
-  serialization on the claim and the swap deadline bound spend more tightly
-  than the limit does (section 4).
+- **D3. Decided: one swap per daily set,** like regeneration's once a day.
+  The allowance lives on `daily_exercises.swapped_at`, is set only when a swap
+  lands (as `regenerated_at` is), survives a carry-forward, and is separate
+  from regeneration's. The worst case is 7 calls per landed swap, and failed
+  attempts can repeat (section 4). There is no hourly limit.
 - **D4. Decided: the judge always runs.** A swapped section goes through
   judged generation exactly as a first generation does, with the same retry
   budget (section 3). Regeneration moves to judged generation too, as its own
@@ -826,7 +944,8 @@ daily_kind_swaps
 ## PR split
 
 0. **Schema only.** Add `users.daily_section_kinds` (`jsonb`, default `[]`),
-   `daily_exercises.swapping_place` and `swapping_kind` (nullable), and
+   `daily_exercises.swapping_place`, `swapping_kind` and `swapped_at`
+   (nullable), and
    `daily_kind_swaps` with its nullable `outcome`. Nothing reads any of them. It ships a release ahead,
    because the worker's pre-deploy waits for a schema, not for pending
    migrations (`tracks.md`). It should not share a release with the
@@ -863,10 +982,11 @@ daily_kind_swaps
    event row, the `swap_section` purpose, profile, routing and snapshots,
    `AiService#generate_swapped_section` sharing `retry_section`'s one-kind
    half, `SwapSectionJob` with `SWAP_DEADLINE` and the deadline-checking
-   provider factory, the `outcome` write, the hourly count, the failure
-   wording, `REGENERATION_STALE_AFTER` re-derived to 1,006 s (section 3), and
-   the swap-claim columns read by `#show`, `#status`, the answer saves and
-   `submit_blocker`. Request specs cover one example per outcome.
+   provider factory, the `outcome` write, the per-set allowance
+   (`swapped_at`), the failure wording, `REGENERATION_STALE_AFTER` re-derived
+   to 1,006 s (section 3), and the swap-claim columns read by `#show`,
+   `#status` and the answer saves. Request specs cover one example per
+   outcome.
 3. **The card control.** Covers the partial, the `daily-kind-swap`
    controller, the extracted guide partial, the picker's consequence
    sentences, the pending card, the welcome line and first-time hint, the page
@@ -940,9 +1060,14 @@ and must merge before PR 2. PR 4 depends on PR 2's deadline machinery.
   for everyone.
 - **Swap concepts may repeat.** A swapped section's concept may repeat one of
   today's other sections, since the fresh plan doesn't know them.
-- **Spend.** An own-key user can swap up to 4 times an hour, worst case 28
-  calls, every hour. The hourly limit is the only guard. The `swap_section`
-  purpose makes the volume visible, and nothing alerts on it.
+- **Spend.** A landed swap costs at most 7 calls, once per set. Failed
+  attempts don't use the allowance, so a set whose swaps keep failing on
+  judge rejections can be retried at up to 7 calls each, one at a time. The
+  same is true of judged regeneration after PR 4. The `swap_section` purpose
+  and the `outcome` column make repeats visible, and nothing alerts on them.
+- **The two-section trap.** A pair holding a kind the user keeps finding hard
+  holds an Automatic account at two sections (section 6). The exits exist, but
+  the automatic one needs level suggestions switched on.
 - **A longer claim window.** A worker that crashes mid-call now holds the claim
   for about 17 minutes instead of 6 (20 after PR 4). In that time neither a
   swap nor a regeneration can start. A crashed swap shows its pending card,
@@ -993,9 +1118,17 @@ and must merge before PR 2. PR 4 depends on PR 2's deadline machinery.
   untouched and `outcome` is `failed`. A typical-speed run with both retry
   cycles finishes inside the deadline.
 - Pending-card specs (request and system): a swap claim renders the day with
-  one pending card, a save for the outgoing key is refused, submit is
-  blocked by the server's reason, and other cards still autosave. A
-  regeneration claim still renders the full-page state.
+  one pending card, a save for the outgoing key is refused, and other cards
+  still autosave. A regeneration claim still renders the full-page state.
+- Submit during a swap, in both lock orders: submit first leaves the outgoing
+  section in the submitted day and the job records `failed`; the swap first
+  leaves the incoming section unanswered in it. Neither loses an answer.
+- Allowance specs: a landed swap sets `swapped_at` and a second swap saves for
+  tomorrow with `reason: set_swapped`. Every failure path leaves it nil, as
+  `regenerated_at` stays nil on the same paths (one shared example group
+  run against both jobs). `carry_forward` keeps it, and regeneration neither
+  clears it nor is blocked by it.
+- A pure `CompetencyGate.plans` spec for the two-section trap (section 6).
 - A rotation simulation spec ports the section 6 run onto the real
   `SectionRotation` with fixed seeds. It asserts the 11-day bound at sizes 3
   and 4 for every reachable pair, and that a daily fourth's siblings never
@@ -1005,3 +1138,65 @@ and must merge before PR 2. PR 4 depends on PR 2's deadline machinery.
   this spec as the brief.
 - After PR 2 deploys, `ApiUsage.where(purpose: "swap_section")` grouped by
   `failure` is the first week's check.
+
+## Scope option: a tomorrow-only swap
+
+This section is for the scope decision: what changes if a swap only saves the
+pair and never touches today's set. Every swap then takes the "tomorrow"
+path.
+
+**What stays the same.** PR 0's `users.daily_section_kinds`, all of PR 1 (the
+per-user layout, per-day pairs in `plan_notes`, row-aware `resolved_keys`),
+all of PR 1b (the gate), the picker and its consequence copy, the
+discoverability line and hint, the Exercise mix changes, and every finding in
+sections 5 and 6. Those are needed by any swap, because the pair still
+changes and still steers planning, rotation and growth.
+
+**What goes away.**
+
+| Area | Removed |
+|---|---|
+| Schema (PR 0) | `daily_exercises.swapping_place`, `swapping_kind`, `swapped_at`; `daily_kind_swaps.today` and `outcome`. The event row is written once |
+| Generation | `SwapSectionJob`; `AiService#generate_swapped_section` and the one-kind draft method it shares with `retry_section`; the judged-keep landing rule and its asymmetry with first generation |
+| Provider plumbing | The `swap_section` purpose, its `CALL_PROFILES` entry and routing entries, three request snapshots and the one-kind prompt snapshot |
+| Time limits | `SWAP_DEADLINE`, `AiService::DeadlineError` and the deadline-checking provider factory. `REGENERATION_STALE_AFTER` no longer depends on the swap. Main's existing 946 s gap is still a bug, and it is still worth a small PR of its own |
+| Concurrency | Sharing the `regenerating` claim between two purposes (a documented pattern deviation), the race with autosave and submit, and the `busy` reason |
+| Allowance | The per-set allowance and its interaction with carry-forward and regeneration (section 4 shrinks to a paragraph) |
+| Page (PR 3) | The pending card, the `swapping` state in `#status`, the refused save for the outgoing key, the outgoing-draft confirm sentence, the failure copy. Section 3's state table collapses to one sentence: the pair applies to the next set |
+| Specs | The deadline, pending-card, submit-order, allowance and judged-outcome groups in the verification plan |
+
+**Size.** PR 2 goes from the largest PR in the plan to a controller, its
+outcome object, the validation and the event row. PR 3 loses its only async
+state. The parts removed are also the ones that took the most review here:
+the claim, the deadline, the stale window and the landing rule.
+
+**Spend.** Zero provider calls per swap. The only paid path left is
+regeneration, which keeps its own once-a-day rule.
+
+**What the user gives up.**
+
+- **Seeing the new kind today.** It appears in the next set: tomorrow on a
+  weekday, after the weekend otherwise. A held set carried forward still
+  holds the old pair, because it was planned before the swap.
+- **The workaround is regeneration.** It plans from the saved pair, so
+  "swap, then generate a new set" gives today a set with the new kind. It
+  costs every answer typed so far and the day's one regeneration, and it is
+  one call today (judged after PR 4). The picker can offer it in one line
+  when regeneration is available and nothing is submitted: "Want it today?
+  Generate a new set (this replaces today's answers)." It is the existing
+  button.
+- **Skipping still works.** A user who doesn't want today's daily section
+  can leave it unanswered, since `submit_blocker` only needs one answered
+  section.
+
+**Moving to in-place later is additive.** The columns, job, deadline, card
+and allowance described above can land on top of the tomorrow-only build,
+with no change to PR 0-1b and no migration of the pair. The event rows from
+the tomorrow-only build would measure the demand first: how often a swap is
+followed by a regeneration on the same set.
+
+**My lean, for your decision:** build tomorrow-only first. It carries every
+part of the feature that changes what the user practises, at no spend and
+with the riskiest code left out. The regeneration path covers "today" for
+people who really want it, and the events show whether in-place is worth
+its cost.
