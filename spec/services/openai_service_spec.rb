@@ -51,7 +51,7 @@ RSpec.describe OpenaiService do
 
     def logged_call(body, **options)
       service.instance_variable_set(:@conn, recording_connection([], body))
-      service.send(:call_and_log, user, purpose: "duck_thread", system: "sys", prompt: "p", **options)
+      service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", **options))
     end
 
     %w[failed cancelled queued in_progress unknown].push(nil).each do |status|

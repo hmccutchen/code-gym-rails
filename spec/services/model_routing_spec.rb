@@ -1,9 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "per-purpose model routing" do
-  let(:purposes_in_use) do
-    File.read(Rails.root.join("app/services/ai_service.rb")).scan(/purpose: "(\w+)"/).flatten.uniq
-  end
+  let(:purposes_in_use) { AiService::CALL_PROFILES.keys }
 
   # A usage row must name the model whose prices apply to it.
   [ ClaudeService, GeminiService, OpenaiService ].each do |service_class|

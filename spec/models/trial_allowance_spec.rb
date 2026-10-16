@@ -67,7 +67,7 @@ RSpec.describe TrialAllowance, type: :model do
     service = AiService.for(trial)
     stub_env("TRIALS_DISABLED" => "1")
 
-    expect { service.send(:call_and_log, trial, purpose: "duck_thread", system: "s", prompt: "p") }
+    expect { service.send(:call_and_log, trial, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }
       .to raise_error(AiService::TrialEndedError)
     expect(ApiUsage.count).to eq(0)
   end
