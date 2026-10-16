@@ -60,6 +60,94 @@ RSpec.describe ForcedConceptDrafts do
     expect(kind.hosted_concepts).not_to include(concept)
   end
 
+  describe "the prompt override" do
+    let(:guidance) { described_class.guidance_for(concept) }
+    let(:forced)   { described_class.new(concept) }
+
+    # Answers the retry with the concept it was asked for, as the Faraday stub above does, with no connection at all.
+    let(:capturing_class) do
+      Class.new(AiService) do
+        attr_reader :sent_prompts
+
+        def initialize(api_key = "no-network-key")
+          super
+          @sent_prompts = []
+        end
+
+        private
+
+        def build_connection = nil
+
+        def call(system:, prompt:, **)
+          @sent_prompts << prompt
+          set  = FakeService::EXERCISE_PROBLEM_SET.deep_dup
+          kind = ExerciseSection::DesignComparison
+          text = if prompt.include?("must be exactly `proportionality`")
+            { kind.key => set.fetch(kind.key).merge("concept" => "proportionality") }.to_json
+          else
+            set.to_json
+          end
+          { text: text, input_tokens: 1, output_tokens: 1, truncated: false }
+        end
+      end
+    end
+
+    before do
+      pin_code_review_mode(:application_code)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:general)
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+    end
+
+    def ordinary_prompt(service)
+      service.generate_exercise(user, language: "ruby_rails")
+      service.sent_prompts.last
+    end
+
+    it "leaves an ordinary prompt on a separate, unmodified service byte-identical before, during and after the experiment" do
+      plain        = capturing_class.new
+      experimental = capturing_class.new
+      before_experiment = ordinary_prompt(plain)
+      inside_block      = forced.with_concept { ordinary_prompt(plain) }
+      during = forced.with_concept do
+        forced.draft(experimental, user, rung: "senior")
+        ordinary_prompt(plain)
+      end
+      after_experiment = ordinary_prompt(plain)
+
+      expect(inside_block).to include(concept)
+      expect(during).to eq(inside_block)
+      expect(after_experiment).to eq(before_experiment)
+      [ before_experiment, inside_block, during, after_experiment ].each { |prompt| expect(prompt).not_to include(guidance) }
+      expect(experimental.sent_prompts.last).to include(guidance).once
+      expect(plain.singleton_class.ancestors.first).to eq(plain.singleton_class)
+      expect(experimental.singleton_class.ancestors.first).not_to eq(experimental.singleton_class)
+    end
+
+    it "adds the guidance line exactly once to each retry prompt, including a second draft from the same service" do
+      experimental = capturing_class.new
+
+      sections = forced.with_concept { 2.times.map { forced.draft(experimental, user, rung: "senior") } }
+
+      expect(experimental.sent_prompts.size).to eq(2)
+      experimental.sent_prompts.each do |prompt|
+        expect(prompt).to include(guidance).once
+        expect(prompt).to include("must be exactly `proportionality`")
+        expect(prompt[/Return JSON matching this schema exactly:\n(.*)\z/m, 1].scan(/^  "(\w+)": \{/).flatten).to eq([ kind.key ])
+      end
+      expect(sections).to all(include("concept" => concept, "pitched_at" => "senior"))
+    end
+
+    it "leaves GenerationPrompt and ConceptGuidance themselves untouched" do
+      experimental = capturing_class.new
+      ancestors_before = [ GenerationPrompt.ancestors, GenerationPrompt::ConceptGuidance.ancestors ]
+
+      forced.with_concept { forced.draft(experimental, user, rung: "junior") }
+
+      expect([ GenerationPrompt.ancestors, GenerationPrompt::ConceptGuidance.ancestors ]).to eq(ancestors_before)
+      expect(render_generation_prompt(user, "ruby_rails")).not_to include(guidance)
+    end
+  end
+
   it "judge_concept drafts every rung through the retry path with the guidance line, and judges each draft" do
     ModelComparison.new(api_key: "sk-ant-runner", out: out).judge_concept(user.id, concept, per_rung: 1)
 

@@ -1,4 +1,4 @@
-# Overrides apply only inside #with_concept, which puts them all back; nothing shipped changes.
+# Call #draft inside #with_concept: the vocabulary overrides apply only there and are put back, so nothing shipped changes.
 class ForcedConceptDrafts
   KIND = ExerciseSection::DesignComparison
   GUIDANCE_PATTERN = /<!-- draft-guidance:start -->\n(.+?)\n<!-- draft-guidance:end -->/m
@@ -13,7 +13,7 @@ class ForcedConceptDrafts
 
   def initialize(concept)
     @concept = concept
-    @guidance_module = guidance_module(self.class.guidance_for(concept))
+    @prompt_override = prompt_override(guidance_module(self.class.guidance_for(concept)))
   end
 
   def with_concept
@@ -32,14 +32,23 @@ class ForcedConceptDrafts
     KIND.define_singleton_method(:hosted_concepts, hosted)
   end
 
-  # Locked so the prompt pitches it exactly at this rung. Call inside #with_concept.
   def draft(service, user, rung:)
     language = user.language_for_today
-    service.singleton_class.prepend(@guidance_module) unless service.singleton_class.include?(@guidance_module)
+    service.singleton_class.prepend(@prompt_override) unless service.singleton_class.include?(@prompt_override)
     service.send(:retry_section, user, language, prompt_draft(service, user, language, rung), KIND, @concept)
   end
 
   private
+
+  # Reaches only the prompts this one service instance builds; GenerationPrompt and its modules stay untouched.
+  def prompt_override(guidance)
+    Module.new do
+      define_method(:generation_prompt) do |*args, **kwargs|
+        super(*args, **kwargs).tap { |prompt| prompt.singleton_class.prepend(guidance) }
+      end
+      private :generation_prompt
+    end
+  end
 
   # Goes after the last concept-group line, where a real guidance method would add its line.
   def guidance_module(line)
@@ -48,7 +57,7 @@ class ForcedConceptDrafts
     end
   end
 
-  # Today's plan for this user, with this one kind targeted and locked at the rung asked for.
+  # Today's plan for this user, with this one kind targeted and locked so the prompt pitches it exactly at the rung asked for.
   def prompt_draft(service, user, language, rung)
     plan       = DailyPlan.for(user, language: language)
     difficulty = KindDifficulty.new(levels: { KIND.key => rung }, locked: [ KIND.key ])
@@ -56,9 +65,8 @@ class ForcedConceptDrafts
     ladders    = service.send(:ladders_for, difficulty.rungs_for(kinds, skill_level: user.skill_level), language,
                               plan.code_review_mode)
     history    = user.recent_performance
-    options    = service.send(:exercise_prompt_options, plan, history, difficulty, ladders)
 
     AiService.const_get(:Draft).new(problem_set: {}, plan: plan, kinds: kinds, difficulty: difficulty, ladders: ladders,
-                                    history: history, prompt_options: options, suggested_concepts: [], unusable_sections: [])
+                                    history: history, suggested_concepts: [], unusable_sections: [])
   end
 end

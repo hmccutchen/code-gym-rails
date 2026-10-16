@@ -13,8 +13,10 @@ paths:
 These are settled decisions, not defaults that drifted into place. CLAUDE.md
 says what a deviation from one requires.
 
-- **Template method for providers** — `AiService` owns prompts, parsing, and
-  usage logging; subclasses implement `#call` and
+- **Template method for providers** — `AiService` owns provider orchestration,
+  parsing and usage logging, and every prompt but the generation prompt, whose
+  text it delegates to `GenerationPrompt` through its private
+  `#generation_prompt` factory; subclasses implement `#call` and
   `#build_connection`, and own the model each purpose routes to
   (`DEFAULT_ROUTE` / `MODEL_FOR_PURPOSE`). Adding a provider is adding a
   subclass and listing it in `AiProvider.all`, the closed registry used by
@@ -41,18 +43,20 @@ says what a deviation from one requires.
   of them a kind may be asked for, `ConceptBucket` for which vocabulary a
   concept records under. Derive from the authority; never recount.
 - **One prompt line per vocabulary group** — a concept group that needs a
-  cross-section rule gets one `AiService#<group>_guidance` method naming the
-  group from its constant and stated once for all sections, never repeated
-  into each kind's `.generation_guidance`. The rule is about the concept, not
-  about any one kind, so every such group has exactly one of these methods and
-  a new group adds another. Don't enumerate the groups here — the constants
-  live in `ConceptVocabulary` and each group's guidance method in `AiService`,
-  and a count kept in this file has already gone stale once.
+  cross-section rule gets one `GenerationPrompt::ConceptGuidance#<group>_guidance`
+  method naming the group from its constant and stated once for all sections,
+  never repeated into each kind's `.generation_guidance`. The rule is about
+  the concept, not about any one kind, so every such group has exactly one of
+  these methods and a new group adds another. Don't enumerate the groups here —
+  the constants live in `ConceptVocabulary` and each group's guidance method in
+  `GenerationPrompt::ConceptGuidance`, and a count kept in this file has
+  already gone stale once.
 - **Provider calls as callables** — a module that orchestrates provider calls
   takes them as a `Provider` struct of callables, with a `providers:` factory
   that returns a fresh one for each thread (`JudgedGeneration::Provider`,
   `ReviewGrading::Provider`, built by `AiService#judged_generation_provider`
-  and `#review_grading_provider`). `AiService` keeps the prompts and the calls;
+  and `#review_grading_provider`). `AiService` keeps the calls and builds the prompts, the
+  generation prompt through `GenerationPrompt`;
   the module keeps the orchestration and the policy, and its specs drive it
   with lambdas. Threads start through `CallerZoneThread.start`, and
   `spec/conventions/app_source_spec.rb` fails on any other `Thread.new` and on
@@ -90,4 +94,8 @@ says what a deviation from one requires.
   dashboard's answers are the one caller, since its endpoint accepts a repeat.
 - **Domain data stays off provider classes** — lists and tables the domain
   owns live in a module of their own (`ConceptVocabulary`), and `AiService`
-  reads them; it keeps only what is about talking to a provider.
+  and `GenerationPrompt` read them; `AiService` keeps only what is about
+  talking to a provider. Two exceptions still sit on `AiService`, and
+  `GenerationPrompt` reads them there: `SCENARIO_POOLS` and the per-language
+  prompt wording behind `.config_for`. Moving them to a domain module is a
+  follow-up; the exception is recorded here so it is not read as the rule.

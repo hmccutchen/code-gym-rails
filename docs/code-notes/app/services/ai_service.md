@@ -160,7 +160,8 @@ tokenization. As an illustrative estimate only, at three characters per token
 the maximum-block increase is about 2,787 input tokens, or $0.011 for one
 uncached Opus 5.5 draft at $4 per million input tokens. That is not a measured
 token count or a dollar ceiling. Shorter rungs and shared levels reduce the
-block; a day without explicit targets sends none. Reference rewrites also
+block, and a level with no ladder rungs sends its definition alone; every kind
+on the plan is listed at its rung, so no day sends none. Reference rewrites also
 generate one additional rung, whose actual output-token cost is unmeasured.
 
 ## `MAX_CONCEPT_GUIDE_LENGTH`
@@ -240,10 +241,17 @@ join this class's public API.
 Stands in for the blank line above the section, so a kind with no judge
 guidance renders its usual prompt.
 
-## `#draft_exercise` and `#build_exercise_prompt`
+## `#draft_exercise` and `#generation_prompt`
 
-History is fetched once and passed to the prompt builder, so the logged
-"requested" history can't diverge from what the prompt contained.
+History is fetched once and handed to the prompt as a whole value, so the
+logged "requested" history can't diverge from what the prompt contained.
+`#generation_prompt` is the one place a `GenerationPrompt` is built: it binds
+`#annotate_retention_concept` as the retention callable, and both the draft and
+`#retry_section` go through it. A retry renders from the draft's own plan,
+history and difficulty with fresh ladders for the retried kind, and stores
+nothing on the draft or the service. `script/forced_concept_drafts.rb` wraps
+the factory on one service instance to add a line to that instance's prompts
+alone, so the override never reaches `GenerationPrompt` itself.
 
 ## `#finish_generation`
 
@@ -288,17 +296,22 @@ Planning reads `ConceptVocabulary`, whose unknown-language error is not an
 `AiService::Error`. Checking first keeps an unsupported language failing the
 way the generation jobs rescue and record.
 
-## `#config_for`
+## `.config_for` and `#config_for`
 
 Fails loudly on "mixed" or a typo instead of silently falling back to
-Ruby/Rails.
+Ruby/Rails. A class method, the way `.error_code_for` is, so `GenerationPrompt`
+and `script/model_comparison.rb` share the one lookup; the instance method
+delegates to it for this class's own callers.
 
 ## `#annotate_retention_concept`
 
 Names the sections that can host the concept today; otherwise the model
 guesses, and ingest records a false miss. It returns nil when no section today
-can host the concept, and `build_exercise_prompt` drops it from the prompt
-(`filter_map`).
+can host the concept, and `GenerationPrompt#retention_block` drops it from the
+prompt (`filter_map`). It stays here, with `#can_host?`, while the rest of the
+template lives in `GenerationPrompt`: `RealSource::APPLICATION_CODE` lists
+this method as a curated excerpt, so moving it would change exercise content
+and the source-history identity keyed on its path and name.
 
 ## `#can_host?`
 
@@ -310,74 +323,18 @@ Uses the day's language, not `cm.language`: `ConceptVocabulary::LANGUAGES`'
 Difficulty adaptation is advisory. This line pairs what was requested with what
 was delivered to check it, alongside `ResponseReview#log_diagnostics`.
 
-## `#annotate_reinforcement`
-
-Shows the tier and `drilled` side by side, so a log line can tell the system's
-reading apart from the engineer's request.
-
 ## `#kind_difficulty_diagnostics`
 
 Measures whether a rung was available and chosen. Whether the problem was
 actually pitched at that rung is deliberately not measured.
-
-## `#build_exercise_prompt`
-
-The default reinforcement list is for direct callers only. `#generate_exercise`
-passes the plan's list, which applies the per-section hosting test for drills.
-The kinds are resolved once through the schema's call, so guidance, hosting and
-schema agree; `only` narrows them to the one retried kind. The established
-concepts block, unlike `retention_block`, never forces a selection. The fixed
-concept line is folded onto the drilled-concepts bullet, because an empty
-interpolation on its own line would break the prompt snapshots. Section
-guidance is keyed off the same `kinds` as the schema, so it can't disagree with
-what the schema asks for.
-
-## `#scenario_flavor_guidance`
-
-Uses `SCENARIO_POOLS.fetch`, so an unknown flavor fails here instead of
-rendering an empty list.
-
-## `#data_modeling_idiom_guidance`
-
-Defers to each section's own vocabulary because ingest validates against the
-full vocabulary and would not catch a misuse.
-
-## `#oo_design_violation_guidance`, `#module_design_depth_guidance`, `#domain_modeling_guidance`
-
-Like `#meta_skill_framing_guidance`, each keeps a findable issue in the
-section: the principle frames the question and never replaces the issue, since
-interface depth or a judgment about the model can otherwise leave nothing
-missable to grade.
-
-## `#silent_correctness_guidance`
-
-The opposite risk to the other groups: the planted code must look like it
-works, or the concept is no longer what its name says.
+`kind_difficulty_chars` is the length of
+`GenerationPrompt::DifficultyGuidance.render`'s output, the same call the
+prompt interpolates, so the logged count is the text that was sent.
 
 ## `#ladders_for`
 
 Merging by concept name is safe because a day's buckets never share a concept
 (`concept_reference_spec` holds that).
-
-## `#kind_difficulty_guidance`
-
-Every kind on the plan is listed at its rung, the target when one is set and
-the skill level otherwise. A kind renders the same either way, so a target equal
-to the skill level changes nothing in the prompt, which
-`level_suggestion_isolation_spec` pins: the junior track's presets can be
-dropped without any account's prompt moving. Before this, the block listed
-targeted kinds only, and an untargeted kind got nothing but the profile's
-"Skill level" line.
-
-## `#locked_difficulty_line`
-
-An easing rule added to the prompt later must be added here on purpose; nothing
-covers it by implication.
-
-## `#scaffolded_kinds_clause`
-
-Built from the registry, since a scaffolding kind left out of a written list
-had its labels truncated mid-word (issue #164).
 
 ## Review day context (`sections = keys.map`)
 

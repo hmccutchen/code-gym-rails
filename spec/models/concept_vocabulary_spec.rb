@@ -375,7 +375,7 @@ RSpec.describe ConceptVocabulary do
       expect(vocabulary).to include(*ConceptVocabulary::OO_DESIGN_CONCEPTS)
     end
 
-    # AiService#oo_design_violation_guidance's test-file idiom assumes this; revisit it if selection narrows.
+    # GenerationPrompt::ConceptGuidance#oo_design_violation_guidance's test-file idiom assumes this; revisit it if selection narrows.
     it "offers every OO design principle to a test-file code_review" do
       vocabulary = described_class.selectable_for_section("code_review", "ruby_rails", mode: :test_file)
 

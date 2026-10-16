@@ -1,6 +1,7 @@
 ---
 paths:
-  - "app/services/{ai_service,problem_set_ingest,fake_service,judged_generation,caller_zone_thread}.rb"
+  - "app/services/{ai_service,generation_prompt,problem_set_ingest,fake_service,judged_generation,caller_zone_thread}.rb"
+  - "app/services/generation_prompt/**"
   - "app/services/judged_generation/**"
   - "app/models/{exercise_section,concept_vocabulary,concept_bucket,real_source,judge_verdict,verdict_schema,code_format,daily_exercise,suggested_concept,mermaid_source}.rb"
   - "app/models/exercise_section/**"
@@ -72,9 +73,9 @@ read it before changing that area.
   `ConceptVocabulary::META_SKILL_CONCEPTS` are reasoning skills listed in both
   language vocabularies, hosted only by `code_review` (non-schema modes),
   `pattern` and `challenge`; `parsons_problem` excludes them explicitly.
-  `AiService#meta_skill_framing_guidance` requires such a section to still
-  hold one findable issue, and `AiService#can_host?` derives hosting from
-  `ConceptVocabulary.selectable_for_section`.
+  `GenerationPrompt::ConceptGuidance#meta_skill_framing_guidance` requires
+  such a section to still hold one findable issue, and `AiService#can_host?`
+  derives hosting from `ConceptVocabulary.selectable_for_section`.
 - **The fourth slot** (`docs/decisions/the-fourth-slot.md`): An optional
   fourth key (`plan_review`, `ambiguity_hunt`, `pseudocode_to_code`) with its
   own language-independent vocabularies and buckets, planned on a separate

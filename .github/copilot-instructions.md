@@ -98,7 +98,7 @@ while the argument for it silently stops being true. Precedent: as the
 vocabularies grew from 13-16 concepts to 28 and 30, three constants' comments
 went false — `DailyPlan::RETENTION_BUCKET_FETCH_CAP` (justified by vocabulary
 size, quietly became a cap that truncated the fetch before its own re-rank ran,
-issue #93), `AiService#data_modeling_idiom_guidance` ("may be tagged on any
+issue #93), `GenerationPrompt::ConceptGuidance#data_modeling_idiom_guidance` ("may be tagged on any
 section", contradicted once a kind excluded that group), and
 `ConceptMastery::RETENTION_MAX_INTERVAL_DAYS` (issue #98). Every one was found
 by accident while someone happened to be editing nearby, which is why this is a
@@ -123,8 +123,9 @@ methods exceed 25.
 Two honest caveats. First, this is **not machine-enforced** —
 `rubocop-rails-omakase` disables the entire `Metrics` department, so no CI job
 measures it and the reviewer is the only enforcement. Second, several existing
-files exceed these numbers, most visibly `app/services/ai_service.rb` at 1303
-lines with a 156-line `build_exercise_prompt`. That method is five heredocs of
+files exceed these numbers, most visibly `app/services/ai_service.rb`, which
+was 1303 lines with a 156-line `build_exercise_prompt` when these figures were
+taken; that template is now `GenerationPrompt#render`, still mostly heredocs of
 prompt text rather than logic, which is why the threshold excludes heredoc
 bodies. The threshold governs new and substantially rewritten code; it is not a
 standing demand to refactor what is already there.
