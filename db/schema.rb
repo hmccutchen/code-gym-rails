@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_17_060000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_17_080000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -90,6 +90,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_17_060000) do
     t.jsonb "plan_notes", default: {}, null: false
     t.index ["user_id", "date"], name: "index_daily_exercises_on_user_id_and_date", unique: true
     t.index ["user_id"], name: "index_daily_exercises_on_user_id"
+  end
+
+  create_table "daily_kind_swaps", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.integer "place", null: false
+    t.string "from_kind", null: false
+    t.string "to_kind", null: false
+    t.string "today_section", null: false
+    t.integer "planned_size"
+    t.integer "size_setting"
+    t.datetime "created_at", null: false
+    t.index ["user_id"], name: "index_daily_kind_swaps_on_user_id"
   end
 
   create_table "daily_responses", force: :cascade do |t|
@@ -383,6 +395,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_17_060000) do
     t.jsonb "level_suggestion_cutoffs", default: {}, null: false
     t.integer "level_suggestion_answers", default: 0, null: false
     t.datetime "track_chosen_at"
+    t.jsonb "daily_section_kinds", default: [], null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["invite_code_id"], name: "index_users_on_invite_code_id"
   end
@@ -390,6 +403,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_17_060000) do
   add_foreign_key "api_usages", "users"
   add_foreign_key "concept_masteries", "users"
   add_foreign_key "daily_exercises", "users"
+  add_foreign_key "daily_kind_swaps", "users"
   add_foreign_key "daily_responses", "daily_exercises"
   add_foreign_key "daily_responses", "users"
   add_foreign_key "featured_concepts", "users"
