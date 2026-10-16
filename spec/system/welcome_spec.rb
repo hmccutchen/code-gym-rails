@@ -12,7 +12,7 @@ RSpec.describe "Welcome choices", type: :system do
       find("[data-level='#{level}']").click
 
       expect(page).to have_current_path(setup_path)
-      expect(user.reload).to have_attributes(skill_level: level, section_kind_levels: {}, learning_track: "none")
+      expect(user.reload).to have_attributes(skill_level: level, section_kind_levels: {})
       expect(user.track_chosen_at).to be_present
       expect(user.daily_exercises).to be_empty
     end

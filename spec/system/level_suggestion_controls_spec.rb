@@ -50,7 +50,6 @@ RSpec.describe "Learning track suggestion controls", type: :system do
 
     expect(page).to have_css("#level-suggestion", text: "Done. Your next sets use the new level.")
     wait_for_saves
-    expect(user.reload.learning_track).to eq("none")
     expect(page).to have_css("#save-status", visible: :hidden)
   end
 

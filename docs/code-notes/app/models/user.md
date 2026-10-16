@@ -51,22 +51,21 @@ returns without overwriting `anonymized_at`.
 The list follows registry order, so Setup lists providers the same way every
 time.
 
-## `#first_run?`, `#choose_track` and the dual write
+## `#first_run?` and `#choose_track`
 
-`#first_run?` is true for a saved account with no `track_chosen_at`, no
-`learning_track` and no exercise. The `learning_track` check is for one
-release: an account that answered the old welcome page between the backfill
-and this code taking traffic has a `learning_track` and no `track_chosen_at`,
-and is not asked again. The exercise check keeps the preview seed account and
+`#first_run?` is true for a saved account with no `track_chosen_at` and no
+exercise. It read `learning_track` too for one release, for an account that
+answered the old welcome page between the backfill and that code taking
+traffic; `FinishTrackChosenAtBackfill` marked those accounts, so the column
+is now in `ignored_columns` until the next release drops it (see
+`docs/decisions/tracks.md`). The exercise check keeps the preview seed account and
 accounts the nightly batch generated for out of `/welcome`. A null
 `track_chosen_at` means no decision was recorded, not that the account is
 undecided.
 
-`#choose_track` records the welcome choice and its level. For one release a
-choice also writes `learning_track: "none"` when it is blank, so code rolled
-back to before tracks per level neither sends the account to `/welcome` again
-nor shows the old Leave control. The cleanup that drops `learning_track` drops
-this write too.
+`#choose_track` records the welcome choice and its level. It no longer writes
+`learning_track`, so a rollback to before tracks per level, two releases
+back, would send an account that chose under this code to `/welcome` again.
 
 ## `#prepares_ladders?`
 

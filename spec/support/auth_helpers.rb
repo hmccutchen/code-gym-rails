@@ -35,7 +35,7 @@ module AuthHelpers
   end
 
   def chosen_track(chosen)
-    chosen ? { track_chosen_at: Time.current, learning_track: User::TRACK_CHOICE_MARKER } : { track_chosen_at: nil, learning_track: nil }
+    { track_chosen_at: chosen ? Time.current : nil }
   end
 
   # The code is minted after the POST because #authenticate_login_code reads the current digest.
