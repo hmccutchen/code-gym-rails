@@ -58,8 +58,8 @@ exercise. It read `learning_track` too for one release, for an account that
 answered the old welcome page between the backfill and that code taking
 traffic; `FinishTrackChosenAtBackfill` marked those accounts, so the column
 is now in `ignored_columns` until the next release drops it (see
-`docs/decisions/tracks.md`). The exercise check keeps the preview seed account and
-accounts the nightly batch generated for out of `/welcome`. A null
+`docs/decisions/tracks.md`). The exercise check keeps the preview seed
+account and accounts the nightly batch generated for out of `/welcome`. A null
 `track_chosen_at` means no decision was recorded, not that the account is
 undecided.
 
