@@ -31,7 +31,7 @@ class SessionsController < ApplicationController
   # POST /login — the pending state written here is what makes the code redeemable in this browser.
   def create
     PendingTrial.forget(session)
-    mail_login_code(normalized_email, params[:name].to_s.strip)
+    mail_login_code(normalized_email)
 
     redirect_to login_path,
                 notice: t("sessions.code_sent", expiry: User.login_code_expiry_in_words)

@@ -5,7 +5,7 @@ RSpec.describe "Sessions", type: :request do
     # Drives BCrypt under bundler, which 500'd in production when bcrypt was missing from the Gemfile.
     it "creates a first-time user and enqueues the login code email" do
       expect {
-        post login_path, params: { email: "new@example.com", name: "New Dev" }
+        post login_path, params: { email: "new@example.com" }
       }.to change(User, :count).by(1)
         .and have_enqueued_mail(UserMailer, :login_code)
 
@@ -20,7 +20,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "records the pending state without a device flag" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      post login_path, params: { email: "dev@example.com" }
 
       expect(session[:pending_login_email]).to eq("dev@example.com")
       expect(session[:pending_login_at]).to be_present
@@ -37,6 +37,12 @@ RSpec.describe "Sessions", type: :request do
       expect(user.reload.login_code_digest).to be_present
     end
 
+    it "names a new account after the email's local part" do
+      post login_path, params: { email: "new.dev@example.com" }
+
+      expect(User.find_by(email: "new.dev@example.com").name).to eq("new.dev")
+    end
+
     it "rejects an invalid email without creating a user" do
       expect {
         post login_path, params: { email: "not-an-email" }
@@ -49,11 +55,11 @@ RSpec.describe "Sessions", type: :request do
   end
 
   describe "the login page" do
-    it "marks the email field as required and the name field as not" do
+    it "marks the email field as required and asks for no name" do
       get login_path
 
       expect(response.body).to include("Work email *")
-      expect(response.body).not_to include("Name *")
+      expect(response.body).not_to include('name="name"')
     end
 
     it "asks for no invite code and links to the trial page" do
@@ -76,14 +82,14 @@ RSpec.describe "Sessions", type: :request do
       get login_path
       expect(Nokogiri::HTML(response.body).at_css("input[type=submit]")["value"]).to eq("Send code")
 
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      post login_path, params: { email: "dev@example.com" }
       get login_path
       expect(Nokogiri::HTML(response.body).css("input[type=submit]").map { |input| input["value"] })
         .to eq([ "Verify code", "Send code" ])
     end
 
     it "offers the code form as soon as a login is pending" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      post login_path, params: { email: "dev@example.com" }
 
       get login_path
 
@@ -92,7 +98,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "carries no polling or device-detection script" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      post login_path, params: { email: "dev@example.com" }
 
       get login_path
 
@@ -116,7 +122,7 @@ RSpec.describe "Sessions", type: :request do
 
     it "logs the user in with the code emailed after POST /login" do
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev" }
+        post login_path, params: { email: "dev@example.com" }
       end
 
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
@@ -130,7 +136,7 @@ RSpec.describe "Sessions", type: :request do
 
     it "rejects an incorrect code without logging in" do
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev" }
+        post login_path, params: { email: "dev@example.com" }
       end
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
       expect(raw_code).to be_present
@@ -144,7 +150,7 @@ RSpec.describe "Sessions", type: :request do
     it "locks out after 5 wrong attempts, invalidating the code" do
       user = User.create!(email: "dev@example.com", name: "Dev")
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev" }
+        post login_path, params: { email: "dev@example.com" }
       end
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
       expect(raw_code).to be_present
@@ -156,7 +162,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "describes the code field by the error after a wrong code, since focus skips the flash, and marks it invalid" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      post login_path, params: { email: "dev@example.com" }
       follow_redirect!
       post verify_login_code_path, params: { code: wrong_code_for(User.find_by!(email: "dev@example.com").generate_login_code!) }
 
@@ -167,7 +173,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "describes the code field by the expiry notice after a code is sent" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      post login_path, params: { email: "dev@example.com" }
       follow_redirect!
 
       field = Nokogiri::HTML(response.body).at_css("input[name=code]")
@@ -177,7 +183,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "keeps an error from requesting a new code off the pending code field" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      post login_path, params: { email: "dev@example.com" }
       follow_redirect!
       post login_path, params: { email: "not-an-email" }
 
@@ -200,7 +206,7 @@ RSpec.describe "Sessions", type: :request do
 
     it "issues a new session on code login" do
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev" }
+        post login_path, params: { email: "dev@example.com" }
       end
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
       pre_login_session_id = session.id.public_id
@@ -238,7 +244,7 @@ RSpec.describe "Sessions", type: :request do
 
     it "clears the pending-login state after a code login" do
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev" }
+        post login_path, params: { email: "dev@example.com" }
       end
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
 
@@ -259,7 +265,7 @@ RSpec.describe "Sessions", type: :request do
     it "sends an already-logged-in user home instead of claiming the session expired" do
       get login_path
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev",
+        post login_path, params: { email: "dev@example.com",
                                    authenticity_token: authenticity_token }
       end
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
@@ -333,7 +339,7 @@ RSpec.describe "Sessions", type: :request do
       user.anonymize!
 
       expect {
-        post login_path, params: { email: "gone@example.com", name: "Gone" }
+        post login_path, params: { email: "gone@example.com" }
       }.to change(User, :count).by(1)
 
       new_user = User.find_by(email: "gone@example.com")
@@ -363,7 +369,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "still offers the email form while a login is pending" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      post login_path, params: { email: "dev@example.com" }
 
       get login_path
 
@@ -371,7 +377,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "keeps the form reachable in a browser that did not request the code, so it can ask for its own" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      post login_path, params: { email: "dev@example.com" }
       user = User.find_by(email: "dev@example.com")
       code = user.generate_login_code!
 
@@ -383,7 +389,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "lets a new code be requested from the pending page" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      post login_path, params: { email: "dev@example.com" }
       get login_path
 
       expect {
@@ -392,7 +398,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "drops the pending state once the code it describes has expired" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      post login_path, params: { email: "dev@example.com" }
 
       travel(User::LOGIN_CODE_EXPIRY + 1.minute) do
         get login_path
@@ -405,7 +411,7 @@ RSpec.describe "Sessions", type: :request do
     # User.authenticate_login_code enforces the expiry, so this passes even without the session stamp's check.
     it "refuses a login code once the code's window has passed" do
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev" }
+        post login_path, params: { email: "dev@example.com" }
       end
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
 

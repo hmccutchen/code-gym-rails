@@ -10,7 +10,8 @@ RSpec.describe "Focus ring", type: :system do
       const target = document.querySelector(#{selector.to_json});
       const stops = [...document.querySelectorAll("a[href], button, input, textarea, select, summary, [tabindex='0']")]
         .filter(el => !el.disabled && el.checkVisibility());
-      stops[stops.indexOf(target) - 1].focus();
+      const previous = stops[stops.indexOf(target) - 1];
+      previous ? previous.focus() : document.activeElement.blur();
     JS
     page.send_keys(:tab)
     expect(page.evaluate_script("document.activeElement.matches(#{selector.to_json})")).to be(true)

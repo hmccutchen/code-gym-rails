@@ -547,7 +547,7 @@ groups of four. `InviteCode.find_by_code` ignores case, spaces and dashes.
 
 ### 6.2 Redemption, as built
 
-Two pages, one rule. `/trial/start` is public: a name, an email, the invite
+Two pages, one rule. `/trial/start` is public: an email, the invite
 code, a provider and the consent checkbox under the data notice.
 `POST /trial/start` checks the code (`InviteCode#available?`: a seat left
 before the deadline), the consent and the provider before it mails anything,
@@ -563,7 +563,7 @@ own is sent to Setup. Asking for a plain login code afterwards drops the
 pending trial.
 
 `/trial` is the same form for a signed-in account with no key, without the
-name and email, and, for a trial account, the trial's standing. A signed-out
+email, and, for a trial account, the trial's standing. A signed-out
 visit to `/trial` goes to `/trial/start`. Code guessing is limited at 10 per
 IP and 5 per account per hour. A missing consent, a provider with no house
 key, and a wrong, expired or full code each get one sentence; for the code:

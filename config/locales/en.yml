@@ -43,8 +43,6 @@ en:
       page_title: "Log in"
       intro_html: "Daily dev exercises.<br>Enter your email to get a login code."
       resend_prompt: "Didn't get the email? Request a new code below, or use a different address."
-      name_label: "Name (first time only)"
-      name_placeholder: "Your name"
       email_label: "Work email *"
       email_placeholder: "you@company.com"
       trial_link: "Have an invite code? Start a trial."

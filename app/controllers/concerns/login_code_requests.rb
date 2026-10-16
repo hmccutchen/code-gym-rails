@@ -28,9 +28,8 @@ module LoginCodeRequests
   end
 
   # `active` only: an anonymized row's email was rewritten, so this creates a fresh account instead.
-  def mail_login_code(email, name)
-    user = User.active.find_by(email: email) ||
-           User.create!(email: email, name: name.presence || email.split("@").first)
+  def mail_login_code(email)
+    user = User.active.find_by(email: email) || User.create!(email: email, name: email.split("@").first)
     UserMailer.login_code(user, user.generate_login_code!).deliver_later
 
     session[:pending_login_email] = email
