@@ -54,10 +54,7 @@ test built from the day's non-fourth kinds and `code_review` mode through
 architecture concept is offered only on an architecture day and a drilled
 data-modeling concept only when some section can tag it. A history entry
 ages out, but a drill persists until mastered and would otherwise claim a
-slot every day no section could carry it. The same test also filters every
-other reinforcement entry (`DailyPlan.host_test`), so a history entry no
-section can tag waits for a day that can host it instead of taking a slot
-the prompt cannot fill. When evidence-driven
+slot every day no section could carry it. When evidence-driven
 reinforcement is waiting, drills keep all but one host
 (`DailyPlan.share_hosts`), so a group drill larger than the day cannot
 starve the concept the ratings flagged; a one-host day still goes to the

@@ -1692,6 +1692,17 @@ RSpec.describe User, "#concepts_needing_reinforcement with drills", type: :model
       .to match_array(%w[n_plus_one sync_vs_async])
   end
 
+  it "with hostable:, offers only history entries the caller says today can host" do
+    exercise = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: { "code_review" => { "concept" => "n_plus_one" } })
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current - 1, submitted_at: Time.current,
+                          answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
+                          concept_tags: { "code_review" => "n_plus_one" }, ai_review: { "code_review" => { "rating" => "developing" } })
+
+    expect(user.concepts_needing_reinforcement(hostable: ->(*) { false })).to eq([])
+    expect(user.concepts_needing_reinforcement(hostable: ->(*) { true }).map { |h| h[:concept] }).to eq(%w[n_plus_one])
+  end
+
   it "applies the bucket filters to drilled concepts" do
     ConceptDrills.start!(user, concept: "scope_creep", bucket: "plan_review")
     ConceptDrills.start!(user, concept: "n_plus_one", bucket: "ruby_rails")

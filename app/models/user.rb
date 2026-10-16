@@ -306,6 +306,7 @@ class User < ApplicationRecord
 
         next if bucket && tag_bucket != bucket
         next if exclude_buckets.include?(tag_bucket)
+        next if hostable && !hostable.call(concept, tag_bucket)
 
         tier = concept_masteries.find_by(concept: concept, language: tag_bucket)&.tier || "standard"
         next if tier == "paused"

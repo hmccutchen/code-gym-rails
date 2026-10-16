@@ -108,9 +108,8 @@ class DailyPlan
   private_class_method :waiting_checks
 
   def self.main_track(user, language, kinds:, hosts:, due:)
-    hostable      = host_test(kinds: kinds, hosts: hosts)
-    reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS, hostable: hostable)
-                        .select { |h| hostable.call(h[:concept], h[:bucket]) }
+    reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
+                                                        hostable: host_test(kinds: kinds, hosts: hosts))
     capacity      = kinds.count { |kind| !kind.fourth? }
     reinforcement = share_hosts(reinforcement, capacity)
     slots         = capacity - reinforcement.size

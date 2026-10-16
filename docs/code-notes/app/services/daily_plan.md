@@ -12,7 +12,7 @@ The plan chooses the day's concepts so the caller can compare what was offered w
 
 Reinforcement is truncated to today's hosts because the prompt demands every concept it lists.
 
-Every reinforcement entry, drilled or from recent history, must pass the same `.host_test`: some non-fourth kind planned today can tag it through `DayHosts`. A bucket check alone let through a concept no section could tag, such as a meta-skill concept on a two-section `schema_review` day, where code review takes only data-modeling concepts and design comparison never takes meta-skill ones. A skipped history entry is not lost: it is offered again on the next day that can host it.
+Every reinforcement entry, drilled or from recent history, must pass the same `.host_test`: some non-fourth kind planned today can tag it through `DayHosts`. `User#concepts_needing_reinforcement` applies it to both through its `hostable:` argument. A bucket check alone let through a concept no section could tag, such as a meta-skill concept on a two-section `schema_review` day, where code review takes only data-modeling concepts and design comparison never takes meta-skill ones. A history entry left out is offered again on a later day that can host it, while it is still in recent history.
 
 The capacity count (every non-fourth kind) is deliberately approximate: on some days the fixed kinds host fewer concepts than that, and placement is advisory anyway.
 
@@ -22,7 +22,7 @@ The real-source choice is a second roll inside the mode, so `CODE_REVIEW_MODE_WE
 
 ## `.hostable_buckets`
 
-Both retention callers share this list, so reserving a slot and filling it read the same eligibility rule.
+Only `.established_concepts_for` reads this bucket list. Established concepts are optional prompt annotations, not concepts the prompt demands, so the looser bucket rule is enough there; reinforcement and retention checks use `DayHosts` instead.
 
 ## `.retention_checks_for`
 

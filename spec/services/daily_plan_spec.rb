@@ -752,6 +752,19 @@ RSpec.describe DailyPlan, "drilled concepts" do
     expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[memoization n_plus_one])
   end
 
+  it "holds no host back from a drill for evidence today cannot host" do
+    submit("reading_for_intent", date: Date.current - 1)
+    ConceptDrills.start_group!(user, group: "data_modeling", bucket: "ruby_rails")
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    pin_code_review_mode(:schema_review)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.reinforcement.map { |h| h[:concept] }).not_to include("reading_for_intent")
+    expect(plan.reinforcement.size).to eq(2)
+    expect(plan.reinforcement).to all(include(drilled: true))
+  end
+
   it "still gives a one-host share to the drill with evidence waiting" do
     drilled  = { concept: "memoization", bucket: "ruby_rails", tier: "standard", drilled: true }
     evidence = { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" }
