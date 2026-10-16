@@ -43,13 +43,17 @@ export default class extends Controller {
   async saveSkillLevel() {
     const select = this.skillLevelTarget
     const level = select.value
+    trackReply.start()
     this.dispatch("trackSaving", { target: document })
     const result = await this.queueSave("skill_level", { skill_level: level }, { line: "exercise_mix" })
-    if (!result.ok) return this.dispatch("trackFailed", { target: document })
+    if (!result.ok) {
+      trackReply.finish(null)
+      return this.dispatch("trackFailed", { target: document })
+    }
 
     // A track change can clear targets; the Exercise mix adopts the saved state rather than keep its own copy.
     const reply = Object.assign({ kind_rungs: result.data.kind_rungs }, result.data.preferences)
-    trackReply.record(reply)
+    trackReply.finish(reply)
     this.dispatch("trackSaved", { target: document, detail: reply })
     this.keptOwnLevelTarget.textContent = result.data.kept_own_level
 

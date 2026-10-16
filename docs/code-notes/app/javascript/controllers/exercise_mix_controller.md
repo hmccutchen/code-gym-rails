@@ -122,7 +122,9 @@ the pending save would post a step the server no longer recognizes and get a
 The track select saves on this controller's queue line (`line:` in
 `code_gym/save_status`), and just before it queues its save it dispatches
 `profile-preferences:trackSaving`, which runs `holdForTrackSave`. That disables
-the prepare button until the track save ends, since preparing guidance while
+the prepare button, and `settlePrepareButton` keeps it disabled while
+`code_gym/track_reply` reports a track save in flight, which also covers a mix
+that connected mid-save and never saw the event, since preparing guidance while
 the levels are changing would bill jobs for the old ones, and queues a mix edit
 still inside its 400 ms delay at once, ahead of the track save. Edits are saved in
 the order the user made them, so a lock set just before a track change reaches

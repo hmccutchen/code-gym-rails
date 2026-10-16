@@ -1,6 +1,7 @@
 # `code_gym/track_reply`
 
-Holds the last successful track save's reply until the Exercise mix claims it.
+Holds the last successful track save's reply until the Exercise mix claims it,
+and says whether a track save is in flight.
 
 Setup's track select and the Exercise mix are separate Stimulus controllers,
 and importmap loads each controller module on its own, so either can connect
@@ -18,3 +19,10 @@ form and version back.
 
 The value is per page load: the module is a singleton for the document, and
 this app's layout loads no Turbo, so a navigation starts it empty.
+
+`start` and `finish` count track saves in flight, so `saving()` is true from
+just before the track select queues its save until it has its reply, success or
+failure. The mix reads it in `settlePrepareButton` and in `connect`. A mix that
+connects while a track save is still on the wire never saw `trackSaving`, so
+without this its Prepare AI guidance button would stay enabled and could bill
+jobs for the old levels until the reply arrived.

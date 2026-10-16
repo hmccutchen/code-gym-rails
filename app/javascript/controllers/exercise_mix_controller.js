@@ -31,6 +31,7 @@ export default class extends Controller {
     const missedReply = trackReply.take()
     if (missedReply) this.adoptReply(missedReply, early)
     if (early) this.adoptEarlyEdit()
+    if (trackReply.saving()) this.prepareButtonTarget.disabled = true
   }
 
   editedBeforeConnect() {
@@ -163,7 +164,7 @@ export default class extends Controller {
   }
 
   settlePrepareButton() {
-    this.prepareButtonTarget.disabled = !this.savedLatest || this.pending !== null || saveStatus.queued("exercise_mix")
+    this.prepareButtonTarget.disabled = !this.savedLatest || this.pending !== null || saveStatus.queued("exercise_mix") || trackReply.saving()
   }
 
   editsSince(before, after) {

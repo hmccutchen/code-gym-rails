@@ -1,8 +1,18 @@
 // Design notes: docs/code-notes/app/javascript/code_gym/track_reply.md
 let unclaimed = null
+let inFlight = 0
 
-export function record(reply) {
-  unclaimed = reply
+export function start() {
+  inFlight++
+}
+
+export function finish(reply) {
+  inFlight--
+  if (reply) unclaimed = reply
+}
+
+export function saving() {
+  return inFlight > 0
 }
 
 export function take() {
@@ -11,4 +21,4 @@ export function take() {
   return reply
 }
 
-export default { record, take }
+export default { start, finish, saving, take }

@@ -272,6 +272,40 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(errors).to be_empty
   end
 
+  it "holds Prepare AI guidance when the Exercise mix connects while a track save is still in flight" do
+    user.update_columns(skill_level: "junior", section_kind_levels: { "challenge" => "junior", "pattern" => "senior" })
+    watch_page_errors
+    visit_as(user)
+    visit setup_path
+    expect(page).to have_css("#mix-ladder-preparation:not([hidden])", visible: :all)
+    url = page.current_url
+    stalled[:controller] = "exercise_mix_controller"
+    allow_any_instance_of(ProfileController).to receive(:update).and_wrap_original do |original, *args|
+      sleep 5 if original.receiver.params.dig(:user, :skill_level)
+      original.call(*args)
+    end
+
+    page.driver.with_playwright_page do |pw|
+      pw.goto(url, waitUntil: "domcontentloaded")
+      pw.evaluate(<<~JS)
+        (() => {
+          const select = document.getElementById("skill-level");
+          select.value = "mid_level";
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        })()
+      JS
+    end
+    mix_connected = %(!!window.Stimulus && !!window.Stimulus.getControllerForElementAndIdentifier(document.getElementById("exercise-mix"), "exercise-mix"))
+    wait_for { page.evaluate_script(mix_connected) }
+    expect(page.evaluate_script(mix_connected)).to be(true)
+    expect(user.reload.skill_level).to eq("junior")
+    expect(page).to have_css("#mix-ladder-preparation button[disabled]", visible: :all)
+
+    wait_for(15) { user.reload.skill_level == "mid_level" }
+    expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all, wait: 5)
+    expect(errors).to be_empty
+  end
+
   it "saves a Setup preference chosen while the modules are still loading" do
     watch_page_errors
     visit_as(user)
