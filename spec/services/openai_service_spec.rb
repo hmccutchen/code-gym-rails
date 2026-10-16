@@ -40,7 +40,7 @@ RSpec.describe OpenaiService do
   def call_with(response_body, **kwargs)
     bodies = []
     service.instance_variable_set(:@conn, recording_connection(bodies, response_body))
-    result = service.send(:call, system: "sys", prompt: "prompt text", **kwargs)
+    result = call_provider(service, system: "sys", prompt: "prompt text", **kwargs)
     [ bodies.sole, result ]
   end
 
@@ -51,7 +51,7 @@ RSpec.describe OpenaiService do
 
     def logged_call(body, **options)
       service.instance_variable_set(:@conn, recording_connection([], body))
-      service.send(:call_and_log, user, purpose: "duck_thread", system: "sys", prompt: "p", **options)
+      service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", **options))
     end
 
     %w[failed cancelled queued in_progress unknown].push(nil).each do |status|
@@ -104,7 +104,7 @@ RSpec.describe OpenaiService do
   it "raises InvalidResponseError when a successful response body is not JSON" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "<html>Bad gateway</html>" ] ]))
 
-    expect { service.send(:call, system: "sys", prompt: "p") }
+    expect { call_provider(service, system: "sys", prompt: "p") }
       .to raise_error(AiService::InvalidResponseError, /OpenAI returned an unreadable response/)
   end
 
@@ -124,7 +124,7 @@ RSpec.describe OpenaiService do
   it "raises InvalidResponseError rather than a TypeError when a successful response body is not a JSON object" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "[]" ] ]))
 
-    expect { service.send(:call, system: "sys", prompt: "p") }
+    expect { call_provider(service, system: "sys", prompt: "p") }
       .to raise_error(AiService::InvalidResponseError, /OpenAI returned an unreadable response/)
   end
 
@@ -151,7 +151,7 @@ RSpec.describe OpenaiService do
       end)
 
       expect {
-        service.send(:call, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
+        call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
       }.to raise_error(AiService::TimeoutError, /Network error calling OpenAI/)
       expect(attempts).to eq(1)
     end
@@ -164,7 +164,7 @@ RSpec.describe OpenaiService do
       end)
 
       expect {
-        service.send(:call, system: "sys", prompt: "p", max_tokens: AiService::JUDGE_MAX_TOKENS, purpose: "judge_section")
+        call_provider(service, system: "sys", prompt: "p", max_tokens: AiService::JUDGE_MAX_TOKENS, purpose: "judge_section")
       }.to raise_error(AiService::TimeoutError)
       expect(attempts).to eq(1)
     end
@@ -176,7 +176,7 @@ RSpec.describe OpenaiService do
         f.adapter(:test) { |stub| stub.post(OpenaiService::API_URL) { attempts += 1; raise Faraday::TimeoutError } }
       end)
 
-      expect { service.send(:call, system: "sys", prompt: "p", max_tokens: 250) }.to raise_error(AiService::TimeoutError)
+      expect { call_provider(service, system: "sys", prompt: "p", max_tokens: 250) }.to raise_error(AiService::TimeoutError)
       expect(attempts).to eq(OpenaiService::RETRY_OPTIONS[:max] + 1)
     end
 
@@ -184,7 +184,7 @@ RSpec.describe OpenaiService do
       responses = [ [ 429, "" ], [ 200, hello.to_json ] ]
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
-      expect(service.send(:call, system: "sys", prompt: "p")[:text]).to eq("hello")
+      expect(call_provider(service, system: "sys", prompt: "p")[:text]).to eq("hello")
       expect(responses).to be_empty
     end
 
@@ -192,7 +192,7 @@ RSpec.describe OpenaiService do
       responses = Array.new(4) { [ 429, "" ] }
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
-      expect { service.send(:call, system: "sys", prompt: "p") }.to raise_error(AiService::RateLimitError)
+      expect { call_provider(service, system: "sys", prompt: "p") }.to raise_error(AiService::RateLimitError)
       expect(responses.size).to eq(1)
     end
 
@@ -200,7 +200,7 @@ RSpec.describe OpenaiService do
       responses = [ [ 401, { "error" => { "message" => "Incorrect API key provided" } }.to_json ], [ 200, hello.to_json ] ]
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
-      expect { service.send(:call, system: "sys", prompt: "p") }
+      expect { call_provider(service, system: "sys", prompt: "p") }
         .to raise_error(AiService::AuthenticationError, "OpenAI rejected your API key or its permissions. Check it in Settings.")
       expect(responses.size).to eq(1)
     end
@@ -211,7 +211,7 @@ RSpec.describe OpenaiService do
         service.instance_variable_set(:@conn, stubbed_connection([ [ status, body ] ]))
         allow(Rails.logger).to receive(:error)
 
-        expect { service.send(:call, system: "sys", prompt: "p") }
+        expect { call_provider(service, system: "sys", prompt: "p") }
           .to raise_error(AiService::AuthenticationError, "OpenAI rejected your API key or its permissions. Check it in Settings.") { |error|
             expect(error.http_status).to eq(status)
           }
@@ -223,7 +223,7 @@ RSpec.describe OpenaiService do
       responses = Array.new(3) { [ 429, "" ] }
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
-      expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::RateLimitError)
+      expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::RateLimitError)
       expect(responses.size).to eq(2)
     end
   end
@@ -250,7 +250,7 @@ RSpec.describe OpenaiService do
                             "type" => "insufficient_quota", "code" => "insufficient_quota" } }.to_json
       service.instance_variable_set(:@conn, stubbed_connection([ [ 429, body ] ]))
 
-      expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }
+      expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }
         .to raise_error(AiService::BillingError) { |e|
           expect(e.http_status).to eq(429)
           expect(e.message).not_to include("exceeded")
@@ -260,11 +260,11 @@ RSpec.describe OpenaiService do
     it "falls back to the status when the error envelope is null" do
       allow(Rails.logger).to receive(:warn)
       service.instance_variable_set(:@conn, stubbed_connection([ [ 429, { "error" => nil }.to_json ] ]))
-      expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }
+      expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }
         .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("rate_limit_exceeded") }
 
       service.instance_variable_set(:@conn, stubbed_connection([ [ 402, { "error" => nil }.to_json ] ]))
-      expect { service.send(:call, system: "sys", prompt: "p") }.to raise_error(AiService::BillingError)
+      expect { call_provider(service, system: "sys", prompt: "p") }.to raise_error(AiService::BillingError)
     end
 
     it "names the exhausted limit and the wait on a rate-limit 429" do
@@ -274,7 +274,7 @@ RSpec.describe OpenaiService do
       end
       service.instance_variable_set(:@conn, conn)
 
-      expect { service.send(:call, system: "sys", prompt: "p") }
+      expect { call_provider(service, system: "sys", prompt: "p") }
         .to raise_error(AiService::RateLimitError) { |e|
           expect(e.quota_id).to eq("x-ratelimit-requests")
           expect(e.retry_after).to eq(20)
@@ -310,7 +310,7 @@ RSpec.describe OpenaiService do
     it "refuses a capped call routed to a model that cannot turn reasoning off" do
       service.instance_variable_set(:@conn, stubbed_connection([]))
 
-      expect { service.send(:call, system: "sys", prompt: "p", max_tokens: 250, purpose: "generate_exercise") }
+      expect { call_provider(service, system: "sys", prompt: "p", max_tokens: 250, purpose: "generate_exercise") }
         .to raise_error(AiService::UnsupportedRouteError, /gpt-6.1-sol/)
     end
 
@@ -384,7 +384,7 @@ RSpec.describe OpenaiService do
     it "raises AiService::Error on a non-success response without leaking the raw body" do
       service.instance_variable_set(:@conn, stubbed_connection([ [ 400, "<html>secret page</html>" ] ]))
 
-      expect { service.send(:call, system: "sys", prompt: "p") }
+      expect { call_provider(service, system: "sys", prompt: "p") }
         .to raise_error(AiService::Error, "OpenAI API error 400") { |error| expect(error.http_status).to eq(400) }
     end
   end

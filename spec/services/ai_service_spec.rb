@@ -107,11 +107,11 @@ RSpec.describe AiService do
 
       private
 
-      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-        @last_read_timeout = read_timeout
-        @last_max_tokens   = max_tokens
-        @last_prompt       = prompt
-        self.class.read_timeouts_by_purpose << [ purpose, read_timeout ]
+      def call(request)
+        @last_read_timeout = request.read_timeout
+        @last_max_tokens   = request.max_tokens
+        @last_prompt       = request.prompt
+        self.class.read_timeouts_by_purpose << [ request.purpose, request.read_timeout ]
         { text: @canned_text, input_tokens: @input_tokens, output_tokens: @output_tokens, truncated: @truncated }
       end
 
@@ -132,9 +132,9 @@ RSpec.describe AiService do
 
       private
 
-      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
+      def call(request)
         text =
-          if system.include?("rating how hard")
+          if request.system.include?("rating how hard")
             raise AiService::RateLimitError, "rate limited" if @difficulty == :raise
 
             @difficulty.to_json
@@ -183,9 +183,8 @@ RSpec.describe AiService do
       judge_review
     ].freeze
 
-    it "covers every purpose except the two conversational ones" do
-      all_purposes = File.read(Rails.root.join("app/services/ai_service.rb"))
-                         .scan(/purpose: "(\w+)"/).flatten.uniq
+    it "covers every profiled purpose except the two conversational ones" do
+      all_purposes = AiService::CALL_PROFILES.keys
 
       expect(all_purposes).to contain_exactly(*SINGLE_SHOT_PURPOSES, "review_follow_up", "duck_thread")
     end
@@ -193,11 +192,9 @@ RSpec.describe AiService do
     it "reaches the provider with no conversational history, from every one of them" do
       histories = []
       spy_class = Class.new(double_class) do
-        define_method(:call) do |system:, prompt:, cache_system: false,
-                                 read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false|
-          histories << history
-          super(system: system, prompt: prompt, cache_system: cache_system,
-                read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose)
+        define_method(:call) do |request|
+          histories << request.history
+          super(request)
         end
       end
 
@@ -261,7 +258,7 @@ RSpec.describe AiService do
         model: "claude-sonnet-5-5", cache_read_tokens: 900, cache_write_tokens: 1_100
       )
 
-      svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p")
+      svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p"))
 
       expect(ApiUsage.last).to have_attributes(
         purpose: "duck_thread", model: "claude-sonnet-5-5", tokens_in: 120, tokens_out: 80,
@@ -277,7 +274,7 @@ RSpec.describe AiService do
       svc = double_class.new
       allow(svc).to receive(:call).and_return(text: "{}", input_tokens: 1, output_tokens: 1, truncated: false, http_status: 200)
 
-      svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p")
+      svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p"))
 
       expect(ApiUsage.last).to have_attributes(provider: double_class.provider_key, http_status: 200, failure: nil, quota_id: nil, house_key: false)
     end
@@ -288,7 +285,7 @@ RSpec.describe AiService do
       allow(svc).to receive(:call).and_raise(error)
 
       expect {
-        expect { svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p") }.to raise_error { |e| expect(e).to equal(error) }
+        expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error { |e| expect(e).to equal(error) }
       }.to change(ApiUsage, :count).by(1)
 
       expect(ApiUsage.last).to have_attributes(
@@ -308,7 +305,7 @@ RSpec.describe AiService do
         svc = double_class.new
         allow(svc).to receive(:call).and_raise(error)
 
-        expect { svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p") }.to raise_error(error.class)
+        expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(error.class)
         expect(ApiUsage.last).to have_attributes(failure: code, http_status: error.http_status)
       end
     end
@@ -316,11 +313,11 @@ RSpec.describe AiService do
     it "marks a refused or truncated reply on the row that carries its tokens" do
       svc = double_class.new
       allow(svc).to receive(:call).and_return(text: nil, input_tokens: 700, output_tokens: 0, truncated: false, refusal: "cyber")
-      expect { svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p") }.to raise_error(AiService::RefusalError)
+      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(AiService::RefusalError)
       expect(ApiUsage.last).to have_attributes(failure: "refusal", tokens_in: 700)
 
       allow(svc).to receive(:call).and_return(text: "{", input_tokens: 10, output_tokens: 400, truncated: true)
-      expect { svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p") }.to raise_error(AiService::TruncatedResponseError)
+      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(AiService::TruncatedResponseError)
       expect(ApiUsage.last).to have_attributes(failure: "truncated", tokens_out: 400)
     end
 
@@ -330,7 +327,7 @@ RSpec.describe AiService do
       allow(ApiUsage).to receive(:create!).and_raise(ActiveRecord::StatementInvalid, "table gone")
       allow(Rails.logger).to receive(:warn)
 
-      expect { svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p") }.to raise_error(AiService::TimeoutError, "slow")
+      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(AiService::TimeoutError, "slow")
     end
   end
 
@@ -2562,9 +2559,9 @@ RSpec.describe AiService do
         context = svc.send(:build_review_day_context, "Rails", exercise, resp)
         expect(context).to include("Their answer: (skipped)")
         expect(context).not_to include(answer)
-        expect(svc).to receive(:call).with(hash_including(prompt: include("Their answer: (skipped)"))).and_call_original
+        expect(svc).to receive(:call).with(having_attributes(prompt: include("Their answer: (skipped)"))).and_call_original
         svc.explain_differently(user, exercise, resp, section: "pattern")
-        expect(svc).to receive(:call).with(hash_including(prompt: include("Their answer was: (skipped)"))).and_call_original
+        expect(svc).to receive(:call).with(having_attributes(prompt: include("Their answer was: (skipped)"))).and_call_original
         svc.answer_follow_up(user, exercise, resp, section: "pattern", question: "Why?", thread: [])
       end
     end
@@ -2952,8 +2949,8 @@ RSpec.describe AiService do
 
         private
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-          raise ActiveRecord::ConnectionTimeoutError, "could not obtain a connection" if prompt.include?('"pattern"')
+        def call(request)
+          raise ActiveRecord::ConnectionTimeoutError, "could not obtain a connection" if request.prompt.include?('"pattern"')
 
           { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
         end
@@ -2977,7 +2974,7 @@ RSpec.describe AiService do
 
         private
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
+        def call(_request)
           nil.this_method_does_not_exist
         end
 
@@ -3094,7 +3091,7 @@ RSpec.describe AiService do
 
         private
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
+        def call(_request)
           # #active_connection? returns the connection or nil, not a boolean.
           self.class.held_connection_during_call = ActiveRecord::Base.connection_pool.active_connection?
           { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
@@ -3121,10 +3118,10 @@ RSpec.describe AiService do
     let(:capturing_class) do
       Class.new(double_class) do
         attr_reader :last_system, :last_prompt, :last_max_tokens
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-          @last_system = system
-          @last_prompt = prompt
-          @last_max_tokens = max_tokens
+        def call(request)
+          @last_system = request.system
+          @last_prompt = request.prompt
+          @last_max_tokens = request.max_tokens
           super
         end
       end
@@ -3217,8 +3214,8 @@ RSpec.describe AiService do
           "<<explain-differently:#{subject}>>"
         end
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-          @last_prompt = prompt
+        def call(request)
+          @last_prompt = request.prompt
           super
         end
       end
@@ -3263,8 +3260,8 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-          @last_prompt = prompt
+        def call(request)
+          @last_prompt = request.prompt
           super
         end
       end
@@ -3309,8 +3306,8 @@ RSpec.describe AiService do
       } })
       spy_class = Class.new(double_class) do
         attr_reader :last_system
-        def call(system:, **kwargs)
-          @last_system = system
+        def call(request)
+          @last_system = request.system
           super
         end
       end
@@ -3337,10 +3334,10 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt, :last_system, :last_history
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-          @last_system  = system
-          @last_prompt  = prompt
-          @last_history = history
+        def call(request)
+          @last_system  = request.system
+          @last_prompt  = request.prompt
+          @last_history = request.history
           super
         end
       end
@@ -3396,9 +3393,9 @@ RSpec.describe AiService do
       Class.new(double_class) do
         attr_reader :last_prompt, :last_system
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-          @last_system = system
-          @last_prompt = prompt
+        def call(request)
+          @last_system = request.system
+          @last_prompt = request.prompt
           super
         end
       end
@@ -3592,10 +3589,10 @@ RSpec.describe AiService do
       Class.new(double_class) do
         attr_reader :last_prompt, :last_system, :last_history
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-          @last_system  = system
-          @last_prompt  = prompt
-          @last_history = history
+        def call(request)
+          @last_system  = request.system
+          @last_prompt  = request.prompt
+          @last_history = request.history
           super
         end
       end
@@ -3873,9 +3870,9 @@ RSpec.describe AiService do
 
     def captured_call(thread:)
       captured = nil
-      allow(service).to receive(:call).and_wrap_original do |original, **kwargs|
-        captured = kwargs
-        original.call(**kwargs)
+      allow(service).to receive(:call).and_wrap_original do |original, request|
+        captured = request
+        original.call(request)
       end
       service.duck_response(user, exercise, section: "code_review", message: "why is this slow?", thread: thread)
       captured
@@ -3887,36 +3884,36 @@ RSpec.describe AiService do
         { role: "assistant", content: "what does the loop do?" }
       ]
 
-      kwargs = captured_call(thread: thread)
+      request = captured_call(thread: thread)
 
-      expect(kwargs[:history]).to eq(UserText.tag_history(thread))
-      expect(kwargs[:history].map { |turn| turn[:role] }).to eq(%w[user assistant])
-      expect(kwargs[:history].last[:content]).to eq("what does the loop do?")
-      expect(kwargs[:prompt]).not_to include("Conversation so far:")
-      expect(kwargs[:prompt]).not_to include("is this N+1?")
+      expect(request.history).to eq(UserText.tag_history(thread))
+      expect(request.history.map { |turn| turn[:role] }).to eq(%w[user assistant])
+      expect(request.history.last[:content]).to eq("what does the loop do?")
+      expect(request.prompt).not_to include("Conversation so far:")
+      expect(request.prompt).not_to include("is this N+1?")
     end
 
     it "asks for the system prompt to be cached" do
-      expect(captured_call(thread: [])[:cache_system]).to be(true)
+      expect(captured_call(thread: []).cache_system).to be(true)
     end
 
     it "moves the section context into system, where it is sent once" do
-      kwargs = captured_call(thread: [])
+      request = captured_call(thread: [])
 
-      expect(kwargs[:system]).to include(AiService::DUCK_SYSTEM_PROMPT)
-      expect(kwargs[:system]).to include(exercise.problem_set.dig("code_review", "question"))
-      expect(kwargs[:prompt]).not_to include(exercise.problem_set.dig("code_review", "question"))
+      expect(request.system).to include(AiService::DUCK_SYSTEM_PROMPT)
+      expect(request.system).to include(exercise.problem_set.dig("code_review", "question"))
+      expect(request.prompt).not_to include(exercise.problem_set.dig("code_review", "question"))
     end
 
     it "keeps the per-turn directive attached to the new turn" do
-      kwargs = captured_call(thread: [])
+      request = captured_call(thread: [])
 
-      expect(kwargs[:prompt]).to include("why is this slow?")
-      expect(kwargs[:prompt]).to include("Respond as their Socratic thinking partner")
+      expect(request.prompt).to include("why is this slow?")
+      expect(request.prompt).to include("Respond as their Socratic thinking partner")
     end
 
     it "keeps its output ceiling" do
-      expect(captured_call(thread: [])[:max_tokens]).to eq(AiService::DUCK_RESPONSE_MAX_TOKENS)
+      expect(captured_call(thread: []).max_tokens).to eq(AiService::DUCK_RESPONSE_MAX_TOKENS)
     end
 
     it "still routes to the duck branch of FakeService" do
@@ -3942,9 +3939,9 @@ RSpec.describe AiService do
 
     def captured_call(thread:)
       captured = nil
-      allow(service).to receive(:call).and_wrap_original do |original, **kwargs|
-        captured = kwargs
-        original.call(**kwargs)
+      allow(service).to receive(:call).and_wrap_original do |original, request|
+        captured = request
+        original.call(request)
       end
       service.answer_follow_up(user, exercise, daily_response,
                                section: "code_review", question: "why does that matter?", thread: thread)
@@ -3957,38 +3954,38 @@ RSpec.describe AiService do
         { role: "assistant", content: "the eager load" }
       ]
 
-      kwargs = captured_call(thread: thread)
+      request = captured_call(thread: thread)
 
-      expect(kwargs[:history]).to eq(UserText.tag_history(thread))
-      expect(kwargs[:history].map { |turn| turn[:role] }).to eq(%w[user assistant])
-      expect(kwargs[:history].last[:content]).to eq("the eager load")
-      expect(kwargs[:prompt]).not_to include("Conversation so far:")
-      expect(kwargs[:prompt]).not_to include("what did I miss?")
+      expect(request.history).to eq(UserText.tag_history(thread))
+      expect(request.history.map { |turn| turn[:role] }).to eq(%w[user assistant])
+      expect(request.history.last[:content]).to eq("the eager load")
+      expect(request.prompt).not_to include("Conversation so far:")
+      expect(request.prompt).not_to include("what did I miss?")
     end
 
     it "does not ask for caching, unlike the duck" do
-      expect(captured_call(thread: [])[:cache_system]).to be_falsey
+      expect(captured_call(thread: []).cache_system).to be_falsey
     end
 
     it "moves the provider-authored question and review into system" do
-      kwargs = captured_call(thread: [])
+      request = captured_call(thread: [])
 
-      expect(kwargs[:system]).to include(exercise.problem_set.dig("code_review", "question"))
-      expect(kwargs[:prompt]).not_to include(exercise.problem_set.dig("code_review", "question"))
+      expect(request.system).to include(exercise.problem_set.dig("code_review", "question"))
+      expect(request.prompt).not_to include(exercise.problem_set.dig("code_review", "question"))
     end
 
     it "keeps the engineer's own answer in the user turn, never in system" do
-      kwargs = captured_call(thread: [])
+      request = captured_call(thread: [])
 
-      expect(kwargs[:prompt]).to include(daily_response.answers["code_review"])
-      expect(kwargs[:system]).not_to include(daily_response.answers["code_review"])
+      expect(request.prompt).to include(daily_response.answers["code_review"])
+      expect(request.system).not_to include(daily_response.answers["code_review"])
     end
 
     it "keeps the per-turn directive attached to the new turn" do
-      kwargs = captured_call(thread: [])
+      request = captured_call(thread: [])
 
-      expect(kwargs[:prompt]).to include("why does that matter?")
-      expect(kwargs[:prompt]).to include("Answer it directly.")
+      expect(request.prompt).to include("why does that matter?")
+      expect(request.prompt).to include("Answer it directly.")
     end
 
     it "still routes to the follow-up branch of FakeService" do
@@ -4028,8 +4025,8 @@ RSpec.describe AiService do
       Class.new(double_class) do
         define_singleton_method(:calls) { calls }
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-          self.class.calls << "#{system}\n#{prompt}"
+        def call(request)
+          self.class.calls << "#{request.system}\n#{request.prompt}"
           super
         end
       end
@@ -4296,8 +4293,8 @@ RSpec.describe AiService do
       Class.new(double_class) do
         attr_reader :last_system
 
-        def call(system:, **options)
-          @last_system = system
+        def call(request)
+          @last_system = request.system
           super
         end
       end
@@ -4539,11 +4536,9 @@ RSpec.describe AiService do
       exercise, response = loaded_day
       caps = []
       capturing_class = Class.new(double_class) do
-        define_method(:call) do |system:, prompt:, cache_system: false,
-                                 read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false|
-          caps << [ system.include?("rating how hard") ? :difficulty : :grade, max_tokens ]
-          super(system: system, prompt: prompt, cache_system: cache_system,
-                read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose)
+        define_method(:call) do |request|
+          caps << [ request.system.include?("rating how hard") ? :difficulty : :grade, request.max_tokens ]
+          super(request)
         end
       end
 
@@ -4848,27 +4843,29 @@ RSpec.describe AiService, "#judge_section" do
   it "sends the section, its concept, rung, lock state and the kind's task, and never another section or history" do
     svc = FakeService.new("fake-key")
     captured = nil
-    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
 
     svc.judge_section(user, ExerciseSection::CodeReview, section, rung: "senior", locked: true)
 
-    expect(captured[:purpose]).to eq("judge_section")
-    expect(captured[:max_tokens]).to eq(AiService::JUDGE_MAX_TOKENS)
-    expect(captured[:system]).to include("checking one section of a generated coding exercise")
-    expect(captured[:system]).to include("Never reject a problem for being hard.")
-    expect(captured[:prompt]).to include("n_plus_one").and include("senior").and include("locked").and include(ExerciseSection::CodeReview.judge_task)
-    expect(captured[:prompt]).not_to include("Recent performance")
-    expect(captured.fetch(:history, [])).to eq([])
+    expect(captured.purpose).to eq("judge_section")
+    expect(captured.max_tokens).to eq(AiService::JUDGE_MAX_TOKENS)
+    expect(captured).to have_attributes(read_timeout: AiService::READ_TIMEOUT, cache_system: false,
+                                        single_attempt: false, allow_truncated: false)
+    expect(captured.system).to include("checking one section of a generated coding exercise")
+    expect(captured.system).to include("Never reject a problem for being hard.")
+    expect(captured.prompt).to include("n_plus_one").and include("senior").and include("locked").and include(ExerciseSection::CodeReview.judge_task)
+    expect(captured.prompt).not_to include("Recent performance")
+    expect(captured.history).to eq([])
   end
 
   it "asks the provider for a reply shaped by the kind's verdict schema" do
     svc = FakeService.new("fake-key")
     captured = nil
-    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
 
     svc.judge_section(user, ExerciseSection::Pattern, section, rung: "senior", locked: false)
 
-    expect(captured[:response_schema]).to eq(JudgeVerdict.schema_for(ExerciseSection::Pattern))
+    expect(captured.response_schema).to eq(JudgeVerdict.schema_for(ExerciseSection::Pattern))
   end
 
   it "returns a parsed verdict" do
@@ -4878,7 +4875,7 @@ RSpec.describe AiService, "#judge_section" do
   it "never sends the design comparison's answer key, and asks for its blind solve" do
     svc = FakeService.new("fake-key")
     captured = nil
-    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
     comparison = { "title" => "Rates", "scenario" => "A carrier a month.", "question" => "Which fits?",
                    "piece_a" => "class A; end", "piece_b" => "class B; end", "concept" => "open_closed",
                    "answer_key" => { "better" => "b", "deciding_fact" => "SECRET", "principle" => "SECRET",
@@ -4886,9 +4883,9 @@ RSpec.describe AiService, "#judge_section" do
 
     verdict = svc.judge_section(user, ExerciseSection::DesignComparison, comparison, rung: "senior", locked: false)
 
-    expect(captured[:prompt]).not_to include("SECRET")
-    expect(captured[:prompt]).not_to include("answer_key")
-    expect(captured[:prompt]).to include("Solve it before judging", "class A; end", "class B; end")
+    expect(captured.prompt).not_to include("SECRET")
+    expect(captured.prompt).not_to include("answer_key")
+    expect(captured.prompt).to include("Solve it before judging", "class A; end", "class B; end")
     expect(verdict.solve).to eq("b")
   end
 
@@ -4906,35 +4903,35 @@ RSpec.describe AiService, "#judge_section" do
   it "never sends the ambiguity hunt's answer key" do
     svc = FakeService.new("fake-key")
     captured = nil
-    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
     hunt = { "request" => "Build a leaderboard", "question" => "q", "teaching_note" => "t", "concept" => "scope_creep", "planted_ambiguities" => [ "SECRET" ] }
 
     svc.judge_section(user, ExerciseSection::AmbiguityHunt, hunt, rung: "junior", locked: false)
 
-    expect(captured[:prompt]).not_to include("SECRET")
+    expect(captured.prompt).not_to include("SECRET")
   end
 
   it "never sends the server's own stamps, and still sends the current schema" do
     svc = FakeService.new("fake-key")
     captured = nil
-    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
     stamped = section.merge("eased" => true, "source" => "excerpt-trace-id",
                             "current_schema" => "create_table :orders do |t|")
 
     svc.judge_section(user, ExerciseSection::CodeReview, stamped, rung: "senior", locked: false)
 
-    ProblemSetIngest::SERVER_STAMPS.each { |stamp| expect(captured[:prompt]).not_to include(stamp) }
-    expect(captured[:prompt]).not_to include("excerpt-trace-id")
-    expect(captured[:prompt]).to include("create_table :orders")
+    ProblemSetIngest::SERVER_STAMPS.each { |stamp| expect(captured.prompt).not_to include(stamp) }
+    expect(captured.prompt).not_to include("excerpt-trace-id")
+    expect(captured.prompt).to include("create_table :orders")
   end
 
   describe "a kind's own judge guidance" do
     def judge_prompt_for(kind)
       svc = FakeService.new("fake-key")
       captured = nil
-      allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+      allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
       svc.judge_section(user, kind, section.except("pitched_at"), rung: "senior", locked: false)
-      captured[:prompt]
+      captured.prompt
     end
 
     it "leaves the prompt as it has always read when the kind has none" do
@@ -5159,7 +5156,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     end
     svc = FakeService.new("fake-key")
     prompts = []
-    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| prompts << kw[:prompt]; m.call(*args, **kw) }
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original { |m, *args| prompts << args.last.prompt; m.call(*args) }
 
     svc.generate_judged_exercise(user, language: "ruby_rails")
 
@@ -5183,12 +5180,12 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     generate_calls = 0
     svc = FakeService.new("fake-key")
-    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
-      if kw[:purpose] == "generate_exercise"
+    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args|
+      if args.last.purpose == "generate_exercise"
         generate_calls += 1
         { text: draft.to_json, input_tokens: 0, output_tokens: 0 }
       else
-        m.call(*args, **kw)
+        m.call(*args)
       end
     end
 
@@ -5215,12 +5212,12 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     generate_calls = 0
     svc = FakeService.new("fake-key")
-    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
-      if kw[:purpose] == "generate_exercise"
+    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args|
+      if args.last.purpose == "generate_exercise"
         generate_calls += 1
         { text: draft.to_json, input_tokens: 0, output_tokens: 0 }
       else
-        m.call(*args, **kw)
+        m.call(*args)
       end
     end
 
@@ -5249,13 +5246,13 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     prompts = []
     generate_calls = 0
     svc = FakeService.new("fake-key")
-    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
-      if kw[:purpose] == "generate_exercise"
+    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args|
+      if args.last.purpose == "generate_exercise"
         generate_calls += 1
-        prompts << kw[:prompt]
+        prompts << args.last.prompt
         { text: draft.to_json, input_tokens: 0, output_tokens: 0 }
       else
-        m.call(*args, **kw)
+        m.call(*args)
       end
     end
 
@@ -5393,11 +5390,12 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       kind == ExerciseSection::Pattern ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
     end
     timeouts = {}
-    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
-      if %w[generate_exercise retry_section].include?(kw[:purpose])
-        timeouts[kw[:purpose]] = kw[:read_timeout]
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args|
+      request = args.last
+      if %w[generate_exercise retry_section].include?(request.purpose)
+        timeouts[request.purpose] = request.read_timeout
       end
-      m.call(*args, **kw)
+      m.call(*args)
     end
 
     FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
@@ -5482,11 +5480,11 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     draft = FakeService::EXERCISE_PROBLEM_SET.deep_dup
     draft["design_comparison"]["other_piece"] = ""
     retry_prompts = []
-    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
-      next { text: draft.to_json, input_tokens: 0, output_tokens: 0 } if kw[:purpose] == "generate_exercise"
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args|
+      next { text: draft.to_json, input_tokens: 0, output_tokens: 0 } if args.last.purpose == "generate_exercise"
 
-      retry_prompts << kw[:prompt] if kw[:purpose] == "retry_section"
-      m.call(*args, **kw)
+      retry_prompts << args.last.prompt if args.last.purpose == "retry_section"
+      m.call(*args)
     end
     allow(Rails.logger).to receive(:warn)
 
@@ -5513,11 +5511,11 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     end
     svc = FakeService.new("fake-key")
     drafted = false
-    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args|
       raise AiService::RateLimitError, "slow down" if drafted
 
       drafted = true
-      m.call(*args, **kw)
+      m.call(*args)
     end
     allow(Rails.logger).to receive(:warn)
 
@@ -5552,10 +5550,10 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     end
     svc = FakeService.new("fake-key")
     drafted = false
-    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args|
       raise AiService::RateLimitError, "slow down" if drafted
       drafted = true
-      m.call(*args, **kw)
+      m.call(*args)
     end
     allow(Rails.logger).to receive(:warn)
     expect(Rails.logger).to receive(:warn).with(/judge_retry_failed/).at_least(:once)
@@ -5721,16 +5719,17 @@ RSpec.describe AiService, "#judge_review_prose" do
 
   def captured_call
     captured = nil
-    allow(service).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+    allow(service).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
     service.judge_review_prose(user, ExerciseSection::CodeReview, review, coach: "Rails")
     captured
   end
 
   it "calls judge_review once, capped, on its own timeout, with the verdict schema" do
-    kw = captured_call
-    expect(kw).to include(purpose: "judge_review", max_tokens: AiService::REVIEW_JUDGE_MAX_TOKENS,
-                          read_timeout: AiService::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true,
-                          response_schema: ReviewProseVerdict.schema, system: AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT)
+    request = captured_call
+    expect(request).to have_attributes(purpose: "judge_review", max_tokens: AiService::REVIEW_JUDGE_MAX_TOKENS,
+                                       read_timeout: AiService::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true,
+                                       cache_system: false, allow_truncated: false,
+                                       response_schema: ReviewProseVerdict.schema, system: AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT)
   end
 
   it "keeps the measured headroom its cap is justified by" do
@@ -5739,7 +5738,7 @@ RSpec.describe AiService, "#judge_review_prose" do
   end
 
   it "shows the projection and never the rating, code, answer or problem" do
-    prompt = captured_call[:prompt]
+    prompt = captured_call.prompt
     expect(prompt).to include("One query per row.").and include("code_review").and include("Rails")
     expect(prompt).not_to include("User.includes(:posts)")
     expect(prompt).not_to include("\"rating\"")
@@ -5899,9 +5898,9 @@ RSpec.describe AiService, "the shared concept" do
 
   def service_tagging_design_comparison(concept)
     Class.new(FakeService) do
-      define_method(:call) do |**kwargs|
-        result = super(**kwargs)
-        next result unless kwargs[:purpose] == "generate_exercise"
+      define_method(:call) do |request|
+        result = super(request)
+        next result unless request.purpose == "generate_exercise"
 
         set = JSON.parse(result[:text])
         set["design_comparison"]["concept"] = concept
@@ -6051,7 +6050,7 @@ RSpec.describe AiService, "the day's size" do
   end
 
   it "logs the decision and the gate's evidence before the provider is contacted" do
-    failing = Class.new(FakeService) { def call(*, **) = raise(AiService::Error, "provider down") }.new("fake-key")
+    failing = Class.new(FakeService) { def call(_request) = raise(AiService::Error, "provider down") }.new("fake-key")
     lines = lines_from("[set_size]") do
       expect { failing.generate_exercise(user, language: "ruby_rails") }.to raise_error(AiService::Error, "provider down")
     end
@@ -6128,9 +6127,9 @@ RSpec.describe AiService, "engineer text fenced under the stated rule" do
 
   def captured_call
     captured = nil
-    allow(service).to receive(:call).and_wrap_original do |original, **kwargs|
-      captured = kwargs
-      original.call(**kwargs)
+    allow(service).to receive(:call).and_wrap_original do |original, request|
+      captured = request
+      original.call(request)
     end
     begin
       yield
@@ -6141,35 +6140,35 @@ RSpec.describe AiService, "engineer text fenced under the stated rule" do
   end
 
   it "fences the duck's new message" do
-    kwargs = captured_call { service.duck_response(user, exercise, section: "code_review", message: injection) }
+    request = captured_call { service.duck_response(user, exercise, section: "code_review", message: injection) }
 
-    expect(kwargs[:prompt]).to include(UserText.tagged(injection))
-    expect(kwargs[:system]).to include(UserText::PROMPT_RULE)
+    expect(request.prompt).to include(UserText.tagged(injection))
+    expect(request.system).to include(UserText::PROMPT_RULE)
   end
 
   it "fences a follow-up's answer and new question" do
-    kwargs = captured_call do
+    request = captured_call do
       service.answer_follow_up(user, exercise, daily_response, section: "code_review", question: injection, thread: [])
     end
 
-    expect(kwargs[:prompt]).to include(UserText.tagged(daily_response.answer_for("code_review")))
-    expect(kwargs[:prompt]).to include(UserText.tagged(injection, limit: UserText::MAX_QUESTION_LENGTH))
-    expect(kwargs[:system]).to include(UserText::PROMPT_RULE)
+    expect(request.prompt).to include(UserText.tagged(daily_response.answer_for("code_review")))
+    expect(request.prompt).to include(UserText.tagged(injection, limit: UserText::MAX_QUESTION_LENGTH))
+    expect(request.system).to include(UserText::PROMPT_RULE)
   end
 
   it "fences the answer a section reframing quotes" do
-    kwargs = captured_call { service.explain_differently(user, exercise, daily_response, section: "code_review") }
+    request = captured_call { service.explain_differently(user, exercise, daily_response, section: "code_review") }
 
-    expect(kwargs[:prompt]).to include(UserText.tagged(daily_response.answer_for("code_review")))
-    expect(kwargs[:system]).to include(UserText::PROMPT_RULE)
+    expect(request.prompt).to include(UserText.tagged(daily_response.answer_for("code_review")))
+    expect(request.system).to include(UserText::PROMPT_RULE)
   end
 
   it "fences the pseudocode sent for critique and for translation" do
     %i[critique_pseudocode translate_pseudocode].each do |entry_point|
-      kwargs = captured_call { service.public_send(entry_point, user, exercise, section: "pseudocode_to_code", pseudocode: injection) }
+      request = captured_call { service.public_send(entry_point, user, exercise, section: "pseudocode_to_code", pseudocode: injection) }
 
-      expect(kwargs[:prompt]).to include(UserText.tagged(injection)), entry_point.to_s
-      expect(kwargs[:system]).to include(UserText::PROMPT_RULE), entry_point.to_s
+      expect(request.prompt).to include(UserText.tagged(injection)), entry_point.to_s
+      expect(request.system).to include(UserText::PROMPT_RULE), entry_point.to_s
     end
   end
 end

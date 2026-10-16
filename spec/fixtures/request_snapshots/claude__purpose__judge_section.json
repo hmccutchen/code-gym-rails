@@ -1,0 +1,124 @@
+{
+  "model": "claude-sonnet-5-5",
+  "max_tokens": 1200,
+  "system": "SYSTEM TEXT",
+  "messages": [
+    {
+      "role": "user",
+      "content": "PROMPT TEXT"
+    }
+  ],
+  "thinking": {
+    "type": "between_tools"
+  },
+  "output_config": {
+    "effort": "high",
+    "format": {
+      "type": "json_schema",
+      "schema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "keep"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "edit"
+              },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "referential_ambiguity",
+                        "technical_ambiguity",
+                        "unstated_incidental_term",
+                        "leakage",
+                        "padding",
+                        "answer_instruction",
+                        "sequencing"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "fields": {
+                "type": "object",
+                "properties": {
+                  "scenario": {
+                    "type": "string"
+                  },
+                  "question": {
+                    "type": "string"
+                  },
+                  "teaching_note": {
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "status",
+              "issues",
+              "fields"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "reject"
+              },
+              "principle": {
+                "type": "string",
+                "enum": [
+                  "scope_mismatch",
+                  "unstated_prerequisite",
+                  "underdetermined",
+                  "reasoning_failure"
+                ]
+              },
+              "evidence": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "principle",
+              "evidence",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  }
+}

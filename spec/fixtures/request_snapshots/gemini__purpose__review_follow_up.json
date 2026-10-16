@@ -1,0 +1,6 @@
+{
+  "model": "gemini-3.5-flash",
+  "system_instruction": "SYSTEM TEXT",
+  "input": "Conversation so far:\nThem: FIRST\nYou: REPLY\n\nPROMPT TEXT",
+  "store": false
+}

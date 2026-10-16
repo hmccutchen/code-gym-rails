@@ -25,7 +25,7 @@ RSpec.describe "AiService on a trial", type: :model do
     expect(service).not_to receive(:call)
 
     expect {
-      service.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p")
+      service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p"))
     }.to raise_error(AiService::TrialAllowanceError)
     expect(ApiUsage.count).to eq(2)
   end
@@ -48,7 +48,7 @@ RSpec.describe "AiService on a trial", type: :model do
     allow(service).to receive(:call).and_return(text: "ok", input_tokens: 1, output_tokens: 1, truncated: false)
     expect(TrialAllowance).not_to receive(:check!)
 
-    service.send(:call_and_log, create_user_with_key(email: "b@example.com"), purpose: "duck_thread", system: "s", prompt: "p")
+    service.send(:call_and_log, create_user_with_key(email: "b@example.com"), AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p"))
     expect(ApiUsage.last).to have_attributes(house_key: false)
   end
 end

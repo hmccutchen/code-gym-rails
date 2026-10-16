@@ -28,7 +28,7 @@ RSpec.describe ModelComparison do
 
             text = reply.is_a?(String) ? reply : reply.to_json
           else
-            text = FakeService.new("unused").send(:call, system: system, prompt: body["messages"].last["content"])[:text]
+            text = FakeService.new("unused").send(:call, AiService.request_for(purpose_for(system), system: system, prompt: body["messages"].last["content"]))[:text]
           end
           [ 200, {}, { "content" => [ { "type" => "text", "text" => text } ],
                        "usage" => { "input_tokens" => 70, "output_tokens" => output_tokens } }.to_json ]

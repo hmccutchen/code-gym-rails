@@ -1,0 +1,22 @@
+{
+  "model": "gpt-6-sol",
+  "instructions": "SYSTEM TEXT",
+  "input": [
+    {
+      "role": "user",
+      "content": "FIRST"
+    },
+    {
+      "role": "assistant",
+      "content": "REPLY"
+    },
+    {
+      "role": "user",
+      "content": "PROMPT TEXT"
+    }
+  ],
+  "store": false,
+  "reasoning": {
+    "effort": "none"
+  }
+}

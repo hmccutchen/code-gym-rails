@@ -1,0 +1,33 @@
+{
+  "model": "claude-sonnet-5-5",
+  "max_tokens": 400,
+  "system": [
+    {
+      "type": "text",
+      "text": "SYSTEM TEXT",
+      "cache_control": {
+        "type": "ephemeral"
+      }
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "FIRST"
+    },
+    {
+      "role": "assistant",
+      "content": "REPLY"
+    },
+    {
+      "role": "user",
+      "content": "PROMPT TEXT"
+    }
+  ],
+  "thinking": {
+    "type": "between_tools"
+  },
+  "output_config": {
+    "effort": "high"
+  }
+}

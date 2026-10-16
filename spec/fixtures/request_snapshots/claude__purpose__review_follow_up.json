@@ -1,0 +1,22 @@
+{
+  "model": "claude-sonnet-5-5",
+  "max_tokens": 16000,
+  "system": "SYSTEM TEXT",
+  "messages": [
+    {
+      "role": "user",
+      "content": "FIRST"
+    },
+    {
+      "role": "assistant",
+      "content": "REPLY"
+    },
+    {
+      "role": "user",
+      "content": "PROMPT TEXT"
+    }
+  ],
+  "output_config": {
+    "effort": "high"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "model": "claude-sonnet-5-5",
+  "max_tokens": 500,
+  "system": "SYSTEM TEXT",
+  "messages": [
+    {
+      "role": "user",
+      "content": "PROMPT TEXT"
+    }
+  ],
+  "thinking": {
+    "type": "between_tools"
+  },
+  "output_config": {
+    "effort": "high"
+  }
+}

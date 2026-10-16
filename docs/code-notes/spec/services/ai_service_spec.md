@@ -10,7 +10,7 @@ The helper pads every third and fourth kind with an inert placeholder section, s
 
 ## `"single-shot purposes"`
 
-`SINGLE_SHOT_PURPOSES` was built by scanning the source for call sites and is listed in full rather than derived by a regex. A purpose the scan's pattern would miss then fails the group instead of silently dropping out of it.
+`SINGLE_SHOT_PURPOSES` is listed in full rather than derived, and the group checks it against `AiService::CALL_PROFILES.keys`, so a new purpose fails the group until it is listed here or named as conversational. That a profiled purpose has a real caller is held by `ai_service_request_spec`, which drives one caller per purpose and fails when none sends a request.
 
 ## `DUCK_RESPONSE_MAX_TOKENS`
 

@@ -19,9 +19,9 @@ RSpec.describe "Track choice and level suggestion isolation" do
     allow_any_instance_of(Array).to receive(:shuffle).and_wrap_original do |original, **kwargs|
       original.call(**kwargs, random: random)
     end
-    allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, **kwargs|
-      calls << kwargs.deep_dup
-      original.call(**kwargs)
+    allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, request|
+      calls << request.to_h.deep_dup
+      original.call(request)
     end
 
     result = AiService.for(user).generate_judged_exercise(user, language: "ruby_rails")

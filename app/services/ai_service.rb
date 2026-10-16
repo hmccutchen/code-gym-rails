@@ -298,6 +298,41 @@ class AiService
     Work through this internally, then reply with only the JSON verdict, with no text before or after it.
   PROMPT
 
+  Request = Data.define(:purpose, :system, :prompt, :history, :response_schema,
+                        :max_tokens, :read_timeout, :cache_system, :single_attempt, :allow_truncated) do
+    def self.build(system:, prompt:, purpose: nil, **settings)
+      defaults = { history: [], response_schema: nil, max_tokens: nil, read_timeout: READ_TIMEOUT,
+                   cache_system: false, single_attempt: false, allow_truncated: false }
+      new(purpose: purpose, system: system, prompt: prompt, **defaults.merge(settings))
+    end
+  end
+
+  CALL_PROFILES = {
+    "generate_exercise"           => { read_timeout: GENERATION_READ_TIMEOUT, blocking_read_timeout: SYNC_GENERATION_READ_TIMEOUT },
+    "retry_section"               => { read_timeout: RETRY_READ_TIMEOUT },
+    "review_response"             => { cache_system: true, read_timeout: REVIEW_READ_TIMEOUT },
+    "assess_difficulty"           => { max_tokens: DIFFICULTY_ASSESSMENT_MAX_TOKENS },
+    "generate_concept_reference"  => { read_timeout: CONCEPT_REFERENCE_READ_TIMEOUT },
+    "generate_recognition_guide"  => { read_timeout: CONCEPT_REFERENCE_READ_TIMEOUT },
+    "explain_concept_differently" => { max_tokens: CONCEPT_ALTERNATE_MAX_TOKENS },
+    "explain_differently"         => {},
+    "review_follow_up"            => {},
+    "duck_thread"                 => { max_tokens: DUCK_RESPONSE_MAX_TOKENS, cache_system: true, allow_truncated: true },
+    "pseudocode_critique"         => { max_tokens: PSEUDOCODE_CRITIQUE_MAX_TOKENS },
+    "pseudocode_translate"        => {},
+    "judge_section"               => { max_tokens: JUDGE_MAX_TOKENS },
+    "judge_review"                => { max_tokens: REVIEW_JUDGE_MAX_TOKENS, read_timeout: REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true }
+  }.freeze
+
+  def self.request_for(purpose, system:, prompt:, history: [], response_schema: nil, blocking: false)
+    profile  = CALL_PROFILES.fetch(purpose)
+    settings = profile.except(:blocking_read_timeout)
+    if blocking
+      settings[:read_timeout] = profile.fetch(:blocking_read_timeout) { raise ArgumentError, "#{purpose} has no blocking read timeout" }
+    end
+    Request.build(purpose: purpose, system: system, prompt: prompt, history: history, response_schema: response_schema, **settings)
+  end
+
   SCENARIO_DOMAINS = %w[
     background_job_processing api_versioning_and_deprecation
     activerecord_query_construction component_state_management
@@ -488,12 +523,10 @@ class AiService
   def generate_concept_reference(user, concept, language)
     config = config_for(language)
 
-    result = call_and_log(
-      user, purpose: "generate_concept_reference",
+    result = call_and_log(user, AiService.request_for("generate_concept_reference",
       system: "You are a senior #{config[:coach]} engineer writing a concise, durable reference for one concept. Return ONLY valid JSON.",
-      prompt: build_concept_reference_prompt(concept, language),
-      read_timeout: CONCEPT_REFERENCE_READ_TIMEOUT
-    )
+      prompt: build_concept_reference_prompt(concept, language)
+    ))
 
     reference = parse_json_object(result[:text], subject: "concept reference")
 
@@ -508,12 +541,10 @@ class AiService
   end
 
   def generate_recognition_guide(user, group_key)
-    result = call_and_log(
-      user, purpose: "generate_recognition_guide",
+    result = call_and_log(user, AiService.request_for("generate_recognition_guide",
       system: "You are a senior engineer writing a short, durable piece on how to recognize one category of problem. Return ONLY valid JSON.",
-      prompt: build_recognition_guide_prompt(group_key),
-      read_timeout: CONCEPT_REFERENCE_READ_TIMEOUT
-    )
+      prompt: build_recognition_guide_prompt(group_key)
+    ))
 
     guide = parse_json_object(result[:text], subject: "recognition guide")
     RECOGNITION_GUIDE_FIELDS.each { |field| guide[field] = usable_optional_text(guide[field], MAX_CONCEPT_GUIDE_LENGTH) }
@@ -531,8 +562,7 @@ class AiService
       .map { |field| "#{field}: #{reference.public_send(field)}" }
       .join("\n")
 
-    result = call_and_log(
-      user, purpose: "explain_concept_differently", max_tokens: CONCEPT_ALTERNATE_MAX_TOKENS,
+    result = call_and_log(user, AiService.request_for("explain_concept_differently",
       system: "You are a senior #{coach} engineer re-teaching one concept to an engineer for whom the standard reference did not land. Return plain prose — no JSON, no markdown fences.\n\n#{UserText::PROMPT_RULE}",
       prompt: <<~PROMPT
         The concept: "#{reference.concept}"
@@ -548,7 +578,7 @@ class AiService
 
         #{PLAIN_LANGUAGE_STANDARD}
       PROMPT
-    )
+    ))
 
     text_or_raise(result, subject: "alternate concept explanation")
   end
@@ -558,8 +588,7 @@ class AiService
     review  = daily_response.ai_review&.dig(section) || {}
     missed  = DailyResponse.review_points(review["missed"])
 
-    result = call_and_log(
-      user, purpose: "explain_differently",
+    result = call_and_log(user, AiService.request_for("explain_differently",
       system: "You are a senior #{coach} engineer re-explaining one point to an engineer who did not follow the first explanation. Return plain prose — no JSON, no markdown fences.\n\n#{UserText::PROMPT_RULE}",
       prompt: <<~PROMPT
         The engineer was asked: #{exercise.problem_set.dig(section, "question")}
@@ -575,7 +604,7 @@ class AiService
 
         #{PLAIN_LANGUAGE_STANDARD}
       PROMPT
-    )
+    ))
 
     text_or_raise(result, subject: "alternate explanation")
   end
@@ -589,8 +618,7 @@ class AiService
       "#{DailyResponse.ai_review_label(key, locale: :en)}: #{points.join('; ')}" if points.any?
     }.join("\n")
 
-    result = call_and_log(
-      user, purpose: "review_follow_up",
+    result = call_and_log(user, AiService.request_for("review_follow_up",
       system: <<~SYSTEM,
         You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Return plain prose — no JSON, no markdown fences.
 
@@ -613,16 +641,14 @@ class AiService
         Answer it directly. Stay on this concept — if they drift far off topic, say
         so briefly and bring it back. Two short paragraphs at most.
       PROMPT
-    )
+    ))
 
     text_or_raise(result, subject: "follow-up answer")
   end
 
   def duck_response(user, exercise, section:, message:, thread: [])
-    result = call_and_log(
-      user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS, allow_truncated: true,
+    result = call_and_log(user, AiService.request_for("duck_thread",
       system: "#{DUCK_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
-      cache_system: true,
       history: UserText.tag_history(thread),
       prompt: <<~PROMPT
         Their new message:
@@ -630,18 +656,17 @@ class AiService
 
         Respond as their Socratic thinking partner, following your system instructions exactly.
       PROMPT
-    )
+    ))
 
     text = text_or_raise(result, subject: "duck response")
     result[:truncated] ? "#{text}…" : text
   end
 
   def critique_pseudocode(user, exercise, section:, pseudocode:)
-    result = call_and_log(
-      user, purpose: "pseudocode_critique", max_tokens: PSEUDOCODE_CRITIQUE_MAX_TOKENS,
+    result = call_and_log(user, AiService.request_for("pseudocode_critique",
       system: "#{PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}",
       prompt: build_pseudocode_critique_prompt(exercise, section, pseudocode)
-    )
+    ))
 
     parsed     = parse_json_object(result[:text], subject: "pseudocode critique", log_raw: false)
     gaps_found = parsed["gaps_found"]
@@ -657,11 +682,10 @@ class AiService
   end
 
   def translate_pseudocode(user, exercise, section:, pseudocode:)
-    result = call_and_log(
-      user, purpose: "pseudocode_translate",
+    result = call_and_log(user, AiService.request_for("pseudocode_translate",
       system: "#{PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}",
       prompt: build_pseudocode_translate_prompt(exercise, section, pseudocode)
-    )
+    ))
 
     code = UserText.normalize(text_or_raise(result, subject: "pseudocode translation"))
     if code.length > MAX_GENERATED_CODE_LENGTH
@@ -674,25 +698,22 @@ class AiService
 
   def judge_section(user, kind, section, rung:, locked:)
     visible = section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS)
-    result  = call_and_log(
-      user, purpose: "judge_section", max_tokens: JUDGE_MAX_TOKENS,
+    result  = call_and_log(user, AiService.request_for("judge_section",
       response_schema: JudgeVerdict.schema_for(kind),
       system: JUDGE_SYSTEM_PROMPT,
       prompt: judge_prompt(kind, visible, rung: rung, locked: locked)
-    )
+    ))
     raw = parse_json_object(result[:text], subject: "#{kind.key} verdict", log_raw: kind.judge_solve_options.nil?)
     JudgeVerdict.parse(raw, kind: kind)
   end
 
   def judge_review_prose(user, kind, review, coach:)
     projection = ReviewProseVerdict.project(review)
-    result = call_and_log(
-      user, purpose: "judge_review", max_tokens: REVIEW_JUDGE_MAX_TOKENS,
-      read_timeout: REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true,
+    result = call_and_log(user, AiService.request_for("judge_review",
       response_schema: ReviewProseVerdict.schema,
       system: REVIEW_PROSE_JUDGE_SYSTEM_PROMPT,
       prompt: review_prose_prompt(kind, coach, projection)
-    )
+    ))
     raw = parse_json_object(result[:text], subject: "review prose verdict", log_raw: false)
     ReviewProseVerdict.parse(raw, projection: projection)
   end
@@ -793,12 +814,11 @@ class AiService
     ladders    = ladders_for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode)
     prompt     = generation_prompt(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders)
 
-    result = call_and_log(
-      user, purpose: "generate_exercise",
-      read_timeout: blocking ? SYNC_GENERATION_READ_TIMEOUT : GENERATION_READ_TIMEOUT,
+    result = call_and_log(user, AiService.request_for("generate_exercise",
+      blocking: blocking,
       system: build_system_prompt(language),
       prompt: prompt.render
-    )
+    ))
 
     ingested = ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "problem set", log_raw: false),
@@ -845,11 +865,10 @@ class AiService
   def retry_section(user, language, draft, kind, concept)
     prompt = generation_prompt(user, language, plan: draft.plan, history: draft.history, difficulty: draft.difficulty,
                                ladders: retry_ladders(user, language, draft, kind))
-    result = call_and_log(
-      user, purpose: "retry_section", read_timeout: RETRY_READ_TIMEOUT,
+    result = call_and_log(user, AiService.request_for("retry_section",
       system: build_system_prompt(language),
       prompt: prompt.render(only: kind, fixed_concept: concept)
-    )
+    ))
 
     ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "#{kind.key} retry", log_raw: false), language: language,
@@ -1112,9 +1131,38 @@ class AiService
     end
   end
 
-  # Abstract: returns text, token and cache counts, model, truncated, refusal and http_status; history holds prior turns.
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-    raise NotImplementedError, "#{self.class} must implement #call"
+  def call(request)
+    resp = post(request_body(request), request)
+    raise_for_status(resp) unless resp.success?
+    read_result(parse_provider_envelope(resp.body, provider: provider_name), request).merge(http_status: resp.status)
+  rescue Faraday::Error => e
+    raise (e.is_a?(Faraday::TimeoutError) ? TimeoutError : NetworkError), "Network error calling #{provider_name}: #{e.message}"
+  end
+
+  def post(body, request)
+    @conn.post(self.class::API_URL, body.to_json) do |req|
+      req.options.timeout = request.read_timeout
+      req.options.context = (req.options.context || {}).merge(long_running: long_running?(request), single_attempt: request.single_attempt)
+    end
+  end
+
+  def long_running?(request) = request.read_timeout > READ_TIMEOUT
+
+  # Subclasses supply API_URL and the hooks below; read_result returns text, token and cache counts, model, truncated and refusal.
+  def request_body(_request)
+    raise NotImplementedError, "#{self.class} must implement #request_body"
+  end
+
+  def read_result(_parsed, _request)
+    raise NotImplementedError, "#{self.class} must implement #read_result"
+  end
+
+  def provider_name
+    raise NotImplementedError, "#{self.class} must implement #provider_name"
+  end
+
+  def raise_for_status(_resp)
+    raise NotImplementedError, "#{self.class} must implement #raise_for_status"
   end
 
   # Subclasses must implement: returns a configured Faraday::Connection.
@@ -1242,22 +1290,19 @@ class AiService
   ].freeze
 
   def grade_review(user, exercise, daily_response, section, context)
-    result = call_and_log(
-      user, purpose: "review_response",
-      system: context, prompt: build_review_section_prompt(exercise, daily_response, section),
-      cache_system: true, read_timeout: REVIEW_READ_TIMEOUT
-    )
+    result = call_and_log(user, AiService.request_for("review_response",
+      system: context, prompt: build_review_section_prompt(exercise, daily_response, section)
+    ))
     parse_json_object(result[:text], subject: "#{section} review", log_raw: false)
       .except(ReviewProseVerdict::ORIGINAL_KEY, "rubric").merge("rubric" => RUBRIC_VERSION)
   end
 
 
   def assess_difficulty(user, exercise, sections:)
-    result = call_and_log(
-      user, purpose: "assess_difficulty", max_tokens: DIFFICULTY_ASSESSMENT_MAX_TOKENS,
+    result = call_and_log(user, AiService.request_for("assess_difficulty",
       system: build_difficulty_system_prompt(config_for(exercise.language)[:coach]),
       prompt: build_difficulty_prompt(exercise, sections)
-    )
+    ))
 
     assessed = parse_json_object(result[:text], subject: "difficulty assessment")
     sections.to_h { |section| [ section, DailyResponse.usable_difficulty(assessed[section]) ] }.compact
@@ -1539,24 +1584,21 @@ class AiService
     )
   end
 
-  def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
-                   read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], response_schema: nil, allow_truncated: false, single_attempt: false)
+  def call_and_log(user, request)
     TrialAllowance.check!(user, provider: self.class) if house_key?
     begin
-      result = call(system: system, prompt: prompt, cache_system: cache_system,
-                    read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose,
-                    response_schema: response_schema, single_attempt: single_attempt)
+      result = call(request)
     rescue Error => e
       e.provider ||= self.class.provider_key
-      log_usage(user, failed_call_result(e, purpose), purpose: purpose)
+      log_usage(user, failed_call_result(e, request.purpose), purpose: request.purpose)
       raise
     end
-    log_usage(user, result.merge(failure: reply_failure_code(result, allow_truncated)), purpose: purpose)
+    log_usage(user, result.merge(failure: reply_failure_code(result, request.allow_truncated)), purpose: request.purpose)
 
     raise Error, result[:error] if result[:error]
     raise RefusalError, "The provider declined this request (#{result[:refusal]})" if result[:refusal]
 
-    if result[:truncated] && !allow_truncated
+    if result[:truncated] && !request.allow_truncated
       raise TruncatedResponseError,
             "Provider did not finish its reply " \
             "(#{result[:output_tokens].to_i} output tokens, thinking included)"

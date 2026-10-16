@@ -148,9 +148,9 @@ RSpec.describe ReviewGrading do
 
         private
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
+        def call(request)
           @calls += 1
-          raise AiService::RateLimitError, "rate limited" if prompt.include?('"pattern"')
+          raise AiService::RateLimitError, "rate limited" if request.prompt.include?('"pattern"')
           { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
         end
 
@@ -314,8 +314,8 @@ RSpec.describe ReviewGrading do
     def graded(judge_reply: { "status" => "keep" }.to_json, grader: grade, provider: FakeService)
       judge_calls = 0
       svc = provider.new("key")
-      allow(svc).to receive(:call).and_wrap_original do |_m, system:, **|
-        if system == AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT
+      allow(svc).to receive(:call).and_wrap_original do |_m, request|
+        if request.system == AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT
           judge_calls += 1
           raise judge_reply if judge_reply.is_a?(Exception)
           { text: judge_reply, input_tokens: 1, output_tokens: 1 }

@@ -126,6 +126,43 @@ number here.
 Review output is unbounded, so a long review can still fall back as
 `truncated`. Passing this cap turns thinking off.
 
+## `Request` and `Request.build`
+
+One value carries everything a provider call needs, so a new setting is one
+new field here, read by the providers that use it. `Request.build` fills the
+defaults a call gets with no profile (`READ_TIMEOUT`, no token cap, no
+caching, retries on, truncation fatal) and takes any setting. Tests and
+scripts use it when they need settings no profile has, such as a
+`duck_thread` request with truncation left fatal. `.request_for` is its one
+caller under `app/`, and `ai_service_request_spec` holds that. A caller that
+changes one setting on a built request uses `Data#with`, as
+`script/gemini_structured_output_check.rb` does for `single_attempt`.
+
+## `CALL_PROFILES`
+
+A purpose's token cap, read timeout, caching, single attempt and allowed
+truncation are facts about the purpose, so they live in one row per purpose
+instead of at each call site. The values are the named constants above, so
+the timeout budget specs and the notes on each constant still apply.
+`ai_service_request_spec` holds the keys equal to `ApiUsage::PURPOSES`.
+`provider_request_characterization_spec` fails if a row changes the body its
+purpose sends to any provider, which covers the token cap and caching. The
+read timeout, single attempt and allowed truncation appear in no body, so
+`ai_service_request_spec` pins them, by driving each purpose's real caller and
+comparing the request it sends with the settings its call site passed before
+the profiles existed.
+
+## `.request_for`
+
+A call site names its purpose and passes only the values that change per
+call: system, prompt, history and response schema. The schema is per call
+because `judge_section`'s depends on the kind. `blocking: true` picks the
+profile's `blocking_read_timeout`, because a request thread waiting on the
+call cannot wait as long as a worker. It raises for a purpose with no
+blocking timeout, so a blocking caller of any other purpose fails at once
+instead of running on a timeout nobody chose for a waiting thread. An unknown
+purpose raises too, at the call site.
+
 ## `SCENARIO_DOMAINS`
 
 Scenario dressing only, never tagged as a concept.
@@ -182,7 +219,8 @@ no provider.
 ## `#generate_exercise`
 
 `blocking:` means a request thread is waiting on the call. The timeout policy
-for that case stays in this class (`SYNC_GENERATION_READ_TIMEOUT`).
+for that case stays in this class, as the `generate_exercise` profile's
+`blocking_read_timeout` (`SYNC_GENERATION_READ_TIMEOUT`).
 
 ## `#review_grading_provider`
 
@@ -360,6 +398,19 @@ design principles keep it.
 
 `medium` is nil for a concept with no code of its own (see
 `ConceptVocabulary.language_agnostic?`).
+
+## `#call`
+
+The template every real provider runs: post the body the subclass's
+`request_body` builds, raise through its `raise_for_status` on a failed
+status, parse the envelope, read the result through its `read_result`, and
+add `http_status`. These steps are the same for every provider, so they live
+here once. `#post` sets the request's read timeout and puts `long_running`
+and `single_attempt` in the Faraday context, where `RETRY_TIMEOUT_GUARD`
+reads them; `OpenaiService` overrides `#long_running?` for a route
+reasoning within an allowance. A Faraday timeout becomes `TimeoutError` and
+any other Faraday error `NetworkError`, both naming the provider.
+`FakeService` overrides `#call` itself, since it makes no HTTP request.
 
 ## `#parse_provider_envelope`
 

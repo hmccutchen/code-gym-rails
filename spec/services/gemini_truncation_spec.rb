@@ -26,7 +26,7 @@ RSpec.describe "Gemini truncation through AiService" do
 
     expect {
       expect {
-        service.send(:call_and_log, user, purpose: "explain_differently", system: "s", prompt: "p", max_tokens: 60)
+        service.send(:call_and_log, user, AiService::Request.build(purpose: "explain_differently", system: "s", prompt: "p", max_tokens: 60))
       }.to raise_error(AiService::TruncatedResponseError, /did not finish its reply/)
     }.to change { ApiUsage.where(purpose: "explain_differently", model: GeminiService::DEFAULT_ROUTE[:model]).count }.by(1)
 

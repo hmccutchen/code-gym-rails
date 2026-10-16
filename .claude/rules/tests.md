@@ -44,10 +44,17 @@ against a `FakeService` (`provider: "fake"`) test user, never a real API key.
 `FakeService` returns every section kind at once rather than the two to four
 a real provider is asked for, so system specs can't assert which third
 `DailyPlan` chose — cover that in service/job specs instead.
-`FakeService` answers the judge's system prompt with a canned `keep` verdict
-(plus a matching `better` for a kind the judge solves blind), so the judged
-path runs end to end in specs without a rejection unless an example stubs
-`judge_section` itself.
+`FakeService` picks each reply by the request's purpose from its `REPLIES`
+table, and raises on a purpose with no entry. It answers `judge_section` with
+a canned `keep` verdict (plus a matching `better` for a kind the judge solves
+blind), so the judged path runs end to end in specs without a rejection
+unless an example stubs `judge_section` itself.
+A spec that stubs a provider's HTTP and uses the fake as its reply oracle has
+only the posted body, so it gets the purpose from the system prompt with
+`purpose_for` (`spec/support/fake_replies.rb`), whose marker table maps each
+purpose to a phrase its system prompt carries. Provider specs send a request
+through `call_provider` (`spec/support/provider_call_helpers.rb`), which
+builds it with `AiService::Request.build` and its defaults.
 A system spec that needs today's set calls `visit_with_todays_set(user)`,
 which generates it before the first page load; visiting first would wait out
 the dashboard's 3-second "generating" poll. `dashboard_generation_spec.rb` is

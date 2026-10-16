@@ -16,12 +16,29 @@ says what a deviation from one requires.
 - **Template method for providers** — `AiService` owns provider orchestration,
   parsing and usage logging, and every prompt but the generation prompt, whose
   text it delegates to `GenerationPrompt` through its private
-  `#generation_prompt` factory; subclasses implement `#call` and
-  `#build_connection`, and own the model each purpose routes to
-  (`DEFAULT_ROUTE` / `MODEL_FOR_PURPOSE`). Adding a provider is adding a
-  subclass and listing it in `AiProvider.all`, the closed registry used by
-  dispatch, key detection and user validation. Each subclass owns its
-  `provider_key`, `key_pattern` and any environment restriction.
+  `#generation_prompt` factory. `AiService#call(request)` is the template: it
+  posts the body with the request's timeout and retry context, raises on a
+  failed status, parses the reply and maps a Faraday error the same way for
+  every provider. Subclasses implement `request_body`, `read_result`,
+  `raise_for_status`, `provider_name` and `build_connection` behind it,
+  define the `API_URL` it posts to, keep a private `route_for`, and own the model each purpose routes to
+  (`DEFAULT_ROUTE` / `MODEL_FOR_PURPOSE`). A subclass overrides
+  `long_running?` only when its retry rule differs, as `OpenaiService` does.
+  Adding a provider is adding a subclass and listing it in `AiProvider.all`,
+  the closed registry used by dispatch, key detection and user validation.
+  Each subclass owns its `provider_key`, `key_pattern` and any environment
+  restriction.
+- **One request value per provider call** — every provider call carries one
+  `AiService::Request`: the purpose, the per-call values (system, prompt,
+  history, response schema) and the settings (token cap, read timeout,
+  caching, single attempt, allowed truncation). `AiService::CALL_PROFILES`
+  is the one place a purpose's settings live. A call site builds its request
+  with `AiService.request_for`, naming only its purpose and its per-call
+  values, and hands it to `call_and_log(user, request)`. `Request.build`
+  applies the defaults with no profile and takes any setting; tests and
+  scripts use it when they need settings outside a profile, and `request_for`
+  is its one caller under `app/`. A new setting is a field on `Request` and a
+  key in the profiles that use it.
 - **Registry for section kinds** — `ExerciseSection` and its subclasses answer
   every per-kind question (which are thirds, which scaffold, what the prompt
   says). Adding a kind is adding a class.

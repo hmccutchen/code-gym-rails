@@ -5,10 +5,10 @@ each provider picks its model from its own
 and falls back to its `DEFAULT_ROUTE` for any purpose not listed. The tables
 are per provider because the providers share no model names and turn thinking down
 differently (`effort` on Claude, `thinking_level` on Gemini,
-`reasoning.effort` on OpenAI). `call_and_log` hands `purpose:` to `#call`
-for this. Because an unlisted purpose falls back silently,
-`spec/services/model_routing_spec.rb` fails on a key that no call site
-logs, so a typo cannot quietly route nothing.
+`reasoning.effort` on OpenAI). Each provider reads the purpose from the
+request `call_and_log` hands to `#call`. Because an unlisted purpose falls
+back silently, `spec/services/model_routing_spec.rb` fails on a key with no
+row in `AiService::CALL_PROFILES`, so a typo cannot quietly route nothing.
 
 **OpenAI** sends generation and its retry to `gpt-6.1-sol` at `high`
 effort, the section judge to `gpt-6-astra` at `low`, and everything else to
@@ -35,8 +35,9 @@ Opus 5.5 replaced Opus 5 on this route because it costs less ($4/$20 per
 million tokens against $5/$25) on the same tokenizer and context; `medium`
 is also its default effort, stated explicitly so a change to that default
 cannot move this route silently. Thinking cannot be turned off on Opus 5.5,
-which this route never asked for anyway: `#call` sends no `thinking` field
-unless a caller passes `max_tokens`, and generation does not. Generation
+which this route never asked for anyway: `ClaudeService#request_body` sends
+no `thinking` field unless the request carries `max_tokens`, and
+generation's profile sets none. Generation
 keeps thinking on and the 16,000-token `MAX_TOKENS`, and Opus 5.5 shares
 Sonnet 5's tokenizer, so that cap covers the same output. What changes is latency, which
 matters less than it would on a request: every generation runs in a job
@@ -123,7 +124,7 @@ input was a local section built from `FakeService`'s canned problem set;
 only the two models' output is real.
 
 Two constraints apply before routing any of them, and this paragraph is
-where they are stated. `#call` turns thinking off whenever a caller passes `max_tokens`,
+where they are stated. `ClaudeService#request_body` turns thinking off whenever a request carries `max_tokens`,
 using the routed model's entry in `ClaudeService::THINKING_OFF` (`between_tools`
 on Sonnet 5.5, `disabled` on Haiku 4.5). Opus 5.5 has no thinking-off setting
 and no entry, so a capped purpose cannot move to Opus: the call raises before sending. And Haiku 4.5 caches only a

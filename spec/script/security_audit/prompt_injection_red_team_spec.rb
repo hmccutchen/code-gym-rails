@@ -16,7 +16,7 @@ RSpec.describe PromptInjectionRedTeam do
           body   = JSON.parse(env.body)
           system = body["system"].is_a?(Array) ? body["system"].first["text"] : body["system"]
           requests << { body: body, system: system }
-          text = FakeService.new("unused").send(:call, system: system, prompt: body["messages"].last["content"])[:text]
+          text = FakeService.new("unused").send(:call, AiService.request_for(purpose_for(system), system: system, prompt: body["messages"].last["content"]))[:text]
           [ 200, {}, { "content" => [ { "type" => "text", "text" => text } ],
                        "usage" => { "input_tokens" => 70, "output_tokens" => 30 } }.to_json ]
         end

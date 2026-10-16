@@ -23,7 +23,7 @@ RSpec.describe ClaudeService do
   it "raises InvalidResponseError rather than a bare JSON::ParserError when a successful response body is not JSON" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "<html>Bad gateway</html>" ] ]))
 
-    expect { service.send(:call, system: "sys", prompt: "p") }
+    expect { call_provider(service, system: "sys", prompt: "p") }
       .to raise_error(AiService::InvalidResponseError, /Claude returned an unreadable response/)
   end
 
@@ -45,7 +45,7 @@ RSpec.describe ClaudeService do
   it "raises InvalidResponseError rather than a TypeError when a successful response body is not a JSON object" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "[]" ] ]))
 
-    expect { service.send(:call, system: "sys", prompt: "p") }
+    expect { call_provider(service, system: "sys", prompt: "p") }
       .to raise_error(AiService::InvalidResponseError, /Claude returned an unreadable response/)
   end
 
@@ -82,7 +82,7 @@ RSpec.describe ClaudeService do
       attempts = []
       service.instance_variable_set(:@conn, recording_connection(attempts, raise_timeout: false))
 
-      service.send(:call, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
+      call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
 
       expect(attempts).to eq([ AiService::GENERATION_READ_TIMEOUT ])
     end
@@ -92,7 +92,7 @@ RSpec.describe ClaudeService do
       service.instance_variable_set(:@conn, recording_connection(attempts))
 
       expect {
-        service.send(:call, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
+        call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
       }.to raise_error(AiService::TimeoutError, /Network error calling Claude/)
 
       expect(attempts.size).to eq(1)
@@ -103,7 +103,7 @@ RSpec.describe ClaudeService do
       service.instance_variable_set(:@conn, recording_connection(attempts))
 
       expect {
-        service.send(:call, system: "sys", prompt: "p", read_timeout: AiService::REVIEW_READ_TIMEOUT)
+        call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::REVIEW_READ_TIMEOUT)
       }.to raise_error(AiService::TimeoutError, /Network error calling Claude/)
 
       expect(attempts).to eq([ AiService::REVIEW_READ_TIMEOUT ])
@@ -114,7 +114,7 @@ RSpec.describe ClaudeService do
       service.instance_variable_set(:@conn, recording_connection(attempts))
 
       expect {
-        service.send(:call, system: "sys", prompt: "p")
+        call_provider(service, system: "sys", prompt: "p")
       }.to raise_error(AiService::TimeoutError, /Network error calling Claude/)
 
       expect(attempts.size).to eq(ClaudeService::RETRY_OPTIONS[:max] + 1)
@@ -135,7 +135,7 @@ RSpec.describe ClaudeService do
       service.instance_variable_set(:@conn, conn)
 
       expect {
-        service.send(:call, system: "sys", prompt: "prompt")
+        call_provider(service, system: "sys", prompt: "prompt")
       }.to raise_error(AiService::TimeoutError, /Network error calling Claude/)
     end
 
@@ -149,7 +149,7 @@ RSpec.describe ClaudeService do
 
       error = nil
       begin
-        service.send(:call, system: "sys", prompt: "prompt")
+        call_provider(service, system: "sys", prompt: "prompt")
       rescue AiService::Error => e
         error = e
       end
@@ -163,7 +163,7 @@ RSpec.describe ClaudeService do
       responses = [ [ 429, "" ], [ 200, success_body ] ]
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
-      result = service.send(:call, system: "sys", prompt: "prompt")
+      result = call_provider(service, system: "sys", prompt: "prompt")
 
       expect(result[:text]).to eq("hello")
       expect(responses).to be_empty
@@ -174,7 +174,7 @@ RSpec.describe ClaudeService do
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
       expect {
-        service.send(:call, system: "sys", prompt: "prompt")
+        call_provider(service, system: "sys", prompt: "prompt")
       }.to raise_error(AiService::RateLimitError)
       # 3 total attempts (max: 2 retries) — one response left unused.
       expect(responses.size).to eq(1)
@@ -185,7 +185,7 @@ RSpec.describe ClaudeService do
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
       expect {
-        service.send(:call, system: "sys", prompt: "prompt")
+        call_provider(service, system: "sys", prompt: "prompt")
       }.to raise_error(AiService::RateLimitError)
       expect(responses.size).to eq(1)
     end
@@ -195,7 +195,7 @@ RSpec.describe ClaudeService do
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
       expect {
-        service.send(:call, system: "sys", prompt: "prompt")
+        call_provider(service, system: "sys", prompt: "prompt")
       }.to raise_error(AiService::AuthenticationError, "Anthropic rejected your API key or its permissions. Check it in Settings.")
       # 401 is not in retry_statuses, so the second stubbed response is never consumed.
       expect(responses.size).to eq(1)
@@ -207,7 +207,7 @@ RSpec.describe ClaudeService do
         service.instance_variable_set(:@conn, stubbed_connection([ [ status, body ] ]))
         allow(Rails.logger).to receive(:error)
 
-        expect { service.send(:call, system: "sys", prompt: "prompt") }
+        expect { call_provider(service, system: "sys", prompt: "prompt") }
           .to raise_error(AiService::AuthenticationError, /\AAnthropic rejected your API key/) { |error|
             expect(error.http_status).to eq(status)
             expect(error.message).not_to include("sk-ant-")
@@ -221,7 +221,7 @@ RSpec.describe ClaudeService do
         responses = [ [ 429, "" ], [ 429, "" ], [ 429, "" ] ]
         service.instance_variable_set(:@conn, stubbed_connection(responses))
 
-        expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::RateLimitError)
+        expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::RateLimitError)
         expect(responses.size).to eq(2)
       end
 
@@ -233,7 +233,7 @@ RSpec.describe ClaudeService do
         end
         service.instance_variable_set(:@conn, conn)
 
-        expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::TimeoutError)
+        expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::TimeoutError)
         expect(attempts).to eq(1)
       end
 
@@ -245,7 +245,7 @@ RSpec.describe ClaudeService do
         end
         service.instance_variable_set(:@conn, conn)
 
-        expect { service.send(:call, system: "sys", prompt: "p") }.to raise_error(AiService::TimeoutError)
+        expect { call_provider(service, system: "sys", prompt: "p") }.to raise_error(AiService::TimeoutError)
         expect(attempts).to eq(AiService::RETRY_MAX + 1)
       end
     end
@@ -270,7 +270,7 @@ RSpec.describe ClaudeService do
         fake_response
       end
 
-      result = service.send(:call, system: "sys", prompt: "prompt text")
+      result = call_provider(service, system: "sys", prompt: "prompt text")
       expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20, truncated: false, refusal: nil,
                            model: ClaudeService::DEFAULT_ROUTE[:model], cache_read_tokens: 0, cache_write_tokens: 0,
                            http_status: 200)
@@ -285,7 +285,7 @@ RSpec.describe ClaudeService do
         }.to_json)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
-      result = service.send(:call, system: "sys", prompt: "p")
+      result = call_provider(service, system: "sys", prompt: "p")
 
       expect(result).to include(input_tokens: 10, cache_read_tokens: 900, cache_write_tokens: 1_100)
     end
@@ -301,7 +301,7 @@ RSpec.describe ClaudeService do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
-      expect(service.send(:call, system: "sys", prompt: "prompt text")[:text]).to eq("hello")
+      expect(call_provider(service, system: "sys", prompt: "prompt text")[:text]).to eq("hello")
     end
 
     it "sends MAX_TOKENS as the request's output budget" do
@@ -314,7 +314,7 @@ RSpec.describe ClaudeService do
         fake_response
       end
 
-      service.send(:call, system: "sys", prompt: "prompt text")
+      call_provider(service, system: "sys", prompt: "prompt text")
     end
 
     it "keeps an output budget large enough for a full three-section review, which overran the old 2,500 tokens" do
@@ -331,7 +331,7 @@ RSpec.describe ClaudeService do
         fake_response
       end
 
-      service.send(:call, system: "sys", prompt: "prompt text")
+      call_provider(service, system: "sys", prompt: "prompt text")
     end
 
     describe "thinking-off for a capped call" do
@@ -344,7 +344,7 @@ RSpec.describe ClaudeService do
           body = JSON.parse(raw)
           instance_double(Faraday::Response, success?: true, status: 200, body: success_body)
         end
-        service.send(:call, system: "sys", prompt: "p", max_tokens: 100)
+        call_provider(service, system: "sys", prompt: "p", max_tokens: 100)
         body
       end
 
@@ -362,7 +362,7 @@ RSpec.describe ClaudeService do
         service.instance_variable_set(:@conn, conn)
         allow(service).to receive(:route_for).and_return({ model: "claude-opus-5-5" })
 
-        expect { service.send(:call, system: "sys", prompt: "p", max_tokens: 100) }
+        expect { call_provider(service, system: "sys", prompt: "p", max_tokens: 100) }
           .to raise_error(AiService::UnsupportedRouteError, /claude-opus-5-5/)
         expect(posts).to eq(0)
         expect(AiService::UnsupportedRouteError).to be < AiService::Error
@@ -378,7 +378,7 @@ RSpec.describe ClaudeService do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
-      expect(service.send(:call, system: "sys", prompt: "prompt text")[:truncated]).to be(true)
+      expect(call_provider(service, system: "sys", prompt: "prompt text")[:truncated]).to be(true)
     end
 
     it "reports a refusal and its category as data, with the billed usage, rather than as an empty-response error" do
@@ -391,7 +391,7 @@ RSpec.describe ClaudeService do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
-      result = service.send(:call, system: "sys", prompt: "prompt text")
+      result = call_provider(service, system: "sys", prompt: "prompt text")
 
       expect(result[:refusal]).to eq("cyber")
       expect(result[:input_tokens]).to eq(10)
@@ -406,7 +406,7 @@ RSpec.describe ClaudeService do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
-      result = service.send(:call, system: "sys", prompt: "prompt text")
+      result = call_provider(service, system: "sys", prompt: "prompt text")
       expect(result[:text]).to eq("hello")
       expect(result[:truncated]).to be(false)
     end
@@ -417,7 +417,7 @@ RSpec.describe ClaudeService do
       service.instance_variable_set(:@conn, fake_conn)
 
       expect {
-        service.send(:call, system: "sys", prompt: "prompt")
+        call_provider(service, system: "sys", prompt: "prompt")
       }.to raise_error(AiService::Error, /Claude API error 500/) { |error| expect(error.http_status).to eq(500) }
     end
 
@@ -428,7 +428,7 @@ RSpec.describe ClaudeService do
       service.instance_variable_set(:@conn, fake_conn)
 
       expect {
-        service.send(:call, system: "sys", prompt: "prompt")
+        call_provider(service, system: "sys", prompt: "prompt")
       }.to raise_error(AiService::Error, "messages: at least one message is required")
     end
 
@@ -443,7 +443,7 @@ RSpec.describe ClaudeService do
         allow(Rails.logger).to receive(:warn)
         service.instance_variable_set(:@conn, stubbed_connection([ [ status, { "type" => "error", "error" => error }.to_json ] ]))
 
-        expect { service.send(:call, system: "sys", prompt: "prompt", single_attempt: true) }
+        expect { call_provider(service, system: "sys", prompt: "prompt", single_attempt: true) }
           .to raise_error(AiService::BillingError) { |e|
             expect(e.http_status).to eq(status)
             expect(e.message).not_to include("credit balance", "regain access")
@@ -459,7 +459,7 @@ RSpec.describe ClaudeService do
       end
       service.instance_variable_set(:@conn, conn)
 
-      expect { service.send(:call, system: "sys", prompt: "prompt") }
+      expect { call_provider(service, system: "sys", prompt: "prompt") }
         .to raise_error(AiService::RateLimitError) { |e|
           expect(e.quota_id).to eq("anthropic-ratelimit-input-tokens")
           expect(e.retry_after).to eq(17)
@@ -469,11 +469,11 @@ RSpec.describe ClaudeService do
     it "falls back to the status when the error envelope is null" do
       allow(Rails.logger).to receive(:warn)
       service.instance_variable_set(:@conn, stubbed_connection([ [ 429, { "type" => "error", "error" => nil }.to_json ] ]))
-      expect { service.send(:call, system: "sys", prompt: "prompt", single_attempt: true) }
+      expect { call_provider(service, system: "sys", prompt: "prompt", single_attempt: true) }
         .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("rate_limit_error") }
 
       service.instance_variable_set(:@conn, stubbed_connection([ [ 400, { "type" => "error", "error" => nil }.to_json ] ]))
-      expect { service.send(:call, system: "sys", prompt: "prompt") }
+      expect { call_provider(service, system: "sys", prompt: "prompt") }
         .to raise_error(AiService::Error) { |e| expect(e).not_to be_a(AiService::BillingError) }
     end
 
@@ -483,7 +483,7 @@ RSpec.describe ClaudeService do
       end
       service.instance_variable_set(:@conn, conn)
 
-      expect { service.send(:call, system: "sys", prompt: "prompt") }
+      expect { call_provider(service, system: "sys", prompt: "prompt") }
         .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("overloaded_error") }
     end
 
@@ -494,7 +494,7 @@ RSpec.describe ClaudeService do
       service.instance_variable_set(:@conn, fake_conn)
 
       expect {
-        service.send(:call, system: "sys", prompt: "prompt")
+        call_provider(service, system: "sys", prompt: "prompt")
       }.to raise_error(AiService::Error) { |e| expect(e.message).not_to include(huge_body) }
     end
 
@@ -509,7 +509,7 @@ RSpec.describe ClaudeService do
         expect(msg).to include("truncated, #{huge_body.bytesize} bytes total")
       end
 
-      expect { service.send(:call, system: "sys", prompt: "prompt") }.to raise_error(AiService::Error)
+      expect { call_provider(service, system: "sys", prompt: "prompt") }.to raise_error(AiService::Error)
     end
 
     it "wraps system in a cache_control content block when cache_system is true" do
@@ -524,7 +524,7 @@ RSpec.describe ClaudeService do
       end
       service.instance_variable_set(:@conn, conn)
 
-      service.send(:call, system: "shared context", prompt: "prompt text", cache_system: true)
+      call_provider(service, system: "shared context", prompt: "prompt text", cache_system: true)
 
       expect(captured_body["system"]).to eq(
         [ { "type" => "text", "text" => "shared context", "cache_control" => { "type" => "ephemeral" } } ]
@@ -543,7 +543,7 @@ RSpec.describe ClaudeService do
       end
       service.instance_variable_set(:@conn, conn)
 
-      service.send(:call, system: "sys", prompt: "prompt text")
+      call_provider(service, system: "sys", prompt: "prompt text")
 
       expect(captured_body["system"]).to eq("sys")
     end
@@ -561,7 +561,7 @@ RSpec.describe ClaudeService do
         end
       end
       service.instance_variable_set(:@conn, conn)
-      service.send(:call, system: "sys", prompt: "new turn", **kwargs)
+      call_provider(service, system: "sys", prompt: "new turn", **kwargs)
       body
     end
 
@@ -603,7 +603,7 @@ RSpec.describe ClaudeService do
         end
       end
       service.instance_variable_set(:@conn, conn)
-      service.send(:call, system: "sys", prompt: "p", **kwargs)
+      call_provider(service, system: "sys", prompt: "p", **kwargs)
       body
     end
 

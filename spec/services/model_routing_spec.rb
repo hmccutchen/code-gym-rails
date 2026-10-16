@@ -1,9 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "per-purpose model routing" do
-  let(:purposes_in_use) do
-    File.read(Rails.root.join("app/services/ai_service.rb")).scan(/purpose: "(\w+)"/).flatten.uniq
-  end
+  let(:purposes_in_use) { AiService::CALL_PROFILES.keys }
 
   # A usage row must name the model whose prices apply to it.
   [ ClaudeService, GeminiService, OpenaiService ].each do |service_class|
@@ -25,7 +23,7 @@ RSpec.describe "per-purpose model routing" do
       end
     end
     service.instance_variable_set(:@conn, conn)
-    service.send(:call, system: "sys", prompt: "p", **kwargs)
+    call_provider(service, system: "sys", prompt: "p", **kwargs)
   end
 
   def posted_body(service_class, **kwargs)
@@ -40,13 +38,13 @@ RSpec.describe "per-purpose model routing" do
       end
     end
     service.instance_variable_set(:@conn, conn)
-    service.send(:call, system: "sys", prompt: "p", **kwargs)
+    call_provider(service, system: "sys", prompt: "p", **kwargs)
     bodies.sole
   end
 
   # An unlisted purpose falls back silently, so a misspelled key would route nothing.
   [ ClaudeService, GeminiService, OpenaiService ].each do |service_class|
-    it "routes only purposes #{service_class} actually logs" do
+    it "routes only purposes with a call profile for #{service_class}" do
       expect(service_class::MODEL_FOR_PURPOSE.keys - purposes_in_use).to be_empty
     end
 

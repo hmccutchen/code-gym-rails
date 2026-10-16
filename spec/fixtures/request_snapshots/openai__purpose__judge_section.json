@@ -1,0 +1,20 @@
+{
+  "model": "gpt-6-astra",
+  "instructions": "SYSTEM TEXT",
+  "input": [
+    {
+      "role": "user",
+      "content": "PROMPT TEXT\n\nReply with a JSON object."
+    }
+  ],
+  "store": false,
+  "reasoning": {
+    "effort": "low"
+  },
+  "max_output_tokens": 26200,
+  "text": {
+    "format": {
+      "type": "json_object"
+    }
+  }
+}

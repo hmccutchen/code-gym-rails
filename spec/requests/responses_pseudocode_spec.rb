@@ -308,9 +308,9 @@ RSpec.describe "Pseudocode rounds", type: :request do
 
     it "grades the section against the code it just generated" do
       prompts = []
-      allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, **kwargs|
-        prompts << [ kwargs[:system], kwargs[:prompt] ]
-        original.call(**kwargs)
+      allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, request|
+        prompts << [ request.system, request.prompt ]
+        original.call(request)
       end
 
       submit_and_review

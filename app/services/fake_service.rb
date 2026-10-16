@@ -1,4 +1,4 @@
-# Only transport is faked; #call dispatches on the literal system: string, and reviews read the section from prompt:.
+# Only transport is faked; #call answers by request.purpose from REPLIES, and a reply that needs a section or kind reads it from the prompt.
 class FakeService < AiService
   def self.provider_key = "fake"
   def self.available? = Rails.env.local?
@@ -293,55 +293,20 @@ class FakeService < AiService
   DUCK_RESPONSE_TEXT =
     "What would happen to that method if it ran a hundred times in one request — where would the slowdown show up?"
 
-  private
+  def self.review_section(prompt)
+    section = prompt[/Grade ONLY the "(\w+)" section/, 1]
+    raise "FakeService could not extract the section key from the review prompt" if section.blank?
 
-  # Raises bare RuntimeErrors because the job turns AiService::Error into a user-facing message that hides the bug.
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
-    text =
-      case system
-      when /editing the prose of one section's code review/
-        { "status" => "keep" }.to_json
-      when /generating personalized daily exercise sets/
-        EXERCISE_PROBLEM_SET.to_json
-      when /giving direct, specific feedback/
-        section = prompt[/Grade ONLY the "(\w+)" section/, 1]
-        raise "FakeService could not extract the section key from the review prompt" if section.blank?
-
-        REVIEW_SECTION.to_json
-      when /rating how hard/
-        difficulty_assessment(prompt).to_json
-      when /writing a concise, durable reference/
-        CONCEPT_REFERENCE.to_json
-      when /how to recognize one category of problem/
-        RECOGNITION_GUIDE.to_json
-      when /re-teaching one concept/
-        CONCEPT_ALTERNATE_TEXT
-      when /re-explaining one point/
-        EXPLAIN_DIFFERENTLY_TEXT
-      when /answering a follow-up question/
-        FOLLOW_UP_ANSWER_TEXT
-      when /Socratic thinking partner/
-        DUCK_RESPONSE_TEXT
-      when /reviewing an engineer's PSEUDOCODE plan/
-        PSEUDOCODE_CRITIQUE.to_json
-      when /TRANSCRIBER, not a reviewer/
-        PSEUDOCODE_TRANSLATION
-      when /checking one section of a generated coding exercise/
-        judge_verdict(prompt).to_json
-      else
-        raise "FakeService received an unrecognized system prompt: #{system.inspect}"
-      end
-
-    { text: text, input_tokens: 0, output_tokens: 0, model: "fake", cache_read_tokens: 0, cache_write_tokens: 0 }
+    REVIEW_SECTION.to_json
   end
 
-  def judge_verdict(prompt)
+  def self.judge_verdict(prompt)
     kind = ExerciseSection.find(prompt[/^Section kind: (\w+)$/, 1])
     solve = kind&.judge_solve_options&.last
     { "status" => "keep", "better" => solve }.compact
   end
 
-  def difficulty_assessment(prompt)
+  def self.difficulty_assessment(prompt)
     # Intersected with the registry so a snippet's own "## Heading" line can't shift the levels.
     sections = prompt.scan(/^## (\w+)$/).flatten & ExerciseSection.keys
     raise "FakeService could not extract any section key from the difficulty prompt" if sections.empty?
@@ -350,6 +315,35 @@ class FakeService < AiService
     sections.each_with_index.to_h do |section, index|
       [ section, { "level" => levels[index % levels.size], "reason" => DIFFICULTY_REASON } ]
     end
+  end
+
+  private_class_method :review_section, :judge_verdict, :difficulty_assessment
+
+  REPLIES = {
+    "generate_exercise"           => EXERCISE_PROBLEM_SET.to_json,
+    "retry_section"               => EXERCISE_PROBLEM_SET.to_json,
+    "review_response"             => ->(prompt) { review_section(prompt) },
+    "assess_difficulty"           => ->(prompt) { difficulty_assessment(prompt).to_json },
+    "generate_concept_reference"  => CONCEPT_REFERENCE.to_json,
+    "generate_recognition_guide"  => RECOGNITION_GUIDE.to_json,
+    "explain_concept_differently" => CONCEPT_ALTERNATE_TEXT,
+    "explain_differently"         => EXPLAIN_DIFFERENTLY_TEXT,
+    "review_follow_up"            => FOLLOW_UP_ANSWER_TEXT,
+    "duck_thread"                 => DUCK_RESPONSE_TEXT,
+    "pseudocode_critique"         => PSEUDOCODE_CRITIQUE.to_json,
+    "pseudocode_translate"        => PSEUDOCODE_TRANSLATION,
+    "judge_section"               => ->(prompt) { judge_verdict(prompt).to_json },
+    "judge_review"                => { "status" => "keep" }.to_json
+  }.freeze
+
+  private
+
+  # Raises bare RuntimeErrors because the job turns AiService::Error into a user-facing message that hides the bug.
+  def call(request)
+    reply = REPLIES.fetch(request.purpose) { raise "FakeService has no reply for purpose: #{request.purpose.inspect}" }
+    text  = reply.respond_to?(:call) ? reply.call(request.prompt) : reply
+
+    { text: text, input_tokens: 0, output_tokens: 0, model: "fake", cache_read_tokens: 0, cache_write_tokens: 0 }
   end
 
   def build_connection

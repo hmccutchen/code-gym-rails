@@ -19,7 +19,7 @@ RSpec.describe ForcedConceptDrafts do
           system = body["system"].is_a?(Array) ? body["system"].first["text"] : body["system"]
           prompt = body["messages"].last["content"]
           seen << prompt
-          text = FakeService.new("unused").send(:call, system: system, prompt: prompt)[:text]
+          text = FakeService.new("unused").send(:call, AiService.request_for(purpose_for(system), system: system, prompt: prompt))[:text]
           if prompt.include?("must be exactly `proportionality`")
             set = JSON.parse(text)
             text = { kind.key => set.fetch(kind.key).merge("concept" => "proportionality") }.to_json
@@ -78,11 +78,11 @@ RSpec.describe ForcedConceptDrafts do
 
         def build_connection = nil
 
-        def call(system:, prompt:, **)
-          @sent_prompts << prompt
+        def call(request)
+          @sent_prompts << request.prompt
           set  = FakeService::EXERCISE_PROBLEM_SET.deep_dup
           kind = ExerciseSection::DesignComparison
-          text = if prompt.include?("must be exactly `proportionality`")
+          text = if request.prompt.include?("must be exactly `proportionality`")
             { kind.key => set.fetch(kind.key).merge("concept" => "proportionality") }.to_json
           else
             set.to_json
