@@ -47,7 +47,9 @@ the mix's queue line (`line: "exercise_mix"`), so it and a mix save never
 travel together and the mix never posts the version the track change moved
 past. Just before queueing, it dispatches `profile-preferences:trackSaving`,
 so the mix sends any edit still inside its delay first and the two land in the
-order the user made them. An event rather than a
+order the user made them. A failed track save dispatches
+`profile-preferences:trackFailed` instead, so the mix can settle its prepare
+button. An event rather than a
 reach into the other controller keeps each controller's state its own. The
 reply's `kept_own_level` sentence, written by the server, fills the status line
 under the select; it is empty when no target was kept.

@@ -122,14 +122,20 @@ The track select saves on this controller's queue line (`line:` in
 its 400 ms delay is queued at once, ahead of the track save. Edits are saved in
 the order the user made them, so a lock set just before a track change reaches
 the server first and `TrackChange` keeps the target it protects. The rebase
-above is for what is left: an edit made while the track save is in flight, or
-one made before this controller connected, when no listener was there for the
-flush.
+above is for what is left: an edit made while the track save is in flight, and
+an edit made before both controllers connected when `profile-preferences`
+connected first and saved the track from its `connect` before this controller
+was listening. Connect order follows module load order, so either can come
+first; when this controller connects first, `adoptEarlyEdit` has already set
+`pending` and the flush sends that edit ahead of the track save.
 
-`adoptTrackChange` also sets the prepare button's state, as `sendNow` does
-after a mix save: a mix save that replied while the track save waited behind it
-on the line saw `queued("exercise_mix")` true and left the button disabled,
-and no further mix save would come to enable it.
+`settlePrepareButton` is the one statement of when the prepare button is
+enabled: the latest mix save succeeded (`savedLatest`), no edit is waiting and
+nothing is queued on the line. A mix save that replied while a track save
+waited behind it saw the line busy and left the button disabled, so the button
+is settled again once the track save ends: `adoptTrackChange` on success, which
+also sets `savedLatest` since the form now matches the server, and
+`profile-preferences:trackFailed` on failure.
 
 One case is left. A save that failed for another reason is no longer pending,
 so a later track reply replaces its edit; the save banner already reports that

@@ -135,6 +135,33 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all)
   end
 
+  it "re-enables Prepare AI guidance when the track save that waited behind a mix save fails" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    expect(page).to have_css("#mix-ladder-preparation:not([hidden])")
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes("section_kind_levels")) {
+          return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 1000));
+        }
+        if (body.includes("skill_level")) return Promise.reject(new TypeError("offline"));
+        return send(url, options);
+      };
+    JS
+
+    find(".mix-difficulty[data-kind='code_review'] input[value='senior']").click
+    sleep 0.6
+    find("#skill-level").select("Mid-level")
+
+    expect(page).to have_css("#save-status", text: /couldn't save/i, wait: 5)
+    wait_for(5) { user.reload.section_kind_levels["code_review"] == "senior" }
+    expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all)
+    expect(user.reload.skill_level).to eq("junior")
+  end
+
   def guide_measurement
     page.evaluate_script(<<~JS)
       (() => {

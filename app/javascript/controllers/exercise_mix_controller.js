@@ -20,6 +20,7 @@ export default class extends Controller {
 
   connect() {
     this.pending = null
+    this.savedLatest = true
     this.editRevision = 0
     this.probe = () => this.pending !== null
     saveStatus.watch(this.probe)
@@ -149,7 +150,12 @@ export default class extends Controller {
       this.applyServerState(this.withEdits(event.detail, mine, edits))
       this.saved = adopted
     }
-    this.prepareButtonTarget.disabled = this.pending !== null || saveStatus.queued("exercise_mix")
+    this.savedLatest = true
+    this.settlePrepareButton()
+  }
+
+  settlePrepareButton() {
+    this.prepareButtonTarget.disabled = !this.savedLatest || this.pending !== null || saveStatus.queued("exercise_mix")
   }
 
   editsSince(before, after) {
@@ -286,7 +292,8 @@ export default class extends Controller {
   sendNow() {
     this.pending = null
     this.persist().then((savedLatest) => {
-      this.prepareButtonTarget.disabled = !savedLatest || this.pending !== null || saveStatus.queued("exercise_mix")
+      this.savedLatest = savedLatest
+      this.settlePrepareButton()
     })
   }
 

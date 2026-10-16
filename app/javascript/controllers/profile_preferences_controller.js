@@ -44,7 +44,7 @@ export default class extends Controller {
     const level = select.value
     this.dispatch("trackSaving", { target: document })
     const result = await this.queueSave("skill_level", { skill_level: level }, { line: "exercise_mix" })
-    if (!result.ok) return
+    if (!result.ok) return this.dispatch("trackFailed", { target: document })
 
     // A track change can clear targets; the Exercise mix adopts the saved state rather than keep its own copy.
     this.dispatch("trackSaved", { target: document, detail: Object.assign({ kind_rungs: result.data.kind_rungs }, result.data.preferences) })
