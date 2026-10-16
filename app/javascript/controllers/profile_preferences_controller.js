@@ -42,6 +42,7 @@ export default class extends Controller {
   async saveSkillLevel() {
     const select = this.skillLevelTarget
     const level = select.value
+    this.dispatch("trackSaving", { target: document })
     const result = await this.queueSave("skill_level", { skill_level: level }, { line: "exercise_mix" })
     if (!result.ok) return
 

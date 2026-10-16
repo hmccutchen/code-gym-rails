@@ -11,8 +11,9 @@ under them.
 Every edit posts the whole mix, including
 `section_kind_preferences_version`. Two saves in flight would both post the
 version the first is about to move, and the second would 409 against its own
-predecessor. `saveStatus.queue` with a single key is what prevents that: the
-queue sends one at a time and reads each body when it is sent, so the second
+predecessor. `saveStatus.queue` on the `exercise_mix` line is what prevents
+that, and Setup's track select saves on the same line: the queue sends one at
+a time and reads each body when it is sent, so the second
 save picks up the version the first stored.
 
 A 409 means another tab moved the version. The reply carries the server's
@@ -116,9 +117,20 @@ the pending save would post a step the server no longer recognizes and get a
 409.
 
 The track select saves on this controller's queue line (`line:` in
-`code_gym/save_status`), so a mix save is never on the wire with the old
-version while the track change commits: it is sent either before the track
-save, which then clears what the track covers, or after the reply has been
-applied. One case is left. A save that failed for another reason is no longer
-pending, so a later track reply replaces its edit; the save banner already
-reports that failure.
+`code_gym/save_status`), and just before it queues its save it dispatches
+`profile-preferences:trackSaving`, which runs `flush`: a mix edit still inside
+its 400 ms delay is queued at once, ahead of the track save. Edits are saved in
+the order the user made them, so a lock set just before a track change reaches
+the server first and `TrackChange` keeps the target it protects. The rebase
+above is for what is left: an edit made while the track save is in flight, or
+one made before this controller connected, when no listener was there for the
+flush.
+
+`adoptTrackChange` also sets the prepare button's state, as `sendNow` does
+after a mix save: a mix save that replied while the track save waited behind it
+on the line saw `queued("exercise_mix")` true and left the button disabled,
+and no further mix save would come to enable it.
+
+One case is left. A save that failed for another reason is no longer pending,
+so a later track reply replaces its edit; the save banner already reports that
+failure.

@@ -144,10 +144,12 @@ export default class extends Controller {
     const edits = unsent ? this.editsSince(this.saved, mine) : []
     this.forgetMovedSuggestions(event.detail.kind_rungs)
     this.applyServerState(event.detail)
-    if (edits.length === 0) return
-    const adopted = this.saved
-    this.applyServerState(this.withEdits(event.detail, mine, edits))
-    this.saved = adopted
+    if (edits.length > 0) {
+      const adopted = this.saved
+      this.applyServerState(this.withEdits(event.detail, mine, edits))
+      this.saved = adopted
+    }
+    this.prepareButtonTarget.disabled = this.pending !== null || saveStatus.queued("exercise_mix")
   }
 
   editsSince(before, after) {
@@ -272,12 +274,20 @@ export default class extends Controller {
     this.editRevision++
     this.prepareButtonTarget.disabled = true
     clearTimeout(this.pending)
-    this.pending = setTimeout(() => {
-      this.pending = null
-      this.persist().then((savedLatest) => {
-        this.prepareButtonTarget.disabled = !savedLatest || this.pending !== null || saveStatus.queued("exercise_mix")
-      })
-    }, SAVE_DELAY_MS)
+    this.pending = setTimeout(() => this.sendNow(), SAVE_DELAY_MS)
+  }
+
+  flush() {
+    if (this.pending === null) return
+    clearTimeout(this.pending)
+    this.sendNow()
+  }
+
+  sendNow() {
+    this.pending = null
+    this.persist().then((savedLatest) => {
+      this.prepareButtonTarget.disabled = !savedLatest || this.pending !== null || saveStatus.queued("exercise_mix")
+    })
   }
 
   slide(event) {

@@ -44,7 +44,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(page.evaluate_script("window.sameDocument")).to be(true)
   end
 
-  it "keeps a mix edit still waiting to save when a track change lands first" do
+  it "saves a mix edit made just before a track change first, so the track change sees it" do
     visit_as(user)
     visit setup_path
     find("#exercise-mix summary").click
@@ -58,6 +58,21 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(checked_level("code_review")).to eq("senior")
     expect(checked_level("design_comparison")).to eq("")
     expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
+  end
+
+  it "keeps a lock set just before a track change, along with the target it protects" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    find(".mix-difficulty[data-kind='security_review'] .mix-lock-box").click
+    find("#skill-level").select("Mid-level")
+
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Security")
+    wait_for(5) { user.reload.locked_section_kinds.include?("security_review") }
+    expect(user.reload).to have_attributes(locked_section_kinds: match_array(%w[challenge security_review]))
+    expect(user.section_kind_levels).to include("security_review" => "junior")
+    expect(checked_level("security_review")).to eq("junior")
   end
 
   it "keeps an unsent weight edit without restoring a target the track change cleared" do
@@ -80,17 +95,44 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
   end
 
-  it "drops a shown suggestion step the track change moved, so the waiting edit still saves" do
+  it "forgets a shown suggestion step the track change moved, so a later pick of that kind saves" do
     visit_as(user)
     visit setup_path(suggested: [ "code_review" ], suggested_level: "mid_level")
 
+    find("#skill-level").select("Senior")
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Challenge")
     find(".mix-difficulty[data-kind='code_review'] input[value='mid_level']").click
+
+    wait_for(5) { user.reload.section_kind_levels["code_review"] == "mid_level" }
+    expect(user.reload.section_kind_levels).to include("code_review" => "mid_level")
+    expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
+    expect(user.level_suggestion_events.where(kind: "code_review").last.source).to eq("setup_edit")
+  end
+
+  it "re-enables Prepare AI guidance once a track change that waited behind a mix save lands" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    expect(page).to have_css("#mix-ladder-preparation:not([hidden])")
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      let held = false;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (!held && body.includes("section_kind_levels")) {
+          held = true;
+          return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 1000));
+        }
+        return send(url, options);
+      };
+    JS
+
+    find(".mix-difficulty[data-kind='code_review'] input[value='senior']").click
+    sleep 0.6
     find("#skill-level").select("Mid-level")
 
-    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
-    wait_for(5) { user.reload.section_kind_levels["code_review"] == "mid_level" }
-    expect(user.reload.section_kind_levels).to eq("code_review" => "mid_level", "pattern" => "senior", "challenge" => "junior")
-    expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 5)
+    expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all)
   end
 
   def guide_measurement

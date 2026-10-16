@@ -124,7 +124,7 @@
 
   <details class="form-field" id="exercise-mix"<%= " open" if suggested_kinds.any? || show_level_suggestions? %>
            data-controller="exercise-mix"
-           data-action="profile-preferences:trackSaved@document->exercise-mix#adoptTrackChange"
+           data-action="profile-preferences:trackSaving@document->exercise-mix#flush profile-preferences:trackSaved@document->exercise-mix#adoptTrackChange"
            data-exercise-mix-url-value="<%= profile_path %>"
            data-exercise-mix-stops-value="<%= KindPreferences::MULTIPLIERS.to_json %>"
            data-exercise-mix-default-stop-value="<%= KindPreferences::DEFAULT_MULTIPLIER %>"

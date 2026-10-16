@@ -101,7 +101,8 @@ under its own key. Setup's track select saves on the exercise mix's line
 (`line: "exercise_mix"`): a track change can clear targets and move the
 version, so a mix save sent beside it would carry the old version and get a
 409. On one line the two go out in turn, and a mix save waiting behind the
-track reads its body after the reply has been applied. `latest` collapses only
+track reads its body after the reply has been applied. `queued(key)` names a
+line, so `queued("exercise_mix")` also counts a waiting track save. `latest` collapses only
 into a waiting save of the same key, so one control never replaces another's
 body.
 
