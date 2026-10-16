@@ -41,8 +41,11 @@ the choice sits on screen unsaved until the user touches the control again.
 A track change can clear targets (`TrackChange`) and bump the preference
 version, so the Exercise mix's radios and version would otherwise be stale and
 its next save refused. The reply carries the same preference state a 409 sends,
-and this controller dispatches it as `profile-preferences:trackSaved` on the
-document, which the Exercise mix's element listens for. An event rather than a
+and this controller dispatches it, with the reply's `kind_rungs`, as
+`profile-preferences:trackSaved` on the document, which the Exercise mix's element listens for. The track save goes on
+the mix's queue line (`line: "exercise_mix"`), so it and a mix save never
+travel together and the mix never posts the version the track change moved
+past. An event rather than a
 reach into the other controller keeps each controller's state its own. The
 reply's `kept_own_level` sentence, written by the server, fills the status line
 under the select; it is empty when no target was kept.

@@ -96,12 +96,29 @@ A mix edit can still be waiting to save when that reply arrives: the 400 ms
 delay, or a save queued behind another. Applying the reply alone would put the
 server's levels back in the form, and the delayed save would then send them,
 so the edit would be lost with no notice. So the controller keeps `saved`, the
-state the server last confirmed (set on connect, on every applied server state
-and on every successful save). When an edit is unsent, the kinds whose weight,
-exclusion, level or lock differ from `saved` are the edit; the reply is applied
-and those kinds are then set back to the edit (`withKinds`). The pending save
-sends the result under the reply's version, so the track's clearing and the
-edit both land, and `saved` stays the reply's state so a later comparison still
-sees the edit as unsent. A save already on the wire with the old version is
-the one case left: the server answers 409 and the form shows the stored state
-with the conflict notice, as it does for a change from another tab.
+state the server last confirmed. It starts from the values the server rendered
+(`state({ rendered: true })`, read from `defaultValue` and `defaultChecked`),
+so an edit the browser restored or made before connect still counts as unsent,
+and it moves on every applied server state and every successful save.
+
+When an edit is unsent, each field (weight, exclusion, level or lock) of each
+kind that differs from `saved` is an edit (`editsSince`). The reply is applied
+and only those fields are set back (`withEdits`). The rebase is per field, not
+per kind: moving a kind's weight must not bring back a level target the track
+change cleared on that kind. A lock left without a level after the merge is
+dropped, since the server refuses a lock on an untargeted kind. The pending
+save sends the result under the reply's version, and `saved` stays the reply's
+state so a later comparison still sees the edit as unsent.
+
+The reply also carries `kind_rungs`, and `forgetMovedSuggestions` drops any
+level-suggestion step whose starting rung the track change moved. Otherwise
+the pending save would post a step the server no longer recognizes and get a
+409.
+
+The track select saves on this controller's queue line (`line:` in
+`code_gym/save_status`), so a mix save is never on the wire with the old
+version while the track change commits: it is sent either before the track
+save, which then clears what the track covers, or after the reply has been
+applied. One case is left. A save that failed for another reason is no longer
+pending, so a later track reply replaces its edit; the save banner already
+reports that failure.

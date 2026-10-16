@@ -216,6 +216,30 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(errors).to be_empty
   end
 
+  it "keeps a mix edit made while the modules load when the track change made beside it saves first" do
+    user.update_columns(skill_level: "junior", section_kind_levels: { "challenge" => "junior", "pattern" => "senior" })
+    watch_page_errors
+    visit_as(user)
+    visit setup_path
+    expect(page).to have_css("#weight-challenge", visible: :all)
+
+    reload_with_modules_stalled do |pw|
+      pw.evaluate(<<~JS)
+        (() => {
+          const slider = document.getElementById("weight-challenge");
+          slider.value = "0";
+          slider.dispatchEvent(new Event("input", { bubbles: true }));
+          document.getElementById("skill-level").value = "mid_level";
+        })()
+      JS
+    end
+
+    wait_for { user.reload.skill_level == "mid_level" && user.section_kind_weights == { "challenge" => 0.25 } }
+    expect(user.reload).to have_attributes(skill_level: "mid_level", section_kind_weights: { "challenge" => 0.25 },
+                                           section_kind_levels: { "pattern" => "senior" })
+    expect(errors).to be_empty
+  end
+
   it "saves a Setup preference chosen while the modules are still loading" do
     watch_page_errors
     visit_as(user)

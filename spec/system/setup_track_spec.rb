@@ -60,6 +60,39 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
   end
 
+  it "keeps an unsent weight edit without restoring a target the track change cleared" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    page.execute_script(<<~JS)
+      const slider = document.querySelector("#weight-security_review");
+      slider.value = 0;
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+    JS
+    find("#skill-level").select("Mid-level")
+
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
+    wait_for(5) { user.reload.section_kind_weights == { "security_review" => 0.25 } }
+    expect(user.reload.section_kind_weights).to eq("security_review" => 0.25)
+    expect(user.section_kind_levels).to eq("pattern" => "senior", "challenge" => "junior")
+    expect(checked_level("security_review")).to eq("")
+    expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
+  end
+
+  it "drops a shown suggestion step the track change moved, so the waiting edit still saves" do
+    visit_as(user)
+    visit setup_path(suggested: [ "code_review" ], suggested_level: "mid_level")
+
+    find(".mix-difficulty[data-kind='code_review'] input[value='mid_level']").click
+    find("#skill-level").select("Mid-level")
+
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
+    wait_for(5) { user.reload.section_kind_levels["code_review"] == "mid_level" }
+    expect(user.reload.section_kind_levels).to eq("code_review" => "mid_level", "pattern" => "senior", "challenge" => "junior")
+    expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
+  end
+
   def guide_measurement
     page.evaluate_script(<<~JS)
       (() => {

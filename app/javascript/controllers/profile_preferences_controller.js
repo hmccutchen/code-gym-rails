@@ -27,8 +27,8 @@ export default class extends Controller {
   }
 
   // Key per control: all controls PATCH one path, and a shared key lets one success clear another's warning.
-  queueSave(key, payload) {
-    return saveStatus.queue(key, "PATCH", this.urlValue, { user: payload })
+  queueSave(key, payload, options) {
+    return saveStatus.queue(key, "PATCH", this.urlValue, { user: payload }, options)
   }
 
   saveTimeZone() {
@@ -42,11 +42,11 @@ export default class extends Controller {
   async saveSkillLevel() {
     const select = this.skillLevelTarget
     const level = select.value
-    const result = await this.queueSave("skill_level", { skill_level: level })
+    const result = await this.queueSave("skill_level", { skill_level: level }, { line: "exercise_mix" })
     if (!result.ok) return
 
     // A track change can clear targets; the Exercise mix adopts the saved state rather than keep its own copy.
-    this.dispatch("trackSaved", { target: document, detail: result.data.preferences })
+    this.dispatch("trackSaved", { target: document, detail: Object.assign({ kind_rungs: result.data.kind_rungs }, result.data.preferences) })
     this.keptOwnLevelTarget.textContent = result.data.kept_own_level
 
     const levelLabel = Array.from(select.options).find((option) => option.value === level).textContent

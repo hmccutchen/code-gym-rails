@@ -24,7 +24,7 @@ export default class extends Controller {
     this.probe = () => this.pending !== null
     saveStatus.watch(this.probe)
     this.lockLastInGroup()
-    this.saved = this.state()
+    this.saved = this.state({ rendered: true })
     if (this.editedBeforeConnect()) this.adoptEarlyEdit()
   }
 
@@ -72,8 +72,9 @@ export default class extends Controller {
     return this.difficultyTargets.find((box) => box.dataset.kind === kind)
   }
 
-  chosenLevel(box) {
-    return (box.querySelector("input[type=radio]:checked") || { value: "" }).value
+  chosenLevel(box, rendered = false) {
+    const radios = Array.from(box.querySelectorAll("input[type=radio]"))
+    return (radios.find((radio) => (rendered ? radio.defaultChecked : radio.checked)) || { value: "" }).value
   }
 
   syncDifficulty(box) {
@@ -91,25 +92,27 @@ export default class extends Controller {
     this.syncDifficulty(box)
   }
 
-  state() {
+  state({ rendered = false } = {}) {
     const weights = {}
     const excluded = []
+    const checked = (input) => (rendered ? input.defaultChecked : input.checked)
 
     this.rowTargets.forEach((row) => {
       const kind = row.dataset.kind
-      const value = this.stopsValue[Number(this.sliderFor(row).value)]
+      const slider = this.sliderFor(row)
+      const value = this.stopsValue[Number(rendered ? slider.defaultValue : slider.value)]
 
-      if (this.excludeBoxFor(row).checked) excluded.push(kind)
+      if (checked(this.excludeBoxFor(row))) excluded.push(kind)
       if (value !== this.defaultStopValue) weights[kind] = value
     })
 
     const levels = {}
     const locked = []
     this.difficultyTargets.forEach((box) => {
-      const level = this.chosenLevel(box)
+      const level = this.chosenLevel(box, rendered)
       if (level === "") return
       levels[box.dataset.kind] = level
-      if (box.querySelector(".mix-lock-box").checked) locked.push(box.dataset.kind)
+      if (checked(box.querySelector(".mix-lock-box"))) locked.push(box.dataset.kind)
     })
 
     return { section_kind_weights: weights, excluded_section_kinds: excluded,
@@ -138,18 +141,20 @@ export default class extends Controller {
   adoptTrackChange(event) {
     const unsent = this.pending !== null || saveStatus.queued("exercise_mix")
     const mine = this.state()
-    const edited = unsent ? this.kindsEditedSince(this.saved, mine) : []
+    const edits = unsent ? this.editsSince(this.saved, mine) : []
+    this.forgetMovedSuggestions(event.detail.kind_rungs)
     this.applyServerState(event.detail)
-    if (edited.length === 0) return
+    if (edits.length === 0) return
     const adopted = this.saved
-    this.applyServerState(this.withKinds(event.detail, mine, edited))
+    this.applyServerState(this.withEdits(event.detail, mine, edits))
     this.saved = adopted
   }
 
-  kindsEditedSince(before, after) {
-    return this.difficultyTargets.map((box) => box.dataset.kind).filter((kind) =>
-      MIX_FIELDS.some((field) => JSON.stringify(this.fieldFor(before, field, kind)) !== JSON.stringify(this.fieldFor(after, field, kind)))
-    )
+  editsSince(before, after) {
+    const kinds = this.difficultyTargets.map((box) => box.dataset.kind)
+    return MIX_FIELDS.flatMap((field) => kinds
+      .filter((kind) => JSON.stringify(this.fieldFor(before, field, kind)) !== JSON.stringify(this.fieldFor(after, field, kind)))
+      .map((kind) => ({ field, kind })))
   }
 
   fieldFor(state, field, kind) {
@@ -157,22 +162,23 @@ export default class extends Controller {
     return (state[field] || {})[kind]
   }
 
-  withKinds(current, mine, kinds) {
-    const merged = Object.assign({}, current)
+  withEdits(current, mine, edits) {
+    const merged = {}
     MIX_FIELDS.forEach((field) => {
-      const theirs = current[field] || (LIST_FIELDS.indexOf(field) !== -1 ? [] : {})
+      merged[field] = LIST_FIELDS.indexOf(field) !== -1 ? (current[field] || []).slice() : Object.assign({}, current[field])
+    })
+    edits.forEach(({ field, kind }) => {
       if (LIST_FIELDS.indexOf(field) !== -1) {
-        merged[field] = theirs.filter((kind) => kinds.indexOf(kind) === -1).concat(mine[field].filter((kind) => kinds.indexOf(kind) !== -1))
+        merged[field] = merged[field].filter((listed) => listed !== kind)
+        if (this.fieldFor(mine, field, kind)) merged[field].push(kind)
+      } else if (Object.prototype.hasOwnProperty.call(mine[field], kind)) {
+        merged[field][kind] = mine[field][kind]
       } else {
-        const values = Object.assign({}, theirs)
-        kinds.forEach((kind) => {
-          if (Object.prototype.hasOwnProperty.call(mine[field], kind)) values[kind] = mine[field][kind]
-          else delete values[kind]
-        })
-        merged[field] = values
+        delete merged[field][kind]
       }
     })
-    return merged
+    merged.locked_section_kinds = merged.locked_section_kinds.filter((kind) => merged.section_kind_levels[kind])
+    return Object.assign({}, current, merged)
   }
 
   applyServerState(current) {
