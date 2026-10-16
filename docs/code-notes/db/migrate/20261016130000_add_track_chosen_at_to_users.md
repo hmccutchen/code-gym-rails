@@ -20,3 +20,10 @@ column repeats this backfill, guarded by `track_chosen_at IS NULL`.
 `RepeatTrackChosenAtBackfill` is that repeat. Its down does nothing: the rows
 it marks hold a `learning_track` either way, and rolled-back code reads only
 that column.
+
+`FinishTrackChosenAtBackfill` runs the same statement once more, in the
+release where `User` stops reading `learning_track`. It covers an account that
+answered the old welcome page in the previous release's own deploy gap, after
+the repeat had run and before the new code took traffic. Its down does
+nothing for the same reason. The column itself is dropped a release later,
+once no running process can read it.

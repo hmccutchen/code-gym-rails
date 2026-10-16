@@ -21,8 +21,8 @@ RSpec.describe "PATCH /profile track choice", type: :request do
       patch_profile(choose_track: true, skill_level: level)
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload).to have_attributes(skill_level: level, track_chosen_at: Time.current,
-                                             learning_track: "none", section_kind_levels: {})
+      expect(user.reload).to have_attributes(skill_level: level, track_chosen_at: Time.current, section_kind_levels: {})
+      expect(read_learning_track(user)).to be_nil
       expect(user.level_suggestion_cutoffs).to eq({})
       expect(user.level_suggestion_events).to be_empty
       expect(user.first_run?).to be false
@@ -71,6 +71,6 @@ RSpec.describe "PATCH /profile track choice", type: :request do
                   skill_level: "junior", section_kind_preferences_version: 0)
 
     expect_refused(I18n.t("tracks.stale_page"))
-    expect(user.reload).to have_attributes(track_chosen_at: nil, learning_track: nil, section_kind_levels: {})
+    expect(user.reload).to have_attributes(track_chosen_at: nil, section_kind_levels: {})
   end
 end

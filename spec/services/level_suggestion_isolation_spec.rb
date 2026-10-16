@@ -6,7 +6,7 @@ RSpec.describe "Track choice and level suggestion isolation" do
   def twin(email, chosen, cutoffs: {}, suggestions: true, levels: ExerciseSection.keys.index_with { "junior" })
     User.create!(
       email: email, name: "Twin", time_zone: "UTC", provider: "fake", api_keys: { "fake" => "fake-test-key" },
-      language: "ruby_rails", track_chosen_at: (Time.current if chosen), learning_track: ("none" if chosen),
+      language: "ruby_rails", track_chosen_at: (Time.current if chosen),
       level_suggestion_cutoffs: cutoffs,
       level_suggestions: suggestions, section_kind_levels: levels
     )

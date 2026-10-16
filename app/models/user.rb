@@ -9,6 +9,8 @@ class User < ApplicationRecord
   has_many :level_suggestion_events, dependent: :destroy
   belongs_to :invite_code, optional: true
 
+  self.ignored_columns += %w[learning_track]
+
   attr_accessor :shown_level_suggestions, :track_change
 
   serialize :api_keys, coder: JSON
@@ -18,9 +20,6 @@ class User < ApplicationRecord
   SKILL_LEVELS = KindDifficulty::LEVELS
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
-
-  LEGACY_LEARNING_TRACKS = %w[junior none].freeze
-  TRACK_CHOICE_MARKER = "none".freeze
 
   DAILY_SECTION_COUNTS = (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
   AUTOMATIC_SECTION_COUNT = "automatic".freeze
@@ -34,7 +33,6 @@ class User < ApplicationRecord
   validate :api_keys_name_providers, if: :api_keys_changed?
   validate :provider_has_a_stored_key, if: -> { provider_changed? || api_keys_changed? }
   validates :language, inclusion: { in: LANGUAGES }
-  validates :learning_track, inclusion: { in: LEGACY_LEARNING_TRACKS }, allow_nil: true
   validate :time_zone_must_be_loadable
   validate :section_kind_weights_name_rotatable_kinds,   if: :section_kind_weights_changed?
   validate :excluded_section_kinds_name_rotatable_kinds, if: :excluded_section_kinds_changed?
@@ -57,7 +55,6 @@ class User < ApplicationRecord
   before_save :record_level_changes, if: -> {
     persisted? && !choosing_track? && (section_kind_levels_changed? || skill_level_changed?)
   }
-  before_save(if: :choosing_track?) { self.learning_track ||= TRACK_CHOICE_MARKER }
   after_save :record_level_suggestion_events, if: -> {
     !previously_new_record? && !chose_track? &&
       (saved_change_to_section_kind_levels? || saved_change_to_skill_level?)
@@ -245,7 +242,7 @@ class User < ApplicationRecord
   def applies_level_suggestions_in_place? = level_suggestion_answers < LevelSuggestion::IN_PLACE_ANSWERS
 
   def first_run?
-    persisted? && track_chosen_at.nil? && learning_track.nil? && !daily_exercises.exists?
+    persisted? && track_chosen_at.nil? && !daily_exercises.exists?
   end
 
   def choose_track(level)

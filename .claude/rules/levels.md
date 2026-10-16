@@ -23,15 +23,15 @@ read it before changing that area.
 
 - **Tracks** (`docs/decisions/tracks.md`): A track is `skill_level` itself,
   stored nowhere else, and no preset targets are written. `/welcome` asks once
-  (`User#first_run?`: no `track_chosen_at`, no `learning_track`, no exercise);
+  (`User#first_run?`: no `track_chosen_at` and no exercise);
   `PATCH /profile` with `choose_track` checks exactly two keys and a
   `LevelSuggestion::LADDER` level under the user-row lock, else 422.
   `TrackChange` is the one rule for which unlocked targets a track change
   clears, and `User#apply_track_change` stays declared ahead of
   `bump_section_kind_preferences_version`. Suggestions never reach principal
-  engineer. `track_chosen_at` is a flag, not a clock. `learning_track` stays
-  one release: a choice writes `User::TRACK_CHOICE_MARKER`, and a post
-  carrying `learning_track` gets a 422.
+  engineer. `track_chosen_at` is a flag, not a clock. `users.learning_track`
+  is in `User.ignored_columns` and nothing reads or writes it; the next
+  release drops it. A post carrying `learning_track` still gets a 422.
 - **Level suggestions** (`docs/decisions/level-suggestions.md`): One-rung
   level proposals per section kind on the submitted dashboard; nothing moves
   without an explicit Apply. `LevelSuggestion` reads only answered, un-eased,

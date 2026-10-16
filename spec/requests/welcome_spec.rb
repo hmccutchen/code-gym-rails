@@ -50,7 +50,7 @@ RSpec.describe "Welcome", type: :request do
   end
 
   it "never asks a backfilled account with no exercises" do
-    login_as(new_account(learning_track: "none", track_chosen_at: 1.year.ago, created_at: 1.year.ago))
+    login_as(new_account(track_chosen_at: 1.year.ago, created_at: 1.year.ago))
 
     get "/welcome"
     expect(response).to redirect_to(root_path)

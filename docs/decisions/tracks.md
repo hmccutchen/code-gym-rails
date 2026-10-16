@@ -17,7 +17,7 @@ graduation reaches; principal engineer is set by hand in Setup**, and both
 pages say so.
 
 **`track_chosen_at` is a flag, not a clock.** `User#first_run?` is a saved
-account with no `track_chosen_at`, no `learning_track` and no exercise.
+account with no `track_chosen_at` and no exercise.
 `AddTrackChosenAtToUsers` shipped a release before any code read the
 column, because the worker's pre-deploy waits for a schema, not for pending
 migrations; it and `RepeatTrackChosenAtBackfill` set it to `created_at` for
@@ -28,15 +28,25 @@ opened `/welcome` hold null and are past first run because they have
 exercises. The exercise check also keeps the preview app's seeded account
 from being asked.
 
-**`learning_track` is kept for one release.** A choice
-writes `learning_track: "none"` when it is blank (`User::TRACK_CHOICE_MARKER`),
-so code rolled back to before tracks per level neither re-asks the account
-nor shows the old Leave control, and `first_run?` still reads it so an
-account that answered the old welcome page in the deploy gap is not asked
-again. A post that carries `learning_track` comes from a page rendered before
-tracks per level and gets a 422 asking for a reload (`tracks.stale_page`).
-The validation accepts the legacy values `junior` and `none`. A cleanup
-release drops the column, the write and the validation. Leave the track,
+**`learning_track` goes in two releases.** For the release that made the
+skill level the track (#398), a choice also wrote `learning_track: "none"`,
+so code rolled back to before it neither re-asked the account nor showed the
+old Leave control, and `first_run?` still read the column so an account
+that answered the old welcome page in that deploy gap was not asked again.
+The next release stopped there: `FinishTrackChosenAtBackfill` repeats the
+`track_chosen_at` backfill once more, guarded by `track_chosen_at IS NULL`,
+for any account that answered the old page in #398's own deploy gap, and
+`User` then lists the column in `ignored_columns`, with the write, the
+validation and the `first_run?` read gone. A release that drops the column
+while code still reads it would raise `MissingAttributeError` on every
+`first_run?` check between the migration and the new code taking traffic,
+which is why the drop waits one more release, as `RemoveApiKeyFromUsers`
+and `RemoveTrackLeftoversFromUsers` did. Rolling back one release is safe
+either way, since #398's code reads `track_chosen_at` first; rolling back
+two re-asks accounts that chose under the ignoring release. A post that
+carries `learning_track` still comes from a page rendered before tracks
+per level and gets a 422 asking for a reload (`tracks.stale_page`); that
+guard reads the request, not the column, and stays. Leave the track,
 `finish_learning_track` and the junior preset are gone: the "Suggest level
 changes" switch is the way to stop suggestions, and graduation will follow
 it. In specs, `create_user_with_key` and `create_fake_provider_user` stand
