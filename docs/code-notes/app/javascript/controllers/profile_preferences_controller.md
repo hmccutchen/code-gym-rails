@@ -57,3 +57,13 @@ button. An event rather than a
 reach into the other controller keeps each controller's state its own. The
 reply's `kept_own_level` sentence, written by the server, fills the status line
 under the select; it is empty when no target was kept.
+
+## One track save at a time
+
+`saveSkillLevel` disables the Track select until its save finishes, success or
+failure, and gives focus back if the select had it. Two track changes in flight
+at once let a mix save frozen by the second one go out after the first track
+reply, carrying a target that reply had cleared; each fix for that case opened
+another. With one track save at a time, every frozen mix save goes out ahead of
+the track save that froze it. The cost is that the select cannot be changed for
+the length of one save.

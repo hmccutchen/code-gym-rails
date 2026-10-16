@@ -308,6 +308,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       slider.value = 0;
       slider.dispatchEvent(new Event("input", { bubbles: true }));
     JS
+    expect(page).to have_css("#skill-level:not([disabled])", wait: 5)
     find("#skill-level").select("Senior")
 
     wait_for(10) { user.reload.skill_level == "senior" && user.section_kind_weights.present? }
@@ -417,12 +418,40 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     page.execute_script(%(moveSlider("1")))
     find("#skill-level").select("Mid-level")
     page.execute_script(%(moveSlider("0")))
+    expect(page).to have_css("#skill-level:not([disabled])", wait: 5)
     find("#skill-level").select("Senior")
 
     wait_for(10) { user.reload.skill_level == "senior" }
     sleep 1.5
     expect(user.reload.section_kind_weights).to eq("security_review" => 0.25)
     expect(page.evaluate_script(%(document.querySelector("#weight-security_review").value))).to eq("0")
+  end
+
+  it "disables the track select while its save is in flight and gives focus back after" do
+    visit_as(user)
+    visit setup_path
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes("skill_level")) {
+          return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 1200));
+        }
+        return send(url, options);
+      };
+    JS
+
+    page.execute_script(<<~JS)
+      const select = document.getElementById("skill-level");
+      select.focus();
+      select.value = "mid_level";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    JS
+
+    expect(page).to have_css("#skill-level[disabled]")
+    expect(page).to have_css("#skill-level:not([disabled])", wait: 5)
+    expect(page.evaluate_script(%(document.activeElement.id))).to eq("skill-level")
+    expect(user.reload.skill_level).to eq("mid_level")
   end
 
   def guide_measurement

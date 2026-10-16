@@ -21,8 +21,7 @@ RSpec.describe "Track select on Setup", type: :system do
     expect(page).to have_current_path(setup_path)
   end
 
-  # Holds the first PATCH until after the second change; sent in parallel it would land last and store the older level.
-  it "stores the last of two quick changes even when the first save is slow" do
+  it "holds a second change until the first save lands, then stores it" do
     page.execute_script(<<~JS)
       const originalFetch = window.fetch;
       window.fetch = (url, options) => {
@@ -35,9 +34,10 @@ RSpec.describe "Track select on Setup", type: :system do
 
     select "Senior", from: "Track"
     wait_for_js_condition("typeof window.releaseSenior === 'function'")
-    select "Principal engineer", from: "Track"
-    page.driver.with_playwright_page { |pw| pw.wait_for_timeout(300) }
+    expect(page).to have_css("#skill-level[disabled]")
     page.execute_script("window.releaseSenior()")
+    expect(page).to have_css("#skill-level:not([disabled])")
+    select "Principal engineer", from: "Track"
     wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
 
     expect(user.reload.skill_level).to eq("principal_engineer")

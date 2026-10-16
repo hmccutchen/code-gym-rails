@@ -138,13 +138,14 @@ before this save lands: `saved`, the save on the wire (`onTheWire`), or a frozen
 save still queued (`editsFromAnyPending`). Comparing with one of them alone
 loses something: `saved` alone misses a weight moved back while its first change
 is in flight, and the wire save alone drops a change that save carried if it
-then fails. Counting a field the form already agrees on with the eventual server
-state only resends the value the form shows. When the save is sent, those edits are laid over `saved`
+then fails. Counting extra fields is safe because a frozen save always goes
+out ahead of the one track save that froze it: the track select is disabled
+while its save is in flight (`profile_preferences`), so no second track save
+can queue ahead of a frozen save, and the server applies the track change after
+the frozen edits. When the save is sent, those edits are laid over `saved`
 as it is then (`frozenState`, through `withEdits`), and the version and the
-shown suggestions are read then too. So an edit made before the track change
-cannot ride in a later save, and a frozen save sent after an earlier track
-reply, when two track changes follow each other quickly, does not bring back a
-target that reply cleared.
+shown suggestions are read then too. So an edit made after the track change
+cannot ride in the save that goes out ahead of it.
 A mix save queued after the track save is not frozen, since it has to read the
 form once the track reply has been applied, or it would send targets the track
 change cleared. Edits are saved in
