@@ -390,6 +390,41 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(user.section_kind_levels).to include("design_comparison" => "senior")
   end
 
+  it "keeps the last weight across two track changes queued behind a mix save" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      let held = false;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (!held && body.includes("section_kind_weights")) {
+          held = true;
+          return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 2000));
+        }
+        return send(url, options);
+      };
+      window.moveSlider = (index) => {
+        const slider = document.querySelector("#weight-security_review");
+        slider.value = index;
+        slider.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+    JS
+
+    page.execute_script(%(moveSlider("0")))
+    sleep 0.6
+    page.execute_script(%(moveSlider("1")))
+    find("#skill-level").select("Mid-level")
+    page.execute_script(%(moveSlider("0")))
+    find("#skill-level").select("Senior")
+
+    wait_for(10) { user.reload.skill_level == "senior" }
+    sleep 1.5
+    expect(user.reload.section_kind_weights).to eq("security_review" => 0.25)
+    expect(page.evaluate_script(%(document.querySelector("#weight-security_review").value))).to eq("0")
+  end
+
   def guide_measurement
     page.evaluate_script(<<~JS)
       (() => {
