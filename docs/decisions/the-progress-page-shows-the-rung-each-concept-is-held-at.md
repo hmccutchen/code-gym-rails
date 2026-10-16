@@ -1,7 +1,7 @@
 # The Progress page shows the rung each concept is held at
 
-, from the
-stamps above: `/progress`, a nav entry between Learn and History, in the buckets and
+It reads the stamps in
+`each-section-records-the-rung-it-was-pitched-at.md`: `/progress`, a nav entry between Learn and History, in the buckets and
 groups Learn uses (`ConceptBucket.slice_for`, `ConceptGroup.grouped`),
 nothing regrouped; a single-group bucket shows one disclosure under the
 bucket's name, as Learn shows it flat. `RungLedger` is the one rule:

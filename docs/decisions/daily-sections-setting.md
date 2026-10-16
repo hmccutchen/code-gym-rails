@@ -38,6 +38,6 @@ the old code kept serving through the pre-deploy migration, and
 `RemoveAdaptiveSetSizeFromUsers` dropped it afterwards.
 
 **A fixed count never gains a coverage section.** The coverage exception
-below applies only to Automatic, so under a fixed 2 a check that only an
+(`coverage-exception.md`) applies only to Automatic, so under a fixed 2 a check that only an
 optional kind can host waits, and the `[retention] waiting=` line says so.
 A fixed choice wins by design.

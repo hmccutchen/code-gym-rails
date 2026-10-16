@@ -34,7 +34,7 @@ The form still carries `submit->answer-form#submit`. Nothing dispatches that
 event today, and the action exists so a field added later cannot post the day
 around this controller.
 
-The "One finish action" decision says the Submit button is always clickable,
+The "One finish action" decision (`docs/decisions/one-finish-action.md`) says the Submit button is always clickable,
 and it still is. A click before the module loads is lost the same way a rating
 click is, and clicking again works.
 

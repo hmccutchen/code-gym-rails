@@ -98,8 +98,8 @@ the report reads every kind at junior, the unsaved user's default skill
 level, where it read the union of every rung before; the 2026-10-08 figures
 below were measured the old way, and only design comparison differs. It is
 no longer the only bulk path: Setup's "Prepare AI guidance" now covers every
-section's level for any account with its own key (see "Difficulty targets
-and locks").
+section's level for any account with its own key (see
+`difficulty-targets-and-locks.md`).
 
 **Production coverage before any run, 2026-10-08.** The report step, run
 against production, grounded 5 of 90 code review pairs, 3 of 48 design

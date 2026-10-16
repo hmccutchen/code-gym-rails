@@ -104,7 +104,7 @@ trade.
 
 **The duck against `claude-haiku-4-5`:** Sonnet answered in 2.4s on
 **54 input tokens**, Haiku in 1.6s on **806**. That gap is the caching bet
-below, measured: Sonnet read the cached prefix and Haiku could not, since
+in `conversational-calls-send-real-turns.md`, measured: Sonnet read the cached prefix and Haiku could not, since
 the duck's prompt sits under Haiku's 4,096-token cache minimum. Moving the
 route would end the caching and eat most of the headline saving. Both
 answers were usable; Sonnet's gave a concrete analogy and stayed inside
@@ -128,4 +128,5 @@ using the routed model's entry in `ClaudeService::THINKING_OFF` (`between_tools`
 on Sonnet 5.5, `disabled` on Haiku 4.5). Opus 5.5 has no thinking-off setting
 and no entry, so a capped purpose cannot move to Opus: the call raises before sending. And Haiku 4.5 caches only a
 prompt of 4,096 tokens or more, above the duck's system prompt, so moving
-`duck_thread` there ends the caching bet described below.
+`duck_thread` there ends the caching bet described in
+`conversational-calls-send-real-turns.md`.

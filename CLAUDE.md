@@ -436,19 +436,25 @@ doc under `docs/decisions/`, which holds the full reasoning, measurements and
 history; read it before changing that area.
 
 - **Tracks** (`docs/decisions/tracks.md`): A track is `skill_level` itself,
-  stored nowhere else. `/welcome` asks once (`User#first_run?`); `PATCH
-  /profile` with `choose_track` checks exactly two keys and a
+  stored nowhere else, and no preset targets are written. `/welcome` asks once
+  (`User#first_run?`: no `track_chosen_at`, no `learning_track`, no exercise);
+  `PATCH /profile` with `choose_track` checks exactly two keys and a
   `LevelSuggestion::LADDER` level under the user-row lock, else 422.
   `TrackChange` is the one rule for which unlocked targets a track change
-  clears; suggestions never reach principal engineer. `track_chosen_at` is a
-  flag, not a clock.
+  clears, and `User#apply_track_change` stays declared ahead of
+  `bump_section_kind_preferences_version`. Suggestions never reach principal
+  engineer. `track_chosen_at` is a flag, not a clock. `learning_track` stays
+  one release: a choice writes `User::TRACK_CHOICE_MARKER`, and a post
+  carrying `learning_track` gets a 422.
 - **Level suggestions** (`docs/decisions/level-suggestions.md`): One-rung
   level proposals per section kind on the submitted dashboard; nothing moves
   without an explicit Apply. `LevelSuggestion` reads only answered, un-eased,
   `pitched_at`- and `RUBRIC_VERSION`-stamped results, never suggests to or
-  from principal engineer, and skips locked kinds. Every rung change records a
-  cutoff under the user-row lock, and posted `LevelSuggestionStep`s whose
-  `from` differs from the stored rung get a 409.
+  from principal engineer, and skips locked kinds. A rung change records a
+  cutoff under the user-row lock (`User#record_level_changes`), except a move
+  to principal engineer and the first-run track choice, which record none.
+  Posted `LevelSuggestionStep`s whose `from` differs from the stored rung get
+  a 409.
 - **Invite codes and trials** (`docs/decisions/invite-codes-and-trials.md`):
   An invite code starts a trial on a house key. `InviteCode#redeem!` takes a
   seat in one statement, and the seat is taken only when the emailed code is
@@ -466,10 +472,15 @@ history; read it before changing that area.
 - **Per-purpose model routing**
   (`docs/decisions/per-purpose-model-routing.md`): Each provider routes a call
   by its `purpose` through its own `MODEL_FOR_PURPOSE`, falling back to
-  `DEFAULT_ROUTE`; `model_routing_spec` fails on a key no call site logs. A
-  capped call turns thinking off from `ClaudeService::THINKING_OFF` (or
-  `OpenaiService::REASONING_OFF`), so a capped purpose cannot route to Opus
-  5.5, and an OpenAI model without `none` needs a `reasoning_allowance`.
+  `DEFAULT_ROUTE`; `model_routing_spec` fails on a key no call site logs.
+  Effort is stated explicitly on each route, so a provider default change
+  cannot move it silently. A capped call turns thinking off from
+  `ClaudeService::THINKING_OFF` (or `OpenaiService::REASONING_OFF`), so a
+  capped purpose cannot route to Opus 5.5, and an OpenAI model without `none`
+  needs a `reasoning_allowance`. `judge_section`, review and `duck_thread`
+  stay on Sonnet as measured decisions; Haiku would end the duck's prompt
+  caching. `script/compare_models.rb` runs only Claude, so the OpenAI routes
+  are uncompared.
 - **Conversational calls send real turns**
   (`docs/decisions/conversational-calls-send-real-turns.md`): `#duck_response`
   and `#answer_follow_up` pass prior turns as `history:`, with only the new
@@ -508,24 +519,35 @@ history; read it before changing that area.
   `application_code`, `test_file` or `schema_review`
   (`DailyPlan::CODE_REVIEW_MODE_WEIGHTS`); only `schema_review` narrows to
   `DATA_MODELING_CONCEPTS` via `ConceptVocabulary.selectable_for_section`. A
-  Ruby day may be grounded in a `RealSource` excerpt; ingest stamps the
-  server's own `scenario`, `source` and `current_schema`, and `RealSource`
-  entries are appended, never inserted.
+  Ruby `application_code` or `schema_review` day may be grounded in a
+  `RealSource` excerpt; `test_file` has no pool. Ingest stamps the server's
+  own `scenario` and `source`, plus `current_schema` for a migration excerpt,
+  and `RealSource` entries are appended, never inserted.
 - **Design comparison, the second fixed section**
   (`docs/decisions/design-comparison-the-second-fixed-section.md`): The second
   fixed kind (`ExerciseSection::DesignComparison`): two working pieces that
   differ on one principle; the engineer picks one and names the deciding fact.
-  The server rolls A/B order in `.arrange!`, `answer_key` never reaches the
-  page, judge or duck before review, and `.reject_unusable!` refuses unusable
-  pieces or keys. A day still holds at most `ExerciseSection::MAX_SECTIONS`,
-  fixed kinds first.
+  The server rolls A/B order in `.arrange!`. `answer_key` never reaches the
+  page, the judge, the duck (which gains only `piece_a` and `piece_b`) or the
+  `[difficulty_diagnostics]` log before review, and the judge's outcomes for
+  this kind omit evidence and reason, with the reply parsed `log_raw: false`.
+  `.reject_unusable!` refuses unusable pieces or keys; `DEFERRED_CONCEPTS`
+  stay out of its vocabulary; `.rejudge_edits?` is true only here;
+  `REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL` stays false until a person has read
+  the disagreements; its reference stays closed until opened. A day still
+  holds at most `ExerciseSection::MAX_SECTIONS`, fixed kinds first.
 - **Two-stage generation** (`docs/decisions/two-stage-generation.md`): Weekday
   first generation drafts a set, then `JudgedGeneration` judges each section:
   keep, edit prose (`.prose_fields` only, never code or the planted defect) or
-  reject. `JudgeVerdict.parse` is the boundary. A rejection buys
-  `.judge_retries` retries with the concept fixed, then a drop recorded in
-  `dropped_sections`; a judge failure keeps the draft. The judge never sees
-  answer keys or `SERVER_STAMPS`.
+  reject. Weekend sets and `RegenerateExerciseJob` stay single-stage.
+  `JudgeVerdict.parse` is the boundary, and evidence is deliberately not
+  matched against the section text. A rejection buys `.judge_retries` retries
+  with the concept fixed, then a drop recorded in `dropped_sections`; a judge
+  failure keeps the draft; a day with every section dropped raises
+  `AllSectionsRejectedError` and writes no row. A dropped kind still counts as
+  scheduled, and nothing in the rotation compensates, on purpose; a day's
+  credit never exceeds the sections it delivered. The judge sees one section
+  with no concept history, answer keys or `SERVER_STAMPS`.
 - **Scenario flavor** (`docs/decisions/scenario-flavor.md`): Each day's
   scenario setting comes from one prompt line offering a pool from
   `AiService::SCENARIO_POOLS`, rolled once a day by `DailyPlan`
@@ -552,11 +574,13 @@ history; read it before changing that area.
 - **The fourth slot** (`docs/decisions/the-fourth-slot.md`): An optional
   fourth key (`plan_review`, `ambiguity_hunt`, `pseudocode_to_code`) with its
   own language-independent vocabularies and buckets, planned on a separate
-  track holding one concept (`FOURTH_SLOT_CAPACITY`). The
+  track holding one concept (`FOURTH_SLOT_CAPACITY`): reinforcement is cut to
+  one and gives the slot up to an overdue retention check. The
   `planted_ambiguities` answer key must never reach the page, a pre-submission
   AI context or logs; strip sites read
-  `ExerciseSection.all_answer_key_fields`, and a `reject_unusable!` refusal
-  costs only that section.
+  `ExerciseSection.all_answer_key_fields`. `AmbiguityHunt.reject_unusable!`
+  refuses only when that kind won the slot, a refusal costs only that section,
+  and a wrong planted count is not a failure.
 - **Which sections count** (`docs/decisions/which-sections-count.md`):
   `DailyExercise#active_section_keys` (through
   `ExerciseSection.resolved_keys`) is the single authority for which sections
@@ -577,8 +601,12 @@ history; read it before changing that area.
   through `KindDifficulty#rung_for`. A lock suppresses `(reduced)` easing and
   both rating adjustments, first exposure included. Targets and locks change
   prompt text only: `DailyPlan`, `ConceptMastery` and `User#concepts_*` never
-  read `KindDifficulty`. `AiService::MAX_LADDER_GUIDANCE_CHARS` bounds the
-  ladder block.
+  read `KindDifficulty`. Weights and difficulty share
+  `section_kind_preferences_version`. `POST /learn/prepare_ladders` is the one
+  scoped exception to Learn's no-bulk-rewrite rule, reaches every teammate
+  through the shared `ConceptReference`, and is never offered to a trial
+  account (`User#prepares_ladders?`). `AiService::MAX_LADDER_GUIDANCE_CHARS`
+  bounds the ladder block.
 - **Drills** (`docs/decisions/drills.md`): A drill (`ConceptDrills`) only
   moves a concept to the front of `User#concepts_needing_reinforcement`; it
   never touches rotation, weights or `KindDifficulty`. It clears on the same
@@ -605,9 +633,10 @@ history; read it before changing that area.
   level choices are `KindDifficulty::LEVELS` (`User::SKILL_LEVELS`), edited
   only from Setup's Track select and the welcome page through `PATCH
   /profile`, which 422s anything outside the list. It sets the rung of every
-  untargeted kind, never changes automatically, clears targets per
-  `TrackChange` under the user-row lock, and bumps
-  `section_kind_preferences_version` only when it clears a target.
+  untargeted kind and never changes automatically. Under the user-row lock it
+  clears targets per `TrackChange` and gives every kind it moves a cutoff and
+  a `skill_level_edit` event row; it bumps `section_kind_preferences_version`
+  only when it clears a target.
 - **What a usage row records** (`docs/decisions/what-a-usage-row-records.md`):
   Every provider call writes exactly one `ApiUsage` row through
   `AiService#log_usage`, including a call that fails before a reply (zero
@@ -662,8 +691,9 @@ history; read it before changing that area.
   fixed kind can tag (via `DayHosts`) into both fixed sections, only on a host
   nothing else needed (`SharedConcept.placeable?`), so it never evicts a drill
   or reinforcement entry. It is advisory prompt text, never enforced through
-  `fixed_concepts:`, and the dashboard line shows only when both delivered
-  sections carry it.
+  `fixed_concepts:`. The dashboard line shows only when both delivered
+  sections carry it, and it gives no reason, since saying why would expose the
+  mastery tier.
 - **Waiting retention checks** (`docs/decisions/waiting-retention-checks.md`):
   `DailyPlan` reads due checks for every bucket in the user's slice plus the
   generated language's bucket in one query
@@ -683,17 +713,21 @@ history; read it before changing that area.
   earns an Automatic day's size from rubric-stamped reviews; `DaySize` takes
   the lower of it and completion, and a fixed setting wins outright. The fold
   is pure and runs forward, moves one step a day, resets to two on the brake
-  (which empties the growth windows), keeps eased ratings out of growth, and
-  reads levels from `pitched_at`. `ReviewedSectionResults` decides which
-  sections count.
+  (which empties the growth windows), and reads levels from `pitched_at`.
+  Eased sections stay out of growth, but their too-hard rating counts toward
+  the brake. `ReviewedSectionResults` decides which sections count, and
+  `CompetencyGate::Evidence` reads every stamped day with no cap, since a cap
+  would forget an earned size.
 - **Pausing generation** (`docs/decisions/pausing-generation.md`):
   `User#paused_generation_at` stops only generation the user didn't ask for
-  (cron and the dashboard auto-trigger), never submit or review. A held
-  unsubmitted set and its draft response move to today
-  (`User#carry_held_set_forward!`, `#recover_held_set`) under
+  (cron and the dashboard auto-trigger), never submit or review. `PATCH
+  /account/toggle_generation` is the only pause control, and its buttons post
+  the state they want. A held unsubmitted set and its draft response move to
+  today (`User#carry_held_set_forward!`, `#recover_held_set`) under
   `DailyExercise#with_response_locked`, clearing both regeneration columns; a
   submitted response ends the move, and it is skipped when today already has a
-  set.
+  set. At most one set carries forward, so an older stray still breaks
+  `#current_streak`, and re-pausing never moves the `#held_exercise` floor.
 - **Personalization loop** (`docs/decisions/personalization-loop.md`):
   `User#recent_performance` feeds the last 10 sessions into the generation
   prompt. A skipped section's AI grade is never skill evidence: ratings,
@@ -751,18 +785,22 @@ history; read it before changing that area.
   display-only.
 - **Grading rubric** (`docs/decisions/grading-rubric.md`):
   `AiService::RATING_RUBRIC` is the one definition of the four review ratings,
-  graded against the section's `pitched_at` rung; per-kind grading notes name
-  the main point and never restate the levels. Parsons' rating comes from its
-  `fixed_rating` hook. `RubricCheck` only logs agreement and never rewrites a
-  rating, and evidence readers that compare ratings to a bar read only
-  `RUBRIC_VERSION`-stamped reviews.
+  graded against the section's `pitched_at` rung; `eased` is never passed to
+  the grader. Per-kind grading notes name the main point and never restate the
+  levels. Parsons' rating comes from its `fixed_rating` hook. `RubricCheck`
+  only logs agreement and never rewrites a rating. The competency gate and
+  `LevelSuggestion` read only `RUBRIC_VERSION`-stamped reviews;
+  `ConceptMastery` and `RungLedger` read all history on purpose.
 - **Review prose judge** (`docs/decisions/review-prose-judge.md`): An optional
   second pass that may reword a graded review's prose fields for plain
   language or length (`AiService#judge_review_prose`); it is never shown the
-  answer, problem or grading note. `ReviewProseVerdict.parse` is the boundary,
-  any failure returns the grade unchanged, and it runs on Claude only. Turning
-  `REVIEW_PROSE_JUDGE` on, or changing its prompt or route, must re-pass the
-  doc's activation gate.
+  answer, problem or grading note. `ReviewProseVerdict.parse` is the boundary:
+  a list field must cite every original entry once, in order. `graded_prose`
+  is server-owned. Any failure returns the grade unchanged, and it runs on
+  Claude only. The call is `single_attempt: true`, and
+  `DailyResponse::REVIEW_CLAIM_STALE_AFTER` (12 minutes) covers it, so the
+  claim outlasts the grading chain. The switch (`REVIEW_PROSE_JUDGE`) is on;
+  any change to its prompt or route must re-pass the doc's activation gate.
 - **One reviewed-response invariant**
   (`docs/decisions/one-reviewed-response-invariant.md`): No action destroys a
   reviewed response, since `ConceptMastery.record_review!` has already moved
@@ -772,11 +810,12 @@ history; read it before changing that area.
   (`#reviewing?`) blocks too; a claim past its stale window does not.
 - **The Learn tab** (`docs/decisions/the-learn-tab.md`): `/learn` lists every
   concept in the user's slice by `user.language`, never `#language_for_today`,
-  and shows explanations before first exposure on this tab only. Guide, ladder
-  and `lesson` come from the same `#generate_concept_reference` call, outside
-  its required fields; `CONCEPT_REFERENCE_FIELDS` stays unwidened,
-  `TRADEOFF_CONCEPTS` is written out, and "seen" reads
-  `concept_exposure_count`, never `ConceptMastery`.
+  and shows explanations before first exposure on this tab only.
+  `ConceptReference` is a team-wide cache keyed on `(concept, language)` with
+  no `user_id`. Guide, ladder and `lesson` come from the same
+  `#generate_concept_reference` call, outside its required fields;
+  `CONCEPT_REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
+  out, and "seen" reads `concept_exposure_count`, never `ConceptMastery`.
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
   `ConceptGroup` or language-independent bucket gets one shared
   `RecognitionGuide` on how to look for that kind of problem. It teaches a
@@ -817,7 +856,9 @@ history; read it before changing that area.
   from `RungLedger` and exposure, never `ConceptMastery`, drills or pause
   state. `#still_met_by?` re-picks a stale row on read, the insert keeps its
   SAVEPOINT for the unique-index race, it never calls a provider, and
-  `#marks?` is the one marking rule.
+  `#marks?` is the one marking rule. `#featured_tagline_shown?` holds the
+  reference's tagline back on the dashboard until the day is submitted, since
+  it can name what a section asks the engineer to find.
 - **Idempotent saves and frozen evidence**
   (`docs/decisions/idempotent-saves-and-frozen-evidence.md`):
   `ResponsesController#create` reloads every answer save under the response
@@ -884,18 +925,26 @@ history; read it before changing that area.
 - **Display preferences** (`docs/decisions/display-preferences.md`): Theme,
   background pattern, text size, line spacing and reading font, saved through
   `PATCH /profile`. `DisplayPreferences` is the one list of choices, defaults
-  first; storage is sparse jsonb and `User` and `ProfileController` refuse
-  values outside the lists. Defaults render no `<html>` attribute or extra
-  stylesheet; the light palette's media (`#light_palette_media`) drives the
-  palette, logo and theme-color together.
+  first; storage is sparse jsonb, and `User` and `ProfileController` refuse
+  values outside the lists. The background pattern is on by default on
+  purpose, the one display change that needs no opt-in, so only an explicit
+  `"off"` is stored. Every other default renders no `<html>` attribute or
+  extra stylesheet. `#light_palette_media` drives the palette, logo and
+  theme-color together. The reading font and spacing apply to prose, never
+  code; `palette_contrast_spec` holds both palettes to WCAG AA; the nav
+  collapses on one `@container` rule that `mobile_nav_menu_spec` guards.
 - **Push reminders** (`docs/decisions/push-reminders.md`): Optional weekday
-  ready and afternoon nudge notifications. Submission alone stops nudges;
-  `PushNudgePlan` owns the window and `QUIET_PERIOD`,
-  `DailyResponse#submit_blocker` gates the copy, and both are enqueued from
-  `GenerateDailyExercisesJob`'s cron branch. `WebPushCredentials` decides
-  whether push exists, endpoints stay on `ALLOWED_ENDPOINT_HOSTS`, and
-  `Notification.requestPermission()` must be the click handler's first
-  synchronous call.
+  ready and afternoon nudge notifications. Intent (`User#reminder_level`) and
+  transport (`PushSubscription`) are separate: an endpoint can die without
+  losing the user's answer, and turning reminders off or anonymizing clears
+  both. Only submission stops the day's nudges; `PushNudgePlan` owns the
+  window and `QUIET_PERIOD`, which must cover a full production tick
+  (`push_nudge_plan_spec`), and `DailyResponse#submit_blocker` gates the copy.
+  Both kinds are enqueued from `GenerateDailyExercisesJob`'s cron branch, with
+  no cron entry of their own and none from the on-demand branch.
+  `WebPushCredentials` decides whether push exists, endpoints stay on
+  `ALLOWED_ENDPOINT_HOSTS`, and `Notification.requestPermission()` must be the
+  click handler's first synchronous call.
 
 ## Railway Deployment
 
@@ -1050,8 +1099,8 @@ One line per file; `docs/file-map.md` has the full descriptions.
 - `app/controllers/level_suggestion_answers_controller.rb` — counts answered proposals
 - `app/views/dashboard/_level_suggestion.html.erb` — submitted-day level suggestion card with Apply/Not now
 - `app/views/api_keys/_level_suggestions_switch.html.erb` — Setup's "Suggest level changes" switch
-- `script/prepare_junior_ladders.rb` (+ `script/junior_ladder_preparation.rb`) — operator ladder coverage report; `--run` queues refreshes
-- `spec/requests/existing_account_pages_spec.rb` — exact snapshots of Dashboard, Setup, Account and History pages
+- `script/prepare_junior_ladders.rb` (+ `script/junior_ladder_preparation.rb`) — operator ladder coverage report; `--run` queues shared-reference refreshes billed to the operator's key
+- `spec/requests/existing_account_pages_spec.rb` — exact snapshots of Dashboard, Setup, Account and History pages; never re-record (`UPDATE_PAGE_SNAPSHOTS=1`) to hide a regression
 - `app/services/ai_service.rb` — `AiService`: provider-agnostic base for prompts, parsing and usage logging
 - `app/services/judged_generation.rb` — `JudgedGeneration`: judge, retry and drop sections after the draft
 - `app/services/problem_set_ingest.rb` — `ProblemSetIngest`: the generation boundary normalizing provider output
@@ -1096,8 +1145,8 @@ One line per file; `docs/file-map.md` has the full descriptions.
 - `script/solve_agreement.rb` — `SolveAgreement`: prints blind-solve agreement for compare_models
 - `app/services/claude_service.rb` / `gemini_service.rb` / `openai_service.rb` — per-provider HTTP call, connection and model routing
 - `app/models/ai_provider.rb` — `AiProvider`: closed provider registry
-- `script/compare_models.rb` (+ `script/model_comparison.rb`) — side-by-side run of stored input through two Claude models
-- `script/probe_gemini_capacity.rb` (+ `script/gemini_capacity_probe.rb`) — replays tester-days against Gemini until a limit is hit
+- `script/compare_models.rb` (+ `script/model_comparison.rb`) — side-by-side run of stored input through two Claude models; billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows
+- `script/probe_gemini_capacity.rb` (+ `script/gemini_capacity_probe.rb`) — replays tester-days against Gemini until a limit is hit; spends that key's daily allowance, never run in CI
 - `script/check_gemini_structured_output.rb` (+ `script/gemini_structured_output_check.rb`) — checks Gemini accepts the judge verdict schema
 - `app/models/rubric_check.rb` — `RubricCheck`: whether a rating agrees with its listed essential gaps
 - `spec/fixtures/review_calibration/` — complete, partial and missed answers for review calibration
@@ -1144,7 +1193,7 @@ One line per file; `docs/file-map.md` has the full descriptions.
 - `app/controllers/concerns/preview_auto_login.rb` — `PreviewAutoLogin`: preview-only auto-login callback
 - `lib/boot/database_pool.rb` — `DatabasePool.size`: the database pool size
 - `lib/boot/app_host.rb` — `AppHost.resolve`: the app's host from ENV
-- `app/services/fake_service.rb` — `FakeService`: deterministic zero-cost provider for tests
+- `app/services/fake_service.rb` — `FakeService`: deterministic zero-cost provider for tests; refused outside a local environment
 - `app/controllers/learn_controller.rb` — the `/learn` library, concept pages and generation triggers
 - `app/controllers/concerns/learn_scope.rb` — `LearnScope`: the user's vocabulary slice and URL checks
 - `app/models/concept_drills.rb` — `ConceptDrills`: starts and stops drills, owns the cap
@@ -1154,14 +1203,14 @@ One line per file; `docs/file-map.md` has the full descriptions.
 - `app/services/featured_concept_pick.rb` — `FeaturedConceptPick`: pure rule choosing among met concepts
 - `app/helpers/featured_concept_helper.rb` — featured concept per request, section marking and tagline rule
 - `app/views/responses/_featured_marker.html.erb` — marker on a section carrying this week's concept
-- `app/models/concept_book_sources.rb` — `ConceptBookSources`: hand-curated book pointers per concept
+- `app/models/concept_book_sources.rb` — `ConceptBookSources`: hand-curated book pointers per concept; never read by any prompt
 - `app/models/concept_lesson.rb` — `ConceptLesson`: short-lesson sections, limits and boundary check
 - `app/models/learn_lessons.rb` — `LearnLessons`: hand-written Learn-only lessons
 - `app/models/section_kind_guide.rb` — `SectionKindGuide`: each kind's hand-written summary and example
 - `app/models/hand_written_learn_text.rb` — `HandWrittenLearnText::MODULES`: static reader-facing text modules
 - `app/models/recognition_guide.rb` — `RecognitionGuide`: cached "how to look for these" per group
 - `app/jobs/generate_recognition_guide_job.rb` — writes one missing recognition guide
-- `app/models/concept_group.rb` — `ConceptGroup`: a concept's display group on the Learn index
+- `app/models/concept_group.rb` — `ConceptGroup`: a concept's display group on the Learn index; has no relationship to `ConceptBucket` and must not acquire one
 - `spec/system/learn_filter_spec.rb` — Learn filter matches the label shown on screen
 - `config/initializers/content_security_policy.rb` — the content security policy
 - `spec/conventions/app_views_spec.rb` — fails on inline scripts, `on*` handlers or `javascript:` URLs
