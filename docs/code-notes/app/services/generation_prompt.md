@@ -13,7 +13,8 @@ no input.
 
 Renders an already-made decision; nothing here reads the clock or rolls
 anything, so a retry renders the same from the same inputs. The kinds are
-resolved once through `#kinds_for`, so guidance, hosting and the schema agree,
+resolved once per render and handed to the embedded schema, so guidance,
+hosting and the schema agree,
 and `only` narrows them to the one retried kind. The fixed concept line is
 folded onto the drilled-concepts bullet, because an empty interpolation on its
 own line would break the prompt snapshots.
@@ -45,7 +46,7 @@ four times, so each keeps its own method and heredoc.
 
 ## `#annotate_reinforcement`
 
-Shows the tier and `drilled` side by side, so a log line can tell the system's
+Shows the tier and `drilled` side by side, so the model can tell the system's
 reading apart from the engineer's request.
 
 ## `#shared_concept_guidance`

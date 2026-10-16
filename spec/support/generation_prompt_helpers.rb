@@ -13,12 +13,12 @@ module GenerationPromptHelpers
 
   # The real curated method, bound to a service that can never open a connection; never a reimplementation.
   def generation_retention_annotation
-    Class.new(AiService) do
+    @generation_retention_annotation ||= Class.new(AiService) do
       private def build_connection = nil
     end.new("no-network-key").method(:annotate_retention_concept)
   end
 
-  def generation_prompt(user, language = "ruby_rails", history: [], difficulty: KindDifficulty.none,
+  def render_generation_prompt(user, language = "ruby_rails", history: [], difficulty: KindDifficulty.none,
                         ladders: {}, only: nil, fixed_concept: nil, **plan_overrides)
     GenerationPrompt.new(user, language, plan: plan_for(**plan_overrides), history: history,
                          difficulty: difficulty, ladders: ladders,

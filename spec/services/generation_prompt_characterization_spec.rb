@@ -15,7 +15,7 @@ RSpec.describe "generation prompt characterization" do
   end
 
   def render(language, third, fourth, mode)
-    generation_prompt(
+    render_generation_prompt(
       user, language,
       third: third, fourth: fourth, code_review_mode: mode,
       reinforcement: [], due_checks: [], established: [], history: [],
@@ -285,7 +285,7 @@ RSpec.describe "generation prompt characterization" do
   }.freeze
 
   def render_case(language, as: user, **plan)
-    generation_prompt(as, language, **BARE_PLAN.merge(plan))
+    render_generation_prompt(as, language, **BARE_PLAN.merge(plan))
   end
 
   def mastery(concept, bucket)

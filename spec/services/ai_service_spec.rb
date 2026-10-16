@@ -455,13 +455,13 @@ RSpec.describe AiService do
     end
 
     it "writes no fourth-section reinforcement line when there is no fourth" do
-      prompt = generation_prompt(user, "ruby_rails", third: :challenge, fourth: nil)
+      prompt = render_generation_prompt(user, "ruby_rails", third: :challenge, fourth: nil)
 
       expect(prompt).not_to include("Fourth-section")
     end
 
     it "gives guidance for each chosen section and no others" do
-      prompt = generation_prompt(user, "ruby_rails", third: nil, fourth: nil, pattern: nil)
+      prompt = render_generation_prompt(user, "ruby_rails", third: nil, fourth: nil, pattern: nil)
 
       expect(prompt).to include("code_review concept from this vocabulary")
       expect(prompt).not_to include("PARSONS PROBLEM")
@@ -470,7 +470,7 @@ RSpec.describe AiService do
 
   describe "diagram syntax constraints" do
     it "constrains the diagram to a narrow, parseable subset" do
-      prompt = generation_prompt(user, "ruby_rails", third: :architecture)
+      prompt = render_generation_prompt(user, "ruby_rails", third: :architecture)
 
       expect(prompt).to match(/flowchart TD|graph LR/)
       expect(prompt).to match(/8 nodes|eight nodes/i)
@@ -503,7 +503,7 @@ RSpec.describe AiService do
 
   describe "code-smell naming guidance in the generation prompt" do
     let(:user) { User.create!(email: "smells@example.com", name: "Smells") }
-    let(:prompt) { generation_prompt(user, "ruby_rails") }
+    let(:prompt) { render_generation_prompt(user, "ruby_rails") }
     let(:guidance) { guidance_line(prompt, "code-smell") }
 
     it "names the group from the constant and asks for recognition, not a patch" do
@@ -524,7 +524,7 @@ RSpec.describe AiService do
 
   describe "OO design-principle guidance in the generation prompt" do
     let(:user) { User.create!(email: "principles@example.com", name: "Principles") }
-    let(:prompt) { generation_prompt(user, "ruby_rails") }
+    let(:prompt) { render_generation_prompt(user, "ruby_rails") }
     let(:guidance) { guidance_line(prompt, "OO design-principle") }
 
     it "names the group from the constant" do
@@ -565,7 +565,7 @@ RSpec.describe AiService do
 
   describe "module-design depth guidance in the generation prompt" do
     let(:user) { User.create!(email: "modules@example.com", name: "Modules") }
-    let(:prompt) { generation_prompt(user, "ruby_rails") }
+    let(:prompt) { render_generation_prompt(user, "ruby_rails") }
     let(:guidance) { guidance_line(prompt, "module-design") }
 
     it "names the group from the constant" do
@@ -597,7 +597,7 @@ RSpec.describe AiService do
 
   describe "silent-correctness guidance in the generation prompt" do
     let(:user) { User.create!(email: "invariants@example.com", name: "Invariants") }
-    let(:prompt) { generation_prompt(user, "ruby_rails") }
+    let(:prompt) { render_generation_prompt(user, "ruby_rails") }
     let(:guidance) { guidance_line(prompt, "silent-correctness") }
 
     it "names the group from the constant" do
@@ -693,7 +693,7 @@ RSpec.describe AiService do
 
   describe "domain-modeling guidance in the generation prompt" do
     let(:user) { User.create!(email: "domain@example.com", name: "Domain") }
-    let(:prompt) { generation_prompt(user, "ruby_rails") }
+    let(:prompt) { render_generation_prompt(user, "ruby_rails") }
     let(:guidance) { guidance_line(prompt, "domain-modeling") }
 
     it "names the group from the constant" do
@@ -998,20 +998,20 @@ RSpec.describe AiService do
     it "reads the section denominator per historical day rather than assuming 3" do
       history = [ { date: "2026-08-01", concepts: {}, scenarios: [], sections_answered: 2,
                     sections_total: 4, self_ratings: {}, ai_ratings: {}, feedback: nil } ]
-      prompt = generation_prompt(user, "ruby_rails", history: history)
+      prompt = render_generation_prompt(user, "ruby_rails", history: history)
       expect(prompt).to include("2/4 answered")
     end
   end
 
   describe "the generation prompt" do
     it "instructs that teaching notes hint without giving the answer" do
-      prompt = generation_prompt(user)
+      prompt = render_generation_prompt(user)
       expect(prompt).to include("teaching_note")
       expect(prompt.downcase).to include("never the full answer")
     end
 
     it "states the answer_scaffold rule for every kind that scaffolds, and no other (issue #164)" do
-      prompt     = generation_prompt(user)
+      prompt     = render_generation_prompt(user)
       rule       = prompt.lines.find { |line| line.include?("- answer_scaffold (") }
       scope      = rule[/answer_scaffold \(([^)]*) only\)/, 1]
       scaffolded = ExerciseSection.all.select(&:scaffolded?).map(&:key)
@@ -1021,28 +1021,28 @@ RSpec.describe AiService do
     end
 
     it "instructs that pattern's question must be self-contained, with no code reference" do
-      prompt = generation_prompt(user)
+      prompt = render_generation_prompt(user)
       expect(prompt).to include(
         "\"question\": \"string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.\""
       )
     end
 
     it "asks for the language's test code, in its test framework, in the code_review guidance on a test-file day" do
-      prompt = generation_prompt(user, "ruby_rails", code_review_mode: :test_file)
+      prompt = render_generation_prompt(user, "ruby_rails", code_review_mode: :test_file)
       expect(prompt).to include(
         "The code_review snippet must be an RSpec-style Ruby/Rails test file — a realistic test file exhibiting one real test smell"
       )
     end
 
     it "asks for JavaScript/React test code, in its test framework, in the code_review guidance on a test-file day" do
-      prompt = generation_prompt(user, "javascript", code_review_mode: :test_file)
+      prompt = render_generation_prompt(user, "javascript", code_review_mode: :test_file)
       expect(prompt).to include(
         "The code_review snippet must be a Jest/Vitest-style JavaScript/React test file — a realistic test file exhibiting one real test smell"
       )
     end
 
     it "asks for the day's schema artifact in the code_review guidance on a schema-review day" do
-      prompt = generation_prompt(user, "ruby_rails", code_review_mode: :schema_review)
+      prompt = render_generation_prompt(user, "ruby_rails", code_review_mode: :schema_review)
       expect(prompt).to include("The code_review snippet must be a Rails migration")
       expect(prompt).to include("one planted data-modeling flaw")
     end
@@ -1050,7 +1050,7 @@ RSpec.describe AiService do
     describe "grounded in Code Gym's own source" do
       it "replaces the mode's toy line with the excerpt's own instruction" do
         excerpt = RealSource::APPLICATION_CODE.first
-        prompt  = generation_prompt(user, "ruby_rails",
+        prompt  = render_generation_prompt(user, "ruby_rails",
                                     code_review_mode: :application_code, code_review_source: excerpt)
 
         expect(prompt).to include("MODIFIED COPY of this real method")
@@ -1061,7 +1061,7 @@ RSpec.describe AiService do
 
       it "hands a schema_review day the real migration as reference, not as the snippet" do
         excerpt = RealSource::SCHEMA_REVIEW.first
-        prompt  = generation_prompt(user, "ruby_rails",
+        prompt  = render_generation_prompt(user, "ruby_rails",
                                     code_review_mode: :schema_review, code_review_source: excerpt)
 
         expect(prompt).to include("MODELLED ON this real one")
@@ -1070,7 +1070,7 @@ RSpec.describe AiService do
       end
 
       it "leaves a toy day's prompt untouched" do
-        prompt = generation_prompt(user, "ruby_rails", code_review_mode: :application_code)
+        prompt = render_generation_prompt(user, "ruby_rails", code_review_mode: :application_code)
 
         expect(prompt).to include("must be realistic Ruby/Rails code")
         expect(prompt).not_to include("Code Gym's own source")
@@ -1079,7 +1079,7 @@ RSpec.describe AiService do
 
       it "tells a grounded schema-review section to ignore the day's scenario flavor (#171)" do
         excerpt = RealSource::SCHEMA_REVIEW.first
-        prompt  = generation_prompt(user, "ruby_rails",
+        prompt  = render_generation_prompt(user, "ruby_rails",
                                     code_review_mode: :schema_review, code_review_source: excerpt,
                                     scenario_flavor: :everyday)
 
@@ -1104,7 +1104,7 @@ RSpec.describe AiService do
             end
 
             it "lets a repeated excerpt keep its setting and names despite the variety rule" do
-              prompt = generation_prompt(user, "ruby_rails", history: user.recent_performance,
+              prompt = render_generation_prompt(user, "ruby_rails", history: user.recent_performance,
                                          code_review_mode: mode, code_review_source: excerpt, scenario_flavor: flavor)
 
               expect(prompt).to include("framings: #{excerpt.scenario}")
@@ -1122,7 +1122,7 @@ RSpec.describe AiService do
                 concept: concept, language: "ruby_rails", tier: :standard,
                 mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 2
               )
-              prompt = generation_prompt(user, "ruby_rails",
+              prompt = render_generation_prompt(user, "ruby_rails",
                                          code_review_mode: mode, code_review_source: excerpt, scenario_flavor: flavor,
                                          reinforcement: [], due_checks: [ due ])
 
@@ -1139,38 +1139,38 @@ RSpec.describe AiService do
     end
 
     it "asks for realistic application code by default" do
-      prompt = generation_prompt(user, "ruby_rails")
+      prompt = render_generation_prompt(user, "ruby_rails")
       expect(prompt).to include("The code_review snippet must be realistic Ruby/Rails code — not toy examples.")
     end
 
     it "tells the model to express a data-modeling concept in the host section's own idiom" do
-      prompt = generation_prompt(user, "javascript")
+      prompt = render_generation_prompt(user, "javascript")
       expect(prompt).to include("may be tagged on any section")
       expect(prompt).to include("Only a schema-review code_review presents a schema artifact to review")
       expect(prompt).to include("not for a migration to review")
     end
 
     it "names every data-modeling concept in that line" do
-      prompt = generation_prompt(user, "javascript")
+      prompt = render_generation_prompt(user, "javascript")
       expect(prompt).to include(
         "The data-modeling concepts (#{ConceptVocabulary::DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section"
       )
     end
 
     it "defers to each section's own vocabulary rather than claiming every section" do
-      prompt = generation_prompt(user, "ruby_rails", third: :parsons_problem)
+      prompt = render_generation_prompt(user, "ruby_rails", third: :parsons_problem)
 
       expect(prompt).to include("may be tagged on any section whose own vocabulary list above includes them")
       expect(prompt).not_to include("may be tagged on any section.")
     end
 
     it "states the idiom rule on a schema-review day too" do
-      prompt = generation_prompt(user, "ruby_rails", code_review_mode: :schema_review)
+      prompt = render_generation_prompt(user, "ruby_rails", code_review_mode: :schema_review)
       expect(prompt).to include("Only a schema-review code_review presents a schema artifact to review")
     end
 
     it "tells the model a meta-skill concept frames a findable issue rather than replacing it" do
-      prompt = generation_prompt(user)
+      prompt = render_generation_prompt(user)
 
       expect(prompt).to include("reading_for_intent, spotting_unstated_assumptions, separating_symptom_from_cause")
       expect(prompt).to include("must still contain exactly one specific, findable issue")
@@ -1178,11 +1178,11 @@ RSpec.describe AiService do
     end
 
     it "says how to express the concept where no code is shown" do
-      expect(generation_prompt(user)).to include("Where no code is shown (pattern)")
+      expect(render_generation_prompt(user)).to include("Where no code is shown (pattern)")
     end
 
     it "gives a worked example for a meta-skill concept hosted by challenge" do
-      prompt = generation_prompt(user)
+      prompt = render_generation_prompt(user)
 
       expect(prompt).to include("A challenge tagged separating_symptom_from_cause")
       expect(prompt).to include("never asks for an essay about how to debug")
@@ -1196,7 +1196,7 @@ RSpec.describe AiService do
                             section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      prompt = generation_prompt(user, history: user.recent_performance,
+      prompt = render_generation_prompt(user, history: user.recent_performance,
                                  reinforcement: user.concepts_needing_reinforcement(exclude_buckets: DailyPlan::FOURTH_BUCKETS))
       expect(prompt).to include(ConceptVocabulary::RAILS_CONCEPTS.join(", "))
       expect(prompt).to include("Mastery loop")
@@ -1213,7 +1213,7 @@ RSpec.describe AiService do
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "developing" } })
 
-      prompt = generation_prompt(user, history: user.recent_performance)
+      prompt = render_generation_prompt(user, history: user.recent_performance)
       expect(prompt).to include("code_review→n_plus_one (self: right_level, ai: developing)")
     end
 
@@ -1225,13 +1225,13 @@ RSpec.describe AiService do
                             section_ratings: { "code_review" => "right_level" },
                             concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" })
 
-      prompt = generation_prompt(user, history: user.recent_performance)
+      prompt = render_generation_prompt(user, history: user.recent_performance)
       expect(prompt).to include("code_review→n_plus_one (self: right_level, ai: unreviewed)")
       expect(prompt).to include("pattern→memoization (self: unrated, ai: skipped)")
     end
 
     it "reports no concepts needing reinforcement when history is empty" do
-      prompt = generation_prompt(user)
+      prompt = render_generation_prompt(user)
       expect(prompt).to include("Concepts needing reinforcement right now: none")
     end
 
@@ -1243,36 +1243,36 @@ RSpec.describe AiService do
                             section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      prompt = generation_prompt(user, reinforcement: user.concepts_needing_reinforcement(exclude_buckets: DailyPlan::FOURTH_BUCKETS))
+      prompt = render_generation_prompt(user, reinforcement: user.concepts_needing_reinforcement(exclude_buckets: DailyPlan::FOURTH_BUCKETS))
       expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one (standard)")
     end
 
     it "includes reduced-tier generation guidance and the tiered mastery-loop instruction" do
-      prompt = generation_prompt(user)
+      prompt = render_generation_prompt(user)
       expect(prompt).to include("annotation includes `reduced`")
       expect(prompt).to include("exits reinforcement only on full mastery")
     end
 
     it "uses the JS/React vocabulary and JavaScript/React labeling when language is javascript" do
-      prompt = generation_prompt(user, "javascript")
+      prompt = render_generation_prompt(user, "javascript")
       expect(prompt).to include(ConceptVocabulary::JS_CONCEPTS.join(", "))
       expect(prompt).to include("JavaScript/React code")
       expect(prompt).not_to include(ConceptVocabulary::RAILS_CONCEPTS.join(", "))
     end
 
     it "defaults to ruby_rails vocabulary when no language is given" do
-      prompt = generation_prompt(user)
+      prompt = render_generation_prompt(user)
       expect(prompt).to include(ConceptVocabulary::RAILS_CONCEPTS.join(", "))
     end
 
     it "instructs varying the concrete business-domain scenario across sessions" do
-      prompt = generation_prompt(user)
+      prompt = render_generation_prompt(user)
       expect(prompt.downcase).to include("business-domain scenario")
     end
 
     it "hands each rolled kind the vocabulary ingest will hold it to" do
       %i[architecture security_review challenge parsons_problem].each do |third|
-        prompt = generation_prompt(user, "ruby_rails", third: third)
+        prompt = render_generation_prompt(user, "ruby_rails", third: third)
         expect(prompt).to include(ConceptVocabulary.for_section(third.to_s, "ruby_rails").join(", "))
       end
     end
@@ -1289,24 +1289,24 @@ RSpec.describe AiService do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current - 1,
                             answers: { "code_review" => "x" * 20 })
 
-      prompt = generation_prompt(user)
+      prompt = render_generation_prompt(user)
       expect(prompt).to include("framings:")
       expect(prompt).to include("inventory restocking")
     end
 
     it "includes TypeScript-syntax guidance keyed off the TS-flavored concepts when language is javascript" do
-      prompt = generation_prompt(user, "javascript")
+      prompt = render_generation_prompt(user, "javascript")
       expect(prompt).to include("TypeScript syntax")
       expect(prompt).to include(ConceptVocabulary::TYPESCRIPT_FLAVORED_CONCEPTS.join(", "))
     end
 
     it "omits TypeScript-syntax guidance for ruby_rails" do
-      prompt = generation_prompt(user, "ruby_rails")
+      prompt = render_generation_prompt(user, "ruby_rails")
       expect(prompt).not_to include("TypeScript syntax")
     end
 
     it "prefers drawing scenarios from SCENARIO_DOMAINS, with legacy GraphQL framed as rare and concept-free" do
-      prompt = generation_prompt(user)
+      prompt = render_generation_prompt(user)
       expect(prompt).to include("background job processing")
       expect(prompt).to include("activerecord query construction")
       expect(prompt.downcase).to include("legacy graphql")
@@ -1316,14 +1316,14 @@ RSpec.describe AiService do
 
     it "instructs adapting a scenario flavor to the day's stack, for either language" do
       %w[ruby_rails javascript].each do |language|
-        prompt = generation_prompt(user, language)
+        prompt = render_generation_prompt(user, language)
         expect(prompt.downcase).to include("adapt any flavor to fit the day's stack")
       end
     end
 
     describe "scenario flavor" do
       it "renders the general pool exactly as before when no flavor is given" do
-        prompt = generation_prompt(user)
+        prompt = render_generation_prompt(user)
 
         expect(prompt).to include(
           "- Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: " \
@@ -1338,7 +1338,7 @@ RSpec.describe AiService do
       end
 
       it "leaves ambiguity_hunt's own Code Gym framing in place on an everyday day" do
-        prompt = generation_prompt(user, "ruby_rails",
+        prompt = render_generation_prompt(user, "ruby_rails",
                                    fourth: :ambiguity_hunt, scenario_flavor: :everyday)
 
         expect(prompt).to include("everyday settings people already know from daily life like:")
@@ -1347,7 +1347,7 @@ RSpec.describe AiService do
       end
 
       it "offers the everyday pool, with the plain-words rule and no legacy GraphQL clause, on an everyday day" do
-        prompt = generation_prompt(user, "ruby_rails", scenario_flavor: :everyday)
+        prompt = render_generation_prompt(user, "ruby_rails", scenario_flavor: :everyday)
 
         AiService::EVERYDAY_SCENARIO_DOMAINS.each do |domain|
           expect(prompt).to include(domain.tr("_", " "))
@@ -1360,7 +1360,7 @@ RSpec.describe AiService do
       end
 
       it "keeps the legacy GraphQL clause rare and concept-free under the job-adjacent flavor" do
-        prompt = generation_prompt(user, "ruby_rails", scenario_flavor: :general)
+        prompt = render_generation_prompt(user, "ruby_rails", scenario_flavor: :general)
 
         expect(prompt).to match(/1 in every 8-10/)
         expect(prompt.downcase).to include("never as the tagged concept")
@@ -1368,7 +1368,7 @@ RSpec.describe AiService do
       end
 
       it "refuses a flavor with no pool rather than rendering an empty list" do
-        expect { generation_prompt(user, "ruby_rails", scenario_flavor: :nope) }
+        expect { render_generation_prompt(user, "ruby_rails", scenario_flavor: :nope) }
           .to raise_error(KeyError)
       end
     end
@@ -1379,7 +1379,7 @@ RSpec.describe AiService do
       cm = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
                                           mastered_at: 1.month.ago, retention_interval_days: 7,
                                           next_retention_check_on: Date.current - 2)
-      prompt = generation_prompt(user, "ruby_rails", third: :challenge,
+      prompt = render_generation_prompt(user, "ruby_rails", third: :challenge,
                                  reinforcement: [], due_checks: [ cm ])
 
       expect(prompt).to include("Retention checks due today: memoization (code_review, design_comparison, pattern, or challenge)")
@@ -1389,7 +1389,7 @@ RSpec.describe AiService do
     end
 
     it "omits the retention block entirely when nothing is due" do
-      prompt = generation_prompt(user, "ruby_rails", third: :challenge,
+      prompt = render_generation_prompt(user, "ruby_rails", third: :challenge,
                                  reinforcement: [], due_checks: [])
       expect(prompt).not_to match(/Retention checks? due/)
     end
@@ -1398,7 +1398,7 @@ RSpec.describe AiService do
       cm = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
                                           mastered_at: 1.month.ago, retention_interval_days: 7,
                                           next_retention_check_on: Date.current - 2)
-      prompt = generation_prompt(user, "ruby_rails", third: :architecture,
+      prompt = render_generation_prompt(user, "ruby_rails", third: :architecture,
                                  reinforcement: [], due_checks: [ cm ])
 
       expect(prompt).to include("Retention checks due today: memoization (code_review, design_comparison, or pattern)")
@@ -1408,7 +1408,7 @@ RSpec.describe AiService do
       cm = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
                                           mastered_at: 1.month.ago, retention_interval_days: 7,
                                           next_retention_check_on: Date.current - 2)
-      prompt = generation_prompt(user, "ruby_rails", third: :security_review,
+      prompt = render_generation_prompt(user, "ruby_rails", third: :security_review,
                                  reinforcement: [], due_checks: [ cm ])
 
       expect(prompt).to include("Retention checks due today: memoization (code_review, design_comparison, or pattern)")
@@ -1418,7 +1418,7 @@ RSpec.describe AiService do
       cm = user.concept_masteries.create!(concept: "sql_injection_prevention", language: "ruby_rails", tier: :standard,
                                           mastered_at: 1.month.ago, retention_interval_days: 7,
                                           next_retention_check_on: Date.current - 2)
-      prompt = generation_prompt(user, "ruby_rails", third: :security_review,
+      prompt = render_generation_prompt(user, "ruby_rails", third: :security_review,
                                  reinforcement: [], due_checks: [ cm ])
 
       expect(prompt).to include("Retention checks due today: sql_injection_prevention (code_review, pattern, or security_review)")
@@ -1428,7 +1428,7 @@ RSpec.describe AiService do
       cm = user.concept_masteries.create!(concept: "service_boundaries", language: "architecture", tier: :standard,
                                           mastered_at: 1.month.ago, retention_interval_days: 7,
                                           next_retention_check_on: Date.current - 2)
-      prompt = generation_prompt(user, "ruby_rails", third: :architecture,
+      prompt = render_generation_prompt(user, "ruby_rails", third: :architecture,
                                  reinforcement: [], due_checks: [ cm ])
 
       expect(prompt).to include("Retention checks due today: service_boundaries (architecture)")
@@ -1439,7 +1439,7 @@ RSpec.describe AiService do
                               tier: :standard, next_retention_check_on: Date.current,
                               retention_interval_days: 7)
       difficulty = KindDifficulty.new(levels: rungs.transform_keys(&:key), locked: [])
-      prompt = generation_prompt(user, day_language, third: third, fourth: nil, code_review_mode: mode,
+      prompt = render_generation_prompt(user, day_language, third: third, fourth: nil, code_review_mode: mode,
                                  due_checks: [ cm ], difficulty: difficulty)
       prompt[/^Retention checks due today: (.*)$/, 1]
     end
@@ -1505,7 +1505,7 @@ RSpec.describe AiService do
                                           mastered_at: 1.month.ago, retention_interval_days: 7,
                                           next_retention_check_on: Date.current - 2)
 
-      prompt = generation_prompt(user, "ruby_rails", third: :parsons_problem,
+      prompt = render_generation_prompt(user, "ruby_rails", third: :parsons_problem,
                                  code_review_mode: :schema_review, reinforcement: [], due_checks: [ cm ])
 
       expect(prompt).not_to include("reading_for_intent ()")
@@ -1539,13 +1539,13 @@ RSpec.describe AiService do
     end
 
     it "annotates an architecture concept to the architecture section when the day has one" do
-      prompt = generation_prompt(user, "ruby_rails", third: :architecture, fourth: nil, due_checks: [ concept ])
+      prompt = render_generation_prompt(user, "ruby_rails", third: :architecture, fourth: nil, due_checks: [ concept ])
 
       expect(prompt).to include("Retention checks due today: service_boundaries (architecture)")
     end
 
     it "drops an architecture concept on a day with no architecture section" do
-      prompt = generation_prompt(user, "ruby_rails", third: :challenge, fourth: nil, due_checks: [ concept ])
+      prompt = render_generation_prompt(user, "ruby_rails", third: :challenge, fourth: nil, due_checks: [ concept ])
 
       expect(prompt).not_to include("Retention checks due today")
       expect(prompt).not_to include("service_boundaries")
@@ -1557,7 +1557,7 @@ RSpec.describe AiService do
       cm = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
                                           mastered_at: 2.months.ago, retention_interval_days: 14,
                                           next_retention_check_on: Date.current + 10)
-      prompt = generation_prompt(user, "ruby_rails", third: :challenge,
+      prompt = render_generation_prompt(user, "ruby_rails", third: :challenge,
                                  reinforcement: [], due_checks: [], established: [ cm ])
 
       expect(prompt).to include(
@@ -1569,7 +1569,7 @@ RSpec.describe AiService do
     end
 
     it "omits the established block entirely when nothing qualifies" do
-      prompt = generation_prompt(user, "ruby_rails", third: :challenge,
+      prompt = render_generation_prompt(user, "ruby_rails", third: :challenge,
                                  reinforcement: [], due_checks: [], established: [])
       expect(prompt).not_to match(/well past first mastery/i)
     end
@@ -1581,7 +1581,7 @@ RSpec.describe AiService do
       cm2 = user.concept_masteries.create!(concept: "scope_chaining", language: "ruby_rails", tier: :standard,
                                            mastered_at: 1.month.ago, retention_interval_days: 28,
                                            next_retention_check_on: Date.current + 20)
-      prompt = generation_prompt(user, "ruby_rails", third: :challenge,
+      prompt = render_generation_prompt(user, "ruby_rails", third: :challenge,
                                  reinforcement: [], due_checks: [], established: [ cm1, cm2 ])
       expect(prompt).to include("memoization, scope_chaining")
     end
@@ -1638,7 +1638,7 @@ RSpec.describe AiService do
 
   describe "difficulty targets in the generation prompt" do
     def render(difficulty:, ladders: {}, third: :challenge, fourth: :plan_review, mode: :application_code)
-      generation_prompt(user, "ruby_rails",
+      render_generation_prompt(user, "ruby_rails",
                         third: third, fourth: fourth, code_review_mode: mode,
                         reinforcement: [], due_checks: [], established: [], history: [],
                         difficulty: difficulty, ladders: ladders)
@@ -1858,7 +1858,7 @@ RSpec.describe AiService do
   describe "diagram instructions in the generation prompt" do
     it "states the Mermaid syntax constraints regardless of which third was rolled" do
       %i[challenge parsons_problem security_review architecture].each do |third|
-        prompt = generation_prompt(user, "ruby_rails", third: third)
+        prompt = render_generation_prompt(user, "ruby_rails", third: third)
 
         expect(prompt).to include("flowchart TD")
         expect(prompt).to include("Maximum 8 nodes")
@@ -1867,14 +1867,14 @@ RSpec.describe AiService do
     end
 
     it "forbids diagramming the fix rather than the scenario as written" do
-      prompt = generation_prompt(user, "ruby_rails", third: :challenge)
+      prompt = render_generation_prompt(user, "ruby_rails", third: :challenge)
 
       expect(prompt).to match(/never diagram the fix/i)
       expect(prompt).to match(/never annotate a node as the problem/i)
     end
 
     it "instructs the diagram to show repetition when a loop wraps the flow" do
-      prompt = generation_prompt(user, "ruby_rails", third: :challenge)
+      prompt = render_generation_prompt(user, "ruby_rails", third: :challenge)
 
       expect(prompt).to include("repeated invocation that wraps the flow")
       expect(prompt).to include("per-item cardinality")
@@ -1882,7 +1882,7 @@ RSpec.describe AiService do
     end
 
     it "does not force a loop cue on snippets without one" do
-      prompt = generation_prompt(user, "ruby_rails", third: :challenge)
+      prompt = render_generation_prompt(user, "ruby_rails", third: :challenge)
 
       expect(prompt).to include("Do not manufacture a loop or cardinality label when the snippet has none")
     end
@@ -4381,23 +4381,23 @@ RSpec.describe AiService do
 
   describe "generation prompt fourth-slot guidance" do
     it "renders the rolled fourth kind's guidance, not the other one's" do
-      prompt = generation_prompt(user, "ruby_rails", third: :challenge, fourth: :plan_review)
+      prompt = render_generation_prompt(user, "ruby_rails", third: :challenge, fourth: :plan_review)
       expect(prompt).to match(/PLAN REVIEW/)
       expect(prompt).not_to match(/AMBIGUITY HUNT/)
     end
 
     it "refuses a kind rolled into a slot it cannot occupy, in either slot" do
       expect {
-        generation_prompt(user, "ruby_rails", third: :plan_review)
+        render_generation_prompt(user, "ruby_rails", third: :plan_review)
       }.to raise_error(ArgumentError, /plan_review/)
 
       expect {
-        generation_prompt(user, "ruby_rails", fourth: :challenge)
+        render_generation_prompt(user, "ruby_rails", fourth: :challenge)
       }.to raise_error(ArgumentError, /challenge/)
     end
 
     it "names the fourth-slot concept needing reinforcement" do
-      prompt = generation_prompt(user, "ruby_rails", fourth: :plan_review,
+      prompt = render_generation_prompt(user, "ruby_rails", fourth: :plan_review,
                                  fourth_reinforcement: [ { concept: "scope_creep", bucket: "plan_review", tier: "standard" } ])
       expect(prompt).to include("scope_creep")
     end
@@ -4406,7 +4406,7 @@ RSpec.describe AiService do
       cm = user.concept_masteries.create!(concept: "scope_creep", language: "plan_review", tier: :standard,
                                           mastered_at: 1.month.ago, retention_interval_days: 7,
                                           next_retention_check_on: Date.current)
-      prompt = generation_prompt(user, "ruby_rails", fourth: :plan_review, fourth_due_checks: [ cm ])
+      prompt = render_generation_prompt(user, "ruby_rails", fourth: :plan_review, fourth_due_checks: [ cm ])
       expect(prompt).to match(/MASTERED/)
       expect(prompt).to include("scope_creep")
     end
@@ -4754,7 +4754,7 @@ RSpec.describe AiService, "drilled concepts in the generation prompt" do
   let(:service) { FakeService.new("fake-key") }
 
   it "annotates a drilled entry apart from its tier and explains the annotation once" do
-    prompt = generation_prompt(user,
+    prompt = render_generation_prompt(user,
                                reinforcement: [ { concept: "n_plus_one", bucket: "ruby_rails", tier: "reduced", drilled: true },
                                                 { concept: "memoization", bucket: "ruby_rails", tier: "standard" } ])
 
@@ -4764,7 +4764,7 @@ RSpec.describe AiService, "drilled concepts in the generation prompt" do
   end
 
   it "annotates a drilled fourth-slot entry the same way" do
-    prompt = generation_prompt(user, fourth: :plan_review,
+    prompt = render_generation_prompt(user, fourth: :plan_review,
                                fourth_reinforcement: [ { concept: "scope_creep", bucket: "plan_review", tier: "standard", drilled: true } ])
 
     expect(prompt).to include("Fourth-section (plan_review) concept needing reinforcement: scope_creep (standard, drilled)")
@@ -4772,7 +4772,7 @@ RSpec.describe AiService, "drilled concepts in the generation prompt" do
 
   it "leaves the locked-kind line to override easing for whichever concept it carries" do
     user.update!(section_kind_levels: { "code_review" => "principal_engineer" }, locked_section_kinds: [ "code_review" ])
-    prompt = generation_prompt(user,
+    prompt = render_generation_prompt(user,
                                reinforcement: [ { concept: "n_plus_one", bucket: "ruby_rails", tier: "reduced", drilled: true } ],
                                difficulty: KindDifficulty.for(user))
 
@@ -4789,7 +4789,7 @@ RSpec.describe AiService, "generation prompt without feedback" do
     user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
                                  answers: { "code_review" => "x" * 20 }, concept_tags: { "code_review" => "n_plus_one" })
 
-    prompt = generation_prompt(user)
+    prompt = render_generation_prompt(user)
 
     expect(prompt).not_to include("Feedback:")
   end
@@ -5018,7 +5018,7 @@ end
 RSpec.describe AiService, "single-section retry prompt" do
   let(:user) { User.create!(email: "retry@example.com", name: "R") }
   it "renders one kind's schema and fixes the concept" do
-    prompt = generation_prompt(user, "ruby_rails",
+    prompt = render_generation_prompt(user, "ruby_rails",
                                third: :challenge, pattern: :pattern, fourth: :plan_review,
                                only: ExerciseSection::Challenge, fixed_concept: "memoization")
     expect(prompt).to include('"challenge": {')
@@ -5930,7 +5930,7 @@ RSpec.describe AiService, "the shared concept" do
   end
 
   it "names the concept for both fixed sections in one prompt line" do
-    prompt = generation_prompt(user, "ruby_rails",
+    prompt = render_generation_prompt(user, "ruby_rails",
                                third: nil, pattern: nil, fourth: nil, shared_concept: "n_plus_one")
 
     line = prompt.lines.find { |l| l.include?("as their concept today") }
@@ -5940,8 +5940,8 @@ RSpec.describe AiService, "the shared concept" do
   end
 
   it "renders no line without a shared concept, and none on a single-section retry" do
-    without = generation_prompt(user, "ruby_rails", third: nil, pattern: nil, fourth: nil)
-    retry_prompt = generation_prompt(user, "ruby_rails", third: nil, pattern: nil, fourth: nil,
+    without = render_generation_prompt(user, "ruby_rails", third: nil, pattern: nil, fourth: nil)
+    retry_prompt = render_generation_prompt(user, "ruby_rails", third: nil, pattern: nil, fourth: nil,
                                      shared_concept: "n_plus_one", only: ExerciseSection::DesignComparison,
                                      fixed_concept: "n_plus_one")
 

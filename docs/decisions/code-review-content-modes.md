@@ -15,7 +15,7 @@ on a real one, through the same ingest and grading as any other
 file), nothing eligible unless added there. It exists for exercise
 *quality*, not safety: nothing in this source is a per-instance secret, and
 `ai_service.rb` is in the pool. `DailyPlan` decides the excerpt
-(`Result#code_review_source`); `AiService` reads its text at prompt time;
+(`Result#code_review_source`); `GenerationPrompt` reads its text at prompt time;
 `ProblemSetIngest` stamps the server's own `scenario` — which names the
 file and says the copy is altered, so the exercise cannot read as a bug
 report against deployed code — and a `source` id into the section. That id

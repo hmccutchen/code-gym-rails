@@ -91,7 +91,7 @@ RSpec.describe "Security hardening targets", type: :request do
     it "caps a name stored before the cap shipped when the generation prompt reads it (finding A1)" do
       user.update_column(:name, "N" * 5_000)
 
-      prompt = generation_prompt(user.reload, "ruby_rails")
+      prompt = render_generation_prompt(user.reload, "ruby_rails")
 
       expect(prompt).to include("N" * UserText::MAX_NAME_LENGTH)
       expect(prompt).not_to include("N" * (UserText::MAX_NAME_LENGTH + 1))

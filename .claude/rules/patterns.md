@@ -55,7 +55,8 @@ says what a deviation from one requires.
   takes them as a `Provider` struct of callables, with a `providers:` factory
   that returns a fresh one for each thread (`JudgedGeneration::Provider`,
   `ReviewGrading::Provider`, built by `AiService#judged_generation_provider`
-  and `#review_grading_provider`). `AiService` keeps the prompts and the calls;
+  and `#review_grading_provider`). `AiService` keeps the calls and builds the prompts, the
+  generation prompt through `GenerationPrompt`;
   the module keeps the orchestration and the policy, and its specs drive it
   with lambdas. Threads start through `CallerZoneThread.start`, and
   `spec/conventions/app_source_spec.rb` fails on any other `Thread.new` and on
@@ -94,4 +95,7 @@ says what a deviation from one requires.
 - **Domain data stays off provider classes** — lists and tables the domain
   owns live in a module of their own (`ConceptVocabulary`), and `AiService`
   and `GenerationPrompt` read them; `AiService` keeps only what is about
-  talking to a provider.
+  talking to a provider. Two exceptions still sit on `AiService`, and
+  `GenerationPrompt` reads them there: `SCENARIO_POOLS` and the per-language
+  prompt wording behind `.config_for`. Moving them to a domain module is a
+  follow-up; the exception is recorded here so it is not read as the rule.

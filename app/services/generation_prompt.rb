@@ -63,15 +63,19 @@ class GenerationPrompt
       - Concepts most recently rated "right level" have no special weighting.
 
       Return JSON matching this schema exactly:
-      #{schema(only: only)}
+      #{schema_for(kinds)}
     PROMPT
   end
 
-  def schema(only: nil)
+  def schema(only: nil) = schema_for(kinds_for(only))
+
+  private
+
+  def schema_for(kinds)
     label = config[:label]
 
-    sections = kinds_for(only).map { |kind| kind.schema_fragment(label: label) }
-                              .join(",\n  ")
+    sections = kinds.map { |kind| kind.schema_fragment(label: label) }
+                    .join(",\n  ")
 
     <<~SCHEMA
       {
@@ -79,8 +83,6 @@ class GenerationPrompt
       }
     SCHEMA
   end
-
-  private
 
   def config = AiService.config_for(@language)
 
@@ -225,19 +227,19 @@ class GenerationPrompt
 
   def sections_guidance(kinds, rungs)
     kinds.map { |kind|
-      generation_guidance_for(kind, @language, mode: @plan.code_review_mode, source: @plan.code_review_source, rung: rungs[kind])
+      generation_guidance_for(kind, mode: @plan.code_review_mode, source: @plan.code_review_source, rung: rungs[kind])
     }.join("\n")
   end
 
-  def generation_guidance_for(kind, language, mode: nil, source: nil, rung: nil)
-    config = AiService.config_for(language)
+  def generation_guidance_for(kind, mode:, source:, rung:)
+    language_config = config
 
     kind.generation_guidance(
-      vocabulary:     ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: rung),
-      label:          config[:label],
+      vocabulary:     ConceptVocabulary.selectable_for_section(kind.key, @language, mode: mode, rung: rung),
+      label:          language_config[:label],
       mode:           mode,
-      artifact:       config[:schema_artifact],
-      test_framework: config[:test_framework],
+      artifact:       language_config[:schema_artifact],
+      test_framework: language_config[:test_framework],
       source:         source,
       rung:           rung
     )

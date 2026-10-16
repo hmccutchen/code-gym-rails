@@ -144,7 +144,7 @@ RSpec.describe ForcedConceptDrafts do
       forced.with_concept { forced.draft(experimental, user, rung: "junior") }
 
       expect([ GenerationPrompt.ancestors, GenerationPrompt::ConceptGuidance.ancestors ]).to eq(ancestors_before)
-      expect(generation_prompt(user, "ruby_rails")).not_to include(guidance)
+      expect(render_generation_prompt(user, "ruby_rails")).not_to include(guidance)
     end
   end
 
