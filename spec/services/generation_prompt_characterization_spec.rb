@@ -254,8 +254,8 @@ RSpec.describe "generation prompt characterization" do
                                  fourth_reinforcement: [ { concept: "scope_creep", bucket: "plan_review", tier: "standard" } ]) },
       includes: [ "This section's concept must be exactly `missing_index`", "Retention checks due today: missing_index (code_review)\n",
                   "Established concepts (well past first mastery — survived a retention check): scope_chaining",
-                  "Concept needing reinforcement in the \"plan_review\" section: scope_creep (standard)", "Sections at junior: code_review\n" ],
-      excludes: [ "as their concept today", "memoization (", '"pattern": {' ],
+                  "Sections at junior: code_review\n" ],
+      excludes: [ "as their concept today", "memoization (", '"pattern": {', "scope_creep", "\"plan_review\" section" ],
       schema:   %w[code_review]
     },
     "case__retry__ruby_rails__third_architecture" => {
