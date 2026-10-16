@@ -356,6 +356,40 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     )
   end
 
+  it "resends a mix change whose own save failed when a frozen save follows it" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      let failed = false;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (!failed && body.includes("section_kind_weights")) {
+          failed = true;
+          return new Promise((resolve, reject) => setTimeout(() => reject(new TypeError("offline")), 1500));
+        }
+        return send(url, options);
+      };
+    JS
+
+    page.execute_script(<<~JS)
+      const slider = document.querySelector("#weight-security_review");
+      slider.value = 0;
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+    JS
+    sleep 0.6
+    find(".mix-difficulty[data-kind='design_comparison'] input[value='senior']").click
+    sleep 0.6
+    find("#skill-level").select("Mid-level")
+
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 6)
+    wait_for(8) { user.reload.skill_level == "mid_level" }
+    sleep 1
+    expect(user.reload.section_kind_weights).to eq("security_review" => 0.25)
+    expect(user.section_kind_levels).to include("design_comparison" => "senior")
+  end
+
   def guide_measurement
     page.evaluate_script(<<~JS)
       (() => {

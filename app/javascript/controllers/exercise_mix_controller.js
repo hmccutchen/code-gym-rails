@@ -275,6 +275,18 @@ export default class extends Controller {
     return body
   }
 
+  editsFromAnyPending(form) {
+    const queued = Array.from(this.waitingSaves).filter((sent) => sent.snapshot).map((sent) => sent.snapshot.state)
+    const baselines = [ this.saved, this.onTheWire, ...queued ].filter(Boolean)
+    const seen = new Set()
+    return baselines.flatMap((baseline) => this.editsSince(baseline, form)).filter(({ field, kind }) => {
+      const key = `${field}:${kind}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }
+
   frozenState(snapshot) {
     const merged = this.withEdits(this.saved, snapshot.state, snapshot.edits)
     const state = {}
@@ -311,7 +323,7 @@ export default class extends Controller {
   holdForTrackSave() {
     this.prepareButtonTarget.disabled = true
     const form = this.state()
-    const beforeTrack = { state: form, edits: this.editsSince(this.onTheWire || this.saved, form), revision: this.editRevision }
+    const beforeTrack = { state: form, edits: this.editsFromAnyPending(form), revision: this.editRevision }
     this.waitingSaves.forEach((sent) => { sent.snapshot = sent.snapshot || beforeTrack })
     if (this.pending === null) return
     clearTimeout(this.pending)
