@@ -524,7 +524,7 @@ copy change the decision doc recommends making before or with PR 2's deploy.
 ## PR split
 
 0. **This spec.** Docs only.
-1. **Snapshot groundwork** (branch `claude/duck-snapshot-groundwork`).
+1. **Snapshot groundwork** (hmccutchen/code-gym-rails#410).
    Normalize `/assets/` digests in the page snapshot spec, and add the duck
    prompt snapshots. No app change; the five
    page snapshot files are rewritten once with placeholders.
