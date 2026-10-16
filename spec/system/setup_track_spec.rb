@@ -497,6 +497,32 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(user.reload.skill_level).to eq("junior")
   end
 
+  it "keeps a level chosen again during a track save, even when it matches the old one" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes("skill_level")) {
+          return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 1500));
+        }
+        return send(url, options);
+      };
+    JS
+
+    find("#skill-level").select("Mid-level")
+    find(".mix-difficulty[data-kind='security_review'] input[value='senior']").click
+    find(".mix-difficulty[data-kind='security_review'] input[value='junior']").click
+
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 6)
+    wait_for(5) { user.reload.section_kind_levels["security_review"] == "junior" }
+    expect(user.reload.section_kind_levels).to include("security_review" => "junior")
+    expect(user.section_kind_levels).not_to include("code_review")
+    expect(checked_level("security_review")).to eq("junior")
+  end
+
   def guide_measurement
     page.evaluate_script(<<~JS)
       (() => {

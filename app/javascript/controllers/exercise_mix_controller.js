@@ -23,6 +23,7 @@ export default class extends Controller {
     this.pending = null
     this.waitingSaves = new Set()
     this.onTheWire = null
+    this.touchedSinceTrack = []
     this.savedLatest = true
     this.editRevision = 0
     this.probe = () => this.pending !== null
@@ -153,7 +154,8 @@ export default class extends Controller {
 
   adoptReply(reply, unsent) {
     const mine = this.state()
-    const edits = unsent ? this.editsSince(this.saved, mine) : []
+    const edits = unsent ? this.withTouched(this.editsSince(this.saved, mine)) : []
+    this.touchedSinceTrack = []
     this.forgetMovedSuggestions(reply.kind_rungs)
     this.applyServerState(reply)
     if (edits.length > 0) {
@@ -275,6 +277,15 @@ export default class extends Controller {
     return body
   }
 
+  touch(kind, ...fields) {
+    fields.forEach((field) => this.touchedSinceTrack.push({ field, kind }))
+  }
+
+  withTouched(edits) {
+    const listed = new Set(edits.map(({ field, kind }) => `${field}:${kind}`))
+    return edits.concat(this.touchedSinceTrack.filter(({ field, kind }) => !listed.has(`${field}:${kind}`) && listed.add(`${field}:${kind}`)))
+  }
+
   editsFromAnyPending(form) {
     const queued = Array.from(this.waitingSaves).filter((sent) => sent.snapshot).map((sent) => sent.snapshot.state)
     const baselines = [ this.saved, this.onTheWire, ...queued ].filter(Boolean)
@@ -321,6 +332,7 @@ export default class extends Controller {
   }
 
   holdForTrackSave() {
+    this.touchedSinceTrack = []
     this.prepareButtonTarget.disabled = true
     const form = this.state()
     const beforeTrack = { state: form, edits: this.editsFromAnyPending(form), revision: this.editRevision }
@@ -341,6 +353,7 @@ export default class extends Controller {
   slide(event) {
     const row = event.target.closest("[data-exercise-mix-target~='row']")
     this.showStop(event.target, row.querySelector("output"))
+    this.touch(row.dataset.kind, "section_kind_weights")
     this.save()
   }
 
@@ -350,15 +363,19 @@ export default class extends Controller {
     this.sliderFor(row).disabled = box.checked
     this.lockLastInGroup()
     this.setDifficultyDisabled(this.difficultyFor(row.dataset.kind), box.checked)
+    this.touch(row.dataset.kind, "excluded_section_kinds")
     this.save()
   }
 
   chooseLevel(event) {
-    this.syncDifficulty(event.target.closest("[data-exercise-mix-target~='difficulty']"))
+    const box = event.target.closest("[data-exercise-mix-target~='difficulty']")
+    this.syncDifficulty(box)
+    this.touch(box.dataset.kind, "section_kind_levels", "locked_section_kinds")
     this.save()
   }
 
-  toggleLock() {
+  toggleLock(event) {
+    this.touch(event.target.closest("[data-exercise-mix-target~='difficulty']").dataset.kind, "locked_section_kinds")
     this.save()
   }
 }

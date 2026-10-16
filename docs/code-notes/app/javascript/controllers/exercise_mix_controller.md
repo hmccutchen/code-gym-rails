@@ -103,7 +103,10 @@ so an edit the browser restored or made before connect still counts as unsent,
 and it moves on every applied server state and every successful save.
 
 When an edit is unsent, each field (weight, exclusion, level or lock) of each
-kind that differs from `saved` is an edit (`editsSince`). The reply is applied
+kind that differs from `saved` is an edit (`editsSince`), and so is each field
+the user touched since the track save started (`touchedSinceTrack`, recorded by
+the edit handlers through `touch`), even if it ended where it began: a level
+changed and then set back to the old one is a choice the reply must not clear. The reply is applied
 and only those fields are set back (`withEdits`). The rebase is per field, not
 per kind: moving a kind's weight must not bring back a level target the track
 change cleared on that kind. A lock the edit turns on also brings back the
