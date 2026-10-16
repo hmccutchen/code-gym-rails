@@ -1,6 +1,6 @@
 # Persist the duck's thread
 
-Status: spec. PR 1 is in progress; PR 2 is not started.
+Status: spec. PR 1 is committed locally; PR 2 is not started.
 Date: 2026-10-16. Checked against `origin/main` at `cb34804`.
 Revised the same day after review: the running note is dropped (see the
 appendix), threads are kept as a record instead of deleted on submit, and
@@ -407,15 +407,19 @@ PR 2 ships, because turns cleared before then are lost.
   the page and gets fixed, not rebaselined.
 - **Request snapshots:** PR 2 changes none. The request still sends
   `history`, and the snapshot uses placeholder text.
-- **Prompt snapshots:** PR 1 adds the duck's system prompt and first-turn
-  prompt for a fixed exercise, and a second prompt with a two-turn history
-  in place. PR 2 must leave all of them unchanged.
+- **Prompt snapshots:** PR 1 adds the duck's system prompt, history, prompt
+  and request settings for a fixed exercise, for a first turn and a turn
+  with a two-turn history, in `spec/fixtures/duck_prompt_snapshots/` (apart
+  from the generation snapshots, whose spec fails on any file it did not
+  write). It also checks that string-keyed turns, as a jsonb column returns
+  them, send the same bytes. PR 2 must leave all of them unchanged.
 
 ## PR split
 
 0. **This spec.** Docs only.
-1. **Snapshot groundwork.** Normalize `/assets/` digests in the page
-   snapshot spec, and add the duck prompt snapshots. No app change; the five
+1. **Snapshot groundwork** (branch `claude/duck-snapshot-groundwork`).
+   Normalize `/assets/` digests in the page snapshot spec, and add the duck
+   prompt snapshots. No app change; the five
    page snapshot files are rewritten once with placeholders.
 2. **Store the thread.** Migration, `DuckThread`, controller and route
    changes, Stimulus values, start over, anonymize, the sweep job, the
