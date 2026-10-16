@@ -13,7 +13,7 @@ Every edit posts the whole mix, including
 version the first is about to move, and the second would 409 against its own
 predecessor. `saveStatus.queue` on the `exercise_mix` line is what prevents
 that, and Setup's track select saves on the same line: the queue sends one at
-a time and reads each body when it is sent, so the second
+a time and reads each save's version when it is sent, so the second
 save picks up the version the first stored.
 
 A 409 means another tab moved the version. The reply carries the server's
@@ -130,9 +130,13 @@ disabled while `code_gym/track_reply` reports a track save in flight, which also
 covers a mix that connected mid-save and never saw the event.
 
 It also queues a mix edit still inside its 400 ms delay at once, ahead of the
-track save, and that save carries the form as it is at this moment, not as it
-is when the save is finally sent (`sendNow` with a snapshot of the state and
-the edit revision; only the version is read at send time). Edits are saved in
+track save. Every mix save that will go out ahead of the track save, the
+flushed one and any already waiting in the queue (`waitingSaves`), is frozen to
+the form as it is at this moment: a snapshot of the state and the edit
+revision, with only the version and the shown suggestions read at send time.
+A mix save queued after the track save is not frozen, since it has to read the
+form once the track reply has been applied, or it would send targets the track
+change cleared. Edits are saved in
 the order the user made them: a lock set just before a track change reaches the
 server first, so `TrackChange` keeps the target it protects, and a target picked
 after the track change, while earlier saves are still queued, stays out of the

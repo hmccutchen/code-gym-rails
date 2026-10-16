@@ -21,6 +21,7 @@ export default class extends Controller {
 
   connect() {
     this.pending = null
+    this.waitingSaves = new Set()
     this.savedLatest = true
     this.editRevision = 0
     this.probe = () => this.pending !== null
@@ -252,7 +253,11 @@ export default class extends Controller {
 
   persist(snapshot = null) {
     const sent = { revision: undefined, snapshot: snapshot }
-    const payload = () => this.savePayload(sent)
+    this.waitingSaves.add(sent)
+    const payload = () => {
+      this.waitingSaves.delete(sent)
+      return this.savePayload(sent)
+    }
 
     // Queued in order: a parallel save would post the version the one in flight is about to move, and 409 against itself.
     return saveStatus.queue("exercise_mix", "PATCH", this.urlValue, payload).then((result) => this.reconcile(result, sent))
@@ -295,9 +300,11 @@ export default class extends Controller {
 
   holdForTrackSave() {
     this.prepareButtonTarget.disabled = true
+    const beforeTrack = { state: this.state(), revision: this.editRevision }
+    this.waitingSaves.forEach((sent) => { sent.snapshot = sent.snapshot || beforeTrack })
     if (this.pending === null) return
     clearTimeout(this.pending)
-    this.sendNow({ state: this.state(), revision: this.editRevision })
+    this.sendNow(beforeTrack)
   }
 
   sendNow(snapshot = null) {
