@@ -1,6 +1,6 @@
 # Design notes: docs/decisions/daily-kinds.md
 class DailyKinds
-  DEFAULT = ExerciseSection.all.select(&:default_daily?).freeze
+  DEFAULT = ExerciseSection.default_daily.freeze
 
   COUNT = DEFAULT.size
 
@@ -24,12 +24,9 @@ class DailyKinds
   def self.problems_with(keys)
     return [ "must be a list" ] unless keys.is_a?(Array)
     return [] if keys.empty?
-    return [ "must name exactly #{COUNT} section kinds" ] unless keys.size == COUNT
-    return [ "must name known section kinds" ] unless keys.all? { |key| key.is_a?(String) && ExerciseSection.find(key) }
-    return [ "must not repeat a section kind" ] unless keys.uniq.size == COUNT
-    return [ "may hold at most one fourth-section kind" ] if keys.count { |key| ExerciseSection.find(key).fourth? } > 1
+    return [] if keys.all?(String) && keys.size == COUNT && normalize(keys).map(&:key) == keys
 
-    []
+    [ "must name #{COUNT} different section kinds, at most one of them a fourth-section kind" ]
   end
 
   def self.fitting(kind, placed)

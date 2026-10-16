@@ -72,4 +72,39 @@ RSpec.describe KindPreferences do
     expect(described_class.instance_method(:initialize).parameters)
       .to eq([ [ :keyreq, :weights ], [ :keyreq, :excluded ] ])
   end
+
+  describe "#eligible" do
+    it "drops excluded kinds, and falls back to every kind when exclusion would empty the pool" do
+      preferences = described_class.new(weights: {}, excluded: %w[challenge parsons_problem])
+
+      expect(preferences.eligible([ ExerciseSection::Challenge, ExerciseSection::Architecture ])).to eq([ ExerciseSection::Architecture ])
+      expect(preferences.eligible([ ExerciseSection::Challenge, ExerciseSection::ParsonsProblem ]))
+        .to eq([ ExerciseSection::Challenge, ExerciseSection::ParsonsProblem ])
+    end
+  end
+
+  describe "#offered" do
+    it "offers a slot whose every kind is excluded, as rotation still fills it" do
+      preferences = described_class.new(weights: {}, excluded: %w[architecture security_review parsons_problem])
+      daily = [ ExerciseSection::Challenge, ExerciseSection::CodeReview ]
+
+      expect(preferences.offered(daily: daily))
+        .to include(ExerciseSection::Architecture, ExerciseSection::SecurityReview, ExerciseSection::ParsonsProblem)
+    end
+
+
+    it "keeps a daily kind the user excluded and drops an excluded optional kind" do
+      preferences = described_class.new(weights: {}, excluded: %w[architecture challenge])
+      daily = [ ExerciseSection::Architecture, ExerciseSection::CodeReview ]
+
+      expect(preferences.offered(daily: daily)).to include(ExerciseSection::Architecture)
+      expect(preferences.offered(daily: daily)).not_to include(ExerciseSection::Challenge)
+    end
+
+    it "is every kind but the excluded ones for the default pair" do
+      preferences = described_class.new(weights: {}, excluded: %w[challenge])
+
+      expect(preferences.offered(daily: DailyKinds::DEFAULT)).to eq(ExerciseSection.all - [ ExerciseSection::Challenge ])
+    end
+  end
 end

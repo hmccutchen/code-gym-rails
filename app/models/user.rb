@@ -36,7 +36,7 @@ class User < ApplicationRecord
   validate :time_zone_must_be_loadable
   validate :section_kind_weights_name_rotatable_kinds,   if: :section_kind_weights_changed?
   validate :excluded_section_kinds_name_rotatable_kinds, if: :excluded_section_kinds_changed?
-  validate :every_slot_keeps_a_kind,                     if: -> { excluded_section_kinds_changed? || daily_section_kinds_changed? }
+  validate :every_slot_keeps_a_kind,                     if: :excluded_section_kinds_changed?
   validate :daily_section_kinds_name_a_full_set,         if: :daily_section_kinds_changed?
   validate :section_kind_levels_name_section_kinds,      if: :section_kind_levels_changed?
   validate :locked_section_kinds_name_section_kinds,     if: :locked_section_kinds_changed?

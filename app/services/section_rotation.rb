@@ -15,14 +15,8 @@ class SectionRotation
     slots.to_h { |slot, kinds| [ slot, filled.include?(slot) ? pick_kind(kinds, recent, preferences) : nil ] }
   end
 
-  # Only exclusion narrows the pool, staleness included; a weight just leans the roll. Empty pools fall back to all.
-  def self.eligible(kinds, preferences)
-    kinds.reject { |kind| preferences.excluded?(kind) }.presence || kinds
-  end
-  private_class_method :eligible
-
   def self.slot_staleness(kinds, recent, preferences)
-    eligible(kinds, preferences).map { |kind| staleness(kind, recent) }.max
+    preferences.eligible(kinds).map { |kind| staleness(kind, recent) }.max
   end
   private_class_method :slot_staleness
 
@@ -35,7 +29,7 @@ class SectionRotation
 
   # Starved kinds drain in registry order to bound the wait; weights reach only the roll, so none can starve a kind.
   def self.pick_kind(slot_kinds, recent, preferences)
-    kinds   = eligible(slot_kinds, preferences)
+    kinds   = preferences.eligible(slot_kinds)
     starved = kinds.select { |kind| staleness(kind, recent) > STARVATION_LIMIT }
 
     return most_stale(starved, recent).key.to_sym if starved.any?

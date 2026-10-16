@@ -22,6 +22,14 @@ In a day's plan, every slot except a daily kind's may be empty, meaning the day 
 
 A daily fourth-slot kind takes the whole `fourth` slot out, so its siblings never rotate in beside it and a day never holds two fourths.
 
+## `.default_daily`
+
+The registry states which kinds form the default pair, and `DailyKinds::DEFAULT` reads it from here. The dependency runs one way: the registry never reads `DailyKinds`.
+
+## `.pickable`
+
+The kinds a plan can ever hold for a pair: the pair plus every kind in its optional slots, in registry order. A daily fourth's siblings are in no slot, so they are left out. For the default pair it is every kind. `KindPreferences#offered` takes it and removes excluded optional kinds; `LadderCoverage`, the Progress page and the level-suggestion card read that answer.
+
 ## `.rotatable`
 
 A slot holding only one candidate is left out, because a weight there could change nothing. It reads the pair's optional slots, so a daily kind is never rotatable.

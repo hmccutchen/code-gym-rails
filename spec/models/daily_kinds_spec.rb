@@ -71,12 +71,13 @@ RSpec.describe DailyKinds do
 
     it "refuses each malformed shape" do
       expect(described_class.problems_with("pattern")).to eq([ "must be a list" ])
-      expect(described_class.problems_with(%w[pattern])).to eq([ "must name exactly 2 section kinds" ])
-      expect(described_class.problems_with(%w[pattern challenge architecture])).to eq([ "must name exactly 2 section kinds" ])
-      expect(described_class.problems_with(%w[pattern retired_kind])).to eq([ "must name known section kinds" ])
-      expect(described_class.problems_with([ "pattern", :challenge ])).to eq([ "must name known section kinds" ])
-      expect(described_class.problems_with(%w[pattern pattern])).to eq([ "must not repeat a section kind" ])
-      expect(described_class.problems_with(%w[plan_review ambiguity_hunt])).to eq([ "may hold at most one fourth-section kind" ])
+
+      refused = [ %w[pattern], %w[pattern challenge architecture], %w[pattern retired_kind], [ "pattern", :challenge ],
+                  %w[pattern pattern], %w[plan_review ambiguity_hunt] ]
+      refused.each do |shape|
+        expect(described_class.problems_with(shape))
+          .to eq([ "must name 2 different section kinds, at most one of them a fourth-section kind" ]), shape.inspect
+      end
     end
   end
 end

@@ -13,8 +13,8 @@ RSpec.describe SectionRotation, "over every reachable pair" do
   def entry(keys) = ExerciseHistoryEntry.new(section_keys: keys, delivered_section_keys: keys, answered: keys.size, dropped: 0)
 
   def simulate(daily, count, seed)
-    srand(seed)
-    history = []
+    previous = srand(seed)
+    history  = []
     seen_on = {}
     longest = Hash.new(0)
 
@@ -29,6 +29,8 @@ RSpec.describe SectionRotation, "over every reachable pair" do
       end
     end
     [ longest, seen_on.keys ]
+  ensure
+    srand(previous)
   end
 
   it "holds the pair count at 42" do

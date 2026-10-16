@@ -21,7 +21,12 @@ every account plans, prompts and renders exactly as before.
   normalized list of kind classes.
 - `DailyKinds.recorded(plan_notes)` reads the pair a stored day was planned
   with.
-- `DailyKinds.problems_with(keys)` is the write-time check `User` runs.
+- `DailyKinds.problems_with(keys)` is the write-time check `User` runs. It
+  accepts an empty list, or a list of `COUNT` key strings that `.normalize`
+  leaves unchanged. The rules about which pairs are allowed are therefore
+  stated once, in `.normalize`, and validation can't drift from them.
+- `DailyKinds::DEFAULT` reads `ExerciseSection.default_daily`, so the
+  registry never depends on `DailyKinds`.
 
 ## Storage is sparse
 
@@ -105,14 +110,40 @@ otherwise (`DailyPlan::Result#judge_retries`). The extra retry follows the
 daily place, not the kind, because every set is built around those
 sections. `AiService::JUDGED_GENERATION_BUDGET` reads the larger of the two.
 
+## Which kinds count as offered
+
+`ExerciseSection.pickable(daily:)` is the set of kinds a plan can hold for a
+pair: the pair plus every kind in its optional slots. `KindPreferences#offered`
+removes excluded optional kinds from it. A daily kind counts as offered even
+when an exclusion is stored on it, since every set holds it, and a daily
+fourth's siblings never count. `LadderCoverage` (which concepts guidance
+preparation covers), the Progress page's "not offered" standing and the
+level-suggestion card read this answer. For the default pair it is every kind
+minus the excluded ones, as before.
+
 ## Weights and exclusions on a daily kind
 
-`User#rotatable_keys` and `User#every_slot_keeps_a_kind` read the user's
-layout, so a daily kind can't be weighted or excluded. A weight or
-exclusion already stored on a kind that becomes daily stays stored and is
-ignored while the kind is daily, because rotation and coverage only read
-optional slots. It applies again when the kind goes back to the pool. That
-keeps storage sparse and makes a swap reversible.
+`User#rotatable_keys` reads the user's layout, so a weight or exclusion can't
+be added for a daily kind. Rotation and coverage read only optional slots, so
+a weight or exclusion stored on a kind before it became daily is ignored while
+it is daily.
+
+Keeping that entry across a swap is not built yet. PR 2 or PR 3 has to add
+two things:
+
+- The Exercise mix form posts only the rows on screen, and a daily kind has no
+  row there, so the next save overwrites the stored weights and exclusions
+  without the daily kind's entry. The save has to merge stored entries for
+  daily kinds back in.
+- `section_kind_weights_name_rotatable_kinds` and
+  `excluded_section_kinds_name_rotatable_kinds` check every stored entry
+  against the current layout. They have to check only the entries a save adds
+  or changes, or a kept entry for a daily kind refuses the save.
+
+`User#every_slot_keeps_a_kind` runs only when the exclusions change. A new
+pair can therefore leave its old slot with every kind excluded, and the save
+still goes through, because `SectionRotation.eligible` falls back to the whole
+slot in that case.
 
 ## What still reads the default pair
 

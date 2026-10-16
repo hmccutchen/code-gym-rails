@@ -1122,6 +1122,18 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".pickable" do
+    it "is every kind, in registry order, for the default pair" do
+      expect(described_class.pickable(daily: DailyKinds::DEFAULT)).to eq(described_class.all)
+    end
+
+    it "leaves out a daily fourth's siblings, which no slot can hold" do
+      daily = [ ExerciseSection::CodeReview, ExerciseSection::PlanReview ]
+
+      expect(described_class.pickable(daily: daily)).to eq(described_class.all - [ ExerciseSection::AmbiguityHunt, ExerciseSection::PseudocodeToCode ])
+    end
+  end
+
   describe ".rotatable" do
     it "holds every kind that competes for a slot" do
       expect(described_class.rotatable(daily: DailyKinds::DEFAULT)).to match_array(described_class.thirds + described_class.fourths)

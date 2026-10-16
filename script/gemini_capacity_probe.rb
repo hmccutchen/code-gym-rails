@@ -139,7 +139,7 @@ class GeminiCapacityProbe
 
   def review(day, draft)
     exercise = DailyExercise.new(user: @user, date: Date.current, problem_set: draft.problem_set,
-                                 language: language, generated_at: Time.current)
+                                 plan_notes: draft.plan.notes, language: language, generated_at: Time.current)
     sections = exercise.active_section_keys
     response = DailyResponse.new(user: @user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                                  answers: sections.index_with { |key| sample_answer(key) },
@@ -157,7 +157,8 @@ class GeminiCapacityProbe
   end
 
   def duck(day, draft)
-    exercise = DailyExercise.new(user: @user, date: Date.current, problem_set: draft.problem_set, language: language)
+    exercise = DailyExercise.new(user: @user, date: Date.current, problem_set: draft.problem_set,
+                                 plan_notes: draft.plan.notes, language: language)
     thread   = []
     DUCK_MESSAGES.first(DUCK_TURNS).each_with_index do |message, turn|
       answer = step(day, "duck turn #{turn + 1}") do

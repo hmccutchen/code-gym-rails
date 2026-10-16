@@ -3,7 +3,7 @@ class ExerciseSection
   MAX_SCAFFOLD_LABELS       = 4
   MAX_SCAFFOLD_LABEL_LENGTH = 80
 
-  # Its own fact rather than the slot count: a second fixed kind adds a slot without making a day longer.
+  # Its own fact rather than the slot count: a second daily kind adds a slot without making a day longer.
   MAX_SECTIONS = 4
 
   def self.all
@@ -13,6 +13,10 @@ class ExerciseSection
 
   def self.keys
     all.map(&:key)
+  end
+
+  def self.default_daily
+    all.select(&:default_daily?)
   end
 
   def self.thirds
@@ -45,9 +49,13 @@ class ExerciseSection
 
   def self.optional_slots(daily:)
     pooled = { pattern: [ Pattern ], third: thirds, fourth: daily.any?(&:fourth?) ? [] : fourths }
-      .merge((DailyKinds::DEFAULT - daily).to_h { |kind| [ kind.key.to_sym, [ kind ] ] })
+      .merge((default_daily - daily).to_h { |kind| [ kind.key.to_sym, [ kind ] ] })
 
     pooled.transform_values { |kinds| kinds - daily }.reject { |_slot, kinds| kinds.empty? }
+  end
+
+  def self.pickable(daily:)
+    all & (daily + optional_slots(daily: daily).values.flatten)
   end
 
   def self.slot_for(kind, daily:)
