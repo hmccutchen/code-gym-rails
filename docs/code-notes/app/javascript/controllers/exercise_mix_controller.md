@@ -132,8 +132,13 @@ covers a mix that connected mid-save and never saw the event.
 It also queues a mix edit still inside its 400 ms delay at once, ahead of the
 track save. Every mix save that will go out ahead of the track save, the
 flushed one and any already waiting in the queue (`waitingSaves`), is frozen to
-the form as it is at this moment: a snapshot of the state and the edit
-revision, with only the version and the shown suggestions read at send time.
+the edits the form holds at this moment: the fields that differ from `saved`,
+and the edit revision. When the save is sent, those edits are laid over `saved`
+as it is then (`frozenState`, through `withEdits`), and the version and the
+shown suggestions are read then too. So an edit made before the track change
+cannot ride in a later save, and a frozen save sent after an earlier track
+reply, when two track changes follow each other quickly, does not bring back a
+target that reply cleared.
 A mix save queued after the track save is not frozen, since it has to read the
 form once the track reply has been applied, or it would send targets the track
 change cleared. Edits are saved in

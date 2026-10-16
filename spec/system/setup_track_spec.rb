@@ -286,6 +286,40 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
   end
 
+  it "does not restore a target the first of two quick track changes cleared" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes("skill_level")) {
+          return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 1200));
+        }
+        return send(url, options);
+      };
+    JS
+
+    find("#skill-level").select("Mid-level")
+    sleep 0.2
+    page.execute_script(<<~JS)
+      const slider = document.querySelector("#weight-security_review");
+      slider.value = 0;
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+    JS
+    find("#skill-level").select("Senior")
+
+    wait_for(10) { user.reload.skill_level == "senior" && user.section_kind_weights.present? }
+    sleep 1
+    expect(user.reload).to have_attributes(
+      skill_level: "senior", section_kind_weights: { "security_review" => 0.25 },
+      section_kind_levels: { "challenge" => "junior" }
+    )
+    expect(checked_level("security_review")).to eq("")
+    expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
+  end
+
   def guide_measurement
     page.evaluate_script(<<~JS)
       (() => {

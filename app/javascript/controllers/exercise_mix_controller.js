@@ -265,12 +265,19 @@ export default class extends Controller {
 
   savePayload(sent) {
     sent.revision = sent.snapshot ? sent.snapshot.revision : this.editRevision
-    const state = sent.snapshot ? JSON.parse(JSON.stringify(sent.snapshot.state)) : this.state()
+    const state = sent.snapshot ? this.frozenState(sent.snapshot) : this.state()
     sent.state = JSON.parse(JSON.stringify(state))
     const steps = this.shownSteps(state.section_kind_levels)
     const body = { user: Object.assign(state, { section_kind_preferences_version: this.versionValue }) }
     if (steps.length > 0) body.level_suggestion_steps = steps
     return body
+  }
+
+  frozenState(snapshot) {
+    const merged = this.withEdits(this.saved, snapshot.state, snapshot.edits)
+    const state = {}
+    MIX_FIELDS.forEach((field) => { state[field] = JSON.parse(JSON.stringify(merged[field])) })
+    return state
   }
 
   reconcile(result, sent) {
@@ -300,7 +307,8 @@ export default class extends Controller {
 
   holdForTrackSave() {
     this.prepareButtonTarget.disabled = true
-    const beforeTrack = { state: this.state(), revision: this.editRevision }
+    const form = this.state()
+    const beforeTrack = { state: form, edits: this.editsSince(this.saved, form), revision: this.editRevision }
     this.waitingSaves.forEach((sent) => { sent.snapshot = sent.snapshot || beforeTrack })
     if (this.pending === null) return
     clearTimeout(this.pending)
