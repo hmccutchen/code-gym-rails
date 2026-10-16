@@ -73,8 +73,8 @@ have answered it.
 loop.** The count is a kind facet, `ExerciseSection.judge_retries`: 2 for
 a fixed kind (`fixed?`), since every day is built around it, and 1 for
 every other kind. `retry_section` regenerates
-that kind alone through the same builder and the same ingest —
-`build_exercise_prompt`'s `only:` restricts the kinds and the schema,
+that kind alone through the same renderer and the same ingest —
+`GenerationPrompt#render`'s `only:` restricts the kinds and the schema,
 `fixed_concept:` adds the line naming the concept the section must carry,
 and `ProblemSetIngest`'s `fixed_concepts:` enforces it through
 `enforce_fixed_concepts!` at the boundary. The concept is fixed because the
@@ -212,7 +212,7 @@ shape and that list price; re-measure against `ApiUsage` rows under
 **Stage 1 never carried `PLAIN_LANGUAGE_STANDARD`.** The standard is
 interpolated into the duck, alternates, follow-up, grading, concept
 reference and recognition guide prompts, and into neither `build_system_prompt` nor
-`build_exercise_prompt`. `JUDGE_SYSTEM_PROMPT` does carry it, which is the
+`GenerationPrompt#render`. `JUDGE_SYSTEM_PROMPT` does carry it, which is the
 point: the judge rewrites prose, so the standard sits where the rewriting
 happens. So nothing was removed from the draft prompt to
 make room for the judge: the field bounds it does carry define the artifact

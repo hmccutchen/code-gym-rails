@@ -1,3 +1,4 @@
+# Design notes: docs/code-notes/app/services/generation_prompt/difficulty_guidance.md
 module GenerationPrompt::DifficultyGuidance
   def self.render(rungs:, difficulty:, ladders:)
     locked, unlocked = rungs.keys.partition { |kind| difficulty.locked?(kind) }

@@ -1,3 +1,4 @@
+# Design notes: docs/code-notes/app/services/generation_prompt.md
 class GenerationPrompt
   include GenerationPrompt::ConceptGuidance
 

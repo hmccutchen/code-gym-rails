@@ -1,6 +1,6 @@
 # Build the generation prompt from the plan as a whole
 
-Status: draft for review. Nothing is implemented.
+Status: implemented on `claude/practical-fermi-vhf3oy` (steps 0 to 3).
 Date: 2026-10-16. Checked against `origin/main` at `3c96c35`.
 Revised after tracing the callers, diagnostics, curated source pool and tests.
 

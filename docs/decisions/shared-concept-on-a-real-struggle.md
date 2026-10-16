@@ -22,7 +22,7 @@ replaces the design note's "cut the remaining reinforcement by one more",
 which let a reduced concept push a drill out.
 
 **Advisory, like all reinforcement.** One line folded onto the end of the
-drilled-concepts bullet (`AiService#shared_concept_guidance`) names it for
+drilled-concepts bullet (`GenerationPrompt#shared_concept_guidance`) names it for
 every fixed section, listing their keys from `ExerciseSection.fixed` and
 stating no count, so a day without
 one renders byte for byte as before; `DesignComparison.generation_guidance`

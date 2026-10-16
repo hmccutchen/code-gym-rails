@@ -67,7 +67,7 @@ where a missing_constraint draft's pieces behaved differently under the
 scenario's own concurrent writers and bulk insert and the judge kept it;
 each returns only after a comparison run shows behavior-equivalent
 drafts. The judge guidance names behavior that differs under any
-condition the scenario states as a reasoning failure. Callers that know the rung pass it (`generation_guidance_for`,
+condition the scenario states as a reasoning failure. Callers that know the rung pass it (`GenerationPrompt#generation_guidance_for`,
 `can_host?` through the prompt's per-kind rungs, the kind-difficulty
 diagnostics, `ladders_for`); `DailyPlan` passes none and gets the strictest
 list; `ConceptHosts` unions every rung unless handed a `difficulty`, which

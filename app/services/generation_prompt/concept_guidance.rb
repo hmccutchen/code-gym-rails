@@ -1,3 +1,4 @@
+# Design notes: docs/code-notes/app/services/generation_prompt/concept_guidance.md
 module GenerationPrompt::ConceptGuidance
   private
 

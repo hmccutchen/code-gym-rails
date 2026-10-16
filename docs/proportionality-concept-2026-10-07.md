@@ -57,7 +57,8 @@ pieces look the same until the scenario says what the system needs.
 ## Draft guidance line
 
 Drafted in the shape of the existing concept-group lines in
-`AiService#build_exercise_prompt`. It is not in any prompt. The
+`AiService#build_exercise_prompt` (now `GenerationPrompt#render`). It is not in
+any prompt. The
 `judge_concept` mode appends it to the drafts it asks for, so the comparison
 judges sections written under the line the follow-up would ship. Change it
 here and the next run reads the new text.
