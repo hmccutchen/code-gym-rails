@@ -170,7 +170,7 @@ two things:
 
 `User#every_slot_keeps_a_kind` runs only when the exclusions change. A new
 pair can therefore leave its old slot with every kind excluded, and the save
-still goes through, because `SectionRotation.eligible` falls back to the whole
+still goes through, because `KindPreferences#eligible` falls back to the whole
 slot in that case.
 
 ## The competency gate
@@ -180,3 +180,23 @@ slot in that case.
 daily that day, and `Evidence#optional_state` uses the row's pair. A change
 of pair neither reclassifies earlier days nor resets an earned size. See
 `docs/decisions/competency-gate.md`.
+
+## Prompt wording that still assumes the default order
+
+The generation prompt names sections by position in places, which is right
+only for the default pair's order:
+
+- Seven kinds' own guidance opens with a fixed ordinal: design comparison
+  ("The second section is…"), architecture, security review and Parsons
+  ("The third section is…"), and plan review, ambiguity hunt and pseudocode
+  to code ("The fourth section is…").
+- `GenerationPrompt`'s retention and established blocks speak of "the fourth
+  section".
+
+The layout puts a pair's kinds first in stored order, so for a pair such as
+architecture and code review, architecture comes first while its guidance
+still calls it the third section. A default account is unaffected, which is
+why this PR leaves the wording alone: changing it rewrites 262 of the 263
+prompt snapshots. Naming each section by its kind instead ("the architecture
+section") is a precondition for PR 2, the first change that can write a
+non-default pair, and lands before it or with it as its own snapshot update.
