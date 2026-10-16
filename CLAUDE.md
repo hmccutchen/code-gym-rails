@@ -3027,11 +3027,17 @@ concept-specific difficulty descriptions for future generation, not a new set.
   instead of enlarging 32 pixels, which looked blocky.
   `script/generate_icons.py` resizes them with Lanczos and composites
   nothing, since an opaque icon has no transparent pixels for iOS to fill
-  with black. The maskable icon is the same image: the script fails if the
-  mark reaches more than 40% of the size from the center, the 80% safe circle
-  every platform mask keeps, and `spec/script/maskable_icon_spec.rb` repeats
-  that check on the committed file, since CI has no Pillow. The current mark
-  reaches 35.6%. The nav shows `brand-mark.png`, the transparent mark, and
+  with black. For `apple-touch-icon.png`, `icon-192.png` and `icon-512.png`
+  it first enlarges the master to 125% about its center on the same navy
+  (`HOME_SCREEN_MARK_SCALE`), also with Lanczos, because at the master's own
+  scale the mark filled about 70% of the width and 48% of the height and
+  looked smaller than other apps' icons; it now fills about 88% and 60%, and
+  reaches 44.5% of the size from the center. The script fails if the
+  enlarged mark touches the icon's edge. The maskable icon stays at the
+  master's scale: the script fails if its mark reaches more than 40% of the
+  size from the center, the 80% safe circle every platform mask keeps, and
+  `spec/script/maskable_icon_spec.rb` repeats that check on the committed
+  file, since CI has no Pillow. The maskable mark reaches 35.6%. The nav shows `brand-mark.png`, the transparent mark, and
   under the light palette `brand-mark-light.png`, the mark on a rounded dark
   tile, through the `<picture>` source `DisplayPreferencesHelper#brand_mark`
   writes; both are sized by height with `width: auto`, so the square tile
