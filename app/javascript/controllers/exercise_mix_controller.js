@@ -1,6 +1,7 @@
 // Design notes: docs/code-notes/app/javascript/controllers/exercise_mix_controller.md
 import { Controller } from "@hotwired/stimulus"
 import saveStatus from "code_gym/save_status"
+import trackReply from "code_gym/track_reply"
 
 const SAVE_DELAY_MS = 400
 const MIX_FIELDS = ["section_kind_weights", "excluded_section_kinds", "section_kind_levels", "locked_section_kinds"]
@@ -26,7 +27,10 @@ export default class extends Controller {
     saveStatus.watch(this.probe)
     this.lockLastInGroup()
     this.saved = this.state({ rendered: true })
-    if (this.editedBeforeConnect()) this.adoptEarlyEdit()
+    const early = this.editedBeforeConnect()
+    const missedReply = trackReply.take()
+    if (missedReply) this.adoptReply(missedReply, early)
+    if (early) this.adoptEarlyEdit()
   }
 
   editedBeforeConnect() {
@@ -140,14 +144,18 @@ export default class extends Controller {
   }
 
   adoptTrackChange(event) {
-    const unsent = this.pending !== null || saveStatus.queued("exercise_mix")
+    trackReply.take()
+    this.adoptReply(event.detail, this.pending !== null || saveStatus.queued("exercise_mix"))
+  }
+
+  adoptReply(reply, unsent) {
     const mine = this.state()
     const edits = unsent ? this.editsSince(this.saved, mine) : []
-    this.forgetMovedSuggestions(event.detail.kind_rungs)
-    this.applyServerState(event.detail)
+    this.forgetMovedSuggestions(reply.kind_rungs)
+    this.applyServerState(reply)
     if (edits.length > 0) {
       const adopted = this.saved
-      this.applyServerState(this.withEdits(event.detail, mine, edits))
+      this.applyServerState(this.withEdits(reply, mine, edits))
       this.saved = adopted
     }
     this.savedLatest = true
@@ -179,6 +187,7 @@ export default class extends Controller {
       if (LIST_FIELDS.indexOf(field) !== -1) {
         merged[field] = merged[field].filter((listed) => listed !== kind)
         if (this.fieldFor(mine, field, kind)) merged[field].push(kind)
+        if (field === "locked_section_kinds" && this.fieldFor(mine, field, kind)) merged.section_kind_levels[kind] = mine.section_kind_levels[kind]
       } else if (Object.prototype.hasOwnProperty.call(mine[field], kind)) {
         merged[field][kind] = mine[field][kind]
       } else {

@@ -106,8 +106,11 @@ When an edit is unsent, each field (weight, exclusion, level or lock) of each
 kind that differs from `saved` is an edit (`editsSince`). The reply is applied
 and only those fields are set back (`withEdits`). The rebase is per field, not
 per kind: moving a kind's weight must not bring back a level target the track
-change cleared on that kind. A lock left without a level after the merge is
-dropped, since the server refuses a lock on an untargeted kind. The pending
+change cleared on that kind. A lock the edit turns on also brings back the
+level it was ticked on: the user locked the level they saw, and the track
+change may have cleared it on the server meanwhile. A lock left without a
+level after the merge is dropped, since the server refuses a lock on an
+untargeted kind. The pending
 save sends the result under the reply's version, and `saved` stays the reply's
 state so a later comparison still sees the edit as unsent.
 
@@ -127,7 +130,9 @@ the server first and `TrackChange` keeps the target it protects. The rebase
 above is for what is left: an edit made while the track save is in flight, and
 an edit made before both controllers connected when `profile-preferences`
 connected first and saved the track from its `connect` before this controller
-was listening. Connect order follows module load order, so either can come
+was listening. A track reply that arrived before this controller connected at
+all is kept in `code_gym/track_reply`, and `connect` takes and adopts it,
+treating an edit made before connect as unsent. Connect order follows module load order, so either can come
 first; when this controller connects first, `adoptEarlyEdit` has already set
 `pending` and `holdForTrackSave` sends that edit ahead of the track save.
 

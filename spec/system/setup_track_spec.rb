@@ -185,6 +185,34 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all)
   end
 
+  it "keeps a lock ticked while the track save is in flight, along with its level" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes("skill_level")) {
+          return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 1500));
+        }
+        return send(url, options);
+      };
+    JS
+
+    find("#skill-level").select("Mid-level")
+    sleep 0.3
+    find(".mix-difficulty[data-kind='security_review'] .mix-lock-box").click
+
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 5)
+    wait_for(5) { user.reload.locked_section_kinds.include?("security_review") }
+    expect(user.reload).to have_attributes(locked_section_kinds: match_array(%w[challenge security_review]))
+    expect(user.section_kind_levels).to include("security_review" => "junior")
+    expect(user.section_kind_levels).not_to include("code_review")
+    expect(checked_level("security_review")).to eq("junior")
+    expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
+  end
+
   def guide_measurement
     page.evaluate_script(<<~JS)
       (() => {

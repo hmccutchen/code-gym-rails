@@ -240,6 +240,38 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(errors).to be_empty
   end
 
+  it "has a late-loading Exercise mix adopt a track change saved before it connected" do
+    user.update_columns(skill_level: "junior", section_kind_levels: { "challenge" => "junior", "pattern" => "senior" })
+    watch_page_errors
+    visit_as(user)
+    visit setup_path
+    expect(page).to have_css("#weight-challenge", visible: :all)
+    url = page.current_url
+    stalled[:controller] = "exercise_mix_controller"
+
+    page.driver.with_playwright_page do |pw|
+      pw.goto(url, waitUntil: "domcontentloaded")
+      pw.evaluate(<<~JS)
+        (() => {
+          const select = document.getElementById("skill-level");
+          select.value = "mid_level";
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        })()
+      JS
+    end
+    wait_for { user.reload.skill_level == "mid_level" }
+    expect(user.reload.section_kind_levels).to eq("pattern" => "senior")
+
+    find("#exercise-mix summary").click
+    expect(page).to have_css(".mix-difficulty[data-kind='challenge'] input[type=radio][value='']:checked", visible: :all, wait: 10)
+    find(".mix-difficulty[data-kind='challenge'] input[value='senior']").click
+
+    wait_for { user.reload.section_kind_levels["challenge"] == "senior" }
+    expect(user.reload.section_kind_levels).to eq("challenge" => "senior", "pattern" => "senior")
+    expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
+    expect(errors).to be_empty
+  end
+
   it "saves a Setup preference chosen while the modules are still loading" do
     watch_page_errors
     visit_as(user)

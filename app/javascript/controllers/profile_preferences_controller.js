@@ -1,6 +1,7 @@
 // Design notes: docs/code-notes/app/javascript/controllers/profile_preferences_controller.md
 import { Controller } from "@hotwired/stimulus"
 import saveStatus from "code_gym/save_status"
+import trackReply from "code_gym/track_reply"
 
 export default class extends Controller {
   static targets = ["timeZone", "dailySections", "skillLevel", "keptOwnLevel"]
@@ -47,7 +48,9 @@ export default class extends Controller {
     if (!result.ok) return this.dispatch("trackFailed", { target: document })
 
     // A track change can clear targets; the Exercise mix adopts the saved state rather than keep its own copy.
-    this.dispatch("trackSaved", { target: document, detail: Object.assign({ kind_rungs: result.data.kind_rungs }, result.data.preferences) })
+    const reply = Object.assign({ kind_rungs: result.data.kind_rungs }, result.data.preferences)
+    trackReply.record(reply)
+    this.dispatch("trackSaved", { target: document, detail: reply })
     this.keptOwnLevelTarget.textContent = result.data.kept_own_level
 
     const levelLabel = Array.from(select.options).find((option) => option.value === level).textContent
