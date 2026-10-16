@@ -56,6 +56,14 @@ RSpec.describe DailyKinds do
         .to eq(kinds("challenge", "design_comparison"))
     end
 
+    it "keeps the pair exactly as recorded, never fitted to today's count, so a past day is never reclassified" do
+      stub_const("DailyKinds::COUNT", 3)
+
+      expect(described_class.recorded("daily_kinds" => %w[challenge design_comparison]))
+        .to eq(kinds("challenge", "design_comparison"))
+      expect(described_class.recorded("daily_kinds" => %w[challenge retired_kind])).to eq(kinds("challenge"))
+    end
+
     it "reads a row planned before the pair was recorded as the default pair" do
       expect(described_class.recorded({})).to eq(described_class::DEFAULT)
       expect(described_class.recorded("size" => 3)).to eq(described_class::DEFAULT)

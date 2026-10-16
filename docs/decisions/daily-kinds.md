@@ -56,7 +56,10 @@ next write stores a list of the new length.
 that later reads a stored day reads that day's pair through
 `DailyExercise#daily_kinds` and never recomputes it. A row without the key
 was planned before the pair was recorded, when the default pair was the
-only one, so `recorded` falls back to `DEFAULT`.
+only one, so `recorded` falls back to `DEFAULT`. A recorded pair is read
+exactly as stored and never fitted to today's `COUNT` the way a user's
+setting is: if the count or the registry changed later, re-fitting would
+reclassify a past day. An unknown key is dropped.
 
 That fallback is for old rows only, and it must never hide a writer that
 forgot the key, since a swapped user's day would then be read with the wrong
