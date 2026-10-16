@@ -28,13 +28,14 @@ read it before changing that area.
   `AiService.for(user)` is the only dispatch. Use `User#store_api_key`,
   `User#api_key` and `User#stored_providers`; no keys stores NULL.
   `ResponseReview` sets `daily_responses.review_provider` on every review.
-- **Provider abstraction**: `AiService` is a template-method base class owning provider orchestration, JSON parsing, usage logging and every prompt but the generation prompt, which it delegates to `GenerationPrompt`; the concept vocabularies those prompts draw from live in `ConceptVocabulary`. Subclasses implement `#call` and `#build_connection`, and own which model each purpose routes to (see "Per-purpose model routing" below). Adding a provider means adding a subclass and an `AiProvider.all` entry, not editing the base. The registry follows `ExerciseSection.all`'s explicit class-list pattern, so Zeitwerk loads each class when asked rather than relying on subclasses having already registered themselves. `User` validates against its keys and Setup uses the subclasses' key patterns. `FakeService` has no key pattern and is available only in local environments; a manually stored fake provider is still refused in production.
+- **Provider abstraction**: `AiService` is a template-method base class owning provider orchestration, JSON parsing, usage logging and every prompt but the generation prompt, which it delegates to `GenerationPrompt`; the concept vocabularies those prompts draw from live in `ConceptVocabulary`. `AiService#call(request)` is the template for the HTTP round trip; subclasses implement `request_body`, `read_result`, `raise_for_status` and `provider_name` behind it, plus `build_connection`, and own which model each purpose routes to (see "Per-purpose model routing" below). Each call carries one `AiService::Request` built by `AiService.request_for` from the purpose's row in `CALL_PROFILES` (see `.claude/rules/patterns.md`). Adding a provider means adding a subclass and an `AiProvider.all` entry, not editing the base. The registry follows `ExerciseSection.all`'s explicit class-list pattern, so Zeitwerk loads each class when asked rather than relying on subclasses having already registered themselves. `User` validates against its keys and Setup uses the subclasses' key patterns. `FakeService` has no key pattern and is available only in local environments; a manually stored fake provider is still refused in production.
 - **Per-purpose model routing**
   (`docs/decisions/per-purpose-model-routing.md`): Each provider routes a call
   by its `purpose` through its own `MODEL_FOR_PURPOSE`, falling back to
-  `DEFAULT_ROUTE`; `model_routing_spec` fails on a key no call site logs.
-  Effort is stated explicitly on each route, so a provider default change
-  cannot move it silently. A capped call turns thinking off from
+  `DEFAULT_ROUTE`; `model_routing_spec` fails on a key with no row in
+  `AiService::CALL_PROFILES`. Effort is stated explicitly on each route, so a
+  provider default change cannot move it silently. A capped call turns
+  thinking off from
   `ClaudeService::THINKING_OFF` (or `OpenaiService::REASONING_OFF`), so a
   capped purpose cannot route to Opus 5.5, and an OpenAI model without `none`
   needs a `reasoning_allowance`. `judge_section`, review and `duck_thread`
@@ -43,11 +44,13 @@ read it before changing that area.
   are uncompared.
 - **Conversational calls send real turns**
   (`docs/decisions/conversational-calls-send-real-turns.md`): `#duck_response`
-  and `#answer_follow_up` pass prior turns as `history:`, with only the new
-  turn in `prompt` and stable context in `system`; every other caller omits it
-  and must stay byte-identical, which the characterization spec and the
-  single-shot group hold. Only the duck passes `cache_system: true`. Gemini
-  still flattens history via `#flatten_history`, a known forgery gap.
+  and `#answer_follow_up` pass prior turns to `AiService.request_for` as
+  `history:`, which becomes the request's `history` field, with only the new
+  turn in `prompt` and stable context in `system`. Every other caller leaves
+  `history` empty and must stay byte-identical, which the request snapshots in
+  `provider_request_characterization_spec` and the single-shot group hold. Of
+  the two, only the duck's profile sets `cache_system: true`. Gemini still
+  flattens history via `#flatten_history`, a known forgery gap.
 - **Per-user request limits** (`docs/decisions/per-user-request-limits.md`):
   Limits guard a trial's house key, so own-key accounts skip them
   (`ApplicationController#own_key?`). Every endpoint billing one provider call
@@ -58,8 +61,8 @@ read it before changing that area.
 - **What a usage row records** (`docs/decisions/what-a-usage-row-records.md`):
   Every provider call writes exactly one `ApiUsage` row through
   `AiService#log_usage`, including a call that fails before a reply (zero
-  tokens, from `call_and_log`'s rescue). `model` is the routed model;
-  `tokens_in` is uncached input, with cache reads and writes in their own
+  tokens, from the rescue in `call_and_log(user, request)`). `model` is the
+  routed model; `tokens_in` is uncached input, with cache reads and writes in their own
   columns, so each provider subclass subtracts what its API counts inside
   input. `failure` comes from `AiService.failure_code_for`.
 - **How a cut-off reply is recognized**
@@ -67,7 +70,8 @@ read it before changing that area.
   truncation as data and `AiService#call_and_log` decides it is fatal after
   writing the usage row: Claude `stop_reason == "max_tokens"`, Gemini status
   `incomplete`, OpenAI `incomplete` unless the reason is `content_filter` (a
-  refusal). `allow_truncated: true` shows partial prose. Auth errors go
+  refusal). A request with `allow_truncated` set, which only the
+  `duck_thread` profile does, shows partial prose. Auth errors go
   through `AiService#raise_if_key_rejected` and never log the provider body.
 - **What a person is told when a provider fails**
   (`docs/decisions/what-a-person-is-told-when-a-provider-fails.md`): Every

@@ -1,23 +1,29 @@
 # Conversational calls send real turns
 
 `AiService#duck_response` and
-`#answer_follow_up` pass prior turns as `history:` — an ordered
+`#answer_follow_up` pass prior turns to `AiService.request_for` as
+`history:` — an ordered
 `{ role:, content: }` array — while `prompt` carries only the new user turn,
 and the section/review context that is stable across a thread lives in
 `system`. `ClaudeService` renders `history` as a Messages API `messages`
 array; `GeminiService` folds it back into `input` via
 `AiService#flatten_history`, because the Interactions API has no equivalent
 shape (its stateless multi-turn form is a `Step[]` whose model steps must be
-replayed exactly as received, and only assistant *text* is stored here). The
-keyword is the third instance of the additive-kwarg pattern after
-`cache_system:` and `max_tokens:`: every other caller omits it and is
+replayed exactly as received, and only assistant *text* is stored here).
+`history` began as an optional keyword on `#call`, added after
+`cache_system:` and `max_tokens:`. All three are now fields of
+`AiService::Request`: `cache_system` and `max_tokens` are set per purpose in
+`AiService::CALL_PROFILES`, and `history` is a per-call value. The
+additive-keyword pattern was replaced because each new keyword meant editing
+five `app/` files and every spec that overrode `#call`, while the settings are
+facts about a purpose. Every other caller leaves `history` empty and is
 byte-identical. Two specs hold that jointly, because neither can alone —
-`spec/services/provider_request_characterization_spec.rb` pins that an empty
-history serializes to the same body as before at the `#call` boundary, and
-`ai_service_spec`'s "single-shot purposes" group drives the other public
-entry points and asserts the history each one reaches `#call` with is empty.
-**`duck_response` passes `cache_system: true`; the other conversational
-caller does not.** Counted with `count_tokens` against `claude-sonnet-5` (5.5 shares its tokenizer)
+`spec/services/provider_request_characterization_spec.rb` records the body
+each purpose's request sends to each provider and fails on any changed byte,
+and `ai_service_spec`'s "single-shot purposes" group drives the other public
+entry points and asserts the history each one's request reaches `#call` with
+is empty. **The `duck_thread` profile sets `cache_system: true`; the other
+conversational caller's profile does not.** Counted with `count_tokens` against `claude-sonnet-5` (5.5 shares its tokenizer)
 rather than estimated from characters, the merged duck prompt runs 993-1,182
 tokens across the stored `code_review` exercises — median 1,059 — and 1,364
 for the largest excerpt `RealSource` can actually produce. That last figure

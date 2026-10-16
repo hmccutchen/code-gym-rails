@@ -158,8 +158,9 @@ why in the PR description rather than quietly diverging.
 
 **Patterns this codebase has deliberately adopted.** These are settled
 decisions, not defaults that drifted into place: template method for
-providers, the section-kind registry, pure decision objects, single authority
-per fact, one prompt line per vocabulary group, provider calls as callables,
+providers, one request value per provider call, the section-kind registry,
+pure decision objects, single authority per fact, one prompt line per
+vocabulary group, provider calls as callables,
 outcomes at the HTTP edge, claims and lock order, the server decides and the
 page shows its answer, page behavior as Stimulus controllers, one way to send
 a request, and domain data kept off provider classes.

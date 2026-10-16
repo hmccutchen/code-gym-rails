@@ -10,7 +10,8 @@ token counts are not consulted, because a live call capped at 60 stopped at
 missed it (#243). Since that status does not say why the reply stopped, the
 error says the provider "did not finish its reply" rather than naming a
 limit. Uncapped Gemini calls are flagged too, as uncapped Claude calls
-already were. The thinking partner passes `allow_truncated: true`, so a
+already were. The thinking partner's `duck_thread` profile in
+`AiService::CALL_PROFILES` sets `allow_truncated: true`, so a
 partial reply is shown with an ellipsis, and an empty one still fails
 `text_or_raise`. A `failed` or `cancelled` Gemini interaction is not handled
 here. OpenAI accepts only `completed` or `incomplete` responses; any other

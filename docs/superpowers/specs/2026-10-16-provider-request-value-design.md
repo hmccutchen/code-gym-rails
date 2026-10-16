@@ -1,7 +1,7 @@
 # One request value per provider call, a call profile per purpose
 
-Status: draft for review, revised after the first review found the caller
-inventory incomplete. Nothing is implemented.
+Status: implemented on `claude/practical-fermi-vhf3oy` (steps 0 to 4).
+The caller inventory below carries the counts the implementation found.
 Date: 2026-10-16. Checked against `main` at `5d27636`, after refactor A
 (#402) merged.
 
@@ -96,7 +96,7 @@ Four specs depend on that text matching from outside `FakeService#call`,
 and they are the finding that changes the design below. They stub Faraday
 at the HTTP layer to exercise a real provider's request and reply handling,
 and use the fake as the reply oracle by pulling the system text back out of
-the posted body: `spec/script/gemini_capacity_probe_spec.rb:34,112,152`,
+the posted body: `spec/script/gemini_capacity_probe_spec.rb:34,112,152,236`,
 `spec/script/forced_concept_drafts_spec.rb:22`,
 `spec/script/model_comparison_spec.rb:31` and
 `spec/script/security_audit/prompt_injection_red_team_spec.rb:19`. At that
@@ -349,7 +349,8 @@ stay as they are. Two additions make the settings side explicit:
 - Transport examples per provider that send one request with a long
   timeout and one with `single_attempt: true` and assert the Faraday
   context and attempt count, which today's provider specs assert through
-  kwargs. These land in step 2 with the shared `post` implementation.
+  kwargs. These land in step 2 with the shared `post` implementation, in a
+  new `spec/services/provider_transport_spec.rb`.
 
 ### The full caller inventory
 
@@ -361,14 +362,14 @@ Every item migrates in the same step as the interface it depends on.
 | Today | Where | Count | After |
 |---|---|---|---|
 | `def call(system:, prompt:, cache_system: ..., single_attempt: false)` doubles with the full nine-keyword signature | `ai_service_spec.rb` (18, at lines 110, 135, 196, 2955, 2980, 3097, 3124, 3220, 3266, 3312, 3340, 3399, 3595, 4031, 4299, 4542, 5902, 6054), `review_grading_spec.rb:151`, `forced_concept_drafts_spec.rb:81` | 20 | `def call(request)` reading `request.system`, `.prompt`, `.read_timeout`, `.max_tokens`, `.purpose`; the `double_class` keeps recording `read_timeouts_by_purpose` from the request |
-| `receive(:call)` expectations, stubs and wrappers | `ai_service_spec.rb` (15), `review_grading_spec.rb` (3), `model_comparison_spec.rb` (2), `ai_service_trial_spec.rb` (2), `level_suggestion_isolation_spec.rb:22`, `trial_isolation_spec.rb:25`, `generate_concept_reference_job_spec.rb:223`, `learn_spec.rb:526`, `responses_duck_thread_spec.rb:388`, `responses_pseudocode_spec.rb:311`, `hardening_targets_spec.rb:105`, `deferred_module_spec.rb` | 30 | migrate in step 2; keep stubbed results, capture the positional request in wrappers, and replace `with(hash_including(prompt: ...))` with `with(having_attributes(prompt: ...))` or a block reading the request |
+| `receive(:call)` expectations, stubs and wrappers on `AiService#call` | `ai_service_spec.rb` (13), `review_grading_spec.rb` (3), `model_comparison_spec.rb` (2), `ai_service_trial_spec.rb` (2), `level_suggestion_isolation_spec.rb:22`, `trial_isolation_spec.rb:25`, `generate_concept_reference_job_spec.rb:223`, `learn_spec.rb:526`, `responses_duck_thread_spec.rb:388`, `responses_pseudocode_spec.rb:311`, `hardening_targets_spec.rb:105` | 27 (an earlier count of 30 included `deferred_module_spec.rb`'s `Propshaft::Server` stub and two `ProblemSetIngest.call` wrappers in `ai_service_spec.rb`) | migrate in step 2; keep stubbed results, capture the positional request in wrappers, and replace `with(hash_including(prompt: ...))` with `with(having_attributes(prompt: ...))` or a block reading the request |
 | `receive(:call_and_log)` stubs and wrappers, including the judge-isolation group at `ai_service_spec.rb:4849-4938` that asserts answer keys and server stamps never reach the judge | `ai_service_spec.rb` | 16 | migrate in step 1; keep stubbed results, and change wrappers to `captured = args.last` and `captured.purpose`, `captured.max_tokens`, `captured.system`, `captured.prompt`; preserve every assertion's expected values and meaning |
-| `send(:call, system:, prompt:, **kwargs)` | `claude_service_spec` 39, `gemini_service_spec` 32, `openai_service_spec` 18, `gemini_capacity_probe_spec` 4 | 93 | `send(:call, AiService::Request.build(system:, prompt:, **kwargs))`, through a support helper so each site changes only its head |
+| `send(:call, system:, prompt:, **kwargs)` | `claude_service_spec` 39, `gemini_service_spec` 32, `openai_service_spec` 17, `gemini_capacity_probe_spec` 4, `model_routing_spec` 2 | 94 (`openai_service_spec`'s eighteenth was the `logged_call` helper, already on `Request.build`) | `send(:call, AiService::Request.build(system:, prompt:, **kwargs))`, through a support helper so each site changes only its head |
 | `send(:call_and_log, user, purpose:, system:, prompt:, ...)` | `ai_service_spec.rb` 7, `ai_service_trial_spec.rb` 2, `gemini_truncation_spec.rb` 1, others 2 | 12 | `send(:call_and_log, user, AiService::Request.build(purpose:, system:, prompt:, **settings))`. These tests pass settings that are not the purpose's profile on purpose: `ai_service_spec.rb:316-324` sends `duck_thread` with `allow_truncated` left false to see `TruncatedResponseError` and a `failure: "truncated"` row, and `gemini_truncation_spec.rb:29` caps `explain_differently` at 60. Through `request_for` they would get the duck's `allow_truncated: true` and no cap, and their assertions would have to change. They use `Request.build` and keep their assertions; the profiles are tested separately |
 | `openai_service_spec`'s `logged_call(body, **kwargs)` helper | 1 helper, 2 examples | | `Request.build` with the `allow_truncated:` it is given |
 | The single-shot group's `spy_class` and its source scan | `ai_service_spec.rb:170-215` | 1 | `call(request)` recording `request.history`; purposes from `CALL_PROFILES.keys` |
 | `model_routing_spec`'s `purposes_in_use` source scan | `model_routing_spec.rb:5` | 1 | `AiService::CALL_PROFILES.keys` |
-| The HTTP-stub oracle specs | the four files above | 6 sites | step 2 wraps the existing system and prompt in `Request.build`, with no purpose required while the fake still matches text; step 3 adds `purpose_for(system)` from the marker table |
+| The HTTP-stub oracle specs | the four files above | 7 sites (4 in `gemini_capacity_probe_spec.rb`) | step 2 wraps the existing system and prompt in `Request.build`, with no purpose required while the fake still matches text; step 3 adds `purpose_for(system)` from the marker table |
 | `fake_service_spec` | 1 send | | step 2 converts the direct send to `Request.build` with the same system and prompt; step 3 drives it by purpose and adds one example per purpose |
 | The two script overrides and `ModelComparison#route_for` | `script/` | 3 | as in "Scripts" above; their specs unchanged |
 | Request snapshot spec | 15 fixtures | | 15 legacy shapes through `Request.build`, plus 45 per-purpose shapes through `request_for` |
@@ -431,8 +432,8 @@ the specs that read them fail rather than pass.
    context rule and OpenAI's override. In the same commit, because they all
    break the moment `#call` takes a positional request: `FakeService#call`'s
    signature (its `case system` body unchanged for this step), the 20
-   keyword doubles, the 30 `receive(:call)` expectations, stubs and wrappers,
-   the 93 `send(:call` sites through the support helper, the six HTTP-oracle
+   keyword doubles, the 27 `receive(:call)` expectations, stubs and wrappers,
+   the 94 `send(:call` sites through the support helper, the seven HTTP-oracle
    calls and the direct `fake_service_spec` call through `Request.build`,
    the two script overrides, the transport examples, and the request
    snapshot spec's builder. The oracle and fake-service test calls keep
@@ -473,8 +474,8 @@ the specs that read them fail rather than pass.
 - **The fake's oracle specs.** Recommendation 1 keeps them green with one
   support table. If the user prefers option 2, the fake keeps text
   matching and the spec says so.
-- **Spec churn.** About 180 sites in specs and scripts need review (93
-  provider sends, 7 oracle and fake sends, 20 doubles, 46 expectations,
+- **Spec churn.** About 180 sites in specs and scripts need review (94
+  provider sends, 8 oracle and fake sends, 20 doubles, 43 expectations,
   stubs and wrappers, 12 `call_and_log` sends, 3 scripts and the snapshot
   builder). The support helper keeps each `send` change to the call's
   head; the doubles and spies read the request instead of keywords.

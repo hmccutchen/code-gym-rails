@@ -43,8 +43,9 @@ judge also reads, never the error message, which can carry provider text. The ca
 cap was re-checked against the comparison script on 2026-10-09; the run
 record at the end of this doc has the measured figures.
 
-**One attempt, and a 12-minute claim.** The call passes `single_attempt:
-true`, which refuses every retry, status retries included, and runs on
+**One attempt, and a 12-minute claim.** The `judge_review` profile in
+`AiService::CALL_PROFILES` sets `single_attempt: true`, which refuses every
+retry, status retries included, and runs the call on
 `REVIEW_JUDGE_READ_TIMEOUT`. The grading stage's time budget now includes
 that one call (`OPEN_TIMEOUT + REVIEW_JUDGE_READ_TIMEOUT`), so
 `DailyResponse::REVIEW_CLAIM_STALE_AFTER` is 12 minutes, whether or not the

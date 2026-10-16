@@ -167,7 +167,7 @@ the verdict schemas use `anyOf`, `const` and `additionalProperties: false`;
 a schema Gemini refuses fails the call, which falls back to the draft like
 any judge failure. `script/check_gemini_structured_output.rb` sends judge
 fixtures on the production route to confirm Gemini accepts them.
-`OpenaiService` answers the keyword with JSON mode (`text.format:
+`OpenaiService` answers a request's `response_schema` with JSON mode (`text.format:
 json_object`) rather than the schema: OpenAI's strict schemas need an object
 at the root and every property required, and `VerdictSchema` builds an
 `anyOf` with optional fields. JSON mode guarantees a parseable reply, and
@@ -176,12 +176,18 @@ input message mentions JSON, and the system prompt goes in `instructions`,
 which it does not check, so `OpenaiService` ends the input with
 `JSON_MODE_REQUEST`. Before that, only a section whose own text happened to
 mention JSON was judged on OpenAI (#253).
-`response_schema:` is the fourth additive keyword on `#call`, after
-`cache_system:`, `max_tokens:` and `history:`; `judge_section` and
-`judge_review_prose` (`ReviewProseVerdict.schema`) pass it, and every other
-caller omits it.
-`single_attempt:` is the fifth: the review prose judge sets it, and every
-other caller omits it.
+`response_schema:` and `single_attempt:` began as optional keywords on
+`#call`, added one at a time like `cache_system:`, `max_tokens:` and
+`history:` before them. They are now fields of `AiService::Request`.
+`judge_section` and `judge_review_prose` (`ReviewProseVerdict.schema`) pass
+a schema to `AiService.request_for` per call, and every other caller leaves
+it nil; the `judge_review` row of `AiService::CALL_PROFILES` sets
+`single_attempt`, and no other profile does. The additive-keyword pattern
+was replaced because each new keyword meant editing five `app/` files and
+every spec that overrode `#call`, while the settings are facts about a purpose.
+`spec/services/provider_request_characterization_spec.rb` records the body
+each purpose's request sends to each provider and fails on any changed
+byte, which holds every caller that passes no schema byte-identical.
 
 **Known leak, reported and left.** The reference disclosure above a section
 is titled "Reference — <concept>: how it works", which on a discovery kind
