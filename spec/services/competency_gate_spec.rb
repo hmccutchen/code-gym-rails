@@ -65,7 +65,7 @@ RSpec.describe CompetencyGate do
       expect(counts(Array.new(4) { day(good) })).to all(eq(2))
     end
 
-    it "counts favourable results across the fixed kinds combined" do
+    it "counts favourable results across the daily kinds combined" do
       days = [ day(good, poor("design_comparison")), day(good, good("design_comparison")), day(good) ]
 
       expect(counts(days)).to eq([ 2, 2, 3 ])
@@ -161,7 +161,7 @@ RSpec.describe CompetencyGate do
     end
 
     # Otherwise struggling only on optional sections would swing the day 3, 2, 3.
-    it "needs a fresh fixed-kind window before growing again" do
+    it "needs a fresh daily-kind window before growing again" do
       both = -> { day(good, good("design_comparison")) }
       days = earned_three + [ day(too_hard("pattern"), too_hard("challenge")) ] + Array.new(4) { both.call }
 

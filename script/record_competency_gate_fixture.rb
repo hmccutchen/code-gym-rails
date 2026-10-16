@@ -53,5 +53,8 @@ histories = PROFILES.flat_map do |name, profile|
   end
 end
 
+previous = FIXTURE.exist? ? JSON.parse(FIXTURE.read).fetch("histories").to_h { |history| [ history["name"], history["plans"] ] } : {}
+changed  = histories.sum { |history| history["plans"].zip(previous.fetch(history["name"], [])).count { |now, before| now != before } }
+
 File.write(FIXTURE, JSON.generate("histories" => histories))
-puts "Wrote #{histories.size} histories to #{FIXTURE.relative_path_from(Rails.root)}"
+puts "Wrote #{histories.size} histories to #{FIXTURE.relative_path_from(Rails.root)}; #{changed} plans differ from the file it replaced"

@@ -112,13 +112,16 @@ on any day, optional days included, still restarts that kind's runs.
 **The default-pair fixture.** A history that only ever held the default pair
 plans exactly as it did when the gate read one global pair.
 `competency_gate_daily_pairs_spec` replays
-`spec/fixtures/competency_gate/default_pair_histories.json`: eight seeded
-50-day histories that grow, brake and hold, with the plans recorded from the
-gate before per-day pairs (`dc14d250`). `script/record_competency_gate_fixture.rb`
+`spec/fixtures/competency_gate/default_pair_histories.json`: eight seeded,
+synthetic 50-day histories that grow, brake and hold, with the plans recorded
+from the gate before per-day pairs (`dc14d250`). They are not shaped like
+production: most days carry one or two optional results whatever their size,
+which exercises more of the fold than real two-section days would. `script/record_competency_gate_fixture.rb`
 rebuilds the file from the gate as it stands, and on the per-day gate it
 reproduced the original recording exactly. When a threshold or rule changes
-on purpose, rerun the script and read the plan diff; a failure with no
-intended change is a regression.
+on purpose, rerun the script, check the count of changed plans it prints, and
+read the diff; a failure with no intended change is a regression, and
+rerunning the script would bake it in.
 
 **Two sections can hold.** On a two-section day the daily kinds' results are
 the only growth input, so a daily kind that is never favourable keeps the day

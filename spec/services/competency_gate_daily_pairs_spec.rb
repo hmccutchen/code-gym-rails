@@ -101,10 +101,7 @@ RSpec.describe CompetencyGate, "with each day's own pair" do
     it "grows within three answered days of that kind becoming favourable" do
       recovered = Array.new(3) { day(good("code_review"), good("design_comparison")) }
 
-      counts = described_class.plans(held + recovered).map(&:count).last(3)
-
-      expect(counts.last).to eq(3)
-      expect(counts.index(3)).to be < 3
+      expect(described_class.plans(held + recovered).map(&:count).last(3)).to eq([ 2, 3, 3 ])
     end
   end
 end
