@@ -224,5 +224,19 @@ RSpec.describe DailyExercise, type: :model do
     it "outlasts the worker's generation budget" do
       expect(DailyExercise::REGENERATION_STALE_AFTER.to_i).to be > AiService::GENERATION_READ_TIMEOUT
     end
+
+    it "outlasts the draft call's worst case, retries included, plus job pickup" do
+      worst_case = AiService.worst_case_call_seconds(AiService::GENERATION_READ_TIMEOUT)
+
+      expect(DailyExercise::REGENERATION_STALE_AFTER.to_i)
+        .to be >= worst_case + DailyExercise::JOB_PICKUP_MARGIN.to_i
+    end
+
+    it "still holds a claim taken seven minutes ago, past the old six-minute window" do
+      held = exercise(regenerating_since: 7.minutes.ago)
+
+      expect(held).to be_regenerating
+      expect(held.claim_regenerating!(regenerated_at: nil)).to be_nil
+    end
   end
 end
