@@ -250,8 +250,8 @@ export default class extends Controller {
     this.suggestedValue = remaining
   }
 
-  persist() {
-    const sent = { revision: undefined }
+  persist(snapshot = null) {
+    const sent = { revision: undefined, snapshot: snapshot }
     const payload = () => this.savePayload(sent)
 
     // Queued in order: a parallel save would post the version the one in flight is about to move, and 409 against itself.
@@ -259,8 +259,8 @@ export default class extends Controller {
   }
 
   savePayload(sent) {
-    sent.revision = this.editRevision
-    const state = this.state()
+    sent.revision = sent.snapshot ? sent.snapshot.revision : this.editRevision
+    const state = sent.snapshot ? JSON.parse(JSON.stringify(sent.snapshot.state)) : this.state()
     sent.state = JSON.parse(JSON.stringify(state))
     const steps = this.shownSteps(state.section_kind_levels)
     const body = { user: Object.assign(state, { section_kind_preferences_version: this.versionValue }) }
@@ -297,12 +297,12 @@ export default class extends Controller {
     this.prepareButtonTarget.disabled = true
     if (this.pending === null) return
     clearTimeout(this.pending)
-    this.sendNow()
+    this.sendNow({ state: this.state(), revision: this.editRevision })
   }
 
-  sendNow() {
+  sendNow(snapshot = null) {
     this.pending = null
-    this.persist().then((savedLatest) => {
+    this.persist(snapshot).then((savedLatest) => {
       this.savedLatest = savedLatest
       this.settlePrepareButton()
     })

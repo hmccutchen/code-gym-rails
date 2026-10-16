@@ -120,15 +120,26 @@ the pending save would post a step the server no longer recognizes and get a
 409.
 
 The track select saves on this controller's queue line (`line:` in
-`code_gym/save_status`), and just before it queues its save it dispatches
-`profile-preferences:trackSaving`, which runs `holdForTrackSave`. That disables
-the prepare button, and `settlePrepareButton` keeps it disabled while
-`code_gym/track_reply` reports a track save in flight, which also covers a mix
-that connected mid-save and never saw the event, since preparing guidance while
-the levels are changing would bill jobs for the old ones, and queues a mix edit
-still inside its 400 ms delay at once, ahead of the track save. Edits are saved in
-the order the user made them, so a lock set just before a track change reaches
-the server first and `TrackChange` keeps the target it protects. The rebase
+`code_gym/save_status`). Just before it queues its save it dispatches
+`profile-preferences:trackSaving`, which runs `holdForTrackSave`. That does two
+things.
+
+It disables the prepare button, since preparing guidance while the levels are
+changing would bill jobs for the old ones. `settlePrepareButton` keeps it
+disabled while `code_gym/track_reply` reports a track save in flight, which also
+covers a mix that connected mid-save and never saw the event.
+
+It also queues a mix edit still inside its 400 ms delay at once, ahead of the
+track save, and that save carries the form as it is at this moment, not as it
+is when the save is finally sent (`sendNow` with a snapshot of the state and
+the edit revision; only the version is read at send time). Edits are saved in
+the order the user made them: a lock set just before a track change reaches the
+server first, so `TrackChange` keeps the target it protects, and a target picked
+after the track change, while earlier saves are still queued, stays out of the
+pre-track save. That later edit still differs from `saved` when the track
+reply arrives, so the rebase keeps it.
+
+The rebase
 above is for what is left: an edit made while the track save is in flight, and
 an edit made before both controllers connected when `profile-preferences`
 connected first and saved the track from its `connect` before this controller

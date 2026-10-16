@@ -213,6 +213,42 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
   end
 
+  it "keeps a target picked after a track change while earlier saves were still queued" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      let held = false;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (!held && body.includes("section_kind_levels")) {
+          held = true;
+          return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 1500));
+        }
+        return send(url, options);
+      };
+    JS
+
+    find(".mix-difficulty[data-kind='code_review'] input[value='senior']").click
+    sleep 0.6
+    page.execute_script(<<~JS)
+      const slider = document.querySelector("#weight-security_review");
+      slider.value = 0;
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+    JS
+    find("#skill-level").select("Mid-level")
+    find(".mix-difficulty[data-kind='design_comparison'] input[value='mid_level']").click
+
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 5)
+    wait_for(8) { user.reload.section_kind_levels["design_comparison"] == "mid_level" }
+    expect(user.reload).to have_attributes(
+      skill_level: "mid_level", section_kind_weights: { "security_review" => 0.25 },
+      section_kind_levels: { "code_review" => "senior", "design_comparison" => "mid_level", "pattern" => "senior", "challenge" => "junior" }
+    )
+    expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
+  end
+
   def guide_measurement
     page.evaluate_script(<<~JS)
       (() => {

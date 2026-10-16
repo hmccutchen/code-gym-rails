@@ -44,7 +44,9 @@ its next save refused. The reply carries the same preference state a 409 sends,
 and this controller dispatches it, with the reply's `kind_rungs`, as
 `profile-preferences:trackSaved` on the document, which the Exercise mix's element listens for. It also tells
 `code_gym/track_reply` when a track save starts and finishes, with the reply on
-success, for a mix that has not connected yet. The track save goes on
+success, for a mix that has not connected yet. A reply without preference
+state, such as a 200 from a proxy page that is not JSON, counts as a failure, so
+the in-flight count always comes back down. The track save goes on
 the mix's queue line (`line: "exercise_mix"`), so it and a mix save never
 travel together and the mix never posts the version the track change moved
 past. Just before queueing, it dispatches `profile-preferences:trackSaving`,

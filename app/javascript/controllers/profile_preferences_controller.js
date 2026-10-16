@@ -46,7 +46,7 @@ export default class extends Controller {
     trackReply.start()
     this.dispatch("trackSaving", { target: document })
     const result = await this.queueSave("skill_level", { skill_level: level }, { line: "exercise_mix" })
-    if (!result.ok) {
+    if (!result.ok || !result.data || !result.data.preferences) {
       trackReply.finish(null)
       return this.dispatch("trackFailed", { target: document })
     }
