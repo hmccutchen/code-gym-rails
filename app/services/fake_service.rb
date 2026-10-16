@@ -1,4 +1,4 @@
-# Only transport is faked; #call answers by request.purpose from REPLIES, and three replies read a section or kind out of the prompt.
+# Only transport is faked; #call answers by request.purpose from REPLIES, and a reply that needs a section or kind reads it from the prompt.
 class FakeService < AiService
   def self.provider_key = "fake"
   def self.available? = Rails.env.local?

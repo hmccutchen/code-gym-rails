@@ -1148,7 +1148,7 @@ class AiService
 
   def long_running?(request) = request.read_timeout > READ_TIMEOUT
 
-  # Subclasses supply API_URL and these four hooks; read_result returns text, token and cache counts, model, truncated and refusal.
+  # Subclasses supply API_URL and the hooks below; read_result returns text, token and cache counts, model, truncated and refusal.
   def request_body(_request)
     raise NotImplementedError, "#{self.class} must implement #request_body"
   end

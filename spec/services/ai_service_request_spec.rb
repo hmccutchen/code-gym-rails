@@ -4,7 +4,7 @@ RSpec.describe AiService, "request values" do
   defaults = { read_timeout: AiService::READ_TIMEOUT, max_tokens: nil,
                cache_system: false, single_attempt: false, allow_truncated: false }
 
-  # Each purpose's settings as its call site passed them before the profile table existed.
+  # Written from the constants, apart from CALL_PROFILES, so a profile row that drifts fails here.
   call_site_settings = {
     "generate_exercise"           => defaults.merge(read_timeout: AiService::GENERATION_READ_TIMEOUT),
     "retry_section"               => defaults.merge(read_timeout: AiService::RETRY_READ_TIMEOUT),
@@ -73,7 +73,7 @@ RSpec.describe AiService, "request values" do
     end
 
     call_site_settings.each do |purpose, settings|
-      it "gives #{purpose} the settings its call site used to pass" do
+      it "gives #{purpose} its pinned settings" do
         expect(settings_of(AiService.request_for(purpose, system: "s", prompt: "p"))).to eq(settings)
       end
     end
@@ -163,7 +163,7 @@ RSpec.describe AiService, "request values" do
     end
 
     call_site_settings.each do |purpose, settings|
-      it "sends #{purpose} with the settings its call site used to pass" do
+      it "sends #{purpose} with its pinned settings" do
         expect(settings_of(request_sent_for(purpose) { drive(purpose) })).to eq(settings)
       end
     end
