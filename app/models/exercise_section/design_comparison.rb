@@ -35,7 +35,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
   }.freeze
 
   class << self
-    def fixed?
+    def default_daily?
       true
     end
 

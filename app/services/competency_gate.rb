@@ -36,7 +36,7 @@ class CompetencyGate
   private_constant :GROWTH_MEMORY
 
   def self.for(user)
-    plan(Evidence.new(user), fixed_kinds: ExerciseSection.fixed.map(&:key))
+    plan(Evidence.new(user), fixed_kinds: DailyKinds::DEFAULT.map(&:key))
   end
 
   def self.plans(days, fixed_kinds:, evidence: false)

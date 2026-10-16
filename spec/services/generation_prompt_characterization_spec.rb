@@ -63,13 +63,15 @@ RSpec.describe "generation prompt characterization" do
     fourth_reinforcement: [], fourth_due_checks: [], fourth_established: []
   }.freeze
 
-  OPTIONAL_SLOT_CHOICES = SectionRotation::OPTIONAL_SLOTS.map do |slot|
-    [ nil, *ExerciseSection.slots.fetch(slot).map { |kind| kind.key.to_sym } ]
+  DEFAULT_OPTIONAL_SLOTS = ExerciseSection.optional_slots(daily: DailyKinds::DEFAULT)
+
+  OPTIONAL_SLOT_CHOICES = DEFAULT_OPTIONAL_SLOTS.values.map do |kinds|
+    [ nil, *kinds.map { |kind| kind.key.to_sym } ]
   end
 
   PLANNED_SHAPES = OPTIONAL_SLOT_CHOICES.first.product(*OPTIONAL_SLOT_CHOICES.drop(1))
-    .map { |chosen| SectionRotation::OPTIONAL_SLOTS.zip(chosen).to_h }
-    .select { |slots| ExerciseSection.fixed.size + slots.values.compact.size <= ExerciseSection::MAX_SECTIONS }
+    .map { |chosen| DEFAULT_OPTIONAL_SLOTS.keys.zip(chosen).to_h }
+    .select { |slots| DailyKinds::COUNT + slots.values.compact.size <= ExerciseSection::MAX_SECTIONS }
     .freeze
 
   SHAPE_FIXTURES = DailyExercise::LANGUAGES.flat_map { |language|

@@ -77,7 +77,7 @@ class GeminiCapacityProbe
     def elapsed_ms(started) = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
   end
 
-  def self.calls_per_day = 1 + ExerciseSection.fixed.size + ExerciseSection.fixed.size + 1 + 1 + DUCK_TURNS
+  def self.calls_per_day = 1 + DailyKinds::COUNT + DailyKinds::COUNT + 1 + 1 + DUCK_TURNS
 
   def initialize(api_key:, user:, pace: DEFAULT_PACE_SECONDS, max_days: nil, out: $stdout,
                  output_dir: Rails.root.join(OUTPUT_DIR), adapter: [ :net_http ], sleeper: ->(seconds) { sleep(seconds) })
@@ -126,7 +126,7 @@ class GeminiCapacityProbe
   end
 
   def judge(day, draft)
-    ExerciseSection.fixed.each do |kind|
+    draft.plan.daily_kinds.each do |kind|
       section = draft.problem_set[kind.key] or next
       step(day, "judge #{kind.key}") do
         service.judge_section(@user, kind, section, rung: draft.difficulty.rung_for(kind, skill_level: @user.skill_level),

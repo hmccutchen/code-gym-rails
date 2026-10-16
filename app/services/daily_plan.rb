@@ -1,15 +1,22 @@
 # Design notes: docs/code-notes/app/services/daily_plan.md
 class DailyPlan
-  Result = Data.define(:pattern, :third, :reinforcement, :due_checks, :established,
+  Result = Data.define(:daily_kinds, :rotation, :reinforcement, :due_checks, :established,
                         :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established,
                         :code_review_mode, :code_review_source, :scenario_flavor,
                         :shared_concept, :coverage, :waiting_checks, :size) do
     def notes
-      { "size" => size&.count, "size_reason" => size&.reason&.to_s,
+      { "daily_kinds" => daily_kinds&.map(&:key), "size" => size&.count, "size_reason" => size&.reason&.to_s,
         "coverage" => coverage&.kind&.key, "coverage_reason" => coverage&.reason&.to_s,
         "shared_concept" => shared_concept }.compact
     end
+
+    def kinds = ExerciseSection.for_plan(daily: daily_kinds, rotation: rotation)
+
+    def judge_retries(kind) = daily_kinds.include?(kind) ? DAILY_JUDGE_RETRIES : ROTATED_JUDGE_RETRIES
   end
+
+  DAILY_JUDGE_RETRIES   = 2
+  ROTATED_JUDGE_RETRIES = 1
 
   CODE_REVIEW_MODE_WEIGHTS = {
     application_code: 0.34, test_file: 0.33, schema_review: 0.33
@@ -32,15 +39,16 @@ class DailyPlan
     history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
     size             = size_for(user, history)
     preferences      = KindPreferences.for(user)
-    rotation         = SectionRotation.for(history, count: size.count, preferences: preferences)
+    daily            = DailyKinds.for(user)
+    rotation         = SectionRotation.for(history, count: size.count, preferences: preferences, daily: daily)
     code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
     hosts            = DayHosts.new(language, mode: code_review_mode)
     due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
-    tracks           = concept_tracks(user, language, rotation, due: due, hosts: hosts)
-    coverage, rotation, tracks = with_coverage(coverage_for(user, size, preferences, tracks.fetch(:waiting_checks), hosts),
-                                               rotation, tracks, user, language, due: due, hosts: hosts)
+    tracks           = concept_tracks(user, language, daily, rotation, due: due, hosts: hosts)
+    coverage, rotation, tracks = with_coverage(coverage_for(user, size, preferences, daily, tracks.fetch(:waiting_checks), hosts),
+                                               daily, rotation, tracks, user, language, due: due, hosts: hosts)
 
-    Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third), **tracks, coverage: coverage, size: size,
+    Result.new(daily_kinds: daily, rotation: rotation, **tracks, coverage: coverage, size: size,
                code_review_mode: code_review_mode,
                code_review_source: code_review_source_for(user, language, code_review_mode),
                scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS))
@@ -55,19 +63,20 @@ class DailyPlan
   end
   private_class_method :due_buckets
 
-  def self.concept_tracks(user, language, rotation, due:, hosts:)
-    kinds  = ExerciseSection.for_plan(**rotation)
-    tracks = main_track(user, language, kinds: kinds, hosts: hosts, due: due).merge(fourth_track(user, rotation.fetch(:fourth), due: due))
+  def self.concept_tracks(user, language, daily, rotation, due:, hosts:)
+    kinds  = ExerciseSection.for_plan(daily: daily, rotation: rotation)
+    fourth = kinds.find(&:fourth?)&.key&.to_sym
+    tracks = main_track(user, language, kinds: kinds, daily: daily, hosts: hosts, due: due).merge(fourth_track(user, fourth, due: due))
 
     tracks.merge(waiting_checks: waiting_checks(tracks, due, kinds: kinds, hosts: hosts))
   end
   private_class_method :concept_tracks
 
-  def self.with_coverage(coverage, rotation, tracks, user, language, due:, hosts:)
+  def self.with_coverage(coverage, daily, rotation, tracks, user, language, due:, hosts:)
     return [ nil, rotation, tracks ] unless coverage
 
-    added_rotation = rotation.merge(ExerciseSection.slot_for(coverage.kind) => coverage.kind.key.to_sym)
-    added_tracks   = concept_tracks(user, language, added_rotation, due: due, hosts: hosts)
+    added_rotation = rotation.merge(ExerciseSection.slot_for(coverage.kind, daily: daily) => coverage.kind.key.to_sym)
+    added_tracks   = concept_tracks(user, language, daily, added_rotation, due: due, hosts: hosts)
     return [ nil, rotation, tracks ] unless check_landed?(coverage, added_tracks)
 
     [ coverage, added_rotation, added_tracks ]
@@ -82,7 +91,7 @@ class DailyPlan
   end
   private_class_method :check_landed?
 
-  def self.coverage_for(user, size, preferences, waiting, hosts)
+  def self.coverage_for(user, size, preferences, daily, waiting, hosts)
     day = { count: size.count, fixed: size.setting, brake: size.brake? }
     return nil unless CoverageException.applies_to_day?(**day)
 
@@ -90,7 +99,7 @@ class DailyPlan
     return nil if CoverageException.capped?(recent, Date.current)
 
     CoverageException.for(today: Date.current, **day, history: CoverageException::History.for(user, coverage_dates: recent),
-                          checks: waiting, preferences: preferences, hosts: hosts)
+                          checks: waiting, preferences: preferences, hosts: hosts, daily: daily)
   end
   private_class_method :coverage_for
 
@@ -107,7 +116,7 @@ class DailyPlan
   end
   private_class_method :waiting_checks
 
-  def self.main_track(user, language, kinds:, hosts:, due:)
+  def self.main_track(user, language, kinds:, daily:, hosts:, due:)
     hostable      = hostable_buckets(language, kinds: kinds)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
                                                         hostable: drill_host_test(kinds: kinds, hosts: hosts))
@@ -118,7 +127,7 @@ class DailyPlan
     slots         = 1 if slots.zero? && overdue_retention_check_pending?(due, kinds: kinds, hosts: hosts, reinforcement: reinforcement)
     reinforcement = reinforcement.first(capacity - slots)
     due_checks    = retention_checks_for(due, kinds: kinds, hosts: hosts, slots: slots, reinforcement: reinforcement)
-    shared        = SharedConcept.pick(reinforcement, due_checks, hosts, kinds: kinds)
+    shared        = SharedConcept.pick(reinforcement, due_checks, hosts, kinds: kinds, daily: daily)
 
     { reinforcement: reinforcement, due_checks: due_checks, shared_concept: shared&.fetch(:concept),
       established: established_concepts_for(user, language, kinds: kinds,

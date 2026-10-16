@@ -425,7 +425,7 @@ RSpec.describe ExerciseSection do
 
   describe ".for_plan" do
     it "returns the day's kinds in slot order" do
-      expect(ExerciseSection.for_plan(third: :architecture, fourth: :ambiguity_hunt))
+      expect(ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :architecture, fourth: :ambiguity_hunt }))
         .to eq([ ExerciseSection::CodeReview, ExerciseSection::DesignComparison, ExerciseSection::Pattern,
                  ExerciseSection::Architecture, ExerciseSection::AmbiguityHunt ])
     end
@@ -433,41 +433,55 @@ RSpec.describe ExerciseSection do
     it "accepts the symbols DailyPlan rolls" do
       ExerciseSection.thirds.map { |kind| kind.key.to_sym }.each do |third|
         ExerciseSection.fourths.map { |kind| kind.key.to_sym }.each do |fourth|
-          expect(ExerciseSection.for_plan(third: third, fourth: fourth).map(&:key))
+          expect(ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: third, fourth: fourth }).map(&:key))
             .to eq([ "code_review", "design_comparison", "pattern", third.to_s, fourth.to_s ])
         end
       end
     end
 
     it "refuses a kind rolled into a slot it cannot occupy, rather than silently dropping a section" do
-      expect { ExerciseSection.for_plan(third: :plan_review, fourth: :plan_review) }
+      expect { ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :plan_review, fourth: :plan_review }) }
         .to raise_error(ArgumentError, /plan_review is not one of/)
-      expect { ExerciseSection.for_plan(third: :challenge, fourth: :challenge) }
+      expect { ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :challenge }) }
         .to raise_error(ArgumentError, /challenge is not one of/)
     end
 
     it "omits a slot given nil" do
-      expect(described_class.for_plan(third: nil, fourth: :plan_review, pattern: nil).map(&:key))
+      expect(described_class.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: nil, third: nil, fourth: :plan_review }).map(&:key))
         .to eq(%w[code_review design_comparison plan_review])
 
-      expect(described_class.for_plan(third: :challenge, fourth: nil, pattern: nil).map(&:key))
+      expect(described_class.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: nil, third: :challenge, fourth: nil }).map(&:key))
         .to eq(%w[code_review design_comparison challenge])
     end
 
-    it "always includes both fixed kinds" do
-      expect(described_class.for_plan(third: nil, fourth: nil, pattern: nil).map(&:key))
+    it "always includes both daily kinds" do
+      expect(described_class.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: nil, third: nil, fourth: nil }).map(&:key))
         .to eq(%w[code_review design_comparison])
     end
 
     it "still raises for a kind ineligible for its slot" do
-      expect { described_class.for_plan(third: :plan_review, fourth: :plan_review) }
+      expect { described_class.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :plan_review, fourth: :plan_review }) }
         .to raise_error(ArgumentError, /plan_review/)
+    end
+
+    it "lists another pair's kinds first and fills a swapped-out default kind's slot from the rotation" do
+      daily = [ ExerciseSection::Challenge, ExerciseSection::DesignComparison ]
+      kinds = described_class.for_plan(daily: daily, rotation: { pattern: nil, third: :architecture, fourth: nil, code_review: :code_review })
+
+      expect(kinds.map(&:key)).to eq(%w[challenge design_comparison architecture code_review])
+    end
+
+    it "refuses a rotation naming a slot the pair has no room for" do
+      daily = [ ExerciseSection::CodeReview, ExerciseSection::PlanReview ]
+
+      expect { described_class.for_plan(daily: daily, rotation: { pattern: nil, third: nil, fourth: :ambiguity_hunt }) }
+        .to raise_error(ArgumentError, /fourth/)
     end
   end
 
   describe ".slot_kinds" do
     it "keeps every slot, so an omitted one cannot shift a later kind into its place" do
-      kinds = described_class.slot_kinds(third: nil, fourth: :plan_review)
+      kinds = described_class.slot_kinds(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: nil, fourth: :plan_review })
 
       expect(kinds.keys).to eq(%i[code_review design_comparison pattern third fourth])
       expect(kinds[:third]).to be_nil
@@ -475,14 +489,14 @@ RSpec.describe ExerciseSection do
     end
 
     it "resolves the same kinds #for_plan lists" do
-      expect(described_class.slot_kinds(third: :challenge, fourth: :plan_review).values.compact)
-        .to eq(described_class.for_plan(third: :challenge, fourth: :plan_review))
+      expect(described_class.slot_kinds(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review }).values.compact)
+        .to eq(described_class.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review }))
     end
   end
 
-  describe ".slots" do
-    it "places each kind in exactly one slot, so no kind counts twice in a denominator" do
-      expect(described_class.slots.values.flatten).to match_array(described_class.all)
+  describe ".layout" do
+    it "places each kind in exactly one slot for the default pair, so no kind counts twice in a denominator" do
+      expect(described_class.layout(daily: DailyKinds::DEFAULT).values.flatten).to match_array(described_class.all)
     end
   end
 
@@ -490,61 +504,96 @@ RSpec.describe ExerciseSection do
     it "never presents more sections than a day holds, even when the provider returns every shape" do
       every_shape = described_class.keys.index_with { {} }
 
-      expect(described_class.resolved_keys(every_shape).size).to be <= described_class::MAX_SECTIONS
+      expect(described_class.resolved_keys(every_shape, daily: DailyKinds::DEFAULT).size).to be <= described_class::MAX_SECTIONS
     end
   end
 
   describe "MAX_SECTIONS" do
     it "is four, one fewer than the slots, so every day leaves at least one slot empty" do
       expect(described_class::MAX_SECTIONS).to eq(4)
-      expect(described_class.slots.size).to eq(described_class::MAX_SECTIONS + 1)
+      expect(described_class.layout(daily: DailyKinds::DEFAULT).size).to eq(described_class::MAX_SECTIONS + 1)
     end
   end
 
-  describe ".fixed" do
-    it "holds code_review and design_comparison" do
-      expect(described_class.fixed).to eq([ ExerciseSection::CodeReview, ExerciseSection::DesignComparison ])
-      expect((described_class.all - described_class.fixed).map(&:fixed?)).to all(be(false))
+  describe ".default_daily?" do
+    it "holds for code_review and design_comparison only" do
+      expect(described_class.all.select(&:default_daily?)).to eq([ ExerciseSection::CodeReview, ExerciseSection::DesignComparison ])
     end
   end
 
-  describe ".slots" do
-    it "gives each fixed kind its own slot ahead of pattern, third and fourth" do
-      expect(described_class.slots).to eq(
+  describe ".layout" do
+    def layout(*keys) = described_class.layout(daily: keys.map { |key| described_class.find(key) })
+
+    it "gives each default daily kind its own slot ahead of pattern, third and fourth" do
+      expect(described_class.layout(daily: DailyKinds::DEFAULT)).to eq(
         code_review: [ ExerciseSection::CodeReview ], design_comparison: [ ExerciseSection::DesignComparison ],
         pattern: [ ExerciseSection::Pattern ], third: described_class.thirds, fourth: described_class.fourths
       )
+    end
+
+    it "puts the daily kinds first in stored order and a swapped-out default kind after the rotating slots" do
+      expect(layout("architecture", "code_review")).to eq(
+        architecture: [ ExerciseSection::Architecture ], code_review: [ ExerciseSection::CodeReview ],
+        pattern: [ ExerciseSection::Pattern ],
+        third: [ ExerciseSection::SecurityReview, ExerciseSection::Challenge, ExerciseSection::ParsonsProblem ],
+        fourth: described_class.fourths, design_comparison: [ ExerciseSection::DesignComparison ]
+      )
+    end
+
+    it "drops a slot the daily kinds empty" do
+      expect(layout("pattern", "design_comparison").keys).to eq(%i[pattern design_comparison third fourth code_review])
+    end
+
+    it "takes the fourth slot out of rotation while a fourth kind is daily" do
+      expect(layout("code_review", "plan_review").keys).to eq(%i[code_review plan_review pattern third design_comparison])
+    end
+
+    it "places each kind in exactly one slot for every reachable pair" do
+      every_pair = described_class.all.combination(2).reject { |pair| pair.count(&:fourth?) > 1 }
+      every_pair.each do |pair|
+        kinds = described_class.layout(daily: pair).values.flatten
+        expect(kinds).to eq(kinds.uniq)
+        expect(kinds).to match_array(pair.any?(&:fourth?) ? described_class.all - (described_class.fourths - pair) : described_class.all)
+      end
     end
   end
 
   describe ".resolved_keys" do
     it "caps FakeService's every-kind set at MAX_SECTIONS, keeping both fixed kinds and then slot order" do
-      expect(described_class.resolved_keys(FakeService::EXERCISE_PROBLEM_SET))
+      expect(described_class.resolved_keys(FakeService::EXERCISE_PROBLEM_SET, daily: DailyKinds::DEFAULT))
         .to eq(%w[code_review design_comparison pattern architecture])
     end
 
     it "keeps both fixed kinds first when it has to cut" do
       every_shape = described_class.keys.index_with { {} }
 
-      expect(described_class.resolved_keys(every_shape).first(2)).to eq(described_class.fixed.map(&:key))
+      expect(described_class.resolved_keys(every_shape, daily: DailyKinds::DEFAULT).first(2)).to eq(DailyKinds::DEFAULT.map(&:key))
     end
 
     it "skips a key whose value is not a section" do
       set = { "code_review" => { "q" => "?" }, "pattern" => "a bare string", "architecture" => nil,
               "challenge" => { "q" => "?" }, "plan_review" => [ "not a hash" ], "ambiguity_hunt" => { "q" => "?" } }
 
-      expect(described_class.resolved_keys(set)).to eq(%w[code_review challenge ambiguity_hunt])
+      expect(described_class.resolved_keys(set, daily: DailyKinds::DEFAULT)).to eq(%w[code_review challenge ambiguity_hunt])
     end
 
     it "keeps the third's precedence over a provider's extra alternates" do
       set = { "code_review" => { "q" => "?" }, "parsons_problem" => { "q" => "?" }, "challenge" => { "q" => "?" },
               "security_review" => { "q" => "?" } }
 
-      expect(described_class.resolved_keys(set)).to eq(%w[code_review security_review])
+      expect(described_class.resolved_keys(set, daily: DailyKinds::DEFAULT)).to eq(%w[code_review security_review])
     end
 
     it "is empty for a set holding no section at all" do
-      expect(described_class.resolved_keys({ "code_review" => nil, "bogus" => { "q" => "?" } })).to eq([])
+      expect(described_class.resolved_keys({ "code_review" => nil, "bogus" => { "q" => "?" } }, daily: DailyKinds::DEFAULT)).to eq([])
+    end
+
+    it "reads a daily third and a rotated third as two sections" do
+      set   = { "architecture" => { "q" => "?" }, "code_review" => { "q" => "?" }, "challenge" => { "q" => "?" } }
+      daily = [ ExerciseSection::Architecture, ExerciseSection::CodeReview ]
+
+      expect(described_class.resolved_keys(set, daily: daily)).to eq(%w[architecture code_review challenge])
+      expect(described_class.resolved_keys(set, daily: DailyKinds::DEFAULT)).to eq(%w[code_review architecture])
     end
   end
 
@@ -575,13 +624,6 @@ RSpec.describe ExerciseSection do
                                ExerciseSection::DesignComparison ]).each do |kind|
         expect { kind.reject_unusable!(section) }.not_to change { section }
       end
-    end
-  end
-
-  describe ".judge_retries" do
-    it "is two for a fixed kind and one for every other kind" do
-      expect(described_class.fixed.map(&:judge_retries)).to all(eq(2))
-      expect((described_class.all - described_class.fixed).map(&:judge_retries)).to all(eq(1))
     end
   end
 
@@ -1082,11 +1124,16 @@ RSpec.describe ExerciseSection do
 
   describe ".rotatable" do
     it "holds every kind that competes for a slot" do
-      expect(described_class.rotatable).to match_array(described_class.thirds + described_class.fourths)
+      expect(described_class.rotatable(daily: DailyKinds::DEFAULT)).to match_array(described_class.thirds + described_class.fourths)
+    end
+
+    it "leaves out a daily kind, and every fourth while one is daily" do
+      expect(described_class.rotatable(daily: [ ExerciseSection::Challenge, ExerciseSection::PlanReview ]))
+        .to match_array([ ExerciseSection::Architecture, ExerciseSection::SecurityReview, ExerciseSection::ParsonsProblem ])
     end
 
     it "omits the kinds whose slot offers no choice" do
-      expect(described_class.rotatable)
+      expect(described_class.rotatable(daily: DailyKinds::DEFAULT))
         .not_to include(ExerciseSection::CodeReview, ExerciseSection::DesignComparison, ExerciseSection::Pattern)
     end
   end

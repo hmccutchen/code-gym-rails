@@ -3,7 +3,8 @@ require "rails_helper"
 RSpec.describe CoverageException do
   let(:monday) { Date.new(2026, 10, 5) }
   let(:hosts) { DayHosts.new("ruby_rails", mode: :application_code) }
-  let(:optional_keys) { described_class::OPTIONAL_KINDS.map(&:key) }
+  let(:daily) { DailyKinds::DEFAULT }
+  let(:optional_keys) { ExerciseSection.optional_slots(daily: daily).values.flatten.map(&:key) }
 
   def weekdays_ago(count)
     date = monday
@@ -17,10 +18,10 @@ RSpec.describe CoverageException do
     CoverageException::History.new(last_seen: seen, coverage_dates: coverage_dates, first_date: first_date)
   end
 
-  def decide(history: self.history, checks: [], count: ExerciseSection.fixed.size, fixed: nil, brake: false,
+  def decide(history: self.history, checks: [], count: DailyKinds::COUNT, fixed: nil, brake: false,
              preferences: KindPreferences.none)
     described_class.for(today: monday, count: count, fixed: fixed, history: history, checks: checks,
-                        preferences: preferences, hosts: hosts, brake: brake)
+                        preferences: preferences, hosts: hosts, daily: daily, brake: brake)
   end
 
   def overdue(concept, bucket, ratio: 2.0)
@@ -54,6 +55,22 @@ RSpec.describe CoverageException do
       preferences = KindPreferences.new(weights: {}, excluded: [ "pattern" ])
 
       expect(decide(history: stale, preferences: preferences).kind).to eq(ExerciseSection::PlanReview)
+    end
+  end
+
+  describe "another pair" do
+    let(:daily) { [ ExerciseSection::Pattern, ExerciseSection::PlanReview ] }
+
+    it "can add a default kind the pair swapped out" do
+      stale = history(last_seen: { "code_review" => weekdays_ago(described_class::GAP_WEEKDAYS + 5) })
+
+      expect(decide(history: stale)).to eq(described_class::Addition.new(kind: ExerciseSection::CodeReview, reason: :gap))
+    end
+
+    it "never adds a sibling of a daily fourth, however long it has gone unseen" do
+      stale = history(last_seen: { "ambiguity_hunt" => nil, "pseudocode_to_code" => nil }, first_date: monday - 400)
+
+      expect(decide(history: stale)).to be_nil
     end
   end
 
@@ -107,12 +124,12 @@ RSpec.describe CoverageException do
     end
 
     it "reads the day's size against the fixed kinds, the authority for having no optional slot" do
-      expect(described_class.applies_to_day?(count: ExerciseSection.fixed.size, fixed: nil)).to be(true)
-      expect(described_class.applies_to_day?(count: ExerciseSection.fixed.size + 1, fixed: nil)).to be(false)
+      expect(described_class.applies_to_day?(count: DailyKinds::COUNT, fixed: nil)).to be(true)
+      expect(described_class.applies_to_day?(count: DailyKinds::COUNT + 1, fixed: nil)).to be(false)
     end
 
     it "never fires on a day above two sections" do
-      expect(decide(history: stale, count: ExerciseSection.fixed.size + 1)).to be_nil
+      expect(decide(history: stale, count: DailyKinds::COUNT + 1)).to be_nil
     end
 
     it "never fires while the brake is on" do

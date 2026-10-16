@@ -3,30 +3,26 @@ class SectionRotation
   LOOKBACK         = 20
   STARVATION_LIMIT = 10
 
-  MANDATORY_SLOT_COUNT = ExerciseSection.fixed.size
-  OPTIONAL_SLOTS       = (ExerciseSection.slots.keys - ExerciseSection.fixed.map { |kind| kind.key.to_sym }).freeze
-
-  def self.for(history, count:, preferences: KindPreferences.none)
+  def self.for(history, count:, daily:, preferences: KindPreferences.none)
     recent    = history.first(LOOKBACK)
-    available = (count - MANDATORY_SLOT_COUNT).clamp(0, OPTIONAL_SLOTS.size)
+    slots     = ExerciseSection.optional_slots(daily: daily)
+    available = (count - daily.size).clamp(0, slots.size)
 
-    filled = OPTIONAL_SLOTS
-      .sort_by { |slot| [ -slot_staleness(slot, recent, preferences), OPTIONAL_SLOTS.index(slot) ] }
+    filled = slots.keys
+      .sort_by { |slot| [ -slot_staleness(slots[slot], recent, preferences), slots.keys.index(slot) ] }
       .first(available)
 
-    OPTIONAL_SLOTS.index_with { |slot| filled.include?(slot) ? pick_kind(slot, recent, preferences) : nil }
+    slots.to_h { |slot, kinds| [ slot, filled.include?(slot) ? pick_kind(kinds, recent, preferences) : nil ] }
   end
 
   # Only exclusion narrows the pool, staleness included; a weight just leans the roll. Empty pools fall back to all.
-  def self.eligible(slot, preferences)
-    kinds = ExerciseSection.slots.fetch(slot)
-
+  def self.eligible(kinds, preferences)
     kinds.reject { |kind| preferences.excluded?(kind) }.presence || kinds
   end
   private_class_method :eligible
 
-  def self.slot_staleness(slot, recent, preferences)
-    eligible(slot, preferences).map { |kind| staleness(kind, recent) }.max
+  def self.slot_staleness(kinds, recent, preferences)
+    eligible(kinds, preferences).map { |kind| staleness(kind, recent) }.max
   end
   private_class_method :slot_staleness
 
@@ -38,8 +34,8 @@ class SectionRotation
   private_class_method :staleness
 
   # Starved kinds drain in registry order to bound the wait; weights reach only the roll, so none can starve a kind.
-  def self.pick_kind(slot, recent, preferences)
-    kinds   = eligible(slot, preferences)
+  def self.pick_kind(slot_kinds, recent, preferences)
+    kinds   = eligible(slot_kinds, preferences)
     starved = kinds.select { |kind| staleness(kind, recent) > STARVATION_LIMIT }
 
     return most_stale(starved, recent).key.to_sym if starved.any?

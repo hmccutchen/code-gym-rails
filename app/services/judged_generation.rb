@@ -51,7 +51,7 @@ class JudgedGeneration
   end
 
   def reject_empty_day!(set, dropped)
-    return if ExerciseSection.resolved_keys(set).any?
+    return if ExerciseSection.resolved_keys(set, daily: @draft.plan.daily_kinds).any?
 
     Rails.logger.warn("[judge_all_rejected] user=#{@user.id} dropped=#{dropped.join(',')}")
     raise AiService::AllSectionsRejectedError
@@ -130,7 +130,7 @@ class JudgedGeneration
     outcome = outcome.merge(retries: 0, **retry_fields.index_with { [] })
     return drop(outcome) if concept.nil? || concept == "other"
 
-    kind.judge_retries.times do
+    @draft.plan.judge_retries(kind).times do
       retried = retry_section(kind, concept)
       return drop(outcome) if retried.nil?
 
