@@ -572,7 +572,7 @@ class ModelComparison
 
   def graded_review(service, response, exercise, section)
     provider = service.review_grading_provider
-    coach    = service.send(:config_for, exercise.language)[:coach]
+    coach    = AiService.config_for(exercise.language)[:coach]
     _, result = ReviewGrading.grade_section(section, context: provider.day_context.call(coach, exercise, response), user: response.user,
                                             exercise: exercise, response: response, coach: coach, provider: provider)
 

@@ -4,12 +4,6 @@ require "rails_helper"
 RSpec.describe "generation prompt characterization" do
   SNAPSHOT_DIR = Rails.root.join("spec/fixtures/prompt_snapshots").freeze
 
-  let(:service) do
-    Class.new(AiService) do
-      private def build_connection = nil
-    end.new("snapshot-key")
-  end
-
   # Unpersisted and explicit, so nothing here reads the database or the clock.
   let(:user) do
     User.new(
@@ -21,8 +15,8 @@ RSpec.describe "generation prompt characterization" do
   end
 
   def render(language, third, fourth, mode)
-    service.send(
-      :build_exercise_prompt, user, language,
+    generation_prompt(
+      user, language,
       third: third, fourth: fourth, code_review_mode: mode,
       reinforcement: [], due_checks: [], established: [], history: [],
       fourth_reinforcement: [], fourth_due_checks: [], fourth_established: []
@@ -291,7 +285,7 @@ RSpec.describe "generation prompt characterization" do
   }.freeze
 
   def render_case(language, as: user, **plan)
-    service.send(:build_exercise_prompt, as, language, **BARE_PLAN.merge(plan))
+    generation_prompt(as, language, **BARE_PLAN.merge(plan))
   end
 
   def mastery(concept, bucket)

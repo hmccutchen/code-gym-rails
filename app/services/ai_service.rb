@@ -444,7 +444,7 @@ class AiService
   end
 
   Draft = Data.define(:problem_set, :plan, :kinds, :difficulty, :ladders, :history,
-                      :prompt_options, :suggested_concepts, :unusable_sections)
+                      :suggested_concepts, :unusable_sections)
   private_constant :Draft
 
   def generate_exercise(user, language: user.language_for_today, blocking: false)
@@ -791,13 +791,13 @@ class AiService
     difficulty = KindDifficulty.for(user)
     kinds      = ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth, pattern: plan.pattern)
     ladders    = ladders_for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode)
-    options    = exercise_prompt_options(plan, history, difficulty, ladders)
+    prompt     = generation_prompt(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders)
 
     result = call_and_log(
       user, purpose: "generate_exercise",
       read_timeout: blocking ? SYNC_GENERATION_READ_TIMEOUT : GENERATION_READ_TIMEOUT,
       system: build_system_prompt(language),
-      prompt: build_exercise_prompt(user, language, **options)
+      prompt: prompt.render
     )
 
     ingested = ProblemSetIngest.call(
@@ -808,26 +808,19 @@ class AiService
 
     log_unusable_sections(user, ingested.unusable_sections)
     Draft.new(problem_set: ingested.problem_set, plan: plan, kinds: kinds, difficulty: difficulty,
-              ladders: ladders, history: history, prompt_options: options,
+              ladders: ladders, history: history,
               suggested_concepts: ingested.suggested_concepts, unusable_sections: ingested.unusable_sections)
+  end
+
+  def generation_prompt(user, language, plan:, history:, difficulty:, ladders:)
+    GenerationPrompt.new(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders,
+                         retention_annotation: method(:annotate_retention_concept))
   end
 
   def log_unusable_sections(user, unusable)
     unusable.each do |section|
       Rails.logger.warn("[unusable_section] user=#{user.id} section=#{section.key} reason=#{section.reason}")
     end
-  end
-
-  def exercise_prompt_options(plan, history, difficulty, ladders)
-    { third: plan.third, pattern: plan.pattern,
-      reinforcement: plan.reinforcement, due_checks: plan.due_checks,
-      established: plan.established, history: history,
-      fourth: plan.fourth, fourth_reinforcement: plan.fourth_reinforcement,
-      fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established,
-      code_review_mode: plan.code_review_mode,
-      code_review_source: plan.code_review_source,
-      scenario_flavor: plan.scenario_flavor, shared_concept: plan.shared_concept,
-      difficulty: difficulty, ladders: ladders }
   end
 
   def finish_generation(user, language, draft, set, dropped_concepts: {}, judge: nil, unhosted: [])
@@ -850,11 +843,12 @@ class AiService
   end
 
   def retry_section(user, language, draft, kind, concept)
+    prompt = generation_prompt(user, language, plan: draft.plan, history: draft.history, difficulty: draft.difficulty,
+                               ladders: retry_ladders(user, language, draft, kind))
     result = call_and_log(
       user, purpose: "retry_section", read_timeout: RETRY_READ_TIMEOUT,
       system: build_system_prompt(language),
-      prompt: build_exercise_prompt(user, language, **draft.prompt_options.merge(ladders: retry_ladders(user, language, draft, kind)),
-                                    only: kind, fixed_concept: concept)
+      prompt: prompt.render(only: kind, fixed_concept: concept)
     )
 
     ProblemSetIngest.call(
@@ -1139,37 +1133,6 @@ class AiService
 
       #{UserText::PROMPT_RULE}
     PROMPT
-  end
-
-  def exercise_schema_for(language = "ruby_rails", third: :challenge, fourth: :plan_review, pattern: :pattern, only: nil)
-    plan = DailyPlan::Result.new(
-      pattern: pattern, third: third, fourth: fourth, reinforcement: [], due_checks: [], established: [],
-      fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [], code_review_mode: :application_code,
-      code_review_source: nil, scenario_flavor: :general, shared_concept: nil, coverage: nil, waiting_checks: nil, size: nil)
-
-    GenerationPrompt.new(nil, language, plan: plan, history: [], difficulty: KindDifficulty.none, ladders: {},
-                         retention_annotation: method(:annotate_retention_concept)).schema(only: only)
-  end
-
-  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, pattern: :pattern,
-                            reinforcement: nil, due_checks: [],
-                            established: [], history: user.recent_performance,
-                            fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
-                            code_review_mode: :application_code, code_review_source: nil,
-                            scenario_flavor: :general, shared_concept: nil,
-                            difficulty: KindDifficulty.none, ladders: {},
-                            only: nil, fixed_concept: nil)
-    plan = DailyPlan::Result.new(
-      pattern: pattern, third: third,
-      reinforcement: reinforcement || user.concepts_needing_reinforcement(exclude_buckets: DailyPlan::FOURTH_BUCKETS),
-      due_checks: due_checks, established: established, fourth: fourth, fourth_reinforcement: fourth_reinforcement,
-      fourth_due_checks: fourth_due_checks, fourth_established: fourth_established, code_review_mode: code_review_mode,
-      code_review_source: code_review_source, scenario_flavor: scenario_flavor, shared_concept: shared_concept,
-      coverage: nil, waiting_checks: nil, size: nil)
-
-    GenerationPrompt.new(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders,
-                         retention_annotation: method(:annotate_retention_concept))
-                    .render(only: only, fixed_concept: fixed_concept)
   end
 
   def ladders_for(rungs, language, code_review_mode)
