@@ -11,10 +11,22 @@ Both masters are opaque and carry their own navy fill, so the script only
 resizes them. iOS fills transparent icon pixels with black, and an opaque
 master has none. The art is smooth, so it scales with Lanczos.
 
+## Home-screen scale
+
+`apple-touch-icon.png`, `icon-192.png` and `icon-512.png` enlarge the master
+by `HOME_SCREEN_MARK_SCALE` (125%) about its center before resizing. At the
+master's own scale the mark filled about 70% of the width and 48% of the
+height, and on a home screen it looked smaller than other apps' icons. The
+enlargement uses Lanczos and pastes the result centered on a canvas of the
+corner navy, so the master stays the single source. The script prints each
+icon's reach and fails if any edge pixel differs from the fill, which would
+mean a later master's mark was cut off.
+
 ## Maskable icon
 
-The maskable icon is the plain icon at 512px, because the mark already sits
-inside the 80% safe-zone circle every platform mask keeps. The script
+The maskable icon is the master at 512px with no enlargement, because a
+platform mask can crop to the 80% safe-zone circle, and the enlarged mark
+reaches about 44.5% of the size from the center, past it. The script
 measures the farthest pixel that differs from the corner color, prints it,
 and fails when it is past 40% of the size from the center.
 

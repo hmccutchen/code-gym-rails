@@ -13,6 +13,8 @@ PUBLIC = ROOT / "public"
 MASKABLE_SAFE_RADIUS = 0.4
 # Near-navy noise a few levels off the corner color is not part of the mark.
 FILL_TOLERANCE = 8
+# The home-screen icons enlarge the mark about the center; the maskable one keeps the master's scale for its safe zone.
+HOME_SCREEN_MARK_SCALE = 1.25
 FAVICON_ICO_SIZES = [16, 32, 48]
 FAVICON_PNG_SIZE = 96
 
@@ -39,6 +41,28 @@ def farthest_mark_reach(image):
     )
 
 
+def edge_pixels(image):
+    pixels = image.load()
+    last_x, last_y = image.width - 1, image.height - 1
+    for i in range(image.width):
+        yield from (pixels[i, 0], pixels[i, last_y], pixels[0, i], pixels[last_x, i])
+
+
+def enlarged_mark(image, scale):
+    fill = image.getpixel((0, 0))
+    enlarged = image.resize((round(image.width * scale), round(image.height * scale)), Image.LANCZOS)
+    canvas = Image.new("RGB", image.size, fill)
+    canvas.paste(enlarged, ((image.width - enlarged.width) // 2, (image.height - enlarged.height) // 2))
+    if any(differs_from(pixel, fill) for pixel in edge_pixels(canvas)):
+        raise SystemExit("The enlarged mark is cut off at the icon's edge.")
+    return canvas
+
+
+def report_reach(name, icon):
+    reach = farthest_mark_reach(icon)
+    print(f"{name}: mark reaches {reach:.1f}px from center, {reach / icon.width:.1%} of the size")
+
+
 def maskable_icon(image, size):
     icon = resized(image, size)
     reach = farthest_mark_reach(icon)
@@ -54,10 +78,14 @@ def main():
     favicon = master(FAVICON_SOURCE)
     favicon.convert("RGBA").save(PUBLIC / "favicon.ico", sizes=[(size, size) for size in FAVICON_ICO_SIZES])
     resized(favicon, FAVICON_PNG_SIZE).save(PUBLIC / f"favicon-{FAVICON_PNG_SIZE}.png")
-    resized(app_icon, 180).save(PUBLIC / "apple-touch-icon.png")
-    resized(app_icon, 192).save(PUBLIC / "icon-192.png")
-    resized(app_icon, 512).save(PUBLIC / "icon-512.png")
-    maskable_icon(app_icon, 512).save(PUBLIC / "icon-maskable-512.png")
+    home_screen = enlarged_mark(app_icon, HOME_SCREEN_MARK_SCALE)
+    for name, size in [("apple-touch-icon.png", 180), ("icon-192.png", 192), ("icon-512.png", 512)]:
+        icon = resized(home_screen, size)
+        report_reach(name, icon)
+        icon.save(PUBLIC / name)
+    maskable = maskable_icon(app_icon, 512)
+    report_reach("icon-maskable-512.png", maskable)
+    maskable.save(PUBLIC / "icon-maskable-512.png")
 
 
 if __name__ == "__main__":
