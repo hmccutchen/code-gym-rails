@@ -1,6 +1,6 @@
 # Persist the duck's thread
 
-Status: spec. PR 1 is open; PR 2 is not started.
+Status: spec. PR 1 is hmccutchen/code-gym-rails#410 and PR 2 is hmccutchen/code-gym-rails#414. PR 2's review changed four details of the design below; the section "Changed in PR 2's review" lists them.
 Date: 2026-10-16. Checked against `origin/main` at `cb34804`.
 Revised the same day after two reviews: the running note is dropped (see
 the appendix), threads are kept as a record for 365 days instead of deleted
@@ -332,6 +332,28 @@ carries (someone ran the thread out or started over on the same problem)
 without keeping what they typed. It isn't a column of its own, because the
 row is per exercise and the count is per section, the same as the turns.
 Nothing reads it.
+
+## Changed in PR 2's review
+
+A critical review of PR 2 found that the design as written lost a cleared
+section's version on reload, so the first message after "Clear, reload" was
+refused after a paid call. PR 2 differs from the sections below in four
+places, and the decision doc (`docs/decisions/the-duck-thread-is-stored.md`)
+describes what shipped:
+
+- **The version is rendered whenever it is above 0,** not only when a section
+  has turns. A section that was never written still renders today's markup.
+- **Every Clear moves the version,** including on an empty section, creating
+  the row if needed, so a reply on its way is refused. It counts a clear only
+  when it emptied turns.
+- **A page whose version is behind is refused before the provider call,** and
+  the append is bound to the version of the thread the duck was sent.
+- **The append runs under `DailyExercise#with_response_locked`,** then the row
+  lock, and is refused if the day was submitted or the set regenerated while
+  the reply was on its way.
+
+A failed Clear also puts the thread back on the page, so the page never hides
+turns the server still holds.
 
 ## Clients loaded before the deploy
 
