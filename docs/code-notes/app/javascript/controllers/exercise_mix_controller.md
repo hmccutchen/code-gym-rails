@@ -90,8 +90,18 @@ mix save.
 `adoptTrackChange` takes the preference state Setup's track select received
 and applies it with `applyServerState`, the method a 409 already uses, so a
 cleared target shows "Your track (…)" and the version matches the server
-without a reload. An edit made in the mix less than 400 ms before the track
-select's reply arrives is replaced by the server's state, and the delayed save
-then sends that state, so the edit is lost and the page shows what is stored.
-That takes two edits in under half a second across two controls, and was
-accepted rather than merged.
+without a reload.
+
+A mix edit can still be waiting to save when that reply arrives: the 400 ms
+delay, or a save queued behind another. Applying the reply alone would put the
+server's levels back in the form, and the delayed save would then send them,
+so the edit would be lost with no notice. So the controller keeps `saved`, the
+state the server last confirmed (set on connect, on every applied server state
+and on every successful save). When an edit is unsent, the kinds whose weight,
+exclusion, level or lock differ from `saved` are the edit; the reply is applied
+and those kinds are then set back to the edit (`withKinds`). The pending save
+sends the result under the reply's version, so the track's clearing and the
+edit both land, and `saved` stays the reply's state so a later comparison still
+sees the edit as unsent. A save already on the wire with the old version is
+the one case left: the server answers 409 and the form shows the stored state
+with the conflict notice, as it does for a change from another tab.

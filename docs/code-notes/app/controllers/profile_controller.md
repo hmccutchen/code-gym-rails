@@ -55,3 +55,12 @@ then merges into `level_suggestion_cutoffs`, which the dismissal endpoint
 also writes under that lock. Without it, Setup's skill-level select, which
 sends no version, could write back a cutoff map read before a Not now
 committed and lose that cutoff.
+
+## `#mixed_track_save?`
+
+A post that carries `skill_level` together with any Exercise mix key, outside
+the welcome choice, is refused with a 422. `TrackChange` runs on the save, so
+it would clear a target the same request had just set when that target equals
+the old or the new track. No page sends both: Setup's track select sends the
+level alone and the mix sends its keys alone. Refusing the pair keeps the
+order of the two from ever deciding what is stored.

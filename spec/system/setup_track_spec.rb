@@ -44,6 +44,22 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(page.evaluate_script("window.sameDocument")).to be(true)
   end
 
+  it "keeps a mix edit still waiting to save when a track change lands first" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    find(".mix-difficulty[data-kind='code_review'] input[value='senior']").click
+    find("#skill-level").select("Mid-level")
+
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
+    wait_for(5) { user.reload.section_kind_levels["code_review"] == "senior" }
+    expect(user.reload.section_kind_levels).to eq("code_review" => "senior", "pattern" => "senior", "challenge" => "junior")
+    expect(checked_level("code_review")).to eq("senior")
+    expect(checked_level("design_comparison")).to eq("")
+    expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
+  end
+
   def guide_measurement
     page.evaluate_script(<<~JS)
       (() => {

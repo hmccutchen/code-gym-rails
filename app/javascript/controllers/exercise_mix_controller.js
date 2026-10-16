@@ -3,6 +3,8 @@ import { Controller } from "@hotwired/stimulus"
 import saveStatus from "code_gym/save_status"
 
 const SAVE_DELAY_MS = 400
+const MIX_FIELDS = ["section_kind_weights", "excluded_section_kinds", "section_kind_levels", "locked_section_kinds"]
+const LIST_FIELDS = ["excluded_section_kinds", "locked_section_kinds"]
 
 export default class extends Controller {
   static targets = ["row", "difficulty", "group", "preparation", "prepareButton"]
@@ -22,6 +24,7 @@ export default class extends Controller {
     this.probe = () => this.pending !== null
     saveStatus.watch(this.probe)
     this.lockLastInGroup()
+    this.saved = this.state()
     if (this.editedBeforeConnect()) this.adoptEarlyEdit()
   }
 
@@ -133,7 +136,43 @@ export default class extends Controller {
   }
 
   adoptTrackChange(event) {
+    const unsent = this.pending !== null || saveStatus.queued("exercise_mix")
+    const mine = this.state()
+    const edited = unsent ? this.kindsEditedSince(this.saved, mine) : []
     this.applyServerState(event.detail)
+    if (edited.length === 0) return
+    const adopted = this.saved
+    this.applyServerState(this.withKinds(event.detail, mine, edited))
+    this.saved = adopted
+  }
+
+  kindsEditedSince(before, after) {
+    return this.difficultyTargets.map((box) => box.dataset.kind).filter((kind) =>
+      MIX_FIELDS.some((field) => JSON.stringify(this.fieldFor(before, field, kind)) !== JSON.stringify(this.fieldFor(after, field, kind)))
+    )
+  }
+
+  fieldFor(state, field, kind) {
+    if (LIST_FIELDS.indexOf(field) !== -1) return (state[field] || []).indexOf(kind) !== -1
+    return (state[field] || {})[kind]
+  }
+
+  withKinds(current, mine, kinds) {
+    const merged = Object.assign({}, current)
+    MIX_FIELDS.forEach((field) => {
+      const theirs = current[field] || (LIST_FIELDS.indexOf(field) !== -1 ? [] : {})
+      if (LIST_FIELDS.indexOf(field) !== -1) {
+        merged[field] = theirs.filter((kind) => kinds.indexOf(kind) === -1).concat(mine[field].filter((kind) => kinds.indexOf(kind) !== -1))
+      } else {
+        const values = Object.assign({}, theirs)
+        kinds.forEach((kind) => {
+          if (Object.prototype.hasOwnProperty.call(mine[field], kind)) values[kind] = mine[field][kind]
+          else delete values[kind]
+        })
+        merged[field] = values
+      }
+    })
+    return merged
   }
 
   applyServerState(current) {
@@ -145,6 +184,7 @@ export default class extends Controller {
     this.rowTargets.forEach((row) => this.applyRowState(row, weights, excluded))
     this.difficultyTargets.forEach((box) => this.applyDifficultyState(box, levels, lockedKinds, excluded))
     this.lockLastInGroup()
+    this.saved = this.state()
     this.versionValue = current.section_kind_preferences_version
     this.applyLadderPreparation(current.ladder_preparation)
   }
@@ -197,6 +237,7 @@ export default class extends Controller {
   savePayload(sent) {
     sent.revision = this.editRevision
     const state = this.state()
+    sent.state = JSON.parse(JSON.stringify(state))
     const steps = this.shownSteps(state.section_kind_levels)
     const body = { user: Object.assign(state, { section_kind_preferences_version: this.versionValue }) }
     if (steps.length > 0) body.level_suggestion_steps = steps
@@ -207,6 +248,7 @@ export default class extends Controller {
     const reported = result.data && result.data.section_kind_preferences_version
     if (result.ok && typeof reported === "number") this.versionValue = reported
     if (result.ok) this.forgetMovedSuggestions(result.data && result.data.kind_rungs)
+    if (result.ok && sent.state) this.saved = sent.state
     if (result.status === 409) this.suggestedValue = {}
     if (result.status === 409 && result.data && result.data.current) {
       this.applyServerState(result.data.current)

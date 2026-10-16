@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Level suggestion proposals", type: :request do
   let(:json) { { "Content-Type" => "application/json", "Accept" => "application/json" } }
 
-  # Seeded without a save's cutoffs, the way the junior track's first-run preset arrived.
+  # Seeded without a save's cutoffs, so no cutoff hides the evidence the examples build.
   def track_user(levels = ExerciseSection.keys.index_with { "junior" })
     create_user_with_key.tap { |user| user.update_columns(section_kind_levels: levels) }
   end

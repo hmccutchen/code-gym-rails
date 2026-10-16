@@ -14,6 +14,7 @@ class ProfileController < ApplicationController
     return render_invalid_lock      if invalid_locked_section_kinds?
     return render_invalid_display   if invalid_display_preferences?
     return render_invalid_skill_level if invalid_skill_level?
+    return render_mixed_track_save if mixed_track_save?
     return render_invalid_level_suggestions if invalid_level_suggestions?
     return render_invalid_shown_steps if invalid_shown_steps?
 
@@ -36,6 +37,15 @@ class ProfileController < ApplicationController
   PREFERENCE_KEYS = %i[section_kind_weights excluded_section_kinds section_kind_levels locked_section_kinds].freeze
   LOCKED_KEYS = %i[choose_track skill_level section_kind_levels].freeze
   TRACK_CHOICE_KEYS = %w[choose_track skill_level].freeze
+
+  def mixed_track_save?
+    user_params = params.require(:user)
+    user_params.key?(:skill_level) && !user_params.key?(:choose_track) && PREFERENCE_KEYS.any? { |key| user_params.key?(key) }
+  end
+
+  def render_mixed_track_save
+    render_json_error("Change the track and the exercise mix in separate saves.", status: :unprocessable_content)
+  end
 
   def invalid_daily_section_count?
     user_params = params.require(:user)

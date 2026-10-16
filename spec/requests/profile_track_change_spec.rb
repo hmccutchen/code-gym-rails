@@ -80,4 +80,14 @@ RSpec.describe "PATCH /profile track change", type: :request do
 
     expect(response.parsed_body["kept_own_level"]).to eq("")
   end
+
+  it "refuses a save that changes the track and a target together, saving nothing" do
+    user.update_columns(skill_level: "junior", section_kind_levels: preset)
+
+    patch_profile(skill_level: "mid_level", section_kind_levels: preset.merge("pattern" => "mid_level"))
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(JSON.parse(response.body)["error"]).to eq("Change the track and the exercise mix in separate saves.")
+    expect(user.reload).to have_attributes(skill_level: "junior", section_kind_levels: preset)
+  end
 end
