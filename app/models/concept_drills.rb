@@ -1,5 +1,5 @@
 class ConceptDrills
-  # Counted in drills, a group as one; stated rather than derived. See CLAUDE.md, "Drills".
+  # Counted in drills, a group as one; stated rather than derived. See docs/decisions/drills.md.
   MAX_CONCURRENT = 2
 
   LimitReached = Class.new(StandardError)

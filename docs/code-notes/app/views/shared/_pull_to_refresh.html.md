@@ -1,6 +1,6 @@
 # app/views/shared/_pull_to_refresh.html.erb
 
-CLAUDE.md's "Pull-to-refresh in the installed app" paragraph covers the gesture's design: why it exists alongside `overscroll-behavior-y: none`, the iOS-style sliding content, how standalone mode is detected, waiting for pending saves, and the sessionStorage note that keeps the spinner turning across the reload. The notes below cover details it leaves out.
+The "Pull-to-refresh in the installed app" paragraph of `docs/decisions/home-screen-app.md` covers the gesture's design: why it exists alongside `overscroll-behavior-y: none`, the iOS-style sliding content, how standalone mode is detected, waiting for pending saves, and the sessionStorage note that keeps the spinner turning across the reload. The notes below cover details it leaves out.
 
 ## The indicator
 

@@ -1,0 +1,175 @@
+# File Map
+
+What each listed file does, in full. CLAUDE.md keeps one line per file.
+
+- `app/models/track_change.rb` — `TrackChange`: which per-kind targets a track change clears, the one statement of the rule; pure.
+- `app/services/level_suggestion.rb` — pure proposal rules: one-rung moves up and back along junior, mid-level and senior, each kind judged on its own results, and the evidence counts a card and an event row show.
+- `app/services/level_suggestion/evidence.rb` — bounded, preloaded reviewed-response history projected into stamped, answered, rubric-graded results.
+- `app/services/reviewed_section_results.rb` — `ReviewedSectionResults`: which sections of one submitted, reviewed response count as evidence of work at a rung, optionally only under the current rubric. Pure over the response it is given; shared by `LevelSuggestion::Evidence` and `CompetencyGate::Evidence`.
+- `app/services/competency_gate.rb` — `CompetencyGate`: the pure fold that earns a day's size from reviewed days, with the brake. `DailyPlan.size_for` calls it once per plan.
+- `app/services/day_size.rb` — `DaySize`: the day's planned count and its reason, from the Daily sections setting, the completion count and the gate's `Plan`. Pure; its `Decision` also answers whether the brake is on, for the coverage exception, and what the `[set_size]` line logs.
+- `app/services/size_forecast.rb` — `SizeForecast`: whether tomorrow's Automatic set will be larger, or smaller because of the brake, than today's planned one, for the submitted dashboard's size lines.
+- `app/services/competency_gate/evidence.rb` — the gate's only query: every rubric-stamped reviewed day, oldest first, in batches, as `CompetencyGate::Day` values.
+- `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileController`.
+- `app/controllers/level_suggestion_dismissals_controller.rb` — records Not now and removed-kind cutoffs for the current user under the user-row lock, refusing a stale shown step with a 409, with a `dismissed` or `removed` event row for each kind whose cutoff moves forward.
+- `app/models/level_suggestion_step.rb` — `LevelSuggestionStep`: one move a card or Setup showed, and the boundary check on the steps they post.
+- `app/models/level_suggestion_event.rb` — `LevelSuggestionEvent`: one row per answer to a level suggestion (`applied`, `dismissed`, `removed`) with the evidence counts behind it; builds applied rows by rung, with `skill_level_edit` for a kind the skill level moved, from the state `User` passes in from before the save.
+- `app/controllers/level_suggestion_answers_controller.rb` — counts an answered proposal, which decides whether the next one applies in place or links to Setup.
+- `app/views/dashboard/_level_suggestion.html.erb` — submitted-day proposal with counts from the evidence, a removable list when several kinds share a destination, and in-place Apply/Not now saves.
+- `app/views/api_keys/_level_suggestions_switch.html.erb` — the "Suggest level changes" switch at the top of Setup's Exercise mix, for every account; its `level-suggestions-switch` controller takes focus when the card's link asks.
+- `script/prepare_junior_ladders.rb` (+ `script/junior_ladder_preparation.rb`) — operator coverage report; explicit `--run` queues shared-reference refreshes using the operator's key.
+- `spec/requests/existing_account_pages_spec.rb` — exact pre-track Dashboard, Setup, Account and History snapshots. `UPDATE_PAGE_SNAPSHOTS=1` intentionally rewrites fixtures; never use it to conceal a learning-track regression.
+- `app/services/ai_service.rb` — provider-agnostic base: prompts, each language's prompt wording (`LANGUAGE_PROMPTS`), JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read. Also owns the judge prompt, the single-section retry call, and the two-stage entry point: `#generate_judged_exercise` drafts, then hands the draft to `JudgedGeneration`
+- `app/services/judged_generation.rb` — `JudgedGeneration`: the two-stage path after the draft. Fans the judge out a section at a time, retries a rejection, or a planned section ingest refused, up to its kind's `judge_retries` times (twice for a fixed kind, once otherwise) with its concept fixed, drops a rejected last retry, re-judges a design comparison's edits, and hands the final set to `AiService`'s shared logging tail. It reaches the provider only through `JudgedGeneration::Provider` (`judge_section` and `retry_section`, as callables built fresh per call), so its specs need no provider subclass. `JudgedGeneration::UnhostedConcepts` names the planned concepts a drop left without a host
+- `app/services/problem_set_ingest.rb` — the generation boundary: holds concepts to their closed vocabulary, bounds scaffolds and diagrams, runs each resolved section's own `.reject_unusable!` check, leaving a refused section out and reporting it on `Result#unusable_sections`, calls each resolved section's `.arrange!` (the Parsons scramble, the design comparison's A/B order), and logs a section the day never asked for. Writes nothing to the database — off-vocabulary concepts come back on the `Result` for `AiService` to record, so a rejected set structurally cannot leave a `SuggestedConcept` row behind, and its specs need no database. Not side-effect free, though: `warn_unrequested_sections!` logs.
+- `app/services/daily_plan.rb` — the day's plan (third section, reinforcement, the shared concept, retention checks and the ones left waiting, the coverage addition, `code_review` mode and the real-source excerpt grounding it, if any), decided before any provider is contacted; pure decision, no prompt or HTTP
+- `app/services/coverage_exception.rb` (+ `coverage_exception/history.rb`) — `CoverageException`: whether a two-section Automatic day gains one optional section, and which; pure. `History.for` is its one-query loader
+- `app/services/shared_concept.rb` — `SharedConcept`: which reduced-tier concept both fixed sections take, from a host the day left free; pure
+- `app/services/day_hosts.rb` — `DayHosts`: which kinds can tag a concept today, bucket and strict no-rung vocabulary; pure
+- `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class
+- `app/models/invite_code.rb` — `InviteCode`: a code's digest, seats, deadline and trial terms; `.mint` prints the code once, `#redeem!` takes a seat atomically
+- `app/models/pending_trial.rb` — `PendingTrial`: a trial asked for on the public trial page, kept in the session until the emailed code is entered
+- `app/controllers/concerns/login_code_requests.rb` — `LoginCodeRequests`: mailing a login code and the limits on asking, shared by the login form and the trial form
+- `app/models/provider_credential.rb` — `ProviderCredential.for(user)`: own key, no key, or the house key for an active trial; raises for an ended one
+- `app/models/trial_allowance.rb` — `TrialAllowance.check!`: the per-account cap and the house-key guard, run ahead of every house-key call
+- `app/models/house_keys.rb` / `trial_mode.rb` — the house keys and guards from ENV, and the kill switch
+- `app/controllers/trials_controller.rb` — `/trial/start` for someone signed out and `/trial` for a keyless account: the code, the provider, the data notice and consent, and a trial's standing once it has begun
+- `app/models/trial_status.rb` — `TrialStatus`: a trial's standing for its pages: days left, today's calls against the cap, the day it ended
+- `script/mint_invite_code.rb` — mints one invite code and prints it once
+- `app/models/provider_failure.rb` — `ProviderFailure`: the kind of failure a page can explain, from the error the boundary rescued; pure
+- `app/models/reset_clock.rb` — `ResetClock`: when a failed call's limit lifts, for the sentence's reset time; pure
+- `app/models/provider_failure_text.rb` — `ProviderFailureText`: one failure as a sentence for a person, from the `provider_failures` locale table, in the reader's zone and against the clock; `#full` for a page, `#brief` for a status line
+- `app/models/concept_reference_failures.rb` — `ConceptReferenceFailures`: the per-user, cache-held note of why a write-up stopped, read by Learn's status endpoint
+- `app/controllers/concerns/provider_failure_rendering.rb` — `ProviderFailureRendering`: the one way a controller turns a provider error into a sentence or a JSON error
+- `app/models/judge_verdict.rb` — `JudgeVerdict`: the judge's reply held to its closed vocabulary, the way `ProblemSetIngest` holds a problem set. A status outside three, an issue type or principle outside the lists, a rewrite of a field that is not prose, or blank evidence or reason is invalid output rather than a judgment. Pure; its specs need no database
+- `app/models/concerns/claimable.rb` — `Claimable`: a timestamp column held as a claim on a paid provider call. A model states the column and the stale window once (`claim :reviewing, column:, stale_after:`) and gets `#claim_<name>!`, an owner-only `#release_<name>!(token)` and `#<name>?`, so the predicate and the claim query share one staleness rule. Used by `DailyResponse` (review) and `DailyExercise` (regeneration)
+- `app/models/concept_vocabulary.rb` — `ConceptVocabulary`: the closed concept lists, each language's lists (`LANGUAGES`), and the two questions asked of them, which concepts are valid when a provider returns them (`.for_section`) and which a kind may be asked for (`.selectable_for_section`). Domain data, so it never reads `AiService`; its specs need no provider or database
+- `app/models/concept_bucket.rb` — which vocabulary bucket a concept's history records under (architecture/plan_review/ambiguity_hunt are each language-independent; everything else buckets by the day's language)
+- `app/models/kind_preferences.rb` — `KindPreferences`: a user's stated weight and exclusion bias over rotating kinds, as plain values `SectionRotation` takes instead of a `User`, so its specs need no database. `.none` is the untouched default; a stored value outside `MULTIPLIERS` reads back as that default rather than reaching `WeightedRoll`
+- `app/models/kind_difficulty.rb` — `KindDifficulty`: a user's stated difficulty target and lock per section kind, as plain values the same way `KindPreferences` is. A level outside `LEVELS` reads as unset and a lock on an untargeted kind reads as unlocked, so an orphaned lock can never suppress easing the user did not validly choose. `#rung_for` is the rung a kind is pitched at today, target or skill level, the one place a skill level is read as a rung
+- `app/models/concept_hosts.rb` — `ConceptHosts`: which section kinds can host each (concept, bucket), derived from `ConceptVocabulary.selectable_for_section` across every `code_review` mode and the user's languages; read by `LadderCoverage` and the Progress page
+- `app/models/ladder_coverage.rb` — `LadderCoverage`: which of the pairs `ConceptHosts` offers each kind already carry a ladder rung, for every kind whether or not it is targeted — callers filter for targets themselves
+- `app/models/rung_ledger.rb` — `RungLedger`: the rung a user holds per concept, from stored responses and the `pitched_at` stamps; pure over the rows it is given
+- `app/controllers/progress_controller.rb` — the `/progress` page: Learn's grouping, `RungLedger`'s standings, `ConceptHosts` for what is offered
+- `app/models/exercise_section.rb` (+ `app/models/exercise_section/`) — the registry of section kinds (code_review, design_comparison, pattern, challenge, architecture, security_review, parsons_problem, plan_review, ambiguity_hunt, pseudocode_to_code); one class per kind answers which are fixed (`.fixed?`, each in a slot of its own, which `.slots`, `SectionRotation::OPTIONAL_SLOTS` and `MANDATORY_SLOT_COUNT` derive from), which are thirds, which are fourths, which vocabulary they draw from and how it narrows that list for generation (`.narrow_vocabulary`, given an optional rung), which fields are answer key (`.answer_key_fields`), what the provider boundary refuses (`.reject_unusable!`), how many judge retries a rejection buys (`.judge_retries`) and any extra judge instructions (`.judge_guidance`), how a resolved section is arranged after it is accepted (`.arrange!`), whether the judge solves it blind (`.judge_solve_options`, `.solve_matches_key?`), which show improved code, which scaffold their answer, and — via `.schema_fragment` / `.generation_guidance` — what the generation prompt says about them. `AiService` assembles those fragments and owns each language's prompt wording (`LANGUAGE_PROMPTS`); it no longer branches on section keys — or on kind identity — to build them. `.generation_guidance` takes a uniform context (`vocabulary:, label:, mode:, artifact:, test_framework:`) that every kind receives and each reads only its own part of; kinds that read none of the optional values absorb them with `**`. Adding a kind means adding a class here, not editing `AiService`.
+- `app/models/code_format.rb` (+ `app/models/code_format/`) — `CodeFormat`: re-indents a batch of exercise code in the day's language, RuboCop's Layout cops for Ruby and Prettier for JavaScript, handing back what it cannot format unchanged
+- `vendor/prettier/` — the Prettier package and `format.mjs`, the Node script `CodeFormat::Javascript` runs
+- `app/models/worked_example.rb` — `WorkedExample.parts`: a stored `guide_worked_example` split into code and prose runs for the Learn page; pure
+- `app/models/code_highlight.rb` — `CodeHighlight`: Rouge highlighting for a code block, its line formatter, the lexer map and the cache key; `SyntaxHighlightingHelper#highlighted_code` is the one call site views use
+- `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value, so the scaffold rule is stated once rather than per textarea
+- `app/models/exercise_section/design_comparison.rb` — the second fixed kind: two working pieces, a server-rolled A/B order, the `pick:` answer encoding, its rung-aware vocabulary allowlist, and the judge's blind-solve facets
+- `app/views/responses/bodies/_design_comparison.html.erb` / `answers/_design_comparison.html.erb` — the two pieces in their own disclosures; the pick fieldset and reason textarea, which the `comparison-answer` controller writes into the hidden answer, plus "What decides it" once reviewed
+- `script/report_answer_positions.rb` (+ `script/answer_position_balance.rb`) — read-only count of where the better design-comparison piece was shown, totals only
+- `script/solve_agreement.rb` — `SolveAgreement`: prints blind-solve agreement per model, rung and concept for `script/compare_models.rb`'s judge modes, never a solve or a key
+- `app/services/claude_service.rb` / `gemini_service.rb` / `openai_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
+- `app/models/ai_provider.rb` — closed provider registry for dispatch, key detection and user validation; provider classes own the key patterns and environment restrictions
+- `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing one row per fixture (an edit's row lists each issue type with the text it quotes, and a provider failure prints as an error row rather than ending the run), then valid-output rate, detection per principle, false rejections, keep fixtures kept unedited, and latency and cost per model from `LIST_PRICE_PER_MILLION`. Both judge modes also print blind-solve agreement (`SolveAgreement`) per model, rung and concept, with match or mismatch only, never a pick or a key. Two more modes are for the review prose judge: `review_prose <user_id> [limit]` runs stored reviews through the judge, and `review_prose_fixtures` runs the candidates over `spec/fixtures/review_judge/`, each printing rewrites beside their sources for a person to read. `review_calibration` grades the fixtures in `spec/fixtures/review_calibration/` on the production review route (see "Grading rubric"). `judge_concept <user_id> <concept> [per_rung]` drafts design comparisons tagged with a concept no vocabulary holds yet, through the production retry route, and judges each with both candidates. `ForcedConceptDrafts` (`script/forced_concept_drafts.rb`) accepts the concept and adds the draft guidance line from its design note for that process only, then puts both back; drafts carry their key, so they are written to `tmp/judge_concept/` and the terminal prints only file, verdict and match or mismatch
+- `script/probe_gemini_capacity.rb` (+ `script/gemini_capacity_probe.rb`) — replays realistic two-section tester-days (draft, judge, review fan-out, a reference, duck turns) against `GEMINI_API_KEY` with the production prompts until a 429 or a refused key, recording every HTTP attempt, replies or not, and reports which limit was hit, the wait returned and tester-days per quota day. Spends that key's daily allowance; writes no `ApiUsage` rows; never in CI. Refused replies land in `tmp/gemini_probe/`
+- `script/check_gemini_structured_output.rb` (+ `script/gemini_structured_output_check.rb`) — sends judge fixtures through `GeminiService` on its production route with the verdict schema, and prints whether Gemini accepted the schema and whether each reply parsed. One request per fixture, two by default, billed to `GEMINI_API_KEY`; writes no `ApiUsage` rows
+- `app/models/rubric_check.rb` — `RubricCheck`: whether a graded review's rating agrees with the essential gaps it lists, under `AiService::RATING_RUBRIC`. Log-only and pure
+- `spec/fixtures/review_calibration/` — sections with a complete, a partial and a missed answer each, read by `ModelComparison#review_calibration`; a fixture may add `extra_answers`, each with its own expected ratings, which are graded and matched outside the rank-order check (the design comparison's vague matching pick and sound other pick)
+- `app/models/review_prose_verdict.rb` — `ReviewProseVerdict`: the prose judge's reply held to its closed lists, the structured-output schema, the projection the judge reads, and `#apply`, which stores the grader's original prose under `graded_prose`. Pure; its specs need no database
+- `app/services/review_prose_judge.rb` — `ReviewProseJudge.enabled?`: the deployment-wide `REVIEW_PROSE_JUDGE` switch, off unless exactly `"1"`
+- `spec/fixtures/review_judge/` — stored reviews that `ModelComparison#review_prose_fixtures` reads to compare candidates for the prose judge
+- `spec/fixtures/judge/` — stored sections, each stating the verdict it expects (`reject`, `keep_or_edit`, or `keep`, which an edit does not satisfy), that `ModelComparison#judge_fixtures` reads to compare judge models. The broken ones include the Ruby `Thread` and frame-rate `code_review`s, the incidents this feature exists for; the hard-but-sound ones make a candidate's false rejections as visible as its detections. Six `design_comparison_*` fixtures cover a surface tell, a missing deciding fact, a junior section with two defensible pieces, a principal tradeoff, and junior and senior sections to keep; six more, `design_comparison_proportionality_*`, carry a concept no vocabulary holds yet, two per rung (see `docs/proportionality-concept-2026-10-07.md`). The ones a judge should keep carry `expected_better`, which the blind-solve report compares against
+- `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation; persists failure state for the dashboard's status-polling to observe
+- `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints; `#review` maps a `ResponseReview` outcome to a redirect and a message
+- `app/services/review_grading.rb` — `ReviewGrading`: the review fan-out, a thread per section plus the difficulty assessment beside them, and every per-section rule (Parsons' computed rating, the rubric check, the prose judge's switch and fallback, the essential-gap positions). Reaches the provider only through `ReviewGrading::Provider`, callables `AiService#review_grading_provider` builds, so its specs need no provider subclass
+- `app/services/caller_zone_thread.rb` — `CallerZoneThread.start`: a thread that runs in the caller's `Time.zone`, shared by `ReviewGrading` and `JudgedGeneration`
+- `app/services/response_review.rb` — `ResponseReview`: applies a review to a submitted response (claim, provider call for the missing sections, stored results and failures, mastery, the review's diagnostics) and returns an `Outcome` whose status says what happened. Knows nothing about HTTP
+- `app/views/responses/_sections.html.erb` / `_section.html.erb` (+ `bodies/`, `answers/`) — the one loop over `DailyExercise#active_section_keys` and the one wrapper every section renders through, in both the answer-form and read-only states. Only the body and the answer area vary per kind, and each kind names its own partial for those (`ExerciseSection.body_partial` / `.answer_partial`), so adding another kind is a body partial, an answer partial if it needs one, two `sections.<key>` locale strings, a `SectionKindGuide` entry, and whichever facets differ from the defaults — never a new branch in a template.
+- `app/views/responses/_review_in_progress.html.erb` — the running-review line the submitted dashboard shows while the review claim is held; polls `GET /responses/:id/review_status` through the `generating` controller and reloads once the claim is released or stale
+- `app/views/responses/_answered_sections.html.erb` — read-only render of a submitted day; shared by the dashboard's submitted state and every history entry. Its styles live in the layout's `<style>`, not a per-page block, precisely because it renders on both.
+- `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
+- `app/controllers/history_controller.rb` — paginated list of submitted sessions
+- `app/controllers/sessions_controller.rb` — code request + verification, with rate limits
+- `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
+- `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
+- `app/controllers/concept_references_controller.rb` — one action: the same concept explained another way, on demand from inside its own disclosure. Persists nothing; owns the cap, since there is no model data for it to live on
+- `app/javascript/controllers/concept_alternates_controller.js` — the `concept-alternates` controller each reference's disclosure mounts; it keys the framings already shown by reference id, so one reference rendering several times still shares one cap
+- `app/services/web_push_credentials.rb` — `WebPushCredentials`: the VAPID pair from ENV, and the single authority for whether push is configured at all
+- `app/services/push_delivery.rb` — sends one notification to one endpoint, and deletes the endpoint when the push service reports it gone; the pruning is what keeps the job honest as iOS drops subscriptions
+- `app/models/push_subscription.rb` — one browser install's endpoint. `.register!` upserts by endpoint, because the client re-subscribes on every launch
+- `app/jobs/send_push_reminder_job.rb` — both reminder kinds, fanned out over one user's endpoints: `:ready` on the tick that generates the set, `:nudge` on later ticks of the same hourly cron, each enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately. Owns the nudge's copy, which varies with how far through the day is — untouched, partway, answered but unrated, or ready to submit
+- `app/services/push_nudge_plan.rb` — the one authority for whether an hourly tick nudges: level, window, the not-submitted stopping rule, and the quiet period that keeps a half-finished day from being nudged while it is still being worked on. Pure, so its specs need no database
+- `app/controllers/push_subscriptions_controller.rb` — enrol (JSON, since only script can call it) and un-enrol (an ordinary form post, so turning it off never depends on the machinery that turns it on)
+- `app/models/display_preferences.rb` — `DisplayPreferences`: the closed lists of display choices, and what the layout renders for them (`<html>` attributes, the light palette's media, status bar and theme color)
+- `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
+- `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
+- `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
+- `app/javascript/code_gym/request.js` — the one way a page script sends a request, and what it may show when one fails; loaded through importmap from the layout's `javascript_importmap_tags`
+- `app/javascript/code_gym/save_status.js` / `app/views/shared/_save_status_banner.html.erb` — the save banner's failures by control, the per-control save queue (in order, or collapsing to the latest, and retrying a save that got no reply when the caller opts in), and `pending()`; the banner markup sits in `<body>`
+- `app/javascript/code_gym/draft_store.js` — the dashboard's one copy of unsent answers on the device; cleared on every signed-out page and on a submitted dashboard
+- `app/controllers/concerns/json_errors.rb` — `render_json_error`: the one shape of a JSON error reply
+- `app/views/shared/_push_script.html.erb` — mounts the `push-launch` controller, which re-subscribes on launch through `app/javascript/code_gym/push.js`; rendered from the layout for a signed-in user when push is configured
+- `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
+- `app/views/pwa/service-worker.js.erb` — shows the notification, with the versioned icon. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing
+- `app/services/schema_wait.rb` — blocks the worker's Railway pre-deploy step until the schema the Solid Queue supervisor boots against exists; waits rather than migrating, so migrations keep exactly one owner
+- `app/services/preview_environment.rb` — single authority for "is this a Railway PR deployment," derived from `PREVIEW_APP`
+- `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PreviewEnvironment.active?`
+- `app/services/preview_mail.rb` — inline mail delivery in preview apps, gated on `PreviewEnvironment.active?`, so login never needs a worker
+- `app/controllers/concerns/preview_auto_login.rb` — preview-only auto-login callback, registered only when `PreviewEnvironment.active?`
+- `lib/boot/database_pool.rb` — `DatabasePool.size`: the pool `config/database.yml` asks for, sized for the judge fan-out on a Solid Queue worker (see "Railway Deployment"); outside the autoload path, because `database.yml` is read before `app/` can load
+- `lib/boot/app_host.rb` — `AppHost.resolve`: `APP_HOST` then `RAILWAY_PUBLIC_DOMAIN`, with that order inverted on a preview app (see "Host resolution" above); outside the autoload path
+- `app/services/fake_service.rb` — deterministic, zero-cost AiService provider for tests (`provider: "fake"`); overrides only `#call`/`#build_connection`, so every other AiService code path runs for real against its canned output. `AiService.for` refuses it outside a local environment.
+- `app/controllers/learn_controller.rb` — the `/learn` library: lists every
+  concept in the user's slice (assigned or not), the per-concept detail page,
+  and three generation triggers: a one-concept `#prepare_concept`, a
+  slice-wide `#prepare` backfill, and `#prepare_ladders`, which rewrites
+  existing rows for the concepts behind each section's level.
+- `app/controllers/concerns/learn_scope.rb` — `LearnScope`: the user's slice
+  of the vocabularies and the 404-on-unknown checks for a `:bucket`/`:concept`
+  arriving from a URL, shared by `LearnController` and
+  `ConceptDrillsController` — the same boundary rule `ProblemSetIngest`
+  applies to provider output.
+- `app/models/concept_drills.rb` — `ConceptDrills`: starts and stops drills,
+  owns the concurrent cap and its reasoning, and answers what is drilled for
+  the Learn pages. Writes only the two drill columns on `ConceptMastery` plus
+  the one pause exit drilling is allowed to take.
+- `app/controllers/concept_drills_controller.rb` — the four drill endpoints
+  under `/learn`, per concept and per group; turns `ConceptDrills`' answers
+  into a redirect and a flash and persists nothing itself.
+- `app/views/shared/_featured_concept.html.erb` — the weekly featured concept's
+  one rendering, shared by the Learn tab and the dashboard; its styles live in
+  the layout for that reason, like `responses/_answered_sections`
+- `app/models/featured_concept.rb` — `FeaturedConcept.for(user)`: this week's
+  stored pick for one user, computed on the first visit, re-picked in place
+  when it leaves the user's slice
+- `app/services/featured_concept_pick.rb` — `FeaturedConceptPick`: the pure
+  rule choosing among met concepts, from the ledger and the user's past picks
+- `app/helpers/featured_concept_helper.rb` — `#featured_concept`, the pick
+  read once per request; `#featured_section?`, which the section wrapper asks;
+  and `#featured_tagline_shown?`, the one rule for when the callout shows the
+  reference's tagline
+- `app/views/responses/_featured_marker.html.erb` — the marker beside a
+  section's label when it carries this week's concept
+- `app/models/concept_book_sources.rb` — `ConceptBookSources`: the hand-curated
+  book pointers a Learn page renders under "Where this comes from". Closed,
+  array-valued, and never read by any prompt — extend it by adding a line
+- `app/models/concept_lesson.rb` — `ConceptLesson`: the Learn page's short-lesson sections, the limits on them, and the boundary check on a provider's lesson; pure. Rendered by `learn/_lesson`
+- `app/models/learn_lessons.rb` — `LearnLessons`: hand-written Learn-only lessons, outside every vocabulary; rendered by `LearnLessonsController` at `/learn/lessons/:lesson`
+- `app/models/section_kind_guide.rb` — `SectionKindGuide`: each kind's hand-written summary and example, rendered by `responses/_kind_about` in Setup and on the answer form
+- `app/models/hand_written_learn_text.rb` — `HandWrittenLearnText::MODULES`: every module of static reader-facing text, which the plain-language spec checks
+- `app/models/recognition_guide.rb` — `RecognitionGuide`: the cached "how to
+  look for these" piece per recognition group, which groups have one, and
+  what the prompt says each group is about.
+- `app/jobs/generate_recognition_guide_job.rb` — writes one missing
+  recognition guide; same permit and race handling as
+  `GenerateConceptReferenceJob`.
+- `app/models/concept_group.rb` — `ConceptGroup`: which display group a
+  concept renders under on the Learn index, and the order groups appear in.
+  Display-only, its groups and their order derived from `ConceptVocabulary::GROUPS`
+  rather than restating their membership. Has no relationship to `ConceptBucket`,
+  which decides where a concept's mastery history records, and must not
+  acquire one.
+- `spec/system/learn_filter_spec.rb` — pins that typing the humanized label
+  actually shown on screen narrows the Learn list; the `learn-filter` controller matches
+  against a rendered attribute a request spec never executes, so a mismatch
+  between that label and the raw concept key was invisible to request specs
+  and only caught here.
+- `config/initializers/content_security_policy.rb` — the policy that makes the Stimulus convention enforceable: `script-src` is this origin, the mermaid and SortableJS package directories on `cdn.jsdelivr.net`, and a per-request nonce, and `style-src` keeps `'unsafe-inline'`, since the views still carry `style=` attributes
+- `spec/conventions/app_views_spec.rb` — fails on an inline `<script>`, `on*` handler or `javascript:` URL in any view, so the convention breaks a build rather than a page
+- `spec/conventions/app_source_spec.rb` — parses `app/` with Prism and fails on `Thread.new` outside `CallerZoneThread` (or a named exemption with its reason and exact thread count) and on `send(:...)`
+- `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
+- `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
+- `railway.toml` — build + deploy config for Railway

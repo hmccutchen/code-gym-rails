@@ -1,4 +1,4 @@
-# Never sent to a provider; a pointer names a term the book coined, never a chapter or page. See CLAUDE.md.
+# Never sent to a provider; a pointer names a term the book coined, never a chapter or page. See docs/decisions/book-citations.md.
 module ConceptBookSources
   APOSD      = { title: "A Philosophy of Software Design", author: "John Ousterhout" }.freeze
   CLEAN_CODE = { title: "Clean Code",                      author: "Robert C. Martin" }.freeze
