@@ -1,6 +1,6 @@
 # Swap which kinds fill the daily places
 
-Status: proposed, not implemented. Waiting on the open decisions at the end.
+Status: proposed, not implemented. D2 and D4 decided on 2026-10-16; D1 and D3 still open.
 Date: 2026-10-16. Checked against `origin/main` at `abf0892` (#404).
 
 ## Goal
@@ -30,7 +30,7 @@ The design works with what is on main and does not work around these points.
 | "The graduation rubric" is planned work to align with | No graduation rubric, "breadth" rule or "both daily kinds" rule is written anywhere in `docs/`, `.claude/` or git history. Graduation shows up only in passing: `tracks.md` says it will reuse `TrackChange` and follow the suggestions switch | Section 5 states what graduation should read. There is nothing on main to change |
 | Daily places will grow "as the section count grows" | Nothing on main plans more than two. `SectionCount::FLOOR = 2` equals `ExerciseSection.fixed.size` by convention only, and `CompetencyGate::FLOOR`, `User::DAILY_SECTION_COUNTS` and the Setup hint ("%{lowest} gives you only %{fixed_sections}") all depend on that | The count is derived, never stored, and a spec asserts `FLOOR == DailyKinds::COUNT` (section 2) |
 | A daily place can hold any kind | `ExerciseSection.slots` groups the kinds, and a group resolves to **one** kind per day: `third` covers architecture, security review, challenge and Parsons, and `fourth` covers plan review, ambiguity hunt and pseudocode to code. `resolved_keys` keeps the first present key in each group | If the stored pair simply replaced `fixed?`, pinning architecture as daily would keep the other three thirds off every day. Worse, a stored row holding two thirds would lose one from `active_section_keys`. Section 2 introduces a per-user layout to fix this, and the decision on fourth kinds is open (D1) |
-| Swaps are "free and unlimited" | Main has no cap on daily generations for own-key accounts. `/regenerate` is once a day, `/generate` is 3 an hour, and trial accounts count every call against the invite's daily cap | Choosing a kind stays unlimited. Generating today's replacement right away is rate-limited per hour, and a refused generation still saves the choice (section 4, D3) |
+| Swaps are "free and unlimited" | Main has no cap on daily generations for own-key accounts. `/regenerate` is once a day, `/generate` is 3 an hour. Trial accounts are being turned off, so every account will be own-key | Choosing a kind stays unlimited. Generating today's replacement right away is rate-limited per hour, the only guard on swap spend, and a refused generation still saves the choice (section 4, D3) |
 
 ## 1. How the daily kinds are decided today
 
@@ -175,7 +175,7 @@ the usual 409. What happens to today's row depends on its state:
 
 | Today's state | Effect on today | Why |
 |---|---|---|
-| No row for today (weekend, paused with nothing held, trial ended) | None. The pair applies from the next generation | Nothing to replace |
+| No row for today (weekend, or paused with nothing held) | None. The pair applies from the next generation | Nothing to replace |
 | Generating or regenerating (`regenerating_since` fresh, or the first generation queued) | None. The pair applies tomorrow. The card isn't on screen in this state, so this only covers a race | The in-flight plan already chose its kinds |
 | Response submitted, reviewing or reviewed | None. The pair applies tomorrow | Submitted work is never replaced (`one-reviewed-response-invariant`) |
 | Not submitted, and the outgoing section **answered** (`DailyResponse#answered?`) | None. The pair applies tomorrow | Your choice: finished work is not replaced |
@@ -193,28 +193,78 @@ says so.
   destroys the response, runs once a day (`regenerated_at`) and resets
   `generated_at`, which invalidates every draft. A swap must keep the other
   sections' answers.
-- **`AiService#retry_section` is the fit for the call itself.** It renders
-  `GenerationPrompt#render(only: kind)` and ingests one key, with
-  `expected_keys: [kind.key]`. It is private to judged first generation and
-  needs a `Draft`. Add a public `AiService#generate_swapped_section(user,
-  exercise, kind)`:
+- **The swapped section goes through judged generation, exactly as a first
+  generation does (D4, decided).** `JudgedGeneration.call` already judges
+  whatever `draft.kinds` holds, so it takes a one-kind `Draft` unchanged: the
+  same judge, the same `judge_retries` (2, because the incoming kind is a
+  daily kind of the plan once PR 1 moves the retry count onto the plan), the
+  same re-judge of an edited design comparison, and the same drop rules.
+- **The draft for that one kind** comes from a public
+  `AiService#generate_swapped_section(user, exercise, kind)`:
   - it builds the plan with `DailyPlan.for(user, language: exercise.language)`
     after the new pair is saved, so the incoming kind's group, reinforcement and
     retention selection come from the normal rules;
-  - it renders `only: kind` with no fixed concept and ingests one key with the
-    usual stamps (`pitched_at`, `eased`);
-  - it shares the prompt/ingest half with `retry_section`, so the one-kind
-    shape lives in one place.
-
-  It is single-stage, like regeneration and weekend sets: no judge. That is a
-  quality trade-off (D4).
+  - it renders `GenerationPrompt#render(only: kind)` with no fixed concept and
+    ingests one key (`expected_keys: [kind.key]`) with the usual stamps
+    (`pitched_at`, `eased`). That is the shape `retry_section` already uses, so
+    the two share one private one-kind draft method;
+  - it hands `JudgedGeneration` a `finish` callback scoped to the one kind:
+    the kind's difficulty diagnostics and the judge outcome, not the whole
+    plan's retention and shared-concept logs, which describe sections the swap
+    did not generate.
+- **A swap lands only on a judged keep.** `JudgedGeneration` ships a section
+  unjudged when the judge call itself fails (`judge_with_fallback` returns a
+  reason, and the outcome records `fallback:`). First generation needs that,
+  because otherwise the user has no day. A swap already has a section to fall
+  back to, today's outgoing one, so `SwapSectionJob` treats an outcome with a
+  `fallback` (on the first judgment or on a retry's), or a dropped section
+  (`AllSectionsRejectedError` on a one-kind set), as "not replaced". Today
+  stays intact, the pair stays saved, and the reply says the change starts
+  tomorrow. One case still lands: a design comparison whose edit re-judge
+  fails reverts to the unedited draft that the first judgment kept, which is
+  what first generation ships too. This is the one place a swap reads the
+  outcome more strictly than first generation, and the PR says why.
 - **Concepts may repeat today's other sections.** The fresh plan doesn't know
   today's other concepts. A known limit, logged and not prevented.
-- **`ApiUsage` gets a new purpose, `swap_section`**, so swaps can be counted
-  apart from `retry_section` and `generate_exercise`. It adds a `CALL_PROFILES`
-  entry (the `retry_section` timeout) and the per-provider routing entries.
-  The characterization spec requires one request snapshot per purpose per
-  provider.
+- **`ApiUsage` gets a new purpose, `swap_section`**, for the draft call only,
+  so swaps can be counted apart from `generate_exercise`. It adds a
+  `CALL_PROFILES` entry with `RETRY_READ_TIMEOUT` (one section, like a retry)
+  and the per-provider routing entries, routed like `generate_exercise`. A
+  swap's judge and retry calls keep the existing `judge_section` and
+  `retry_section` purposes, so those rows can't be told apart from first
+  generation's; the swap's own row and the `[swap_section]` log line carry the
+  count. The characterization spec requires one request snapshot per purpose
+  per provider.
+
+### Calls and time for one judged swap
+
+Counted as `ApiUsage` rows, one per `call_and_log`; Faraday's retries on a 429
+or 5xx happen inside one call and add no row:
+
+| Path | Rows | Kinds |
+|---|---|---|
+| Judge keeps or edits | 2 (draft, judge) | any kind except design comparison |
+| Judge edits a design comparison, re-judged | 3 | design comparison |
+| Judge rejects, both retries used, last retry kept | 1 + 1 + 2 × (retry + judge) = **6** | any kind |
+| Same, last retry is an edited design comparison and is re-judged | **7** | design comparison |
+
+**The worst case is 7 rows** for a design comparison and 6 for any other kind,
+and it holds whether the swap lands or not. An unusable draft (refused at
+ingest) enters the same retry path with one judge fewer, so it stays under 7.
+
+Wall time, from the code's own formula (`worst_case_call_seconds(t) = 3t + 46`,
+with `RETRY_MAX = 2`, `RETRY_MAX_INTERVAL = 8`, `OPEN_TIMEOUT = 10`):
+
+- **Worst case:** draft 316 s + judge 181 s + 2 × (retry 316 s + judge
+  181 s) + re-judge 181 s = **1,672 s, about 28 minutes**. This becomes
+  `AiService::JUDGED_SWAP_BUDGET`, derived the way `JUDGED_GENERATION_BUDGET`
+  (2,302 s, about 38 minutes) is.
+- **Typical,** from `two-stage-generation.md`'s estimates for one retry cycle
+  (retry 15-40 s, judge 5-15 s, re-judge 5-10 s): a one-section draft is about
+  15-40 s and its judge 5-15 s, so a kept swap takes about **20-55 s**, one
+  retry cycle adds about 20-50 s, and the second adds about the same. Those
+  are estimates, not measurements; the first week's `ApiUsage` rows replace
+  them.
 
 ### Claim and lock order
 
@@ -235,8 +285,8 @@ exercise row; that order exists only in `carry_held_set_forward!`.
    - If any changed, release the claim and drop the generated section. The
      cost is spent, and the usage row records it.
 
-**The claim reuses `regenerating`** (`regenerating_since`, 6 minutes stale)
-instead of adding a column. It is already the lease on "a paid call rewriting
+**The claim reuses `regenerating`** (`regenerating_since`) instead of adding
+a column. It is already the lease on "a paid call rewriting
 this row's set". `DashboardController#show`/`#status` already show the
 generating page and poll while it is fresh, and `RegenerateExerciseJob`
 already refuses while it is held, so a swap and a regeneration can't overlap.
@@ -244,6 +294,33 @@ The swap does **not** set `regenerated_at` (a swap doesn't use up the day's
 regeneration) and does **not** touch `generated_at`, so `draft_scope` and every
 other section's draft stay valid. The generating partial gets a swap-specific
 hint. This is a deviation from one claim per purpose, and the PR states why.
+
+**The 6-minute staleness window does not fit a judged call, so the swap PR
+changes it.** `REGENERATION_STALE_AFTER` is 6 minutes, and its comment says it
+must exceed `GENERATION_READ_TIMEOUT` (300 s) plus job pickup. That held for one
+single-stage call that times out once. A judged swap can run 28 minutes in the
+worst case. Once a claim goes stale, three things break at once:
+
+- `DashboardController#show` and `#status` stop reporting "pending", so the
+  poller reloads into the old section while the job is still running;
+- a second swap or a regeneration can take the stale claim, so the first job
+  finds a different token under the lock and throws its paid result away;
+- the job can still land later, onto a page the user went back to working on.
+
+The swap's re-check of "outgoing section unanswered" protects the user's
+work, but the page still shows something false. So PR 2 derives the window:
+`REGENERATION_STALE_AFTER = [JUDGED_GENERATION_BUDGET, JUDGED_SWAP_BUDGET].max
++ pickup margin`. That is about 40 minutes. The cost of the change is that a
+worker that crashes mid-call holds the claim that long: the dashboard shows
+the generating page, then its existing slow hint, and neither a swap nor a
+regeneration can start until the claim goes stale. The generating poller
+already sizes its attempts from `[JUDGED_GENERATION_BUDGET,
+REGENERATION_STALE_AFTER].max / 3 + 1`, so it keeps polling for the whole
+window with no change.
+
+Main has this gap today. A single-stage regeneration's draft retries a 429 or
+5xx after a full 300-second read, so its worst case (946 s) is already past 6
+minutes. The derived window closes that too, and the PR says so.
 
 ## 4. Cost control
 
@@ -253,10 +330,8 @@ What main has today:
   `ProviderCallLimits` (60 an hour, 300 a day) covers the conversational calls
   only and is skipped for own-key accounts. `/generate` is 3 an hour for
   everyone, and `/regenerate` is once a day.
-- **Trial (house-key) accounts** count every call, judges and retries
-  included, against `invite_code.daily_request_cap` through
-  `TrialAllowance#check_account_cap!`. A refusal raises `TrialAllowanceError`
-  and writes no row.
+- **Trial (house-key) accounts** are being turned off, so every account will
+  be own-key. Until then, `TrialAllowance` wraps their calls unchanged.
 - **`ApiUsage` writes one row per call**, but regeneration logs as
   `generate_exercise`, so it can't be told apart today.
 
@@ -264,24 +339,60 @@ Proposal:
 
 - **Choosing a kind is unlimited.** It saves a row and calls no provider.
 - **Generating today's replacement is limited per hour,** with
-  `rate_limit to: SWAP_GENERATIONS_PER_HOUR` (proposed 6) on the swap action,
-  for every account, the way `/generate` is limited. When the limit is hit,
-  the pair is still saved and today is untouched. The reply says: "Saved. You've
-  swapped several times in the last hour, so today's section stays as it is and
-  the change starts tomorrow." That keeps "swaps are free and unlimited" true
-  for the choice, and bounds the spend from a stuck or scripted client.
+  `rate_limit to: SWAP_GENERATIONS_PER_HOUR` on the swap action, for every
+  account, the way `/generate` is limited. When the limit is hit, the pair is
+  still saved and today is untouched. The reply says: "Saved. You've swapped
+  several times in the last hour, so today's section stays as it is and the
+  change starts tomorrow." That keeps "swaps are free and unlimited" true for
+  the choice, and bounds the spend from a stuck or scripted client.
+- **This limit is the only guard on swap spend.** Own-key accounts skip
+  `ProviderCallLimits`, and every account will be own-key, so the user's own
+  key pays for every call.
+- **Recommended value: 4 an hour** (down from the 6 proposed for a one-call
+  swap):
+  - At 4, the worst case is 4 × 7 = 28 calls an hour and the typical case 8.
+    At 6 it would be 42 worst and 12 typical.
+  - For scale, `/generate` at 3 an hour allows about 54 worst-case calls an
+    hour. That counts a judged four-section day at about 18 calls: one draft,
+    four judges, two retry cycles for each of the two daily kinds, one for each
+    optional kind, and one re-judge.
+  - Swaps also serialize on the claim. A second swap while one is generating
+    saves its pair and reports "busy", so a person who is weighing kinds moves
+    one replacement at a time. Four covers trying a few kinds in a sitting.
+  - Swapping back and forth faster than that mostly pays for sections nobody
+    answers.
+  - The limit counts swap requests that would generate. It is checked before
+    the claim, so a request refused for any other reason doesn't use one up.
 - **A swap does not count against `/regenerate`'s once a day,** and regenerating
   doesn't use up swaps.
-- **On a trial, the swap call counts against the invite's daily cap** like any
-  other call. A `TrialAllowanceError` in the job releases the claim and shows
-  the existing `provider_failures.trial_allowance_used` text with a new
-  `outcomes.swap`: "today's section wasn't replaced; your choice starts
-  tomorrow". Other provider failures use the same failure wording path as
-  regeneration, under `what-a-person-is-told-when-a-provider-fails`.
+- **No trial-specific path.** Trial accounts are being turned off, so the
+  swap adds nothing for them. `TrialAllowance.check!` still runs first inside
+  `AiService#call_and_log` for any house-key account, so it wraps every swap
+  call (draft, judge, retry) exactly as it wraps first generation. The swap
+  leaves it as it is and doesn't extend it.
+- **A failed call mid-swap leaves today intact.** The swap reads the
+  `JudgedGeneration` outcome as described in section 3:
+
+  | Failed call | What the code does today | Swap outcome |
+  |---|---|---|
+  | The draft (`swap_section`) | The error reaches the job | Not replaced |
+  | The first judge | `judge_with_fallback` keeps the section unjudged, with a `fallback` reason | Not replaced: a swap lands only on a judged keep |
+  | A retry (`retry_section`) | `JudgedGeneration#retry_section` returns nil and the section drops; a one-kind set raises `AllSectionsRejectedError` | Not replaced |
+  | A retry's judge | Fallback as above, on a retried section | Not replaced |
+  | A design comparison's edit re-judge | Reverts to the unedited draft that the first judgment kept | **Lands.** It was judged |
+
+  In every "not replaced" case the job releases the claim and leaves
+  `problem_set`, `plan_notes` and the response untouched. The pair is already
+  saved, in its own transaction before the claim. The page shows the failure
+  through the same wording path as regeneration
+  (`what-a-person-is-told-when-a-provider-fails`), with a new
+  `provider_failures.outcomes.swap`: "today's section wasn't replaced; your new
+  choice starts tomorrow". The calls made before the failure keep their usage
+  rows.
 - **The new purpose** makes the volume measurable:
   `ApiUsage.where(purpose: "swap_section")`.
 
-Whether the hourly limit should exist at all is D3.
+The value is D3.
 
 ## 5. Evidence after a swap
 
@@ -495,16 +606,17 @@ daily_kind_swaps
 
   **Recommendation: (a).** It keeps the change in the layout and is easy to
   lift later. Two daily thirds are fine under every option.
-- **D2. A swap while today's set is held or paused.** This design treats a
-  carried-forward row like any other. Pausing stops only generation the user
-  didn't ask for, so a swap still generates while paused. Confirm.
-- **D3. The hourly limit on in-place generation.** It is proposed at 6, with the
-  choice always saved. Alternatives: no limit for own-key accounts, or a daily
-  count instead.
-- **D4. Judge the swapped section?** Single-stage, as proposed, matches
-  regeneration and is one call. Judging adds at least one call and up to the
-  daily kinds' two retries, which is closer to first-generation quality for
-  the very sections the user cares most about.
+- **D2. Decided: a swap generates even while generation is paused.**
+  Pausing stops generation the user didn't ask for, and a swap is asked for.
+  A carried-forward row is treated like any other row dated today.
+- **D3. The hourly limit on in-place generation.** Recommended at 4 an hour
+  against a worst case of 7 calls per judged swap (section 4), with the choice
+  always saved. It is the only guard on swap spend once every account is
+  own-key.
+- **D4. Decided: the judge always runs.** A swapped section goes through
+  judged generation exactly as a first generation does, with the same retry
+  budget (section 3). Regeneration moves to judged generation too, as its own
+  PR after the swap work (PR 4 below).
 
 ## PR split
 
@@ -535,8 +647,35 @@ daily_kind_swaps
    controller, the extracted guide partial, the generating hint, the page
    snapshots and the system specs.
 
+4. **Judged regeneration, after the swap work and separate from it.**
+   `RegenerateExerciseJob` calls `generate_judged_exercise` in place of
+   `generate_unjudged_exercise`. Everything else about regeneration stays:
+   once a day, refused once reviewed, the response destroyed, and a new
+   `generated_at`. `AllSectionsRejectedError` is an `AiService::Error`, so the
+   job's existing rescue keeps today's set and records the failure with no new
+   branch. Weekend "generate anyway" sets stay single-stage; that is a
+   separate question.
+   - **How much longer it takes.** Today's regeneration is one draft call.
+     Judging adds a fan-out of judges and up to two retry cycles, run in
+     parallel across sections, so the day waits on the slowest section, not on
+     their sum. From `two-stage-generation.md`'s estimates, one retry cycle
+     adds about 55-155 s over the draft and a daily kind's second cycle about
+     20-50 s more, so a regeneration takes up to about 3.5 minutes longer. By
+     the code's own worst-case formula, it goes from 946 s (one draft) to
+     `JUDGED_GENERATION_BUDGET`, 2,302 s.
+   - **Whether the generating page fits.** The poller sizes its attempts from
+     `[JUDGED_GENERATION_BUDGET, REGENERATION_STALE_AFTER].max / 3 + 1`. That
+     already allows for the judged budget, so it needs no change. The
+     6-minute staleness window would not fit, but PR 2 already derives it from
+     the larger of the two judged budgets (section 3), so this PR needs no
+     window change either. It checks that the derived value covers it.
+   - **Updates** `two-stage-generation.md` and `generation.md` ("Weekend sets
+     and `RegenerateExerciseJob` stay single-stage"), and the
+     `regenerate_exercise_job` code note.
+
 PR 2 and PR 3 could merge into one. Keeping them apart lets the server rules
-be reviewed without markup in the diff.
+be reviewed without markup in the diff. PR 4 depends only on PR 2's window
+change.
 
 ## Risks
 
@@ -551,10 +690,18 @@ be reviewed without markup in the diff.
 - **Rotation fairness with more optional groups.** Covered by the simulation
   spec. If the longest wait goes past what `STARVATION_LIMIT` implies, that is
   a decision to make, not a constant to raise.
-- **Swap quality.** A single-stage section is unjudged (D4), and its concept
-  may repeat one of today's other sections.
-- **Spend.** An own-key user can swap up to the hourly limit, every hour. The
-  `swap_section` purpose makes this visible. Nothing alerts on it.
+- **Swap concepts may repeat.** A swapped section's concept may repeat one of
+  today's other sections, since the fresh plan doesn't know them.
+- **Spend.** An own-key user can swap up to 4 times an hour, worst case 28
+  calls, every hour. The hourly limit is the only guard. The `swap_section`
+  purpose makes the volume visible, and nothing alerts on it.
+- **A longer claim window.** A worker that crashes mid-call now holds the claim
+  for about 40 minutes instead of 6. In that time neither a swap nor a
+  regeneration can start, and the page shows the generating state and then
+  the slow hint.
+- **Stricter landing than first generation.** A judge fallback keeps today's
+  outgoing section instead of shipping an unjudged one. A provider outage
+  therefore turns every swap into "starts tomorrow", which is the intent.
 - **Race with autosave.** The page flushes the answers queue before posting,
   and the job re-checks "answered" under the lock. A section answered mid-call
   keeps the user's work and wastes one call.
@@ -579,6 +726,12 @@ be reviewed without markup in the diff.
   `SectionKindGuide`).
 - Lock and claim specs for `SwapSectionJob`: superseded by a regeneration,
   answered mid-call, submitted mid-call, stale claim and provider failure.
+- `JudgedGeneration` outcomes for a one-kind draft: a keep lands, a fallback on
+  the first judgment doesn't land, a drop doesn't land, and an edited design
+  comparison whose re-judge fails lands unedited. A spec derives
+  `SWAP_WORST_CASE_CALLS` (7) from `judge_retries` and `rejudge_edits?`, so the
+  number in this spec can't silently go stale.
+- A spec asserts `REGENERATION_STALE_AFTER` exceeds both judged budgets.
 - The `critical-reviewer` agent runs on each PR before it leaves draft, with
   this spec as the brief.
 - After PR 2 deploys, `ApiUsage.where(purpose: "swap_section")` grouped by
