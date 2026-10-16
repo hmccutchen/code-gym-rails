@@ -320,6 +320,42 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
   end
 
+  it "keeps a weight moved back while its first save is in flight when the track changes" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      let held = false;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (!held && body.includes("section_kind_weights")) {
+          held = true;
+          return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 1500));
+        }
+        return send(url, options);
+      };
+      window.moveSlider = (value) => {
+        const slider = document.querySelector("#weight-security_review");
+        slider.value = value === "default" ? slider.defaultValue : value;
+        slider.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+    JS
+
+    page.execute_script(%(moveSlider("0")))
+    sleep 0.6
+    page.execute_script(%(moveSlider("default")))
+    find("#skill-level").select("Mid-level")
+
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 6)
+    wait_for(8) { user.reload.skill_level == "mid_level" }
+    sleep 1
+    expect(user.reload.section_kind_weights).to eq({})
+    expect(page.evaluate_script(%(document.querySelector("#weight-security_review").value))).to eq(
+      page.evaluate_script(%(document.querySelector("#weight-security_review").defaultValue))
+    )
+  end
+
   def guide_measurement
     page.evaluate_script(<<~JS)
       (() => {

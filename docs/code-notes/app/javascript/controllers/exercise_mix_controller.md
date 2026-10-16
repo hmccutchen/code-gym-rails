@@ -132,8 +132,11 @@ covers a mix that connected mid-save and never saw the event.
 It also queues a mix edit still inside its 400 ms delay at once, ahead of the
 track save. Every mix save that will go out ahead of the track save, the
 flushed one and any already waiting in the queue (`waitingSaves`), is frozen to
-the edits the form holds at this moment: the fields that differ from `saved`,
-and the edit revision. When the save is sent, those edits are laid over `saved`
+the edits the form holds at this moment, and the edit revision. The edits are
+the fields that differ from what the server will hold next: the save on the
+wire (`onTheWire`), if one is, else `saved`. Comparing with `saved` alone would
+miss an edit that undoes an unconfirmed save, such as a weight moved back while
+its first change is still in flight. When the save is sent, those edits are laid over `saved`
 as it is then (`frozenState`, through `withEdits`), and the version and the
 shown suggestions are read then too. So an edit made before the track change
 cannot ride in a later save, and a frozen save sent after an earlier track

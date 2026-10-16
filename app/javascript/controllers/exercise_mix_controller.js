@@ -22,6 +22,7 @@ export default class extends Controller {
   connect() {
     this.pending = null
     this.waitingSaves = new Set()
+    this.onTheWire = null
     this.savedLatest = true
     this.editRevision = 0
     this.probe = () => this.pending !== null
@@ -267,6 +268,7 @@ export default class extends Controller {
     sent.revision = sent.snapshot ? sent.snapshot.revision : this.editRevision
     const state = sent.snapshot ? this.frozenState(sent.snapshot) : this.state()
     sent.state = JSON.parse(JSON.stringify(state))
+    this.onTheWire = sent.state
     const steps = this.shownSteps(state.section_kind_levels)
     const body = { user: Object.assign(state, { section_kind_preferences_version: this.versionValue }) }
     if (steps.length > 0) body.level_suggestion_steps = steps
@@ -284,6 +286,7 @@ export default class extends Controller {
     const reported = result.data && result.data.section_kind_preferences_version
     if (result.ok && typeof reported === "number") this.versionValue = reported
     if (result.ok) this.forgetMovedSuggestions(result.data && result.data.kind_rungs)
+    if (this.onTheWire === sent.state) this.onTheWire = null
     if (result.ok && sent.state) this.saved = sent.state
     if (result.status === 409) this.suggestedValue = {}
     if (result.status === 409 && result.data && result.data.current) {
@@ -308,7 +311,7 @@ export default class extends Controller {
   holdForTrackSave() {
     this.prepareButtonTarget.disabled = true
     const form = this.state()
-    const beforeTrack = { state: form, edits: this.editsSince(this.saved, form), revision: this.editRevision }
+    const beforeTrack = { state: form, edits: this.editsSince(this.onTheWire || this.saved, form), revision: this.editRevision }
     this.waitingSaves.forEach((sent) => { sent.snapshot = sent.snapshot || beforeTrack })
     if (this.pending === null) return
     clearTimeout(this.pending)
