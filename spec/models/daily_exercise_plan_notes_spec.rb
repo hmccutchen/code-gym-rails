@@ -58,14 +58,15 @@ RSpec.describe "Every path that writes a daily exercise records its pair" do
     expect(held.reload).to have_attributes(date: Date.current, plan_notes: { "daily_kinds" => %w[code_review design_comparison] })
   end
 
-  it "records the seeded user's pair on every preview day" do
+  it "records the seeded account's own pair on every preview day" do
     ENV[PreviewEnvironment::VAR] = "1"
-    seeded = PreviewSeed.run!
+    ENV[PreviewSeed::EMAIL_VAR] = user.email
 
-    expect(seeded.daily_exercises).to be_present
-    expect(seeded.daily_exercises.map { |exercise| exercise.plan_notes["daily_kinds"] })
-      .to all(eq(DailyKinds.for(seeded).map(&:key)))
+    expect(PreviewSeed.run!).to eq(user)
+    expect(user.daily_exercises).to be_present
+    expect(user.daily_exercises.map { |exercise| exercise.plan_notes["daily_kinds"] }).to all(eq(pair))
   ensure
     ENV.delete(PreviewEnvironment::VAR)
+    ENV.delete(PreviewSeed::EMAIL_VAR)
   end
 end

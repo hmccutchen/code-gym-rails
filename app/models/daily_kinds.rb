@@ -10,7 +10,9 @@ class DailyKinds
 
   # A row planned before plan_notes carried the pair was planned with the default one.
   def self.recorded(plan_notes)
-    plan_notes.key?("daily_kinds") ? normalize(plan_notes["daily_kinds"]) : DEFAULT
+    return DEFAULT unless plan_notes.key?("daily_kinds")
+
+    Array(plan_notes["daily_kinds"]).filter_map { |key| ExerciseSection.find(key) }.uniq.presence&.freeze || DEFAULT
   end
 
   def self.normalize(keys)
