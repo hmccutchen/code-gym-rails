@@ -1,10 +1,13 @@
 # Persist the duck's thread
 
-Status: spec. PR 1 is committed locally; PR 2 is not started.
+Status: spec. PR 1 is open; PR 2 is not started.
 Date: 2026-10-16. Checked against `origin/main` at `cb34804`.
-Revised the same day after review: the running note is dropped (see the
-appendix), threads are kept as a record instead of deleted on submit, and
-asset-digest normalization moves into PR 1.
+Revised the same day after two reviews: the running note is dropped (see
+the appendix), threads are kept as a record for 365 days instead of deleted
+on submit, cleared turns are counted rather than archived, asset-digest
+normalization moves into PR 1, clients loaded before the deploy keep working
+through a one-release compatibility path, and the pressure-thread finding
+moves to its own note (`2026-10-16-duck-pressure-thread-note.md`).
 
 ## Goal
 
@@ -28,6 +31,7 @@ renders them after submit.
 |---|---|---|
 | Each duck turn is context-free today | The browser sends the whole thread with every turn, and the duck receives it as real conversation turns (fact 1) | Persisting the thread is enough to give the duck its memory across reloads and devices. The running note is not built; the appendix records why |
 | Store the thread on the day's response row | Creating a response row has four side effects the duck must not cause (see "Storage") | A sibling row per exercise holds the same section-keyed JSON map |
+| Cached JavaScript from the service worker keeps posting the old shape | The service worker caches nothing; it handles push only. Stale code comes from pages loaded before the deploy and not reloaded, which Safari's home-screen app keeps for a long time | PR 2 accepts the old request shape for one release, on today's code path, and stores nothing from it (see "Clients loaded before the deploy") |
 | Page snapshots won't change | Page snapshots include every Propshaft asset digest, so any edit to a Stimulus controller moves all five | PR 1 normalizes asset digests in the snapshot spec. After that, PR 2's page snapshot diff is empty, and any change is a leak into the page |
 
 ## Facts
@@ -233,12 +237,14 @@ end
 ```json
 { "code_review": { "turns": [ { "role": "user", "content": "…" },
                               { "role": "assistant", "content": "…" } ],
-                   "version": 3 } }
+                   "version": 3,
+                   "cleared": 1 } }
 ```
 
 - **One authority for a section's turns.** A `DuckThread` model answers
   `turns_for(section)`, `user_turn_count(section)`, `append!(section, pair,
-  expected_version:)` and `clear!(section)`. The controller asks it and
+  expected_version:)` and `clear!(section)`, which also adds one to the
+  section's `cleared` count. The controller asks it and
   never reads the JSON itself.
 - **`version`** goes up on every append and clear. An append carries the
   version it read and is refused if the version moved. That handles a Clear
@@ -265,9 +271,9 @@ end
 | Event | Thread |
 |---|---|
 | Reload, second device | Restored, with its count |
-| Clear | Emptied on the server, version bumped |
-| Start over | Emptied, every section (`#start_over` adds one line). Today a start over reloads the page, which empties it |
-| Regenerate | Ignored and overwritten (scope mismatch) |
+| Clear | Emptied on the server, version bumped, `cleared` count up by one |
+| Start over | The row is deleted, counts included, as the response row is (`#start_over` adds one line). Today a start over reloads the page, which empties it |
+| Regenerate | Ignored and overwritten, counts included (scope mismatch). The old problem set is gone, so the old thread has nothing to be read against |
 | Submit | Kept. The duck is never rendered after submit (`errors.responses.duck_after_submit`), and nothing else renders it |
 | Day rolls over, unsubmitted | Kept. The duck serves only `for_date` today's exercise, and history renders no duck |
 | Paused set carried forward | Follows its exercise, so it is restored on the day the set reappears |
@@ -315,25 +321,96 @@ user. A shorter window saves almost nothing. Keeping them indefinitely is
 also affordable, but a year bound means a record nobody ever reads doesn't
 grow forever.
 
-**What the record does not keep.** Clear, start over and regenerate replace
-a thread rather than adding to it, so the record holds only each section's
-last thread. A Clear partway through a hard problem drops the earlier
-exchange, which is arguably the part worth keeping. Keeping it would mean
-moving cleared turns into an `"archived"` list beside `"turns"` (bounded per
-entry by the same cap, unbounded in count for own-key accounts). Regenerate
-is different: the problem set the old thread discussed is gone, so an
-archived thread from before a regenerate would have no problem to read it
-against. This spec doesn't archive. It is a data decision to make before
-PR 2 ships, because turns cleared before then are lost.
+**Cleared turns are counted, not kept.** Clear replaces a thread, so the
+record holds only each section's last thread. Archiving cleared turns was
+considered and declined: the record has no reader, so making it complete is
+speculative, and an archive would turn a record bounded at one thread per
+section into one bounded only by how often someone clears. What survives a
+Clear is a per-section `cleared` count, one integer in the section's entry,
+raised by one in `DuckThread#clear!`. It keeps the one signal a Clear
+carries (someone ran the thread out or started over on the same problem)
+without keeping what they typed. It isn't a column of its own, because the
+row is per exercise and the count is per section, the same as the turns.
+Nothing reads it.
+
+## Clients loaded before the deploy
+
+**Where stale code comes from.** The service worker
+(`app/views/pwa/service-worker.js.erb`) handles only push and notification
+clicks. It has no fetch handler and caches nothing, so it never serves old
+JavaScript. What does keep old code running is a page loaded before the
+deploy and not reloaded since: an open tab, or the home-screen app, which
+Safari restores from its back-forward cache on every launch even though the
+dashboard is `no-store` (`answer_form_controller.js:58`). Asset URLs carry
+their digest, so any real reload fetches the new controller. Until then, the
+old `duck_thread_controller.js` keeps its thread in memory and posts
+`{ section, message, thread }`, with no `version`.
+
+**What happens without a compatibility path.** Take the server as PR 2
+describes it below, with `params[:version].to_i` reading a missing version
+as 0. On the first message from a stale page after the deploy:
+
+1. No `duck_threads` row exists yet (the table is new), so the stored
+   version is 0 and the missing version matches. The request succeeds.
+2. The server sends the provider its own copy of the thread, which is empty.
+   Any turns the engineer had before the deploy are still on their screen,
+   but the duck no longer sees them. A follow-up like "and what about the
+   second loop?" gets a reply with no idea what the first loop was.
+3. The server stores one exchange, version 1. The page appends it to its own
+   copy. The counts now differ: the page counts its pre-deploy turns plus
+   this one, and the server counts one.
+
+On the second message, the page again sends no version, which reads as 0
+against a stored 1. The server refuses it with `conversation_out_of_step`:
+"This conversation is out of step — clear it to keep going." The old
+`clear` empties only the page's copy and sends nothing, so the stored thread
+stays at version 1 and every later message is refused the same way. The app
+looks fine, and the duck stops answering after one reply until the page is
+reloaded. Rejecting a missing version outright is worse: the first message
+fails too.
+
+**What PR 2 does: accept the old shape for one release.** A request with a
+`thread` param and no `version` takes today's code path unchanged: today's
+`#duck_thread_param` and `#well_formed_thread?` checks, the cap counted from
+the posted thread, the posted thread sent as history, and **nothing read
+from or written to `duck_threads`**. A stale page then behaves exactly as it
+does today: the duck sees what the engineer sees, the cap counts what they
+see, and no one gets `conversation_out_of_step` from the version check. Its
+turns aren't stored, which is today's behavior too, and a reload moves it
+onto the new path with an empty thread, as a reload does today.
+
+The other option, treating a missing version as "no stored thread", was
+rejected. Whether it means "ignore the stored thread" or "use it without a
+version check", the duck's history and the page's thread disagree. In the
+second form a cap reached on the server shows "clear the conversation" to
+someone whose page shows a short thread, and their Clear doesn't reach the
+server.
+
+The legacy path writes nothing because writing the posted thread into the
+store would put forgeable assistant turns into the record and into later
+requests' history, after the compatibility window has closed.
+
+**The cost.** While the legacy path exists, finding A4 is not fixed: a
+hand-written request with a `thread` and no `version` still forges assistant
+turns and resets the cap, exactly as today. The A4 fix lands when the path
+is removed. The path logs one line per use (`[duck] legacy thread shape
+user <id>`, no content), and the follow-up PR that removes it waits until
+that line has not appeared for 7 days, and at least 14 days after the
+deploy. New JavaScript never sends `thread`, so it can't take this path by
+accident. A request spec pins the stale shape: given a stored thread, a
+`thread` param without `version` succeeds, sends the posted thread as
+history, leaves the stored row untouched, and counts the cap from the
+posted thread.
 
 ## Design, PR 2: persistence
 
 ### Server
 
 - `POST /responses/duck_thread` takes `section`, `message` and `version`
-  (the version the browser last saw). It no longer reads a `thread` param.
-  `#duck_thread_param` and `#well_formed_thread?` go, since the server
-  writes every turn itself. `MAX_DUCK_THREAD_BYTES` and
+  (the version the browser last saw). The new page never sends `thread`. A
+  request with `thread` and no `version` takes the one-release legacy path
+  above, which keeps `#duck_thread_param` and `#well_formed_thread?` until
+  the follow-up PR removes all three. `MAX_DUCK_THREAD_BYTES` and
   `MAX_DUCK_THREAD_ENTRIES` stay as checks on the stored thread, because the
   stored assistant turns are still provider output.
 - Order of work: load today's exercise and the `DuckThread` without a lock,
@@ -378,12 +455,41 @@ PR 2 ships, because turns cleared before then are lost.
   description has to say this, since the "one way to send a request" pattern
   names the queue for saves that must not overlap.
 
+### The decision doc PR 2 adds
+
+`docs/decisions/the-duck-thread-is-stored.md` covers the storage, the event
+table, the legacy path and the retention window, and it states these two
+choices in so many words:
+
+- **Archiving cleared turns was considered and declined.** The record has no
+  reader, so completing it is speculative, and archiving would make a record
+  bounded at one thread per section unbounded. A per-section `cleared` count
+  is kept instead.
+- **The privacy choice.** These are transcripts of what people typed while
+  they were stuck, kept for 365 days and read by nothing. On this app they
+  include trial and invited accounts, so they are other people's data, not
+  only the owner's. That is accepted on these terms: they are deleted with
+  the account, filtered from logs and `inspect`, scoped to their owner, and
+  kept out of every provider prompt but the duck's own by the isolation
+  spec. Giving them a reader, or a longer window, is a new decision, not an
+  extension of this one.
+
+**User-facing privacy text.** The app has no privacy page. The only text
+about what is kept is the account page's danger zone
+(`accounts.show.danger_body`): "Deleting your account permanently removes
+your name, email and API key, and logs you out. Your exercise history is kept
+anonymously for team statistics." It stays true, because threads are deleted
+with the account rather than kept with the anonymous history. Nothing on the
+page tells someone that what they type to the duck is stored for a year,
+though, and someone could reasonably assume a chat box that used to vanish
+on reload keeps nothing. PR 2 adds no copy, because it changes no markup. A
+one-line disclosure, near the duck or on the account page, is a separate
+copy change the decision doc recommends making before or with PR 2's deploy.
+
 ### Docs PR 2 updates
 
-- New `docs/decisions/the-duck-thread-is-stored.md` (storage, the event
-  table, retention and the record's limits), plus an entry in
-  `.claude/rules/providers.md` next to "Conversational calls send real
-  turns".
+- The decision doc above, plus an entry in `.claude/rules/providers.md` next
+  to "Conversational calls send real turns".
 - `docs/code-notes/app/views/shared/_duck_thread.html.md` says "nothing is
   written on the server". That becomes false and must change in the same PR.
 - `docs/code-notes/app/controllers/responses_controller.md` sections on
@@ -398,8 +504,9 @@ PR 2 ships, because turns cleared before then are lost.
   PR 1 replaces each Propshaft digest in a `/assets/` path
   (`duck_thread_controller-cb4ca1f7.js`) with a fixed placeholder before
   comparing, the same way `#without_nonces` already replaces CSP nonces. An
-  edit to any Stimulus controller, stylesheet or image under `app/assets`
-  then stops moving the snapshots. The `?v=` query on public icons
+  edit to any Stimulus controller or image under `app/assets` then stops
+  moving the snapshots. The page's CSS is inline in the layout, so editing
+  it still moves them, as it should. The `?v=` query on public icons
   (`versioned_public_path`) is left alone: it changes only when an icon
   changes, which is a deliberate page change. With that in place, **PR 2's
   page snapshot diff must be empty.** The fixture user has no duck thread, so
@@ -425,9 +532,15 @@ PR 2 ships, because turns cleared before then are lost.
    changes, Stimulus values, start over, anonymize, the sweep job, the
    isolation spec, docs. Request specs for every row of the event table,
    restore, the two-device race, clear mid-flight, the cap from stored turns,
-   a regenerated day, cross-user isolation and the filtered column. A system
-   spec: ask, reload, see the same turns; reach the cap, reload, still
-   capped; Clear, reload, empty.
+   a regenerated day, cross-user isolation, the filtered column, the
+   `cleared` count, and the stale shape (a `thread` param with no `version`)
+   taking the legacy path. A system spec: ask, reload, see the same turns;
+   reach the cap, reload, still capped; Clear, reload, empty.
+3. **Remove the legacy shape.** Deletes the legacy path,
+   `#duck_thread_param` and `#well_formed_thread?`, and turns the stale-shape
+   spec into one that expects a refusal. Opens once the
+   `[duck] legacy thread shape` line has been absent for 7 days, and no
+   sooner than 14 days after PR 2's deploy. This is the PR that closes A4.
 
 ## Risks
 
@@ -440,6 +553,10 @@ PR 2 ships, because turns cleared before then are lost.
 - **Gemini.** It still flattens history, so turns are re-rendered as text.
   Assistant turns are now server-written, which narrows A4 there too, but the
   gap in `conversational-calls-send-real-turns.md` stays.
+- **The legacy path keeps A4 open** until PR 3 removes it. Anyone can still
+  post the old shape by hand and forge assistant turns or reset the cap,
+  exactly as today. It writes nothing, so the forgery can't reach the
+  stored record.
 - **The "one way to send a request" pattern.** Clear and ask overlap safely
   because of the version check, not through the save queue. The PR
   description must say why.
@@ -448,9 +565,10 @@ PR 2 ships, because turns cleared before then are lost.
   account deletion, scoped to `current_user`, and read by nothing but the
   duck, which the isolation spec holds.
 - **File size.** `ResponsesController` is 448 lines, over the 300-line
-  guideline already. PR 2 removes `#duck_thread_param` and
-  `#well_formed_thread?` and moves the thread rules to `DuckThread`, so the
-  controller should not grow. If it does, the PR says why.
+  guideline already. PR 2 moves the thread rules to `DuckThread`, but keeps
+  `#duck_thread_param` and `#well_formed_thread?` for the legacy path, so
+  the controller grows for one release. The PR says so. PR 3 removes both
+  methods and should leave the controller smaller than it is today.
 
 ## Verification
 
@@ -544,14 +662,9 @@ the limiter seeing it.
   to them). A third risk was that the note, built from engineer text but
   outside `<engineer_text>` tags, could carry a planted instruction forward.
 
-### A finding that stands without the note
+### The pressure-thread finding
 
-A duck that remembers is under more pressure to give in than a fresh one.
-Persistence doesn't lengthen a thread, since the cap stays 6, so the model
-sees no more than it can today. But the rules were only red-teamed with
-single messages (`docs/security-audit-2026-10-05.md`), never a six-message
-pressure thread. "Never comply" and "not even as an illustrative example"
-don't depend on turn count, but nothing says repeated asking isn't a reason
-to reveal. That is worth a live eval of its own: scripted six-message
-pressure threads on stored days, per provider, checking replies for the
-planted defect, the correct option or a code block. It is outside this spec.
+Reviewing the note surfaced a gap in the duck's guardrails that doesn't
+depend on this feature: the rules were only red-teamed with single messages,
+and nothing in them says repeated asking isn't a reason to reveal. It is
+recorded in its own note, `2026-10-16-duck-pressure-thread-note.md`.
