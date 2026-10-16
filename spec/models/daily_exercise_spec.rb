@@ -135,7 +135,7 @@ RSpec.describe DailyExercise, type: :model do
     it "reads the same keys ExerciseSection.resolved_keys does for FakeService's every-kind set" do
       exercise = DailyExercise.new(problem_set: FakeService::EXERCISE_PROBLEM_SET)
 
-      expect(exercise.active_section_keys).to eq(ExerciseSection.resolved_keys(FakeService::EXERCISE_PROBLEM_SET))
+      expect(exercise.active_section_keys).to eq(ExerciseSection.resolved_keys(FakeService::EXERCISE_PROBLEM_SET, daily: DailyKinds::DEFAULT))
       expect(exercise.active_section_keys).to eq(%w[code_review design_comparison pattern architecture])
     end
   end

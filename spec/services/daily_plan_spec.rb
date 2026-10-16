@@ -437,7 +437,7 @@ RSpec.describe DailyPlan do
       allow(SectionCount).to receive(:for).and_return(3)
       plan = described_class.for(user, language: "ruby_rails")
 
-      chosen = [ plan.pattern, plan.third, plan.fourth ].compact
+      chosen = plan.rotation.values.compact
 
       expect(chosen.size).to eq(1)
     end
@@ -512,7 +512,7 @@ RSpec.describe DailyPlan do
 
       plan = described_class.for(user, language: "ruby_rails")
 
-      expect([ plan.pattern, plan.third, plan.fourth ].compact.size).to eq(3 - ExerciseSection.fixed.size)
+      expect(plan.rotation.values.compact.size).to eq(3 - DailyKinds::COUNT)
       expect(plan.size.reason).to eq(:setting)
     end
 
@@ -521,8 +521,8 @@ RSpec.describe DailyPlan do
 
       plan = described_class.for(user, language: "ruby_rails")
 
-      optional_slots = ExerciseSection::MAX_SECTIONS - ExerciseSection.fixed.size
-      expect([ plan.pattern, plan.third, plan.fourth ].compact.size).to eq(optional_slots)
+      optional_slots = ExerciseSection::MAX_SECTIONS - DailyKinds::COUNT
+      expect(plan.rotation.values.compact.size).to eq(optional_slots)
     end
 
     it "leaves sizing Automatic for a user who never chose" do
@@ -536,7 +536,7 @@ RSpec.describe DailyPlan do
   describe "the day's size" do
     let(:user) { User.create!(email: "size@example.com", name: "Size") }
 
-    def optional_kinds(plan) = [ plan.pattern, plan.third, plan.fourth ].compact
+    def optional_kinds(plan) = plan.rotation.values.compact
 
     it "starts a new account at the floor, from the gate's own evidence" do
       plan = described_class.for(user, language: "ruby_rails")
@@ -554,14 +554,14 @@ RSpec.describe DailyPlan do
       plan = described_class.for(user, language: "ruby_rails")
 
       expect(plan.size.count).to eq(3)
-      expect(optional_kinds(plan).size).to eq(3 - ExerciseSection.fixed.size)
+      expect(optional_kinds(plan).size).to eq(3 - DailyKinds::COUNT)
     end
 
     it "takes completion when it is lower than the gate" do
       allow(SectionCount).to receive(:for).and_return(3)
       open_gate
 
-      expect(optional_kinds(described_class.for(user, language: "ruby_rails")).size).to eq(3 - ExerciseSection.fixed.size)
+      expect(optional_kinds(described_class.for(user, language: "ruby_rails")).size).to eq(3 - DailyKinds::COUNT)
     end
 
     it "lets a fixed setting override the gate and the brake" do
@@ -570,7 +570,7 @@ RSpec.describe DailyPlan do
 
       plan = described_class.for(user, language: "ruby_rails")
 
-      expect(optional_kinds(plan).size).to eq(ExerciseSection::MAX_SECTIONS - ExerciseSection.fixed.size)
+      expect(optional_kinds(plan).size).to eq(ExerciseSection::MAX_SECTIONS - DailyKinds::COUNT)
       expect(plan.size.brake?).to be(false)
     end
 
@@ -655,8 +655,9 @@ RSpec.describe DailyPlan do
 
       described_class.for(user, language: "ruby_rails")
 
-      expect(SectionRotation).to have_received(:for) do |_history, count:, preferences:|
+      expect(SectionRotation).to have_received(:for) do |_history, count:, preferences:, daily:|
         expect(count).to be_a(Integer)
+        expect(daily).to eq(DailyKinds::DEFAULT)
         expect(preferences.excluded?(ExerciseSection::ParsonsProblem)).to be(true)
       end
     end
@@ -849,6 +850,13 @@ RSpec.describe DailyPlan::Result, "#notes" do
     expect(result(coverage: gap).notes).to eq("coverage" => "pattern", "coverage_reason" => "gap")
   end
 
+  it "records the day's daily kinds by key, in place order" do
+    daily = [ ExerciseSection::Architecture, ExerciseSection::CodeReview ]
+
+    expect(result(daily_kinds: daily).notes).to eq("daily_kinds" => %w[architecture code_review])
+    expect(DailyKinds.recorded(result(daily_kinds: daily).notes)).to eq(daily)
+  end
+
   it "records the planned size beside a coverage addition" do
     size = DaySize.for(setting: nil, completion: 2, gate: CompetencyGate::Plan.new(count: 2, reason: :held, evidence: {}))
     gap = CoverageException::Addition.new(kind: ExerciseSection::Pattern, reason: :gap)
@@ -881,7 +889,7 @@ RSpec.describe DailyPlan, "the shared concept" do
     plan = described_class.for(user, language: "ruby_rails")
 
     expect(plan.shared_concept).to eq("n_plus_one")
-    expect(plan.notes).to eq("size" => SectionCount::FLOOR, "size_reason" => "gate", "shared_concept" => "n_plus_one")
+    expect(plan.notes).to eq("daily_kinds" => %w[code_review design_comparison], "size" => SectionCount::FLOOR, "size_reason" => "gate", "shared_concept" => "n_plus_one")
   end
 
   it "never shares a paused concept" do
@@ -1055,7 +1063,7 @@ RSpec.describe DailyPlan, "the coverage exception" do
 
   before do
     pin_code_review_mode(:application_code)
-    allow(SectionCount).to receive(:for).and_return(ExerciseSection.fixed.size)
+    allow(SectionCount).to receive(:for).and_return(DailyKinds::COUNT)
   end
 
   def two_section_day(date, plan_notes: {})
@@ -1078,10 +1086,10 @@ RSpec.describe DailyPlan, "the coverage exception" do
     expect(plan.coverage.kind).to eq(ExerciseSection::Architecture)
     expect(plan.coverage.reason).to eq(:due_check)
     expect(plan.coverage.check).to include(concept: "service_boundaries", bucket: "architecture")
-    expect(plan.third).to eq(:architecture)
+    expect(plan.rotation[:third]).to eq(:architecture)
     expect(plan.due_checks.map(&:concept)).to eq(%w[service_boundaries])
     expect(plan.waiting_checks).to eq([])
-    expect(plan.notes).to eq("size" => SectionCount::FLOOR, "size_reason" => "completion",
+    expect(plan.notes).to eq("daily_kinds" => %w[code_review design_comparison], "size" => SectionCount::FLOOR, "size_reason" => "completion",
                              "coverage" => "architecture", "coverage_reason" => "due_check")
   end
 
@@ -1097,7 +1105,7 @@ RSpec.describe DailyPlan, "the coverage exception" do
     plan = described_class.for(user, language: "ruby_rails")
 
     expect(plan.coverage).to be_nil
-    expect([ plan.pattern, plan.third, plan.fourth ].compact).to eq([])
+    expect(plan.rotation.values.compact).to eq([])
     expect(plan.due_checks.map(&:concept)).to eq(%w[n_plus_one])
     expect(plan.waiting_checks.map { |w| w.slice(:concept, :reason) }).to eq([ { concept: "memoization", reason: :no_slot } ])
     expect(plan.notes).not_to have_key("coverage")
@@ -1109,7 +1117,7 @@ RSpec.describe DailyPlan, "the coverage exception" do
     plan = described_class.for(user, language: "ruby_rails")
 
     expect(plan.coverage).to eq(CoverageException::Addition.new(kind: ExerciseSection::Pattern, reason: :gap))
-    expect(plan.pattern).to eq(:pattern)
+    expect(plan.rotation[:pattern]).to eq(:pattern)
   end
 
   it "adds nothing while the brake is on, and the check waits with no host" do
@@ -1120,7 +1128,7 @@ RSpec.describe DailyPlan, "the coverage exception" do
 
     expect(plan.size.brake?).to be(true)
     expect(plan.coverage).to be_nil
-    expect([ plan.pattern, plan.third, plan.fourth ].compact).to eq([])
+    expect(plan.rotation.values.compact).to eq([])
     expect(plan.waiting_checks.map { |w| w.slice(:concept, :reason) }).to eq([ { concept: "service_boundaries", reason: :no_host } ])
   end
 
@@ -1155,7 +1163,7 @@ RSpec.describe DailyPlan, "the coverage exception" do
     plan = described_class.for(user, language: "ruby_rails")
 
     expect(plan.coverage).to be_nil
-    expect([ plan.pattern, plan.third, plan.fourth ].compact).to eq([])
+    expect(plan.rotation.values.compact).to eq([])
     expect(plan.waiting_checks.map { |w| w.slice(:concept, :reason) }).to eq([ { concept: "service_boundaries", reason: :no_host } ])
   end
 
@@ -1175,7 +1183,7 @@ RSpec.describe DailyPlan, "the coverage exception" do
 
   it "does not read the coverage history on a day it cannot apply to" do
     open_gate
-    allow(SectionCount).to receive(:for).and_return(ExerciseSection.fixed.size + 1)
+    allow(SectionCount).to receive(:for).and_return(DailyKinds::COUNT + 1)
     expect(CoverageException::History).not_to receive(:for)
     expect(CoverageException::History).not_to receive(:recent_coverage_dates)
 

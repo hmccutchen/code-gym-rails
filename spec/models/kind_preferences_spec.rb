@@ -45,7 +45,7 @@ RSpec.describe KindPreferences do
     end
 
     it "is false for everything when nothing is stated" do
-      expect(ExerciseSection.rotatable).to all(satisfy { |kind| !described_class.none.excluded?(kind) })
+      expect(ExerciseSection.rotatable(daily: DailyKinds::DEFAULT)).to all(satisfy { |kind| !described_class.none.excluded?(kind) })
     end
   end
 
@@ -53,7 +53,7 @@ RSpec.describe KindPreferences do
     it "treats a user who has stated nothing as no preferences at all" do
       preferences = described_class.for(stated)
 
-      ExerciseSection.rotatable.each do |kind|
+      ExerciseSection.rotatable(daily: DailyKinds::DEFAULT).each do |kind|
         expect(preferences.multiplier_for(kind)).to eq(described_class::DEFAULT_MULTIPLIER)
         expect(preferences.excluded?(kind)).to be(false)
       end

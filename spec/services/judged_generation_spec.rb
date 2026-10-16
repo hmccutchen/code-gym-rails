@@ -3,7 +3,6 @@ require "rails_helper"
 # Plain callables, since the pipeline reaches a provider only through JudgedGeneration::Provider.
 RSpec.describe JudgedGeneration do
   let(:draft_type) { Struct.new(:problem_set, :plan, :kinds, :difficulty, :unusable_sections, keyword_init: true) }
-  let(:plan_type) { Struct.new(:due_checks, :fourth_due_checks, :reinforcement, :fourth_reinforcement, keyword_init: true) }
   let(:due_check) { Struct.new(:concept) }
 
   let(:user) { User.new(id: 42, skill_level: "senior") }
@@ -16,9 +15,10 @@ RSpec.describe JudgedGeneration do
       "architecture" => { "concept" => "extra", "question" => "never planned" }
     }
   end
+  let(:daily_kinds) { DailyKinds::DEFAULT }
   let(:plan) do
-    plan_type.new(due_checks: [ due_check.new("service_objects") ], fourth_due_checks: [],
-                  reinforcement: [ { concept: "memoization" } ], fourth_reinforcement: nil)
+    plan_for(daily_kinds: daily_kinds, due_checks: [ due_check.new("service_objects") ], fourth_due_checks: [],
+             reinforcement: [ { concept: "memoization" } ], fourth_reinforcement: nil)
   end
   let(:draft) { draft_type.new(problem_set: drafted, plan: plan, kinds: kinds, difficulty: KindDifficulty.none) }
   let(:finished) { [] }
@@ -222,27 +222,29 @@ RSpec.describe JudgedGeneration do
     expect(retry_calls.size).to eq(1)
   end
 
-  it "gives a kind as many retries as its judge_retries allows" do
-    allow(ExerciseSection::Pattern).to receive(:judge_retries).and_return(2)
-    verdicts["pattern"] = [ reject, reject("underdetermined"), { "status" => "keep" } ]
+  context "when the kind is one of the plan's daily kinds" do
+    let(:daily_kinds) { [ ExerciseSection::Pattern, ExerciseSection::CodeReview ] }
 
-    judged = run
+    it "gives it as many retries as the plan allows a daily kind" do
+      verdicts["pattern"] = [ reject, reject("underdetermined"), { "status" => "keep" } ]
 
-    expect(retry_calls.map { |call| call[3] }).to eq(%w[pattern pattern])
-    expect(judged.outcomes["pattern"]).to include(status: :keep, retries: 2, dropped: false)
-    # One entry per judged retry, so the rejected first attempt never describes the section that shipped.
-    expect(judged.outcomes["pattern"]).to include(retry_principle: [ "underdetermined", nil ],
-                                                  retry_evidence: [ "quoted", nil ], retry_reason: [ "because", nil ])
-  end
+      judged = run
 
-  it "drops a section once every retry its kind allows is rejected" do
-    allow(ExerciseSection::Pattern).to receive(:judge_retries).and_return(2)
-    verdicts["pattern"] = [ reject, reject, reject("underdetermined") ]
+      expect(retry_calls.map { |call| call[3] }).to eq(%w[pattern pattern])
+      expect(judged.outcomes["pattern"]).to include(status: :keep, retries: 2, dropped: false)
+      # One entry per judged retry, so the rejected first attempt never describes the section that shipped.
+      expect(judged.outcomes["pattern"]).to include(retry_principle: [ "underdetermined", nil ],
+                                                    retry_evidence: [ "quoted", nil ], retry_reason: [ "because", nil ])
+    end
 
-    judged = run
+    it "drops a section once every retry its kind allows is rejected" do
+      verdicts["pattern"] = [ reject, reject, reject("underdetermined") ]
 
-    expect(retry_calls.size).to eq(2)
-    expect(judged.outcomes["pattern"]).to include(retries: 2, dropped: true, retry_principle: %w[scope_mismatch underdetermined])
+      judged = run
+
+      expect(retry_calls.size).to eq(2)
+      expect(judged.outcomes["pattern"]).to include(retries: 2, dropped: true, retry_principle: %w[scope_mismatch underdetermined])
+    end
   end
 
   # The diagnostics log serializes these hashes, so key order is part of the log line.
