@@ -508,6 +508,18 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".daily_sections_share?" do
+    let(:problem_set) { { "code_review" => { "concept" => "n_plus_one" }, "design_comparison" => { "concept" => "n_plus_one" } } }
+
+    it "holds when every daily section carries the concept" do
+      expect(described_class.daily_sections_share?(problem_set, "n_plus_one", daily: DailyKinds::DEFAULT)).to be(true)
+    end
+
+    it "never holds for an empty pair, which has no section to carry it" do
+      expect(described_class.daily_sections_share?(problem_set, "n_plus_one", daily: [])).to be(false)
+    end
+  end
+
   describe "MAX_SECTIONS" do
     it "is four, one fewer than the slots, so every day leaves at least one slot empty" do
       expect(described_class::MAX_SECTIONS).to eq(4)
