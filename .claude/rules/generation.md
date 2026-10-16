@@ -86,6 +86,11 @@ read it before changing that area.
   `ExerciseSection.all_answer_key_fields`. `AmbiguityHunt.reject_unusable!`
   refuses only when that kind won the slot, a refusal costs only that section,
   and a wrong planted count is not a failure.
+- **Sections are named by kind, never by position**: the generation prompt
+  refers to a section by its JSON key (`The "architecture" section is…`, the
+  fourth-track lines name `@plan.fourth`), because the order of sections is
+  not fixed. `generation_prompt_section_names_spec` fails on "third
+  section" and the like in any prompt snapshot.
 - **Which sections count** (`docs/decisions/which-sections-count.md`):
   `DailyExercise#active_section_keys` (through
   `ExerciseSection.resolved_keys`) is the single authority for which sections

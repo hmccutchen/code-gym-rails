@@ -118,12 +118,12 @@ RSpec.describe "generation prompt characterization" do
       render:   -> { render_case("ruby_rails", pattern: :pattern, third: :challenge,
                                  established: [ mastery("memoization", "ruby_rails"), mastery("scope_chaining", "ruby_rails") ]) },
       includes: [ "Established concepts (well past first mastery — survived a retention check): memoization, scope_chaining" ],
-      excludes: [ "Established fourth-section concept" ]
+      excludes: [ "Established concept for the" ]
     },
     "case__ruby_rails__fourth_established" => {
       render:   -> { render_case("ruby_rails", third: :challenge, fourth: :pseudocode_to_code,
                                  fourth_established: [ mastery("missing_base_case", "pseudocode_to_code") ]) },
-      includes: [ "Established fourth-section concept (well past first mastery, survived a retention check): missing_base_case" ],
+      includes: [ "Established concept for the \"pseudocode_to_code\" section (well past first mastery, survived a retention check): missing_base_case" ],
       excludes: [ "Established concepts (well past" ]
     },
     "case__ruby_rails__retention_mixed_hosts" => {
@@ -198,14 +198,14 @@ RSpec.describe "generation prompt characterization" do
     "case__ruby_rails__fourth_reinforcement" => {
       render:   -> { render_case("ruby_rails", third: :challenge, fourth: :plan_review,
                                  fourth_reinforcement: [ { concept: "scope_creep", bucket: "plan_review", tier: "standard" } ]) },
-      includes: [ "Fourth-section (plan_review) concept needing reinforcement: scope_creep (standard)" ],
-      excludes: [ "Retention check due for the fourth section" ]
+      includes: [ "Concept needing reinforcement in the \"plan_review\" section: scope_creep (standard)" ],
+      excludes: [ "Retention check due for the" ]
     },
     "case__ruby_rails__fourth_due_check" => {
       render:   -> { render_case("ruby_rails", third: :challenge, fourth: :ambiguity_hunt,
                                  fourth_due_checks: [ mastery("undefined_scope_boundary", "ambiguity_hunt") ]) },
-      includes: [ "Fourth-section (ambiguity_hunt) concept needing reinforcement: none",
-                  "Retention check due for the fourth section today: undefined_scope_boundary (ambiguity_hunt bucket)." ],
+      includes: [ "Concept needing reinforcement in the \"ambiguity_hunt\" section: none",
+                  "Retention check due for the \"ambiguity_hunt\" section today: undefined_scope_boundary (ambiguity_hunt bucket)." ],
       excludes: [ "Retention checks due today" ]
     },
     "case__ruby_rails__source_annotate_retention_concept" => {
@@ -254,7 +254,7 @@ RSpec.describe "generation prompt characterization" do
                                  fourth_reinforcement: [ { concept: "scope_creep", bucket: "plan_review", tier: "standard" } ]) },
       includes: [ "This section's concept must be exactly `missing_index`", "Retention checks due today: missing_index (code_review)\n",
                   "Established concepts (well past first mastery — survived a retention check): scope_chaining",
-                  "Fourth-section (plan_review) concept needing reinforcement: scope_creep (standard)", "Sections at junior: code_review\n" ],
+                  "Concept needing reinforcement in the \"plan_review\" section: scope_creep (standard)", "Sections at junior: code_review\n" ],
       excludes: [ "as their concept today", "memoization (", '"pattern": {' ],
       schema:   %w[code_review]
     },
@@ -276,8 +276,8 @@ RSpec.describe "generation prompt characterization" do
                                  due_checks: [ mastery("closures", "javascript") ], established: [ mastery("closures", "javascript") ],
                                  fourth_due_checks: [ mastery("missing_base_case", "pseudocode_to_code") ]) },
       includes: [ "This section's concept must be exactly `missing_base_case`",
-                  "Fourth-section (pseudocode_to_code) concept needing reinforcement: none",
-                  "Retention check due for the fourth section today: missing_base_case (pseudocode_to_code bucket).",
+                  "Concept needing reinforcement in the \"pseudocode_to_code\" section: none",
+                  "Retention check due for the \"pseudocode_to_code\" section today: missing_base_case (pseudocode_to_code bucket).",
                   "Sections at junior: pseudocode_to_code\n" ],
       excludes: [ "as their concept today", "Retention checks due today", '"challenge": {' ],
       schema:   %w[pseudocode_to_code]

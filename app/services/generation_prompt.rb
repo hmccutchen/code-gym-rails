@@ -135,7 +135,7 @@ class GenerationPrompt
   def fourth_reinforcement_line
     return "" unless @plan.fourth
 
-    "Fourth-section (#{@plan.fourth}) concept needing reinforcement: #{annotated_concepts(@plan.fourth_reinforcement)}"
+    "Concept needing reinforcement in the \"#{@plan.fourth}\" section: #{annotated_concepts(@plan.fourth_reinforcement)}"
   end
 
   def retention_block(kinds, rungs)
@@ -170,8 +170,8 @@ class GenerationPrompt
 
     <<~RET.chomp
 
-      Retention check due for the fourth section today: #{@plan.fourth_due_checks.map(&:concept).join(', ')} (#{@plan.fourth} bucket).
-      - This is a concept the engineer previously MASTERED in this skill. Work it into the fourth section as its concept.
+      Retention check due for the "#{@plan.fourth}" section today: #{@plan.fourth_due_checks.map(&:concept).join(', ')} (#{@plan.fourth} bucket).
+      - This is a concept the engineer previously MASTERED in this skill. Work it into the "#{@plan.fourth}" section as its concept.
       - Use a completely FRESH scenario — never reuse a prior framing. Pitch at FULL difficulty, no extra scaffolding — the engineer is not struggling with this, making it easier defeats the point of checking.
     RET
   end
@@ -181,8 +181,8 @@ class GenerationPrompt
 
     <<~EST.chomp
 
-      Established fourth-section concept (well past first mastery, survived a retention check): #{@plan.fourth_established.map(&:concept).join(', ')}
-      - If you were already going to select this for the fourth section's concept, keep the teaching_note minimal and pitch at full difficulty, the same as you would for any other established concept.
+      Established concept for the "#{@plan.fourth}" section (well past first mastery, survived a retention check): #{@plan.fourth_established.map(&:concept).join(', ')}
+      - If you were already going to select this for the "#{@plan.fourth}" section's concept, keep the teaching_note minimal and pitch at full difficulty, the same as you would for any other established concept.
     EST
   end
 
