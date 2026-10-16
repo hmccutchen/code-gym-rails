@@ -35,7 +35,7 @@ class TrialsController < ApplicationController
     return refuse_start(t("trials.provider_needed")) unless TrialMode.providers.include?(params[:provider])
 
     email = normalized_email
-    mail_login_code(email, params[:name].to_s.strip)
+    mail_login_code(email)
     PendingTrial.remember(session, email: email, invite: invite, provider: params[:provider], consented_at: Time.current)
     redirect_to login_path, notice: t("trials.code_sent", expiry: User.login_code_expiry_in_words)
   rescue ActiveRecord::RecordInvalid

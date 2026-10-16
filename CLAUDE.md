@@ -695,7 +695,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   to and a house key set (Gemini, Claude and OpenAI), and none under the kill
   switch.
 
-  **Two ways in.** `/trial/start` is public: a name, an email, the code, a
+  **Two ways in.** `/trial/start` is public: an email, the code, a
   provider and the consent checkbox. It checks the code (`#available?`)
   before mailing anything, mails a login code through the same
   `LoginCodeRequests` concern and limits the login form uses, and keeps a

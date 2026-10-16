@@ -1,10 +1,6 @@
-<%# Required locals: url (form target), providers (provider keys a trial can start on), signed_out (ask for name and email). %>
+<%# Required locals: url (form target), providers (provider keys a trial can start on), signed_out (ask for an email). %>
 <%= form_with url: url, method: :post do |f| %>
   <% if signed_out %>
-    <div class="form-field">
-      <%= f.label :name, t("sessions.new.name_label") %>
-      <%= f.text_field :name, value: params[:name], placeholder: t("sessions.new.name_placeholder"), autocomplete: "name" %>
-    </div>
     <div class="form-field">
       <%= f.label :email, t("sessions.new.email_label") %>
       <%= f.email_field :email, value: params[:email], placeholder: t("sessions.new.email_placeholder"), required: true, autocomplete: "email" %>

@@ -8,8 +8,8 @@ them needs `RAILS_MASTER_KEY` or the credentials file.
 ## `before_validation :clean_name`
 
 A name that breaks the rules is cleaned and clamped rather than refused.
-Sign-up creates the row from a name the person typed, so refusing it would
-fail the login.
+Sign-up names the row after the email's local part, which can be long or
+oddly shaped, so refusing it would fail the login.
 
 ## Section kind validations
 

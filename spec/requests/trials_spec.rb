@@ -3,8 +3,8 @@ require "rails_helper"
 RSpec.describe "Trials", type: :request do
   before { stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key") }
 
-  def start(email: "new@example.com", code:, provider: "fake", consent: "1", name: "New")
-    post start_trial_path, params: { name: name, email: email, invite_code: code, provider: provider, consent: consent }
+  def start(email: "new@example.com", code:, provider: "fake", consent: "1")
+    post start_trial_path, params: { email: email, invite_code: code, provider: provider, consent: consent }
   end
 
   def emailed_code
@@ -23,6 +23,7 @@ RSpec.describe "Trials", type: :request do
       get new_trial_path
 
       expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include('name="name"')
       expect(response.body).to include('name="email"', 'name="invite_code"', 'name="consent"')
       expect(response.body).to include('value="openai"', 'value="fake"')
       expect(response.body).not_to include('value="gemini"')
