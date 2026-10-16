@@ -472,11 +472,7 @@ class AiService
 
   def self.judges_review_prose? = false
 
-  JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes) do
-    def initialize(problem_set:, dropped_sections:, outcomes:, plan_notes: {})
-      super
-    end
-  end
+  JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes)
 
   Draft = Data.define(:problem_set, :plan, :kinds, :difficulty, :ladders, :history,
                       :suggested_concepts, :unusable_sections)
@@ -502,7 +498,7 @@ class AiService
       user: user, language: language, draft: draft,
       providers: -> { fresh_service.judged_generation_provider },
       finish: ->(set, **logs) { finish_generation(user, language, draft, set, **logs) }
-    ).with(plan_notes: draft.plan.notes)
+    )
   end
 
   def review_sections(user, exercise, daily_response, sections:)

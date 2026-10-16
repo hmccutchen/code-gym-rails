@@ -50,6 +50,7 @@ RSpec.describe CoverageException do
       expect(decide(history: CoverageException::History.new(last_seen: {}, coverage_dates: [], first_date: nil))).to be_nil
     end
 
+    # No fallback, unlike rotation, on purpose: docs/decisions/coverage-exception.md.
     it "never adds a kind the user excluded" do
       stale = history(last_seen: { "pattern" => weekdays_ago(30), "plan_review" => weekdays_ago(25) })
       preferences = KindPreferences.new(weights: {}, excluded: [ "pattern" ])

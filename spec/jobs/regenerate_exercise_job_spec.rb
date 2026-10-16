@@ -13,7 +13,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
   end
 
   def unjudged(problem_set, dropped: [])
-    AiService::JudgedSet.new(problem_set: problem_set, dropped_sections: dropped, outcomes: {})
+    AiService::JudgedSet.new(problem_set: problem_set, dropped_sections: dropped, outcomes: {}, plan_notes: {})
   end
 
   def stub_provider(result)

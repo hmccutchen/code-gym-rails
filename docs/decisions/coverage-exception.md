@@ -24,6 +24,19 @@ Reinforcement can still outrank that check for the one retention slot
 recomputed tracks for it); then the addition is given up and the day stays
 at two, rather than spending the cap on a section carrying something else.
 
+**Exclusion is final here, unlike in rotation, on purpose.** Coverage
+drops every excluded kind and has no fallback: when every candidate is
+excluded, it adds nothing. `SectionRotation` falls back to the whole slot
+when exclusion would empty it (`KindPreferences#eligible`), because rotation
+has to produce a day and has no other choice. Coverage only adds an extra
+section to a sparse day, so adding nothing is the right answer, and taking
+rotation's fallback would weaken "never show me this kind" for the sake of
+symmetry. This was decided on 2026-10-16 while building per-user daily
+kinds (PR 1 of the daily kind swap), and the difference is not an
+inconsistency to fix. `spec/services/coverage_exception_spec.rb` ("never
+adds a kind the user excluded") pins it with `pattern`, a slot holding one
+kind, where rotation's fallback would have added it.
+
 **The cap counts calendar weekdays, not delivered rows.** Weekends never
 count toward the four, a weekend addition inside the window still blocks,
 and a paused stretch counts as the weekdays it spans. Because the note is

@@ -58,6 +58,29 @@ that later reads a stored day reads that day's pair through
 was planned before the pair was recorded, when the default pair was the
 only one, so `recorded` falls back to `DEFAULT`.
 
+That fallback is for old rows only, and it must never hide a writer that
+forgot the key, since a swapped user's day would then be read with the wrong
+layout and lose sections. No backfill was run: it would rewrite history and
+change no behaviour (decided 2026-10-16). The guarantee is on the write side
+instead:
+
+- `DailyPlan::Result#notes` always writes `daily_kinds`.
+- `AiService::JudgedSet` requires `plan_notes`, so neither generation path can
+  build a result without the plan's notes.
+- `spec/models/daily_exercise_plan_notes_spec.rb` lists every file under
+  `app/` and `lib/` that writes a problem set, and fails when a new one
+  appears. It checks each path with a non-default pair, so the fallback cannot
+  make it pass: the cron and on-demand generation job (judged weekday and
+  unjudged weekend), `RegenerateExerciseJob`, the held-set carry-forward
+  (which moves the row and keeps its own pair) and `PreviewSeed`.
+
+A model validation on create was considered and not added. Specs create
+about 259 rows directly without notes, and a factory default filling the key
+in would itself mask a forgotten writer. Scripts that build unsaved
+single-section rows (`script/model_comparison.rb`,
+`script/security_audit/prompt_injection_red_team.rb`) are left as they are,
+because a single section resolves the same under any pair.
+
 ## The layout
 
 `ExerciseSection.layout(daily:)` replaced the global `ExerciseSection.slots`.

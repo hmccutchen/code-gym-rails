@@ -839,15 +839,17 @@ end
 
 RSpec.describe DailyPlan::Result, "#notes" do
   def result(**overrides)
-    defaults = DailyPlan::Result.members.index_with { nil }
+    defaults = DailyPlan::Result.members.index_with { nil }.merge(daily_kinds: DailyKinds::DEFAULT)
     DailyPlan::Result.new(**defaults, **overrides)
   end
 
-  it "records only what applied" do
-    expect(result.notes).to eq({})
-    expect(result(shared_concept: "feature_envy").notes).to eq("shared_concept" => "feature_envy")
+  let(:pair) { { "daily_kinds" => %w[code_review design_comparison] } }
+
+  it "always records the pair, and otherwise only what applied" do
+    expect(result.notes).to eq(pair)
+    expect(result(shared_concept: "feature_envy").notes).to eq(pair.merge("shared_concept" => "feature_envy"))
     gap = CoverageException::Addition.new(kind: ExerciseSection::Pattern, reason: :gap)
-    expect(result(coverage: gap).notes).to eq("coverage" => "pattern", "coverage_reason" => "gap")
+    expect(result(coverage: gap).notes).to eq(pair.merge("coverage" => "pattern", "coverage_reason" => "gap"))
   end
 
   it "records the day's daily kinds by key, in place order" do
@@ -862,7 +864,7 @@ RSpec.describe DailyPlan::Result, "#notes" do
     gap = CoverageException::Addition.new(kind: ExerciseSection::Pattern, reason: :gap)
 
     expect(result(size: size, coverage: gap).notes)
-      .to eq("size" => 2, "size_reason" => "completion", "coverage" => "pattern", "coverage_reason" => "gap")
+      .to eq(pair.merge("size" => 2, "size_reason" => "completion", "coverage" => "pattern", "coverage_reason" => "gap"))
   end
 end
 

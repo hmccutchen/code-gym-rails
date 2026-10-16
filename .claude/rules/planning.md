@@ -52,7 +52,10 @@ read it before changing that area.
   authority for which kinds every set holds. `users.daily_section_kinds` is
   sparse (empty means `DailyKinds::DEFAULT`) and normalized on read; each day
   records its pair in `plan_notes["daily_kinds"]`, and a row without it reads
-  as the default. Every slot reader takes the pair through
+  as the default. That fallback covers only rows from before the feature:
+  `DailyPlan::Result#notes` always writes the pair, `AiService::JudgedSet`
+  requires `plan_notes`, and `daily_exercise_plan_notes_spec` lists every
+  writer and fails on a new one. Every slot reader takes the pair through
   `ExerciseSection.layout(daily:)` or `.optional_slots(daily:)`; never
   re-introduce a global slot list. A default account must stay byte-identical,
   which the prompt, page and request snapshots hold. A daily fourth takes the
@@ -93,8 +96,9 @@ read it before changing that area.
   `CoverageException` (pure) adds one optional section, from the pair's
   optional slots, to a two-section Automatic day when the brake is off and
   no exercise on the previous `CAP_WEEKDAYS` weekdays has `plan_notes["coverage"]`, picking a kind for an
-  overdue check or one unseen for `GAP_WEEKDAYS`. It respects exclusions,
-  reads hosting through `DayHosts`, and gives up the addition when the check
+  overdue check or one unseen for `GAP_WEEKDAYS`. It respects exclusions with
+  no fallback, unlike rotation, on purpose: an all-excluded pool adds nothing.
+  It reads hosting through `DayHosts`, and gives up the addition when the check
   would not land in it.
 - **Competency gate** (`docs/decisions/competency-gate.md`): `CompetencyGate`
   earns an Automatic day's size from rubric-stamped reviews; `DaySize` takes

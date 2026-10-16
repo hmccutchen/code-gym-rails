@@ -32,7 +32,7 @@ class JudgedGeneration
     dropped = outcomes.select { |_, outcome| outcome[:dropped] }.keys
     reject_empty_day!(set, dropped)
     finish(set, dropped, outcomes)
-    AiService::JudgedSet.new(problem_set: set, dropped_sections: dropped, outcomes: outcomes)
+    AiService::JudgedSet.new(problem_set: set, dropped_sections: dropped, outcomes: outcomes, plan_notes: @draft.plan.notes)
   end
 
   private
