@@ -29,8 +29,8 @@ from the answer form. A page showing a set that is no longer today's
 behind the stored thread, is refused before anything is billed or written,
 with the 409 text a stale autosave gets: "This page is out of date. Refresh
 it". A reload brings the page level with the server. The duck's older
-"out of step — clear it to keep going" text is left for the legacy path,
-because on a second device it told people to wipe a thread that was fine.
+"out of step — clear it to keep going" text is gone, because on a second
+device it told people to wipe a thread that was fine.
 
 After the reply, the append is stored under the owner's user row lock
 (`FOR SHARE`), then `DailyExercise#with_response_locked`, then the row lock:
@@ -61,21 +61,21 @@ Clear starts a new one, so nobody gets fewer turns than before. A reload no
 longer gives a fresh allowance, because the reload now restores the thread;
 Clear is the reset, as the cap text has always said. Counting on the server
 closes the security audit's A4 (forged assistant turns, a cap reset by an
-empty `thread`) once the legacy path below is removed.
+empty `thread`): a posted `thread` is ignored.
 
-**Pages loaded before the deploy keep today's behaviour for one release.**
+**Pages loaded before the deploy kept the old behaviour for one release.**
 The service worker caches nothing, but an open tab or the home-screen app,
 which Safari restores from its back-forward cache, keeps running the old
 controller until a real reload. That controller posts its own `thread` and no
 `version`. Read as version 0, its first message would succeed with the duck
 blind to the turns on screen, and every later one would be refused as out of
-step. So a request with `thread` and no `version` takes the old path
-unchanged: the posted thread is the history and the cap, and nothing is read
-from or written to `duck_threads`, so forgeable turns can't enter the record.
-Each use logs `[duck] legacy thread shape user <id>`. The follow-up that
-deletes the path, `#duck_thread_param` and `#well_formed_thread?` waits until
-that line has been absent for 7 days, and at least 14 days after the deploy.
-Until then A4 stays open on that path, exactly as before.
+step. So for one release a request with `thread` and no `version` took the old
+path unchanged: the posted thread was the history and the cap, and nothing
+was read from or written to `duck_threads`, so forgeable turns couldn't enter
+the record. Each use logged `[duck] legacy thread shape user <id>`, and the
+path was removed once that line had been absent for 7 days, and at least 14
+days after the deploy. Such a page sends no draft scope, so it now gets the
+refresh text before any call, and a reload moves it onto the new script.
 
 **The table and its readers ship together.** `.claude/rules/deployment.md`
 has a new column ship a release before code reads it, because the worker

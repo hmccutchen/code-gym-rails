@@ -83,7 +83,7 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
       exercise = DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,
                                        problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } })
 
-      post duck_thread_responses_path, params: { section: "code_review", message: "Why?", thread: [] }, as: :json
+      post duck_thread_responses_path, params: { section: "code_review", message: "Why?", version: 0, draft_scope: exercise.draft_scope }, as: :json
       expect(response).to have_http_status(:service_unavailable)
       expect(response.parsed_body).to eq("status" => "error", "failure" => "trial_ended",
                                          "error" => ended_sentence("the thinking partner didn't answer"))

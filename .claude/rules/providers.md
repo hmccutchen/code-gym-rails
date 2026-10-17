@@ -60,9 +60,8 @@ read it before changing that area.
   row lock, `with_response_locked` and the row lock, and return a named
   outcome (`:deleted`, `:submitted`, `:stale`) when what they read moved.
   Every Clear moves the version, and counts itself when it emptied turns. The
-  cap is six user turns a thread, counted on the server. A request with
-  `thread` and no `version` takes the old path for one release and touches no
-  row. Threads are kept 365 days (`SweepDuckThreadsJob`), emptied on start over,
+  cap is six user turns a thread, counted on the server, and a posted `thread`
+  is ignored. Threads are kept 365 days (`SweepDuckThreadsJob`), emptied on start over,
   deleted on account deletion, and never rendered after submit.
 - **Per-user request limits** (`docs/decisions/per-user-request-limits.md`):
   Limits guard a trial's house key, so own-key accounts skip them

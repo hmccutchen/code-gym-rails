@@ -230,7 +230,6 @@ en:
       message_blank: "Say something first."
       message_too_long: "That message is too long — keep it under %{max} characters."
       conversation_too_long: "This conversation is too long to continue — clear it to keep going."
-      conversation_out_of_step: "This conversation is out of step — clear it to keep going."
       no_review_yet: "No review to attach that to yet."
       pseudocode:
         no_section: "Today's set has no pseudocode section."

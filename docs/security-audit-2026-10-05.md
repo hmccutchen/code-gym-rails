@@ -412,6 +412,9 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
   cap from its own copy (`docs/decisions/the-duck-thread-is-stored.md`). A
   request that posts `thread` without `version` still takes the old path for
   one release, so A4 stays open there until that path is removed.
+- **Closed (2026-10-17):** the old path is removed. A posted `thread` is
+  ignored, the cap counts only stored turns, and assistant turns come only
+  from the provider.
 
 **A5. User content and emails in logs (low).**
 - **Found:**
