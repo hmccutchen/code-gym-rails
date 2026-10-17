@@ -6,10 +6,10 @@ RSpec.describe CompetencyGate::Evidence do
   let(:user) { create_user_with_key }
   let(:start) { Date.new(2026, 1, 5) }
 
-  def day(offset, sections = { "code_review" => {} }, owner: user, **attributes)
+  def day(offset, sections = { "code_review" => {} }, owner: user, plan_notes: {}, **attributes)
     date = start + offset
     exercise = DailyExercise.create!(
-      user: owner, date: date, generated_at: Time.current,
+      user: owner, date: date, generated_at: Time.current, plan_notes: plan_notes,
       problem_set: sections.transform_values do |section|
         { "question" => "q", "snippet" => "s", "pitched_at" => section.fetch(:rung, "senior"),
           "eased" => section[:eased] }.compact
@@ -74,7 +74,16 @@ RSpec.describe CompetencyGate::Evidence do
   it "keeps a stamped day's optional state even when none of its sections are evidence" do
     day(0, { "code_review" => { answered: false }, "pattern" => { rung: nil } })
 
-    expect(days).to eq([ CompetencyGate::Day.new(results: [], optional: :complete) ])
+    expect(days).to eq([ CompetencyGate::Day.new(results: [], optional: :complete, daily: %w[code_review design_comparison]) ])
+  end
+
+  it "reads each day's pair from its own row, and the default pair from a row that predates it" do
+    day(0, { "pattern" => {}, "plan_review" => {}, "code_review" => { answered: false } },
+        plan_notes: { "daily_kinds" => %w[pattern plan_review] })
+    day(1, { "code_review" => {}, "design_comparison" => {}, "pattern" => {} })
+
+    expect(days.map { |each_day| [ each_day.daily, each_day.optional ] })
+      .to eq([ [ %w[pattern plan_review], :incomplete ], [ %w[code_review design_comparison], :complete ] ])
   end
 
   it "leaves out sections graded before the rubric on a day that is otherwise stamped" do
@@ -108,20 +117,36 @@ RSpec.describe CompetencyGate::Evidence do
     5.times { |n| day(n) }
     (5..70).each { |n| day(n, { "code_review" => { rung: "principal_engineer", ai: "developing" } }) }
 
-    plans = CompetencyGate.plans(described_class.new(user, batch_size: 7), fixed_kinds: [ "code_review" ])
+    plans = CompetencyGate.plans(described_class.new(user, batch_size: 7))
 
     expect(plans.size).to eq(71)
     expect(plans.map(&:count)).to eq([ 2, 2, 2, 2 ] + [ 3 ] * 67)
-    expect(CompetencyGate.plan(days.last(60), fixed_kinds: [ "code_review" ]).count).to eq(2)
+    expect(CompetencyGate.plan(days.last(60)).count).to eq(2)
+  end
+
+  describe "growth to four after a change of pair" do
+    let(:swapped) { { "daily_kinds" => %w[pattern plan_review] } }
+
+    before { 6.times { |n| day(n) } }
+
+    it "reads a swapped-out kind as optional on the rows planned after the swap" do
+      [ 6, 7 ].each { |n| day(n, { "pattern" => {}, "plan_review" => {}, "code_review" => {} }, plan_notes: swapped) }
+
+      expect(CompetencyGate.for(user).count).to eq(4)
+    end
+
+    it "holds at three when that optional kind goes unanswered, even though the new pair was answered" do
+      [ 6, 7 ].each { |n| day(n, { "pattern" => {}, "plan_review" => {}, "code_review" => { answered: false } }, plan_notes: swapped) }
+
+      expect(CompetencyGate.for(user).count).to eq(3)
+    end
   end
 
   describe "CompetencyGate.for" do
-    it "folds the user's history with the registry's fixed kinds" do
+    it "folds the user's history, each day with its own pair" do
       5.times { |n| day(n) }
 
-      expect(CompetencyGate.for(user)).to eq(
-        CompetencyGate.plan(days, fixed_kinds: DailyKinds::DEFAULT.map(&:key))
-      )
+      expect(CompetencyGate.for(user)).to eq(CompetencyGate.plan(days))
       expect(CompetencyGate.for(user).count).to eq(3)
     end
 

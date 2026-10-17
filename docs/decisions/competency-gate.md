@@ -71,7 +71,7 @@ grows linearly with post-rubric history.
 **The rule.** The gate starts at two and folds over the user's reviewed
 days, oldest first. After each day: two `too_hard` self-ratings among the
 latest four results of any kind (`BRAKE`) return it to two; otherwise, at
-two, 4 favourable of the latest 5 fixed-kind results (`GROW_TO_THREE`)
+two, 4 favourable of the latest 5 daily-kind results (`GROW_TO_THREE`)
 grow it to three; at three, 8 of the latest 10 (`GROW_TO_FOUR`) grow it to
 four, but only when the optional sections were all answered on each of the
 last `OPTIONAL_RUN` days that had any. Otherwise it holds. A window with
@@ -82,13 +82,52 @@ shape `RungLedger` uses, because the AI rating's level calibration is
 unverified. These values are a starting policy, not thresholds history
 has validated.
 
-**A brake restarts growth.** On every day the brake holds, the fixed-kind
+**A brake restarts growth.** On every day the brake holds, the daily-kind
 growth windows start empty, so growing again needs a full window of
 results that came after it. Without that, a user who struggles only on
 optional sections would swing from three to two and straight back to
-three on fixed-kind results earned before the struggle. The brake's own
+three on daily-kind results earned before the struggle. The brake's own
 window is untouched, so the reason stays `:brake` while the too-hard
 results remain in it.
+
+**Growth reads the kinds that were daily that day.** Each `Day` carries
+the pair its row was planned with (`DailyExercise#daily_kinds`, so a row
+from before the pair was recorded reads as the default). A result enters the
+growth windows only when its kind was daily on its own day, and the brake
+still reads every kind. The fold runs forward over every stamped day, so a
+change of pair never reclassifies earlier days: a size earned under one pair
+stays earned, results from a kind's daily days keep counting after it is
+swapped out, and its later optional results never enter growth.
+`Evidence#optional_state` reads the row's pair the same way. Re-reading all
+history with today's pair would quietly change sizes users have already
+earned, which is why the pair is read per day.
+
+Only daily results are stored in the growth runs, rather than storing every
+result with a tag and reading the tagged ones. The windows hold the same
+results, except that a kind's later optional results can never push its
+earlier daily results out of the per-kind memory (`GROWTH_MEMORY`), so the
+windows here are a superset of what tagging would give. A level change seen
+on any day, optional days included, still restarts that kind's runs.
+
+**The default-pair fixture.** A history that only ever held the default pair
+plans exactly as it did when the gate read one global pair.
+`competency_gate_daily_pairs_spec` replays
+`spec/fixtures/competency_gate/default_pair_histories.json`: eight seeded,
+synthetic 50-day histories that grow, brake and hold, with the plans recorded
+from the gate before per-day pairs (`dc14d250`). They are not shaped like
+production: most days carry one or two optional results whatever their size,
+which exercises more of the fold than real two-section days would. `script/record_competency_gate_fixture.rb`
+rebuilds the file from the gate as it stands, and on the per-day gate it
+reproduced the original recording exactly. When a threshold or rule changes
+on purpose, rerun the script, check the count of changed plans it prints, and
+read the diff; a failure with no intended change is a regression, and
+rerunning the script would bake it in.
+
+**Two sections can hold.** On a two-section day the daily kinds' results are
+the only growth input, so a daily kind that is never favourable keeps the day
+at two. This is today's behaviour, pinned by the same spec and recorded as an
+open product question in
+`docs/superpowers/specs/2026-10-16-two-section-gate-hold-note.md`.
 
 **Eased sections reach the brake only.** An eased section answered an
 easier question than its rung, so its AI rating stays out of the growth
@@ -129,7 +168,8 @@ had aged out; the batches bound memory, not history, so the query grows
 with post-rubric history. A day graded before the rubric adds neither
 results nor optional-section history. Each day reaches the fold as a
 `CompetencyGate::Day` whose `optional` is `:none`, `:incomplete` or
-`:complete`. The fold builds a `Plan`'s evidence (required, available,
+`:complete` and whose `daily` holds the keys of the pair the row was
+planned with. The fold builds a `Plan`'s evidence (required, available,
 AI-bar and favourable counts, per-kind counts and levels) only for a plan a
 caller reads: `.plan` and `.for` return it for the last day, and `.plans`
 only with `evidence: true`. The `[set_size]` line logs it.
