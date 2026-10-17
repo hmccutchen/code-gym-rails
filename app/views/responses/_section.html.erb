@@ -40,6 +40,6 @@
                 data-rating-for="<%= key %>" data-rating="<%= value %>"><%= label.upcase_first %></button>
       <% end %>
     </div>
-    <%= render "shared/duck_thread", field: key %>
+    <%= render "shared/duck_thread", field: key, turns: exercise.duck_thread&.turns_for(key) || [], version: exercise.duck_thread&.version_for(key) %>
   <% end %>
 </details>

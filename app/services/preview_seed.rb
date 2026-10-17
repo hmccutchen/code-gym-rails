@@ -65,6 +65,7 @@ class PreviewSeed
   def seed_day(user, date, problem_set)
     exercise = DailyExercise.find_or_create_by!(user: user, date: date) do |e|
       e.problem_set  = problem_set
+      e.plan_notes   = { "daily_kinds" => DailyKinds.for(user).map(&:key) }
       e.language     = "ruby_rails"
       e.generated_at = Time.current
     end

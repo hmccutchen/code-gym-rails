@@ -7,9 +7,9 @@ real back-and-forth. The view partial reads the value from this constant.
 
 ## `MAX_DUCK_MESSAGE_LENGTH` and `MAX_DUCK_THREAD_ENTRIES`
 
-The client holds the thread, so an attacker can make it any size, and the turn
-cap counts only user turns. These two limits bound what is forwarded to the
-provider.
+The message limit bounds every new turn. The entry limit bounds a thread a
+page posts on the legacy path, where the client holds the thread and can make
+it any size; it goes when that path does.
 
 ## `MAX_DUCK_THREAD_BYTES`
 
@@ -39,6 +39,52 @@ answer to text the provider never saw.
 A missing exercise still gets a JSON body, because the client calls
 `res.json()` before it checks `res.ok`.
 
+The provider is called with the stored thread, and the exchange is stored
+only after the reply, under `DuckThread.append!`'s checks.
+
+## `#stale_duck_page?`
+
+A page names the set it shows by its draft scope. A tab loaded before a
+regeneration, or left open since yesterday, still reads version 0 for a
+section, which would match the current set's empty thread: the duck would be
+asked about one problem and answer against another, and its Clear would erase
+the current set's thread. So both actions refuse a scope that isn't today's
+set before the provider call or any write, with the same 409 text a stale
+autosave gets. The legacy path is exempt, since it stores nothing.
+
+## `#stored_thread_refusal`
+
+The byte check runs on the stored thread, because assistant turns in it are
+provider output. A page whose version is behind is refused before this, with
+the refresh text, since its reply would only be refused after it was paid
+for.
+
+## `#duck_outcome`
+
+Maps `DuckThread`'s named outcomes to replies. `:submitted` gets the
+after-submit text; a moved version, a regenerated set and a deleted account
+all get the 409 refresh text, because reloading is what brings the page level
+with the server.
+
+## `#clear_duck_thread`
+
+Refused once the day is submitted, so a kept thread can't be erased from a
+stale page.
+
+## `#load_duck_section` and `#load_duck_turn`
+
+Each renders its own refusal and returns nil, so the actions guard on the
+result. `#duck_refusal` returns nil explicitly, because a render returns a
+truthy value and would let the action carry on.
+
+## `#legacy_duck_request?` and `#legacy_duck_thread`
+
+A page loaded before threads were stored posts its own `thread` and no
+`version`. It takes the old path unchanged and touches no stored row; reading
+it as version 0 would answer once and then refuse every later message as out
+of step. The log line is how its removal is timed. See
+`docs/decisions/the-duck-thread-is-stored.md`.
+
 ## `#pseudocode_critique`
 
 Round 1: one text-only critique of the engineer's plan.
@@ -67,6 +113,8 @@ return `nil`, which the trailing `|| :failed` turns into the failure outcome
 `#create` renders as a 422.
 
 ## `#duck_thread_param`
+
+Legacy path only.
 
 Roles are normalized and limited to `user` and `assistant`; the turn cap
 matches `"user"` exactly. Blank turns are dropped, because the provider would

@@ -135,8 +135,35 @@ RSpec.describe DailyExercise, type: :model do
     it "reads the same keys ExerciseSection.resolved_keys does for FakeService's every-kind set" do
       exercise = DailyExercise.new(problem_set: FakeService::EXERCISE_PROBLEM_SET)
 
-      expect(exercise.active_section_keys).to eq(ExerciseSection.resolved_keys(FakeService::EXERCISE_PROBLEM_SET))
+      expect(exercise.active_section_keys).to eq(ExerciseSection.resolved_keys(FakeService::EXERCISE_PROBLEM_SET, daily: DailyKinds::DEFAULT))
       expect(exercise.active_section_keys).to eq(%w[code_review design_comparison pattern architecture])
+    end
+  end
+
+  describe "#active_section_keys for a row planned with another pair" do
+    let(:pair_user) do
+      User.create!(email: "pair-row@example.com", name: "Pair", daily_section_kinds: %w[architecture code_review])
+    end
+
+    it "keeps the planned pair and its rotated third, in order, after a reload and after the user's pair changes" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil, design_comparison: nil)
+      plan = DailyPlan.for(pair_user, language: "ruby_rails")
+      set  = plan.kinds.to_h { |kind| [ kind.key, { "question" => "?" } ] }
+      exercise = DailyExercise.create!(user: pair_user, date: Date.current, generated_at: Time.current,
+                                       problem_set: set, plan_notes: plan.notes)
+
+      expect(exercise.reload.active_section_keys).to eq(%w[architecture code_review challenge])
+
+      pair_user.update!(daily_section_kinds: [])
+
+      expect(DailyExercise.find(exercise.id).active_section_keys).to eq(%w[architecture code_review challenge])
+    end
+
+    it "reads a row with no recorded pair with the default pair, which shows only one of two thirds" do
+      exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                       problem_set: { "architecture" => {}, "code_review" => {}, "challenge" => {} })
+
+      expect(exercise.active_section_keys).to eq(%w[code_review architecture])
     end
   end
 

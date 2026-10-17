@@ -2,14 +2,16 @@
 
 every day holds
 `code_review` and `design_comparison` (`ExerciseSection::DesignComparison`,
-`fixed? true`), each in a slot of its own ahead of pattern, third and
-fourth. A day still holds at most `ExerciseSection::MAX_SECTIONS` (4), so
+`default_daily? true`), each in a slot of its own ahead of pattern, third
+and fourth. Those are the default daily pair; since `DailyKinds`
+(`docs/decisions/daily-kinds.md`) the pair is a per-user value and the
+slots come from `ExerciseSection.layout(daily:)`. A day still holds at most `ExerciseSection::MAX_SECTIONS` (4), so
 a day of N sections has N − 2 optional slots, which pattern, the thirds
 and the fourths compete for on staleness. With five slots, a payload with
 a shape in every slot would resolve to five sections: `ProblemSetIngest`
 drops the slots the plan left empty whenever a payload would resolve past
 the maximum, and `ExerciseSection.resolved_keys` caps a stored row at
-`MAX_SECTIONS`, fixed kinds first, so a requested section is never the one
+`MAX_SECTIONS`, daily kinds first, so a requested section is never the one
 cut. Below the maximum an unrequested extra is still kept and warned about.
 
 **The task.** Two working pieces of code that meet the same stated
@@ -108,5 +110,6 @@ first exposure for every other kind; for this one it names and illustrates
 the principle the grade asks for, so `.reference_opens_before_answer?` is
 false and it stays closed until the engineer opens it.
 
-**Setup.** The Exercise mix groups the fixed kinds under "In every set"
-(difficulty only), and gives pattern a group of its own.
+**Setup.** The Exercise mix groups the user's daily kinds under "In every set"
+(difficulty only), and gives pattern, and any default kind that is not
+daily, a group of its own.

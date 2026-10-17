@@ -91,6 +91,15 @@ RSpec.describe "Progress", type: :request do
     expect(response.body).to include(setup_path)
   end
 
+  it "counts a daily kind as offered even when the user had excluded it" do
+    user.update!(excluded_section_kinds: [ "architecture" ])
+    user.update!(daily_section_kinds: %w[architecture code_review])
+
+    get progress_path
+
+    expect(response.body).to match(%r{data-concept="sync_vs_async"[^>]*data-standing="not_yet"})
+  end
+
   it "appears in the navigation" do
     get root_path
 

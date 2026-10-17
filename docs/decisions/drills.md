@@ -36,7 +36,7 @@ group is one.** It is a stated 2, kept below the non-fourth hosts on the
 fullest day, where every drill but a fourth-bucket one competes, so
 single-concept drills always leave a host for evidence-driven
 reinforcement or an overdue retention check. It is not derived from
-`ExerciseSection.slots`: the second fixed slot raised that count without
+the slot layout: the second daily slot raised that count without
 making a day longer, and `DailyPlan.share_hosts` already keeps a host for
 evidence when drills outnumber the hosts. A fourth-bucket drill counts
 against the same cap while occupying only the fourth: the cap bounds how

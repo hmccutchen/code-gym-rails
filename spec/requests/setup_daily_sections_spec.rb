@@ -6,7 +6,7 @@ RSpec.describe "Setup Daily sections control", type: :request do
   def page_html = Nokogiri::HTML(response.body)
 
   def fixed_section_names
-    ExerciseSection.fixed.map { |kind| I18n.t("sections.#{kind.key}.name") }
+    DailyKinds.for(user).map { |kind| I18n.t("sections.#{kind.key}.name") }
   end
 
   it "offers Automatic and every count with the stored one checked" do
@@ -21,9 +21,9 @@ RSpec.describe "Setup Daily sections control", type: :request do
     expect(page_html.at_css("#daily-sections input[checked]")["value"]).to eq("3")
   end
 
-  # The hint holds only while the lowest choice equals the number of fixed sections.
-  it "names the fixed sections as everything the lowest choice holds" do
-    expect(User::DAILY_SECTION_COUNTS.first).to eq(ExerciseSection.fixed.size)
+  # The hint holds only while the lowest choice equals the number of daily sections.
+  it "names the user's daily sections as everything the lowest choice holds" do
+    expect(User::DAILY_SECTION_COUNTS.first).to eq(DailyKinds::COUNT)
     login_as(user)
 
     get setup_path

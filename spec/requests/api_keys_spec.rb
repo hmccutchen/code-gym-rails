@@ -204,7 +204,7 @@ RSpec.describe "ApiKeys", type: :request do
 
       get setup_path
 
-      ExerciseSection.rotatable.each do |kind|
+      ExerciseSection.rotatable(daily: DailyKinds::DEFAULT).each do |kind|
         expect(response.body).to include(%(id="weight-#{kind.key}"))
         expect(response.body).to include(%(id="exclude-#{kind.key}"))
         expect(response.body).to include(I18n.t("sections.#{kind.key}.name"))

@@ -2,11 +2,22 @@
 
 ## The partial
 
-A pre-submission thinking partner for one section. The conversation lives only
-in this tab's memory and is sent back in full on every request as prompt
-context; nothing is written on the server. The partial renders only from an
-unsubmitted section, and once the day is submitted it is not rendered again,
-so there is nothing to clean up.
+A pre-submission thinking partner for one section. The server stores the
+conversation (`DuckThread`), so a reload or another device shows it again. The
+partial renders only from an unsubmitted section, and once the day is
+submitted it is not rendered again.
+
+## Restored turns
+
+`turns` and `version` come from the section's stored thread. Each is written
+as a Stimulus value only when present: turns when there are any, and the
+version once it is above 0. A section that was never written renders exactly
+the markup it rendered before threads were stored. A cleared section keeps its
+version on the page, because a reload without it would send 0 and every next
+message would be refused. The
+attributes sit at the end of the last attribute line, inside one `if`, for the
+same reason: a statement on a line of its own would add whitespace to every
+page.
 
 ## Visually hidden input label
 

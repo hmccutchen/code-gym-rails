@@ -1,4 +1,4 @@
-# Each kind is read at its rung, since the prompt grounds every kind at it; gaps skip kinds the plan can never pick.
+# Each kind is read at its rung, since the prompt grounds every kind at it; gaps skip kinds the user's pair and exclusions leave unpicked.
 class LadderCoverage
   Entry = Data.define(:kind, :pairs, :grounded) do
     def gaps = pairs - grounded
@@ -11,7 +11,7 @@ class LadderCoverage
 
     preferences = KindPreferences.for(user)
     new(pairs_by_kind.to_h { |kind, pairs| [ kind, Entry.new(kind: kind, pairs: pairs, grounded: pairs & grounded) ] },
-        offered: ExerciseSection.all.reject { |kind| preferences.excluded?(kind) })
+        offered: preferences.offered(daily: DailyKinds.for(user)))
   end
 
   def self.laddered_pairs(pairs)

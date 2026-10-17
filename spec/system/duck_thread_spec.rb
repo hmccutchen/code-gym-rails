@@ -16,7 +16,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     duck.find(".duck-send").click
   end
 
-  it "answers a question, keeps the thread client-side, and enforces the cap" do
+  it "answers a question and enforces the cap" do
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
@@ -96,13 +96,12 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
       # Resolve in-page with a canned payload so Clear runs mid-flight deterministically, with no network involved.
       page.execute_script(<<~JS)
-        window.__release = null;
-        window.fetch = () => new Promise((resolve) => {
-          window.__release = () => resolve(new Response(
-            JSON.stringify({ status: "ok", answer: "RELEASED-ANSWER" }),
-            { status: 200, headers: { "Content-Type": "application/json" } }
-          ));
-        });
+        window.__held = [];
+        window.__release = () => window.__held.splice(0).forEach((resolve) => resolve(new Response(
+          JSON.stringify({ status: "ok", answer: "RELEASED-ANSWER", version: 1 }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )));
+        window.fetch = () => new Promise((resolve) => window.__held.push(resolve));
       JS
 
       ask(duck, "hold this one open")
@@ -120,6 +119,167 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       expect(duck).to have_no_content("RELEASED-ANSWER")
       expect(duck.find(".duck-send")).not_to be_disabled
       expect(duck.find(".duck-input")).not_to be_disabled
+    end
+  end
+
+  def reopen_duck
+    visit root_path
+    expect(page).to have_content(/Code Review/i, wait: 10)
+    duck = first(".duck-thread[data-duck-thread-section-value='code_review']")
+    duck.find(".duck-toggle").click
+    duck
+  end
+
+  it "restores the thread after a reload, and the duck still answers from it" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      ask(open_duck(user), "before the reload")
+      expect(page).to have_css(".duck-turn.duck-assistant", count: 1, wait: 10)
+
+      duck = reopen_duck
+      expect(duck).to have_css(".duck-turn.duck-user", text: "before the reload")
+      expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT)
+
+      ask(duck, "after the reload")
+      expect(duck).to have_css(".duck-turn.duck-user", count: 2, wait: 10)
+      expect(duck).to have_no_content(/out of step/i)
+    end
+  end
+
+  it "keeps the cap across a reload, and Clear still gives it back" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+      ResponsesController::MAX_DUCK_TURNS_PER_SECTION.times do |i|
+        ask(duck, "stuck #{i}")
+        expect(duck).to have_css(".duck-turn.duck-user", count: i + 1, wait: 10)
+      end
+
+      duck = reopen_duck
+      expect(duck).to have_content(/used all #{ResponsesController::MAX_DUCK_TURNS_PER_SECTION} messages/i)
+      expect(duck.find(".duck-send")).to be_disabled
+
+      duck.find(".duck-clear").click
+      expect(duck.find(".duck-send")).not_to be_disabled
+      ask(duck, "a fresh start")
+      expect(duck).to have_css(".duck-turn.duck-user", count: 1, wait: 10)
+      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT)
+    end
+  end
+
+  it "keeps a cleared thread cleared after a reload, and answers the next message" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+      ask(duck, "soon cleared")
+      expect(duck).to have_css(".duck-turn.duck-assistant", count: 1, wait: 10)
+
+      duck.find(".duck-clear").click
+      cleared = -> { DuckThread.first.reload.stored_turns("code_review").empty? }
+      50.times { cleared.call ? break : sleep(0.2) }
+      expect(cleared.call).to be(true)
+
+      duck = reopen_duck
+      expect(duck).to have_no_css(".duck-turn")
+
+      ask(duck, "after clearing and reloading")
+      expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(duck).to have_no_content(/out of step/i)
+    end
+  end
+
+  it "sends one Clear for a double click, and the next message is answered" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+      ask(duck, "soon cleared twice")
+      expect(duck).to have_css(".duck-turn.duck-assistant", count: 1, wait: 10)
+
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch;
+        window.__deletes = 0;
+        window.__held = [];
+        window.__release = () => window.__held.splice(0).forEach((go) => go());
+        window.fetch = (url, options) => {
+          if (options?.method !== "DELETE") return originalFetch(url, options);
+          window.__deletes++;
+          return new Promise((resolve) => window.__held.push(() => resolve(originalFetch(url, options))));
+        };
+      JS
+      duck.find(".duck-clear").click
+      duck.find(".duck-clear").click
+      expect(page.evaluate_script("window.__deletes")).to eq(1)
+      page.execute_script("window.__release()")
+
+      ask(duck, "after a double clear")
+      expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(duck).to have_no_content(/out of step/i)
+      expect(page.evaluate_script("window.__deletes")).to eq(1)
+    end
+  end
+
+  it "puts the thread back when Clear can't reach the server" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+      ask(duck, "kept on a failed clear")
+      expect(duck).to have_css(".duck-turn.duck-assistant", count: 1, wait: 10)
+
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch;
+        window.fetch = (url, options) => options?.method === "DELETE"
+          ? Promise.reject(new TypeError("offline"))
+          : originalFetch(url, options);
+      JS
+      duck.find(".duck-clear").click
+
+      expect(duck).to have_css(".duck-turn.duck-user", text: "kept on a failed clear", wait: 10)
+      expect(duck).to have_content(I18n.t("duck.send_failed"))
+      expect(DuckThread.first.reload.user_turn_count("code_review")).to eq(1)
+    end
+  end
+
+  [ [ "the reply returns first", %w[ask delete] ], [ "the Clear fails first", %w[delete ask] ] ].each do |order_name, order|
+    it "keeps the in-flight reply when Clear can't reach the server and #{order_name}" do
+      user = create_fake_provider_user
+
+      travel_to(a_weekday) do
+        duck = open_duck(user)
+        page.execute_script(<<~JS)
+          window.__originalFetch = window.fetch;
+          window.__held = {};
+          window.fetch = (url, options) => {
+            if (options?.method === "DELETE") {
+              return new Promise((_, reject) => { window.__held.delete = () => reject(new TypeError("offline")); });
+            }
+            if (options?.method === "POST" && String(url).includes("duck_thread")) {
+              return new Promise((resolve) => { window.__held.ask = () => resolve(window.__originalFetch(url, options)); });
+            }
+            return window.__originalFetch(url, options);
+          };
+        JS
+
+        ask(duck, "sent before the clear")
+        expect(duck).to have_content("Thinking…", wait: 10)
+        duck.find(".duck-clear").click
+        order.each do |kind|
+          page.execute_script("window.__held['#{kind}']()")
+          sleep 0.5
+        end
+
+        expect(duck).to have_css(".duck-turn.duck-user", text: "sent before the clear", wait: 10)
+        expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT)
+
+        page.execute_script("window.fetch = window.__originalFetch")
+        ask(duck, "the next message")
+        expect(duck).to have_css(".duck-turn.duck-user", count: 2, wait: 10)
+        expect(duck).to have_no_content(/out of date|out of step/i)
+      end
     end
   end
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_17_080000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_17_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -124,6 +124,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_17_080000) do
     t.index ["daily_exercise_id"], name: "index_daily_responses_on_daily_exercise_id", unique: true
     t.index ["user_id", "date"], name: "index_daily_responses_on_user_id_and_date", unique: true
     t.index ["user_id"], name: "index_daily_responses_on_user_id"
+  end
+
+  create_table "duck_threads", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "daily_exercise_id", null: false
+    t.string "draft_scope", null: false
+    t.jsonb "threads", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["daily_exercise_id"], name: "index_duck_threads_on_daily_exercise_id", unique: true
+    t.index ["user_id"], name: "index_duck_threads_on_user_id"
   end
 
   create_table "featured_concepts", force: :cascade do |t|
@@ -406,6 +417,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_17_080000) do
   add_foreign_key "daily_kind_swaps", "users"
   add_foreign_key "daily_responses", "daily_exercises"
   add_foreign_key "daily_responses", "users"
+  add_foreign_key "duck_threads", "daily_exercises"
+  add_foreign_key "duck_threads", "users"
   add_foreign_key "featured_concepts", "users"
   add_foreign_key "level_suggestion_events", "users"
   add_foreign_key "push_subscriptions", "users"

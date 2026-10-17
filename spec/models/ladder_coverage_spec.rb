@@ -76,6 +76,23 @@ RSpec.describe LadderCoverage do
     expect(gaps).to include([ "n_plus_one", "ruby_rails" ])
   end
 
+  it "prepares nothing for a daily fourth's siblings, which no set can hold" do
+    user.update!(daily_section_kinds: %w[code_review plan_review])
+    sibling_buckets = %w[ambiguity_hunt pseudocode_to_code].map { |key| ConceptBucket.for(key, nil) }
+
+    gaps = described_class.for(user.reload).gaps
+
+    expect(gaps.map(&:last)).to include(ConceptBucket.for("plan_review", nil))
+    expect(gaps.map(&:last) & sibling_buckets).to be_empty
+  end
+
+  it "prepares a daily kind the user had excluded, since every set holds it" do
+    user.update!(excluded_section_kinds: %w[architecture])
+    user.update!(daily_section_kinds: %w[architecture code_review])
+
+    expect(described_class.for(user.reload).gaps.map(&:last)).to include(ConceptBucket::ARCHITECTURE)
+  end
+
   it "names the kinds a concept grounds" do
     kinds = described_class.for(user).grounding_kinds("n_plus_one", "ruby_rails")
 

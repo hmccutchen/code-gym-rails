@@ -2,14 +2,14 @@ require "rails_helper"
 
 RSpec.describe SharedConcept do
   let(:hosts) { DayHosts.new("ruby_rails", mode: :application_code) }
-  let(:fixed) { ExerciseSection.fixed }
+  let(:fixed) { DailyKinds::DEFAULT }
 
   def entry(concept, tier: "standard", drilled: nil)
     { concept: concept, bucket: "ruby_rails", tier: tier, drilled: drilled }.compact
   end
 
   def pick(list, kinds:, due_checks: [])
-    described_class.pick(list, due_checks, hosts, kinds: kinds)
+    described_class.pick(list, due_checks, hosts, kinds: kinds, daily: fixed)
   end
 
   it "takes the first reduced entry every fixed section can tag, drilled or not, when the rest fit elsewhere" do
@@ -21,6 +21,13 @@ RSpec.describe SharedConcept do
 
   it "takes nothing from a list with no reduced entry" do
     expect(pick([ entry("n_plus_one") ], kinds: fixed + [ ExerciseSection::Pattern ])).to be_nil
+  end
+
+  it "takes nothing for a pair holding a fourth kind, which cannot tag a language concept" do
+    daily = [ ExerciseSection::CodeReview, ExerciseSection::PlanReview ]
+    list  = [ entry("n_plus_one", tier: "reduced") ]
+
+    expect(described_class.pick(list, [], hosts, kinds: daily + [ ExerciseSection::Pattern ], daily: daily)).to be_nil
   end
 
   it "takes nothing when the day left no host free" do

@@ -5,12 +5,14 @@
 A tap on an exclude, lock, difficulty or daily-sections label toggles its
 box, so the label is the tap target. 24px is the WCAG 2.5.8 minimum for it.
 
-## Fixed and single-kind groups
+## Daily and single-kind groups
 
 These groups complement the rotating loop below them: a slot holding one
 candidate has nothing to weigh or exclude, but its difficulty can still be
-set. The fixed kinds share one group because they share a promise, that they
-are in every set. Any other single-kind slot appears in some sets only, so it
+set. The user's daily kinds (`DailyKinds.for`) share one group because they
+share a promise, that they are in every set. The other groups come from
+`ExerciseSection.optional_slots` for that pair, so a daily kind is never
+offered a weight or an exclusion. Any other single-kind slot appears in some sets only, so it
 gets a group of its own.
 
 ## Rotating groups

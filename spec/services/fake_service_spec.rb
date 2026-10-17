@@ -25,7 +25,7 @@ RSpec.describe FakeService do
 
       # Derived from the registry so "every kind" stays true when a kind is added.
       expect(described_class::EXERCISE_PROBLEM_SET.keys).to match_array(ExerciseSection.keys)
-      expect(ExerciseSection.resolved_keys(problem_set)).to include(*ExerciseSection.fixed.map(&:key))
+      expect(ExerciseSection.resolved_keys(problem_set, daily: DailyKinds::DEFAULT)).to include(*DailyKinds::DEFAULT.map(&:key))
       problem_set.each_value do |section|
         expect(section["concept"]).to be_present
         expect(section["concept"]).not_to eq("other")
