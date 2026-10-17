@@ -28,7 +28,7 @@ class DailyKinds
     return [] if keys.empty?
     return [] if keys.all?(String) && keys.size == COUNT && normalize(keys).map(&:key) == keys
 
-    [ "must name #{COUNT} different section kinds, at most one of them a fourth-section kind" ]
+    [ "must name #{COUNT} different section kinds, at most one of them from #{ExerciseSection.fourths.map(&:key).join(", ")}" ]
   end
 
   def self.fitting(kind, placed)

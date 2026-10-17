@@ -176,7 +176,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
 
     def generation_guidance(vocabulary:, label:, rung: nil, **)
       <<~GUIDANCE.chomp
-        - The second section is a DESIGN COMPARISON: "better_piece" and "other_piece" are two pieces of #{label} code, 12-15 lines each, that meet the same stated behavior, including its retry and failure cases, and differ on exactly one design principle: the tagged concept. Compare what they cost to change or to run, never correct behavior against a defect; a worse piece that is incorrect turns this into a code review.
+        - The "#{key}" section is a DESIGN COMPARISON: "better_piece" and "other_piece" are two pieces of #{label} code, 12-15 lines each, that meet the same stated behavior, including its retry and failure cases, and differ on exactly one design principle: the tagged concept. Compare what they cost to change or to run, never correct behavior against a defect; a worse piece that is incorrect turns this into a code review.
         - Surface parity: the pieces behave identically, are about the same length, and are equally clean, named and commented. Any difference other than the tested principle is a defect.
         - #{rung_line(rung)}
         - The deciding fact must be stated in the section. A hypothetical condition the section never states does not decide anything.

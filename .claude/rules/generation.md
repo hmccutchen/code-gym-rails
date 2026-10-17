@@ -87,6 +87,14 @@ read it before changing that area.
   `ExerciseSection.all_answer_key_fields`. `AmbiguityHunt.reject_unusable!`
   refuses only when that kind won the slot, a refusal costs only that section,
   and a wrong planted count is not a failure.
+- **Sections are named by kind, never by position**
+  (`docs/decisions/kind-named-prompt-sections.md`): every prompt refers to a
+  section by its JSON key (`The "architecture" section is…`, the
+  fourth-track lines name `@plan.fourth`), since per-user daily kinds make
+  the order vary. The fourth-track lines render only when the fourth kind is
+  requested, so a retry never names an absent key.
+  `generation_prompt_section_names_spec` fails on "third section" and the
+  like in any prompt snapshot or any Ruby file under `app/` or `lib/`.
 - **Which sections count** (`docs/decisions/which-sections-count.md`):
   `DailyExercise#active_section_keys` (through
   `ExerciseSection.resolved_keys`, given the row's own pair from

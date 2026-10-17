@@ -66,7 +66,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
 
   def self.generation_guidance(vocabulary:, label:, **)
     <<~GUIDANCE.chomp
-      - The fourth section is PSEUDOCODE TO CODE: "problem_statement" is a self-contained problem the engineer will plan in pseudocode before any code exists. It must be solvable in roughly 15-25 lines of pseudocode — small enough to plan in one sitting, large enough to need real decomposition — and must state at least one requirement an under-specified plan would quietly miss (an empty input, a boundary, an ordering guarantee, a failure path), so there is something missable to grade.
+      - The "#{key}" section is PSEUDOCODE TO CODE: "problem_statement" is a self-contained problem the engineer will plan in pseudocode before any code exists. It must be solvable in roughly 15-25 lines of pseudocode — small enough to plan in one sitting, large enough to need real decomposition — and must state at least one requirement an under-specified plan would quietly miss (an empty input, a boundary, an ordering guarantee, a failure path), so there is something missable to grade.
       - State the problem in terms of behavior and inputs, never in terms of #{label} APIs: the engineer answers in pseudocode, and naming a framework method would hand them the decomposition.
       - Do NOT include starter code, a function signature, or a worked example. Choosing the decomposition is the whole exercise.
       - Choose the pseudocode_to_code concept from this vocabulary, exactly one: #{vocabulary.join(", ")}

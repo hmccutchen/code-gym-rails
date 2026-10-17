@@ -454,7 +454,7 @@ RSpec.describe AiService do
     it "writes no fourth-section reinforcement line when there is no fourth" do
       prompt = render_generation_prompt(user, "ruby_rails", third: :challenge, fourth: nil)
 
-      expect(prompt).not_to include("Fourth-section")
+      expect(prompt).not_to include("Concept needing reinforcement in the")
     end
 
     it "gives guidance for each chosen section and no others" do
@@ -2161,7 +2161,7 @@ RSpec.describe AiService do
 
       svc.generate_exercise(user)
 
-      expect(svc.last_prompt).to include('"architecture": {', "The third section is an ARCHITECTURE decision")
+      expect(svc.last_prompt).to include('"architecture": {', 'The "architecture" section is an ARCHITECTURE decision')
       expect(svc.last_prompt).not_to include('"challenge": {', '"pattern": {')
     end
 
@@ -4762,7 +4762,7 @@ RSpec.describe AiService, "drilled concepts in the generation prompt" do
     prompt = render_generation_prompt(user, fourth: :plan_review,
                                fourth_reinforcement: [ { concept: "scope_creep", bucket: "plan_review", tier: "standard", drilled: true } ])
 
-    expect(prompt).to include("Fourth-section (plan_review) concept needing reinforcement: scope_creep (standard, drilled)")
+    expect(prompt).to include('Concept needing reinforcement in the "plan_review" section: scope_creep (standard, drilled)')
   end
 
   it "leaves the locked-kind line to override easing for whichever concept it carries" do

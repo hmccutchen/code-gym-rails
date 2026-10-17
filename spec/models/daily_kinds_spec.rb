@@ -88,7 +88,7 @@ RSpec.describe DailyKinds do
                   %w[pattern pattern], %w[plan_review ambiguity_hunt] ]
       refused.each do |shape|
         expect(described_class.problems_with(shape))
-          .to eq([ "must name 2 different section kinds, at most one of them a fourth-section kind" ]), shape.inspect
+          .to eq([ "must name 2 different section kinds, at most one of them from plan_review, ambiguity_hunt, pseudocode_to_code" ]), shape.inspect
       end
     end
   end

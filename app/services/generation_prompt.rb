@@ -28,7 +28,7 @@ class GenerationPrompt
       #{history_text}
 
       Concepts needing reinforcement right now: #{annotated_concepts(@plan.reinforcement)}
-      #{fourth_reinforcement_line}
+      #{fourth_reinforcement_line(kinds)}
 
       Instructions:
       - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
@@ -57,8 +57,8 @@ class GenerationPrompt
       - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.#{fixed_concept_line(fixed_concept)}#{shared_concept_line(only)}
       #{retention_block(kinds, rungs)}
       #{established_block}
-      #{fourth_retention_block}
-      #{fourth_established_block}#{DifficultyGuidance.render(rungs: rungs, difficulty: @difficulty, ladders: @ladders)}
+      #{fourth_retention_block(kinds)}
+      #{fourth_established_block(kinds)}#{DifficultyGuidance.render(rungs: rungs, difficulty: @difficulty, ladders: @ladders)}
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
@@ -132,10 +132,12 @@ class GenerationPrompt
     "#{entry[:concept]} (#{[ entry[:tier], ("drilled" if entry[:drilled]) ].compact.join(', ')})"
   end
 
-  def fourth_reinforcement_line
-    return "" unless @plan.fourth
+  def fourth_planned?(kinds) = @plan.fourth.present? && kinds.any? { |kind| kind.key == @plan.fourth.to_s }
 
-    "Fourth-section (#{@plan.fourth}) concept needing reinforcement: #{annotated_concepts(@plan.fourth_reinforcement)}"
+  def fourth_reinforcement_line(kinds)
+    return "" unless fourth_planned?(kinds)
+
+    "Concept needing reinforcement in the \"#{@plan.fourth}\" section: #{annotated_concepts(@plan.fourth_reinforcement)}"
   end
 
   def retention_block(kinds, rungs)
@@ -165,24 +167,24 @@ class GenerationPrompt
     EST
   end
 
-  def fourth_retention_block
-    return "" if @plan.fourth_due_checks.none?
+  def fourth_retention_block(kinds)
+    return "" if !fourth_planned?(kinds) || @plan.fourth_due_checks.none?
 
     <<~RET.chomp
 
-      Retention check due for the fourth section today: #{@plan.fourth_due_checks.map(&:concept).join(', ')} (#{@plan.fourth} bucket).
-      - This is a concept the engineer previously MASTERED in this skill. Work it into the fourth section as its concept.
+      Retention check due for the "#{@plan.fourth}" section today: #{@plan.fourth_due_checks.map(&:concept).join(', ')} (#{@plan.fourth} bucket).
+      - This is a concept the engineer previously MASTERED in this skill. Work it into the "#{@plan.fourth}" section as its concept.
       - Use a completely FRESH scenario — never reuse a prior framing. Pitch at FULL difficulty, no extra scaffolding — the engineer is not struggling with this, making it easier defeats the point of checking.
     RET
   end
 
-  def fourth_established_block
-    return "" if @plan.fourth_established.none?
+  def fourth_established_block(kinds)
+    return "" if !fourth_planned?(kinds) || @plan.fourth_established.none?
 
     <<~EST.chomp
 
-      Established fourth-section concept (well past first mastery, survived a retention check): #{@plan.fourth_established.map(&:concept).join(', ')}
-      - If you were already going to select this for the fourth section's concept, keep the teaching_note minimal and pitch at full difficulty, the same as you would for any other established concept.
+      Established concept for the "#{@plan.fourth}" section (well past first mastery, survived a retention check): #{@plan.fourth_established.map(&:concept).join(', ')}
+      - If you were already going to select this for the "#{@plan.fourth}" section's concept, keep the teaching_note minimal and pitch at full difficulty, the same as you would for any other established concept.
     EST
   end
 

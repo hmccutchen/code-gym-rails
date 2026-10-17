@@ -44,6 +44,10 @@ blocks list plain concept names where the main retention block annotates each
 with its hosts. Four rules share one syntax here; they are not one rule stated
 four times, so each keeps its own method and heredoc.
 
+All three fourth-track methods take the requested kinds and stay empty
+through `#fourth_planned?` unless the fourth kind is among them, so a retry
+for another kind does not name a section its schema lacks.
+
 ## `#annotate_reinforcement`
 
 Shows the tier and `drilled` side by side, so the model can tell the system's
