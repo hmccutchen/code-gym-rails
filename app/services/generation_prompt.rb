@@ -87,7 +87,7 @@ class GenerationPrompt
   def config = AiService.config_for(@language)
 
   def kinds_for(only)
-    only ? [ only ] : ExerciseSection.for_plan(third: @plan.third, fourth: @plan.fourth, pattern: @plan.pattern)
+    only ? [ only ] : @plan.kinds
   end
 
   def profile_name
@@ -207,7 +207,7 @@ class GenerationPrompt
   def shared_concept_guidance(concept)
     return "" if concept.nil?
 
-    sections = ExerciseSection.fixed.map(&:key).to_sentence
+    sections = @plan.daily_kinds.map(&:key).to_sentence
     "\n- The #{sections} sections share `#{concept}` as their concept today. It is one concept needing reinforcement, looked at from different sides: each section tests it in its own way and its own scenario, following its own rules above."
   end
 

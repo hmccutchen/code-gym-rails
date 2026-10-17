@@ -14,12 +14,20 @@ export default class extends Controller {
     thinkingText: String,
     cappedText: String,
     userSpeaker: String,
-    assistantSpeaker: String
+    assistantSpeaker: String,
+    turns: Array,
+    version: Number
   }
 
   connect() {
-    this.thread = []
+    this.thread = this.turnsValue.map((turn) => ({ role: turn.role, content: turn.content }))
+    this.version = this.versionValue
     this.generation = 0
+    this.clearing = Promise.resolve()
+    if (this.thread.length > 0) {
+      this.renderTurns()
+      this.refreshCap()
+    }
   }
 
   toggle() {
@@ -36,31 +44,57 @@ export default class extends Controller {
   }
 
   clear() {
+    const cleared = this.thread
     this.generation += 1
     this.thread = []
     // input.value is left alone: after a failed send it holds text to retry, and Clear names the conversation.
     this.statusTarget.textContent = ""
     this.renderTurns()
     this.refreshCap()
+    if (this.clearPending) return
+
+    this.clearPending = true
+    this.overtaken = []
+    this.clearing = this.clearStored(cleared, this.generation - 1).finally(() => { this.clearPending = false })
+  }
+
+  async clearStored(cleared, generationBefore) {
+    const result = await request.send("DELETE", this.urlValue, { section: this.sectionValue, draft_scope: this.draftScope() },
+      { fallback: this.sendFailedTextValue })
+    if (result.ok && typeof result.data?.version === "number") {
+      this.version = result.data.version
+      return
+    }
+    this.generation = generationBefore
+    this.thread = cleared
+    this.overtaken.forEach(({ message, data }) => this.keepReply(message, data))
+    this.renderTurns()
+    this.refreshCap()
+    this.statusTarget.textContent = result.message || this.sendFailedTextValue
   }
 
   async ask(explicitMessage) {
     const message = explicitMessage || this.inputTarget.value.trim()
     if (!message || this.sendTarget.disabled) return
 
-    const priorThread = this.thread.slice()
     const generation = this.generation
     this.disableControls(true)
     this.statusTarget.textContent = this.thinkingTextValue
 
+    await this.clearing
+    if (generation !== this.generation) return this.refreshCap()
+
     const result = await request.send("POST", this.urlValue,
-      { section: this.sectionValue, message: message, thread: priorThread },
+      { section: this.sectionValue, message: message, version: this.version, draft_scope: this.draftScope() },
       { fallback: this.sendFailedTextValue })
     // Clear ran while this was in flight; dropping the reply keeps a cleared thread cleared.
-    if (generation !== this.generation) return
+    if (generation !== this.generation) {
+      if (this.clearPending && result.ok && result.data) this.overtaken.push({ message: message, data: result.data })
+      return
+    }
 
     if (result.ok && result.data) {
-      this.thread.push({ role: "user", content: message }, { role: "assistant", content: result.data.answer })
+      this.keepReply(message, result.data)
       this.renderTurns()
       if (!explicitMessage) this.inputTarget.value = ""
       this.statusTarget.textContent = ""
@@ -68,6 +102,15 @@ export default class extends Controller {
       this.statusTarget.textContent = result.message || this.sendFailedTextValue
     }
     this.refreshCap()
+  }
+
+  keepReply(message, data) {
+    this.version = data.version
+    this.thread.push({ role: "user", content: message }, { role: "assistant", content: data.answer })
+  }
+
+  draftScope() {
+    return this.element.closest("[data-answer-form-draft-scope-value]")?.dataset.answerFormDraftScopeValue ?? ""
   }
 
   renderTurns() {

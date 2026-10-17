@@ -26,7 +26,7 @@ RSpec.describe AiService do
     end
 
     it "gives a judged generation every attempt of each stage, for every retry the most-retried kind gets" do
-      retry_cycles = ExerciseSection.all.map(&:judge_retries).max
+      retry_cycles = [ DailyPlan::DAILY_JUDGE_RETRIES, DailyPlan::ROTATED_JUDGE_RETRIES ].max
       stages = [ AiService::GENERATION_READ_TIMEOUT, AiService::READ_TIMEOUT ] +
                ([ AiService::RETRY_READ_TIMEOUT, AiService::READ_TIMEOUT ] * retry_cycles) +
                [ AiService::READ_TIMEOUT ]
@@ -1596,7 +1596,7 @@ RSpec.describe AiService do
     let(:difficulty) { KindDifficulty.new(levels: { "challenge" => "senior", "pattern" => "mid_level" }, locked: %w[challenge]) }
     let(:draft_ladders) { { "senior" => { "memoization" => "the draft's senior rung" } } }
     let(:draft) do
-      AiService.const_get(:Draft).new(problem_set: {}, plan: plan, kinds: ExerciseSection.for_plan(third: :challenge, fourth: :plan_review),
+      AiService.const_get(:Draft).new(problem_set: {}, plan: plan, kinds: ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review }),
                                       difficulty: difficulty, ladders: draft_ladders, history: history,
                                       suggested_concepts: [], unusable_sections: [])
     end
@@ -1801,7 +1801,7 @@ RSpec.describe AiService do
         fourths  = ExerciseSection.fourths.map { |kind| kind.key.to_sym } + [ nil ]
 
         patterns.product(thirds, fourths)
-          .map { |pattern, third, fourth| ExerciseSection.for_plan(pattern: pattern, third: third, fourth: fourth) }
+          .map { |pattern, third, fourth| ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: pattern, third: third, fourth: fourth }) }
           .select { |kinds| kinds.size <= ExerciseSection::MAX_SECTIONS }
       end
 
@@ -1813,11 +1813,11 @@ RSpec.describe AiService do
 
       it "counts only day shapes a plan can produce" do
         expect(day_shapes.map(&:size).max).to eq(ExerciseSection::MAX_SECTIONS)
-        expect(day_shapes).to all(include(*ExerciseSection.fixed))
+        expect(day_shapes).to all(include(*DailyKinds::DEFAULT))
       end
 
       it "includes mixed locks that render more instructions than locking every kind" do
-        kinds = ExerciseSection.for_plan(pattern: nil, third: :challenge, fourth: :pseudocode_to_code)
+        kinds = ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: nil, third: :challenge, fourth: :pseudocode_to_code })
         levels = { "code_review" => "junior", "design_comparison" => "senior",
                    "challenge" => "principal_engineer", "pseudocode_to_code" => "junior" }
         ladders = kinds.each_with_object({}) do |kind, acc|
@@ -1831,7 +1831,7 @@ RSpec.describe AiService do
       end
 
       it "isolates lock overhead from every level assignment in the rendered block" do
-        kinds = ExerciseSection.for_plan(pattern: nil, third: :challenge, fourth: :pseudocode_to_code)
+        kinds = ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: nil, third: :challenge, fourth: :pseudocode_to_code })
         rungs = KindDifficulty::LEVELS.index_with { { "example" => "x" * AiService::MAX_LADDER_RUNG_LENGTH } }
 
         KindDifficulty::LEVELS.repeated_permutation(kinds.size).each do |levels|
@@ -4979,8 +4979,7 @@ RSpec.describe AiService, "#judge_section given a prose reply" do
   it "keeps the draft and records the fallback" do
     draft = Struct.new(:problem_set, :plan, :kinds, :difficulty, :unusable_sections, keyword_init: true).new(
       problem_set: { "code_review" => section }, unusable_sections: [],
-      plan: Struct.new(:due_checks, :fourth_due_checks, :reinforcement, :fourth_reinforcement, keyword_init: true)
-        .new(due_checks: [], fourth_due_checks: [], reinforcement: [], fourth_reinforcement: nil),
+      plan: plan_for(due_checks: [], fourth_due_checks: [], reinforcement: [], fourth_reinforcement: nil),
       kinds: [ ExerciseSection::CodeReview ], difficulty: KindDifficulty.none
     )
     providers = -> { JudgedGeneration::Provider.new(judge_section: service.method(:judge_section), retry_section: ->(*) { raise "no retry expected" }) }
@@ -5047,7 +5046,8 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
     single = FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
 
-    notes = { "size" => SectionCount::FLOOR, "size_reason" => "gate", "shared_concept" => "feature_envy" }
+    notes = { "daily_kinds" => %w[code_review design_comparison], "size" => SectionCount::FLOOR, "size_reason" => "gate",
+              "shared_concept" => "feature_envy" }
     expect(judged.plan_notes).to eq(notes)
     expect(single.plan_notes).to eq(notes)
     expect(single.dropped_sections).to eq([])
@@ -5298,7 +5298,8 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
   it "does not replay ingest on an already-built judged parsons_problem set" do
     allow(DailyPlan).to receive(:for).and_wrap_original do |m, *args, **kw|
-      m.call(*args, **kw).with(third: :parsons_problem)
+      plan = m.call(*args, **kw)
+      plan.with(rotation: plan.rotation.merge(third: :parsons_problem))
     end
     allow_any_instance_of(FakeService).to receive(:judge_section) { |_, _, kind, _section, **| verdict({ "status" => "keep" }, kind) }
 

@@ -1,6 +1,7 @@
 class DailyExercise < ApplicationRecord
   belongs_to :user
   has_one    :daily_response, dependent: :destroy
+  has_one    :duck_thread, dependent: :delete
 
   # Excludes "mixed": a stored "mixed" would flow back into generation through RegenerateExerciseJob.
   LANGUAGES = %w[ruby_rails javascript].freeze
@@ -47,13 +48,15 @@ class DailyExercise < ApplicationRecord
 
   def planned_by_setting? = plan_notes["size_reason"] == "setting"
 
+  def daily_kinds = DailyKinds.recorded(plan_notes)
+
   def shared_concept_shown?
-    ExerciseSection.fixed_sections_share?(problem_set, plan_notes["shared_concept"])
+    ExerciseSection.daily_sections_share?(problem_set, plan_notes["shared_concept"], daily: daily_kinds)
   end
 
   # The single authority for section counts; never problem_set.keys, which can hold unrendered alternates.
   def active_section_keys
-    ExerciseSection.resolved_keys(problem_set)
+    ExerciseSection.resolved_keys(problem_set, daily: daily_kinds)
   end
 
   def with_response_locked

@@ -120,7 +120,7 @@ RSpec.describe CompetencyGate::Evidence do
       5.times { |n| day(n) }
 
       expect(CompetencyGate.for(user)).to eq(
-        CompetencyGate.plan(days, fixed_kinds: ExerciseSection.fixed.map(&:key))
+        CompetencyGate.plan(days, fixed_kinds: DailyKinds::DEFAULT.map(&:key))
       )
       expect(CompetencyGate.for(user).count).to eq(3)
     end

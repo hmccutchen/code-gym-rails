@@ -408,6 +408,10 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
   turns can be forged. The six-turn cap is soft by design (`:293-295`). The
   damage stays in the user's own thread on their own key.
 - **Fix:** none needed beyond RL1's per-user limit.
+- **Update (2026-10-16):** the server now stores each thread and counts the
+  cap from its own copy (`docs/decisions/the-duck-thread-is-stored.md`). A
+  request that posts `thread` without `version` still takes the old path for
+  one release, so A4 stays open there until that path is removed.
 
 **A5. User content and emails in logs (low).**
 - **Found:**

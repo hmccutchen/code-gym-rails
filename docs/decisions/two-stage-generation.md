@@ -70,9 +70,11 @@ knows what a Thread is was never tracked — so there is no history that would
 have answered it.
 
 **A rejection buys a bounded number of retries, never an open-ended
-loop.** The count is a kind facet, `ExerciseSection.judge_retries`: 2 for
-a fixed kind (`fixed?`), since every day is built around it, and 1 for
-every other kind. `retry_section` regenerates
+loop.** The count is a plan fact, `DailyPlan::Result#judge_retries`: 2
+(`DailyPlan::DAILY_JUDGE_RETRIES`) for one of the plan's daily kinds, since
+every day is built around them, and 1 (`ROTATED_JUDGE_RETRIES`) for every
+other kind. It was a kind facet until the daily kinds became a per-user
+value (`docs/decisions/daily-kinds.md`). `retry_section` regenerates
 that kind alone through the same renderer and the same ingest —
 `GenerationPrompt#render`'s `only:` restricts the kinds and the schema,
 `fixed_concept:` adds the line naming the concept the section must carry,
@@ -88,7 +90,7 @@ and `retry_reason` are lists with one entry per judged retry, in order.
 downstream count still derives from `active_section_keys`. The dropped keys
 persist on `daily_exercises.dropped_sections` (jsonb), and the dashboard
 says so in one muted line (`dashboard.section_left_out`), which is the only
-user-facing change. Every kind can be dropped, both fixed kinds included:
+user-facing change. Every kind can be dropped, both daily kinds included:
 with two of them, a day without one is still a day. A day whose sections
 are all dropped raises `AiService::AllSectionsRejectedError`, which
 `GenerateDailyExercisesJob` records through `persist_failure` like any
@@ -202,11 +204,11 @@ about $0.03, and one retry with its re-judge about $0.07 more — under a
 fifth of a normal day, and Haiku would halve the judge's share. Worst case
 runs about 55-155 seconds on top of the draft for one retry cycle (judge
 fan-out 5-15s, retry 15-40s, re-judge 5-10s), plus about 20-50 seconds and
-$0.07 when a fixed kind needs its second retry, and stays there however
+$0.07 when a daily kind needs its second retry, and stays there however
 many sections were rejected: the retries fan out the same way the judging
 does, so the day waits for the slowest rather than their sum.
 `JUDGED_GENERATION_BUDGET`, which the dashboard's generating poll reads,
-derives its retry cycles from the largest registered `judge_retries`, each
+derives its retry cycles from the larger of the two retry counts, each
 cycle `worst_case_call_seconds(RETRY_READ_TIMEOUT)` plus
 `worst_case_call_seconds(READ_TIMEOUT)`, plus one judge call when a kind
 re-judges its edits. Each retry asks for one

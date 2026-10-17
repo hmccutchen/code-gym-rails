@@ -3,6 +3,10 @@ production:
     class: GenerateDailyExercisesJob
     schedule: "0 * * * *"   # The five-nudge cap and PushNudgePlan's quiet period depend on this staying hourly
     description: "Generate personalized daily Code Gym exercises for all users"
+  sweep_duck_threads:
+    class: SweepDuckThreadsJob
+    schedule: "17 3 * * *"
+    description: "Delete duck threads past DuckThread::KEPT_FOR"
 
 development:
   generate_daily_exercises:

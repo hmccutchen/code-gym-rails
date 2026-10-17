@@ -1438,8 +1438,8 @@ RSpec.describe User, type: :model do
       expect(user.reload.update(name: "Renamed")).to be(true)
     end
 
-    it "never offers fewer sections than the fixed kinds every day holds" do
-      expect(SectionCount::FLOOR).to be >= ExerciseSection.fixed.size
+    it "never offers fewer sections than the daily kinds every day holds" do
+      expect(SectionCount::FLOOR).to eq(DailyKinds::COUNT)
     end
 
     it "no longer reads the retired adaptive_set_size column" do
@@ -1523,7 +1523,7 @@ RSpec.describe User, type: :model do
       user.update!(excluded_section_kinds: [ "parsons_problem" ])
 
       allow(ExerciseSection).to receive(:rotatable)
-        .and_return(ExerciseSection.rotatable - [ ExerciseSection::ParsonsProblem ])
+        .and_return(ExerciseSection.rotatable(daily: DailyKinds::DEFAULT) - [ ExerciseSection::ParsonsProblem ])
 
       expect { user.generate_login_code! }.not_to raise_error
     end
@@ -1532,7 +1532,7 @@ RSpec.describe User, type: :model do
       user = create_user_with_key
 
       allow(ExerciseSection).to receive(:rotatable)
-        .and_return(ExerciseSection.rotatable - [ ExerciseSection::ParsonsProblem ])
+        .and_return(ExerciseSection.rotatable(daily: DailyKinds::DEFAULT) - [ ExerciseSection::ParsonsProblem ])
       user.excluded_section_kinds = [ "parsons_problem" ]
 
       expect(user).not_to be_valid

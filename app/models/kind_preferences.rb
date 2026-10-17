@@ -25,4 +25,15 @@ class KindPreferences
   def excluded?(kind)
     @excluded.include?(kind.key)
   end
+
+  # Only exclusion narrows a pool; one it would empty falls back to every kind, so no slot goes unfilled.
+  def eligible(kinds)
+    kinds.reject { |kind| excluded?(kind) }.presence || kinds
+  end
+
+  def offered(daily:)
+    rotating = ExerciseSection.optional_slots(daily: daily).values.flat_map { |kinds| eligible(kinds) }
+
+    ExerciseSection.pickable(daily: daily) & (daily + rotating)
+  end
 end

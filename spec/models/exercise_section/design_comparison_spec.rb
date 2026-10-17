@@ -18,9 +18,9 @@ RSpec.describe ExerciseSection::DesignComparison do
     allow(WeightedRoll).to receive(:pick).with(described_class::POSITION_WEIGHTS).and_return(position)
   end
 
-  it "is a fixed kind" do
-    expect(described_class.fixed?).to be(true)
-    expect(ExerciseSection.fixed).to eq([ ExerciseSection::CodeReview, described_class ])
+  it "is a default daily kind" do
+    expect(described_class.default_daily?).to be(true)
+    expect(DailyKinds::DEFAULT).to eq([ ExerciseSection::CodeReview, described_class ])
   end
 
   it "keeps its answer key out of everything that shows a section before submission" do

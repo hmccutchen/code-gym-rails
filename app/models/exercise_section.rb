@@ -3,7 +3,7 @@ class ExerciseSection
   MAX_SCAFFOLD_LABELS       = 4
   MAX_SCAFFOLD_LABEL_LENGTH = 80
 
-  # Its own fact rather than the slot count: a second fixed kind adds a slot without making a day longer.
+  # Its own fact rather than the slot count: a second daily kind adds a slot without making a day longer.
   MAX_SECTIONS = 4
 
   def self.all
@@ -15,8 +15,8 @@ class ExerciseSection
     all.map(&:key)
   end
 
-  def self.fixed
-    all.select(&:fixed?)
+  def self.default_daily
+    all.select(&:default_daily?)
   end
 
   def self.thirds
@@ -35,39 +35,51 @@ class ExerciseSection
     kinds.map(&:key).find { |key| present?(problem_set, key) }
   end
 
-  def self.resolved_keys(problem_set)
-    slots.values.filter_map { |kinds| resolved_key(problem_set, kinds) }.first(MAX_SECTIONS)
+  def self.resolved_keys(problem_set, daily:)
+    layout(daily: daily).values.filter_map { |kinds| resolved_key(problem_set, kinds) }.first(MAX_SECTIONS)
   end
 
-  def self.fixed_sections_share?(problem_set, concept)
-    concept.present? && fixed.all? { |kind| present?(problem_set, kind.key) && problem_set[kind.key]["concept"] == concept }
+  def self.daily_sections_share?(problem_set, concept, daily:)
+    concept.present? && daily.any? && daily.all? { |kind| present?(problem_set, kind.key) && problem_set[kind.key]["concept"] == concept }
   end
 
-  def self.slots
-    fixed.to_h { |kind| [ kind.key.to_sym, [ kind ] ] }
-      .merge(pattern: [ Pattern ], third: thirds, fourth: fourths)
+  def self.layout(daily:)
+    daily.to_h { |kind| [ kind.key.to_sym, [ kind ] ] }.merge(optional_slots(daily: daily))
   end
 
-  def self.slot_for(kind)
-    slots.find { |_slot, kinds| kinds.include?(kind) }&.first
+  def self.optional_slots(daily:)
+    pooled = { pattern: [ Pattern ], third: thirds, fourth: daily.any?(&:fourth?) ? [] : fourths }
+      .merge((default_daily - daily).to_h { |kind| [ kind.key.to_sym, [ kind ] ] })
+
+    pooled.transform_values { |kinds| kinds - daily }.reject { |_slot, kinds| kinds.empty? }
+  end
+
+  def self.pickable(daily:)
+    all & (daily + optional_slots(daily: daily).values.flatten)
+  end
+
+  def self.slot_for(kind, daily:)
+    layout(daily: daily).find { |_slot, kinds| kinds.include?(kind) }&.first
   end
 
   def self.all_answer_key_fields
     all.flat_map(&:answer_key_fields).uniq
   end
 
-  def self.rotatable
-    slots.values.select { |kinds| kinds.size > 1 }.flatten
+  def self.rotatable(daily:)
+    optional_slots(daily: daily).values.select { |kinds| kinds.size > 1 }.flatten
   end
 
-  def self.for_plan(third:, fourth:, pattern: :pattern)
-    slot_kinds(third: third, fourth: fourth, pattern: pattern).values.compact
+  def self.for_plan(daily:, rotation:)
+    slot_kinds(daily: daily, rotation: rotation).values.compact
   end
 
-  def self.slot_kinds(third:, fourth:, pattern: :pattern)
-    chosen = fixed.to_h { |kind| [ kind.key.to_sym, kind.key.to_sym ] }
-      .merge(pattern: pattern, third: third, fourth: fourth)
+  def self.slot_kinds(daily:, rotation:)
+    slots = layout(daily: daily)
+    stray = rotation.compact.keys - optional_slots(daily: daily).keys
+    raise ArgumentError, "#{stray.inspect} are not optional slots beside #{daily.map(&:key).inspect}" if stray.any?
 
+    chosen = daily.to_h { |kind| [ kind.key.to_sym, kind.key.to_sym ] }.merge(rotation)
     slots.to_h { |slot, eligible| [ slot, slot_kind(chosen.fetch(slot), eligible) ] }
   end
 
@@ -96,7 +108,7 @@ class ExerciseSection
       ExerciseSection.fourths.include?(self)
     end
 
-    def fixed?
+    def default_daily?
       false
     end
 
@@ -168,10 +180,6 @@ class ExerciseSection
 
     def prose_fields
       %w[title scenario question teaching_note]
-    end
-
-    def judge_retries
-      fixed? ? 2 : 1
     end
 
     def judge_guidance

@@ -11,7 +11,7 @@ class CompetencyGate
     def initialize(user, batch_size: BATCH_SIZE)
       @user = user
       @batch_size = batch_size
-      @fixed_kinds = ExerciseSection.fixed.map(&:key)
+      @fixed_kinds = DailyKinds::DEFAULT.map(&:key)
     end
 
     def each

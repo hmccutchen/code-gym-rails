@@ -152,7 +152,7 @@ RSpec.describe GenerationPrompt do
 
       FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
 
-      kinds = ExerciseSection.for_plan(pattern: nil, third: :challenge, fourth: :plan_review)
+      kinds = ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: nil, third: :challenge, fourth: :plan_review })
       expect(rendered.size).to eq(2)
       expect(rendered.uniq.size).to eq(1)
       expect(rendered.last[:rungs]).to eq(KindDifficulty.for(user).rungs_for(kinds, skill_level: user.skill_level))
