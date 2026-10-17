@@ -31,8 +31,9 @@ is called, with the existing `conversation_out_of_step` text. After the reply, t
 `User#carry_forward` uses), and only if the account still exists, the day is
 unsubmitted, the set is the one the turn was
 read under, and the version is still the one whose thread the duck was sent.
-So a Clear, a regeneration, a submit or an account deletion that lands while a
-reply is on its way drops the reply, as Clear already drops one on the page today. Clear always
+A Clear takes the same locks and is refused once the day is submitted, so a
+submitted day's thread is never erased. So a Clear, a regeneration, a submit
+or an account deletion that lands while a reply is on its way drops the reply, as Clear already drops one on the page today. Clear always
 wins. `draft_scope` stamps the row with `DailyExercise#draft_scope`; a
 regenerated day has a new scope, so its old thread reads as empty and is
 overwritten on the next write. One gap is accepted: a first message whose

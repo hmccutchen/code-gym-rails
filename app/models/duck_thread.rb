@@ -25,8 +25,11 @@ class DuckThread < ApplicationRecord
     end
   end
 
+  # Returns the new version, or nil when the day was submitted or the account deleted while the Clear waited.
   def self.clear!(exercise, section)
-    under_locks(exercise) do
+    under_locks(exercise) do |response|
+      next if response&.submitted?
+
       write(row_for(exercise)) do |row|
         cleared = row.cleared_count(section) + (row.stored_turns(section).empty? ? 0 : 1)
         row.put(section, "turns" => [], "version" => row.version_for(section) + 1, "cleared" => cleared)

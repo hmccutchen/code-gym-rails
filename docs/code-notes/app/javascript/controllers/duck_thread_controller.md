@@ -44,7 +44,11 @@ With no stored thread it touches nothing.
 
 Clear empties the page at once, as it always has, then sends the DELETE. The
 pending request is kept as `clearing`, and `ask` waits for it before sending,
-so an ask doesn't carry a version the Clear is about to retire. A failed clear
+so an ask doesn't carry a version the Clear is about to retire. An ask that a
+Clear overtook while it waited is dropped before it is sent, since the server
+would otherwise store a turn the page no longer shows. A second Clear while
+one is pending empties the page again but shares the pending request, so two
+replies can't arrive out of order and rewind the version. A failed clear
 puts the thread back on the page before it shows the send-failed text, since
 the server still holds it; leaving the page empty would hide history the duck
 still answers from. Both requests go

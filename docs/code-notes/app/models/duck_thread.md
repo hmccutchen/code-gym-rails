@@ -24,7 +24,8 @@ always continues the history the duck actually saw.
 
 ## `.clear!`
 
-Always moves the version, so a reply on its way is refused even when the
+Refused when the day was submitted while the Clear waited for the lock, since
+a submitted day's thread is kept. Otherwise it always moves the version, so a reply on its way is refused even when the
 section held nothing yet, which is the usual state while a first reply is
 slow. It creates the row if there is none for the same reason. It counts a
 clear only when there were turns to clear.

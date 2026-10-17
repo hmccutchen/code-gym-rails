@@ -170,7 +170,10 @@ class ResponsesController < ApplicationController
     return unless exercise
     return duck_refusal(t("flash.responses.stale_answers"), status: :conflict) if stale_duck_page?(exercise)
 
-    render json: { status: "ok", version: DuckThread.clear!(exercise, section) }
+    version = DuckThread.clear!(exercise, section)
+    return duck_refusal(t("errors.responses.duck_after_submit")) unless version
+
+    render json: { status: "ok", version: version }
   end
 
   # POST /responses/pseudocode_critique

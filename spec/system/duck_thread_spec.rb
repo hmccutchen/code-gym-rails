@@ -191,6 +191,59 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     end
   end
 
+  it "sends one Clear for a double click, and the next message is answered" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+      ask(duck, "soon cleared twice")
+      expect(duck).to have_css(".duck-turn.duck-assistant", count: 1, wait: 10)
+
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch;
+        window.__deletes = 0;
+        window.__held = [];
+        window.__release = () => window.__held.splice(0).forEach((go) => go());
+        window.fetch = (url, options) => {
+          if (options?.method !== "DELETE") return originalFetch(url, options);
+          window.__deletes++;
+          return new Promise((resolve) => window.__held.push(() => resolve(originalFetch(url, options))));
+        };
+      JS
+      duck.find(".duck-clear").click
+      duck.find(".duck-clear").click
+      expect(page.evaluate_script("window.__deletes")).to eq(1)
+      page.execute_script("window.__release()")
+
+      ask(duck, "after a double clear")
+      expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(duck).to have_no_content(/out of step/i)
+      expect(page.evaluate_script("window.__deletes")).to eq(1)
+    end
+  end
+
+  it "puts the thread back when Clear can't reach the server" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+      ask(duck, "kept on a failed clear")
+      expect(duck).to have_css(".duck-turn.duck-assistant", count: 1, wait: 10)
+
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch;
+        window.fetch = (url, options) => options?.method === "DELETE"
+          ? Promise.reject(new TypeError("offline"))
+          : originalFetch(url, options);
+      JS
+      duck.find(".duck-clear").click
+
+      expect(duck).to have_css(".duck-turn.duck-user", text: "kept on a failed clear", wait: 10)
+      expect(duck).to have_content(I18n.t("duck.send_failed"))
+      expect(DuckThread.first.reload.user_turn_count("code_review")).to eq(1)
+    end
+  end
+
   it "surfaces a server-side rejection as a status message instead of a broken page" do
     user = create_fake_provider_user
 

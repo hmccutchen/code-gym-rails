@@ -51,7 +51,10 @@ export default class extends Controller {
     this.statusTarget.textContent = ""
     this.renderTurns()
     this.refreshCap()
-    this.clearing = this.clearStored(cleared)
+    if (this.clearPending) return
+
+    this.clearPending = true
+    this.clearing = this.clearStored(cleared).finally(() => { this.clearPending = false })
   }
 
   async clearStored(cleared) {
@@ -76,6 +79,8 @@ export default class extends Controller {
     this.statusTarget.textContent = this.thinkingTextValue
 
     await this.clearing
+    if (generation !== this.generation) return this.refreshCap()
+
     const result = await request.send("POST", this.urlValue,
       { section: this.sectionValue, message: message, version: this.version, draft_scope: this.draftScope() },
       { fallback: this.sendFailedTextValue })

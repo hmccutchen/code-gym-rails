@@ -99,6 +99,15 @@ RSpec.describe DuckThread do
       expect(append("on its way", version: 2)).to be_nil
     end
 
+    it "refuses a Clear that reaches the lock after the day was submitted, and keeps the thread" do
+      append
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+
+      expect(described_class.clear!(exercise.reload, "code_review")).to be_nil
+      expect(described_class.for(exercise.reload).user_turn_count("code_review")).to eq(1)
+    end
+
     it "moves the version even before anything was stored, so a first reply on its way is refused" do
       expect(described_class.clear!(exercise, "code_review")).to eq(1)
 
