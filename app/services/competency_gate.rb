@@ -15,11 +15,13 @@ class CompetencyGate
   # :incomplete means at least one optional section went unanswered.
   OPTIONAL_STATES = %i[none incomplete complete].freeze
 
-  # Eased results included, in the order the day presented them.
-  Day = Data.define(:results, :optional) do
-    def initialize(results:, optional:)
+  # Eased results included, in the order the day presented them; daily holds the keys that were daily that day.
+  Day = Data.define(:results, :optional, :daily) do
+    def initialize(results:, optional:, daily:)
       raise ArgumentError, "optional must be one of #{OPTIONAL_STATES.inspect}, not #{optional.inspect}" unless
         OPTIONAL_STATES.include?(optional)
+      raise ArgumentError, "daily must be a list of section keys, not #{daily.inspect}" unless
+        daily.is_a?(Array) && daily.all?(String)
 
       super
     end
@@ -36,22 +38,21 @@ class CompetencyGate
   private_constant :GROWTH_MEMORY
 
   def self.for(user)
-    plan(Evidence.new(user), fixed_kinds: DailyKinds::DEFAULT.map(&:key))
+    plan(Evidence.new(user))
   end
 
-  def self.plans(days, fixed_kinds:, evidence: false)
-    gate = new(fixed_kinds: fixed_kinds)
+  def self.plans(days, evidence: false)
+    gate = new
     days.map { |day| gate.add(day).plan(evidence: evidence) }
   end
 
-  def self.plan(days, fixed_kinds:)
-    gate = new(fixed_kinds: fixed_kinds)
+  def self.plan(days)
+    gate = new
     days.each { |day| gate.add(day) }
     gate.plan
   end
 
-  def initialize(fixed_kinds:)
-    @fixed_kinds = fixed_kinds
+  def initialize
     @levels = {}
     @growth_runs = {}
     @brake_runs = {}
@@ -62,7 +63,7 @@ class CompetencyGate
   end
 
   def add(day)
-    day.results.each { |result| record(result) }
+    day.results.each { |result| record(result, daily: day.daily.include?(result.kind)) }
     @optional_days = (@optional_days + [ day.optional ]).last(OPTIONAL_RUN) unless day.optional == :none
     @count, @reason = next_step
     restart_growth if @reason == :brake
@@ -88,12 +89,12 @@ class CompetencyGate
   private
 
   # A level change restarts that kind's runs; eased AI ratings never enter growth but still count toward the brake.
-  def record(result)
+  def record(result, daily:)
     reset_runs(result.kind) if @levels.key?(result.kind) && @levels[result.kind] != result.level
     @levels[result.kind] = result.level
     entry = Entry.new(sequence: @sequence += 1, result: result)
     append(@brake_runs, result.kind, entry, BRAKE.of)
-    append(@growth_runs, result.kind, entry, GROWTH_MEMORY) unless result.eased
+    append(@growth_runs, result.kind, entry, GROWTH_MEMORY) if daily && !result.eased
   end
 
   def reset_runs(kind)
@@ -122,7 +123,7 @@ class CompetencyGate
   end
 
   def grows?(threshold)
-    threshold.met?(fixed_window(threshold)) { |result| result.favourable?(bar: BAR) }
+    threshold.met?(daily_window(threshold)) { |result| result.favourable?(bar: BAR) }
   end
 
   def optional_run_complete?
@@ -130,14 +131,14 @@ class CompetencyGate
   end
 
   def brake_window = latest(@brake_runs, BRAKE.of, @brake_runs.keys)
-  def fixed_window(threshold) = latest(@growth_runs, threshold.of, @fixed_kinds)
+  def daily_window(threshold) = latest(@growth_runs, threshold.of, @growth_runs.keys)
 
   def latest(runs, size, kinds)
     kinds.flat_map { |kind| runs.fetch(kind, []) }.max_by(size, &:sequence).map(&:result)
   end
 
   def growth_evidence(threshold)
-    window = fixed_window(threshold)
+    window = daily_window(threshold)
     { required: threshold.of, available: window.size,
       bar_met: window.count { |result| result.at_or_above?(BAR) },
       favourable: window.count { |result| result.favourable?(bar: BAR) },

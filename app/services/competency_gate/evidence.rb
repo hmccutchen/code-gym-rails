@@ -11,7 +11,6 @@ class CompetencyGate
     def initialize(user, batch_size: BATCH_SIZE)
       @user = user
       @batch_size = batch_size
-      @fixed_kinds = DailyKinds::DEFAULT.map(&:key)
     end
 
     def each
@@ -30,12 +29,14 @@ class CompetencyGate
     end
 
     def day_for(response)
-      Day.new(results: ReviewedSectionResults.for(response, require_rubric: true, include_eased: true), optional: optional_state(response))
+      daily = response.daily_exercise.daily_kinds.map(&:key)
+      Day.new(results: ReviewedSectionResults.for(response, require_rubric: true, include_eased: true),
+              optional: optional_state(response, daily), daily: daily)
     end
 
     # Assumes well-formed JSON; the readable? check above guarantees it.
-    def optional_state(response)
-      optional = response.section_keys - @fixed_kinds
+    def optional_state(response, daily)
+      optional = response.section_keys - daily
       return :none if optional.empty?
 
       (optional - response.answered_sections).empty? ? :complete : :incomplete
