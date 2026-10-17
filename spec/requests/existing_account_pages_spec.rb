@@ -46,10 +46,13 @@ RSpec.describe "Pages for an account that predates the learning track", type: :r
 
   def without_nonces(body) = body.gsub(/nonce="[^"]*"/, 'nonce="NONCE"').gsub(/content="[^"]*" name="csp-nonce"/, 'content="NONCE" name="csp-nonce"').gsub(/name="csp-nonce" content="[^"]*"/, 'name="csp-nonce" content="NONCE"')
 
+  # A Propshaft digest moves with any edit to its asset, which is not a change to the page.
+  def without_asset_digests(body) = body.gsub(%r{(/assets/[^"'\s?#]+)-\h{8}(?=\.(?:js|css|png|svg|ico|webp|woff2?)\b)}, '\\1-DIGEST')
+
   def expect_snapshot(name)
     expect(response).to have_http_status(:ok)
     path = snapshot_dir.join("#{name}.html")
-    body = without_nonces(response.body)
+    body = without_asset_digests(without_nonces(response.body))
     if ENV["UPDATE_PAGE_SNAPSHOTS"] == "1"
       FileUtils.mkdir_p(snapshot_dir)
       File.write(path, body)

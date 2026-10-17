@@ -1,4 +1,4 @@
-<%# Local: field (section key, e.g. "code_review"). Design notes: docs/code-notes/app/views/shared/_duck_thread.html.md %>
+<%# Locals: field (section key, e.g. "code_review"), turns and version (its stored thread; each written only when present). Design notes: docs/code-notes/app/views/shared/_duck_thread.html.md %>
 <div class="duck-thread"
      data-controller="duck-thread"
      data-duck-thread-section-value="<%= field %>"
@@ -9,7 +9,7 @@
      data-duck-thread-thinking-text-value="<%= t("duck.thinking") %>"
      data-duck-thread-capped-text-value="<%= t("duck.turns_used", count: ResponsesController::MAX_DUCK_TURNS_PER_SECTION) %>"
      data-duck-thread-user-speaker-value="<%= t("duck.speakers.user") %>"
-     data-duck-thread-assistant-speaker-value="<%= t("duck.speakers.assistant") %>">
+     data-duck-thread-assistant-speaker-value="<%= t("duck.speakers.assistant") %>"<% if turns.any? %> data-duck-thread-turns-value="<%= turns.to_json %>"<% end %><% if version.to_i.positive? %> data-duck-thread-version-value="<%= version %>"<% end %>>
   <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-<%= field %>" data-duck-thread-target="toggle" data-action="duck-thread#toggle"><%= image_tag("duck-flex.png", alt: "", class: "duck-icon", aria: { hidden: true }) %><%= t("duck.toggle") %></button>
   <div class="duck-body" id="duck-body-<%= field %>" hidden data-duck-thread-target="body">
     <div class="duck-turns" aria-live="polite" data-duck-thread-target="turns"></div>

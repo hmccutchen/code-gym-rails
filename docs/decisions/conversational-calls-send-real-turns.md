@@ -43,11 +43,12 @@ unless **more than about 72%** of duck threads are single-turn. The
 five-minute cache lifetime sits inside that bet: turns seconds apart read the
 entry, and someone who wanders off and comes back pays a second write.
 
-**Nothing measures that share yet.** The duck is deliberately unpersisted, so
-no thread is recorded anywhere; `ApiUsage` rows with
-`purpose: "duck_thread"` are the only trace a turn leaves, and counting them
-per user per day is the way to check this assumption once the feature has
-real traffic. Until then the 72% figure is the argument, not evidence.
+**Nothing measures that share yet.** Threads are now stored
+(`the-duck-thread-is-stored.md`), but nothing reads them, and a cleared
+thread keeps only its count. `ApiUsage` rows with `purpose: "duck_thread"`
+are still the way to check this assumption: counting them per user per day
+gives the thread lengths once the feature has real traffic. Until then the
+72% figure is the argument, not evidence.
 
 Two numbers here have been wrong before, both from estimating at 3.5
 characters per token. Real text in these prompts runs 2.83-2.94, so the
