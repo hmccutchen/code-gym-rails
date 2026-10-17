@@ -244,6 +244,45 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     end
   end
 
+  [ [ "the reply returns first", %w[ask delete] ], [ "the Clear fails first", %w[delete ask] ] ].each do |order_name, order|
+    it "keeps the in-flight reply when Clear can't reach the server and #{order_name}" do
+      user = create_fake_provider_user
+
+      travel_to(a_weekday) do
+        duck = open_duck(user)
+        page.execute_script(<<~JS)
+          window.__originalFetch = window.fetch;
+          window.__held = {};
+          window.fetch = (url, options) => {
+            if (options?.method === "DELETE") {
+              return new Promise((_, reject) => { window.__held.delete = () => reject(new TypeError("offline")); });
+            }
+            if (options?.method === "POST" && String(url).includes("duck_thread")) {
+              return new Promise((resolve) => { window.__held.ask = () => resolve(window.__originalFetch(url, options)); });
+            }
+            return window.__originalFetch(url, options);
+          };
+        JS
+
+        ask(duck, "sent before the clear")
+        expect(duck).to have_content("Thinking…", wait: 10)
+        duck.find(".duck-clear").click
+        order.each do |kind|
+          page.execute_script("window.__held['#{kind}']()")
+          sleep 0.5
+        end
+
+        expect(duck).to have_css(".duck-turn.duck-user", text: "sent before the clear", wait: 10)
+        expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT)
+
+        page.execute_script("window.fetch = window.__originalFetch")
+        ask(duck, "the next message")
+        expect(duck).to have_css(".duck-turn.duck-user", count: 2, wait: 10)
+        expect(duck).to have_no_content(/out of date|out of step/i)
+      end
+    end
+  end
+
   it "surfaces a server-side rejection as a status message instead of a broken page" do
     user = create_fake_provider_user
 

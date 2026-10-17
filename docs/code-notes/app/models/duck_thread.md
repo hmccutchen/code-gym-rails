@@ -22,13 +22,28 @@ under), or when the section's version moved. The caller passes the version of
 the thread it sent the provider, not the page's number, so a stored reply
 always continues the history the duck actually saw.
 
+## Outcomes
+
+`.append!` and `.clear!` return the new version, or a symbol naming what moved
+while they waited: `:deleted`, `:submitted` or `:stale`. `.under_locks` checks
+the account, the submitted state and the set; `.append!` adds the version.
+The controller maps them to messages, so the model never picks wording.
+
 ## `.clear!`
 
-Refused when the day was submitted while the Clear waited for the lock, since
-a submitted day's thread is kept. Otherwise it always moves the version, so a reply on its way is refused even when the
+Re-checks the set under the lock, as `.append!` does: a regeneration that
+commits after the controller's check would otherwise let an old page's Clear
+reset the new set's thread. It always moves the version, so a reply on its way is refused even when the
 section held nothing yet, which is the usual state while a first reply is
 slow. It creates the row if there is none for the same reason. It counts a
 clear only when there were turns to clear.
+
+## `.start_over!`
+
+Empties every section and moves its version instead of deleting the row.
+Deleting it restarted versions at 0 under the same set, so a second tab still
+showing version 2 could line up with a rebuilt thread's version 2. It writes
+nothing when there is no row.
 
 ## `.under_locks`
 

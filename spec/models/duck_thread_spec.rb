@@ -9,6 +9,10 @@ RSpec.describe DuckThread do
                           problem_set: { "code_review" => { "question" => "Find the bug", "snippet" => "def a; end" } })
   end
 
+  def clear(section = "code_review", scope: exercise.reload.draft_scope)
+    described_class.clear!(exercise.reload, section, expected_scope: scope)
+  end
+
   def append(message = "stuck", answer: "What runs first?", version: 0)
     described_class.append!(exercise, "code_review", message: message, answer: answer,
                             expected_version: version, expected_scope: exercise.draft_scope)
@@ -38,7 +42,7 @@ RSpec.describe DuckThread do
     it "refuses an exchange read at a version that has since moved, and stores nothing" do
       append
 
-      expect(append("second", version: 0)).to be_nil
+      expect(append("second", version: 0)).to eq(:stale)
       expect(described_class.for(exercise.reload).user_turn_count("code_review")).to eq(1)
     end
 
@@ -46,7 +50,7 @@ RSpec.describe DuckThread do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
 
-      expect(append).to be_nil
+      expect(append).to eq(:submitted)
       expect(described_class.for(exercise.reload).turns_for("code_review")).to eq([])
     end
 
@@ -65,7 +69,7 @@ RSpec.describe DuckThread do
       exercise.update!(generated_at: 1.minute.from_now)
 
       expect(described_class.append!(exercise, "code_review", message: "old set", answer: "reply",
-                                     expected_version: 0, expected_scope: scope)).to be_nil
+                                     expected_version: 0, expected_scope: scope)).to eq(:stale)
       expect(described_class.count).to eq(0)
     end
 
@@ -83,7 +87,7 @@ RSpec.describe DuckThread do
     it "empties the section, moves the version and counts the clear" do
       append
 
-      expect(described_class.clear!(exercise.reload, "code_review")).to eq(2)
+      expect(clear).to eq(2)
 
       thread = described_class.for(exercise.reload)
       expect(thread.turns_for("code_review")).to eq([])
@@ -92,11 +96,11 @@ RSpec.describe DuckThread do
 
     it "still moves the version on an empty section, so a reply already on its way is refused, but counts no clear" do
       append
-      described_class.clear!(exercise.reload, "code_review")
+      clear
 
-      expect(described_class.clear!(exercise.reload, "code_review")).to eq(3)
+      expect(clear).to eq(3)
       expect(described_class.for(exercise.reload).cleared_count("code_review")).to eq(1)
-      expect(append("on its way", version: 2)).to be_nil
+      expect(append("on its way", version: 2)).to eq(:stale)
     end
 
     it "refuses a Clear that reaches the lock after the day was submitted, and keeps the thread" do
@@ -104,15 +108,53 @@ RSpec.describe DuckThread do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
 
-      expect(described_class.clear!(exercise.reload, "code_review")).to be_nil
+      expect(clear).to eq(:submitted)
       expect(described_class.for(exercise.reload).user_turn_count("code_review")).to eq(1)
     end
 
-    it "moves the version even before anything was stored, so a first reply on its way is refused" do
-      expect(described_class.clear!(exercise, "code_review")).to eq(1)
+    it "refuses a Clear from a page whose set was regenerated after it was checked, and keeps the new set's thread" do
+      old_scope = exercise.draft_scope
+      exercise.update!(generated_at: 1.minute.from_now)
+      append("on the new set")
 
-      expect(append("first, on its way", version: 0)).to be_nil
+      expect(clear(scope: old_scope)).to eq(:stale)
+      expect(described_class.for(exercise.reload).user_turn_count("code_review")).to eq(1)
+    end
+
+    it "refuses a Clear for an account deleted while it waited" do
+      append
+      user.anonymize!
+
+      expect(clear).to eq(:deleted)
+    end
+
+    it "moves the version even before anything was stored, so a first reply on its way is refused" do
+      expect(clear).to eq(1)
+
+      expect(append("first, on its way", version: 0)).to eq(:stale)
       expect(described_class.for(exercise.reload).cleared_count("code_review")).to eq(0)
+    end
+  end
+
+  describe ".start_over!" do
+    it "empties every section and moves its version, so an old tab can't line up with a new thread" do
+      append
+      described_class.append!(exercise, "pattern", message: "other", answer: "reply",
+                              expected_version: 0, expected_scope: exercise.draft_scope)
+
+      described_class.start_over!(exercise.reload)
+
+      thread = described_class.for(exercise.reload)
+      expect(thread.turns_for("code_review")).to eq([])
+      expect(thread.version_for("code_review")).to eq(2)
+      expect(thread.version_for("pattern")).to eq(2)
+      expect(append("from the old tab", version: 1)).to eq(:stale)
+    end
+
+    it "writes nothing for a day that never stored a thread" do
+      described_class.start_over!(exercise)
+
+      expect(described_class.count).to eq(0)
     end
   end
 

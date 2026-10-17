@@ -11,13 +11,11 @@ class DuckThread < ApplicationRecord
     exercise.duck_thread || new(user: exercise.user, daily_exercise: exercise, draft_scope: exercise.draft_scope)
   end
 
-  # Returns the new version, or nil when the thread, the set or the submitted state moved since the turn was read.
+  # Each writer returns the new version, or :deleted, :submitted or :stale for what moved while it waited.
   def self.append!(exercise, section, message:, answer:, expected_version:, expected_scope:)
-    under_locks(exercise) do |response|
-      next if response&.submitted? || exercise.draft_scope != expected_scope
-
+    under_locks(exercise, expected_scope) do
       write(row_for(exercise)) do |row|
-        next unless row.version_for(section) == expected_version
+        next :stale unless row.version_for(section) == expected_version
 
         pair = [ { "role" => "user", "content" => message }, { "role" => "assistant", "content" => answer } ]
         row.put(section, "turns" => row.stored_turns(section) + pair, "version" => expected_version + 1)
@@ -25,11 +23,8 @@ class DuckThread < ApplicationRecord
     end
   end
 
-  # Returns the new version, or nil when the day was submitted or the account deleted while the Clear waited.
-  def self.clear!(exercise, section)
-    under_locks(exercise) do |response|
-      next if response&.submitted?
-
+  def self.clear!(exercise, section, expected_scope:)
+    under_locks(exercise, expected_scope) do
       write(row_for(exercise)) do |row|
         cleared = row.cleared_count(section) + (row.stored_turns(section).empty? ? 0 : 1)
         row.put(section, "turns" => [], "version" => row.version_for(section) + 1, "cleared" => cleared)
@@ -37,12 +32,28 @@ class DuckThread < ApplicationRecord
     end
   end
 
-  # The owner first, as User#carry_forward does: an account deleted while a reply was on its way stays deleted.
-  def self.under_locks(exercise, &)
-    transaction do
-      next if User.lock("FOR SHARE").find(exercise.user_id).anonymized?
+  # Start over empties every section and moves its version, so a tab still showing the old turns can't line up with new ones.
+  def self.start_over!(exercise)
+    return unless exercise.duck_thread
 
-      exercise.with_response_locked(&)
+    exercise.with_response_locked do
+      write(row_for(exercise)) do |row|
+        row.threads.each_key { |section| row.put(section, "turns" => [], "version" => row.version_for(section) + 1) }
+      end
+    end
+  end
+
+  # The owner first, as User#carry_forward does: an account deleted while a reply was on its way stays deleted.
+  def self.under_locks(exercise, expected_scope)
+    transaction do
+      next :deleted if User.lock("FOR SHARE").find(exercise.user_id).anonymized?
+
+      exercise.with_response_locked do |response|
+        next :submitted if response&.submitted?
+        next :stale if exercise.draft_scope != expected_scope
+
+        yield
+      end
     end
   end
   private_class_method :under_locks

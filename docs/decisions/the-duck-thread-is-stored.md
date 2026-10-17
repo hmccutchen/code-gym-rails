@@ -21,24 +21,40 @@ offline draft, whose token names the row's id. A `duck_threads` row, unique on
 **`DuckThread` is the one authority for a section's thread.** The controller
 asks it for the turns, the user-turn count, the stored size and the version,
 and never reads the JSON. `version` goes up on every append and every clear,
-including a clear of an empty section. Every ask and Clear names the set the
-page shows by its draft scope, read from the answer form, and a page showing a
-set that is no longer today's (regenerated, or yesterday's tab still open) is
-refused before anything is billed or written, with the 409 text a stale
-autosave gets. A page whose version is behind is refused before the provider
-is called, with the existing `conversation_out_of_step` text. After the reply, the append is stored under the owner's user row lock, then
-`DailyExercise#with_response_locked`, then the row lock (the order
-`User#carry_forward` uses), and only if the account still exists, the day is
-unsubmitted, the set is the one the turn was
-read under, and the version is still the one whose thread the duck was sent.
-A Clear takes the same locks and is refused once the day is submitted, so a
-submitted day's thread is never erased. So a Clear, a regeneration, a submit
-or an account deletion that lands while a reply is on its way drops the reply, as Clear already drops one on the page today. Clear always
-wins. `draft_scope` stamps the row with `DailyExercise#draft_scope`; a
-regenerated day has a new scope, so its old thread reads as empty and is
-overwritten on the next write. One gap is accepted: a first message whose
-reply lands after a start over is stored on a new row, because start over
-deletes the row the version lived on.
+including a clear of an empty section.
+
+Every ask and Clear names the set the page shows by its draft scope, read
+from the answer form. A page showing a set that is no longer today's
+(regenerated, or yesterday's tab still open), or a page whose version is
+behind the stored thread, is refused before anything is billed or written,
+with the 409 text a stale autosave gets: "This page is out of date. Refresh
+it". A reload brings the page level with the server. The duck's older
+"out of step — clear it to keep going" text is left for the legacy path,
+because on a second device it told people to wipe a thread that was fine.
+
+After the reply, the append is stored under the owner's user row lock
+(`FOR SHARE`), then `DailyExercise#with_response_locked`, then the row lock:
+the same user-then-exercise order as `User#carry_forward`. A Clear takes the
+same locks. Under them each writer re-checks what may have moved while it
+waited and returns a named outcome: the new version, `:deleted` (the account
+was deleted), `:submitted` (the day was submitted) or `:stale` (the set was
+regenerated or the version moved). The controller answers `:submitted` with
+the after-submit text and the rest with the refresh text. So a Clear, a
+regeneration, a submit or an account deletion that lands while a reply is on
+its way drops the reply, as Clear already drops one on the page today, and a
+Clear never erases a submitted day's thread or a newer set's thread. Clear
+always wins over a reply.
+
+`draft_scope` stamps the row with `DailyExercise#draft_scope`; a regenerated
+day has a new scope, so its old thread reads as empty and is overwritten on
+the next write. Start over keeps the row but empties every section and moves
+its version, so a tab still showing the old turns is told to refresh rather
+than lining up with a new thread at a reused version.
+
+One cost is accepted: two devices asking at the same version both pass the
+check before the call and both bill, and the second reply is dropped at the
+lock. One page disables its controls while it waits, and the request limit
+bounds trial accounts.
 
 **The cap is counted from the stored thread.** Six user turns a thread, and
 Clear starts a new one, so nobody gets fewer turns than before. A reload no
@@ -72,8 +88,10 @@ job fails once and runs again the next day.
 renders it after submit, and the duck refuses to run or clear once the day is
 submitted. `SweepDuckThreadsJob` runs daily at 03:17 UTC and deletes rows
 whose exercise is dated more than `DuckThread::KEPT_FOR` ago. Start over
-deletes the day's row, as it deletes the response, and account deletion
-deletes every row. At a heavy rate (three sections, six exchanges each, every
+empties the day's thread, as it deletes the response, and account deletion
+deletes every row. A rolled-back release has no cleanup in
+`User#anonymize!`, so an account deleted during a rollback keeps its threads
+until the sweep runs on a release that has it. At a heavy rate (three sections, six exchanges each, every
 weekday) a year is about 1.9 MB and 260 rows per account; a light user stores
 about 160 KB. The worst case, every turn at the byte cap on four sections
 every day, is about 60 MB a year, and the trial limit bounds it for house-key

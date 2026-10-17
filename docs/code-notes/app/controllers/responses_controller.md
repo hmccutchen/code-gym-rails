@@ -54,10 +54,17 @@ autosave gets. The legacy path is exempt, since it stores nothing.
 
 ## `#stored_thread_refusal`
 
-Runs before the paid call. A page whose version is behind the stored thread
-would only have its reply refused afterwards, so it is refused first. The byte
-check runs on the stored thread, because assistant turns in it are provider
-output.
+The byte check runs on the stored thread, because assistant turns in it are
+provider output. A page whose version is behind is refused before this, with
+the refresh text, since its reply would only be refused after it was paid
+for.
+
+## `#duck_outcome`
+
+Maps `DuckThread`'s named outcomes to replies. `:submitted` gets the
+after-submit text; a moved version, a regenerated set and a deleted account
+all get the 409 refresh text, because reloading is what brings the page level
+with the server.
 
 ## `#clear_duck_thread`
 

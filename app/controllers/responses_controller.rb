@@ -56,7 +56,7 @@ class ResponsesController < ApplicationController
     return redirect_to root_path, alert: t("flash.responses.start_over_not_today") unless @response.date == Date.current
     return redirect_to root_path, alert: t("flash.responses.start_over_while_reviewing") if blocker == :reviewing
 
-    @response.daily_exercise.duck_thread&.destroy
+    DuckThread.start_over!(@response.daily_exercise)
     @response.destroy
     redirect_to root_path, notice: t("flash.responses.answers_cleared")
   end
@@ -147,19 +147,17 @@ class ResponsesController < ApplicationController
     exercise, section, message = load_duck_turn
     return unless exercise
     return legacy_duck_thread(exercise, section, message) if legacy_duck_request?
-    return duck_refusal(t("flash.responses.stale_answers"), status: :conflict) if stale_duck_page?(exercise)
-
     store = DuckThread.for(exercise)
+    return duck_outcome(:stale) if stale_duck_page?(exercise) || params[:version].to_i != store.version_for(section)
+
     refusal = stored_thread_refusal(store, section)
     return render_section_error(refusal) if refusal
 
     answer  = AiService.for(current_user).duck_response(current_user, exercise, section: section, message: message,
                                                         thread: store.turns_for(section))
-    version = DuckThread.append!(exercise, section, message: message, answer: answer,
-                                 expected_version: store.version_for(section), expected_scope: exercise.draft_scope)
-    return render_section_error(t("errors.responses.conversation_out_of_step")) unless version
-
-    render json: { status: "ok", answer: answer, version: version }
+    outcome = DuckThread.append!(exercise, section, message: message, answer: answer,
+                                 expected_version: store.version_for(section), expected_scope: params[:draft_scope].to_s)
+    duck_outcome(outcome) { |version| { answer: answer, version: version } }
   rescue AiService::Error => e
     render_provider_failure(e, :duck)
   end
@@ -168,12 +166,10 @@ class ResponsesController < ApplicationController
   def clear_duck_thread
     exercise, section = load_duck_section
     return unless exercise
-    return duck_refusal(t("flash.responses.stale_answers"), status: :conflict) if stale_duck_page?(exercise)
+    return duck_outcome(:stale) if stale_duck_page?(exercise)
 
-    version = DuckThread.clear!(exercise, section)
-    return duck_refusal(t("errors.responses.duck_after_submit")) unless version
-
-    render json: { status: "ok", version: version }
+    outcome = DuckThread.clear!(exercise, section, expected_scope: params[:draft_scope].to_s)
+    duck_outcome(outcome) { |version| { version: version } }
   end
 
   # POST /responses/pseudocode_critique
@@ -315,11 +311,8 @@ class ResponsesController < ApplicationController
     [ exercise, section, message ]
   end
 
-  # Checked before the paid call: a page whose version is behind would only have its reply refused after it.
   def stored_thread_refusal(store, section)
-    if params[:version].to_i != store.version_for(section)
-      t("errors.responses.conversation_out_of_step")
-    elsif store.byte_size(section) > MAX_DUCK_THREAD_BYTES
+    if store.byte_size(section) > MAX_DUCK_THREAD_BYTES
       t("errors.responses.conversation_too_long")
     elsif store.user_turn_count(section) >= MAX_DUCK_TURNS_PER_SECTION
       t("duck.turns_used", count: MAX_DUCK_TURNS_PER_SECTION)
@@ -327,6 +320,15 @@ class ResponsesController < ApplicationController
   end
 
   def stale_duck_page?(exercise) = params[:draft_scope].to_s != exercise.draft_scope
+
+  # An Integer is the new version; :stale covers a moved version, a regenerated set and a deleted account.
+  def duck_outcome(outcome)
+    case outcome
+    when Integer    then render json: { status: "ok", **yield(outcome) }
+    when :submitted then render_section_error(t("errors.responses.duck_after_submit"))
+    else                 render_json_error(t("flash.responses.stale_answers"), status: :conflict)
+    end
+  end
 
   def duck_refusal(message, status: :unprocessable_content)
     render_json_error(message, status: status)

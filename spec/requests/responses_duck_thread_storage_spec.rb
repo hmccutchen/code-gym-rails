@@ -61,12 +61,12 @@ RSpec.describe "Stored duck threads", type: :request do
     expect(fake).to have_received(:duck_response).exactly(ResponsesController::MAX_DUCK_TURNS_PER_SECTION).times
   end
 
-  it "refuses a page whose version is behind before paying for a reply, and stores nothing" do
+  it "tells a page whose version is behind to refresh, before paying for a reply, and stores nothing" do
     ask
     ask("from another device", version: 0)
 
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(response.parsed_body["error"]).to eq(I18n.t("errors.responses.conversation_out_of_step"))
+    expect(response).to have_http_status(:conflict)
+    expect(response.parsed_body["error"]).to eq(I18n.t("flash.responses.stale_answers"))
     expect(fake).to have_received(:duck_response).once
     expect(stored.user_turn_count("code_review")).to eq(1)
   end
@@ -123,11 +123,12 @@ RSpec.describe "Stored duck threads", type: :request do
     end
 
     it "drops the reply when the section is cleared, even if it held nothing yet" do
-      during_the_call { DuckThread.clear!(DailyExercise.find(exercise.id), "code_review") }
+      during_the_call { DuckThread.clear!(DailyExercise.find(exercise.id), "code_review", expected_scope: exercise.draft_scope) }
 
       ask
 
-      expect(response.parsed_body["error"]).to eq(I18n.t("errors.responses.conversation_out_of_step"))
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["error"]).to eq(I18n.t("flash.responses.stale_answers"))
       expect(stored.turns_for("code_review")).to eq([])
     end
 
@@ -136,7 +137,7 @@ RSpec.describe "Stored duck threads", type: :request do
 
       ask
 
-      expect(response).to have_http_status(:unprocessable_content)
+      expect(response).to have_http_status(:conflict)
       expect(DuckThread.count).to eq(0)
     end
 
@@ -145,7 +146,7 @@ RSpec.describe "Stored duck threads", type: :request do
 
       ask
 
-      expect(response).to have_http_status(:unprocessable_content)
+      expect(response).to have_http_status(:conflict)
       expect(DuckThread.count).to eq(0)
     end
 
@@ -158,6 +159,7 @@ RSpec.describe "Stored duck threads", type: :request do
       ask
 
       expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["error"]).to eq(I18n.t("errors.responses.duck_after_submit"))
       expect(DuckThread.count).to eq(0)
     end
   end
@@ -205,14 +207,18 @@ RSpec.describe "Stored duck threads", type: :request do
     expect(stored.user_turn_count("code_review")).to eq(1)
   end
 
-  it "deletes the thread when the day is started over" do
+  it "empties the thread when the day is started over, and an old tab's next ask is told to refresh" do
     ask
     response_row = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                                          answers: { "code_review" => "draft" })
 
     delete start_over_response_path(response_row)
 
-    expect(DuckThread.count).to eq(0)
+    expect(stored.turns_for("code_review")).to eq([])
+    ask("from the old tab", version: 1)
+    expect(response).to have_http_status(:conflict)
+    ask("on the fresh page", version: 2)
+    expect(response).to have_http_status(:ok)
   end
 
   it "never reads another user's thread" do

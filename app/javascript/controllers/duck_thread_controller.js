@@ -54,17 +54,20 @@ export default class extends Controller {
     if (this.clearPending) return
 
     this.clearPending = true
-    this.clearing = this.clearStored(cleared).finally(() => { this.clearPending = false })
+    this.overtaken = []
+    this.clearing = this.clearStored(cleared, this.generation - 1).finally(() => { this.clearPending = false })
   }
 
-  async clearStored(cleared) {
+  async clearStored(cleared, generationBefore) {
     const result = await request.send("DELETE", this.urlValue, { section: this.sectionValue, draft_scope: this.draftScope() },
       { fallback: this.sendFailedTextValue })
     if (result.ok && typeof result.data?.version === "number") {
       this.version = result.data.version
       return
     }
+    this.generation = generationBefore
     this.thread = cleared
+    this.overtaken.forEach(({ message, data }) => this.keepReply(message, data))
     this.renderTurns()
     this.refreshCap()
     this.statusTarget.textContent = result.message || this.sendFailedTextValue
@@ -85,11 +88,13 @@ export default class extends Controller {
       { section: this.sectionValue, message: message, version: this.version, draft_scope: this.draftScope() },
       { fallback: this.sendFailedTextValue })
     // Clear ran while this was in flight; dropping the reply keeps a cleared thread cleared.
-    if (generation !== this.generation) return
+    if (generation !== this.generation) {
+      if (this.clearPending && result.ok && result.data) this.overtaken.push({ message: message, data: result.data })
+      return
+    }
 
     if (result.ok && result.data) {
-      this.version = result.data.version
-      this.thread.push({ role: "user", content: message }, { role: "assistant", content: result.data.answer })
+      this.keepReply(message, result.data)
       this.renderTurns()
       if (!explicitMessage) this.inputTarget.value = ""
       this.statusTarget.textContent = ""
@@ -97,6 +102,11 @@ export default class extends Controller {
       this.statusTarget.textContent = result.message || this.sendFailedTextValue
     }
     this.refreshCap()
+  }
+
+  keepReply(message, data) {
+    this.version = data.version
+    this.thread.push({ role: "user", content: message }, { role: "assistant", content: data.answer })
   }
 
   draftScope() {

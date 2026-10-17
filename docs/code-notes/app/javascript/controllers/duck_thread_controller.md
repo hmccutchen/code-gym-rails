@@ -51,7 +51,11 @@ one is pending empties the page again but shares the pending request, so two
 replies can't arrive out of order and rewind the version. A failed clear
 puts the thread back on the page before it shows the send-failed text, since
 the server still holds it; leaving the page empty would hide history the duck
-still answers from. Both requests go
+still answers from. It also restores `generation` to its value before the
+Clear and keeps any reply that came back for an ask sent before it
+(`overtaken`), because the server stored that reply. Without both, the page
+would sit a version behind and the next message would be refused. Both
+requests go
 through `request.send` rather than the save queue; the decision doc says why.
 
 ## draftScope
