@@ -251,11 +251,13 @@ RSpec.describe "generation prompt characterization" do
                                  reinforcement: [ { concept: "n_plus_one", bucket: "ruby_rails", tier: "reduced" } ],
                                  due_checks: [ mastery("missing_index", "ruby_rails"), mastery("memoization", "ruby_rails") ],
                                  established: [ mastery("scope_chaining", "ruby_rails") ],
-                                 fourth_reinforcement: [ { concept: "scope_creep", bucket: "plan_review", tier: "standard" } ]) },
+                                 fourth_reinforcement: [ { concept: "scope_creep", bucket: "plan_review", tier: "standard" } ],
+                                 fourth_due_checks: [ mastery("silent_behavior_change", "plan_review") ],
+                                 fourth_established: [ mastery("unjustified_constant", "plan_review") ]) },
       includes: [ "This section's concept must be exactly `missing_index`", "Retention checks due today: missing_index (code_review)\n",
                   "Established concepts (well past first mastery — survived a retention check): scope_chaining",
                   "Sections at junior: code_review\n" ],
-      excludes: [ "as their concept today", "memoization (", '"pattern": {', "scope_creep", "\"plan_review\" section" ],
+      excludes: [ "as their concept today", "memoization (", '"pattern": {', "scope_creep", "silent_behavior_change", "unjustified_constant", "\"plan_review\" section" ],
       schema:   %w[code_review]
     },
     "case__retry__ruby_rails__third_architecture" => {
