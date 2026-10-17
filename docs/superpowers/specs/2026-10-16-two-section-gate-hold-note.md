@@ -8,9 +8,10 @@ Checked against `origin/main` at `abf0892`.
 ## What happens
 
 An Automatic account's day size grows from two to three through
-`CompetencyGate`. Growth reads only the daily kinds' results: today, code
-review and design comparison for every account, and after the swap, the
-user's own pair. On a two-section day those are the only results there are.
+`CompetencyGate`. Growth reads only results whose kind was daily on that
+day, by each day's own recorded pair (#411). Until the swap ships, that is
+code review and design comparison for every account. On a two-section day
+those are the only results there are.
 
 - **Growth from 2 to 3** needs 4 favourable results in the latest 5 daily,
   un-eased ones (`GROW_TO_THREE`). A two-section day adds 2 such results, so
@@ -28,8 +29,9 @@ user's own pair. On a two-section day those are the only results there are.
 
 This is the case on main today. An account that keeps finding code review or
 design comparison hard is held at two sections in exactly this way. The swap
-doesn't create it. It only lets a user put a different kind into the gate's
-only input, so it can now also happen with a kind they chose.
+doesn't create it. It only lets a user put a different kind into each day's
+recorded pair, the gate's only growth input, so it can now also happen with a
+kind they chose.
 
 ## Exits that already exist
 
@@ -64,4 +66,5 @@ decision changes it on purpose:
   at two;
 - growth resumes within 3 answered days of that kind becoming favourable.
 
-It lands with the swap design's PR 1b, which already edits the gate's specs.
+It landed in #411, the swap design's PR 1b, as
+`spec/services/competency_gate_daily_pairs_spec.rb`.
