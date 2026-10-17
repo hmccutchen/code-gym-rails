@@ -168,7 +168,7 @@ end
 
   it "never prints the ambiguity hunt's planted answer key while judging" do
     rolled = DailyPlan.for(user, language: "ruby_rails")
-    plan   = rolled.with(fourth: :ambiguity_hunt, rotation: rolled.rotation.merge(fourth: :ambiguity_hunt))
+    plan   = rolled.with(rotation: rolled.rotation.merge(fourth: :ambiguity_hunt))
     allow(DailyPlan).to receive(:for).and_return(plan)
 
     comparison.judge(user.id)
