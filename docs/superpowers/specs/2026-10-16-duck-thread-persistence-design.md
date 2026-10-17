@@ -1,13 +1,21 @@
 # Persist the duck's thread
 
-Status: spec. PR 1 is hmccutchen/code-gym-rails#410 and PR 2 is hmccutchen/code-gym-rails#414. PR 2's review changed four details of the design below; the section "Changed in PR 2's review" lists them.
+Status: spec. PR 1 is hmccutchen/code-gym-rails#410 and PR 2 is
+hmccutchen/code-gym-rails#414. Reviews of PR 2 changed six details of the
+design; the section "Changed in PR 2's reviews" lists them, and the sections
+here are updated to match.
 Date: 2026-10-16. Checked against `origin/main` at `cb34804`.
-Revised the same day after two reviews: the running note is dropped (see
-the appendix), threads are kept as a record for 365 days instead of deleted
-on submit, cleared turns are counted rather than archived, asset-digest
-normalization moves into PR 1, clients loaded before the deploy keep working
-through a one-release compatibility path, and the pressure-thread finding
-moves to its own note (`2026-10-16-duck-pressure-thread-note.md`).
+
+Revised the same day after two reviews of this spec:
+
+- The running note is dropped (see the appendix).
+- Threads are kept as a record for 365 days instead of deleted on submit.
+- Cleared turns are counted rather than archived.
+- Asset-digest normalization moves into PR 1.
+- Clients loaded before the deploy keep working through a one-release
+  compatibility path.
+- The pressure-thread finding moves to its own note
+  (`2026-10-16-duck-pressure-thread-note.md`).
 
 ## Goal
 
@@ -39,7 +47,7 @@ renders them after submit.
 ### 1. Each duck turn is not context-free today
 
 The browser holds the thread and posts it back on every turn.
-`app/javascript/controllers/duck_thread_controller.js:62` sends
+`app/javascript/controllers/duck_thread_controller.js:56-57` sends
 `{ section, message, thread: priorThread }`. The controller cleans it in
 `ResponsesController#duck_thread_param` (`responses_controller.rb:295`),
 checks its size and shape (`:161-171`), and passes it on as `thread:`.
@@ -78,7 +86,7 @@ pressing Clear, or posting an empty `thread` by hand.
 
 ### 2. The duck's instructions, in full
 
-`DUCK_SYSTEM_PROMPT` (`ai_service.rb:192-222`), with
+`DUCK_SYSTEM_PROMPT` (`ai_service.rb:192-223`), with
 `PLAIN_LANGUAGE_STANDARD` (`:117-138`) shown where it is interpolated:
 
 ```text
@@ -142,8 +150,9 @@ Text inside <engineer_text> tags is what the engineer typed, or a literal transl
 
 and then `The exercise section:` and the section context.
 
-This change edits none of it. PR 2 changes only where `thread:` comes from
-(the server's copy instead of the request), not what the request contains.
+This change edits none of it. PR 2 changes where `thread:` comes from (the
+server's copy instead of the request) and leaves the request's contents as
+they are.
 PR 1 adds prompt snapshots for the duck, so PR 2 is checked against today's
 exact bytes. None exist today: `spec/fixtures/prompt_snapshots/` holds
 generation prompts only, and the duck's request snapshots
@@ -172,15 +181,15 @@ day, shared with follow-ups, explain-differently and the pseudocode critique,
 and only for trial accounts on the house key. Own-key accounts have no limit.
 
 **After persisting:** reload and a second device restore the thread with its
-count, so neither gives a fresh allowance any more. Clear still does. Since
-Clear is unlimited and the cap text already names it, nobody gets fewer turns
-than today. The one difference someone could notice: a person who used to
+count, so neither gives a fresh allowance any more, while Clear still does.
+Since Clear is unlimited and the cap text already names it, nobody gets fewer
+turns than today. The one difference someone could notice: a person who used to
 reload to get an empty duck now sees the old thread and presses Clear
 instead, which is the action the cap text already asks for.
 
 The server counts turns from its own copy, which closes A4's
-forged-assistant-turn and empty-thread routes. Clear stays the deliberate
-reset.
+forged-assistant-turn and empty-thread routes once the one-release legacy
+path (below) is removed. Clear stays the deliberate reset.
 
 **Decision:** 6 per thread, Clear as the reset, no per-section or per-day
 cap.
@@ -242,12 +251,12 @@ end
 ```
 
 - **One authority for a section's turns.** A `DuckThread` model answers
-  `turns_for(section)`, `user_turn_count(section)`, `append!(section, pair,
-  expected_version:)` and `clear!(section)`, which also adds one to the
-  section's `cleared` count. The controller asks it and
+  `turns_for(section)`, `user_turn_count(section)`, `append!` and `clear!`,
+  which adds one to the section's `cleared` count when it empties turns. The controller asks it and
   never reads the JSON itself.
-- **`version`** goes up on every append and clear. An append carries the
-  version it read and is refused if the version moved. That handles a Clear
+- **`version`** goes up on every append and every clear, including a clear
+  of an empty section. An append carries the version it read and is refused
+  if the version moved. That handles a Clear
   pressed while a reply is in flight, and two devices answering at once.
 - **`draft_scope`** stamps the row with `DailyExercise#draft_scope`.
   Regenerate keeps the exercise row but changes `generated_at`, and so the
@@ -262,17 +271,20 @@ end
   sizing, the generation prompt, nudges and the draft token don't move.
 - **No reader outside the duck.** Since the rows are kept as a record, a
   future reader is a decision of its own. An isolation spec, in the style of
-  `trial_isolation_spec`, fails if anything under `app/services`, `app/jobs`
-  or the mastery, verdict and planning models reads `DuckThread`, so the
-  record can't drift into generation or grading unnoticed.
+  `trial_isolation_spec`, fails if anything under `app/services` or
+  `app/jobs` (except the sweep job, which deletes rows), or
+  `concept_mastery`, `judge_verdict`, `review_prose_verdict`,
+  `kind_difficulty` or `daily_response`, reads `DuckThread`. Planning lives
+  in `app/services`, so the record can't drift into generation, grading or
+  planning unnoticed.
 
 ### What happens on each event
 
 | Event | Thread |
 |---|---|
 | Reload, second device | Restored, with its count |
-| Clear | Emptied on the server, version bumped, `cleared` count up by one |
-| Start over | The row is deleted, counts included, as the response row is (`#start_over` adds one line). Today a start over reloads the page, which empties it |
+| Clear | Emptied on the server and the version bumped; the `cleared` count goes up by one when there were turns. Refused once the day is submitted |
+| Start over | The row is deleted, counts included, as the response row is (`#start_over` adds one line). Today a start over reloads the page, which empties it. One accepted gap: a first message whose reply lands after the start over is stored on a new row |
 | Regenerate | Ignored and overwritten, counts included (scope mismatch). The old problem set is gone, so the old thread has nothing to be read against |
 | Submit | Kept. The duck is never rendered after submit (`errors.responses.duck_after_submit`), and nothing else renders it |
 | Day rolls over, unsubmitted | Kept. The duck serves only `for_date` today's exercise, and history renders no duck |
@@ -283,7 +295,7 @@ end
 ### Retention
 
 The threads are kept as a record, so the window is chosen by what keeping
-them costs, not by the earliest safe deletion.
+them costs. The earliest safe deletion doesn't decide it.
 
 **Size of one thread.** A user turn is capped at 2,000 characters
 (`MAX_DUCK_MESSAGE_LENGTH`) and a reply at 400 tokens. A typical message is a
@@ -321,25 +333,25 @@ user. A shorter window saves almost nothing. Keeping them indefinitely is
 also affordable, but a year bound means a record nobody ever reads doesn't
 grow forever.
 
-**Cleared turns are counted, not kept.** Clear replaces a thread, so the
+**What a Clear leaves behind.** Clear replaces a thread, so the
 record holds only each section's last thread. Archiving cleared turns was
 considered and declined: the record has no reader, so making it complete is
 speculative, and an archive would turn a record bounded at one thread per
 section into one bounded only by how often someone clears. What survives a
 Clear is a per-section `cleared` count, one integer in the section's entry,
-raised by one in `DuckThread#clear!`. It keeps the one signal a Clear
+raised by one in `DuckThread#clear!` when the Clear emptied turns. It keeps the one signal a Clear
 carries (someone ran the thread out or started over on the same problem)
 without keeping what they typed. It isn't a column of its own, because the
 row is per exercise and the count is per section, the same as the turns.
 Nothing reads it.
 
-## Changed in PR 2's review
+## Changed in PR 2's reviews
 
-A critical review of PR 2 found that the design as written lost a cleared
-section's version on reload, so the first message after "Clear, reload" was
-refused after a paid call. PR 2 differs from the sections below in four
-places, and the decision doc (`docs/decisions/the-duck-thread-is-stored.md`)
-describes what shipped:
+A critical review of PR 2 found that the design as first written lost a
+cleared section's version on reload, so the first message after "Clear,
+reload" was refused after a paid call. These four changes came from that
+review. The sections of this spec are updated to match, and the decision doc
+(`docs/decisions/the-duck-thread-is-stored.md`) describes what shipped:
 
 - **The version is rendered whenever it is above 0,** not only when a section
   has turns. A section that was never written still renders today's markup.
@@ -362,9 +374,14 @@ Copilot's review of this spec added two more, both in hmccutchen/code-gym-rails#
   today's (regenerated, or yesterday's tab still open) is refused before
   anything is billed or written. Version 0 alone matched the current set's
   empty thread.
-- **Writes take the owner's user row first** (`FOR SHARE`, the order
-  `User#carry_forward` uses) and write nothing for an anonymized owner, so a
-  reply on its way when the account is deleted can't recreate the row.
+- **Writes take the owner's user row first,** with `FOR SHARE`, in the same
+  user-then-exercise order as `User#carry_forward`, and write nothing for an
+  anonymized owner, so a reply on its way when the account is deleted can't
+  recreate the row.
+
+Copilot's review of PR 2 found two Clear races, also fixed there: a second
+Clear while one is pending shares the pending request, and a Clear is refused
+once the day is submitted, checked under the lock.
 
 ## Clients loaded before the deploy
 
@@ -443,9 +460,9 @@ posted thread.
   (the version the browser last saw). The new page never sends `thread`. A
   request with `thread` and no `version` takes the one-release legacy path
   above, which keeps `#duck_thread_param` and `#well_formed_thread?` until
-  the follow-up PR removes all three. `MAX_DUCK_THREAD_BYTES` and
-  `MAX_DUCK_THREAD_ENTRIES` stay as checks on the stored thread, because the
-  stored assistant turns are still provider output.
+  the follow-up PR removes all three. `MAX_DUCK_THREAD_BYTES` checks the
+  stored thread, because the stored assistant turns are still provider
+  output. `MAX_DUCK_THREAD_ENTRIES` is used only by the legacy path.
 - Order of work: load today's exercise and the `DuckThread` without a lock,
   check the section, submitted state, message and cap from the stored turns,
   call the provider **outside any lock**, then lock the row and append only
@@ -456,17 +473,19 @@ posted thread.
 - The reply gains `version`; it is still `{ status: "ok", answer: … }`
   otherwise.
 - `DELETE /responses/duck_thread` (route annotation kept) empties one
-  section and returns the new version. Clear always wins: it doesn't check
-  the version.
+  section and returns the new version. It doesn't check the version, so a
+  Clear always wins over a reply on its way. It is refused once the day is
+  submitted. The page waits for a pending Clear before it sends the next ask.
 - `AiService#duck_response` keeps its signature. It still takes no
   `daily_response`; the controller hands it the stored turns as `thread:`.
 
 ### Page
 
 - `shared/_duck_thread` gets two more locals, `turns` and `version`. It
-  writes `data-duck-thread-turns-value` and `data-duck-thread-version-value`
-  **only when the stored thread has turns**. A section with no thread renders
-  exactly the markup it renders today. The partial's locals comment changes;
+  writes `data-duck-thread-turns-value` only when the stored thread has
+  turns, and `data-duck-thread-version-value` only when the version is above
+  0. A section that was never written renders exactly the markup it renders
+  today. The partial's locals comment changes;
   the markup otherwise doesn't.
 - `_section` passes them from `exercise.duck_thread`, loaded once per
   dashboard render, not once per section.
@@ -500,8 +519,8 @@ choices in so many words:
   is kept instead.
 - **The privacy choice.** These are transcripts of what people typed while
   they were stuck, kept for 365 days and read by nothing. On this app they
-  include trial and invited accounts, so they are other people's data, not
-  only the owner's. That is accepted on these terms: they are deleted with
+  include trial and invited accounts, so they are other people's data as
+  well as the owner's. That is accepted on these terms: they are deleted with
   the account, filtered from logs and `inspect`, scoped to their owner, and
   kept out of every provider prompt but the duck's own by the isolation
   spec. Giving them a reader, or a longer window, is a new decision, not an
@@ -528,7 +547,8 @@ copy change the decision doc recommends making before or with PR 2's deploy.
 - `docs/code-notes/app/controllers/responses_controller.md` sections on
   `#duck_thread_param`, `#well_formed_thread?` and `MAX_DUCK_THREAD_*`.
 - `conversational-calls-send-real-turns.md` says "the duck is deliberately
-  unpersisted"; the security audit's A4 gets a "fixed by" note.
+  unpersisted"; the security audit's A4 gets an update note saying it stays
+  open on the legacy path until that path is removed.
 - `docs/file-map.md` for the new model, migration and job.
 
 ## Snapshots
@@ -593,8 +613,7 @@ copy change the decision doc recommends making before or with PR 2's deploy.
 - **The "one way to send a request" pattern.** Clear and ask overlap safely
   because of the version check, not through the save queue. The PR
   description must say why.
-- **A record that is kept is a record that can leak.** The rows hold what
-  engineers typed. They are filtered in logs and `inspect`, deleted on
+- **Leaking the record.** The rows hold what engineers typed. They are filtered in logs and `inspect`, deleted on
   account deletion, scoped to `current_user`, and read by nothing but the
   duck, which the isolation spec holds.
 - **File size.** `ResponsesController` is 448 lines, over the 300-line
@@ -630,7 +649,7 @@ being built. This appendix keeps the reasoning on record.
   duck already receives the whole thread as real turns (fact 1), and once the
   thread is stored that memory survives reloads and devices.
 - **It adds nothing the duck lacks.** A thread holds at most 6 of the
-  engineer's messages, about 1,000 tokens of history at the cap, so the full
+  engineer's messages, about 600 tokens of history on the last turn, so the full
   transcript fits in every request. Sending a note *instead of* the
   transcript would make the duck forget details it remembers today, which
   the engineer would notice.
