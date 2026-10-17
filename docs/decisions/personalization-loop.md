@@ -22,3 +22,14 @@ therefore applies to a due concept actually shown and reviewed, whether
 explicitly requested as retention or incidentally repeated. It cannot
 infer an unhonored offer and never reschedules unrepresented concepts.
 No backfill repairs mastery changed by historical skips.
+
+**Reinforcement is offered only where today can host it.** `DailyPlan` passes
+`User#concepts_needing_reinforcement` a `hostable:` test built from the day's
+non-fourth kinds and `code_review` mode through `DayHosts`, and the method
+applies it to drilled concepts and history entries alike. The prompt demands
+every reinforcement concept it lists, so an entry no planned section can tag
+would otherwise take a slot nothing can fill: on a two-section
+`schema_review` day, for example, code review takes only data-modeling
+concepts and design comparison never takes meta-skill ones. A history entry
+left out is offered again on a later day that can host it, while it is still
+in recent history.

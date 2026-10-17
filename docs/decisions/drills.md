@@ -61,7 +61,9 @@ starve the concept the ratings flagged; a one-host day still goes to the
 drill. A drilled concept whose retention
 check is due is listed once, as reinforcement, and its overdue check
 neither reserves nor takes a slot: the check would have asked for the same
-concept under a second instruction in the same prompt.
+concept under a second instruction in the same prompt. The same host test filters
+history-derived reinforcement too, as `personalization-loop.md` records
+("Reinforcement is offered only where today can host it").
 
 **`ConceptDrills.for` reads only the user's current slice**
 (`ConceptBucket.slice_for`, shared with the Learn tab), so a drill stranded

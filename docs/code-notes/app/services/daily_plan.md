@@ -16,6 +16,8 @@ The fourth track takes the day's fourth kind from the planned kinds, so a daily 
 
 Reinforcement is truncated to today's hosts because the prompt demands every concept it lists.
 
+Every reinforcement entry, drilled or from recent history, must pass the same `.host_test`: some non-fourth kind planned today can tag it through `DayHosts`. `User#concepts_needing_reinforcement` applies it to both through its `hostable:` argument. A bucket check alone let through a concept no section could tag, such as a meta-skill concept on a two-section `schema_review` day, where code review takes only data-modeling concepts and design comparison never takes meta-skill ones. A history entry left out is offered again on a later day that can host it, while it is still in recent history.
+
 The capacity count (every non-fourth kind) is deliberately approximate: on some days the daily kinds host fewer concepts than that, and placement is advisory anyway.
 
 ## `.code_review_source_for`
@@ -24,7 +26,7 @@ The real-source choice is a second roll inside the mode, so `CODE_REVIEW_MODE_WE
 
 ## `.hostable_buckets`
 
-Both retention callers share this list, so reserving a slot and filling it read the same eligibility rule. The buckets come from the day's non-fourth kinds, through `ConceptBucket.for`, rather than always including the language. A pair whose only regular section is architecture (with a daily fourth) can't host a language concept, so reinforcement must not pick one for it. For the default pair the list is unchanged: the language first, then `architecture` when that kind is planned.
+Only `.established_concepts_for` reads this bucket list. Established concepts are optional prompt annotations, not concepts the prompt demands, so the looser bucket rule is enough there; reinforcement and retention checks use `DayHosts` instead. The buckets come from the day's non-fourth kinds, through `ConceptBucket.for`, rather than always including the language, so a pair whose only regular section is architecture never lists a language concept. For the default pair the list is unchanged: the language first, then `architecture` when that kind is planned.
 
 ## `.retention_checks_for`
 

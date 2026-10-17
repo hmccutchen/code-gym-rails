@@ -46,8 +46,9 @@ read it before changing that area.
   never touches rotation, weights or `KindDifficulty`. It clears on the same
   co-favourable rating that sets mastery to standard.
   `ConceptDrills::MAX_CONCURRENT` caps drills, a group counting as one, with
-  `#can_start?`/`#can_start_group?` as the one statement of it. Drills are
-  offered only where `DayHosts` says today can tag them.
+  `#can_start?`/`#can_start_group?` as the one statement of it. Drills, like
+  every reinforcement entry, are offered only where `DayHosts` says today can
+  tag them (`concepts_needing_reinforcement(hostable:)`).
 - **Daily kinds** (`docs/decisions/daily-kinds.md`): `DailyKinds` is the one
   authority for which kinds every set holds. `users.daily_section_kinds` is
   sparse (empty means `DailyKinds::DEFAULT`) and normalized on read; each day
@@ -125,6 +126,7 @@ read it before changing that area.
   `User#recent_performance` feeds the last 10 sessions into the generation
   prompt. A skipped section's AI grade is never skill evidence: ratings,
   `ConceptMastery.record_review!` and reinforcement read
-  `DailyResponse#answered_concept_tags`. A skipped, due retention check is
+  `DailyResponse#answered_concept_tags`, and only where today can host them.
+  A skipped, due retention check is
   deferred one interval without changing tier, streak or rating, and only for
   a concept answered nowhere on that response.
