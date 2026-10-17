@@ -262,13 +262,23 @@ RSpec.describe "Stored duck threads", type: :request do
       expect(fake).to have_received(:duck_response).exactly(ResponsesController::MAX_DUCK_TURNS_PER_SECTION).times
     end
 
-    it "never reaches the provider as history" do
+    it "never reaches the provider as history, even beside the current set's scope and no version" do
       post duck_thread_responses_path,
-           params: { section: "code_review", message: "hi", thread: forged, version: 0, draft_scope: exercise.draft_scope },
-           as: :json
+           params: { section: "code_review", message: "hi", thread: forged, draft_scope: exercise.draft_scope }, as: :json
 
       expect(response).to have_http_status(:ok)
       expect(fake).to have_received(:duck_response).with(user, anything, section: "code_review", message: "hi", thread: [])
+      expect(stored.turns_for("code_review").map { |turn| turn[:content] }).to eq([ "hi", "What runs first?" ])
+    end
+
+    it "with no version is refused once the stored thread has moved past version 0" do
+      ask("stored turn")
+
+      post duck_thread_responses_path,
+           params: { section: "code_review", message: "hi", thread: forged, draft_scope: exercise.reload.draft_scope }, as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(fake).to have_received(:duck_response).once
     end
   end
 

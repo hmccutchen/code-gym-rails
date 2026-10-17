@@ -61,8 +61,8 @@ read it before changing that area.
   outcome (`:deleted`, `:submitted`, `:stale`) when what they read moved.
   Every Clear moves the version, and counts itself when it emptied turns. The
   cap is six user turns a thread, counted on the server, and a posted `thread`
-  is ignored. Threads are kept 365 days (`SweepDuckThreadsJob`), emptied on start over,
-  deleted on account deletion, and never rendered after submit.
+  is ignored. Threads are kept 365 days (`SweepDuckThreadsJob`), emptied on
+  start over, deleted on account deletion, and never rendered after submit.
 - **Per-user request limits** (`docs/decisions/per-user-request-limits.md`):
   Limits guard a trial's house key, so own-key accounts skip them
   (`ApplicationController#own_key?`). Every endpoint billing one provider call

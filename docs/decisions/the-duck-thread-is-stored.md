@@ -72,10 +72,11 @@ blind to the turns on screen, and every later one would be refused as out of
 step. So for one release a request with `thread` and no `version` took the old
 path unchanged: the posted thread was the history and the cap, and nothing
 was read from or written to `duck_threads`, so forgeable turns couldn't enter
-the record. Each use logged `[duck] legacy thread shape user <id>`, and the
-path was removed once that line had been absent for 7 days, and at least 14
-days after the deploy. Such a page sends no draft scope, so it now gets the
-refresh text before any call, and a reload moves it onto the new script.
+the record. Each use logged `[duck] legacy thread shape user <id>`, and the spec gated
+the path's removal on that line being absent for 7 days, and at least 14 days
+after the deploy. With the path gone, such a page sends no draft scope, so it
+gets the refresh text before any call, and a reload moves it onto the new
+script.
 
 **The table and its readers ship together.** `.claude/rules/deployment.md`
 has a new column ship a release before code reads it, because the worker
