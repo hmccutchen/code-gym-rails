@@ -12,21 +12,35 @@ These lists are in precedence order, which differs from enumeration order. When 
 
 A provider can emit a key holding null or a bare string beside the real section, so a key counts as present only when its value is a Hash.
 
-## `.slots`
+## `.layout`
 
-In a day's plan, every slot except a fixed kind's may be empty, meaning the day does not include it.
+The layout's order is the generation prompt's section order and the page's section order. The default pair must therefore come out as `code_review`, `design_comparison`, `pattern`, `third`, `fourth`, exactly the order of the old `.slots`; the prompt and page snapshots hold it, and a change there shows up as a snapshot diff. `docs/decisions/daily-kinds.md` has the full rule.
+
+In a day's plan, every slot except a daily kind's may be empty, meaning the day does not include it.
+
+## `.optional_slots`
+
+A daily fourth-slot kind takes the whole `fourth` slot out, so its siblings never rotate in beside it and a day never holds two fourths.
+
+## `.default_daily`
+
+The registry states which kinds form the default pair, and `DailyKinds::DEFAULT` reads it from here. The dependency runs one way: the registry never reads `DailyKinds`.
+
+## `.pickable`
+
+The kinds a plan can ever hold for a pair: the pair plus every kind in its optional slots, in registry order. A daily fourth's siblings are in no slot, so they are left out. For the default pair it is every kind. `KindPreferences#offered` takes it and removes excluded optional kinds; `LadderCoverage`, the Progress page and the level-suggestion card read that answer.
 
 ## `.rotatable`
 
-A slot holding only one candidate is left out, because a weight there could change nothing.
+A slot holding only one candidate is left out, because a weight there could change nothing. It reads the pair's optional slots, so a daily kind is never rotatable.
 
 ## `.for_plan`
 
-This works from `DailyPlan`'s rolled symbols, before the provider is contacted.
+This works from the plan's daily kinds and `DailyPlan`'s rolled symbols, before the provider is contacted.
 
 ## `.slot_kinds`
 
-The result is keyed by slot. `.for_plan` drops omitted slots, so reading its result by position names the wrong kind.
+A rotation naming a slot the pair leaves no room for raises, rather than dropping that kind silently. The result is keyed by slot. `.for_plan` drops omitted slots, so reading its result by position names the wrong kind.
 
 ## `.slot_kind`
 
@@ -54,7 +68,7 @@ The base class raises because a kind that returned nothing would produce a revie
 
 ## Judge facets
 
-`.judge_task`, `.discovery?`, `.prose_fields`, `.judge_retries`, `.judge_guidance`, `.rejudge_edits?`, `.judge_solve_options` and `.solve_matches_key?` are read only by the judge (`AiService#judge_section`), never by the draft prompt or by grading.
+`.judge_task`, `.discovery?`, `.prose_fields`, `.judge_guidance`, `.rejudge_edits?`, `.judge_solve_options` and `.solve_matches_key?` are read only by the judge (`AiService#judge_section`), never by the draft prompt or by grading. How many retries a rejection buys is a plan fact (`DailyPlan::Result#judge_retries`), not a kind facet.
 
 ## `.improved_code_label` and `.improved_code_prose?`
 

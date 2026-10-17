@@ -4,21 +4,38 @@ at two sections a day has no optional slot, so
 `SectionRotation`'s starvation guarantee has nothing to act on.
 `CoverageException` (pure) adds one optional section when the setting is
 Automatic, the day's count leaves no optional slot (`count <=
-ExerciseSection.fixed.size`), the struggle brake is
+DailyKinds::COUNT`), the struggle brake is
 off (`DaySize::Decision#brake?`, true while the gate's reason is `:brake`,
 even on a day completion alone would also have held at two), and no exercise dated on the previous `CAP_WEEKDAYS` (4)
 weekdays carries `plan_notes["coverage"]`. It picks (a) the kind able to
 host the most overdue waiting check at or past
 `ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER`, or else (b) the
 optional kind unseen for more than `GAP_WEEKDAYS` (20) weekdays, longest
-gap first, never seen before seen, ties in registry order. Both respect
+gap first, never seen before seen, ties in registry order. The
+candidates are the kinds in the pair's optional slots
+(`ExerciseSection.optional_slots(daily:)`), so a default kind the user
+swapped out can be added, while a daily fourth's siblings never can,
+because the pair's layout has no fourth slot. Both respect
 the user's exclusions, and (a) reads hosting through `DayHosts`. The added
-kind fills its own slot (`ExerciseSection.slot_for`) without weights, and
+kind fills its own slot (`ExerciseSection.slot_for(kind, daily:)`) without weights, and
 `DailyPlan` decides the concept tracks again so the check can land in it.
 Reinforcement can still outrank that check for the one retention slot
 (`Addition#check` names the check, and `DailyPlan.check_landed?` reads the
 recomputed tracks for it); then the addition is given up and the day stays
 at two, rather than spending the cap on a section carrying something else.
+
+**Exclusion is final here, unlike in rotation, on purpose.** Coverage
+drops every excluded kind and has no fallback: when every candidate is
+excluded, it adds nothing. `SectionRotation` falls back to the whole slot
+when exclusion would empty it (`KindPreferences#eligible`), because rotation
+has to produce a day and has no other choice. Coverage only adds an extra
+section to a sparse day, so adding nothing is the right answer, and taking
+rotation's fallback would weaken "never show me this kind" for the sake of
+symmetry. This was decided on 2026-10-16 while building per-user daily
+kinds (PR 1 of the daily kind swap), and the difference is not an
+inconsistency to fix. `spec/services/coverage_exception_spec.rb` ("never
+adds a kind the user excluded") pins it with `pattern`, a slot holding one
+kind, where rotation's fallback would have added it.
 
 **The cap counts calendar weekdays, not delivered rows.** Weekends never
 count toward the four, a weekend addition inside the window still blocks,
@@ -45,11 +62,11 @@ returns the stored `plan_notes["coverage_reason"]` and the line follows it:
 gap, and `dashboard.coverage_added.due_check` ("so an idea you learned
 earlier can come back up") for a due check, whose host may have been seen
 last week, so the gap wording would be false for it.
-`dashboard.shared_concept` shows only when both delivered fixed sections carry
+`dashboard.shared_concept` shows only when both delivered daily sections carry
 the planned concept (`#shared_concept_shown?`), so a dropped section or an
 ignored placement never produces a false claim. The shared line gives no
 reason: "because it has been giving you trouble" would expose the mastery
-tier, which stays invisible. It names the fixed sections from their
-locale names (`sections.<key>.name`, listed from `ExerciseSection.fixed`)
-and says "from different sides", so neither line nor prompt assumes how
-many fixed kinds there are.
+tier, which stays invisible. It names the day's daily sections from their
+locale names (`sections.<key>.name`, listed from the row's
+`DailyExercise#daily_kinds`) and says "from different sides", so neither
+line nor prompt assumes which or how many daily kinds there are.

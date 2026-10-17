@@ -7,7 +7,7 @@ class ExerciseSection::CodeReview < ExerciseSection
     false
   end
 
-  def self.fixed?
+  def self.default_daily?
     true
   end
 

@@ -72,7 +72,7 @@ class AiService
 
   JUDGED_GENERATION_BUDGET = worst_case_call_seconds(GENERATION_READ_TIMEOUT) +
                              worst_case_call_seconds(READ_TIMEOUT) +
-                             (ExerciseSection.all.map(&:judge_retries).max *
+                             ([ DailyPlan::DAILY_JUDGE_RETRIES, DailyPlan::ROTATED_JUDGE_RETRIES ].max *
                                (worst_case_call_seconds(RETRY_READ_TIMEOUT) + worst_case_call_seconds(READ_TIMEOUT))) +
                              (ExerciseSection.all.any?(&:rejudge_edits?) ? worst_case_call_seconds(READ_TIMEOUT) : 0)
 
@@ -472,11 +472,7 @@ class AiService
 
   def self.judges_review_prose? = false
 
-  JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes) do
-    def initialize(problem_set:, dropped_sections:, outcomes:, plan_notes: {})
-      super
-    end
-  end
+  JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes)
 
   Draft = Data.define(:problem_set, :plan, :kinds, :difficulty, :ladders, :history,
                       :suggested_concepts, :unusable_sections)
@@ -502,7 +498,7 @@ class AiService
       user: user, language: language, draft: draft,
       providers: -> { fresh_service.judged_generation_provider },
       finish: ->(set, **logs) { finish_generation(user, language, draft, set, **logs) }
-    ).with(plan_notes: draft.plan.notes)
+    )
   end
 
   def review_sections(user, exercise, daily_response, sections:)
@@ -810,7 +806,7 @@ class AiService
     log_set_size(user, plan.size)
     history    = user.recent_performance
     difficulty = KindDifficulty.for(user)
-    kinds      = ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth, pattern: plan.pattern)
+    kinds      = plan.kinds
     ladders    = ladders_for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode)
     prompt     = generation_prompt(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders)
 
@@ -822,7 +818,7 @@ class AiService
 
     ingested = ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "problem set", log_raw: false),
-      language: language, expected_keys: kinds.map(&:key), code_review_source: plan.code_review_source,
+      language: language, expected_keys: kinds.map(&:key), daily: plan.daily_kinds, code_review_source: plan.code_review_source,
       pitched_at: difficulty.rungs(skill_level: user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
     )
 
@@ -855,7 +851,7 @@ class AiService
                     set, plan.code_review_mode, dropped: fourth_dropped)
     end
     log_waiting_retention(user, plan.waiting_checks)
-    log_shared_concept(user, plan.shared_concept, set)
+    log_shared_concept(user, plan, set)
     log_coverage(user, plan.coverage)
     log_difficulty_diagnostics(user, language, plan, set, draft.history,
                                kinds: draft.kinds, difficulty: draft.difficulty, ladders: draft.ladders,
@@ -872,7 +868,7 @@ class AiService
 
     ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "#{kind.key} retry", log_raw: false), language: language,
-      expected_keys: [ kind.key ], fixed_concepts: { kind.key => concept },
+      expected_keys: [ kind.key ], daily: draft.plan.daily_kinds, fixed_concepts: { kind.key => concept },
       code_review_source: draft.plan.code_review_source,
       pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
       eased_for: eased_concepts_for(draft.plan, draft.difficulty).slice(kind.key)
@@ -1046,12 +1042,13 @@ class AiService
     Rails.logger.info("[coverage] user=#{user.id} kind=#{coverage.kind.key} reason=#{coverage.reason}")
   end
 
-  def log_shared_concept(user, concept, problem_set)
+  def log_shared_concept(user, plan, problem_set)
+    concept = plan.shared_concept
     return if concept.nil?
 
     Rails.logger.info(
       "[shared_concept] user=#{user.id} concept=#{concept} reason=reduced_tier " \
-      "honored=#{ExerciseSection.fixed_sections_share?(problem_set, concept)}"
+      "honored=#{ExerciseSection.daily_sections_share?(problem_set, concept, daily: plan.daily_kinds)}"
     )
   end
 
@@ -1069,8 +1066,9 @@ class AiService
       code_review_mode: plan.code_review_mode,
       code_review_source: plan.code_review_source&.id,
       scenario_flavor: plan.scenario_flavor,
-      pattern: plan.pattern,
-      third: plan.third,
+      daily_kinds: plan.daily_kinds.map(&:key),
+      pattern: plan.rotation[:pattern],
+      third: plan.rotation[:third],
       fourth: plan.fourth,
       section_count: kinds.size,
       reinforcement: plan.reinforcement,

@@ -163,7 +163,7 @@ RSpec.describe "DailyExercises", type: :request do
         "challenge" => { "title" => "Build", "question" => "Implement X", "starter_code" => "" }
       }
       fake_service = instance_double(ClaudeService, generate_unjudged_exercise:
-        AiService::JudgedSet.new(problem_set: fresh, dropped_sections: [], outcomes: {}))
+        AiService::JudgedSet.new(problem_set: fresh, dropped_sections: [], outcomes: {}, plan_notes: {}))
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
       perform_enqueued_jobs
 

@@ -51,7 +51,7 @@ reading apart from the engineer's request.
 
 ## `#shared_concept_guidance`
 
-Lists the fixed kinds from `ExerciseSection.fixed` and states no count, so a
+Lists the plan's daily kinds (`DailyPlan::Result#daily_kinds`) and states no count, so a
 day without a shared concept renders byte for byte as before. `#render` skips
 it on a retry, which asks for one section.
 

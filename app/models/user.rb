@@ -38,6 +38,7 @@ class User < ApplicationRecord
   validate :section_kind_weights_name_rotatable_kinds,   if: :section_kind_weights_changed?
   validate :excluded_section_kinds_name_rotatable_kinds, if: :excluded_section_kinds_changed?
   validate :every_slot_keeps_a_kind,                     if: :excluded_section_kinds_changed?
+  validate :daily_section_kinds_name_a_full_set,         if: :daily_section_kinds_changed?
   validate :section_kind_levels_name_section_kinds,      if: :section_kind_levels_changed?
   validate :locked_section_kinds_name_section_kinds,     if: :locked_section_kinds_changed?
   validate :locks_have_levels, if: -> { section_kind_levels_changed? || locked_section_kinds_changed? }
@@ -508,7 +509,11 @@ class User < ApplicationRecord
   end
 
   def rotatable_keys
-    ExerciseSection.rotatable.map(&:key)
+    ExerciseSection.rotatable(daily: DailyKinds.for(self)).map(&:key)
+  end
+
+  def daily_section_kinds_name_a_full_set
+    DailyKinds.problems_with(daily_section_kinds).each { |problem| errors.add(:daily_section_kinds, problem) }
   end
 
   def section_kind_weights_name_rotatable_kinds
@@ -581,7 +586,7 @@ class User < ApplicationRecord
   def every_slot_keeps_a_kind
     return unless excluded_section_kinds.is_a?(Array)
 
-    ExerciseSection.slots.each do |slot, kinds|
+    ExerciseSection.optional_slots(daily: DailyKinds.for(self)).each do |slot, kinds|
       next if kinds.size <= 1
       next if kinds.any? { |kind| excluded_section_kinds.exclude?(kind.key) }
 

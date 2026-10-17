@@ -210,7 +210,8 @@ RSpec.describe ConceptDrills do
     end
 
     it "leaves a non-fourth host free on the fullest possible day" do
-      non_fourth_slots = ExerciseSection.slots.count { |_slot, kinds| kinds.none?(&:fourth?) }
+      reachable_pairs  = ExerciseSection.all.combination(2).reject { |pair| pair.count(&:fourth?) > 1 }
+      non_fourth_slots = reachable_pairs.map { |pair| ExerciseSection.layout(daily: pair).count { |_slot, kinds| kinds.none?(&:fourth?) } }.min
       fullest_day_hosts = [ non_fourth_slots, ExerciseSection::MAX_SECTIONS ].min
 
       expect(described_class::MAX_CONCURRENT).to be < fullest_day_hosts

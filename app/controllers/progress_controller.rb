@@ -5,11 +5,11 @@ class ProgressController < ApplicationController
   def index
     ledger      = RungLedger.for(current_user)
     hosts       = ConceptHosts.for(current_user)
-    preferences = KindPreferences.for(current_user)
+    offered     = KindPreferences.for(current_user).offered(daily: DailyKinds.for(current_user))
 
     @buckets = learn_buckets.map do |bucket|
       groups = ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)).map do |group, concepts|
-        standings = concepts.to_h { |concept| [ concept, standing_for(concept, bucket, ledger, hosts, preferences) ] }
+        standings = concepts.to_h { |concept| [ concept, standing_for(concept, bucket, ledger, hosts, offered) ] }
         { key: group, standings: standings, counts: standings.values.tally }
       end
       { key: bucket, groups: groups }
@@ -18,14 +18,14 @@ class ProgressController < ApplicationController
 
   private
 
-  # :not_offered when every host kind is excluded, which is the user's choice rather than a gap.
-  def standing_for(concept, bucket, ledger, hosts, preferences)
+  # :not_offered when no host kind is offered, which is the user's choice rather than a gap.
+  def standing_for(concept, bucket, ledger, hosts, offered)
     toward = ledger.developing_toward(concept, bucket)
     return :"#{ProgressHelper::DEVELOPING}#{toward}" if toward
 
     held = ledger.held(concept, bucket)
     return held if held
 
-    hosts.kinds_for(concept, bucket).any? { |kind| !preferences.excluded?(kind) } ? :not_yet : :not_offered
+    hosts.kinds_for(concept, bucket).intersect?(offered) ? :not_yet : :not_offered
   end
 end

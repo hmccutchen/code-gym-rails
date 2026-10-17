@@ -7,8 +7,9 @@ class ProblemSetIngest
 
   Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections)
 
-  def self.call(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
-    new(problem_set, language: language, expected_keys: expected_keys, code_review_source: code_review_source,
+  def self.call(problem_set, language:, expected_keys:, daily:, code_review_source: nil, pitched_at: nil, eased_for: {},
+                fixed_concepts: {})
+    new(problem_set, language: language, expected_keys: expected_keys, daily: daily, code_review_source: code_review_source,
         pitched_at: pitched_at, eased_for: eased_for, fixed_concepts: fixed_concepts).call
   end
 
@@ -16,10 +17,13 @@ class ProblemSetIngest
     problem_set.deep_dup.slice(*expected_keys)
   end
 
-  def initialize(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
+  def initialize(problem_set, language:, expected_keys:, daily:, code_review_source: nil, pitched_at: nil, eased_for: {},
+                 fixed_concepts: {})
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
+    @daily              = daily
+    @layout             = ExerciseSection.layout(daily: daily)
     @code_review_source = code_review_source
     @pitched_at         = pitched_at
     @eased_for          = eased_for
@@ -88,23 +92,23 @@ class ProblemSetIngest
   def prune_unplanned_slots!
     return if resolved_slot_count <= ExerciseSection::MAX_SECTIONS
 
-    ExerciseSection.slots.each_value do |kinds|
+    @layout.each_value do |kinds|
       keys = kinds.map(&:key)
       @problem_set = @problem_set.except(*keys) if (keys & @expected_keys).empty?
     end
   end
 
   def resolved_slot_count
-    ExerciseSection.slots.values.count { |kinds| ExerciseSection.resolved_key(@problem_set, kinds) }
+    @layout.values.count { |kinds| ExerciseSection.resolved_key(@problem_set, kinds) }
   end
 
   def reject_unusable_sections!
-    pending = ExerciseSection.resolved_keys(@problem_set)
+    pending = resolved_keys
     while (key = pending.shift)
       successor = reject_if_unusable(key)
       pending << successor if successor
     end
-    return if ExerciseSection.resolved_keys(@problem_set).any?
+    return if resolved_keys.any?
 
     raise AiService::InvalidResponseError, "No usable section left: #{@unusable_sections.map(&:reason).join('; ')}"
   end
@@ -123,8 +127,12 @@ class ProblemSetIngest
     concept if ConceptVocabulary.for_section(key, @language).include?(concept)
   end
 
+  def resolved_keys
+    ExerciseSection.resolved_keys(@problem_set, daily: @daily)
+  end
+
   def slot_kinds_for(key)
-    ExerciseSection.slots.values.find { |kinds| kinds.map(&:key).include?(key) }
+    @layout.values.find { |kinds| kinds.map(&:key).include?(key) }
   end
 
   # Before normalize_concepts!, which would pass a mismatched concept through or launder it to "other" silently.
@@ -220,7 +228,7 @@ class ProblemSetIngest
   end
 
   def arrange_sections!
-    ExerciseSection.resolved_keys(@problem_set).each do |key|
+    resolved_keys.each do |key|
       ExerciseSection.for(key).arrange!(@problem_set[key])
     end
   end

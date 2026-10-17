@@ -450,6 +450,8 @@ en:
     intro: "Bias how often each rotating section appears, and set how hard any section is pitched. Neither changes how many sections a day holds — that's the setting above. Changes save automatically."
     fixed_group: "In every set"
     pattern_group: "Pattern section, in some sets"
+    code_review_group: "Code review section, in some sets"
+    design_comparison_group: "Design comparison section, in some sets"
     third_group: "Rotating third section"
     fourth_group: "Rotating fourth section"
     exclude_heading: "Excluding is a stronger, different action than turning a slider down."

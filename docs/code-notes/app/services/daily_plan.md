@@ -8,11 +8,15 @@ No `code_review`, pattern or third section can host a fourth bucket's concepts, 
 
 The plan chooses the day's concepts so the caller can compare what was offered with what the provider used (`AiService#log_retention`).
 
+## `.concept_tracks`
+
+The fourth track takes the day's fourth kind from the planned kinds, so a daily fourth and a rotated fourth are planned the same way. Under the pair's layout a day never holds two. `Result#fourth` is derived from `#kinds` the same way rather than stored beside the rotation, so a hand-built plan cannot name one fourth kind in its rotation and another in its prompt lines.
+
 ## `.main_track`
 
 Reinforcement is truncated to today's hosts because the prompt demands every concept it lists.
 
-The capacity count (every non-fourth kind) is deliberately approximate: on some days the fixed kinds host fewer concepts than that, and placement is advisory anyway.
+The capacity count (every non-fourth kind) is deliberately approximate: on some days the daily kinds host fewer concepts than that, and placement is advisory anyway.
 
 ## `.code_review_source_for`
 
@@ -20,7 +24,7 @@ The real-source choice is a second roll inside the mode, so `CODE_REVIEW_MODE_WE
 
 ## `.hostable_buckets`
 
-Both retention callers share this list, so reserving a slot and filling it read the same eligibility rule.
+Both retention callers share this list, so reserving a slot and filling it read the same eligibility rule. The buckets come from the day's non-fourth kinds, through `ConceptBucket.for`, rather than always including the language. A pair whose only regular section is architecture (with a daily fourth) can't host a language concept, so reinforcement must not pick one for it. For the default pair the list is unchanged: the language first, then `architecture` when that kind is planned.
 
 ## `.retention_checks_for`
 

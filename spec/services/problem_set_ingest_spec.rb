@@ -4,20 +4,20 @@ require "rails_helper"
 RSpec.describe ProblemSetIngest do
   # The steps are ordered and none undoes another, so one field after a full run tests that step.
   def step(problem_set, language: "ruby_rails")
-    described_class.call(problem_set, language: language, expected_keys: problem_set.keys).problem_set
+    described_class.call(problem_set, language: language, daily: DailyKinds::DEFAULT, expected_keys: problem_set.keys).problem_set
   rescue AiService::InvalidResponseError
     raise
   end
 
   def ingest(problem_set, language: "ruby_rails")
-    described_class.call(problem_set, language: language, expected_keys: problem_set.keys)
+    described_class.call(problem_set, language: language, daily: DailyKinds::DEFAULT, expected_keys: problem_set.keys)
   end
 
   describe "grounding a code_review in real source" do
     let(:excerpt) { RealSource::APPLICATION_CODE.first }
 
     def grounded(problem_set, source:)
-      described_class.call(problem_set, language: "ruby_rails", expected_keys: problem_set.keys,
+      described_class.call(problem_set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: problem_set.keys,
                            code_review_source: source).problem_set
     end
 
@@ -135,7 +135,7 @@ RSpec.describe ProblemSetIngest do
         pseudo = { "code_review" => { "concept" => "n_plus_one" },
                    "ambiguity_hunt" => { "concept" => "missing_success_criteria", "planted_ambiguities" => [] },
                    "pseudocode_to_code" => { "concept" => "x", "problem_statement" => "Write the function" } }
-        result = described_class.call(pseudo, language: "ruby_rails", expected_keys: %w[code_review pseudocode_to_code])
+        result = described_class.call(pseudo, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pseudocode_to_code])
 
         expect(result.problem_set.keys).to contain_exactly("code_review", "pseudocode_to_code")
         expect(result.unusable_sections.map(&:key)).to eq([ "ambiguity_hunt" ])
@@ -149,7 +149,7 @@ RSpec.describe ProblemSetIngest do
       end
 
       it "still refuses a set missing a requested key entirely" do
-        expect { described_class.call({ "code_review" => {} }, language: "ruby_rails", expected_keys: %w[code_review pattern]) }
+        expect { described_class.call({ "code_review" => {} }, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern]) }
           .to raise_error(AiService::InvalidResponseError, /omitted/)
       end
 
@@ -223,7 +223,7 @@ RSpec.describe ProblemSetIngest do
       set = step({ "architecture" => { "question" => "q" },
                   "parsons_problem" => { "blocks" => %w[a b c d e] } })
 
-      expect(ExerciseSection.resolved_keys(set)).not_to include("parsons_problem")
+      expect(ExerciseSection.resolved_keys(set, daily: DailyKinds::DEFAULT)).not_to include("parsons_problem")
       expect(set["parsons_problem"]).not_to have_key("display_order")
     end
   end
@@ -547,27 +547,27 @@ RSpec.describe ProblemSetIngest do
     it "rejects a set missing an intended section, naming it" do
       expect {
         described_class.call(full_set.except("pattern"), language: "ruby_rails",
-                             expected_keys: %w[code_review pattern])
+                             daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern])
       }.to raise_error(AiService::InvalidResponseError, /pattern/)
     end
 
     it "names every missing section, not just the first" do
       expect {
-        described_class.call({}, language: "ruby_rails", expected_keys: %w[code_review pattern])
+        described_class.call({}, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern])
       }.to raise_error(AiService::InvalidResponseError, /code_review.*pattern/)
     end
 
     it "treats a non-Hash value as missing" do
       expect {
         described_class.call(full_set.merge("pattern" => "oops"), language: "ruby_rails",
-                             expected_keys: %w[code_review pattern])
+                             daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern])
       }.to raise_error(AiService::InvalidResponseError, /pattern/)
     end
 
     it "accepts extra sections the day did not intend" do
       extra = full_set.merge("challenge" => { "concept" => "caching" })
 
-      result = described_class.call(extra, language: "ruby_rails", expected_keys: %w[code_review pattern])
+      result = described_class.call(extra, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern])
 
       expect(result.problem_set).to have_key("challenge")
     end
@@ -577,7 +577,7 @@ RSpec.describe ProblemSetIngest do
 
       expect(Rails.logger).to receive(:warn).with(/\[unrequested_sections\].*challenge/)
 
-      described_class.call(extra, language: "ruby_rails", expected_keys: %w[code_review pattern])
+      described_class.call(extra, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern])
     end
 
     it "names what was intended alongside what arrived unasked for" do
@@ -585,7 +585,7 @@ RSpec.describe ProblemSetIngest do
 
       expect(Rails.logger).to receive(:warn).with(/code_review.*pattern/)
 
-      described_class.call(extra, language: "ruby_rails", expected_keys: %w[code_review pattern])
+      described_class.call(extra, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern])
     end
 
     it "escapes a section name rather than letting it forge a log line" do
@@ -596,19 +596,19 @@ RSpec.describe ProblemSetIngest do
         expect(message).to include('challenge\\nFATAL')
       end
 
-      described_class.call(forged, language: "ruby_rails", expected_keys: %w[code_review pattern])
+      described_class.call(forged, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern])
     end
 
     it "stays quiet when the delivered set is exactly the intended one" do
       expect(Rails.logger).not_to receive(:warn)
 
-      described_class.call(full_set, language: "ruby_rails", expected_keys: %w[code_review pattern])
+      described_class.call(full_set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern])
     end
 
     it "reports a missing section rather than its unusable answer key" do
       expect {
         described_class.call(full_set, language: "ruby_rails",
-                             expected_keys: %w[code_review pattern ambiguity_hunt])
+                             daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern ambiguity_hunt])
       }.to raise_error(AiService::InvalidResponseError, /ambiguity_hunt/)
     end
   end
@@ -616,7 +616,7 @@ end
 
 RSpec.describe ProblemSetIngest, "formatting code" do
   def ingested(problem_set, language: "ruby_rails")
-    described_class.call(problem_set, language: language, expected_keys: problem_set.keys).problem_set
+    described_class.call(problem_set, language: language, daily: DailyKinds::DEFAULT, expected_keys: problem_set.keys).problem_set
   end
 
   before do
@@ -647,7 +647,7 @@ RSpec.describe ProblemSetIngest, "formatting code" do
     set = { "code_review" => { "concept" => "n_plus_one", "snippet" => "a" },
             "design_comparison" => FakeService::EXERCISE_PROBLEM_SET.fetch("design_comparison").deep_dup }
 
-    result = described_class.call(set, language: "ruby_rails", expected_keys: set.keys)
+    result = described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: set.keys)
 
     expect(result.unusable_sections.map(&:key)).to eq([ "design_comparison" ])
   end
@@ -666,7 +666,7 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
   end
 
   def ingest(set, pitched_at:, eased_for: {})
-    described_class.call(set, language: "ruby_rails", expected_keys: set.keys,
+    described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: set.keys,
                          pitched_at: pitched_at, eased_for: eased_for).problem_set
   end
 
@@ -691,7 +691,7 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
     set = problem_set.merge("architecture" => { "question" => "q", "concept" => "sync_vs_async",
                                                 "pitched_at" => "principal_engineer", "eased" => true })
 
-    result = described_class.call(set, language: "ruby_rails", expected_keys: problem_set.keys,
+    result = described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: problem_set.keys,
                                   pitched_at: { "code_review" => "junior", "pattern" => "junior" }).problem_set
 
     expect(result["architecture"]).not_to have_key("pitched_at")
@@ -727,7 +727,7 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
   it "stamps a section the day did not ask for when a rung is known for its kind, since it can still win its slot" do
     set = problem_set.merge("architecture" => { "question" => "q", "concept" => "sync_vs_async" })
 
-    result = described_class.call(set, language: "ruby_rails", expected_keys: problem_set.keys,
+    result = described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: problem_set.keys,
                                   pitched_at: { "code_review" => "junior", "pattern" => "junior", "architecture" => "senior" }).problem_set
 
     expect(result["architecture"]["pitched_at"]).to eq("senior")
@@ -737,7 +737,7 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
     set = problem_set.deep_dup
     set["code_review"].merge!("pitched_at" => "senior", "eased" => true)
 
-    result = described_class.call(set, language: "ruby_rails", expected_keys: set.keys).problem_set
+    result = described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: set.keys).problem_set
 
     expect(result["code_review"]).not_to have_key("pitched_at")
     expect(result["code_review"]).not_to have_key("eased")
@@ -747,18 +747,18 @@ end
 RSpec.describe ProblemSetIngest, "fixed concepts on a retry" do
   let(:set) { { "challenge" => { "question" => "q", "starter_code" => "s", "concept" => "n_plus_one" } } }
   it "raises when the returned concept is not the fixed one, before normalization can hide it" do
-    expect { described_class.call(set, language: "ruby_rails", expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "memoization" }) }
+    expect { described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "memoization" }) }
       .to raise_error(AiService::InvalidResponseError, /memoization/)
   end
   it "rejects a retry tagged with any different concept when n_plus_one was fixed" do
     mismatch = { "challenge" => set.fetch("challenge").merge("concept" => "memoization") }
 
-    expect { described_class.call(mismatch, language: "ruby_rails", expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "n_plus_one" }) }
+    expect { described_class.call(mismatch, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "n_plus_one" }) }
       .to raise_error(AiService::InvalidResponseError, /n_plus_one/)
   end
   it "drops sections the retry did not ask for instead of keeping them" do
     extra = set.merge("pattern" => { "question" => "q", "concept" => "memoization" })
-    result = described_class.call(extra, language: "ruby_rails", expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "n_plus_one" }).problem_set
+    result = described_class.call(extra, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "n_plus_one" }).problem_set
     expect(result.keys).to eq([ "challenge" ])
   end
 end
@@ -770,7 +770,7 @@ RSpec.describe ProblemSetIngest, "with the second fixed kind" do
     end
 
     def ingested(problem_set)
-      described_class.call(problem_set, language: "ruby_rails", expected_keys: problem_set.keys).problem_set
+      described_class.call(problem_set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: problem_set.keys).problem_set
     end
 
     def roll_better(position)
@@ -800,7 +800,7 @@ RSpec.describe ProblemSetIngest, "with the second fixed kind" do
     it "leaves the comparison out when a piece or the answer key is unusable" do
       { comparison("other_piece" => "") => /other_piece/, comparison("answer_key" => {}) => /answer key/ }.each do |section, reason|
         result = described_class.call({ "code_review" => { "concept" => "n_plus_one" }, "design_comparison" => section },
-                                      language: "ruby_rails", expected_keys: %w[code_review design_comparison])
+                                      language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review design_comparison])
 
         expect(result.problem_set.keys).to eq([ "code_review" ])
         expect(result.unusable_sections.sole).to have_attributes(key: "design_comparison", concept: "open_closed", reason: reason)
@@ -817,11 +817,11 @@ RSpec.describe ProblemSetIngest, "with the second fixed kind" do
 
     it "drops the slots the plan left empty, so no requested section is cut" do
       expected = %w[code_review design_comparison challenge plan_review]
-      result = described_class.call(every_kind, language: "ruby_rails", expected_keys: expected).problem_set
+      result = described_class.call(every_kind, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: expected).problem_set
 
       expect(result.keys).not_to include("pattern")
-      expect(ExerciseSection.resolved_keys(result)).to eq(%w[code_review design_comparison architecture plan_review])
-      expect(ExerciseSection.resolved_keys(result).size).to eq(ExerciseSection::MAX_SECTIONS)
+      expect(ExerciseSection.resolved_keys(result, daily: DailyKinds::DEFAULT)).to eq(%w[code_review design_comparison architecture plan_review])
+      expect(ExerciseSection.resolved_keys(result, daily: DailyKinds::DEFAULT).size).to eq(ExerciseSection::MAX_SECTIONS)
     end
 
     it "never delivers more than MAX_SECTIONS, whatever the plan asked for" do
@@ -830,15 +830,24 @@ RSpec.describe ProblemSetIngest, "with the second fixed kind" do
 
       plans.each do |expected|
         result = described_class.call(FakeService::EXERCISE_PROBLEM_SET.deep_dup, language: "ruby_rails",
-                                      expected_keys: expected).problem_set
-        expect(ExerciseSection.resolved_keys(result).size).to be <= ExerciseSection::MAX_SECTIONS
-        expect(ExerciseSection.resolved_keys(result).first(2)).to eq(%w[code_review design_comparison])
+                                      daily: DailyKinds::DEFAULT, expected_keys: expected).problem_set
+        expect(ExerciseSection.resolved_keys(result, daily: DailyKinds::DEFAULT).size).to be <= ExerciseSection::MAX_SECTIONS
+        expect(ExerciseSection.resolved_keys(result, daily: DailyKinds::DEFAULT).first(2)).to eq(%w[code_review design_comparison])
       end
+    end
+
+    it "reads the slots from the pair it is given, so a daily third and a rotated third both stay" do
+      daily  = [ ExerciseSection::Architecture, ExerciseSection::CodeReview ]
+      result = described_class.call(every_kind, language: "ruby_rails", daily: daily,
+                                                expected_keys: %w[architecture code_review challenge plan_review]).problem_set
+
+      expect(result.keys).not_to include("pattern", "design_comparison")
+      expect(ExerciseSection.resolved_keys(result, daily: daily)).to eq(%w[architecture code_review security_review plan_review])
     end
 
     it "keeps an unrequested extra when the day still has room" do
       set = { "code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" } }
-      result = described_class.call(set, language: "ruby_rails", expected_keys: [ "code_review" ]).problem_set
+      result = described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: [ "code_review" ]).problem_set
 
       expect(result.keys).to eq(%w[code_review pattern])
     end

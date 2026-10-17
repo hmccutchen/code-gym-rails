@@ -13,8 +13,9 @@ count so the `[set_size]` line can log its evidence. Weights, exclusions, diffic
 the setting is not part of the Exercise mix, so it does not bump
 `section_kind_preferences_version`.
 
-The lowest choice holds only the fixed kinds, and Setup's hint says so; a
-spec holds `SectionCount::FLOOR` equal to their number for that sentence. A
+The lowest choice holds only the user's daily kinds, and Setup's hint names
+them; a spec holds `SectionCount::FLOOR` equal to `DailyKinds::COUNT` for that
+sentence. A
 fixed count is what the day is planned with, and the judge can still drop
 an optional section from it.
 

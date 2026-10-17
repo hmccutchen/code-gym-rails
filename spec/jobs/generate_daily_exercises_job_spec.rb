@@ -7,7 +7,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
   # Examples without travel_to may run on a weekday or weekend, so these stubs answer both paths.
   def stub_provider(u = user, problem_set: { "code_review" => {} })
-    judged = AiService::JudgedSet.new(problem_set: problem_set, dropped_sections: [], outcomes: {})
+    judged = AiService::JudgedSet.new(problem_set: problem_set, dropped_sections: [], outcomes: {}, plan_notes: {})
     svc = instance_double(ClaudeService, generate_unjudged_exercise: judged, generate_judged_exercise: judged)
     allow(AiService).to receive(:for).with(u).and_return(svc)
     svc
@@ -248,7 +248,8 @@ RSpec.describe GenerateDailyExercisesJob do
     judged_set = AiService::JudgedSet.new(
       problem_set:      { "code_review" => { "question" => "q", "concept" => "n_plus_one" } },
       dropped_sections: [ "pattern" ],
-      outcomes:         {}
+      outcomes:         {},
+      plan_notes:       {}
     )
     fake_service = instance_double(ClaudeService, generate_judged_exercise: judged_set)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
@@ -264,7 +265,7 @@ RSpec.describe GenerateDailyExercisesJob do
     user.update!(language: "javascript")
     svc = stub_provider
     allow(svc).to receive(:generate_judged_exercise).and_return(
-      AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [ "pattern" ], outcomes: {})
+      AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [ "pattern" ], outcomes: {}, plan_notes: {})
     )
 
     travel_to(Time.utc(2026, 7, 13, 6, 0)) do
@@ -280,7 +281,7 @@ RSpec.describe GenerateDailyExercisesJob do
     user.update!(language: "javascript")
     svc = stub_provider
     allow(svc).to receive(:generate_unjudged_exercise).and_return(
-      AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [ "design_comparison" ], outcomes: {})
+      AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [ "design_comparison" ], outcomes: {}, plan_notes: {})
     )
 
     travel_to(Time.utc(2026, 7, 18, 12, 0)) do
@@ -303,7 +304,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
   describe "hourly batch (no user_id), zone-gated" do
     def stub_generation_for(u)
-      judged_set = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {})
+      judged_set = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {}, plan_notes: {})
       svc = instance_double(ClaudeService, generate_judged_exercise: judged_set, generate_unjudged_exercise: judged_set)
       allow(AiService).to receive(:for).with(u).and_return(svc)
     end
@@ -385,7 +386,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
   describe "the push reminder" do
     def stub_generation_for(u)
-      judged_set = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {})
+      judged_set = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {}, plan_notes: {})
       svc = instance_double(ClaudeService, generate_judged_exercise: judged_set, generate_unjudged_exercise: judged_set)
       allow(AiService).to receive(:for).with(u).and_return(svc)
     end

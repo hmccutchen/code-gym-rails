@@ -7,22 +7,21 @@ class CoverageException
   # Longer than SectionRotation::LOOKBACK, where capped staleness ties every slot.
   HISTORY_LIMIT = 120
 
-  OPTIONAL_KINDS = ExerciseSection.all.reject(&:fixed?).freeze
-
   Addition = Data.define(:kind, :reason, :check) do
     def initialize(kind:, reason:, check: nil) = super
   end
 
   def self.applies_to_day?(count:, fixed:, brake: false)
-    fixed.nil? && count <= ExerciseSection.fixed.size && !brake
+    fixed.nil? && count <= DailyKinds::COUNT && !brake
   end
 
   # checks are hashes with :concept, :bucket and :overdue_ratio.
-  def self.for(today:, count:, fixed:, history:, checks:, preferences:, hosts:, brake: false)
+  def self.for(today:, count:, fixed:, history:, checks:, preferences:, hosts:, daily:, brake: false)
     return nil unless applies_to_day?(count: count, fixed: fixed, brake: brake)
     return nil if capped?(history.coverage_dates, today)
 
-    gaps       = OPTIONAL_KINDS.reject { |kind| preferences.excluded?(kind) }.index_with { |kind| gap(kind, history, today) }
+    optional   = ExerciseSection.optional_slots(daily: daily).values.flatten
+    gaps       = optional.reject { |kind| preferences.excluded?(kind) }.index_with { |kind| gap(kind, history, today) }
     candidates = gaps.keys.sort_by { |kind| [ -gaps[kind], history.last_seen.key?(kind.key) ? 1 : 0, ExerciseSection.all.index(kind) ] }
 
     due_check_addition(checks, candidates, hosts) || gap_addition(candidates.first, gaps)
