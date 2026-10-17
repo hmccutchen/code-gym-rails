@@ -21,14 +21,18 @@ offline draft, whose token names the row's id. A `duck_threads` row, unique on
 **`DuckThread` is the one authority for a section's thread.** The controller
 asks it for the turns, the user-turn count, the stored size and the version,
 and never reads the JSON. `version` goes up on every append and every clear,
-including a clear of an empty section. A page whose version is behind is
-refused before the provider is called, with the existing
-`conversation_out_of_step` text. After the reply, the append is stored under
-`DailyExercise#with_response_locked` and then the row lock, the declared lock
-order, and only if the day is unsubmitted, the set is the one the turn was
+including a clear of an empty section. Every ask and Clear names the set the
+page shows by its draft scope, read from the answer form, and a page showing a
+set that is no longer today's (regenerated, or yesterday's tab still open) is
+refused before anything is billed or written, with the 409 text a stale
+autosave gets. A page whose version is behind is refused before the provider
+is called, with the existing `conversation_out_of_step` text. After the reply, the append is stored under the owner's user row lock, then
+`DailyExercise#with_response_locked`, then the row lock (the order
+`User#carry_forward` uses), and only if the account still exists, the day is
+unsubmitted, the set is the one the turn was
 read under, and the version is still the one whose thread the duck was sent.
-So a Clear, a regeneration or a submit that lands while a reply is on its way
-drops the reply, as Clear already drops one on the page today. Clear always
+So a Clear, a regeneration, a submit or an account deletion that lands while a
+reply is on its way drops the reply, as Clear already drops one on the page today. Clear always
 wins. `draft_scope` stamps the row with `DailyExercise#draft_scope`; a
 regenerated day has a new scope, so its old thread reads as empty and is
 overwritten on the next write. One gap is accepted: a first message whose

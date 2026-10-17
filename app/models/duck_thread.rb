@@ -13,7 +13,7 @@ class DuckThread < ApplicationRecord
 
   # Returns the new version, or nil when the thread, the set or the submitted state moved since the turn was read.
   def self.append!(exercise, section, message:, answer:, expected_version:, expected_scope:)
-    exercise.with_response_locked do |response|
+    under_locks(exercise) do |response|
       next if response&.submitted? || exercise.draft_scope != expected_scope
 
       write(row_for(exercise)) do |row|
@@ -26,13 +26,23 @@ class DuckThread < ApplicationRecord
   end
 
   def self.clear!(exercise, section)
-    exercise.with_response_locked do
+    under_locks(exercise) do
       write(row_for(exercise)) do |row|
         cleared = row.cleared_count(section) + (row.stored_turns(section).empty? ? 0 : 1)
         row.put(section, "turns" => [], "version" => row.version_for(section) + 1, "cleared" => cleared)
       end
     end
   end
+
+  # The owner first, as User#carry_forward does: an account deleted while a reply was on its way stays deleted.
+  def self.under_locks(exercise, &)
+    transaction do
+      next if User.lock("FOR SHARE").find(exercise.user_id).anonymized?
+
+      exercise.with_response_locked(&)
+    end
+  end
+  private_class_method :under_locks
 
   def self.row_for(exercise)
     transaction(requires_new: true) do

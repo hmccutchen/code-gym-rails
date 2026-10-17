@@ -55,7 +55,7 @@ export default class extends Controller {
   }
 
   async clearStored(cleared) {
-    const result = await request.send("DELETE", this.urlValue, { section: this.sectionValue },
+    const result = await request.send("DELETE", this.urlValue, { section: this.sectionValue, draft_scope: this.draftScope() },
       { fallback: this.sendFailedTextValue })
     if (result.ok && typeof result.data?.version === "number") {
       this.version = result.data.version
@@ -77,7 +77,7 @@ export default class extends Controller {
 
     await this.clearing
     const result = await request.send("POST", this.urlValue,
-      { section: this.sectionValue, message: message, version: this.version },
+      { section: this.sectionValue, message: message, version: this.version, draft_scope: this.draftScope() },
       { fallback: this.sendFailedTextValue })
     // Clear ran while this was in flight; dropping the reply keeps a cleared thread cleared.
     if (generation !== this.generation) return
@@ -92,6 +92,10 @@ export default class extends Controller {
       this.statusTarget.textContent = result.message || this.sendFailedTextValue
     }
     this.refreshCap()
+  }
+
+  draftScope() {
+    return this.element.closest("[data-answer-form-draft-scope-value]")?.dataset.answerFormDraftScopeValue ?? ""
   }
 
   renderTurns() {

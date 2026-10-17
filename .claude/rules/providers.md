@@ -55,9 +55,11 @@ read it before changing that area.
   `DuckThread`, one row per exercise keyed by section, is the one authority for
   a section's turns, user-turn count and version; generation, review, the
   judges, mastery and planning never read it (`duck_thread_isolation_spec`).
-  A page behind the stored version is refused before the call; the append is
-  stored after the reply under `with_response_locked` and the row lock, and
-  refused if the day was submitted, the set regenerated or the version moved.
+  A page showing another set (its draft scope) or behind the stored version is
+  refused before the call; the append is stored after the reply under the
+  user row lock, `with_response_locked` and the row lock, and refused if the
+  account was deleted, the day submitted, the set regenerated or the version
+  moved.
   Every Clear moves the version, and counts itself when it emptied turns. The
   cap is six user turns a thread, counted on the server. A request with
   `thread` and no `version` takes the old path for one release and touches no

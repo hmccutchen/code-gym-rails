@@ -20,12 +20,13 @@ RSpec.describe "Stored duck threads", type: :request do
     login_as(user)
   end
 
-  def ask(message = "I'm stuck", version: 0, section: "code_review")
-    post duck_thread_responses_path, params: { section: section, message: message, version: version }, as: :json
+  def ask(message = "I'm stuck", version: 0, section: "code_review", scope: exercise.reload.draft_scope)
+    post duck_thread_responses_path,
+         params: { section: section, message: message, version: version, draft_scope: scope }, as: :json
   end
 
-  def clear(section = "code_review")
-    delete duck_thread_responses_path, params: { section: section }, as: :json
+  def clear(section = "code_review", scope: exercise.reload.draft_scope)
+    delete duck_thread_responses_path, params: { section: section, draft_scope: scope }, as: :json
   end
 
   def stored = DuckThread.for(exercise.reload)
@@ -70,6 +71,49 @@ RSpec.describe "Stored duck threads", type: :request do
     expect(stored.user_turn_count("code_review")).to eq(1)
   end
 
+  describe "a page showing a set that is no longer today's" do
+    it "refuses an ask from a page loaded before a regeneration, before paying for a reply" do
+      old_scope = exercise.draft_scope
+      exercise.update!(generated_at: 1.minute.from_now)
+
+      ask(scope: old_scope)
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["error"]).to eq(I18n.t("flash.responses.stale_answers"))
+      expect(fake).not_to have_received(:duck_response)
+      expect(DuckThread.count).to eq(0)
+    end
+
+    it "refuses an ask from yesterday's page, still open the next day" do
+      yesterday = DailyExercise.create!(user: user, date: Date.yesterday, generated_at: 1.day.ago,
+                                        language: "ruby_rails", problem_set: exercise.problem_set)
+
+      ask(scope: yesterday.draft_scope)
+
+      expect(response).to have_http_status(:conflict)
+      expect(fake).not_to have_received(:duck_response)
+    end
+
+    it "refuses a Clear from a stale page, so it can't erase the current set's thread" do
+      ask
+      old_scope = exercise.draft_scope
+      exercise.update!(generated_at: 1.minute.from_now)
+      ask("on the new set", scope: exercise.reload.draft_scope)
+
+      clear(scope: old_scope)
+
+      expect(response).to have_http_status(:conflict)
+      expect(stored.user_turn_count("code_review")).to eq(1)
+    end
+
+    it "refuses a request that names no set at all" do
+      post duck_thread_responses_path, params: { section: "code_review", message: "hi", version: 0 }, as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(fake).not_to have_received(:duck_response)
+    end
+  end
+
   describe "a change that lands while the reply is on its way" do
     def during_the_call(&change)
       allow(fake).to receive(:duck_response) do
@@ -89,6 +133,15 @@ RSpec.describe "Stored duck threads", type: :request do
 
     it "drops the reply when the set is regenerated, so it never lands on the new problems" do
       during_the_call { DailyExercise.find(exercise.id).update!(generated_at: 1.minute.from_now) }
+
+      ask
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(DuckThread.count).to eq(0)
+    end
+
+    it "drops the reply when the account is deleted, so the thread is not written back" do
+      during_the_call { User.find(user.id).anonymize! }
 
       ask
 
@@ -165,11 +218,11 @@ RSpec.describe "Stored duck threads", type: :request do
   it "never reads another user's thread" do
     ask
     other = create_user_with_key(email: "other@example.com")
-    DailyExercise.create!(user: other, date: Date.current, generated_at: Time.current, language: "ruby_rails",
-                          problem_set: exercise.problem_set)
+    theirs = DailyExercise.create!(user: other, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                   problem_set: exercise.problem_set)
     login_as(other)
 
-    ask("mine", version: 0)
+    ask("mine", version: 0, scope: theirs.draft_scope)
 
     expect(fake).to have_received(:duck_response).with(other, anything, section: "code_review", message: "mine", thread: [])
   end

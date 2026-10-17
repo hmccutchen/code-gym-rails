@@ -147,6 +147,7 @@ class ResponsesController < ApplicationController
     exercise, section, message = load_duck_turn
     return unless exercise
     return legacy_duck_thread(exercise, section, message) if legacy_duck_request?
+    return duck_refusal(t("flash.responses.stale_answers"), status: :conflict) if stale_duck_page?(exercise)
 
     store = DuckThread.for(exercise)
     refusal = stored_thread_refusal(store, section)
@@ -167,6 +168,7 @@ class ResponsesController < ApplicationController
   def clear_duck_thread
     exercise, section = load_duck_section
     return unless exercise
+    return duck_refusal(t("flash.responses.stale_answers"), status: :conflict) if stale_duck_page?(exercise)
 
     render json: { status: "ok", version: DuckThread.clear!(exercise, section) }
   end
@@ -320,6 +322,8 @@ class ResponsesController < ApplicationController
       t("duck.turns_used", count: MAX_DUCK_TURNS_PER_SECTION)
     end
   end
+
+  def stale_duck_page?(exercise) = params[:draft_scope].to_s != exercise.draft_scope
 
   def duck_refusal(message, status: :unprocessable_content)
     render_json_error(message, status: status)

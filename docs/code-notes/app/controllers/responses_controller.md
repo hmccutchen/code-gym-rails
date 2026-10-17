@@ -42,6 +42,16 @@ A missing exercise still gets a JSON body, because the client calls
 The provider is called with the stored thread, and the exchange is stored
 only after the reply, under `DuckThread.append!`'s checks.
 
+## `#stale_duck_page?`
+
+A page names the set it shows by its draft scope. A tab loaded before a
+regeneration, or left open since yesterday, still reads version 0 for a
+section, which would match the current set's empty thread: the duck would be
+asked about one problem and answer against another, and its Clear would erase
+the current set's thread. So both actions refuse a scope that isn't today's
+set before the provider call or any write, with the same 409 text a stale
+autosave gets. The legacy path is exempt, since it stores nothing.
+
 ## `#stored_thread_refusal`
 
 Runs before the paid call. A page whose version is behind the stored thread

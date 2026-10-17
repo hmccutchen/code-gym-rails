@@ -50,6 +50,14 @@ the server still holds it; leaving the page empty would hide history the duck
 still answers from. Both requests go
 through `request.send` rather than the save queue; the decision doc says why.
 
+## draftScope
+
+The set's draft scope is already rendered on the answer form that wraps every
+duck, for autosave. The duck reads it from there instead of carrying a copy of
+its own, so a section's markup stays as it was, and sends it with every ask
+and Clear so the server can refuse a page showing a set that is no longer
+today's.
+
 ## ask
 
 An explicit message, the Explain button's, bypasses the input entirely. An
