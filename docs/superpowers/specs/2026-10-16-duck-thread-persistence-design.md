@@ -355,6 +355,17 @@ describes what shipped:
 A failed Clear also puts the thread back on the page, so the page never hides
 turns the server still holds.
 
+Copilot's review of this spec added two more, both in hmccutchen/code-gym-rails#414:
+
+- **Every ask and Clear names the set the page shows,** by the draft scope the
+  answer form already renders, and a page showing a set that is no longer
+  today's (regenerated, or yesterday's tab still open) is refused before
+  anything is billed or written. Version 0 alone matched the current set's
+  empty thread.
+- **Writes take the owner's user row first** (`FOR SHARE`, the order
+  `User#carry_forward` uses) and write nothing for an anonymized owner, so a
+  reply on its way when the account is deleted can't recreate the row.
+
 ## Clients loaded before the deploy
 
 **Where stale code comes from.** The service worker
