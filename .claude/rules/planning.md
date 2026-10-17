@@ -60,7 +60,7 @@ read it before changing that area.
   `ExerciseSection.layout(daily:)` or `.optional_slots(daily:)`; never
   re-introduce a global slot list. A default account must stay byte-identical,
   which the prompt, page and request snapshots hold. A daily fourth takes the
-  fourth slot out of rotation. `CompetencyGate` still reads `DEFAULT`.
+  fourth slot out of rotation. `CompetencyGate` reads each day's own pair.
 - **Daily sections setting** (`docs/decisions/daily-sections-setting.md`):
   `User#daily_section_count` is Automatic (nil) or a count in
   `User::DAILY_SECTION_COUNTS`. `DaySize.for` returns a fixed count before
@@ -107,9 +107,11 @@ read it before changing that area.
   is pure and runs forward, moves one step a day, resets to two on the brake
   (which empties the growth windows), and reads levels from `pitched_at`.
   Eased sections stay out of growth, but their too-hard rating counts toward
-  the brake. `ReviewedSectionResults` decides which sections count, and
-  `CompetencyGate::Evidence` reads every stamped day with no cap, since a cap
-  would forget an earned size.
+  the brake. Growth counts a result only when its kind was daily on its own
+  day (`Day#daily`, from the row's `plan_notes`), so a change of pair never
+  reclassifies past days or resets an earned size. `ReviewedSectionResults`
+  decides which sections count, and `CompetencyGate::Evidence` reads every
+  stamped day with no cap, since a cap would forget an earned size.
 - **Pausing generation** (`docs/decisions/pausing-generation.md`):
   `User#paused_generation_at` stops only generation the user didn't ask for
   (cron and the dashboard auto-trigger), never submit or review. `PATCH
