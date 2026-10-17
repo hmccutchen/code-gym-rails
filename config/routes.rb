@@ -71,6 +71,7 @@ Rails.application.routes.draw do
     end
     collection do
       post :duck_thread
+      delete :duck_thread, action: :clear_duck_thread
       post :pseudocode_critique
     end
   end

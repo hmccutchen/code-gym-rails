@@ -235,11 +235,12 @@ RSpec.describe "Provider failures as users see them", type: :request do
 
     KINDS.each do |failure, kind|
       it "the duck under a #{failure} answers 503 with the kind and its sentence" do
-        create_exercise
+        exercise = create_exercise
         stub_gemini(FAILURES[failure])
         login_as(user)
 
-        post duck_thread_responses_path, params: { section: "code_review", message: "Why?" }, as: :json
+        post duck_thread_responses_path,
+             params: { section: "code_review", message: "Why?", version: 0, draft_scope: exercise.draft_scope }, as: :json
 
         expect_failure_json(kind, "the thinking partner didn't answer")
       end
