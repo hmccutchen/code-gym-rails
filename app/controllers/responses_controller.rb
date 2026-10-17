@@ -9,7 +9,6 @@ class ResponsesController < ApplicationController
   MAX_DUCK_TURNS_PER_SECTION = 6
 
   MAX_DUCK_MESSAGE_LENGTH = 2_000
-  MAX_DUCK_THREAD_ENTRIES = MAX_DUCK_TURNS_PER_SECTION * 2
 
   DUCK_REPLY_BYTES_PER_TOKEN = 4
   DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE = AiService::DUCK_RESPONSE_MAX_TOKENS * DUCK_REPLY_BYTES_PER_TOKEN
@@ -146,7 +145,6 @@ class ResponsesController < ApplicationController
   def duck_thread
     exercise, section, message = load_duck_turn
     return unless exercise
-    return legacy_duck_thread(exercise, section, message) if legacy_duck_request?
     store = DuckThread.for(exercise)
     return duck_outcome(:stale) if stale_duck_page?(exercise) || params[:version].to_i != store.version_for(section)
 
@@ -333,49 +331,6 @@ class ResponsesController < ApplicationController
   def duck_refusal(message, status: :unprocessable_content)
     render_json_error(message, status: status)
     nil
-  end
-
-  # A page loaded before duck threads were stored still posts its own thread; remove with #duck_thread_param.
-  def legacy_duck_request? = params.key?(:thread) && !params.key?(:version)
-
-  def legacy_duck_thread(exercise, section, message)
-    Rails.logger.info("[duck] legacy thread shape user #{current_user.id}")
-    thread = duck_thread_param
-    if thread.size > MAX_DUCK_THREAD_ENTRIES ||
-       thread.sum { |turn| turn[:content].bytesize } > MAX_DUCK_THREAD_BYTES
-      return render_section_error(t("errors.responses.conversation_too_long"))
-    end
-    return render_section_error(t("errors.responses.conversation_out_of_step")) unless well_formed_thread?(thread)
-    if thread.count { |turn| turn[:role] == "user" } >= MAX_DUCK_TURNS_PER_SECTION
-      return render_section_error(t("duck.turns_used", count: MAX_DUCK_TURNS_PER_SECTION))
-    end
-
-    answer = AiService.for(current_user).duck_response(current_user, exercise, section: section, message: message,
-                                                       thread: thread)
-    render json: { status: "ok", answer: answer }
-  end
-
-  def duck_thread_param
-    Array(params[:thread]).first(MAX_DUCK_THREAD_ENTRIES + 1).filter_map { |turn|
-      next unless turn.is_a?(Hash) || turn.respond_to?(:permit)
-
-      role = turn[:role].to_s.downcase
-      next unless %w[user assistant].include?(role)
-
-      content = UserText.normalize(turn[:content])
-      next if content.blank?
-
-      { role: role, content: content }
-    }
-  end
-
-  def well_formed_thread?(thread)
-    return true if thread.empty?
-
-    thread.last[:role] == "assistant" &&
-      thread.each_slice(2).all? { |user_turn, assistant_turn|
-        user_turn[:role] == "user" && assistant_turn&.dig(:role) == "assistant"
-      }
   end
 
   def load_pseudocode_context

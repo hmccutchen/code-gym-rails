@@ -5,11 +5,10 @@
 Double `DailyResponse::MAX_FOLLOW_UPS_PER_SECTION`, because a duck thread is a
 real back-and-forth. The view partial reads the value from this constant.
 
-## `MAX_DUCK_MESSAGE_LENGTH` and `MAX_DUCK_THREAD_ENTRIES`
+## `MAX_DUCK_MESSAGE_LENGTH`
 
-The message limit bounds every new turn. The entry limit bounds a thread a
-page posts on the legacy path, where the client holds the thread and can make
-it any size; it goes when that path does.
+Bounds every new turn. Earlier turns come from the stored thread, never the
+request, so nothing else a page posts needs a size limit.
 
 ## `MAX_DUCK_THREAD_BYTES`
 
@@ -50,7 +49,8 @@ section, which would match the current set's empty thread: the duck would be
 asked about one problem and answer against another, and its Clear would erase
 the current set's thread. So both actions refuse a scope that isn't today's
 set before the provider call or any write, with the same 409 text a stale
-autosave gets. The legacy path is exempt, since it stores nothing.
+autosave gets. A page loaded before threads were stored sends no scope at
+all, so it gets the same refusal, and its reload loads the new script.
 
 ## `#stored_thread_refusal`
 
@@ -76,14 +76,6 @@ stale page.
 Each renders its own refusal and returns nil, so the actions guard on the
 result. `#duck_refusal` returns nil explicitly, because a render returns a
 truthy value and would let the action carry on.
-
-## `#legacy_duck_request?` and `#legacy_duck_thread`
-
-A page loaded before threads were stored posts its own `thread` and no
-`version`. It takes the old path unchanged and touches no stored row; reading
-it as version 0 would answer once and then refuse every later message as out
-of step. The log line is how its removal is timed. See
-`docs/decisions/the-duck-thread-is-stored.md`.
 
 ## `#pseudocode_critique`
 
@@ -111,22 +103,6 @@ A refused submit raises `ActiveRecord::Rollback` instead of returning
 then, and returning early would commit it. The rollback makes the transaction
 return `nil`, which the trailing `|| :failed` turns into the failure outcome
 `#create` renders as a 422.
-
-## `#duck_thread_param`
-
-Legacy path only.
-
-Roles are normalized and limited to `user` and `assistant`; the turn cap
-matches `"user"` exactly. Blank turns are dropped, because the provider would
-answer them with a 400.
-
-It maps at most one entry past `MAX_DUCK_THREAD_ENTRIES`. That bounds the work
-while still leaving an over-limit thread detectably over the limit.
-
-## `#well_formed_thread?`
-
-Turns must alternate and end on an assistant reply. The page script always
-sends that shape, so any other shape was written by hand.
 
 ## `#load_pseudocode_context`
 

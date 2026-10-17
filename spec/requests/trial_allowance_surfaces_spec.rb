@@ -25,9 +25,10 @@ RSpec.describe "A trial at its daily cap", type: :request do
   def sentence_for(outcome) = Regexp.new(format(cap_sentence.source, Regexp.escape(outcome)))
 
   it "answers the thinking partner with the cap sentence" do
-    todays_exercise
+    exercise = todays_exercise
 
-    post duck_thread_responses_path, params: { section: "code_review", message: "Why?", thread: [] }, as: :json
+    post duck_thread_responses_path, params: { section: "code_review", message: "Why?", version: 0, draft_scope: exercise.draft_scope },
+                                     as: :json
 
     expect(response).to have_http_status(:service_unavailable)
     expect(response.parsed_body).to include("status" => "error", "failure" => "trial_allowance_used")

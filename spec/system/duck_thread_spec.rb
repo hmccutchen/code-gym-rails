@@ -143,7 +143,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
       ask(duck, "after the reload")
       expect(duck).to have_css(".duck-turn.duck-user", count: 2, wait: 10)
-      expect(duck).to have_no_content(/out of step/i)
+      expect(duck).to have_no_content(/out of date/i)
     end
   end
 
@@ -187,7 +187,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
       ask(duck, "after clearing and reloading")
       expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT, wait: 10)
-      expect(duck).to have_no_content(/out of step/i)
+      expect(duck).to have_no_content(/out of date/i)
     end
   end
 
@@ -217,7 +217,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
       ask(duck, "after a double clear")
       expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT, wait: 10)
-      expect(duck).to have_no_content(/out of step/i)
+      expect(duck).to have_no_content(/out of date/i)
       expect(page.evaluate_script("window.__deletes")).to eq(1)
     end
   end
@@ -278,7 +278,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
         page.execute_script("window.fetch = window.__originalFetch")
         ask(duck, "the next message")
         expect(duck).to have_css(".duck-turn.duck-user", count: 2, wait: 10)
-        expect(duck).to have_no_content(/out of date|out of step/i)
+        expect(duck).to have_no_content(/out of date/i)
       end
     end
   end
