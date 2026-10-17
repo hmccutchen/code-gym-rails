@@ -1,6 +1,6 @@
 module GenerationPromptHelpers
   PLAN_DEFAULTS = {
-    daily_kinds: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review }, fourth: :plan_review,
+    daily_kinds: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review },
     reinforcement: [], due_checks: [], established: [],
     fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
     code_review_mode: :application_code, code_review_source: nil, scenario_flavor: :general,
@@ -9,7 +9,7 @@ module GenerationPromptHelpers
 
   # pattern:, third: and fourth: fill the default pair's rotation, so a spec names a day the way SectionRotation rolls one.
   def plan_for(**overrides)
-    rolled   = overrides.extract!(:pattern, :third).merge(overrides.slice(:fourth))
+    rolled   = overrides.extract!(:pattern, :third, :fourth)
     rotation = PLAN_DEFAULTS[:rotation].merge(rolled)
 
     DailyPlan::Result.new(**PLAN_DEFAULTS.merge(rotation: rotation, **overrides))

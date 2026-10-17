@@ -1,7 +1,7 @@
 # Design notes: docs/code-notes/app/services/daily_plan.md
 class DailyPlan
   Result = Data.define(:daily_kinds, :rotation, :reinforcement, :due_checks, :established,
-                        :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established,
+                        :fourth_reinforcement, :fourth_due_checks, :fourth_established,
                         :code_review_mode, :code_review_source, :scenario_flavor,
                         :shared_concept, :coverage, :waiting_checks, :size) do
     def notes
@@ -11,6 +11,8 @@ class DailyPlan
     end
 
     def kinds = ExerciseSection.for_plan(daily: daily_kinds, rotation: rotation)
+
+    def fourth = kinds.find(&:fourth?)&.key&.to_sym
 
     def judge_retries(kind) = daily_kinds.include?(kind) ? DAILY_JUDGE_RETRIES : ROTATED_JUDGE_RETRIES
   end
@@ -33,7 +35,7 @@ class DailyPlan
 
   FOURTH_SLOT_CAPACITY = 1
 
-  NO_FOURTH_TRACK = { fourth: nil, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
+  NO_FOURTH_TRACK = { fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
 
   def self.for(user, language:)
     history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
@@ -167,7 +169,7 @@ class DailyPlan
     due_checks    = retention_checks_for_bucket(due, bucket, slots: FOURTH_SLOT_CAPACITY - reinforcement.size,
                                                 reinforcement: reinforcement)
 
-    { fourth: fourth, fourth_reinforcement: reinforcement, fourth_due_checks: due_checks,
+    { fourth_reinforcement: reinforcement, fourth_due_checks: due_checks,
       fourth_established: established_concepts_for_bucket(user, bucket, reinforcement: reinforcement,
                                                           due_checks: due_checks) }
   end

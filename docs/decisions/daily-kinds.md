@@ -198,7 +198,7 @@ only for the default pair's order:
 The layout puts a pair's kinds first in stored order, so for a pair such as
 architecture and code review, architecture comes first while its guidance
 still calls it the third section. A default account is unaffected, which is
-why this PR leaves the wording alone: changing it rewrites 262 of the 263
+why this PR leaves the wording alone: changing it rewrites all 263
 prompt snapshots. Naming each section by its kind instead ("the architecture
 section") is a precondition for PR 2, the first change that can write a
 non-default pair, and lands before it or with it as its own snapshot update.
@@ -209,3 +209,15 @@ Two lines assume `code_review` is in the day without naming a position:
 "the same bar as code_review's snippet". A pair without `code_review` makes
 them point at a section that is not there. PR 2 either gates them on
 `code_review` being planned or rewords them to stand alone.
+
+## Other PR 2 preconditions
+
+- Deploy order: the worker must run this PR's code before any pair other
+  than the default can be stored. A worker still on older code writes rows
+  without `daily_kinds`, and those rows read as the default pair.
+- Pair-dependent view logic: `api_keys/edit.html.erb` reads
+  `DailyKinds.for` four times per render, and
+  `dashboard/_level_suggestion.html.erb` decides `in_place` from
+  `KindPreferences#offered` inline. Before PR 2 adds more branches on the
+  pair, resolve the pair once in the controller and have the server state
+  the answer, as the "server decides" pattern asks.
