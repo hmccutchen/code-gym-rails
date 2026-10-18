@@ -36,6 +36,12 @@ class AiService
 
   class UnsupportedRouteError < Error; end
 
+  class DeadlineError < TimeoutError
+    def initialize(purpose = nil)
+      super("The generation deadline left no time for a #{purpose || "further"} call.")
+    end
+  end
+
   class AllSectionsRejectedError < Error
     def initialize(message = "Every section of today's draft failed its quality check, so no set was saved. Try generating again.")
       super
@@ -324,6 +330,12 @@ class AiService
     "judge_review"                => { max_tokens: REVIEW_JUDGE_MAX_TOKENS, read_timeout: REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true }
   }.freeze
 
+  def self.worst_case_seconds_for(purpose)
+    profile = CALL_PROFILES.fetch(purpose)
+    read_timeout = profile.fetch(:read_timeout, READ_TIMEOUT)
+    profile[:single_attempt] ? single_attempt_call_seconds(read_timeout) : worst_case_call_seconds(read_timeout)
+  end
+
   def self.request_for(purpose, system:, prompt:, history: [], response_schema: nil, blocking: false)
     profile  = CALL_PROFILES.fetch(purpose)
     settings = profile.except(:blocking_read_timeout)
@@ -482,7 +494,8 @@ class AiService
     generate_unjudged_exercise(user, language: language, blocking: blocking).problem_set
   end
 
-  def generate_unjudged_exercise(user, language: user.language_for_today, blocking: false)
+  def generate_unjudged_exercise(user, language: user.language_for_today, blocking: false, deadline: GenerationDeadline::NONE)
+    deadline.ensure_fits!("generate_exercise")
     draft   = draft_exercise(user, language: language, blocking: blocking)
     planned = draft.kinds.map(&:key)
     dropped = draft.unusable_sections.select { |section| planned.include?(section.key) }
@@ -492,11 +505,12 @@ class AiService
                   plan_notes: draft.plan.notes)
   end
 
-  def generate_judged_exercise(user, language: user.language_for_today)
+  def generate_judged_exercise(user, language: user.language_for_today, deadline: GenerationDeadline::NONE)
+    deadline.ensure_fits!("generate_exercise")
     draft = draft_exercise(user, language: language, blocking: false)
     JudgedGeneration.call(
       user: user, language: language, draft: draft,
-      providers: -> { fresh_service.judged_generation_provider },
+      providers: -> { deadline.guard(fresh_service.judged_generation_provider) },
       finish: ->(set, **logs) { finish_generation(user, language, draft, set, **logs) }
     )
   end

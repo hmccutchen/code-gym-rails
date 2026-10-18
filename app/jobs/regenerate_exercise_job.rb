@@ -17,7 +17,7 @@ class RegenerateExerciseJob < ApplicationJob
 
     # The claim's timestamp is this worker's token; a cleared and retaken claim is present but not ours.
     claim = exercise.regenerating_since
-    generated = AiService.for(user).generate_unjudged_exercise(user, language: exercise.language)
+    generated = generate(user, exercise.language, GenerationDeadline.new(claim + DailyExercise::REGENERATION_DEADLINE))
 
     kept_for = exercise.with_response_locked do |existing|
       # Re-read the claim under the lock: carry_forward or a later click can take it during the provider call.
@@ -43,15 +43,25 @@ class RegenerateExerciseJob < ApplicationJob
 
     user.clear_generation_failure! if user.last_generation_error_date.present?
     Rails.logger.info("Regenerated exercise for user #{user.id} on #{Date.current}")
+  rescue AiService::AllSectionsRejectedError => e
+    release(user, exercise, claim, e) { user.record_generation_message!(KEPT_SET_MESSAGES.fetch(:all_rejected)) }
   rescue AiService::Error => e
     release(user, exercise, claim, e) { user.record_generation_failure!(e) }
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
     release(user, exercise, claim, e) { user.record_generation_message!("Generation returned an unusable set — try again.") }
   end
 
+  def generate(user, language, deadline)
+    service = AiService.for(user)
+    return service.generate_unjudged_exercise(user, language: language, deadline: deadline) if Date.current.on_weekend?
+
+    service.generate_judged_exercise(user, language: language, deadline: deadline)
+  end
+
   KEPT_SET_MESSAGES = {
-    reviewed:  "your review landed first, and replacing a reviewed set would discard it — today's reviewed set was kept.",
-    reviewing: "a review was running for today's set, so it was kept rather than replaced mid-review."
+    all_rejected: "every section of the new set failed its quality check, so today's set was kept.",
+    reviewed:     "your review landed first, and replacing a reviewed set would discard it — today's reviewed set was kept.",
+    reviewing:    "a review was running for today's set, so it was kept rather than replaced mid-review."
   }.freeze
 
   def keep_superseded_set(user)

@@ -27,14 +27,16 @@ The regeneration claim has to outlast the longest a healthy
 take the stale claim, and the first job would throw away its paid result when
 it found a different token under the lock.
 
-The job makes one single-stage draft call. That call retries a 429 or 5xx
-after a full read, so its worst case is
-`AiService.worst_case_call_seconds(GENERATION_READ_TIMEOUT)`, 946 s at a 300 s
-read timeout. The window is that worst case plus `JOB_PICKUP_MARGIN`, the 60 s
-the old six-minute value already allowed for a worker to pick the job up. It
-comes to 1,006 s, about 17 minutes. The cost is that a worker which dies
-mid-call keeps `/regenerate` refused, and the page on its generating state,
-for that long instead of six minutes.
+The window equals `REGENERATION_DEADLINE`, the deadline the job runs under
+(`GenerationDeadline`, measured from the claim). That deadline is one
+worst-case judged pass plus `JOB_PICKUP_MARGIN`: the draft call, which retries
+a 429 or 5xx after a full 300 s read (946 s), then one judge call (181 s), plus
+the 60 s the old six-minute value allowed for a worker to pick the job up. It
+comes to 1,187 s, about 20 minutes. The deadline refuses any call whose worst
+case would end after it, so no healthy job outlives the claim, and a judged
+day's full budget (2,302 s) never has to fit in the window. The cost is that a
+worker which dies mid-call keeps `/regenerate` refused, and the page on its
+generating state, for that long.
 
 The generating poller sizes its attempts from the larger of this window and
 `AiService::JUDGED_GENERATION_BUDGET`, so it keeps polling for the whole
