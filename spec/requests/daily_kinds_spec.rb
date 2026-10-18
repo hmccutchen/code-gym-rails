@@ -78,6 +78,23 @@ RSpec.describe "Swapping a daily section kind", type: :request do
     expect(user.daily_section_kinds).to eq(%w[pattern design_comparison])
   end
 
+  it "sends a stale page fresh panels for the stored pair and version, and a 422 none" do
+    DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,
+                          problem_set: { "code_review" => { "question" => "q" }, "design_comparison" => { "question" => "q" } },
+                          plan_notes: { "daily_kinds" => %w[code_review design_comparison], "size" => 2 })
+    stale = user.section_kind_preferences_version
+    user.update!(daily_section_kinds: %w[pattern design_comparison])
+
+    swap(1, "architecture", version: stale)
+
+    expect(body["panels"].keys).to eq(%w[0 1])
+    expect(body["panels"]["0"]).to include("Swap #{I18n.t("sections.pattern.name")}").and include(%(data-version="#{user.reload.section_kind_preferences_version}"))
+
+    swap(1, "design_comparison")
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(body).not_to have_key("panels")
+  end
+
   it "keeps a weight on a kind through swap, Exercise mix edit and swap back" do
     user.update!(section_kind_weights: { "challenge" => 2.0 })
 

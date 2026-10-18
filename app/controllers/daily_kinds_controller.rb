@@ -18,7 +18,7 @@ class DailyKindsController < ApplicationController
       want_it_today_link: (I18n.t("daily_kinds.picker.generate_link") if outcome.want_it_today), panels: panels, **state(outcome) }
   end
 
-  # Every place's panel, so both cards' pickers and their version reflect the new pair without a reload.
+  # Every place's panel, so after a save or a stale refusal both cards' pickers show the stored pair and version.
   def panels
     exercise = current_user.daily_exercises.for_date.first
     pickers  = DailyKindSwap::Picker.for_day(current_user.reload, exercise: exercise, response: exercise&.daily_response)
@@ -28,8 +28,9 @@ class DailyKindsController < ApplicationController
   end
 
   def render_refusal(outcome)
-    status = outcome.reason == :stale ? :conflict : :unprocessable_content
-    render_json_error(outcome.message, status: status, outcome: outcome.reason.to_s, **state(outcome))
+    return render_json_error(outcome.message, status: :conflict, outcome: "stale", panels: panels, **state(outcome)) if outcome.reason == :stale
+
+    render_json_error(outcome.message, status: :unprocessable_content, outcome: outcome.reason.to_s, **state(outcome))
   end
 
   def state(outcome)

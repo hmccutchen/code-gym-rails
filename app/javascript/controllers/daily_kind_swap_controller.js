@@ -67,6 +67,7 @@ export default class extends Controller {
       { kind: chosen.value, section_kind_preferences_version: this.panelTarget.dataset.version },
       "daily_kind_swap")
     if (result && result.ok && result.data) return this.saved(result.data)
+    if (result && result.status === 409 && result.data && result.data.panels) return this.refreshStale(result.data.panels)
 
     this.setBusy(false)
     this.choose()
@@ -74,12 +75,22 @@ export default class extends Controller {
   }
 
   saved(data) {
-    Object.entries(data.panels || {}).forEach(([place, html]) => {
+    this.replacePanels(data.panels)
+    this.announce(data.message, data.want_it_today, data.want_it_today_link)
+    if (this.hasTriggerTarget) this.triggerTarget.focus()
+  }
+
+  // Another tab changed the pair or the mix, so the picker reopens on the stored pair before the reader tries again.
+  refreshStale(panels) {
+    this.replacePanels(panels)
+    if (this.hasPickerTarget) this.open()
+  }
+
+  replacePanels(panels) {
+    Object.entries(panels || {}).forEach(([place, html]) => {
       const panel = document.getElementById(`daily-kind-swap-panel-${place}`)
       if (panel) panel.outerHTML = html
     })
-    this.announce(data.message, data.want_it_today, data.want_it_today_link)
-    if (this.hasTriggerTarget) this.triggerTarget.focus()
   }
 
   announce(message, wantItToday, linkLabel) {

@@ -13,10 +13,18 @@ attribute is the server's answer too.
 
 ## Saving goes through `CodeGymSaveStatus.save`
 
-A failure (the 409 for a page that is out of date, or a 422 refusal) shows
-in the shared `#save-status` banner like every other save on the page. The
-picker stays open and focus goes back to Confirm, so the reader can cancel or
-reload without hunting for where they were.
+A failure shows in the shared `#save-status` banner like every other save on
+the page. On a 422 refusal the picker stays open and focus goes back to
+Confirm, so the reader can cancel without hunting for where they were.
+
+A 409 means another tab changed the pair or the Exercise mix, so the panels
+on this page describe settings that are no longer stored. The 409 reply
+carries the same freshly rendered panels a save does, the controller swaps
+them in and reopens this card's picker on the stored pair, with focus on its
+checked radio. The next Confirm posts the stored version and saves. This is
+the card's counterpart to Exercise mix reloading on `layout_changed`; the
+card can refresh in place because its whole state is one server-rendered
+panel.
 
 ## The reply replaces both panels
 

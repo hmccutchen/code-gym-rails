@@ -71,14 +71,36 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page.evaluate_script("window.swapPage")).to be(true)
   end
 
-  it "shows the stale message from another tab's change and keeps the picker open on Confirm" do
-    user.update!(section_kind_weights: { "challenge" => 2.0 })
+  it "shows the stale message, reopens the picker on the pair another tab stored, and saves on the next try" do
+    user.update!(daily_section_kinds: %w[pattern design_comparison])
     confirm_swap(0, "architecture")
 
     expect(page).to have_css("#save-status", text: I18n.t("daily_kinds.swap.refused.stale"))
+    expect(page).to have_css("#daily-kind-swap-panel-0[data-current='pattern']")
+    expect(page).to have_css("#daily-kind-0-picker", visible: :visible)
+    expect(page.evaluate_script("document.activeElement.id")).to eq("daily-kind-0-pattern")
+    expect(user.reload.daily_section_kinds).to eq(%w[pattern design_comparison])
+
+    find("#daily-kind-0-architecture").click
+    within("#daily-kind-0-picker") { click_button "Confirm" }
+    expect(page).to have_css(".daily-kind-reply", text: I18n.t("daily_kinds.swap.saved"))
+    expect(user.reload.daily_section_kinds).to eq(%w[architecture design_comparison])
+  end
+
+  it "shows a refusal in the banner and keeps the picker open with focus on Confirm" do
+    open_picker(0)
+    find("#daily-kind-0-challenge").click
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.fetch = (url, options) => url.includes("/daily_kinds/")
+        ? Promise.resolve(new Response(JSON.stringify({ status: "invalid", error: "That swap couldn't be saved." }), { status: 422, headers: { "Content-Type": "application/json" } }))
+        : originalFetch(url, options);
+    JS
+    within("#daily-kind-0-picker") { click_button "Confirm" }
+
+    expect(page).to have_css("#save-status", text: "That swap couldn't be saved.")
     expect(page).to have_css("#daily-kind-0-picker", visible: :visible)
     expect(page.evaluate_script("document.activeElement.textContent")).to eq("Confirm")
-    expect(user.reload.daily_section_kinds).to eq([])
   end
 
   it "works from the keyboard: open, arrow to a kind, Escape closes and returns focus" do
