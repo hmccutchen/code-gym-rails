@@ -162,10 +162,18 @@ it is daily.
 The entry is kept across a swap, so swapping a kind back restores its
 setting:
 
-- The Exercise mix form posts only the rows on screen, and a daily kind has no
-  row there. `ProfileController` passes every save through
-  `User#keep_daily_kind_entries`, which merges the stored entries for the
-  current daily kinds back in.
+- The Exercise mix form posts only the controls on screen. A daily kind has
+  no weight row there, and while a fourth kind is daily its two siblings have
+  no row at all, so neither their weights and exclusions nor their difficulty
+  targets and locks are posted. `ProfileController` passes every save through
+  `User#keep_unrendered_preferences`, which merges back the stored weights and
+  exclusions for kinds outside `ExerciseSection.rotatable` and the stored
+  targets and locks for kinds outside `ExerciseSection.pickable`, the two sets
+  Setup renders controls for.
+- A Setup page left open while another tab swaps a kind was rendered for the
+  old pair. Its next save gets the usual 409, and the reply's
+  `layout_changed`, decided by the server from the `layout` the page posts,
+  makes the page reload instead of saving with controls missing.
 - `section_kind_weights_name_rotatable_kinds` and
   `excluded_section_kinds_name_rotatable_kinds` check only the entries a save
   adds or changes, so a kept entry for a daily kind never refuses a save, and

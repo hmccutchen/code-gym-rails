@@ -219,7 +219,9 @@ class ProfileController < ApplicationController
   end
 
   def render_stale_preferences
-    render_json_error(t("exercise_mix.conflict"), status: :conflict, current: preference_state)
+    daily = DailyKinds.for(current_user).map(&:key)
+    render_json_error(t("exercise_mix.conflict"), status: :conflict, current: preference_state,
+                                                  daily_kinds: daily, layout_changed: Array(params[:layout]) != daily)
   end
 
   def preference_state
@@ -275,6 +277,6 @@ class ProfileController < ApplicationController
     %i[section_kind_weights section_kind_levels display_preferences].each do |key|
       permitted[key] = permitted[key].to_h if permitted.key?(key)
     end
-    current_user.keep_daily_kind_entries(permitted.to_h)
+    current_user.keep_unrendered_preferences(permitted.to_h)
   end
 end
