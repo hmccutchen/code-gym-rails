@@ -2,6 +2,7 @@
 <%= tag.div class: "daily-kind-swap",
       data: { controller: "daily-kind-swap",
               daily_kind_swap_url_value: daily_kind_path(picker.place),
+              daily_kind_swap_exercise_value: picker.exercise_id,
               daily_kind_swap_saving_text_value: t("daily_kinds.picker.saving") } do %>
   <%= render "daily_kinds/panel", picker: picker %>
   <div class="daily-kind-reply" role="status" aria-live="polite" data-daily-kind-swap-target="reply"></div>

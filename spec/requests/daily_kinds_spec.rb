@@ -6,8 +6,9 @@ RSpec.describe "Swapping a daily section kind", type: :request do
 
   before { login_as(user) }
 
-  def swap(place, kind, version: user.reload.section_kind_preferences_version)
-    patch daily_kind_path(place), params: { kind: kind, section_kind_preferences_version: version }.to_json, headers: json
+  def swap(place, kind, version: user.reload.section_kind_preferences_version, exercise: user.daily_exercises.order(:date).last)
+    patch daily_kind_path(place), params: { kind: kind, exercise_id: exercise&.id, section_kind_preferences_version: version }.to_json,
+                                  headers: json
   end
 
   def body = JSON.parse(response.body)
@@ -37,6 +38,29 @@ RSpec.describe "Swapping a daily section kind", type: :request do
       .and include(%(id="daily-kind-1-design_comparison"))
     expect(body["panels"]["0"]).to include("Already a daily section")
     expect(exercise.reload.problem_set.keys).to eq(%w[code_review design_comparison])
+  end
+
+  it "renders the panels for the set the page shows, so a dashboard left open past midnight still refreshes" do
+    yesterday = DailyExercise.create!(user: user, date: Date.current - 1, language: "ruby_rails", generated_at: 1.day.ago,
+                                      problem_set: { "code_review" => { "question" => "q" }, "design_comparison" => { "question" => "q" } },
+                                      plan_notes: { "daily_kinds" => %w[code_review design_comparison], "size" => 2 })
+    swap(1, "architecture", exercise: yesterday)
+
+    expect(body["panels"].keys).to eq(%w[0 1])
+
+    swap(1, "pattern", version: 0, exercise: yesterday)
+    expect(response).to have_http_status(:conflict)
+    expect(body["panels"].keys).to eq(%w[0 1])
+  end
+
+  it "renders no panels for another user's set" do
+    other = User.create!(email: "other@example.com", name: "Other")
+    theirs = DailyExercise.create!(user: other, date: Date.current, language: "ruby_rails", generated_at: Time.current,
+                                   problem_set: { "code_review" => { "question" => "q" } },
+                                   plan_notes: { "daily_kinds" => %w[code_review design_comparison], "size" => 2 })
+    swap(1, "architecture", exercise: theirs)
+
+    expect(body["panels"]).to eq({})
   end
 
   it "names the button the want-it-today line points at only when that line is offered" do

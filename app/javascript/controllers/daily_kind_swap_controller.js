@@ -5,7 +5,16 @@ import saveStatus from "code_gym/save_status"
 export default class extends Controller {
   static targets = ["panel", "trigger", "picker", "option", "summary", "confirm", "cancel", "status", "reply"]
 
-  static values = { url: String, savingText: String }
+  static values = { url: String, exercise: Number, savingText: String }
+
+  connect() {
+    this.busy = false
+  }
+
+  // Another card's reply re-renders this panel too; a swap still queued here keeps showing as saving.
+  panelTargetConnected() {
+    if (this.busy) this.setBusy(true)
+  }
 
   toggle() {
     if (this.pickerTarget.hidden) this.open()
@@ -37,12 +46,11 @@ export default class extends Controller {
     this.cancel()
   }
 
-  // The server rendered each option's consequences; the page only shows the one for the chosen kind.
   choose() {
     const chosen = this.chosen()
     const available = chosen && chosen.dataset.state === "available"
     this.summaryTargets.forEach((summary) => { summary.hidden = !available || summary.dataset.kind !== chosen.value })
-    this.confirmTarget.disabled = !available
+    this.confirmTarget.disabled = this.busy || !available
     const summary = available && this.summaryTargets.find((element) => element.dataset.kind === chosen.value)
     if (summary) this.confirmTarget.setAttribute("aria-describedby", summary.id)
     else this.confirmTarget.removeAttribute("aria-describedby")
@@ -53,6 +61,7 @@ export default class extends Controller {
   }
 
   setBusy(busy) {
+    this.busy = busy
     this.confirmTarget.disabled = busy
     this.cancelTarget.disabled = busy
     this.statusTarget.textContent = busy ? this.savingTextValue : ""
@@ -60,37 +69,47 @@ export default class extends Controller {
 
   async confirm() {
     const chosen = this.chosen()
-    if (!chosen || chosen.dataset.state !== "available") return
+    if (this.busy || !chosen || chosen.dataset.state !== "available") return
 
     this.setBusy(true)
-    const result = await saveStatus.save("PATCH", this.urlValue,
-      { kind: chosen.value, section_kind_preferences_version: this.panelTarget.dataset.version },
-      "daily_kind_swap")
+    const kind = chosen.value
+    const result = await saveStatus.queue("daily_kind_swap", "PATCH", this.urlValue, () => this.body(kind))
+    this.busy = false
     if (result && result.ok && result.data) return this.saved(result.data)
-    if (result && result.status === 409 && result.data && result.data.panels) return this.refreshStale(result.data.panels)
+    if (result && result.status === 409 && result.data) return this.refreshStale(result.data.panels)
 
     this.setBusy(false)
     this.choose()
     this.confirmTarget.focus()
   }
 
+  // Read when the queue sends it, so a swap queued behind another posts the version that one's reply left.
+  body(kind) {
+    return { kind: kind, exercise_id: this.exerciseValue, section_kind_preferences_version: this.panelTarget.dataset.version }
+  }
+
   saved(data) {
-    this.replacePanels(data.panels)
+    if (!this.replacePanels(data.panels)) {
+      this.setBusy(false)
+      this.close()
+    }
     this.announce(data.message, data.want_it_today, data.want_it_today_link)
     if (this.hasTriggerTarget) this.triggerTarget.focus()
   }
 
   // Another tab changed the pair or the mix, so the picker reopens on the stored pair before the reader tries again.
   refreshStale(panels) {
-    this.replacePanels(panels)
-    if (this.hasPickerTarget) this.open()
+    if (!this.replacePanels(panels)) this.setBusy(false)
+    this.open()
   }
 
   replacePanels(panels) {
+    const mine = this.panelTarget
     Object.entries(panels || {}).forEach(([place, html]) => {
       const panel = document.getElementById(`daily-kind-swap-panel-${place}`)
       if (panel) panel.outerHTML = html
     })
+    return !mine.isConnected
   }
 
   announce(message, wantItToday, linkLabel) {

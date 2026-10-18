@@ -44,6 +44,8 @@ class DailyKindSwap::Picker
 
   def version = @user.section_kind_preferences_version
 
+  def exercise_id = @exercise.id
+
   def next_set_line
     I18n.t(@user.paused_generation_at? ? "daily_kinds.picker.next_set_paused" : "daily_kinds.picker.next_set")
   end

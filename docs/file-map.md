@@ -102,7 +102,7 @@ What each listed file does.
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
 - `app/controllers/concept_references_controller.rb` — one action: the same concept explained another way, on demand from inside its own disclosure. Persists nothing; owns the cap, since there is no model data for it to live on
-- `app/javascript/controllers/daily_kind_swap_controller.js` — the `daily-kind-swap` controller on each daily card's swap row: opens the picker, shows the server-rendered summary for the chosen kind, saves through `CodeGymSaveStatus.save`, and swaps in every card's fresh panel from the reply
+- `app/javascript/controllers/daily_kind_swap_controller.js` — the `daily-kind-swap` controller on each daily card's swap row: opens the picker, shows the server-rendered summary for the chosen kind, queues each swap on one `CodeGymSaveStatus.queue` line with the page's exercise id, and swaps in every card's fresh panel from the reply
 - `app/javascript/controllers/concept_alternates_controller.js` — the `concept-alternates` controller each reference's disclosure mounts; it keys the framings already shown by reference id, so one reference rendering several times still shares one cap
 - `app/services/web_push_credentials.rb` — `WebPushCredentials`: the VAPID pair from ENV, and the single authority for whether push is configured at all
 - `app/services/push_delivery.rb` — sends one notification to one endpoint, and deletes the endpoint when the push service reports it gone; the pruning is what keeps the job honest as iOS drops subscriptions

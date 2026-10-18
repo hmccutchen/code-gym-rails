@@ -103,6 +103,63 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page.evaluate_script("document.activeElement.textContent")).to eq("Confirm")
   end
 
+  def hold_swap_replies
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.heldSwaps = [];
+      window.fetch = (url, options) => {
+        if (!url.includes("/daily_kinds/")) return originalFetch(url, options);
+        window.heldSwaps.push(JSON.parse(options.body));
+        return new Promise((resolve) => { window.releaseSwap = () => resolve(originalFetch(url, options)); });
+      };
+    JS
+  end
+
+  def release_swap
+    wait_for_js_condition("window.releaseSwap")
+    page.execute_script("const release = window.releaseSwap; window.releaseSwap = null; release()")
+  end
+
+  it "sends a second card's swap only after the first one's reply, with the version that reply left" do
+    hold_swap_replies
+    confirm_swap(0, "challenge")
+    confirm_swap(1, "pattern")
+
+    wait_for_js_condition("window.heldSwaps.length === 1")
+    release_swap
+    expect(page).to have_css("#daily-kind-swap-panel-0[data-current='challenge']")
+    wait_for_js_condition("window.heldSwaps.length === 2")
+    first, second = page.evaluate_script("window.heldSwaps")
+    expect(second["section_kind_preferences_version"]).not_to eq(first["section_kind_preferences_version"])
+
+    release_swap
+    expect(page).to have_css("#daily-kind-swap-panel-1[data-current='pattern']")
+    expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
+    expect(page).to have_no_css("#save-status", visible: :visible)
+  end
+
+  it "keeps Confirm disabled while a swap is on its way, whatever radio is chosen" do
+    hold_swap_replies
+    confirm_swap(0, "challenge")
+    find("#daily-kind-0-pattern").click
+
+    expect(find("#daily-kind-0-picker")).to have_button("Confirm", disabled: true)
+    release_swap
+    expect(page).to have_css(".daily-kind-reply", text: I18n.t("daily_kinds.swap.saved"))
+    expect(page.evaluate_script("window.heldSwaps.length")).to eq(1)
+    expect(user.reload.daily_section_kinds).to eq(%w[challenge design_comparison])
+  end
+
+  it "still refreshes both pickers when the page's set is no longer today's" do
+    user.daily_exercises.sole.update_columns(date: Date.current - 1)
+    confirm_swap(0, "challenge")
+
+    expect(page).to have_css("#daily-kind-swap-panel-0[data-current='challenge']")
+    expect(panel(1)["data-version"]).to eq(user.reload.section_kind_preferences_version.to_s)
+    confirm_swap(1, "pattern")
+    expect(page).to have_css("#daily-kind-swap-panel-1[data-current='pattern']")
+  end
+
   it "works from the keyboard: open, arrow to a kind, Escape closes and returns focus" do
     trigger = within(panel(0)) { find("button.daily-kind-trigger") }
     trigger.send_keys(:enter)

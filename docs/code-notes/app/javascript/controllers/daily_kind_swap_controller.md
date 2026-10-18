@@ -11,7 +11,26 @@ reply sentence are rendered by the server. The script only reads
 `data-state` on a radio to decide whether Confirm may be enabled, and that
 attribute is the server's answer too.
 
-## Saving goes through `CodeGymSaveStatus.save`
+## Swaps go one at a time through `CodeGymSaveStatus.queue`
+
+Every card's controller queues on the one `daily_kind_swap` line. Two
+confirms in quick succession, on two cards or after changing the radio on
+one, would otherwise post the same version: the second would get a 409, and
+`save` would drop the first reply even though that swap was saved. The body
+is a function the queue calls when it sends, so a queued swap reads the
+version from its panel after the earlier reply has replaced it. Confirm
+stays disabled while a swap of this card is queued or on the wire, and a
+panel re-rendered by another card's reply keeps showing "Saving…".
+
+## The page's set, not today's
+
+The request names the exercise the page shows (`exercise_id`), and the
+server renders the panels for that row. A dashboard left open past midnight,
+before the next set exists, still gets its panels back. If a reply has no
+panel for this card anyway, the controller clears its busy state itself, so
+Cancel and Confirm never stay disabled.
+
+## Failures
 
 A failure shows in the shared `#save-status` banner like every other save on
 the page. On a 422 refusal the picker stays open and focus goes back to
