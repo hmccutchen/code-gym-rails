@@ -28,13 +28,15 @@ The answer count is a third write, and it is deliberately not waited on — a
 lost count delays the switch to Setup without undoing the choice, which is
 why its failure text says the choice was saved.
 
-## A conflict reloads; a hung save does not
+## A conflict reloads; a hung or failed save does not
 
 A 409 means the stored version or a shown rung moved, so the page is out of
 date and must be read again. Apply and Not now both handle it this way. Reloading over an unfinished save would lose it, so
 `reloadWhenSaved` goes through `saveStatus.reloadWhenSaved`, which waits for
-`saveStatus.pending()` first. Past ten seconds it stops waiting and the card
-offers a reload button instead, so a refused proposal can
+`saveStatus.pending()` first. If another save fails meanwhile, or ten seconds
+pass, it stops waiting and the card offers a reload button instead. It passes
+its own key (`level_apply` or `level_dismissal`) so the refusal that started
+the wait does not count as that failure. Either way, a refused proposal can
 never leave the page stuck with no way forward.
 
 ## No double-wire guard

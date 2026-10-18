@@ -57,8 +57,8 @@ export default class extends Controller {
     this.settle(this.strandedTextValue, reload)
   }
 
-  reloadWhenSaved() {
-    saveStatus.reloadWhenSaved(() => this.stranded())
+  reloadWhenSaved(conflict) {
+    saveStatus.reloadWhenSaved(conflict, () => this.stranded())
   }
 
   answer() {
@@ -92,14 +92,14 @@ export default class extends Controller {
       this.dismiss(setAside, "removed")
       return
     }
-    if (result && result.status === 409) return this.reloadWhenSaved()
+    if (result && result.status === 409) return this.reloadWhenSaved("level_apply")
     this.setBusy(false)
   }
 
   async notNow() {
     this.setBusy(true)
     const result = await this.dismiss(this.stepTargets, "not_now")
-    if (result && result.status === 409) return this.reloadWhenSaved()
+    if (result && result.status === 409) return this.reloadWhenSaved("level_dismissal")
     if (!result || !result.ok) return this.setBusy(false)
     this.answer()
     this.settle(this.dismissedTextValue)
