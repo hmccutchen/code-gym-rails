@@ -1,10 +1,8 @@
 # Design notes: docs/code-notes/app/models/daily_kind_swap.md
 class DailyKindSwap
-  Outcome = Data.define(:status, :reason, :message, :want_it_today, :daily_kinds, :version) do
-    def saved? = status == :saved
-  end
+  Outcome = Data.define(:status, :reason, :message, :want_it_today, :daily_kinds, :version)
 
-  REFUSALS = %i[invalid_place unknown_kind stale unchanged already_daily second_fourth empties_a_slot].freeze
+  CONFLICT_REASONS = { repeat: :already_daily, second_fourth: :second_fourth }.freeze
 
   def self.call(user, place:, kind:, version:)
     new(user, place: place, kind: kind, version: version).call
@@ -29,6 +27,10 @@ class DailyKindSwap
       save!
       outcome(:saved)
     end
+  rescue ActiveRecord::RecordInvalid => error
+    Rails.logger.warn("[daily_kind_swap] user=#{@user.id} refused=#{error.record.class} on=#{error.record.errors.attribute_names.join(",")}")
+    @user.reload
+    outcome(:refused, :invalid)
   end
 
   def refusal = shape_refusal || pair_refusal
@@ -39,13 +41,15 @@ class DailyKindSwap
 
   def pair_refusal
     return :unchanged if current[@place] == @kind
-    return :already_daily if current.include?(@kind)
-    return :second_fourth if @kind.fourth? && (current - [ current[@place] ]).any?(&:fourth?)
+
+    conflict = DailyKinds.conflict(@kind, current.reject.with_index { |_kind, index| index == @place })
+    return CONFLICT_REASONS.fetch(conflict) if conflict
 
     :empties_a_slot if @user.emptied_slots(daily: proposed).any?
   end
 
   def shape_refusal
+    return :trial_ended if @user.trial_ended?
     return :invalid_place unless @place && (0...DailyKinds::COUNT).cover?(@place)
 
     :unknown_kind unless @kind

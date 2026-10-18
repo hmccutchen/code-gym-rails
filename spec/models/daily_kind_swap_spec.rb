@@ -25,7 +25,7 @@ RSpec.describe DailyKindSwap do
 
       outcome = swap(place: 1, kind: "architecture")
 
-      expect(outcome).to be_saved
+      expect(outcome.status).to eq(:saved)
       expect(user.reload.daily_section_kinds).to eq(%w[code_review architecture])
       expect(user.section_kind_preferences_version).to eq(version + 1)
       expect(outcome).to have_attributes(message: "Saved. This starts with your next set.",
@@ -148,6 +148,20 @@ RSpec.describe DailyKindSwap do
 
       expect(expect_refused(:second_fourth, place: 0, kind: "ambiguity_hunt").message)
         .to eq("Only one of Plan Review, Ambiguity Hunt and Pseudocode to Code can be a daily section.")
+    end
+
+    it "refuses an ended trial, since no next set can come" do
+      allow(user).to receive(:trial_ended?).and_return(true)
+
+      expect(expect_refused(:trial_ended).message).to start_with("Your trial has ended")
+    end
+
+    it "answers a validation failure on a legacy row as a refusal and keeps the stored pair" do
+      user.update_columns(daily_section_count: 9)
+
+      outcome = expect_refused(:invalid, place: 1, kind: "architecture")
+
+      expect(outcome.daily_kinds).to eq(%w[code_review design_comparison])
     end
 
     it "refuses a swap that would leave every remaining kind in a group turned off" do

@@ -197,7 +197,8 @@ It reads the slot roster from `ExerciseSection.optional_slots` for the
 user's own pair (`DailyKinds.for`), so a future slot that holds several
 kinds needs no edit here. It runs when the exclusions or the pair change, and
 reads `#emptied_slots`, which `DailyKindSwap` also asks to name the kinds in
-its refusal. A pair that leaves an optional slot holding only excluded kinds
+its refusal; it tests each slot with `KindPreferences#all_excluded?`, the
+predicate rotation's whole-slot fallback reads. A pair that leaves an optional slot holding only excluded kinds
 is refused, the same as an exclusion that would: rotation would otherwise
 fall back to the excluded kinds (`KindPreferences#eligible`), quietly undoing
 "never show me this". Single-kind slots are skipped.

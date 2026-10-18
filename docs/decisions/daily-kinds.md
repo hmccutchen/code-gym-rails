@@ -183,15 +183,23 @@ exclusion would stop holding.
 the pair through `DailyKindSwap`. Under the user-row lock it refuses, in
 order:
 
-1. a place outside `0...COUNT` (`invalid_place`) or an unknown kind
+1. an ended trial (`trial_ended`): it gets no next set, so a reply promising
+   one would be false;
+2. a place outside `0...COUNT` (`invalid_place`) or an unknown kind
    (`unknown_kind`);
-2. a posted `section_kind_preferences_version` that is not the stored one
+3. a posted `section_kind_preferences_version` that is not the stored one
    (`stale`, answered 409 with the current pair and version);
-3. the kind already in that place (`unchanged`), the other daily kind
+4. the kind already in that place (`unchanged`), the other daily kind
    (`already_daily`), a second fourth kind (`second_fourth`), or a pair that
    empties an optional slot of everything not excluded (`empties_a_slot`).
+   The repeat and second-fourth rules are `DailyKinds.conflict`, the same
+   check `normalize` places kinds with, and the emptied slot is
+   `KindPreferences#all_excluded?`, the test rotation's fallback reads.
 
-Every other refusal is a 422, and none writes anything. A saved swap stores
+A validation failure the checks above did not foresee, such as a legacy row
+whose stored size setting is no longer listed, rolls the save back and is
+refused as `invalid`. Every refusal but `stale` is a 422, and none writes
+anything. A saved swap stores
 the pair (an empty list when it is the default again, so storage stays
 sparse), bumps the preferences version through `User`'s `before_save`, so an
 Exercise mix open elsewhere gets its usual 409, and writes one
