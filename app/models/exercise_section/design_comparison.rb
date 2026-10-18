@@ -174,13 +174,12 @@ class ExerciseSection::DesignComparison < ExerciseSection
         "Naming the other piece's real cost, or a consequence of the choice, is the kind of addition the rubric credits beyond solid."
     end
 
-    def generation_guidance(vocabulary:, label:, rung: nil, **)
+    def generation_guidance(vocabulary:, label:, rung: nil, alongside: [], **)
       <<~GUIDANCE.chomp
         - The "#{key}" section is a DESIGN COMPARISON: "better_piece" and "other_piece" are two pieces of #{label} code, 12-15 lines each, that meet the same stated behavior, including its retry and failure cases, and differ on exactly one design principle: the tagged concept. Compare what they cost to change or to run, never correct behavior against a defect; a worse piece that is incorrect turns this into a code review.
         - Surface parity: the pieces behave identically, are about the same length, and are equally clean, named and commented. Any difference other than the tested principle is a defect.
         - #{rung_line(rung)}
-        - The deciding fact must be stated in the section. A hypothetical condition the section never states does not decide anything.
-        - When this section's concept is the same as the code review's, test it through a choice between two working designs in a different scenario from the code review, never by restating a defect to find.
+        - The deciding fact must be stated in the section. A hypothetical condition the section never states does not decide anything.#{code_review_overlap_line(alongside)}
         - "answer_key" is HIDDEN grading data. Never restate or hint at it, or at which piece is better, in "title", "scenario" or "question".
         - Choose the design_comparison concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
       GUIDANCE
@@ -215,6 +214,13 @@ class ExerciseSection::DesignComparison < ExerciseSection
 
     def usable_text?(value)
       value.is_a?(String) && value.strip.present?
+    end
+
+    def code_review_overlap_line(alongside)
+      return "" unless alongside.include?(ExerciseSection::CodeReview.key)
+
+      "\n- When this section's concept is the same as the code review's, test it through a choice between two working designs " \
+        "in a different scenario from the code review, never by restating a defect to find."
     end
 
     def rung_line(rung)
