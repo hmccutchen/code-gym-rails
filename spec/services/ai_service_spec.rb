@@ -5053,6 +5053,40 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(single.dropped_sections).to eq([])
   end
 
+  describe "under a deadline" do
+    let(:purposes) { [] }
+    let(:start) { Time.current }
+
+    before do
+      calls = purposes
+      allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, request|
+        calls << request.purpose
+        original.call(request)
+      end
+    end
+
+    it "makes no call on either path once the deadline leaves no room for the draft" do
+      expired = GenerationDeadline.new(start - 1)
+
+      expect { FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails", deadline: expired) }
+        .to raise_error(AiService::DeadlineError)
+      expect { FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails", deadline: expired) }
+        .to raise_error(AiService::DeadlineError)
+      expect(purposes).to be_empty
+    end
+
+    it "stops a judge call that no longer fits once the draft is back, keeping the drafted sections" do
+      draft_only = start + AiService.worst_case_seconds_for("generate_exercise")
+      clock = -> { purposes.empty? ? start : draft_only }
+      deadline = GenerationDeadline.new(draft_only, clock: clock)
+
+      judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails", deadline: deadline)
+
+      expect(purposes).to eq(%w[generate_exercise])
+      expect(judged.outcomes.values).to all(include(status: :keep, fallback: "deadline"))
+    end
+  end
+
   it "keeps a set the judge keeps, with every section still present and stamped" do
     judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
 
@@ -5782,6 +5816,7 @@ RSpec.describe AiService, ".judge_fallback_reason" do
     AiService::InvalidResponseError.new("x")           => "invalid_json",
     AiService::RefusalError.new("x")                   => "refusal",
     AiService::TimeoutError.new("x")                   => "timeout",
+    AiService::DeadlineError.new("judge_section")      => "deadline",
     Timeout::Error.new("x")                            => "timeout",
     AiService::RateLimitError.new("x")                 => "rate_limit",
     AiService::AuthenticationError.new("x")            => "authentication",

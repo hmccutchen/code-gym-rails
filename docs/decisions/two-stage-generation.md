@@ -35,8 +35,8 @@ start, so a slow pickup comes out of the same budget.
 - **The deadline** is `DailyExercise::REGENERATION_DEADLINE`: one worst-case
   draft plus one worst-case judge plus `JOB_PICKUP_MARGIN`, 946 + 181 + 60 =
   1,187 s, about 20 minutes. A slow but working provider still gets one
-  judged answer. `REGENERATION_STALE_AFTER` is the same value, up from
-  1,006 s.
+  judged answer. `REGENERATION_STALE_AFTER` adds `WRITE_MARGIN` (60 s) for
+  the work after the last call, 1,247 s in all, up from 1,006 s.
 - **The rule.** Before each provider call, the deadline checks that the
   call's own worst case (`AiService.worst_case_seconds_for` its purpose)
   still ends in time, and raises `AiService::DeadlineError`, a
@@ -47,7 +47,8 @@ start, so a slow pickup comes out of the same budget.
   longer fits ends the run, releases the claim and leaves today's set, shown
   as a timeout. The judge and retry checks run inside `JudgedGeneration`
   through the guarded `Provider`, which needs no change: a judge that can't
-  start is a fallback that keeps the draft, and a retry that can't start
+  start is a fallback that keeps the draft (reason `deadline`, kept apart from
+`timeout` so queue delay doesn't read as a slow judge), and a retry that can't start
   returns nil and drops that section. The sections already kept land, since
   throwing away a judged day over one late retry costs more than one dropped
   section. If nothing is left, `AllSectionsRejectedError` keeps today's set,
@@ -180,7 +181,8 @@ bucket's line, and every other dropped kind on the language line.
 raises, times out, or returns output `JudgeVerdict` refuses, the draft
 section stands unedited, `fallback` records the reason from
 `AiService.judge_fallback_reason` (`invalid_output`, `truncated`,
-`invalid_json`, `refusal`, `timeout`, the shared error code, or
+`invalid_json`, `refusal`, `timeout`, `deadline` when a regeneration's
+deadline left no time to start the call, the shared error code, or
 `http_<status>` when the provider refused the request itself), and
 `[judge_fallback]` warns. Provider errors carry the response's HTTP status
 (`AiService::Error#http_status`); authentication and rate-limit errors keep

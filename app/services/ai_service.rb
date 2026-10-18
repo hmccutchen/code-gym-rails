@@ -76,12 +76,6 @@ class AiService
     OPEN_TIMEOUT + read_timeout
   end
 
-  JUDGED_GENERATION_BUDGET = worst_case_call_seconds(GENERATION_READ_TIMEOUT) +
-                             worst_case_call_seconds(READ_TIMEOUT) +
-                             ([ DailyPlan::DAILY_JUDGE_RETRIES, DailyPlan::ROTATED_JUDGE_RETRIES ].max *
-                               (worst_case_call_seconds(RETRY_READ_TIMEOUT) + worst_case_call_seconds(READ_TIMEOUT))) +
-                             (ExerciseSection.all.any?(&:rejudge_edits?) ? worst_case_call_seconds(READ_TIMEOUT) : 0)
-
   RETRY_TIMEOUT_GUARD = lambda do |env, exception|
     return false if env.request.context.to_h[:single_attempt]
     return true unless exception.is_a?(Faraday::TimeoutError)
@@ -335,6 +329,12 @@ class AiService
     read_timeout = profile.fetch(:read_timeout, READ_TIMEOUT)
     profile[:single_attempt] ? single_attempt_call_seconds(read_timeout) : worst_case_call_seconds(read_timeout)
   end
+
+  JUDGED_GENERATION_BUDGET = worst_case_seconds_for("generate_exercise") +
+                             worst_case_seconds_for("judge_section") +
+                             ([ DailyPlan::DAILY_JUDGE_RETRIES, DailyPlan::ROTATED_JUDGE_RETRIES ].max *
+                               (worst_case_seconds_for("retry_section") + worst_case_seconds_for("judge_section"))) +
+                             (ExerciseSection.all.any?(&:rejudge_edits?) ? worst_case_seconds_for("judge_section") : 0)
 
   def self.request_for(purpose, system:, prompt:, history: [], response_schema: nil, blocking: false)
     profile  = CALL_PROFILES.fetch(purpose)
@@ -766,6 +766,7 @@ class AiService
     when TruncatedResponseError                              then "truncated"
     when InvalidResponseError                                then "invalid_json"
     when RefusalError                                        then "refusal"
+    when DeadlineError                                       then "deadline"
     when TimeoutError, Timeout::Error                        then "timeout"
     else                                                          http_status_code_for(error) || error_code_for(error)
     end

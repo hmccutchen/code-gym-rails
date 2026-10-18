@@ -12,7 +12,9 @@ class DailyExercise < ApplicationRecord
   REGENERATION_DEADLINE = (AiService.worst_case_seconds_for("generate_exercise") +
                            AiService.worst_case_seconds_for("judge_section")).seconds + JOB_PICKUP_MARGIN
 
-  REGENERATION_STALE_AFTER = REGENERATION_DEADLINE
+  WRITE_MARGIN = 60.seconds
+
+  REGENERATION_STALE_AFTER = REGENERATION_DEADLINE + WRITE_MARGIN
 
   include Claimable
   claim :regenerating, column: :regenerating_since, stale_after: REGENERATION_STALE_AFTER

@@ -259,14 +259,19 @@ RSpec.describe DailyExercise, type: :model do
         .to be >= worst_case + DailyExercise::JOB_PICKUP_MARGIN.to_i
     end
 
-    it "outlasts the regeneration deadline, so no call the deadline lets start can outlive the claim" do
-      expect(DailyExercise::REGENERATION_STALE_AFTER).to be >= DailyExercise::REGENERATION_DEADLINE
+    it "outlasts the regeneration deadline by the write margin, so the write after the last call keeps its claim" do
+      expect(DailyExercise::WRITE_MARGIN).to be_positive
+      expect(DailyExercise::REGENERATION_STALE_AFTER)
+        .to eq(DailyExercise::REGENERATION_DEADLINE + DailyExercise::WRITE_MARGIN)
     end
 
-    it "sets the deadline to one worst-case draft and judge, plus pickup: 1,187 s with today's timeouts" do
+    it "sets the deadline to one worst-case draft and judge, plus pickup" do
       first_pass = AiService.worst_case_seconds_for("generate_exercise") + AiService.worst_case_seconds_for("judge_section")
 
       expect(DailyExercise::REGENERATION_DEADLINE.to_i).to eq(first_pass + DailyExercise::JOB_PICKUP_MARGIN.to_i)
+    end
+
+    it "keeps the deadline at 1,187 s, the figure the decision doc quotes, until the doc is updated with it" do
       expect(DailyExercise::REGENERATION_DEADLINE.to_i).to eq(1_187)
     end
 
