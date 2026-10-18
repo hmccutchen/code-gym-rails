@@ -508,7 +508,7 @@ class AiService
     draft = draft_exercise(user, language: language, blocking: false, deadline: deadline)
     JudgedGeneration.call(
       user: user, language: language, draft: draft,
-      providers: -> { deadline.guard(fresh_service.judged_generation_provider) },
+      providers: -> { fresh_service.judged_generation_provider(deadline) },
       finish: ->(set, **logs) { finish_generation(user, language, draft, set, **logs) }
     )
   end
@@ -704,13 +704,12 @@ class AiService
     code
   end
 
-  def judge_section(user, kind, section, rung:, locked:)
+  def judge_section(user, kind, section, rung:, locked:, deadline: GenerationDeadline::NONE)
     visible = section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS)
-    result  = call_and_log(user, AiService.request_for("judge_section",
-      response_schema: JudgeVerdict.schema_for(kind),
-      system: JUDGE_SYSTEM_PROMPT,
-      prompt: judge_prompt(kind, visible, rung: rung, locked: locked)
-    ))
+    request = AiService.request_for("judge_section", response_schema: JudgeVerdict.schema_for(kind), system: JUDGE_SYSTEM_PROMPT,
+                                                     prompt: judge_prompt(kind, visible, rung: rung, locked: locked))
+    deadline.ensure_fits!(request.purpose)
+    result = call_and_log(user, request)
     raw = parse_json_object(result[:text], subject: "#{kind.key} verdict", log_raw: kind.judge_solve_options.nil?)
     JudgeVerdict.parse(raw, kind: kind)
   end
@@ -776,8 +775,11 @@ class AiService
 
   protected
 
-  def judged_generation_provider
-    JudgedGeneration::Provider.new(judge_section: method(:judge_section), retry_section: method(:retry_section))
+  def judged_generation_provider(deadline = GenerationDeadline::NONE)
+    JudgedGeneration::Provider.new(
+      judge_section: ->(*args, **options) { judge_section(*args, **options, deadline: deadline) },
+      retry_section: ->(*args) { retry_section(*args, deadline: deadline) }
+    )
   end
 
   private
@@ -870,13 +872,13 @@ class AiService
                                judge: judge, unhosted: unhosted)
   end
 
-  def retry_section(user, language, draft, kind, concept)
+  def retry_section(user, language, draft, kind, concept, deadline: GenerationDeadline::NONE)
     prompt = generation_prompt(user, language, plan: draft.plan, history: draft.history, difficulty: draft.difficulty,
                                ladders: retry_ladders(user, language, draft, kind))
-    result = call_and_log(user, AiService.request_for("retry_section",
-      system: build_system_prompt(language),
-      prompt: prompt.render(only: kind, fixed_concept: concept)
-    ))
+    request = AiService.request_for("retry_section", system: build_system_prompt(language),
+                                                     prompt: prompt.render(only: kind, fixed_concept: concept))
+    deadline.ensure_fits!(request.purpose)
+    result = call_and_log(user, request)
 
     ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "#{kind.key} retry", log_raw: false), language: language,

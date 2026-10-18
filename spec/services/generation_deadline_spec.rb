@@ -29,42 +29,11 @@ RSpec.describe GenerationDeadline do
     end
   end
 
-  describe "#guard" do
-    let(:calls) { [] }
-    let(:provider) do
-      JudgedGeneration::Provider.new(
-        judge_section: ->(*args, **options) { calls << [ :judge, args, options ]; :verdict },
-        retry_section: ->(*args) { calls << [ :retry, args ]; :section }
-      )
-    end
+  it "reads the clock at each check, so a later check sees the time spent since an earlier one" do
+    deadline = deadline_in(worst("judge_section"))
+    deadline.ensure_fits!("judge_section")
+    now[0] = start + 1
 
-    it "passes calls through while each one still fits" do
-      guarded = deadline_in(worst("retry_section")).guard(provider)
-
-      expect(guarded.judge_section.call(:user, :kind, :section, rung: "junior", locked: false)).to eq(:verdict)
-      expect(guarded.retry_section.call(:user, :language, :draft, :kind, :concept)).to eq(:section)
-      expect(calls.map(&:first)).to eq(%i[judge retry])
-    end
-
-    it "stops a retry that no longer fits while a judge still does, so only late work is lost" do
-      guarded = deadline_in(worst("judge_section")).guard(provider)
-
-      expect { guarded.retry_section.call(:user, :language, :draft, :kind, :concept) }.to raise_error(AiService::DeadlineError)
-      expect(guarded.judge_section.call(:user, :kind, :section, rung: "junior", locked: false)).to eq(:verdict)
-      expect(calls.map(&:first)).to eq(%i[judge])
-    end
-
-    it "checks the clock at each call, not once when guarded" do
-      guarded = deadline_in(worst("judge_section")).guard(provider)
-      now[0] = start + 1
-
-      expect { guarded.judge_section.call(:user, :kind, :section, rung: "junior", locked: false) }
-        .to raise_error(AiService::DeadlineError)
-      expect(calls).to be_empty
-    end
-
-    it "returns the provider unchanged when there is no end" do
-      expect(described_class::NONE.guard(provider)).to be(provider)
-    end
+    expect { deadline.ensure_fits!("judge_section") }.to raise_error(AiService::DeadlineError)
   end
 end

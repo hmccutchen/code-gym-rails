@@ -5100,6 +5100,21 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       expect(purposes).to eq(%w[generate_exercise])
       expect(judged.outcomes.values).to all(include(status: :keep, fallback: "deadline"))
     end
+
+    it "checks a retry against the time left after its ladders load, so no retry request starts" do
+      service = FakeService.new("fake-key")
+      draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false)
+      now = [ start ]
+      deadline = GenerationDeadline.new(start + AiService.worst_case_seconds_for("retry_section"), clock: -> { now.first })
+      allow(service).to receive(:retry_ladders).and_wrap_original do |original, *args|
+        original.call(*args).tap { now[0] = start + 1 }
+      end
+
+      expect { service.send(:retry_section, user, "ruby_rails", draft, ExerciseSection::Pattern, "service_objects", deadline: deadline) }
+        .to raise_error(AiService::DeadlineError)
+      expect(service).to have_received(:retry_ladders)
+      expect(purposes).not_to include("retry_section")
+    end
   end
 
   it "keeps a set the judge keeps, with every section still present and stamped" do

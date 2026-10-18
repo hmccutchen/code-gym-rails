@@ -7,12 +7,11 @@ rather than only checking the start time. Checking only the start would let a
 call begun a second before the deadline run its whole worst case past it, and
 the claim window would have to cover that overrun.
 
-## `#guard`
-
-It wraps `JudgedGeneration::Provider`'s callables, so `JudgedGeneration`
-needs no deadline of its own. A judge that raises `AiService::DeadlineError`
-becomes a fallback that keeps the draft, and a retry that raises drops its
-section, which is what any failed call already does there.
+Callers check after building the request, just before the call, so time spent
+preparing it (planning, ladders, rendering the prompt) is already counted.
+`AiService`'s draft, judge and retry paths do this. A judge stopped here
+becomes a fallback that keeps the draft, and a stopped retry drops its
+section, which is what any failed call already does in `JudgedGeneration`.
 
 ## `NONE`
 

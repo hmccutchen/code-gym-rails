@@ -47,11 +47,13 @@ start, so a slow pickup comes out of the same budget.
   after the plan, history, ladders and prompt are built and just before the
   call, since that preparation spends time too. A draft that no longer fits
   ends the run before any request, releases the claim and leaves today's set,
-  shown as a timeout. The judge and retry checks run inside `JudgedGeneration`
-  through the guarded `Provider`, which needs no change: a judge that can't
-  start is a fallback that keeps the draft (reason `deadline`, kept apart from
-`timeout` so queue delay doesn't read as a slow judge), and a retry that can't start
-  returns nil and drops that section. The sections already kept land, since
+  shown as a timeout. `#judge_section` and `#retry_section` make the same
+  check after building their own requests (a retry loads ladders and renders
+  a prompt first). `#judged_generation_provider(deadline)` passes the
+  deadline to both, so `JudgedGeneration` needs no change: a judge that can't
+  start is a fallback that keeps the draft (reason `deadline`, kept apart
+  from `timeout` so queue delay doesn't read as a slow judge), and a retry
+  that can't start returns nil and drops that section. The sections already kept land, since
   throwing away a judged day over one late retry costs more than one dropped
   section. If nothing is left, `AllSectionsRejectedError` keeps today's set,
   and the job says the new set failed its quality check.

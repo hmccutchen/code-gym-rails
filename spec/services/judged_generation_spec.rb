@@ -160,14 +160,12 @@ RSpec.describe JudgedGeneration do
     end
   end
 
-  it "under a deadline with room for judges but not retries, drops the late section and lands the kept ones" do
+  it "drops a section whose retry the deadline stopped and lands the kept ones" do
     verdicts["pattern"] = [ reject, { "status" => "keep" } ]
-    deadline = GenerationDeadline.new(Time.current + AiService.worst_case_seconds_for("judge_section") + 1)
-    guarded = providers
-    judged = described_class.call(user: user, language: "ruby_rails", draft: draft,
-                                  providers: -> { deadline.guard(guarded.call) }, finish: finish)
+    retried_sections["pattern"] = AiService::DeadlineError.new("retry_section")
 
-    expect(retry_calls).to be_empty
+    judged = run
+
     expect(judged.problem_set.keys).to eq(%w[code_review challenge])
     expect(judged.dropped_sections).to eq(%w[pattern])
   end
