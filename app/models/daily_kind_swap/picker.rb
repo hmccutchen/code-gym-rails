@@ -35,10 +35,13 @@ class DailyKindSwap::Picker
     @hint     = hint
     @pair     = DailyKinds.for(user)
     @current  = @pair[place]
-    @options  = ExerciseSection.all.map { |kind| option(kind) }
+    @closed   = closing_message
+    @options  = @closed ? [] : ExerciseSection.all.map { |kind| option(kind) }
   end
 
-  def hint? = @hint
+  attr_reader :closed
+
+  def hint? = @hint && !@closed
 
   def version = @user.section_kind_preferences_version
 
@@ -47,6 +50,13 @@ class DailyKindSwap::Picker
   end
 
   private
+
+  # A refusal of the place's own kind is about the account, not a choice, so the picker offers nothing.
+  def closing_message
+    swap = DailyKindSwap.new(@user, place: @place, kind: @current.key, version: nil)
+    reason = swap.refusal
+    swap.refusal_message(reason) unless reason.nil? || reason == :unchanged
+  end
 
   def option(kind)
     swap    = DailyKindSwap.new(@user, place: @place, kind: kind.key, version: nil)

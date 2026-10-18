@@ -64,7 +64,7 @@ class DailyKindSwap::Consequences
 
   def rotation_skips_outgoing?
     group = ExerciseSection.optional_slots(daily: @proposed).values.find { |kinds| kinds.include?(@outgoing) }
-    @preferences.excluded?(@outgoing) && group.present? && @preferences.eligible(group).exclude?(@outgoing)
+    @preferences.excluded?(@outgoing) && group.present? && !@preferences.all_excluded?(group)
   end
 
   def two_sections?

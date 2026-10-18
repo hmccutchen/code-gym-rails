@@ -101,6 +101,15 @@ RSpec.describe DailyKindSwap::Picker do
     end
   end
 
+  it "offers no options to an ended trial, only the reason, and drops the first-time hint" do
+    allow_any_instance_of(User).to receive(:trial_ended?).and_return(true)
+    picker = pickers["code_review"]
+
+    expect(picker.options).to be_empty
+    expect(picker.closed).to start_with("Your trial has ended")
+    expect(picker.hint?).to be(false)
+  end
+
   it "adds the paused sentence to the next-set line while generation is paused" do
     expect(pickers["code_review"].next_set_line).to eq(I18n.t("daily_kinds.picker.next_set"))
 

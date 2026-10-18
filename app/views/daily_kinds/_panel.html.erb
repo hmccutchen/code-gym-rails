@@ -10,7 +10,11 @@
   <fieldset id="<%= prefix %>-picker" class="daily-kind-picker" hidden data-daily-kind-swap-target="picker"
             data-action="change->daily-kind-swap#choose keydown->daily-kind-swap#closeOnEscape">
     <legend><%= t("daily_kinds.picker.legend") %></legend>
-    <p class="hint" id="<%= prefix %>-next-set"><%= picker.next_set_line %></p>
+    <% if picker.closed %>
+      <p class="hint" id="<%= prefix %>-closed"><%= picker.closed %></p>
+    <% else %>
+      <p class="hint" id="<%= prefix %>-next-set"><%= picker.next_set_line %></p>
+    <% end %>
     <% picker.options.each do |option| %>
       <%= render "daily_kinds/option", option: option, prefix: prefix, place: picker.place %>
     <% end %>
