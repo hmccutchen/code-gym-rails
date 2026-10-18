@@ -138,6 +138,51 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page).to have_no_css("#save-status", visible: :visible)
   end
 
+  def focused(script) = page.evaluate_script("document.activeElement.#{script}")
+
+  it "reopens a queued card refused after the first card's swap, focused on a control it can use" do
+    hold_swap_replies
+    confirm_swap(0, "challenge")
+    confirm_swap(1, "challenge")
+    release_swap
+    wait_for_js_condition("window.heldSwaps.length === 2")
+    release_swap
+
+    expect(page).to have_css("#save-status", text: I18n.t("daily_kinds.swap.refused.already_daily"))
+    expect(page).to have_css("#daily-kind-1-picker", visible: :visible)
+    expect(find("#daily-kind-1-challenge")).to be_disabled
+    expect(focused("disabled")).to be(false)
+    expect(focused("id")).to eq("daily-kind-1-design_comparison")
+    expect(user.reload.daily_section_kinds).to eq(%w[challenge design_comparison])
+  end
+
+  it "reopens a queued card whose swap failed in transit with its choice kept and Confirm focused" do
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.swapCalls = 0;
+      window.fetch = (url, options) => {
+        if (!url.includes("/daily_kinds/")) return originalFetch(url, options);
+        window.swapCalls += 1;
+        if (window.swapCalls === 1) return new Promise((resolve) => { window.releaseSwap = () => resolve(originalFetch(url, options)); });
+        if (window.swapCalls === 2) return Promise.resolve(new Response("unavailable", { status: 503 }));
+        return originalFetch(url, options);
+      };
+    JS
+    confirm_swap(0, "challenge")
+    confirm_swap(1, "pattern")
+    release_swap
+
+    expect(page).to have_css("#daily-kind-swap-panel-0[data-current='challenge']")
+    expect(page).to have_css("#daily-kind-1-picker", visible: :visible)
+    expect(find("#daily-kind-1-pattern")).to be_checked
+    expect(focused("textContent")).to eq("Confirm")
+    expect(focused("disabled")).to be(false)
+
+    within("#daily-kind-1-picker") { click_button "Confirm" }
+    expect(page).to have_css("#daily-kind-swap-panel-1[data-current='pattern']")
+    expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
+  end
+
   it "keeps Confirm disabled while a swap is on its way, whatever radio is chosen" do
     hold_swap_replies
     confirm_swap(0, "challenge")
@@ -158,6 +203,20 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(panel(1)["data-version"]).to eq(user.reload.section_kind_preferences_version.to_s)
     confirm_swap(1, "pattern")
     expect(page).to have_css("#daily-kind-swap-panel-1[data-current='pattern']")
+  end
+
+  it "takes the stored version from a stale reply with no panels, so the next try saves" do
+    page.execute_script(%(document.querySelector("[data-daily-kind-swap-url-value='/daily_kinds/0']").dataset.dailyKindSwapExerciseValue = "0"))
+    user.update!(section_kind_weights: { "challenge" => 2.0 })
+    confirm_swap(0, "architecture")
+
+    expect(page).to have_css("#save-status", text: I18n.t("daily_kinds.swap.refused.stale"))
+    expect(page).to have_css("#daily-kind-swap-panel-0[data-version='#{user.reload.section_kind_preferences_version}']")
+    expect(find("#daily-kind-0-picker")).to have_button("Confirm", disabled: false)
+
+    within("#daily-kind-0-picker") { click_button "Confirm" }
+    expect(page).to have_css(".daily-kind-reply", text: I18n.t("daily_kinds.swap.saved"))
+    expect(user.reload.daily_section_kinds).to eq(%w[architecture design_comparison])
   end
 
   it "works from the keyboard: open, arrow to a kind, Escape closes and returns focus" do

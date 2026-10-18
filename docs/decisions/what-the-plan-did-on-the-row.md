@@ -10,7 +10,9 @@ every plan, and
 held, so coverage could add nothing; `size_reason` alone can't say so, since
 it names completion whenever completion gives the same count), each only when
 it applied
-(`DailyPlan::Result#notes`). The size is the planned count before any
+(`DailyPlan::Result#notes`). `brake` has no backfill: a set planned before
+it was recorded reads as unbraked, so the swap picker can show its weeks
+figure on that day until the row is replaced. The size is the planned count before any
 coverage addition, so a coverage day never reads as a larger planned size;
 `DailyExercise#planned_size` reads it and `.planned_size_before(date)` finds
 the latest earlier one. It is server-owned and written with the row

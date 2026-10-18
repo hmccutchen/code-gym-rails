@@ -76,11 +76,17 @@ export default class extends Controller {
     const result = await saveStatus.queue("daily_kind_swap", "PATCH", this.urlValue, () => this.body(kind))
     this.busy = false
     if (result && result.ok && result.data) return this.saved(result.data)
-    if (result && result.status === 409 && result.data) return this.refreshStale(result.data.panels)
+    if (result && result.status === 409 && result.data) return this.refreshStale(result.data)
 
     this.setBusy(false)
-    this.choose()
-    this.confirmTarget.focus()
+    this.reopenWith(kind)
+  }
+
+  reopenWith(kind) {
+    const submitted = this.optionTargets.find((option) => option.value === kind)
+    if (submitted && submitted.dataset.state === "available") submitted.checked = true
+    this.open()
+    if (!this.confirmTarget.disabled) this.confirmTarget.focus()
   }
 
   // Read when the queue sends it, so a swap queued behind another posts the version that one's reply left.
@@ -98,8 +104,12 @@ export default class extends Controller {
   }
 
   // Another tab changed the pair or the mix, so the picker reopens on the stored pair before the reader tries again.
-  refreshStale(panels) {
-    if (!this.replacePanels(panels)) this.setBusy(false)
+  refreshStale(data) {
+    if (!this.replacePanels(data.panels)) {
+      this.panelTarget.dataset.version = data.section_kind_preferences_version
+      this.setBusy(false)
+      this.choose()
+    }
     this.open()
   }
 

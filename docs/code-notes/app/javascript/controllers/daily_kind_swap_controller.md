@@ -33,8 +33,13 @@ Cancel and Confirm never stay disabled.
 ## Failures
 
 A failure shows in the shared `#save-status` banner like every other save on
-the page. On a 422 refusal the picker stays open and focus goes back to
-Confirm, so the reader can cancel without hunting for where they were.
+the page. On a refusal or a request that never got a usable reply, the
+picker reopens, even when another card's reply re-rendered this panel
+closed while the swap waited in the queue. The submitted kind is checked
+again only if the current panel still offers it, and focus goes to Confirm
+when it is enabled, otherwise to the checked radio. So two cards that both
+chose Coding Challenge leave the second open on its current kind, and a
+503 leaves the choice in place for one more Confirm.
 
 A 409 means another tab changed the pair or the Exercise mix, so the panels
 on this page describe settings that are no longer stored. The 409 reply

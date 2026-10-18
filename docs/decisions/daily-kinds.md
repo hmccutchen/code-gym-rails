@@ -284,7 +284,8 @@ controller only reveals what they rendered.
   second swap works without a reload. The reply sentence is announced in a
   polite live region; the want-it-today line, when sent, links to the
   existing "Generate new set" button. A failure shows in the save-status
-  banner. A 422 leaves the picker open with focus on Confirm; a 409 also
+  banner. Any other failure reopens the picker, keeps the submitted kind
+  when it is still offered, and focuses an enabled control; a 409 also
   carries fresh panels, and the card's picker reopens on the stored pair
   and version, so the next try saves.
 - Discoverability: the welcome page names the default pair and says either
