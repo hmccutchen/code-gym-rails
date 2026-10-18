@@ -160,6 +160,16 @@ RSpec.describe JudgedGeneration do
     end
   end
 
+  it "drops a section whose retry the deadline stopped and lands the kept ones" do
+    verdicts["pattern"] = [ reject, { "status" => "keep" } ]
+    retried_sections["pattern"] = AiService::DeadlineError.new("retry_section")
+
+    judged = run
+
+    expect(judged.problem_set.keys).to eq(%w[code_review challenge])
+    expect(judged.dropped_sections).to eq(%w[pattern])
+  end
+
   it "drops without a retry call when the drafted concept is other" do
     drafted["challenge"]["concept"] = "other"
     verdicts["challenge"] = [ reject ]
@@ -286,6 +296,20 @@ RSpec.describe JudgedGeneration do
                                     retry_principle retry_issues retry_evidence retry_reason])
       expect(outcome.except(:latency_ms)).to eq(
         status: :keep, issues: [], principle: "scope_mismatch", retries: 1, dropped: false, fallback: "timeout",
+        evidence: "quoted", reason: "because", retry_principle: [ nil ], retry_issues: [ [] ],
+        retry_evidence: [ nil ], retry_reason: [ nil ]
+      )
+    end
+
+    it "drops a retry whose re-judge the deadline stopped, and starts no further retry" do
+      allow(Rails.logger).to receive(:warn)
+      outcome = outcome_for(reject, AiService::DeadlineError.new("judge_section"))
+
+      expect(retry_calls.size).to eq(1)
+      expect(outcome.keys).to eq(%i[status issues principle retries dropped fallback latency_ms evidence reason
+                                    retry_principle retry_issues retry_evidence retry_reason])
+      expect(outcome.except(:latency_ms)).to eq(
+        status: :reject, issues: [], principle: "scope_mismatch", retries: 1, dropped: true, fallback: "deadline",
         evidence: "quoted", reason: "because", retry_principle: [ nil ], retry_issues: [ [] ],
         retry_evidence: [ nil ], retry_reason: [ nil ]
       )

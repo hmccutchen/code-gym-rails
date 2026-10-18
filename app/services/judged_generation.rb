@@ -143,7 +143,7 @@ class JudgedGeneration
   def rejudge(kind, retried, outcome)
     verdict, latency = judge_with_fallback(kind, retried)
     outcome = outcome.merge(retries: outcome[:retries] + 1, latency_ms: outcome[:latency_ms] + latency)
-    return [ retried, record_attempt(outcome).merge(status: :keep, fallback: verdict), true ] if verdict.is_a?(String)
+    return unjudged_retry(retried, record_attempt(outcome).merge(fallback: verdict)) if verdict.is_a?(String)
 
     matched = solve_matched(kind, retried, verdict)
     verdict = settled(kind, verdict, matched)
@@ -153,6 +153,12 @@ class JudgedGeneration
     # Keep the draft's principle and issues: they are the only record that this section was ever rejected.
     shipped, outcome = confirmed_edit(kind, retried, verdict, outcome.merge(status: verdict.status))
     [ shipped, outcome, true ]
+  end
+
+  def unjudged_retry(retried, outcome)
+    return [ *drop(outcome), true ] if outcome[:fallback] == AiService::DeadlineError::FALLBACK_REASON
+
+    [ retried, outcome.merge(status: :keep), true ]
   end
 
   def record_attempt(outcome, verdict = nil)

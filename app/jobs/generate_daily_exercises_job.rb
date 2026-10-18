@@ -28,7 +28,7 @@ class GenerateDailyExercisesJob < ApplicationJob
     if (exercise = DailyExercise.find_by(user: user, date: Date.current))
       nudge_if_due(user, exercise)
     else
-      generate_for(user, judge: true)
+      generate_for(user, judge: AiService.judged_on?(Date.current))
       remind(user)
     end
   end
@@ -57,7 +57,7 @@ class GenerateDailyExercisesJob < ApplicationJob
 
   def generate_now(user)
     return if DailyExercise.exists?(user: user, date: Date.current)
-    generate_for(user, judge: Date.current.on_weekday?)
+    generate_for(user, judge: AiService.judged_on?(Date.current))
   end
 
   def generate_for(user, judge: false)

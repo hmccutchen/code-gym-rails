@@ -127,7 +127,7 @@ RSpec.describe AiService, "request values" do
 
     def requests_sent_while
       requests = []
-      allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original { |m, *args| requests << args.last; m.call(*args) }
+      allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original { |m, *args, **options| requests << args.last; m.call(*args, **options) }
       yield
       requests
     end
