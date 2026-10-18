@@ -76,6 +76,17 @@ RSpec.describe "Pages for an account that predates the learning track", type: :r
     expect_snapshot("dashboard_submitted")
   end
 
+  it "renders the unsubmitted dashboard for a swapped pair on a two-section day" do
+    user.update!(daily_section_kinds: %w[architecture design_comparison], excluded_section_kinds: %w[parsons_problem],
+                 section_kind_weights: { "challenge" => 2.0 })
+    DailyExercise.create!(id: 900_002, user: user, date: Date.current, generated_at: Time.current,
+                          problem_set: { "architecture" => { "title" => "Queue", "question" => "Which?" },
+                                         "design_comparison" => { "question" => "Pick one" } },
+                          plan_notes: { "daily_kinds" => %w[architecture design_comparison], "size" => 2 })
+    get root_path
+    expect_snapshot("dashboard_swapped_pair")
+  end
+
   it "renders setup unchanged" do
     exercise
     get setup_path

@@ -21,4 +21,5 @@
   <% end %>
 
   <p class="hint welcome-note"><%= t("welcome.note") %></p>
+  <p class="hint welcome-note"><%= t("welcome.daily_sections", sections: DailyKinds::DEFAULT.map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
 </div>

@@ -1,0 +1,6 @@
+<%# Locals: key (a section kind key); id (optional, for an aria-describedby that points at the guide). %>
+<% guide = SectionKindGuide.for(key) %>
+<div class="kind-about-body"<% if local_assigns[:id] %> id="<%= local_assigns[:id] %>"<% end %>>
+    <p><%= guide[:summary] %></p>
+    <p><strong><%= t("responses.kind_about.example_label") %></strong> <%= guide[:example] %></p>
+  </div>

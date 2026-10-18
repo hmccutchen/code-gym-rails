@@ -33,6 +33,8 @@ class DailyKindSwap
 
   def refusal = shape_refusal || pair_refusal
 
+  def refusal_message(reason) = message(:refused, reason)
+
   private
 
   def pair_refusal

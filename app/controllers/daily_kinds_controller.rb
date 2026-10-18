@@ -14,7 +14,17 @@ class DailyKindsController < ApplicationController
   private
 
   def saved_body(outcome)
-    { status: "saved", message: outcome.message, want_it_today: outcome.want_it_today, **state(outcome) }
+    { status: "saved", message: outcome.message, want_it_today: outcome.want_it_today,
+      want_it_today_link: (I18n.t("daily_kinds.picker.generate_link") if outcome.want_it_today), panels: panels, **state(outcome) }
+  end
+
+  # Every place's panel, so both cards' pickers and their version reflect the new pair without a reload.
+  def panels
+    exercise = current_user.daily_exercises.for_date.first
+    pickers  = DailyKindSwap::Picker.for_day(current_user.reload, exercise: exercise, response: exercise&.daily_response)
+    pickers.values.to_h do |picker|
+      [ picker.place, render_to_string(partial: "daily_kinds/panel", formats: [ :html ], locals: { picker: picker }) ]
+    end
   end
 
   def render_refusal(outcome)

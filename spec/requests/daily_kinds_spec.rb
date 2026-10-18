@@ -18,9 +18,34 @@ RSpec.describe "Swapping a daily section kind", type: :request do
     expect(response).to have_http_status(:ok)
     expect(body).to eq(
       "status" => "saved", "message" => "Saved. This starts with your next set.", "want_it_today" => nil,
+      "want_it_today_link" => nil, "panels" => {},
       "daily_kinds" => %w[code_review architecture], "section_kind_preferences_version" => user.reload.section_kind_preferences_version
     )
     expect(user.daily_kind_swap_events.sole).to have_attributes(from_kind: "design_comparison", to_kind: "architecture")
+  end
+
+  it "renders a fresh panel for every daily card on today's set, each carrying the new version" do
+    exercise = DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,
+                                     problem_set: { "code_review" => { "question" => "q" }, "design_comparison" => { "question" => "q" } },
+                                     plan_notes: { "daily_kinds" => %w[code_review design_comparison], "size" => 2 })
+    swap(1, "architecture")
+
+    version = user.reload.section_kind_preferences_version
+    expect(body["panels"].keys).to eq(%w[0 1])
+    expect(body["panels"].values).to all(include(%(data-version="#{version}")))
+    expect(body["panels"]["1"]).to include("Swap Architecture").and include(%(id="daily-kind-1-design_comparison"))
+    expect(body["panels"]["0"]).to include("Already a daily section")
+    expect(exercise.reload.problem_set.keys).to eq(%w[code_review design_comparison])
+  end
+
+  it "names the button the want-it-today line points at only when that line is offered" do
+    DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,
+                          problem_set: { "code_review" => { "question" => "q" }, "design_comparison" => { "question" => "q" } },
+                          plan_notes: { "daily_kinds" => %w[code_review design_comparison], "size" => 2 })
+    swap(1, "architecture")
+
+    expect(body).to include("want_it_today" => I18n.t("daily_kinds.swap.want_it_today"),
+                            "want_it_today_link" => I18n.t("daily_kinds.picker.generate_link"))
   end
 
   it "refuses a pair the rules do not allow with a 422 naming the reason" do

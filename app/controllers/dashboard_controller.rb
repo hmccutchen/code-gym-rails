@@ -17,6 +17,7 @@ class DashboardController < ApplicationController
     @size_change = SizeForecast.for(current_user, @exercise) if @response&.submitted?
 
     @trial_status = TrialStatus.for(current_user) if current_user.on_trial?
+    @daily_kind_pickers = DailyKindSwap::Picker.for_day(current_user, exercise: @exercise, response: @response)
 
     if @exercise&.regenerating?
       @generating = true

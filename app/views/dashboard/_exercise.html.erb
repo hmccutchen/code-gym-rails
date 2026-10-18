@@ -5,6 +5,10 @@
   </div>
 <% end %>
 <% submitted = response.persisted? && response.submitted? %>
+<% if @daily_kind_pickers.present? %>
+  <%# Owns the swap radios, which sit inside #gym-form but must never post with the day's answers. %>
+  <form id="daily-kind-swap" hidden></form>
+<% end %>
 
 <div class="regenerate-row" style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
   <div>
@@ -38,7 +42,7 @@
 
 <% if submitted %>
   <div data-submitted-day hidden></div>
-  <%= render "responses/answered_sections", exercise: exercise, response: response %>
+  <%= render "responses/answered_sections", exercise: exercise, response: response, pickers: @daily_kind_pickers %>
   <%= render "responses/submission", response: response %>
   <% if @size_change&.direction == :larger %>
     <p class="hint"><%= t("dashboard.size_change.larger") %></p>
@@ -77,7 +81,7 @@
     <%= form_with url: responses_path, method: :post, id: "gym-form",
           data: { turbo: false, answer_form_target: "form",
                   action: "submit->answer-form#submit input->answer-form#input change->answer-form#change click->answer-form#rate" } do |f| %>
-      <%= render "responses/sections", exercise: exercise, response: response, submitted: false %>
+      <%= render "responses/sections", exercise: exercise, response: response, submitted: false, pickers: @daily_kind_pickers %>
 
       <% if exercise.dropped_sections.any? %>
         <p class="hint"><%= t("dashboard.section_left_out", count: exercise.dropped_sections.size) %></p>

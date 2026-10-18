@@ -26,6 +26,7 @@
     "controllers/code_lines_controller": "/assets/controllers/code_lines_controller-DIGEST.js",
     "controllers/comparison_answer_controller": "/assets/controllers/comparison_answer_controller-DIGEST.js",
     "controllers/concept_alternates_controller": "/assets/controllers/concept_alternates_controller-DIGEST.js",
+    "controllers/daily_kind_swap_controller": "/assets/controllers/daily_kind_swap_controller-DIGEST.js",
     "controllers/display_preferences_controller": "/assets/controllers/display_preferences_controller-DIGEST.js",
     "controllers/duck_thread_controller": "/assets/controllers/duck_thread_controller-DIGEST.js",
     "controllers/exercise_mix_controller": "/assets/controllers/exercise_mix_controller-DIGEST.js",
@@ -66,6 +67,7 @@
 <link rel="modulepreload" href="/assets/controllers/code_lines_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/comparison_answer_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/concept_alternates_controller-DIGEST.js" nonce="NONCE">
+<link rel="modulepreload" href="/assets/controllers/daily_kind_swap_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/display_preferences_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/duck_thread_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/exercise_mix_controller-DIGEST.js" nonce="NONCE">
@@ -590,7 +592,8 @@
 </div>
 
 <div id="dashboard-content">
-    
+      <form id="daily-kind-swap" hidden></form>
+
 <div class="regenerate-row" style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
   <div>
       <form data-controller="loading-form" data-action="submit-&gt;loading-form#submit pageshow@window-&gt;loading-form#restore" data-loading-form-label-value="Generating…" data-loading-form-confirm-message-value="Generate a new set for today?" class="button_to" method="post" action="/regenerate"><button class="btn btn-ghost btn-sm" disabled="disabled" type="submit">Generate new set</button></form>
@@ -634,6 +637,164 @@
   </div>
 </details>
 
+    <div class="daily-kind-swap" data-controller="daily-kind-swap" data-daily-kind-swap-url-value="/daily_kinds/0" data-daily-kind-swap-saving-text-value="Saving…">
+  <div id="daily-kind-swap-panel-0" class="daily-kind-swap-panel" data-daily-kind-swap-target="panel" data-version="0" data-current="code_review">
+    <p class="hint daily-kind-hint">New: you can swap this daily section for another kind.</p>
+  <button type="button" class="btn btn-ghost btn-sm daily-kind-trigger" aria-expanded="false" aria-controls="daily-kind-0-picker"
+          data-daily-kind-swap-target="trigger" data-action="daily-kind-swap#toggle">Swap Code Review</button>
+  <fieldset id="daily-kind-0-picker" class="daily-kind-picker" hidden data-daily-kind-swap-target="picker"
+            data-action="change->daily-kind-swap#choose keydown->daily-kind-swap#closeOnEscape">
+    <legend>Choose the kind for this daily section</legend>
+    <p class="hint" id="daily-kind-0-next-set">Your current set keeps its sections. This starts with your next set.</p>
+      <div class="daily-kind-option" data-kind="code_review">
+  <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-code_review" value="code_review" checked="checked" aria-describedby="daily-kind-0-code_review-guide" data-daily-kind-swap-target="option" data-state="now">
+  <label for="daily-kind-0-code_review">Code Review <span class="daily-kind-now">Now</span></label>
+  <div class="kind-about-body" id="daily-kind-0-code_review-guide">
+    <p>Find the one problem in a short piece of code and say how you&#39;d fix it. This builds the habit of reading a change closely before you approve it.</p>
+    <p><strong>Example:</strong> You see a ten-line method from a library app that emails members about overdue books. The question asks what&#39;s wrong with it and how you&#39;d fix it. On some days the code is a test file or a database migration instead.</p>
+  </div>
+</div>
+
+      <div class="daily-kind-option" data-kind="design_comparison">
+  <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-design_comparison" value="design_comparison" disabled="disabled" aria-describedby="daily-kind-0-design_comparison-guide daily-kind-0-design_comparison-note" data-daily-kind-swap-target="option" data-state="disabled">
+  <label for="daily-kind-0-design_comparison">Design Comparison</label>
+    <p class="hint" id="daily-kind-0-design_comparison-note">Already a daily section</p>
+  <div class="kind-about-body" id="daily-kind-0-design_comparison-guide">
+    <p>Two pieces of code both work, and you pick the one that suits the system described. Then you name the fact from the scenario or question that decides it.</p>
+    <p><strong>Example:</strong> A grocery list app will add new kinds of items later. Piece A and Piece B both save an item today, built two different ways. You choose one and point to the sentence that settles it.</p>
+  </div>
+</div>
+
+      <div class="daily-kind-option" data-kind="pattern">
+  <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-pattern" value="pattern" aria-describedby="daily-kind-0-pattern-guide" data-daily-kind-swap-target="option" data-state="available">
+  <label for="daily-kind-0-pattern">Pattern of the Month</label>
+  <div class="kind-about-body" id="daily-kind-0-pattern-guide">
+    <p>This section names a design pattern and why it exists, then asks how you&#39;d apply it to a stated problem. The answer box starts with headings for the parts a full answer covers.</p>
+    <p><strong>Example:</strong> The setting is a gym log, where one button saves a workout, updates a streak and sends a message. You&#39;re asked how you&#39;d structure the work using the day&#39;s pattern, and you describe it in words.</p>
+  </div>
+</div>
+
+      <div class="daily-kind-option" data-kind="challenge">
+  <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-challenge" value="challenge" aria-describedby="daily-kind-0-challenge-guide" data-daily-kind-swap-target="option" data-state="available">
+  <label for="daily-kind-0-challenge">Coding Challenge</label>
+  <div class="kind-about-body" id="daily-kind-0-challenge-guide">
+    <p>Write working code for a small task the question describes. Some days you start from a skeleton, and other days from an empty box.</p>
+    <p><strong>Example:</strong> The task is a method that sorts a shopping list by aisle, with a sentence saying what it should return. You write the method in the answer box.</p>
+  </div>
+</div>
+
+      <div class="daily-kind-option" data-kind="architecture">
+  <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-architecture" value="architecture" aria-describedby="daily-kind-0-architecture-guide daily-kind-0-architecture-consequences" data-daily-kind-swap-target="option" data-state="available">
+  <label for="daily-kind-0-architecture">Architecture Decision</label>
+  <div class="kind-about-body" id="daily-kind-0-architecture-guide">
+    <p>Choose between two or three ways to build something, and justify the choice by what each one costs. You write reasoning, not code.</p>
+    <p><strong>Example:</strong> A library app has to tell members when a book they reserved comes back. One option checks every few minutes, and another reacts the moment the book is returned. You pick one for the situation described and say what you&#39;d give up.</p>
+  </div>
+    <ul class="daily-kind-consequences" id="daily-kind-0-architecture-consequences">
+      <li>Your two daily sections will no longer look at the same idea from different sides on the same day.</li>
+    </ul>
+</div>
+
+      <div class="daily-kind-option" data-kind="security_review">
+  <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-security_review" value="security_review" aria-describedby="daily-kind-0-security_review-guide daily-kind-0-security_review-consequences" data-daily-kind-swap-target="option" data-state="available">
+  <label for="daily-kind-0-security_review">Security Review</label>
+  <div class="kind-about-body" id="daily-kind-0-security_review-guide">
+    <p>Find the one weakness someone could exploit in a short piece of code, and say how you&#39;d close it. It trains you to read code the way an attacker would.</p>
+    <p><strong>Example:</strong> You see a short controller action that shows a shared shopping list. The question asks what someone could exploit here and how you&#39;d stop it.</p>
+  </div>
+    <ul class="daily-kind-consequences" id="daily-kind-0-security_review-consequences">
+      <li>Your two daily sections will no longer look at the same idea from different sides on the same day.</li>
+    </ul>
+</div>
+
+      <div class="daily-kind-option" data-kind="parsons_problem">
+  <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-parsons_problem" value="parsons_problem" aria-describedby="daily-kind-0-parsons_problem-guide" data-daily-kind-swap-target="option" data-state="available">
+  <label for="daily-kind-0-parsons_problem">Parsons Problem</label>
+  <div class="kind-about-body" id="daily-kind-0-parsons_problem-guide">
+    <p>Put shuffled pieces of code back in the order that works. Drag them into place, or move them with the keyboard.</p>
+    <p><strong>Example:</strong> A short method that totals a gym member&#39;s weekly workouts arrives in a random order. You arrange the pieces until the method would run and give the right total.</p>
+  </div>
+</div>
+
+      <div class="daily-kind-option" data-kind="plan_review">
+  <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-plan_review" value="plan_review" aria-describedby="daily-kind-0-plan_review-guide daily-kind-0-plan_review-consequences" data-daily-kind-swap-target="option" data-state="available">
+  <label for="daily-kind-0-plan_review">Plan Review</label>
+  <div class="kind-about-body" id="daily-kind-0-plan_review-guide">
+    <p>Read an implementation plan, written as if by an AI assistant, before any code exists. Say what you&#39;d push back on, since a problem costs less to fix in a plan than in finished code.</p>
+    <p><strong>Example:</strong> The plan lays out five steps for letting gym members export their workout history. You&#39;re asked what you&#39;d want changed before you approve it.</p>
+  </div>
+    <ul class="daily-kind-consequences" id="daily-kind-0-plan_review-consequences">
+      <li>Ambiguity Hunt and Pseudocode to Code won&#39;t appear on their own while Plan Review is a daily section. Swap one of them in to get it back.</li><li>Your two daily sections will no longer look at the same idea from different sides on the same day.</li>
+    </ul>
+</div>
+
+      <div class="daily-kind-option" data-kind="ambiguity_hunt">
+  <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-ambiguity_hunt" value="ambiguity_hunt" aria-describedby="daily-kind-0-ambiguity_hunt-guide daily-kind-0-ambiguity_hunt-consequences" data-daily-kind-swap-target="option" data-state="available">
+  <label for="daily-kind-0-ambiguity_hunt">Ambiguity Hunt</label>
+  <div class="kind-about-body" id="daily-kind-0-ambiguity_hunt-guide">
+    <p>Read a vague feature request and write down what you&#39;d need clarified before you could build it. Asking early costs less than building the wrong thing.</p>
+    <p><strong>Example:</strong> A product manager writes: “Let people pause their daily practice while they&#39;re on holiday.” You&#39;re asked what you&#39;d need answered before building it.</p>
+  </div>
+    <ul class="daily-kind-consequences" id="daily-kind-0-ambiguity_hunt-consequences">
+      <li>Plan Review and Pseudocode to Code won&#39;t appear on their own while Ambiguity Hunt is a daily section. Swap one of them in to get it back.</li><li>Your two daily sections will no longer look at the same idea from different sides on the same day.</li>
+    </ul>
+</div>
+
+      <div class="daily-kind-option" data-kind="pseudocode_to_code">
+  <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-pseudocode_to_code" value="pseudocode_to_code" aria-describedby="daily-kind-0-pseudocode_to_code-guide daily-kind-0-pseudocode_to_code-consequences" data-daily-kind-swap-target="option" data-state="available">
+  <label for="daily-kind-0-pseudocode_to_code">Pseudocode to Code</label>
+  <div class="kind-about-body" id="daily-kind-0-pseudocode_to_code-guide">
+    <p>Write the steps to solve a problem in plain words, without worrying about syntax. When your answer is reviewed, Code Gym turns your steps into code exactly as written, so you can see what a missing step would do.</p>
+    <p><strong>Example:</strong> The problem is merging overlapping bookings in a meeting room&#39;s calendar. You write your steps, and “Check my plan” can point out gaps before you submit.</p>
+  </div>
+    <ul class="daily-kind-consequences" id="daily-kind-0-pseudocode_to_code-consequences">
+      <li>Plan Review and Ambiguity Hunt won&#39;t appear on their own while Pseudocode to Code is a daily section. Swap one of them in to get it back.</li><li>Your two daily sections will no longer look at the same idea from different sides on the same day.</li>
+    </ul>
+</div>
+
+      <div class="daily-kind-summary" id="daily-kind-0-pattern-summary" hidden data-daily-kind-swap-target="summary" data-kind="pattern">
+</div>
+
+      <div class="daily-kind-summary" id="daily-kind-0-challenge-summary" hidden data-daily-kind-swap-target="summary" data-kind="challenge">
+</div>
+
+      <div class="daily-kind-summary" id="daily-kind-0-architecture-summary" hidden data-daily-kind-swap-target="summary" data-kind="architecture">
+    <p class="hint">Your two daily sections will no longer look at the same idea from different sides on the same day.</p>
+</div>
+
+      <div class="daily-kind-summary" id="daily-kind-0-security_review-summary" hidden data-daily-kind-swap-target="summary" data-kind="security_review">
+    <p class="hint">Your two daily sections will no longer look at the same idea from different sides on the same day.</p>
+</div>
+
+      <div class="daily-kind-summary" id="daily-kind-0-parsons_problem-summary" hidden data-daily-kind-swap-target="summary" data-kind="parsons_problem">
+</div>
+
+      <div class="daily-kind-summary" id="daily-kind-0-plan_review-summary" hidden data-daily-kind-swap-target="summary" data-kind="plan_review">
+    <p class="hint">Ambiguity Hunt and Pseudocode to Code won&#39;t appear on their own while Plan Review is a daily section. Swap one of them in to get it back.</p>
+    <p class="hint">Your two daily sections will no longer look at the same idea from different sides on the same day.</p>
+</div>
+
+      <div class="daily-kind-summary" id="daily-kind-0-ambiguity_hunt-summary" hidden data-daily-kind-swap-target="summary" data-kind="ambiguity_hunt">
+    <p class="hint">Plan Review and Pseudocode to Code won&#39;t appear on their own while Ambiguity Hunt is a daily section. Swap one of them in to get it back.</p>
+    <p class="hint">Your two daily sections will no longer look at the same idea from different sides on the same day.</p>
+</div>
+
+      <div class="daily-kind-summary" id="daily-kind-0-pseudocode_to_code-summary" hidden data-daily-kind-swap-target="summary" data-kind="pseudocode_to_code">
+    <p class="hint">Plan Review and Ambiguity Hunt won&#39;t appear on their own while Pseudocode to Code is a daily section. Swap one of them in to get it back.</p>
+    <p class="hint">Your two daily sections will no longer look at the same idea from different sides on the same day.</p>
+</div>
+
+    <div class="daily-kind-actions">
+      <button type="button" class="btn btn-primary btn-sm" disabled data-daily-kind-swap-target="confirm"
+              data-action="daily-kind-swap#confirm">Confirm</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-daily-kind-swap-target="cancel"
+              data-action="daily-kind-swap#cancel">Cancel</button>
+      <span class="hint" aria-live="polite" data-daily-kind-swap-target="status"></span>
+    </div>
+  </fieldset>
+</div>
+  <div class="daily-kind-reply" role="status" aria-live="polite" data-daily-kind-swap-target="reply"></div>
+</div>
   
   <div class="question">Find the bug</div>
 
