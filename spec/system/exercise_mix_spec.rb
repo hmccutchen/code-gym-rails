@@ -96,6 +96,21 @@ RSpec.describe "Exercise mix", type: :system do
     expect(user.reload.section_kind_weights).to eq({})
   end
 
+  it "keeps a daily kind's difficulty controls enabled after a re-sync, though it was excluded before it became daily" do
+    user.update!(excluded_section_kinds: %w[challenge])
+    user.update!(daily_section_kinds: %w[code_review challenge])
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    user.update!(section_kind_levels: { "pattern" => "senior" })
+    find("#weight-architecture").set(0)
+
+    expect(page).to have_css("#save-status", text: /changed in another tab/i, wait: 5)
+    expect(page).to have_no_css("fieldset.mix-difficulty[data-kind='challenge'] input[type=radio]:disabled")
+    expect(user.reload.excluded_section_kinds).to eq(%w[challenge])
+  end
+
   # The debounce is 400ms, so a slow save is still in flight when the next posts; unchained, the second would be refused.
   it "does not refuse a second save issued while this tab's first is in flight" do
     visit_as(user)
