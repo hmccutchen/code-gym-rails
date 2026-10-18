@@ -45,7 +45,6 @@ en:
       resend_prompt: "Didn't get the email? Request a new code below, or use a different address."
       email_label: "Work email *"
       email_placeholder: "you@company.com"
-      trial_link: "Have an invite code? Start a trial."
       submit: "Send code"
     pending:
       message: "Enter the 6-digit code we emailed you."
@@ -704,6 +703,15 @@ en:
       danger_body: "Deleting your account permanently removes your name, email and API key, and logs you out. Your exercise history is kept anonymously for team statistics. This cannot be undone."
       delete: "Delete my account"
       delete_confirm: "Delete your account? This permanently removes your name and email and logs you out. It cannot be undone."
+    api_usage:
+      heading: "API usage this month"
+      intro: "Requests Code Gym sent with your API key since %{since}. Your provider's console shows the exact bill."
+      empty: "No requests sent with your API key since %{since}."
+      provider: "Provider"
+      requests: "Requests"
+      input_tokens: "Input tokens"
+      output_tokens: "Output tokens"
+      note: "Requests include ones that failed. Input includes tokens your provider read from or wrote to its prompt cache, which it bills at different rates. Output includes the model's thinking tokens."
     push_reminders:
       enabled: "Daily reminders are on. You'll get a notification when each weekday's set is ready."
       nudges_label: "Also remind me during the day if today's set isn't finished (hourly, %{window})"

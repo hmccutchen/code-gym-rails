@@ -12,6 +12,19 @@ class ApiUsage < ApplicationRecord
 
   scope :failed, -> { where.not(failure: nil) }
 
+  ProviderTotal = Data.define(:provider, :requests, :input_tokens, :output_tokens)
+
+  # House-key rows are left out: a trial's calls were not billed to the account's own key.
+  def self.own_key_totals(user, since:)
+    where(user: user, house_key: false, created_at: since..)
+      .group(:provider)
+      .order(:provider)
+      .pluck(:provider, Arel.sql("COUNT(*)"),
+             Arel.sql("SUM(tokens_in + COALESCE(cache_read_tokens, 0) + COALESCE(cache_write_tokens, 0))"),
+             Arel.sql("SUM(tokens_out)"))
+      .map { |provider, requests, input, output| ProviderTotal.new(provider:, requests:, input_tokens: input, output_tokens: output) }
+  end
+
   # Counted by created_at, not `date`: a job outside the user's zone stamps `date` with the server's day.
   def self.requests_on(user, day, provider:)
     start = day.in_time_zone(user.effective_time_zone)

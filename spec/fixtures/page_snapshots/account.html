@@ -566,6 +566,15 @@
   .reminder-nudges label { display: flex; align-items: flex-start; gap: .5rem;
                            color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
   .reminder-nudges input[type="checkbox"] { margin-top: .2rem; flex: none; }
+  .api-usage { margin-top: 2.5rem; }
+  .api-usage h2 { font-size: 1rem; margin-bottom: .4rem; }
+  .api-usage p { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
+  .api-usage-scroll { overflow-x: auto; margin-bottom: .75rem; }
+  .api-usage table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .api-usage th, .api-usage td { padding: .4rem .5rem; border-bottom: 1px solid var(--border); text-align: right; }
+  .api-usage th:first-child, .api-usage td:first-child { text-align: left; padding-left: 0; }
+  .api-usage th { color: var(--muted); font-weight: normal; }
+  .api-usage td { font-variant-numeric: tabular-nums; }
   .danger-zone { margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 2rem; }
   .danger-zone h2 { font-size: 1rem; color: var(--red); margin-bottom: .4rem; }
   .danger-zone p { color: var(--muted); font-size: .85rem; margin-bottom: 1rem; }
@@ -590,6 +599,12 @@
   </div>
 
   
+
+  <div class="api-usage">
+  <h2>API usage this month</h2>
+    <p>No requests sent with your API key since September 1.</p>
+</div>
+
 
   <div class="danger-zone">
     <h2>Danger zone</h2>

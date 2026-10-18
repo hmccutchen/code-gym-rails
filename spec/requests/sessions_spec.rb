@@ -62,11 +62,11 @@ RSpec.describe "Sessions", type: :request do
       expect(response.body).not_to include('name="name"')
     end
 
-    it "asks for no invite code and links to the trial page" do
+    it "asks for no invite code and does not offer a trial while trials are paused" do
       get login_path
 
       expect(response.body).not_to include('name="invite_code"')
-      expect(response.body).to include(%(href="#{new_trial_path}"), "Have an invite code? Start a trial.")
+      expect(response.body).not_to include(%(href="#{new_trial_path}"))
     end
 
     it "renders no app nav, since its brand and links only mean anything once logged in" do

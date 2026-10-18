@@ -98,6 +98,41 @@ RSpec.describe "Accounts", type: :request do
     end
   end
 
+  describe "API usage" do
+    def usage(user, **attrs)
+      ApiUsage.create!({ user: user, purpose: "review_response", date: Date.current, provider: "anthropic",
+                         tokens_in: 0, tokens_out: 0 }.merge(attrs))
+    end
+
+    it "totals this month's own-key requests and tokens per provider in the user's zone" do
+      travel_to Time.utc(2026, 10, 18, 12) do
+        user = create_user_with_key(time_zone: "America/New_York")
+        usage(user, tokens_in: 1_200, cache_read_tokens: 800, tokens_out: 3_456)
+        usage(user, tokens_in: 1_000, tokens_out: 1)
+        usage(user, provider: "gemini", tokens_in: 5, tokens_out: 6, created_at: Time.utc(2026, 10, 1, 4, 30))
+        usage(user, tokens_in: 999_999, created_at: Time.utc(2026, 10, 1, 3, 59))
+        usage(user, tokens_in: 999_999, house_key: true)
+        login_as(user)
+
+        get account_path
+
+        rows = Nokogiri::HTML(response.body).css(".api-usage tbody tr").map { |row| row.css("td").map(&:text) }
+        expect(rows).to eq([ [ "Claude", "2", "3,000", "3,457" ], [ "Gemini", "1", "5", "6" ] ])
+        expect(response.body).to include("since October 1")
+      end
+    end
+
+    it "says so when the key has sent nothing this month" do
+      login_as(create_user_with_key)
+
+      get account_path
+
+      page = Nokogiri::HTML(response.body)
+      expect(page.css(".api-usage table")).to be_empty
+      expect(page.at_css(".api-usage").text).to include("No requests")
+    end
+  end
+
   describe "the danger zone" do
     it "renders the delete control and the confirmation copy" do
       login_as(create_user_with_key)
