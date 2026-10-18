@@ -16,7 +16,7 @@ en:
       applied: "Done. Your next sets use the new level."
       dismissed: "Okay. This comes back once there's more to go on."
       count_failed: "Your choice was saved, but we couldn't update the suggestion count. You don't need to repeat it."
-      stranded: "Your settings changed in another tab, and another save on this page is still running. Reload once it finishes to see the current suggestion."
+      stranded: "Your settings changed in another tab, and another change on this page hasn't saved. Reload once it saves to see the current suggestion."
       reload: "Reload"
       invalid: "Those sections can't be set aside."
       invalid_steps: "That suggestion can't be applied. Reload the page to see the current one."
@@ -439,6 +439,21 @@ en:
     setup_link: "Change the mix"
   save_status:
     generic: "Couldn't save your last change. It hasn't reached the server — check your connection and try again."
+  daily_kinds:
+    swap:
+      saved: "Saved. This starts with your next set."
+      saved_paused: "Saved. This starts with your next set. Generation is paused, so that's the next set you generate or the first one after you resume."
+      want_it_today: "Want it in today's set? Generate a new set. This replaces every answer you've typed so far."
+      refused:
+        trial_ended: "Your trial has ended, so there's no next set for a swap to change. Add your own API key in Setup to keep going."
+        invalid: "That swap couldn't be saved. Reload the page and try again."
+        invalid_place: "That daily section doesn't exist."
+        unknown_kind: "That section kind doesn't exist."
+        stale: "Your daily sections changed in another tab. Reload the page to see them."
+        unchanged: "That kind is already in this daily section."
+        already_daily: "That kind is already a daily section."
+        second_fourth: "Only one of %{kinds} can be a daily section."
+        empties_a_slot: "You turned off %{kinds} in Exercise mix, so this swap would leave that group with nothing to rotate. Turn one of them back on first."
   daily_sections:
     legend: "Daily sections"
     automatic: "Automatic"
@@ -459,6 +474,7 @@ en:
     exclude_label: "Exclude"
     last_in_slot: "At least one section in this group has to stay in rotation."
     conflict: "Your exercise mix was changed in another tab. This page has been updated to match."
+    layout_stranded: "Your daily sections changed in another tab, and another change on this page hasn't saved. Reload once it saves to see the new sections."
     difficulty_legend: "Difficulty target"
     level_default: "Your track (%{skill_level})"
     levels:

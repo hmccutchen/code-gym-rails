@@ -164,7 +164,8 @@ class ProfileController < ApplicationController
     current_user.with_lock do
       outcome = if invalid_track_choice?(user_params)
         :track_refused
-      elsif (!posted.nil? && posted.to_s != current_user.section_kind_preferences_version.to_s) || moved_since_shown?
+      elsif (!posted.nil? && posted.to_s != current_user.section_kind_preferences_version.to_s) || moved_since_shown? ||
+            layout_moved?
         :stale
       elsif unsaved_shown_step?(user_params)
         :unsaved_step
@@ -178,7 +179,11 @@ class ProfileController < ApplicationController
   end
 
   def locked_save?(user_params, posted)
-    !posted.nil? || !shown_steps.nil? || LOCKED_KEYS.any? { |key| user_params.key?(key) }
+    !posted.nil? || !shown_steps.nil? || !params[:layout].nil? || (LOCKED_KEYS | PREFERENCE_KEYS).any? { |key| user_params.key?(key) }
+  end
+
+  def layout_moved?
+    !params[:layout].nil? && Array(params[:layout]) != DailyKinds.for(current_user).map(&:key)
   end
 
   def shown_steps
@@ -219,19 +224,22 @@ class ProfileController < ApplicationController
   end
 
   def render_stale_preferences
-    render_json_error(t("exercise_mix.conflict"), status: :conflict, current: preference_state)
+    render_json_error(t("exercise_mix.conflict"), status: :conflict, current: preference_state,
+                                                  daily_kinds: DailyKinds.for(current_user).map(&:key), layout_changed: layout_moved?)
   end
 
   def preference_state
     {
       section_kind_weights:             current_user.section_kind_weights,
-      excluded_section_kinds:           current_user.excluded_section_kinds,
+      excluded_section_kinds:           current_user.excluded_section_kinds & rendered_exclusions,
       section_kind_levels:              current_user.section_kind_levels,
       locked_section_kinds:             current_user.locked_section_kinds,
       section_kind_preferences_version: current_user.section_kind_preferences_version,
       ladder_preparation:               ladder_preparation
     }
   end
+
+  def rendered_exclusions = ExerciseSection.rotatable(daily: DailyKinds.for(current_user)).map(&:key)
 
   def saved_body
     body = { name: current_user.name, time_zone: current_user.time_zone,
@@ -275,6 +283,6 @@ class ProfileController < ApplicationController
     %i[section_kind_weights section_kind_levels display_preferences].each do |key|
       permitted[key] = permitted[key].to_h if permitted.key?(key)
     end
-    permitted
+    current_user.keep_unrendered_preferences(permitted.to_h)
   end
 end

@@ -83,6 +83,15 @@ RSpec.describe KindPreferences do
     end
   end
 
+  describe "#all_excluded?" do
+    it "is the one test for a pool exclusion would empty, read by the fallback and the emptied-slot refusal" do
+      preferences = described_class.new(weights: {}, excluded: %w[challenge parsons_problem])
+
+      expect(preferences.all_excluded?([ ExerciseSection::Challenge, ExerciseSection::ParsonsProblem ])).to be(true)
+      expect(preferences.all_excluded?([ ExerciseSection::Challenge, ExerciseSection::Architecture ])).to be(false)
+    end
+  end
+
   describe "#offered" do
     it "offers a slot whose every kind is excluded, as rotation still fills it" do
       preferences = described_class.new(weights: {}, excluded: %w[architecture security_review parsons_problem])

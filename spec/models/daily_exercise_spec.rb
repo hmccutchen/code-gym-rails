@@ -33,6 +33,30 @@ RSpec.describe DailyExercise, type: :model do
                              generated_at: Time.current, language: "javascript")).to be_valid
   end
 
+  describe "#regeneration_offered?" do
+    let(:exercise) do
+      DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
+    end
+
+    it "offers a fresh set until the response is reviewed or the day has already regenerated" do
+      expect(exercise.regeneration_offered?(nil)).to be(true)
+      expect(exercise.regeneration_offered?(DailyResponse.new(user: user, daily_exercise: exercise))).to be(true)
+
+      reviewed = DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date,
+                                       ai_review: { "code_review" => { "rating" => "solid" } })
+      expect(exercise.regeneration_offered?(reviewed)).to be(false)
+
+      exercise.update!(regenerated_at: Time.current)
+      expect(exercise.regeneration_offered?(nil)).to be(false)
+    end
+
+    it "never offers one to an ended trial" do
+      allow(user).to receive(:trial_ended?).and_return(true)
+
+      expect(exercise.regeneration_offered?(nil)).to be(false)
+    end
+  end
+
   describe "#architecture" do
     it "reads the architecture blob with indifferent access, nil when absent" do
       user = User.create!(email: "arch@example.com", name: "Arch")

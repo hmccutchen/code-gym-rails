@@ -82,6 +82,151 @@ RSpec.describe "Exercise mix", type: :system do
     expect(find("#exclude-parsons_problem")).to be_checked
   end
 
+  it "reloads instead of re-syncing when another tab swapped a daily kind, so the new controls are on the page" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script("window.renderedBeforeSwap = true")
+
+    user.update!(daily_section_kinds: %w[code_review challenge])
+    find("#weight-architecture").set(0)
+
+    expect(page).to have_no_css("#weight-challenge", wait: 5)
+    expect(page.evaluate_script("window.renderedBeforeSwap === undefined")).to be(true)
+    expect(user.reload.section_kind_weights).to eq({})
+  end
+
+  it "sends a skill level change queued behind a mix save before reloading for another tab's swap" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      window.renderedBeforeSwap = true;
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes('"skill_level"')) return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 500));
+        if (!body.includes('"layout"')) return send(url, options);
+        return new Promise((resolve) => { window.releaseMixSave = () => resolve(send(url, options)); });
+      };
+    JS
+
+    find("#weight-architecture").set(0)
+    wait_for(5) { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
+    user.update!(daily_section_kinds: %w[code_review challenge])
+    level = (User::SKILL_LEVELS - [ user.skill_level ]).first
+    find("#skill-level").select(I18n.t("exercise_mix.levels.#{level}"))
+    page.execute_script("window.releaseMixSave()")
+
+    expect(page).to have_no_css("#weight-challenge", wait: 5)
+    expect(page.evaluate_script("window.renderedBeforeSwap === undefined")).to be(true)
+    expect(user.reload.skill_level).to eq(level)
+  end
+
+  it "keeps the page and the unsaved skill level when the save queued behind the swapped-layout reply fails, and through a repeated conflict" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      window.renderedBeforeSwap = true;
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes('"skill_level"')) return new Promise((resolve) => setTimeout(() => resolve(new Response("", { status: 503 })), 500));
+        if (!body.includes('"layout"')) return send(url, options);
+        return new Promise((resolve) => { window.releaseMixSave = () => resolve(send(url, options)); });
+      };
+    JS
+
+    find("#weight-architecture").set(0)
+    wait_for(5) { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
+    user.update!(daily_section_kinds: %w[code_review challenge])
+    stored = user.skill_level
+    level = (User::SKILL_LEVELS - [ stored ]).first
+    find("#skill-level").select(I18n.t("exercise_mix.levels.#{level}"))
+    page.execute_script("window.releaseMixSave()")
+
+    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"), wait: 5)
+    expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
+    expect(find("#skill-level").value).to eq(level)
+    expect(user.reload.skill_level).to eq(stored)
+
+    page.execute_script("window.releaseMixSave = null; window.CodeGymSaveStatus.clear('exercise_mix')")
+    find("#weight-architecture").set(4)
+    wait_for(5) { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
+    page.execute_script("window.releaseMixSave()")
+
+    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"), wait: 5)
+    expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
+    expect(find("#skill-level").value).to eq(level)
+  end
+
+  it "keeps the page when another control's save failed before the swapped-layout reply arrived" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      window.renderedBeforeSwap = true;
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes('"time_zone"')) return Promise.resolve(new Response("", { status: 503 }));
+        return send(url, options);
+      };
+    JS
+
+    find("#tz-select").select(I18n.t("api_keys.edit.time_zones.hawaii"))
+    expect(page).to have_css("#save-status:not([hidden])", wait: 5)
+    user.update!(daily_section_kinds: %w[code_review challenge])
+    find("#weight-architecture").set(0)
+
+    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"), wait: 5)
+    expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
+    expect(find("#tz-select").value).to eq("Pacific/Honolulu")
+  end
+
+  it "leaves the reload to the user when a save queued behind the swapped-layout reply never finishes" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      window.renderedBeforeSwap = true;
+      const send = window.fetch;
+      const wait = window.setTimeout;
+      window.setTimeout = (callback, delay, ...rest) => wait(callback, delay === 200 ? 0 : delay, ...rest);
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes('"skill_level"')) return new Promise(() => {});
+        if (!body.includes('"layout"')) return send(url, options);
+        return new Promise((resolve) => { window.releaseMixSave = () => resolve(send(url, options)); });
+      };
+    JS
+
+    find("#weight-architecture").set(0)
+    wait_for(5) { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
+    user.update!(daily_section_kinds: %w[code_review challenge])
+    find("#skill-level").select(I18n.t("exercise_mix.levels.#{(User::SKILL_LEVELS - [ user.skill_level ]).first}"))
+    page.execute_script("window.releaseMixSave()")
+
+    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"), wait: 5)
+    expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
+  end
+
+  it "keeps a daily kind's difficulty controls enabled after a re-sync, though it was excluded before it became daily" do
+    user.update!(excluded_section_kinds: %w[challenge])
+    user.update!(daily_section_kinds: %w[code_review challenge])
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    user.update!(section_kind_levels: { "pattern" => "senior" })
+    find("#weight-architecture").set(0)
+
+    expect(page).to have_css("#save-status", text: /changed in another tab/i, wait: 5)
+    expect(page).to have_no_css("fieldset.mix-difficulty[data-kind='challenge'] input[type=radio]:disabled")
+    expect(user.reload.excluded_section_kinds).to eq(%w[challenge])
+  end
+
   # The debounce is 400ms, so a slow save is still in flight when the next posts; unchained, the second would be refused.
   it "does not refuse a second save issued while this tab's first is in flight" do
     visit_as(user)

@@ -50,3 +50,20 @@ Prettier's cap; it is a margin, not a measured figure. The window comes to
 The generating poller sizes its attempts from the larger of this window and
 `AiService::JUDGED_GENERATION_BUDGET`, so it keeps polling for the whole
 window.
+
+## `#regeneration_offered?`
+
+The regenerate button's three conditions: the response is not reviewed, the
+day has not already regenerated, and the trial has not ended. The dashboard's
+button reads it, and `DailyKindSwap` reads it plus "nothing submitted" before
+offering its "Want it in today's set?" line, so the two cannot drift. The line
+is stricter than the button on purpose: the button still shows on a submitted
+but unreviewed set, and offering a swap's "apply it today" there would mean
+throwing away submitted work.
+
+It deliberately differs from `DailyResponse#replace_blocker`, which also
+refuses while a review is in flight. The swap design keeps the button as it
+was, so its three conditions moved here unchanged. `replace_blocker` stays the
+authority on whether a regeneration is accepted: a click during a review that
+is still running is refused by `/regenerate`, and the button is right again
+once the review lands.

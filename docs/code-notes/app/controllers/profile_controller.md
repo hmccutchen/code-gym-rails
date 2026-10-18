@@ -56,6 +56,11 @@ also writes under that lock. Without it, Setup's skill-level select, which
 sends no version, could write back a cutoff map read before a Not now
 committed and lose that cutoff.
 
+Any Exercise mix field (`PREFERENCE_KEYS`) takes the lock too, with or
+without a version. `User#keep_unrendered_preferences` merges the stored
+entries for unrendered controls into the save, and it must read the pair and
+those entries from the locked row, not from a copy a swap may have changed.
+
 ## `#mixed_track_save?`
 
 A post that carries `skill_level` together with any Exercise mix key, outside
@@ -64,3 +69,25 @@ it would clear a target the same request had just set when that target equals
 the old or the new track. No page sends both: Setup's track select sends the
 level alone and the mix sends its keys alone. Refusing the pair keeps the
 order of the two from ever deciding what is stored.
+
+## The rendered layout is checked as well as the version
+
+Which Exercise mix controls a page has depends on the daily pair it was
+rendered for, and `User#keep_unrendered_preferences` keeps only what the
+current pair hides. A matching version does not prove the page has the right
+controls: a track save's reply hands the page the new version without
+rebuilding them, so after a swap in another tab the next mix save would pass
+the version check and delete a hidden sibling's setting. A save that posts
+`layout` is therefore checked under the user lock (`#layout_moved?`), and a
+mismatch gets the same 409 with `layout_changed: true`, which makes the page
+reload. A save that posts no layout, such as the track control's, is not
+checked.
+
+## The 409 and track replies send only exclusions Setup shows
+
+`preference_state` returns the exclusions for rotatable kinds only. A kind
+excluded before it became daily keeps its stored exclusion, so swapping it
+back restores the setting, but its difficulty controls have no exclude box;
+syncing the dormant exclusion would disable them with nothing left to
+re-enable them. The stored list stays whole, and the next save merges the
+dormant entry back in.

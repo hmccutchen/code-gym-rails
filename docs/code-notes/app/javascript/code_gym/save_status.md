@@ -58,6 +58,21 @@ These count work the page shows but the server has not stored yet: a request on
 the wire, or a delayed save a page registered through `watch()`.
 Pull-to-refresh waits on `pending()` so a reload cannot drop an edit mid-save.
 
+## `reloadWhenSaved()`
+
+A page that answers a refusal by reloading must not reload over a save that
+has not landed. `reloadWhenSaved(conflict, stranded)` polls `pending()` every
+200 ms and reloads once nothing is left. A save that hangs or fails must never
+cost an edit to a forced reload. So after ten seconds, or while any key but
+`conflict` still has a failure in `failures`, it calls `stranded` instead,
+which hands the reload to the user and leaves the failed selection on the page
+to retry. A failure counts whether it came before the wait or during it, and
+stops counting once that key saves or is cleared. The conflict key is left out
+because the refusal that started the wait reports under it, and so does any
+later save from the same out-of-date page. The level suggestion card and the
+exercise mix both use it. Pull-to-refresh keeps its own loop, because it polls
+faster, cancels when the pull ends and resets its spinner instead.
+
 ## `queue()` and `queued()`
 
 A control whose saves must not overlap queues them under its key. Without

@@ -67,6 +67,9 @@ User interacts:
        reloads once the claim is released or goes stale.
   └→ ResponsesController#email_review→ mails the completed review to the user,
        then returns to the dashboard (where the button lives)
+  └→ DailyKindsController#update     → swaps one daily kind (DailyKindSwap): saves
+       the pair under the user-row lock, writes one daily_kind_swaps row, and
+       never touches today's set; the new pair starts with the next set planned
   └→ DailyExercisesController#regenerate → replaces today's set in place (once/day),
        destroying today's response — so it is blocked once that response has been
        reviewed, the same invariant ResponsesController#start_over is blocked on

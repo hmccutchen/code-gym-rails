@@ -18,6 +18,7 @@ paths:
 | `FeaturedConcept` | user_id, week_of (the Monday, in the user's zone), bucket, concept — unique on user_id and week_of; one row per week a user had a concept to feature |
 | `DuckThread` | user_id, daily_exercise_id (unique), draft_scope (the exercise's scope when written; a mismatch reads as empty), threads (jsonb keyed by section: turns, version, cleared) |
 | `LevelSuggestionEvent` | user_id, kind, action (applied/dismissed/removed), source (suggestion/setup_edit/skill_level_edit, applied rows only), from_level, to_level, window_size, favourable, too_hard_latest3, newest_result_on |
+| `DailyKindSwapEvent` | table `daily_kind_swaps`: user_id, place (0-based), from_kind, to_kind, today_section (unanswered/answered/submitted/not_in_set/no_set), planned_size (today's `plan_notes["size"]`; null for no_set or an unrecorded size), size_setting (`daily_section_count` at the swap; null = Automatic) — one row per saved swap |
 
 `ConceptReference` (not listed above — it has no `user_id`; see
 `.claude/rules/learn.md`) now also carries `guide_plain_language`, `guide_worked_example`,

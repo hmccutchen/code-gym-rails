@@ -181,3 +181,21 @@ also sets `savedLatest` since the form now matches the server, and
 One case is left. A save that failed for another reason is no longer pending,
 so a later track reply replaces its edit; the save banner already reports that
 failure.
+
+## A 409 after another tab changed the pair reloads the page
+
+Which controls Setup renders depends on the daily pair, so after a swap in
+another tab the form lacks the newly rendered rows, and re-syncing the
+controls it has would leave their settings out of every later save. Each save
+posts the pair the page was rendered for (`layout`, from
+`data-exercise-mix-layout-value`), and the server's 409 answers
+`layout_changed`. The controller reloads when it is true and never compares
+pairs itself; otherwise it re-syncs the controls as before.
+
+The reply arrives while a skill level change may still wait behind it on the
+`exercise_mix` line, so the reload goes through `saveStatus.reloadWhenSaved`
+and happens only once that save has landed. If that save fails, or is still
+running after ten seconds, the banner shows `exercise_mix.layout_stranded` and
+the user reloads. `reloading` keeps a second refused save from starting a second wait,
+and clears when the banner shows, so a later conflict in the same tab starts
+a new wait.

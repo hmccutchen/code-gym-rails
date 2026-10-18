@@ -12,6 +12,8 @@ export default class extends Controller {
 
   static values = {
     url: String,
+    layout: Array,
+    layoutStrandedText: String,
     stops: Array,
     defaultStop: Number,
     labels: Array,
@@ -272,7 +274,7 @@ export default class extends Controller {
     sent.state = JSON.parse(JSON.stringify(state))
     this.onTheWire = sent.state
     const steps = this.shownSteps(state.section_kind_levels)
-    const body = { user: Object.assign(state, { section_kind_preferences_version: this.versionValue }) }
+    const body = { user: Object.assign(state, { section_kind_preferences_version: this.versionValue }), layout: this.layoutValue }
     if (steps.length > 0) body.level_suggestion_steps = steps
     return body
   }
@@ -305,6 +307,15 @@ export default class extends Controller {
     return state
   }
 
+  reloadForNewLayout() {
+    if (this.reloading) return
+    this.reloading = true
+    saveStatus.reloadWhenSaved("exercise_mix", () => {
+      this.reloading = false
+      saveStatus.report("exercise_mix", this.layoutStrandedTextValue)
+    })
+  }
+
   reconcile(result, sent) {
     const reported = result.data && result.data.section_kind_preferences_version
     if (result.ok && typeof reported === "number") this.versionValue = reported
@@ -312,6 +323,10 @@ export default class extends Controller {
     if (this.onTheWire === sent.state) this.onTheWire = null
     if (result.ok && sent.state) this.saved = sent.state
     if (result.status === 409) this.suggestedValue = {}
+    if (result.status === 409 && result.data && result.data.layout_changed) {
+      this.reloadForNewLayout()
+      return false
+    }
     if (result.status === 409 && result.data && result.data.current) {
       this.applyServerState(result.data.current)
       return sent.revision === this.editRevision

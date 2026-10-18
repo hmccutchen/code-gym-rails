@@ -593,7 +593,7 @@ daily_kind_swaps
   place          integer  not null   # 0-based index into the daily list
   from_kind      string   not null
   to_kind        string   not null
-  today_section  string   not null   # unanswered | answered | submitted | no_set
+  today_section  string   not null   # unanswered | answered | submitted | not_in_set | no_set
   planned_size   integer             # today's set's plan_notes["size"]; null when no_set
   size_setting   integer             # users.daily_section_count at the swap; null = Automatic
   created_at     datetime not null
@@ -609,6 +609,11 @@ daily_kind_swaps
   `unanswered` on an unsubmitted set is the case in-place would have
   changed. It is read through `DailyResponse#answered?` and `#submitted?`,
   the existing authorities.
+- **`not_in_set`** is recorded when today's set does not hold the outgoing
+  kind, as after an earlier swap of the same place or a judge-dropped daily
+  section. It is checked before the answer state, so such a swap never counts
+  as `unanswered`. Built in PR 2; `docs/decisions/daily-kinds.md` ("The swap")
+  is the record.
 - **`no_set`** is recorded when the user has no set for today: a weekend
   without "Generate anyway", or a paused account with nothing held.
   - The control lives on a card, so this mostly comes from a page left open
@@ -649,8 +654,10 @@ daily_kind_swaps
   row's `created_at`, same date).
 - **Validations** follow `LevelSuggestionEvent`: kinds in
   `ExerciseSection.keys`, `today_section` with an `inclusion` check,
-  `planned_size` present unless `today_section` is `no_set`, and
-  `size_setting` in `User::DAILY_SECTION_COUNTS` when present.
+  `planned_size` absent for `no_set`, and `size_setting` in
+  `User::DAILY_SECTION_COUNTS` when present. `planned_size` may also be null
+  on a set: a held set planned before `plan_notes` recorded a size has none,
+  and inferring one would be wrong (`docs/decisions/daily-kinds.md`).
 
 ## Decisions
 

@@ -195,7 +195,31 @@ name a provider while holding no keys.
 
 It reads the slot roster from `ExerciseSection.optional_slots` for the
 user's own pair (`DailyKinds.for`), so a future slot that holds several
-kinds needs no edit here. It runs only when the exclusions change. A new pair
-can leave its old slot holding only excluded kinds, and that save still goes
-through: `KindPreferences#eligible` already falls back to the whole slot
-when every kind in it is excluded. Single-kind slots are skipped.
+kinds needs no edit here. It runs when the exclusions or the pair change, and
+reads `#emptied_slots`, which `DailyKindSwap` also asks to name the kinds in
+its refusal; it tests each slot with `KindPreferences#all_excluded?`, the
+predicate rotation's whole-slot fallback reads. A pair that leaves an optional slot holding only excluded kinds
+is refused, the same as an exclusion that would: rotation would otherwise
+fall back to the excluded kinds (`KindPreferences#eligible`), quietly undoing
+"never show me this". Single-kind slots are skipped.
+
+## `#keep_unrendered_preferences` and the rotatable-kind validations
+
+The Exercise mix form posts only the controls it renders, and which those
+are depends on the pair. Setup renders a weight and an exclude box for each
+kind in a multi-kind optional slot, which is `ExerciseSection.rotatable`, and
+difficulty controls for the daily kinds and every optional slot's kinds, which
+is `ExerciseSection.pickable`; `spec/requests/setup_unrendered_preferences_spec.rb`
+pins that the page renders exactly those. A daily kind has no weight row, and
+while a fourth kind is daily its two siblings have no row at all (D1).
+`ProfileController#profile_params` passes every save through
+`#keep_unrendered_preferences`, which merges back the stored weights and
+exclusions for kinds outside `rotatable` and the stored difficulty targets and
+locks for kinds outside `pickable`. A swap can therefore be undone without
+losing any of those settings, and an unrelated save never deletes them.
+Only entries for kinds still in `ExerciseSection.keys` are kept, so a retired
+kind's stored entries drop out on the next save that posts that field.
+`section_kind_weights_name_rotatable_kinds` and
+`excluded_section_kinds_name_rotatable_kinds` check only the entries a save
+adds or changes against `#rotatable_keys`; a kept entry was valid when it
+was stored and must not refuse an unrelated save.

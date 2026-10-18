@@ -2,9 +2,6 @@
 import { Controller } from "@hotwired/stimulus"
 import saveStatus from "code_gym/save_status"
 
-const SAVE_POLL_MS = 200
-const SAVE_WAIT_LIMIT_MS = 10000
-
 export default class extends Controller {
   static targets = ["step", "apply", "setupLink", "notNow"]
 
@@ -60,11 +57,8 @@ export default class extends Controller {
     this.settle(this.strandedTextValue, reload)
   }
 
-  // Only a conflict reloads, after other saves finish; a hung save must never cost an edit to a forced reload.
-  reloadWhenSaved(waited = 0) {
-    if (!saveStatus.pending()) return window.location.reload()
-    if (waited >= SAVE_WAIT_LIMIT_MS) return this.stranded()
-    setTimeout(() => this.reloadWhenSaved(waited + SAVE_POLL_MS), SAVE_POLL_MS)
+  reloadWhenSaved(conflict) {
+    saveStatus.reloadWhenSaved(conflict, () => this.stranded())
   }
 
   answer() {
@@ -98,14 +92,14 @@ export default class extends Controller {
       this.dismiss(setAside, "removed")
       return
     }
-    if (result && result.status === 409) return this.reloadWhenSaved()
+    if (result && result.status === 409) return this.reloadWhenSaved("level_apply")
     this.setBusy(false)
   }
 
   async notNow() {
     this.setBusy(true)
     const result = await this.dismiss(this.stepTargets, "not_now")
-    if (result && result.status === 409) return this.reloadWhenSaved()
+    if (result && result.status === 409) return this.reloadWhenSaved("level_dismissal")
     if (!result || !result.ok) return this.setBusy(false)
     this.answer()
     this.settle(this.dismissedTextValue)

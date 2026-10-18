@@ -8,6 +8,7 @@ class User < ApplicationRecord
   has_many :push_subscriptions, dependent: :destroy
   has_many :featured_concepts, dependent: :destroy
   has_many :level_suggestion_events, dependent: :destroy
+  has_many :daily_kind_swap_events, dependent: :destroy
   belongs_to :invite_code, optional: true
 
   self.ignored_columns += %w[learning_track]
@@ -37,7 +38,7 @@ class User < ApplicationRecord
   validate :time_zone_must_be_loadable
   validate :section_kind_weights_name_rotatable_kinds,   if: :section_kind_weights_changed?
   validate :excluded_section_kinds_name_rotatable_kinds, if: :excluded_section_kinds_changed?
-  validate :every_slot_keeps_a_kind,                     if: :excluded_section_kinds_changed?
+  validate :every_slot_keeps_a_kind,                     if: -> { excluded_section_kinds_changed? || daily_section_kinds_changed? }
   validate :daily_section_kinds_name_a_full_set,         if: :daily_section_kinds_changed?
   validate :section_kind_levels_name_section_kinds,      if: :section_kind_levels_changed?
   validate :locked_section_kinds_name_section_kinds,     if: :locked_section_kinds_changed?
@@ -408,6 +409,24 @@ class User < ApplicationRecord
 
   def provider_label = AiProvider.label(provider)
 
+  def emptied_slots(daily:)
+    preferences = KindPreferences.new(weights: {}, excluded: Array(excluded_section_kinds))
+    ExerciseSection.optional_slots(daily: daily).select do |_slot, kinds|
+      kinds.size > 1 && preferences.all_excluded?(kinds)
+    end
+  end
+
+  def keep_unrendered_preferences(attrs)
+    daily    = DailyKinds.for(self)
+    weighted = ExerciseSection.rotatable(daily: daily).map(&:key)
+    shown    = ExerciseSection.pickable(daily: daily).map(&:key)
+    keep_hidden(attrs, :section_kind_weights, section_kind_weights.except(*weighted))
+    keep_hidden(attrs, :excluded_section_kinds, excluded_section_kinds - weighted)
+    keep_hidden(attrs, :section_kind_levels, section_kind_levels.except(*shown))
+    keep_hidden(attrs, :locked_section_kinds, locked_section_kinds - shown)
+    attrs
+  end
+
   private
 
   def clean_name
@@ -509,6 +528,13 @@ class User < ApplicationRecord
     ))
   end
 
+  def keep_hidden(attrs, field, hidden)
+    return unless attrs.key?(field)
+
+    known = ExerciseSection.keys
+    attrs[field] = hidden.is_a?(Hash) ? hidden.slice(*known).merge(attrs[field]) : attrs[field] | (hidden & known)
+  end
+
   def rotatable_keys
     ExerciseSection.rotatable(daily: DailyKinds.for(self)).map(&:key)
   end
@@ -520,7 +546,10 @@ class User < ApplicationRecord
   def section_kind_weights_name_rotatable_kinds
     return errors.add(:section_kind_weights, "must be an object") unless section_kind_weights.is_a?(Hash)
 
+    stored = section_kind_weights_in_database.is_a?(Hash) ? section_kind_weights_in_database : {}
     section_kind_weights.each do |key, value|
+      next if stored.key?(key) && stored[key] == value
+
       errors.add(:section_kind_weights, "names an unknown section kind: #{key}") if rotatable_keys.exclude?(key)
       errors.add(:section_kind_weights, "has an unsupported weight for #{key}") if KindPreferences::MULTIPLIERS.exclude?(value)
     end
@@ -529,14 +558,14 @@ class User < ApplicationRecord
   def excluded_section_kinds_name_rotatable_kinds
     return errors.add(:excluded_section_kinds, "must be a list") unless excluded_section_kinds.is_a?(Array)
 
-    (excluded_section_kinds - rotatable_keys).each do |key|
+    (excluded_section_kinds - Array(excluded_section_kinds_in_database) - rotatable_keys).each do |key|
       errors.add(:excluded_section_kinds, "names an unknown section kind: #{key}")
     end
   end
 
   def section_kind_preferences_changed?
     section_kind_weights_changed? || excluded_section_kinds_changed? ||
-      section_kind_levels_changed? || locked_section_kinds_changed?
+      section_kind_levels_changed? || locked_section_kinds_changed? || daily_section_kinds_changed?
   end
 
   def section_kind_levels_name_section_kinds
@@ -587,10 +616,7 @@ class User < ApplicationRecord
   def every_slot_keeps_a_kind
     return unless excluded_section_kinds.is_a?(Array)
 
-    ExerciseSection.optional_slots(daily: DailyKinds.for(self)).each do |slot, kinds|
-      next if kinds.size <= 1
-      next if kinds.any? { |kind| excluded_section_kinds.exclude?(kind.key) }
-
+    emptied_slots(daily: DailyKinds.for(self)).each_key do |slot|
       errors.add(:excluded_section_kinds, "must leave at least one #{slot} section in rotation")
     end
   end
