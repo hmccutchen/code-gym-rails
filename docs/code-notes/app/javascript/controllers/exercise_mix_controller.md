@@ -191,3 +191,9 @@ posts the pair the page was rendered for (`layout`, from
 `data-exercise-mix-layout-value`), and the server's 409 answers
 `layout_changed`. The controller reloads when it is true and never compares
 pairs itself; otherwise it re-syncs the controls as before.
+
+The reply arrives while a skill level change may still wait behind it on the
+`exercise_mix` line, so the reload goes through `saveStatus.reloadWhenSaved`
+and happens only once that save has landed. If a save is still running after
+ten seconds, the banner shows `exercise_mix.layout_stranded` and the user
+reloads. `reloading` keeps a second refused save from starting a second wait.

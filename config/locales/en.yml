@@ -474,6 +474,7 @@ en:
     exclude_label: "Exclude"
     last_in_slot: "At least one section in this group has to stay in rotation."
     conflict: "Your exercise mix was changed in another tab. This page has been updated to match."
+    layout_stranded: "Your daily sections changed in another tab, and another save on this page is still running. Reload once it finishes to see the new sections."
     difficulty_legend: "Difficulty target"
     level_default: "Your track (%{skill_level})"
     levels:

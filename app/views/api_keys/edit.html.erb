@@ -127,6 +127,7 @@
            data-action="profile-preferences:trackSaving@document->exercise-mix#holdForTrackSave profile-preferences:trackSaved@document->exercise-mix#adoptTrackChange profile-preferences:trackFailed@document->exercise-mix#settlePrepareButton"
            data-exercise-mix-url-value="<%= profile_path %>"
            data-exercise-mix-layout-value="<%= DailyKinds.for(current_user).map(&:key).to_json %>"
+           data-exercise-mix-layout-stranded-text-value="<%= t("exercise_mix.layout_stranded") %>"
            data-exercise-mix-stops-value="<%= KindPreferences::MULTIPLIERS.to_json %>"
            data-exercise-mix-default-stop-value="<%= KindPreferences::DEFAULT_MULTIPLIER %>"
            data-exercise-mix-labels-value="<%= t("exercise_mix.stops").to_json %>"

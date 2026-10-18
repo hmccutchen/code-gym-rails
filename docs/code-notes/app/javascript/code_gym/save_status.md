@@ -58,6 +58,16 @@ These count work the page shows but the server has not stored yet: a request on
 the wire, or a delayed save a page registered through `watch()`.
 Pull-to-refresh waits on `pending()` so a reload cannot drop an edit mid-save.
 
+## `reloadWhenSaved()`
+
+A page that answers a refusal by reloading must not reload over a save that
+has not landed. `reloadWhenSaved(stranded)` polls `pending()` every 200 ms and
+reloads once nothing is left. A save that hangs must never cost an edit to a
+forced reload, so after ten seconds it stops and calls `stranded`, which hands
+the reload to the user. The level suggestion card and the exercise mix both
+use it. Pull-to-refresh keeps its own loop, because it polls faster, cancels
+when the pull ends and resets its spinner instead.
+
 ## `queue()` and `queued()`
 
 A control whose saves must not overlap queues them under its key. Without
