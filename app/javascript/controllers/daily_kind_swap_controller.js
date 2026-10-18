@@ -5,7 +5,7 @@ import saveStatus from "code_gym/save_status"
 export default class extends Controller {
   static targets = ["panel", "trigger", "picker", "option", "summary", "confirm", "cancel", "status", "reply"]
 
-  static values = { url: String, exercise: Number, savingText: String }
+  static values = { url: String, exercise: Number, draftScope: String, savingText: String }
 
   connect() {
     this.busy = false
@@ -93,26 +93,28 @@ export default class extends Controller {
 
   // Read when the queue sends it, so a swap queued behind another posts the version that one's reply left.
   body(kind) {
-    return { kind: kind, exercise_id: this.exerciseValue, section_kind_preferences_version: this.panelTarget.dataset.version }
+    return { kind: kind, exercise_id: this.exerciseValue, draft_scope: this.draftScopeValue,
+             section_kind_preferences_version: this.panelTarget.dataset.version }
   }
 
   saved(data) {
-    if (!this.replacePanels(data.panels)) {
-      this.setBusy(false)
-      this.close()
-    }
+    if (!this.replacePanels(data.panels)) this.leaveCards()
     this.announce(data.message, data.want_it_today, data.want_it_today_link)
-    if (this.hasTriggerTarget) this.triggerTarget.focus()
+    if (data.set_changed) this.replyTarget.append(this.paragraph(data.set_changed))
+    this.triggerTarget.focus()
+  }
+
+  leaveCards() {
+    this.setBusy(false)
+    this.close()
   }
 
   // Another tab changed the pair or the mix, so the picker reopens on the stored pair before the reader tries again.
   refreshStale(data) {
-    if (!this.replacePanels(data.panels)) {
-      this.panelTarget.dataset.version = data.section_kind_preferences_version
-      this.setBusy(false)
-      this.choose()
-    }
-    this.open()
+    if (this.replacePanels(data.panels)) return this.open()
+
+    this.leaveCards()
+    this.replyTarget.replaceChildren(this.paragraph(data.set_changed || data.error))
   }
 
   replacePanels(panels) {

@@ -6,9 +6,10 @@ RSpec.describe "Swapping a daily section kind", type: :request do
 
   before { login_as(user) }
 
-  def swap(place, kind, version: user.reload.section_kind_preferences_version, exercise: user.daily_exercises.order(:date).last)
-    patch daily_kind_path(place), params: { kind: kind, exercise_id: exercise&.id, section_kind_preferences_version: version }.to_json,
-                                  headers: json
+  def swap(place, kind, version: user.reload.section_kind_preferences_version, exercise: user.daily_exercises.order(:date).last,
+           draft_scope: exercise&.draft_scope)
+    patch daily_kind_path(place), params: { kind: kind, exercise_id: exercise&.id, draft_scope: draft_scope,
+                                            section_kind_preferences_version: version }.to_json, headers: json
   end
 
   def body = JSON.parse(response.body)
@@ -19,7 +20,7 @@ RSpec.describe "Swapping a daily section kind", type: :request do
     expect(response).to have_http_status(:ok)
     expect(body).to eq(
       "status" => "saved", "message" => "Saved. This starts with your next set.", "want_it_today" => nil,
-      "want_it_today_link" => nil, "panels" => {},
+      "want_it_today_link" => nil, "panels" => {}, "set_changed" => I18n.t("daily_kinds.picker.set_changed"),
       "daily_kinds" => %w[code_review architecture], "section_kind_preferences_version" => user.reload.section_kind_preferences_version
     )
     expect(user.daily_kind_swap_events.sole).to have_attributes(from_kind: "design_comparison", to_kind: "architecture")
@@ -51,6 +52,29 @@ RSpec.describe "Swapping a daily section kind", type: :request do
     swap(1, "pattern", version: 0, exercise: yesterday)
     expect(response).to have_http_status(:conflict)
     expect(body["panels"].keys).to eq(%w[0 1])
+  end
+
+  it "renders no panels for a set another tab regenerated, and says the cards are out of date" do
+    exercise = DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails", generated_at: 1.hour.ago,
+                                     problem_set: { "code_review" => { "question" => "q" }, "design_comparison" => { "question" => "q" } },
+                                     plan_notes: { "daily_kinds" => %w[code_review design_comparison], "size" => 2 })
+    shown = exercise.draft_scope
+    user.update!(daily_section_kinds: %w[architecture design_comparison])
+    exercise.update!(generated_at: Time.current, regenerated_at: Time.current,
+                     problem_set: { "architecture" => { "question" => "q" }, "design_comparison" => { "question" => "q" } },
+                     plan_notes: { "daily_kinds" => %w[architecture design_comparison], "size" => 2 })
+
+    swap(1, "pattern", exercise: exercise, draft_scope: shown)
+    expect(response).to have_http_status(:ok)
+    expect(body).to include("panels" => {}, "set_changed" => I18n.t("daily_kinds.picker.set_changed"))
+
+    swap(1, "challenge", version: 0, exercise: exercise, draft_scope: shown)
+    expect(response).to have_http_status(:conflict)
+    expect(body).to include("panels" => {}, "set_changed" => I18n.t("daily_kinds.picker.set_changed"))
+
+    swap(1, "challenge", exercise: exercise)
+    expect(body["panels"].keys).to eq(%w[0 1])
+    expect(body["set_changed"]).to be_nil
   end
 
   it "renders no panels for another user's set" do

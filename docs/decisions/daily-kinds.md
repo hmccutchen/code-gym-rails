@@ -281,8 +281,10 @@ controller only reveals what they rendered.
   excluded; `docs/code-notes/app/models/daily_kind_swap/consequences.md` has
   the formula.
 - Swaps go one at a time through one `CodeGymSaveStatus.queue` line, each
-  reading its version when it is sent, and name the exercise the page shows,
-  so the reply's panels are for that set even past midnight.
+  reading its version when it is sent, and name the exercise and generation
+  (`draft_scope`) the page shows, so the reply's panels are for that set
+  even past midnight. When another tab has regenerated it, the reply sends
+  no panels, the cards stay as they are, and the card says to reload.
 - A save replaces every card's panel from the reply (`panels`), so both
   pickers carry the new version and the new pair's disabled options, and a
   second swap works without a reload. The reply sentence is announced in a

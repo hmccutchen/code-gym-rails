@@ -229,18 +229,45 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page).to have_css("#daily-kind-swap-panel-1[data-current='pattern']")
   end
 
-  it "takes the stored version from a stale reply with no panels, so the next try saves" do
-    page.execute_script(%(document.querySelector("[data-daily-kind-swap-url-value='/daily_kinds/0']").dataset.dailyKindSwapExerciseValue = "0"))
-    user.update!(section_kind_weights: { "challenge" => 2.0 })
-    confirm_swap(0, "architecture")
+  def expect_cards_left_alone
+    expect(page).to have_css(".daily-kind-reply", text: I18n.t("daily_kinds.picker.set_changed"))
+    expect(page).to have_css("#daily-kind-1-picker", visible: :hidden)
+    expect(within(panel(0)) { find("button.daily-kind-trigger").text }).to eq("Swap Code Review")
+    expect(panel(1)["data-current"]).to eq("design_comparison")
+    expect(find("#daily-kind-1-picker", visible: :all).find_button("Cancel", visible: :all)).not_to be_disabled
+  end
 
-    expect(page).to have_css("#save-status", text: I18n.t("daily_kinds.swap.refused.stale"))
-    expect(page).to have_css("#daily-kind-swap-panel-0[data-version='#{user.reload.section_kind_preferences_version}']")
-    expect(find("#daily-kind-0-picker")).to have_button("Confirm", disabled: false)
+  def regenerate_in_another_tab(pair: nil)
+    exercise = user.daily_exercises.sole
+    user.update!(daily_section_kinds: pair) if pair
+    exercise.update!(generated_at: Time.current + 1.minute, regenerated_at: Time.current,
+                     plan_notes: exercise.plan_notes.merge("daily_kinds" => pair || DailyKinds::DEFAULT.map(&:key)))
+  end
 
-    within("#daily-kind-0-picker") { click_button "Confirm" }
+  it "saves but leaves the cards alone when another tab regenerated the set, and says to reload" do
+    regenerate_in_another_tab
+    confirm_swap(1, "pattern")
+
     expect(page).to have_css(".daily-kind-reply", text: I18n.t("daily_kinds.swap.saved"))
+    expect_cards_left_alone
+    expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
+  end
+
+  it "leaves the cards alone on a stale reply after another tab swapped and regenerated" do
+    page.execute_script("window.swapPage = true")
+    regenerate_in_another_tab(pair: %w[architecture design_comparison])
+    confirm_swap(1, "pattern")
+
+    expect_cards_left_alone
     expect(user.reload.daily_section_kinds).to eq(%w[architecture design_comparison])
+    expect(page.evaluate_script("window.swapPage")).to be(true)
+  end
+
+  it "says to reload when the page's set can't be found" do
+    page.execute_script(%(document.querySelector("[data-daily-kind-swap-url-value='/daily_kinds/1']").dataset.dailyKindSwapExerciseValue = "0"))
+    confirm_swap(1, "pattern")
+
+    expect_cards_left_alone
   end
 
   it "works from the keyboard: open, arrow to a kind, Escape closes and returns focus" do

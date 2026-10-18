@@ -27,11 +27,17 @@ panel re-rendered by another card's reply keeps showing "Saving…".
 
 ## The page's set, not today's
 
-The request names the exercise the page shows (`exercise_id`), and the
-server renders the panels for that row. A dashboard left open past midnight,
-before the next set exists, still gets its panels back. If a reply has no
-panel for this card anyway, the controller clears its busy state itself, so
-Cancel and Confirm never stay disabled.
+The request names the exercise the page shows (`exercise_id`) and its
+generation (`draft_scope`, the id plus `generated_at`, the same token the
+answer form posts). The server renders panels only for that generation. A
+dashboard left open past midnight, before the next set exists, still gets
+its panels back. A set another tab regenerated keeps its id but not its
+scope, so the reply carries no panels and a `set_changed` sentence instead:
+the old cards would otherwise take panels built for the new set's kinds.
+The controller then leaves the cards as they are, clears its busy state,
+closes the picker and shows the sentence, which asks for a reload. It never
+reloads by itself, so typed answers are not lost. The same applies to a
+stale 409 and to an id the server can't find.
 
 ## Failures
 
@@ -48,10 +54,10 @@ chose Coding Challenge leave the second open on its current kind, and a
 503 leaves the choice in place for one more Confirm.
 
 A 409 means another tab changed the pair or the Exercise mix, so the panels
-on this page describe settings that are no longer stored. The 409 reply
-carries the same freshly rendered panels a save does, the controller swaps
-them in and reopens this card's picker on the stored pair, with focus on its
-checked radio. The next Confirm posts the stored version and saves. This is
+on this page describe settings that are no longer stored. When the set on
+the page is still current, the 409 reply carries the same freshly rendered
+panels a save does, and the controller swaps them in and reopens this card's
+picker on the stored pair, with focus on its checked radio. The next Confirm posts the stored version and saves. This is
 the card's counterpart to Exercise mix reloading on `layout_changed`; the
 card can refresh in place because its whole state is one server-rendered
 panel.
