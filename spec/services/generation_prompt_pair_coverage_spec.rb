@@ -45,7 +45,7 @@ RSpec.describe "Generation prompt over every reachable daily pair" do
   def absent_mentions(prompt)
     text = instructions(prompt)
     (ExerciseSection.keys - schema_keys(prompt)).flat_map do |key|
-      [ key, key.tr("_", " ") ].uniq.filter_map { |name| text[/\b#{Regexp.escape(name)}('s| section)\b/i] }
+      [ key, key.tr("_", " ") ].uniq.filter_map { |name| text[%r{\b#{Regexp.escape(name)}(?:/\w+)*('s| section)\b}i] }
     end
   end
 
@@ -102,6 +102,12 @@ RSpec.describe "Generation prompt over every reachable daily pair" do
     prompt = "- Match the challenge's difficulty.\nReturn JSON matching this schema exactly:\n{\n  \"pattern\": {\n"
 
     expect(absent_mentions(prompt)).to eq([ "challenge's" ])
+  end
+
+  it "reports an absent kind that owns a comparison through a slash, beside a present one" do
+    prompt = "- Never one from code_review/pattern's broader vocabulary.\nReturn JSON matching this schema exactly:\n{\n  \"pattern\": {\n"
+
+    expect(absent_mentions(prompt)).to eq([ "code_review/pattern's" ])
   end
 
   it "covers at least the pairs the registry offered when this spec was written, in both languages" do
