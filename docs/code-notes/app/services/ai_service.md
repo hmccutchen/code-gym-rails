@@ -271,8 +271,12 @@ does.
 
 ## `#judged_generation_provider`
 
-Hands over bound methods, so neither `judge_section` nor `retry_section` has to
-join this class's public API.
+Hands over callables, so neither `judge_section` nor `retry_section` has to
+join this class's public API. Each closes over the generation's deadline and
+passes it to `#call_and_log`, which checks it after the request is built, since
+a retry's ladders and prompt can spend the time the check would have allowed.
+The retry passes the deadline less a judge's worst case, so its re-judge still
+has room.
 
 ## `#judge_guidance_block`
 

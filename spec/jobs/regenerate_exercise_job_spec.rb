@@ -5,6 +5,12 @@ RSpec.describe RegenerateExerciseJob, type: :job do
 
   let(:user) { create_user_with_key(email: "regen-job@example.com") }
 
+  around do |example|
+    next example.run if example.metadata[:own_clock]
+
+    travel_to(Time.utc(2026, 10, 14, 15, 0, 0)) { example.run }
+  end
+
   def claimed_exercise
     DailyExercise.create!(user: user, date: Date.current, generated_at: 1.hour.ago,
                           language: "ruby_rails",
@@ -20,9 +26,9 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     fake_service = instance_double(ClaudeService)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
     if result.is_a?(StandardError)
-      allow(fake_service).to receive(:generate_unjudged_exercise).and_raise(result)
+      allow(fake_service).to receive(:generate_judged_exercise).and_raise(result)
     else
-      allow(fake_service).to receive(:generate_unjudged_exercise).and_return(unjudged(result))
+      allow(fake_service).to receive(:generate_judged_exercise).and_return(unjudged(result))
     end
     fake_service
   end
@@ -55,7 +61,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
       exercise = claimed_exercise
       fake_service = instance_double(ClaudeService)
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
-      allow(fake_service).to receive(:generate_unjudged_exercise) do
+      allow(fake_service).to receive(:generate_judged_exercise) do
         exercise.update_columns(regenerating_since: nil)
         unjudged({ "code_review" => { "question" => "new" } })
       end
@@ -103,7 +109,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     exercise.update!(plan_notes: { "coverage" => "plan_review", "shared_concept" => "feature_envy" })
     fake_service = instance_double(ClaudeService)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(fake_service).to receive(:generate_unjudged_exercise).and_return(
+    allow(fake_service).to receive(:generate_judged_exercise).and_return(
       AiService::JudgedSet.new(problem_set: { "code_review" => { "question" => "new" } }, dropped_sections: [],
                                outcomes: {}, plan_notes: { "shared_concept" => "long_method" })
     )
@@ -130,7 +136,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
                                   answers: { "code_review" => "a draft worth keeping here" })
     fake_service = instance_double(ClaudeService)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(fake_service).to receive(:generate_unjudged_exercise) do
+    allow(fake_service).to receive(:generate_judged_exercise) do
       exercise.update_columns(regenerating_since: nil)
       unjudged({ "code_review" => { "question" => "new" } })
     end
@@ -152,7 +158,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
                                   answers: { "code_review" => "a draft worth keeping here" })
     fake_service = instance_double(ClaudeService)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(fake_service).to receive(:generate_unjudged_exercise) do
+    allow(fake_service).to receive(:generate_judged_exercise) do
       exercise.update_columns(regenerating_since: newer_claim)
       unjudged({ "code_review" => { "question" => "new" } })
     end
@@ -169,7 +175,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     newer_claim = exercise.regenerating_since + 90.seconds
     fake_service = instance_double(ClaudeService)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(fake_service).to receive(:generate_unjudged_exercise) do
+    allow(fake_service).to receive(:generate_judged_exercise) do
       exercise.update_columns(regenerating_since: newer_claim)
       raise AiService::TimeoutError, "slow"
     end
@@ -267,7 +273,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                                            answers: { "code_review" => "a" * 20 })
     fake_service = stub_provider({ "code_review" => { "question" => "new" } })
-    allow(fake_service).to receive(:generate_unjudged_exercise) do
+    allow(fake_service).to receive(:generate_judged_exercise) do
       daily_response.destroy
       unjudged({ "code_review" => { "question" => "new" } })
     end
@@ -287,13 +293,13 @@ RSpec.describe RegenerateExerciseJob, type: :job do
 
     described_class.new.perform(user_id: user.id)
 
-    expect(fake_service).to have_received(:generate_unjudged_exercise).with(user, language: "javascript")
+    expect(fake_service).to have_received(:generate_judged_exercise).with(user, hash_including(language: "javascript"))
   end
 
   it "records a section the provider returned unusable as dropped" do
     exercise = claimed_exercise
     stub_provider({ "code_review" => { "question" => "new" } })
-    allow(AiService.for(user)).to receive(:generate_unjudged_exercise)
+    allow(AiService.for(user)).to receive(:generate_judged_exercise)
       .and_return(unjudged({ "code_review" => { "question" => "new" } }, dropped: [ "design_comparison" ]))
 
     described_class.new.perform(user_id: user.id)
@@ -428,7 +434,76 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(AiService).not_to have_received(:for)
   end
 
-  it "resolves today in the user's own time zone" do
+  it "regenerates a weekend set single-stage, as a weekend set is generated", :own_clock do
+    travel_to Time.utc(2026, 10, 17, 15, 0, 0) do
+      claimed_exercise
+      fake_service = stub_provider({ "code_review" => { "question" => "new" } })
+      allow(fake_service).to receive(:generate_unjudged_exercise)
+        .and_return(unjudged({ "code_review" => { "question" => "weekend" } }))
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(fake_service).to have_received(:generate_unjudged_exercise)
+        .with(user, hash_including(deadline: an_instance_of(GenerationDeadline)))
+      expect(fake_service).not_to have_received(:generate_judged_exercise)
+    end
+  end
+
+  it "asks AiService which days are judged rather than deciding itself" do
+    claimed_exercise
+    fake_service = stub_provider({ "code_review" => { "question" => "new" } })
+    allow(fake_service).to receive(:generate_unjudged_exercise).and_return(unjudged({ "code_review" => { "question" => "new" } }))
+    allow(AiService).to receive(:judged_on?).and_return(false)
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(AiService).to have_received(:judged_on?).with(Date.current)
+    expect(fake_service).to have_received(:generate_unjudged_exercise)
+  end
+
+  it "hands the provider a deadline measured from the claim, not from when the job started" do
+    exercise = claimed_exercise
+    exercise.update_column(:regenerating_since, 2.minutes.ago)
+    claim = exercise.reload.regenerating_since
+    fake_service = stub_provider({ "code_review" => { "question" => "new" } })
+    handed = nil
+    allow(fake_service).to receive(:generate_judged_exercise) do |_user, deadline:, **|
+      handed = deadline
+      unjudged({ "code_review" => { "question" => "new" } })
+    end
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(handed.ends_at).to eq(claim + DailyExercise::REGENERATION_DEADLINE)
+  end
+
+  it "keeps today's set and the day's regeneration when the deadline leaves no time to draft" do
+    exercise = claimed_exercise
+    stub_provider(AiService::DeadlineError.new("generate_exercise"))
+
+    described_class.new.perform(user_id: user.id)
+
+    exercise.reload
+    expect(exercise.problem_set).to eq("code_review" => { "question" => "old" })
+    expect(exercise.regenerating_since).to be_nil
+    expect(exercise.regenerated_at).to be_nil
+    expect(user.reload.last_generation_failure).to eq("timeout")
+  end
+
+  it "keeps today's set when the judge rejected every section of the new one, and says so" do
+    exercise = claimed_exercise
+    stub_provider(AiService::AllSectionsRejectedError.new)
+
+    described_class.new.perform(user_id: user.id)
+
+    exercise.reload
+    expect(exercise.problem_set).to eq("code_review" => { "question" => "old" })
+    expect(exercise.regenerating_since).to be_nil
+    expect(exercise.regenerated_at).to be_nil
+    expect(user.reload.last_generation_error).to eq(described_class::KEPT_SET_MESSAGES.fetch(:all_rejected))
+  end
+
+  it "resolves today in the user's own time zone", :own_clock do
     user.update!(time_zone: "Hawaii")
     travel_to Time.utc(2026, 8, 7, 5, 0, 0) do
       exercise = DailyExercise.create!(user: user, date: Date.new(2026, 8, 6),

@@ -36,6 +36,14 @@ class AiService
 
   class UnsupportedRouteError < Error; end
 
+  class DeadlineError < TimeoutError
+    def initialize(purpose = nil)
+      super("The generation deadline left no time for a #{purpose || "further"} call.")
+    end
+
+    FALLBACK_REASON = "deadline".freeze
+  end
+
   class AllSectionsRejectedError < Error
     def initialize(message = "Every section of today's draft failed its quality check, so no set was saved. Try generating again.")
       super
@@ -70,11 +78,9 @@ class AiService
     OPEN_TIMEOUT + read_timeout
   end
 
-  JUDGED_GENERATION_BUDGET = worst_case_call_seconds(GENERATION_READ_TIMEOUT) +
-                             worst_case_call_seconds(READ_TIMEOUT) +
-                             ([ DailyPlan::DAILY_JUDGE_RETRIES, DailyPlan::ROTATED_JUDGE_RETRIES ].max *
-                               (worst_case_call_seconds(RETRY_READ_TIMEOUT) + worst_case_call_seconds(READ_TIMEOUT))) +
-                             (ExerciseSection.all.any?(&:rejudge_edits?) ? worst_case_call_seconds(READ_TIMEOUT) : 0)
+  def self.call_worst_case_seconds(read_timeout:, single_attempt:)
+    single_attempt ? single_attempt_call_seconds(read_timeout) : worst_case_call_seconds(read_timeout)
+  end
 
   RETRY_TIMEOUT_GUARD = lambda do |env, exception|
     return false if env.request.context.to_h[:single_attempt]
@@ -305,6 +311,8 @@ class AiService
                    cache_system: false, single_attempt: false, allow_truncated: false }
       new(purpose: purpose, system: system, prompt: prompt, **defaults.merge(settings))
     end
+
+    def worst_case_seconds = AiService.call_worst_case_seconds(read_timeout: read_timeout, single_attempt: single_attempt)
   end
 
   CALL_PROFILES = {
@@ -323,6 +331,19 @@ class AiService
     "judge_section"               => { max_tokens: JUDGE_MAX_TOKENS },
     "judge_review"                => { max_tokens: REVIEW_JUDGE_MAX_TOKENS, read_timeout: REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true }
   }.freeze
+
+  def self.judged_on?(date) = date.on_weekday?
+
+  def self.worst_case_seconds_for(purpose)
+    profile = CALL_PROFILES.fetch(purpose)
+    call_worst_case_seconds(read_timeout: profile.fetch(:read_timeout, READ_TIMEOUT), single_attempt: profile.fetch(:single_attempt, false))
+  end
+
+  JUDGED_GENERATION_BUDGET = worst_case_seconds_for("generate_exercise") +
+                             worst_case_seconds_for("judge_section") +
+                             ([ DailyPlan::DAILY_JUDGE_RETRIES, DailyPlan::ROTATED_JUDGE_RETRIES ].max *
+                               (worst_case_seconds_for("retry_section") + worst_case_seconds_for("judge_section"))) +
+                             (ExerciseSection.all.any?(&:rejudge_edits?) ? worst_case_seconds_for("judge_section") : 0)
 
   def self.request_for(purpose, system:, prompt:, history: [], response_schema: nil, blocking: false)
     profile  = CALL_PROFILES.fetch(purpose)
@@ -482,8 +503,8 @@ class AiService
     generate_unjudged_exercise(user, language: language, blocking: blocking).problem_set
   end
 
-  def generate_unjudged_exercise(user, language: user.language_for_today, blocking: false)
-    draft   = draft_exercise(user, language: language, blocking: blocking)
+  def generate_unjudged_exercise(user, language: user.language_for_today, blocking: false, deadline: GenerationDeadline::NONE)
+    draft   = draft_exercise(user, language: language, blocking: blocking, deadline: deadline)
     planned = draft.kinds.map(&:key)
     dropped = draft.unusable_sections.select { |section| planned.include?(section.key) }
     finish_generation(user, language, draft, draft.problem_set,
@@ -492,11 +513,11 @@ class AiService
                   plan_notes: draft.plan.notes)
   end
 
-  def generate_judged_exercise(user, language: user.language_for_today)
-    draft = draft_exercise(user, language: language, blocking: false)
+  def generate_judged_exercise(user, language: user.language_for_today, deadline: GenerationDeadline::NONE)
+    draft = draft_exercise(user, language: language, blocking: false, deadline: deadline)
     JudgedGeneration.call(
       user: user, language: language, draft: draft,
-      providers: -> { fresh_service.judged_generation_provider },
+      providers: -> { fresh_service.judged_generation_provider(deadline) },
       finish: ->(set, **logs) { finish_generation(user, language, draft, set, **logs) }
     )
   end
@@ -692,13 +713,11 @@ class AiService
     code
   end
 
-  def judge_section(user, kind, section, rung:, locked:)
+  def judge_section(user, kind, section, rung:, locked:, deadline: GenerationDeadline::NONE)
     visible = section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS)
-    result  = call_and_log(user, AiService.request_for("judge_section",
-      response_schema: JudgeVerdict.schema_for(kind),
-      system: JUDGE_SYSTEM_PROMPT,
-      prompt: judge_prompt(kind, visible, rung: rung, locked: locked)
-    ))
+    request = AiService.request_for("judge_section", response_schema: JudgeVerdict.schema_for(kind), system: JUDGE_SYSTEM_PROMPT,
+                                                     prompt: judge_prompt(kind, visible, rung: rung, locked: locked))
+    result = call_and_log(user, request, deadline: deadline)
     raw = parse_json_object(result[:text], subject: "#{kind.key} verdict", log_raw: kind.judge_solve_options.nil?)
     JudgeVerdict.parse(raw, kind: kind)
   end
@@ -752,6 +771,7 @@ class AiService
     when TruncatedResponseError                              then "truncated"
     when InvalidResponseError                                then "invalid_json"
     when RefusalError                                        then "refusal"
+    when DeadlineError                                       then DeadlineError::FALLBACK_REASON
     when TimeoutError, Timeout::Error                        then "timeout"
     else                                                          http_status_code_for(error) || error_code_for(error)
     end
@@ -763,8 +783,11 @@ class AiService
 
   protected
 
-  def judged_generation_provider
-    JudgedGeneration::Provider.new(judge_section: method(:judge_section), retry_section: method(:retry_section))
+  def judged_generation_provider(deadline = GenerationDeadline::NONE)
+    JudgedGeneration::Provider.new(
+      judge_section: ->(*args, **options) { judge_section(*args, **options, deadline: deadline) },
+      retry_section: ->(*args) { retry_section(*args, deadline: deadline) }
+    )
   end
 
   private
@@ -800,7 +823,7 @@ class AiService
     kind.judge_guidance ? "\n#{kind.judge_guidance}\n" : ""
   end
 
-  def draft_exercise(user, language:, blocking:)
+  def draft_exercise(user, language:, blocking:, deadline: GenerationDeadline::NONE)
     require_supported_language!(language)
     plan       = DailyPlan.for(user, language: language)
     log_set_size(user, plan.size)
@@ -810,11 +833,9 @@ class AiService
     ladders    = ladders_for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode)
     prompt     = generation_prompt(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders)
 
-    result = call_and_log(user, AiService.request_for("generate_exercise",
-      blocking: blocking,
-      system: build_system_prompt(language),
-      prompt: prompt.render
-    ))
+    request = AiService.request_for("generate_exercise", blocking: blocking, system: build_system_prompt(language),
+                                                         prompt: prompt.render)
+    result = call_and_log(user, request, deadline: deadline)
 
     ingested = ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "problem set", log_raw: false),
@@ -858,13 +879,12 @@ class AiService
                                judge: judge, unhosted: unhosted)
   end
 
-  def retry_section(user, language, draft, kind, concept)
+  def retry_section(user, language, draft, kind, concept, deadline: GenerationDeadline::NONE)
     prompt = generation_prompt(user, language, plan: draft.plan, history: draft.history, difficulty: draft.difficulty,
                                ladders: retry_ladders(user, language, draft, kind))
-    result = call_and_log(user, AiService.request_for("retry_section",
-      system: build_system_prompt(language),
-      prompt: prompt.render(only: kind, fixed_concept: concept)
-    ))
+    request = AiService.request_for("retry_section", system: build_system_prompt(language),
+                                                     prompt: prompt.render(only: kind, fixed_concept: concept))
+    result = call_and_log(user, request, deadline: deadline.leaving(AiService.worst_case_seconds_for("judge_section")))
 
     ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "#{kind.key} retry", log_raw: false), language: language,
@@ -1582,7 +1602,8 @@ class AiService
     )
   end
 
-  def call_and_log(user, request)
+  def call_and_log(user, request, deadline: GenerationDeadline::NONE)
+    deadline.ensure_fits!(request)
     TrialAllowance.check!(user, provider: self.class) if house_key?
     begin
       result = call(request)
