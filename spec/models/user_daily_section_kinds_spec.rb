@@ -49,14 +49,14 @@ RSpec.describe User, "daily section kinds" do
     expect(user.reload.section_kind_weights).to eq("challenge" => 2.0, "architecture" => 0.5)
   end
 
-  it "merges a daily kind's stored entries back into an Exercise mix save, which posts only the rows on screen" do
+  it "merges the stored entries for controls Setup does not render back into an Exercise mix save" do
     user.update!(section_kind_weights: { "challenge" => 2.0 }, excluded_section_kinds: %w[parsons_problem])
     user.update!(daily_section_kinds: %w[challenge parsons_problem])
 
-    attrs = user.keep_daily_kind_entries(section_kind_weights: { "architecture" => 0.5 }, excluded_section_kinds: [])
+    attrs = user.keep_unrendered_preferences(section_kind_weights: { "architecture" => 0.5 }, excluded_section_kinds: [])
 
     expect(attrs).to eq(section_kind_weights: { "challenge" => 2.0, "architecture" => 0.5 },
                         excluded_section_kinds: %w[parsons_problem])
-    expect(user.keep_daily_kind_entries(name: "Kept")).to eq(name: "Kept")
+    expect(user.keep_unrendered_preferences(name: "Kept")).to eq(name: "Kept")
   end
 end

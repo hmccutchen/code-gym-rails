@@ -416,12 +416,14 @@ class User < ApplicationRecord
     end
   end
 
-  def keep_daily_kind_entries(attrs)
-    daily = DailyKinds.for(self).map(&:key)
-    if attrs.key?(:section_kind_weights)
-      attrs[:section_kind_weights] = section_kind_weights.slice(*daily).merge(attrs[:section_kind_weights])
-    end
-    attrs[:excluded_section_kinds] = attrs[:excluded_section_kinds] | (excluded_section_kinds & daily) if attrs.key?(:excluded_section_kinds)
+  def keep_unrendered_preferences(attrs)
+    daily    = DailyKinds.for(self)
+    weighted = ExerciseSection.rotatable(daily: daily).map(&:key)
+    shown    = ExerciseSection.pickable(daily: daily).map(&:key)
+    keep_hidden(attrs, :section_kind_weights, section_kind_weights.except(*weighted))
+    keep_hidden(attrs, :excluded_section_kinds, excluded_section_kinds - weighted)
+    keep_hidden(attrs, :section_kind_levels, section_kind_levels.except(*shown))
+    keep_hidden(attrs, :locked_section_kinds, locked_section_kinds - shown)
     attrs
   end
 
@@ -524,6 +526,12 @@ class User < ApplicationRecord
       cutoffs: level_suggestion_cutoffs_before_last_save || {},
       cleared: track_change&.cleared || []
     ))
+  end
+
+  def keep_hidden(attrs, field, hidden)
+    return unless attrs.key?(field)
+
+    attrs[field] = hidden.is_a?(Hash) ? hidden.merge(attrs[field]) : attrs[field] | hidden
   end
 
   def rotatable_keys

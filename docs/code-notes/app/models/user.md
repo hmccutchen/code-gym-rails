@@ -203,12 +203,20 @@ is refused, the same as an exclusion that would: rotation would otherwise
 fall back to the excluded kinds (`KindPreferences#eligible`), quietly undoing
 "never show me this". Single-kind slots are skipped.
 
-## `#keep_daily_kind_entries` and the rotatable-kind validations
+## `#keep_unrendered_preferences` and the rotatable-kind validations
 
-A daily kind has no Exercise mix row, so the form never posts its weight or
-exclusion. `ProfileController#profile_params` passes every save through
-`#keep_daily_kind_entries`, which merges the stored entries for the current
-daily kinds back in, so a swap can be undone without losing the setting.
+The Exercise mix form posts only the controls it renders, and which those
+are depends on the pair. Setup renders a weight and an exclude box for each
+kind in a multi-kind optional slot, which is `ExerciseSection.rotatable`, and
+difficulty controls for the daily kinds and every optional slot's kinds, which
+is `ExerciseSection.pickable`; `spec/requests/setup_unrendered_preferences_spec.rb`
+pins that the page renders exactly those. A daily kind has no weight row, and
+while a fourth kind is daily its two siblings have no row at all (D1).
+`ProfileController#profile_params` passes every save through
+`#keep_unrendered_preferences`, which merges back the stored weights and
+exclusions for kinds outside `rotatable` and the stored difficulty targets and
+locks for kinds outside `pickable`. A swap can therefore be undone without
+losing any of those settings, and an unrelated save never deletes them.
 `section_kind_weights_name_rotatable_kinds` and
 `excluded_section_kinds_name_rotatable_kinds` check only the entries a save
 adds or changes against `#rotatable_keys`; a kept entry was valid when it
