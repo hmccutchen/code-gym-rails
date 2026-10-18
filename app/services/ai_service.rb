@@ -495,8 +495,7 @@ class AiService
   end
 
   def generate_unjudged_exercise(user, language: user.language_for_today, blocking: false, deadline: GenerationDeadline::NONE)
-    deadline.ensure_fits!("generate_exercise")
-    draft   = draft_exercise(user, language: language, blocking: blocking)
+    draft   = draft_exercise(user, language: language, blocking: blocking, deadline: deadline)
     planned = draft.kinds.map(&:key)
     dropped = draft.unusable_sections.select { |section| planned.include?(section.key) }
     finish_generation(user, language, draft, draft.problem_set,
@@ -506,8 +505,7 @@ class AiService
   end
 
   def generate_judged_exercise(user, language: user.language_for_today, deadline: GenerationDeadline::NONE)
-    deadline.ensure_fits!("generate_exercise")
-    draft = draft_exercise(user, language: language, blocking: false)
+    draft = draft_exercise(user, language: language, blocking: false, deadline: deadline)
     JudgedGeneration.call(
       user: user, language: language, draft: draft,
       providers: -> { deadline.guard(fresh_service.judged_generation_provider) },
@@ -815,7 +813,7 @@ class AiService
     kind.judge_guidance ? "\n#{kind.judge_guidance}\n" : ""
   end
 
-  def draft_exercise(user, language:, blocking:)
+  def draft_exercise(user, language:, blocking:, deadline: GenerationDeadline::NONE)
     require_supported_language!(language)
     plan       = DailyPlan.for(user, language: language)
     log_set_size(user, plan.size)
@@ -825,11 +823,10 @@ class AiService
     ladders    = ladders_for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode)
     prompt     = generation_prompt(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders)
 
-    result = call_and_log(user, AiService.request_for("generate_exercise",
-      blocking: blocking,
-      system: build_system_prompt(language),
-      prompt: prompt.render
-    ))
+    request = AiService.request_for("generate_exercise", blocking: blocking, system: build_system_prompt(language),
+                                                         prompt: prompt.render)
+    deadline.ensure_fits!(request.purpose)
+    result = call_and_log(user, request)
 
     ingested = ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "problem set", log_raw: false),

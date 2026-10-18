@@ -140,40 +140,48 @@ RSpec.describe "DailyExercises", type: :request do
     end
 
     # Walks the whole loop so a mismatch between what the controller enqueues and the job expects cannot pass.
-    it "shows the spinner until the enqueued job replaces the set" do
-      exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
-                                       problem_set: { "code_review" => { "question" => "PREVIOUS-SET-MARKER" } })
+    { "on a weekday, through the judged path" => [ Time.utc(2026, 10, 14, 15), :generate_judged_exercise ],
+      "at a weekend, single-stage" => [ Time.utc(2026, 10, 17, 15), :generate_unjudged_exercise ] }.each do |day, (at, path)|
+      context day do
+        around { |example| travel_to(at) { example.run } }
 
-      post regenerate_path
+        it "shows the spinner until the enqueued job replaces the set" do
+          exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                           problem_set: { "code_review" => { "question" => "PREVIOUS-SET-MARKER" } })
 
-      get root_path
-      expect(response.body).to include("Generating your personalized exercise set")
-      expect(response.body).not_to include("PREVIOUS-SET-MARKER")
+          post regenerate_path
 
-      get dashboard_status_path
-      expect(JSON.parse(response.body)["status"]).to eq("pending")
+          get root_path
+          expect(response.body).to include("Generating your personalized exercise set")
+          expect(response.body).not_to include("PREVIOUS-SET-MARKER")
 
-      fresh = {
-        "code_review" => { "question" => "freshly generated", "snippet" => "def a; end" },
-        "pattern" => {
-          "title" => "Service Objects", "why" => "Because", "question" => "When?",
-          "reference" => { "tagline" => "T", "explanation" => "E",
-                           "code_example" => "code", "senior_lens" => "S" }
-        },
-        "challenge" => { "title" => "Build", "question" => "Implement X", "starter_code" => "" }
-      }
-      fake_service = instance_double(ClaudeService, generate_unjudged_exercise:
-        AiService::JudgedSet.new(problem_set: fresh, dropped_sections: [], outcomes: {}, plan_notes: {}))
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-      perform_enqueued_jobs
+          get dashboard_status_path
+          expect(JSON.parse(response.body)["status"]).to eq("pending")
 
-      expect(exercise.reload.regenerating_since).to be_nil
+          fresh = {
+            "code_review" => { "question" => "freshly generated", "snippet" => "def a; end" },
+            "pattern" => {
+              "title" => "Service Objects", "why" => "Because", "question" => "When?",
+              "reference" => { "tagline" => "T", "explanation" => "E",
+                               "code_example" => "code", "senior_lens" => "S" }
+            },
+            "challenge" => { "title" => "Build", "question" => "Implement X", "starter_code" => "" }
+          }
+          fake_service = instance_double(ClaudeService, path =>
+            AiService::JudgedSet.new(problem_set: fresh, dropped_sections: [], outcomes: {}, plan_notes: {}))
+          allow(AiService).to receive(:for).with(user).and_return(fake_service)
+          perform_enqueued_jobs
 
-      get dashboard_status_path
-      expect(JSON.parse(response.body)["status"]).to eq("ready")
+          expect(exercise.reload.regenerating_since).to be_nil
+          expect(fake_service).to have_received(path)
 
-      get root_path
-      expect(response.body).to include("freshly generated")
+          get dashboard_status_path
+          expect(JSON.parse(response.body)["status"]).to eq("ready")
+
+          get root_path
+          expect(response.body).to include("freshly generated")
+        end
+      end
     end
   end
 

@@ -5075,6 +5075,21 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       expect(purposes).to be_empty
     end
 
+    { judged: :generate_judged_exercise, unjudged: :generate_unjudged_exercise }.each do |path, method|
+      it "checks the draft against the time left after planning, not before it (#{path})" do
+        now = [ start ]
+        deadline = GenerationDeadline.new(start + AiService.worst_case_seconds_for("generate_exercise"), clock: -> { now.first })
+        allow(DailyPlan).to receive(:for).and_wrap_original do |original, *args, **kwargs|
+          original.call(*args, **kwargs).tap { now[0] = start + 1 }
+        end
+
+        expect { FakeService.new("fake-key").public_send(method, user, language: "ruby_rails", deadline: deadline) }
+          .to raise_error(AiService::DeadlineError)
+        expect(DailyPlan).to have_received(:for)
+        expect(purposes).to be_empty
+      end
+    end
+
     it "stops a judge call that no longer fits once the draft is back, keeping the drafted sections" do
       draft_only = start + AiService.worst_case_seconds_for("generate_exercise")
       clock = -> { purposes.empty? ? start : draft_only }

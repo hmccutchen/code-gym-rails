@@ -43,9 +43,11 @@ start, so a slow pickup comes out of the same budget.
   `TimeoutError`, if it doesn't. Checking the worst case rather than the
   clock alone makes the deadline a ceiling on the job: a call begun just
   before it can't overrun.
-- **What a stop costs.** The draft check is the job's own: a draft that no
-  longer fits ends the run, releases the claim and leaves today's set, shown
-  as a timeout. The judge and retry checks run inside `JudgedGeneration`
+- **What a stop costs.** The draft check runs in `AiService`'s draft path,
+  after the plan, history, ladders and prompt are built and just before the
+  call, since that preparation spends time too. A draft that no longer fits
+  ends the run before any request, releases the claim and leaves today's set,
+  shown as a timeout. The judge and retry checks run inside `JudgedGeneration`
   through the guarded `Provider`, which needs no change: a judge that can't
   start is a fallback that keeps the draft (reason `deadline`, kept apart from
 `timeout` so queue delay doesn't read as a slow judge), and a retry that can't start
