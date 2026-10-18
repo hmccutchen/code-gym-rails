@@ -16,13 +16,24 @@ class ExerciseSection::SecurityReview < ExerciseSection
     %w[snippet]
   end
 
-  def self.generation_guidance(vocabulary:, label:, **)
+  def self.generation_guidance(vocabulary:, label:, alongside: [], **)
     <<~GUIDANCE.chomp
       - The "#{key}" section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to #{label}. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
-      - Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from code_review/pattern's broader vocabulary: #{vocabulary.join(", ")}
-      - The security_review snippet should be realistic #{label} code, not a contrived toy example — the same bar as code_review's snippet.
+      - Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from #{broader_vocabulary_owner(alongside)} broader vocabulary: #{vocabulary.join(", ")}
+      - The security_review snippet should be realistic #{label} code, not a contrived toy example#{snippet_bar(alongside)}.
     GUIDANCE
   end
+
+  def self.broader_vocabulary_owner(alongside)
+    named = [ ExerciseSection::CodeReview.key, ExerciseSection::Pattern.key ] & alongside
+    named.any? ? "#{named.join("/")}'s" : "another section's"
+  end
+  private_class_method :broader_vocabulary_owner
+
+  def self.snippet_bar(alongside)
+    alongside.include?(ExerciseSection::CodeReview.key) ? " — the same bar as #{ExerciseSection::CodeReview.key}'s snippet" : ""
+  end
+  private_class_method :snippet_bar
 
   def self.schema_fragment(label:)
     <<~SCHEMA.chomp
