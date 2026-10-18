@@ -6,26 +6,28 @@
     <p><%= t("accounts.api_usage.empty", since: since_day) %></p>
   <% else %>
     <p><%= t("accounts.api_usage.intro", since: since_day) %></p>
-    <table>
-      <thead>
-        <tr>
-          <th scope="col"><%= t("accounts.api_usage.provider") %></th>
-          <th scope="col"><%= t("accounts.api_usage.requests") %></th>
-          <th scope="col"><%= t("accounts.api_usage.input_tokens") %></th>
-          <th scope="col"><%= t("accounts.api_usage.output_tokens") %></th>
-        </tr>
-      </thead>
-      <tbody>
-        <% totals.each do |total| %>
+    <div class="api-usage-scroll" tabindex="0" role="region" aria-label="<%= t("accounts.api_usage.heading") %>">
+      <table>
+        <thead>
           <tr>
-            <td><%= AiProvider.label(total.provider) %></td>
-            <td><%= number_with_delimiter(total.requests) %></td>
-            <td><%= number_with_delimiter(total.input_tokens) %></td>
-            <td><%= number_with_delimiter(total.output_tokens) %></td>
+            <th scope="col"><%= t("accounts.api_usage.provider") %></th>
+            <th scope="col"><%= t("accounts.api_usage.requests") %></th>
+            <th scope="col"><%= t("accounts.api_usage.input_tokens") %></th>
+            <th scope="col"><%= t("accounts.api_usage.output_tokens") %></th>
           </tr>
-        <% end %>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <% totals.each do |total| %>
+            <tr>
+              <td><%= AiProvider.label(total.provider) %></td>
+              <td><%= number_with_delimiter(total.requests) %></td>
+              <td><%= number_with_delimiter(total.input_tokens) %></td>
+              <td><%= number_with_delimiter(total.output_tokens) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
     <p><%= t("accounts.api_usage.note") %></p>
   <% end %>
 </div>
