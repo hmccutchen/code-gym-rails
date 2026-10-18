@@ -4,10 +4,10 @@
 user gets in every set. Before it, "every day holds code review and design
 comparison" was a facet on two kinds (`fixed?`) that a dozen readers asked
 the registry about. Now the pair is a per-user value, and every reader that
-needs it takes it as an argument. Nothing can change a user's pair yet: the
-swap itself is a later PR (see
-`docs/superpowers/specs/2026-10-16-daily-kind-swap-design.md`). Until then
-every account plans, prompts and renders exactly as before.
+needs it takes it as an argument. A user changes their pair from a daily card's
+swap control ("The swap" and "The card's control" below; the design is
+`docs/superpowers/specs/2026-10-16-daily-kind-swap-design.md`). An account
+that never swaps plans and prompts exactly as before.
 
 ## What `DailyKinds` owns
 
@@ -224,6 +224,56 @@ an earlier swap or a judge drop), `submitted`, then `answered` or
 planned before `plan_notes` recorded a size. The model is
 `DailyKindSwapEvent` on the `daily_kind_swaps` table, since `DailyKindSwap`
 is the swap itself.
+
+## The card's control
+
+Each delivered daily card, in the answer form and on the submitted
+dashboard, gets a swap row directly after its `kind_about` disclosure
+(`daily_kinds/_swap`). History never shows it. Cards are matched to places
+by membership in the day's recorded pair, so a judge-dropped daily section
+has no control and no control moves onto a rotating card.
+`DailyKindSwap::Picker` builds what each card shows, and
+`DailyKindSwap::Consequences` the sentences for each available option; both
+are pure reads of server state, and the `daily-kind-swap` Stimulus
+controller only reveals what they rendered.
+
+- The trigger reads "Swap Code Review". The picker is a fieldset with one
+  radio per kind; each radio's `aria-describedby` names the kind's
+  `SectionKindGuide` text (the `responses/_kind_guide` partial, which
+  `_kind_about` renders too), its disabled reason and its consequences.
+- An option's state is `DailyKindSwap.refusal` for that kind: `unchanged` is
+  "Now", any other reason disables it with that reason's sentence ("Already a
+  daily section" for the other daily kind), and no reason makes it
+  available. A refusal of the place's own kind (an ended trial) closes the
+  picker: no options, only the reason.
+- A line above the options says the current set keeps its sections and the
+  swap starts with the next set, with the paused wording while generation is
+  paused.
+- Sentences on the incoming kind: a fourth's siblings stop appearing; the
+  daily sections can no longer share a concept (shown when the current pair
+  can share one through `DayHosts` and the new pair can't); a stored weight
+  or exclusion does nothing while the kind is daily.
+- The warning on the outgoing kind sits above Confirm, and Confirm points at
+  it. Suppression comes first, at any size: a fourth swapped for a fourth
+  won't appear at all, and neither will an excluded kind whose group still
+  has a kind turned on. Then, only on a two-section day: a fixed setting of 2
+  means the kind won't appear at all; on Automatic, an excluded kind won't
+  appear at all, and any other kind appears about once every N weeks as a
+  coverage addition, followed by the line that the pair also decides when
+  sets grow. N counts the new pair's optional kinds the user hasn't
+  excluded; `docs/code-notes/app/models/daily_kind_swap/consequences.md` has
+  the formula.
+- A save replaces every card's panel from the reply (`panels`), so both
+  pickers carry the new version and the new pair's disabled options, and a
+  second swap works without a reload. The reply sentence is announced in a
+  polite live region; the want-it-today line, when sent, links to the
+  existing "Generate new set" button. A failure shows in the save-status
+  banner and leaves the picker open with focus on Confirm.
+- Discoverability: the welcome page names the default pair and says either
+  can be swapped from its card. The first delivered daily card of an
+  unsubmitted set carries "New: you can swap this daily section for another
+  kind." while the account has no swap events and fewer than
+  `Picker::HINT_UNTIL_SUBMITTED_DAYS` submitted days.
 
 ## The competency gate
 

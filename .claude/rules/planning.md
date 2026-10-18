@@ -14,6 +14,12 @@ paths:
   - "app/models/daily_response.rb"
   - "spec/**/competency_gate/**"
   - "spec/**/*{weighted_roll,daily_exercise}*"
+  - "app/models/{daily_kinds,daily_kind_swap}.rb"
+  - "app/models/daily_kind_swap/**"
+  - "app/controllers/daily_kinds_controller.rb"
+  - "app/views/daily_kinds/**"
+  - "app/javascript/controllers/daily_kind_swap_controller.js"
+  - "spec/**/*daily_kind*"
 ---
 
 # Day planning, sizing and mastery
@@ -60,7 +66,10 @@ read it before changing that area.
   `ExerciseSection.layout(daily:)` or `.optional_slots(daily:)`; never
   re-introduce a global slot list. A default account must stay byte-identical,
   which the prompt, page and request snapshots hold. A daily fourth takes the
-  fourth slot out of rotation. `CompetencyGate` reads each day's own pair.
+  fourth slot out of rotation. `CompetencyGate` reads each day's own pair. The card's swap control (`DailyKindSwap::Picker`,
+  `DailyKindSwap::Consequences`) restates no pair rule: option states come
+  from `DailyKindSwap.refusal`, sharing from `DayHosts`, and the weeks figure
+  from `CoverageException`'s constants.
   `DailyKindSwap` (`PATCH /daily_kinds/:place`) is the one writer of a
   non-default pair: it refuses a stale version, a repeat, a second fourth or a
   pair that empties an optional slot, saves under the user-row lock and writes

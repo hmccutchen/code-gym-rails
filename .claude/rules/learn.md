@@ -8,7 +8,7 @@ paths:
   - "app/helpers/{featured_concept,concept_references,concept_drills,progress,section_kind_guide,glossary}_helper.rb"
   - "app/views/{learn,learn_lessons,progress}/**"
   - "app/views/shared/{_concept_reference,_featured_concept}.html.erb"
-  - "app/views/responses/{_featured_marker,_kind_about}.html.erb"
+  - "app/views/responses/{_featured_marker,_kind_about,_kind_guide}.html.erb"
   - "app/javascript/controllers/{concept_alternates,learn_filter,write_up_control,glossary}_controller.js"
   - "spec/**/*{learn,concept_reference,featured,progress,rung_ledger,recognition,lesson,book_source,kind_guide,glossary,hand_written}*"
   - "app/models/concept_vocabulary.rb"
@@ -63,7 +63,9 @@ read it before changing that area.
   answer form shows one under a section's summary only until the user has
   answered that kind on a submitted day (`DailyResponse.answered_kinds_for`,
   read from submitted `section_ratings` keys, with no column of its own); the
-  submitted dashboard and History never show it. Like `ConceptBookSources` it
+  submitted dashboard and History never show it as a disclosure. The
+  daily cards' swap picker shows each option's guide text
+  (`responses/_kind_guide`, the one copy both render). Like `ConceptBookSources` it
   is never sent to a provider, and a spec fails if anything under
   `app/services` or `app/jobs` names it. Each example says what the engineer
   sees and is asked, never an answer, and the ambiguity hunt's names no gap
