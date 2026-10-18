@@ -56,6 +56,11 @@ also writes under that lock. Without it, Setup's skill-level select, which
 sends no version, could write back a cutoff map read before a Not now
 committed and lose that cutoff.
 
+Any Exercise mix field (`PREFERENCE_KEYS`) takes the lock too, with or
+without a version. `User#keep_unrendered_preferences` merges the stored
+entries for unrendered controls into the save, and it must read the pair and
+those entries from the locked row, not from a copy a swap may have changed.
+
 ## `#mixed_track_save?`
 
 A post that carries `skill_level` together with any Exercise mix key, outside

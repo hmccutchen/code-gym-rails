@@ -31,6 +31,10 @@ class DailyKinds
     [ "must name #{COUNT} different section kinds, at most one of them from #{ExerciseSection.fourths.map(&:key).join(", ")}" ]
   end
 
+  def self.place?(place) = place.is_a?(Integer) && (0...COUNT).cover?(place)
+
+  def self.stored(keys) = keys == DEFAULT.map(&:key) ? [] : keys
+
   def self.conflict(kind, others)
     return :repeat if others.include?(kind)
 

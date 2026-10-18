@@ -7,9 +7,11 @@ const SETTLE_POLL_MS = 200;
 const SETTLE_WAIT_LIMIT_MS = 10000;
 
 const failures = new Map();
+const reportedAt = new Map();
 const issued = new Map();
 const queues = new Map();
 let counter = 0;
+let reports = 0;
 
 let requests = 0;
 const probes = [];
@@ -30,10 +32,21 @@ export function pending() {
   return requests > 0 || [...queues.values()].some((line) => line.busy || line.waiting.length > 0) || probes.some((probe) => probe());
 }
 
-export function reloadWhenSaved(stranded, waited = 0) {
-  if (!pending()) return window.location.reload();
-  if (waited >= SETTLE_WAIT_LIMIT_MS) return stranded();
-  setTimeout(() => reloadWhenSaved(stranded, waited + SETTLE_POLL_MS), SETTLE_POLL_MS);
+export function reloadWhenSaved(conflict, stranded) {
+  waitThenReload(conflict, stranded, reports, 0);
+}
+
+function waitThenReload(conflict, stranded, since, waited) {
+  if (pending() && waited < SETTLE_WAIT_LIMIT_MS) {
+    setTimeout(() => waitThenReload(conflict, stranded, since, waited + SETTLE_POLL_MS), SETTLE_POLL_MS);
+    return;
+  }
+  if (pending() || failedSince(conflict, since)) return stranded();
+  window.location.reload();
+}
+
+function failedSince(conflict, since) {
+  return [...failures.keys()].some((key) => key !== conflict && reportedAt.get(key) > since);
 }
 
 function render() {
@@ -60,6 +73,7 @@ function render() {
 export function report(key, message) {
   failures.delete(key);
   failures.set(key, message);
+  reportedAt.set(key, ++reports);
   render();
 }
 

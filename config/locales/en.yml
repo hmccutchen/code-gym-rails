@@ -16,7 +16,7 @@ en:
       applied: "Done. Your next sets use the new level."
       dismissed: "Okay. This comes back once there's more to go on."
       count_failed: "Your choice was saved, but we couldn't update the suggestion count. You don't need to repeat it."
-      stranded: "Your settings changed in another tab, and another save on this page is still running. Reload once it finishes to see the current suggestion."
+      stranded: "Your settings changed in another tab, and another change on this page hasn't saved. Reload once it saves to see the current suggestion."
       reload: "Reload"
       invalid: "Those sections can't be set aside."
       invalid_steps: "That suggestion can't be applied. Reload the page to see the current one."
@@ -502,7 +502,7 @@ en:
     exclude_label: "Exclude"
     last_in_slot: "At least one section in this group has to stay in rotation."
     conflict: "Your exercise mix was changed in another tab. This page has been updated to match."
-    layout_stranded: "Your daily sections changed in another tab, and another save on this page is still running. Reload once it finishes to see the new sections."
+    layout_stranded: "Your daily sections changed in another tab, and another change on this page hasn't saved. Reload once it saves to see the new sections."
     difficulty_legend: "Difficulty target"
     level_default: "Your track (%{skill_level})"
     levels:

@@ -123,6 +123,42 @@ RSpec.describe "Exercise mix", type: :system do
     expect(user.reload.skill_level).to eq(level)
   end
 
+  it "keeps the page and the unsaved skill level when the save queued behind the swapped-layout reply fails, and still recovers from the next conflict" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      window.renderedBeforeSwap = true;
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes('"skill_level"')) return new Promise((resolve) => setTimeout(() => resolve(new Response("", { status: 503 })), 500));
+        if (!body.includes('"layout"')) return send(url, options);
+        return new Promise((resolve) => { window.releaseMixSave = () => resolve(send(url, options)); });
+      };
+    JS
+
+    find("#weight-architecture").set(0)
+    wait_for(5) { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
+    user.update!(daily_section_kinds: %w[code_review challenge])
+    stored = user.skill_level
+    level = (User::SKILL_LEVELS - [ stored ]).first
+    find("#skill-level").select(I18n.t("exercise_mix.levels.#{level}"))
+    page.execute_script("window.releaseMixSave()")
+
+    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"), wait: 5)
+    expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
+    expect(find("#skill-level").value).to eq(level)
+    expect(user.reload.skill_level).to eq(stored)
+
+    page.execute_script("window.releaseMixSave = null")
+    find("#weight-architecture").set(4)
+    wait_for(5) { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
+    page.execute_script("window.releaseMixSave()")
+    wait_for(5) { page.evaluate_script("window.renderedBeforeSwap === undefined") }
+    expect(page.evaluate_script("window.renderedBeforeSwap === undefined")).to be(true)
+  end
+
   it "leaves the reload to the user when a save queued behind the swapped-layout reply never finishes" do
     visit_as(user)
     visit setup_path

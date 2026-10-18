@@ -25,6 +25,10 @@ that never swaps plans and prompts exactly as before.
   accepts an empty list, or a list of `COUNT` key strings that `.normalize`
   leaves unchanged. The rules about which pairs are allowed are therefore
   stated once, in `.normalize`, and validation can't drift from them.
+- `DailyKinds.place?(n)` says whether `n` names a daily place, and
+  `DailyKinds.stored(keys)` gives a pair's stored form, `[]` for the default
+  pair. The swap and its event row ask them, so neither restates the range or
+  the sparse storage rule.
 - `DailyKinds::DEFAULT` reads `ExerciseSection.default_daily`, so the
   registry never depends on `DailyKinds`.
 
@@ -323,11 +327,10 @@ section") is a precondition for PR 2, the first change that can write a
 non-default pair, and lands before it or with it as its own snapshot update.
 That change is #415.
 
-Two lines assume `code_review` is in the day without naming a position:
-`DesignComparison`'s "the same as the code review's" and `SecurityReview`'s
-"the same bar as code_review's snippet". A pair without `code_review` makes
-them point at a section that is not there. PR 2 either gates them on
-`code_review` being planned or rewords them to stand alone.
+The lines that compared a section with `code_review` or `pattern` now
+render only beside them (`alongside:`, recorded in
+`kind-named-prompt-sections.md`), and `generation_prompt_pair_coverage_spec`
+renders every reachable pair to hold it.
 
 ## Other PR 2 preconditions
 

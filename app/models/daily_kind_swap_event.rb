@@ -7,7 +7,7 @@ class DailyKindSwapEvent < ApplicationRecord
   TODAY_SECTIONS = %w[unanswered answered submitted not_in_set no_set].freeze
   NO_SET = "no_set".freeze
 
-  validates :place, numericality: { only_integer: true, in: 0...DailyKinds::COUNT }
+  validate { errors.add(:place, :inclusion) unless DailyKinds.place?(place) }
   validates :from_kind, :to_kind, inclusion: { in: ->(_) { ExerciseSection.keys } }
   validates :today_section, inclusion: { in: TODAY_SECTIONS }
   validates :planned_size, absence: true, if: -> { today_section == NO_SET }

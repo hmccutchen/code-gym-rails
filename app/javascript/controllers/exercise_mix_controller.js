@@ -310,7 +310,10 @@ export default class extends Controller {
   reloadForNewLayout() {
     if (this.reloading) return
     this.reloading = true
-    saveStatus.reloadWhenSaved(() => saveStatus.report("exercise_mix", this.layoutStrandedTextValue))
+    saveStatus.reloadWhenSaved("exercise_mix", () => {
+      this.reloading = false
+      saveStatus.report("exercise_mix", this.layoutStrandedTextValue)
+    })
   }
 
   reconcile(result, sent) {

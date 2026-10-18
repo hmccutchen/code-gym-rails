@@ -158,7 +158,7 @@ class ExerciseSection
     end
 
     # Every kind gets the same context and states only its own vocabulary (#81); absorb unread values with `**`.
-    def generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil)
+    def generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil, alongside: [])
       raise NotImplementedError, "#{self} must implement .generation_guidance"
     end
 
