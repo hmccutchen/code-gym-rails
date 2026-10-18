@@ -410,9 +410,9 @@ class User < ApplicationRecord
   def provider_label = AiProvider.label(provider)
 
   def emptied_slots(daily:)
-    excluded = Array(excluded_section_kinds)
+    preferences = KindPreferences.new(weights: {}, excluded: Array(excluded_section_kinds))
     ExerciseSection.optional_slots(daily: daily).select do |_slot, kinds|
-      kinds.size > 1 && kinds.all? { |kind| excluded.include?(kind.key) }
+      kinds.size > 1 && preferences.all_excluded?(kinds)
     end
   end
 

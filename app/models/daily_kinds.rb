@@ -31,9 +31,14 @@ class DailyKinds
     [ "must name #{COUNT} different section kinds, at most one of them from #{ExerciseSection.fourths.map(&:key).join(", ")}" ]
   end
 
+  def self.conflict(kind, others)
+    return :repeat if others.include?(kind)
+
+    :second_fourth if kind.fourth? && others.compact.any?(&:fourth?)
+  end
+
   def self.fitting(kind, placed)
-    return nil if kind.nil? || placed.include?(kind)
-    return nil if kind.fourth? && placed.compact.any?(&:fourth?)
+    return nil if kind.nil? || conflict(kind, placed)
 
     kind
   end

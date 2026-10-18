@@ -28,8 +28,10 @@ class KindPreferences
 
   # Only exclusion narrows a pool; one it would empty falls back to every kind, so no slot goes unfilled.
   def eligible(kinds)
-    kinds.reject { |kind| excluded?(kind) }.presence || kinds
+    all_excluded?(kinds) ? kinds : kinds.reject { |kind| excluded?(kind) }
   end
+
+  def all_excluded?(kinds) = kinds.all? { |kind| excluded?(kind) }
 
   def offered(daily:)
     rotating = ExerciseSection.optional_slots(daily: daily).values.flat_map { |kinds| eligible(kinds) }

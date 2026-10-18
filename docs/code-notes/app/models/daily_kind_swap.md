@@ -31,6 +31,21 @@ zone when the request is handled, never the set the page was showing. A page
 left open across midnight therefore records `no_set` and offers no
 regeneration, which is right: that set is no longer today's.
 
+## `.refusal` is for the picker
+
+PR 3's picker renders one option per kind and marks the ones it can't
+offer. It asks `DailyKindSwap.refusal(user, place:, kind:)` for each, which
+runs the same shape and pair checks as a save without a version, so the
+disabled options and a refused post can never disagree.
+
+## The pair rules are not restated here
+
+Whether a kind repeats one already daily, or is a second fourth, is
+`DailyKinds.conflict`, which `DailyKinds.normalize` also places kinds with;
+the swap only maps its answer to a reason. Whether a slot would be left with
+every kind excluded is `User#emptied_slots`, built on
+`KindPreferences#all_excluded?`, the same test rotation's fallback reads.
+
 ## Storing the default as an empty list
 
 Swapping back to `DailyKinds::DEFAULT` stores `[]`. Storage is sparse, like

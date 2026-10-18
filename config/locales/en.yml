@@ -445,6 +445,8 @@ en:
       saved_paused: "Saved. This starts with your next set. Generation is paused, so that's the next set you generate or the first one after you resume."
       want_it_today: "Want it in today's set? Generate a new set. This replaces every answer you've typed so far."
       refused:
+        trial_ended: "Your trial has ended, so there's no next set for a swap to change. Add your own API key in Setup to keep going."
+        invalid: "That swap couldn't be saved. Reload the page and try again."
         invalid_place: "That daily section doesn't exist."
         unknown_kind: "That section kind doesn't exist."
         stale: "Your daily sections changed in another tab. Reload the page to see them."

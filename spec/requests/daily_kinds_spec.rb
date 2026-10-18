@@ -32,6 +32,15 @@ RSpec.describe "Swapping a daily section kind", type: :request do
     expect(user.daily_kind_swap_events).to be_empty
   end
 
+  it "answers an unexpected validation failure with a 422, not a server error" do
+    user.update_columns(daily_section_count: 9)
+
+    swap(1, "architecture")
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(body).to include("status" => "invalid", "daily_kinds" => %w[code_review design_comparison])
+  end
+
   it "refuses a page behind the stored version with a 409 carrying the current pair" do
     stale = user.section_kind_preferences_version
     user.update!(daily_section_kinds: %w[pattern design_comparison])

@@ -50,6 +50,15 @@ RSpec.describe DailyKinds do
     end
   end
 
+  describe ".conflict" do
+    it "names the rule a kind would break beside the others, the one statement the swap and normalize share" do
+      expect(described_class.conflict(ExerciseSection::CodeReview, kinds("code_review"))).to eq(:repeat)
+      expect(described_class.conflict(ExerciseSection::AmbiguityHunt, kinds("plan_review"))).to eq(:second_fourth)
+      expect(described_class.conflict(ExerciseSection::AmbiguityHunt, [ nil ])).to be_nil
+      expect(described_class.conflict(ExerciseSection::Pattern, kinds("plan_review"))).to be_nil
+    end
+  end
+
   describe ".recorded" do
     it "reads the pair a row's plan recorded" do
       expect(described_class.recorded("daily_kinds" => %w[challenge design_comparison]))
