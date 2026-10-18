@@ -461,6 +461,9 @@ en:
       next_set: "Your current set keeps its sections. This starts with your next set."
       next_set_paused: "Your current set keeps its sections. This starts with your next set. Generation is paused, so that's the next set you generate or the first one after you resume."
       now: "Now"
+      next_kind: "Your next set uses %{kind} here."
+      next_set_mark: "In your next set"
+      today_mark: "In today's set"
       already_daily: "Already a daily section"
       confirm: "Confirm"
       cancel: "Cancel"
@@ -477,6 +480,7 @@ en:
         outgoing_excluded: "You turned %{outgoing} off in Exercise mix, so after this swap it won't appear at all. Swap it back, or turn it on again, to see it."
         outgoing_fixed_two: "Your Daily sections setting is 2, so after this swap %{outgoing} won't appear at all. Swap it back, or raise the setting in Setup, to see it again."
         outgoing_weeks: "Your sets have two sections right now, so after this swap %{outgoing} will appear about once every %{weeks} weeks, as an extra section. Swap it back to have it every day."
+        outgoing_braked: "Your sets have two sections right now, so after this swap %{outgoing} will rarely appear until your sets grow. Swap it back to have it every day."
         outgoing_gate: "Your two daily sections are also what decides when your sets grow."
   daily_sections:
     legend: "Daily sections"

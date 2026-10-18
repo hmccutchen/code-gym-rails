@@ -2,11 +2,14 @@
 <% prefix = "daily-kind-#{picker.place}" %>
 <%= tag.div id: "daily-kind-swap-panel-#{picker.place}", class: "daily-kind-swap-panel",
       data: { daily_kind_swap_target: "panel", version: picker.version, current: picker.current.key } do %>
+  <% if picker.next_kind_line %>
+    <p class="hint daily-kind-next"><%= picker.next_kind_line %></p>
+  <% end %>
   <% if picker.hint? %>
     <p class="hint daily-kind-hint"><%= t("daily_kinds.picker.first_time_hint") %></p>
   <% end %>
   <button type="button" class="btn btn-ghost btn-sm daily-kind-trigger" aria-expanded="false" aria-controls="<%= prefix %>-picker"
-          data-daily-kind-swap-target="trigger" data-action="daily-kind-swap#toggle"><%= t("daily_kinds.picker.trigger", name: t("sections.#{picker.current.key}.name")) %></button>
+          data-daily-kind-swap-target="trigger" data-action="daily-kind-swap#toggle"><%= t("daily_kinds.picker.trigger", name: t("sections.#{picker.card_kind.key}.name")) %></button>
   <fieldset id="<%= prefix %>-picker" class="daily-kind-picker" hidden data-daily-kind-swap-target="picker"
             data-action="change->daily-kind-swap#choose keydown->daily-kind-swap#closeOnEscape">
     <legend><%= t("daily_kinds.picker.legend") %></legend>

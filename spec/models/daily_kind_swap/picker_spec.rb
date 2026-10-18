@@ -101,6 +101,44 @@ RSpec.describe DailyKindSwap::Picker do
     end
   end
 
+  describe "a card whose recorded kind differs from the stored one" do
+    before do
+      exercise
+      user.update!(daily_section_kinds: %w[challenge design_comparison])
+    end
+
+    it "keeps the card's kind for the trigger and says what the next set uses here" do
+      picker = pickers["code_review"]
+
+      expect(picker.card_kind).to eq(ExerciseSection::CodeReview)
+      expect(picker.next_kind_line).to eq("Your next set uses Coding Challenge here.")
+      expect(option(picker, "challenge")).to have_attributes(state: :now, mark: "In your next set")
+      expect(option(picker, "code_review")).to have_attributes(state: :available, mark: "In today's set")
+    end
+
+    it "marks only Now and adds no line when the card and the stored pair agree" do
+      picker = pickers["design_comparison"]
+
+      expect(picker.next_kind_line).to be_nil
+      expect(option(picker, "design_comparison").mark).to eq("Now")
+      expect(picker.options.filter_map(&:mark)).to eq([ "Now" ])
+    end
+  end
+
+  it "asks whether the stored pair can share a concept once per picker, not once per option" do
+    allow(DailyKindSwap::Consequences).to receive(:shares_a_concept?).and_call_original
+    expect(DailyKindSwap::Consequences).to receive(:shares_a_concept?).with(DailyKinds::DEFAULT, anything).twice.and_call_original
+
+    pickers
+  end
+
+  it "reads the brake from the row, so a braked two-section day gets no weeks figure" do
+    exercise(size: 2)
+    @exercise.update!(plan_notes: @exercise.plan_notes.merge("brake" => true))
+
+    expect(option(pickers["code_review"], "challenge").consequences.warning.join).not_to include("weeks")
+  end
+
   it "offers no options to an ended trial, only the reason, and drops the first-time hint" do
     allow_any_instance_of(User).to receive(:trial_ended?).and_return(true)
     picker = pickers["code_review"]

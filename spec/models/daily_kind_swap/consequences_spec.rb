@@ -4,10 +4,11 @@ RSpec.describe DailyKindSwap::Consequences do
   def kind(key) = ExerciseSection.find(key)
 
   def consequences(kind_key, place: 0, pair: DailyKinds::DEFAULT, weights: {}, excluded: [], setting: nil, planned_size: 3,
-                   languages: %w[ruby_rails])
+                   brake: false, languages: %w[ruby_rails])
     described_class.for(pair: pair, place: place, kind: kind(kind_key),
                         preferences: KindPreferences.new(weights: weights, excluded: excluded),
-                        setting: setting, planned_size: planned_size, languages: languages)
+                        day: described_class::Day.new(setting: setting, planned_size: planned_size, brake: brake),
+                        languages: languages, pair_shares: described_class.shares_a_concept?(pair, languages))
   end
 
   def t(key, **values) = I18n.t("daily_kinds.picker.consequences.#{key}", **values)
@@ -57,6 +58,13 @@ RSpec.describe DailyKindSwap::Consequences do
       expect(warning).to eq([ t(:outgoing_weeks, outgoing: "Code Review", weeks: 8), t(:outgoing_gate) ])
     end
 
+    it "gives no weeks figure while the brake holds, since coverage adds nothing then" do
+      warning = consequences("challenge", planned_size: 2, brake: true).warning
+
+      expect(warning).to eq([ t(:outgoing_braked, outgoing: "Code Review"), t(:outgoing_gate) ])
+      expect(warning.join).not_to include("weeks")
+    end
+
     it "derives the estimate from the coverage constants and the kinds the user has not excluded" do
       stub_const("CoverageException::CAP_WEEKDAYS", 9)
 
@@ -85,7 +93,7 @@ RSpec.describe DailyKindSwap::Consequences do
         .to eq([ t(:outgoing_excluded, outgoing: "Code Review") ])
     end
 
-    it "puts D1 ahead of every size rule when a fourth replaces a fourth" do
+    it "puts a fourth replacing a fourth ahead of every size rule" do
       pair = [ kind("code_review"), kind("plan_review") ]
 
       expect(consequences("ambiguity_hunt", place: 1, pair: pair, setting: 2).warning)

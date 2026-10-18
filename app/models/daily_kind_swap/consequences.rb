@@ -4,20 +4,30 @@ class DailyKindSwap::Consequences
 
   Result = Data.define(:sentences, :warning)
 
-  def self.for(pair:, place:, kind:, preferences:, setting:, planned_size:, languages:)
-    new(pair: pair, place: place, kind: kind, preferences: preferences, setting: setting,
-        planned_size: planned_size, languages: languages).result
+  Day = Data.define(:setting, :planned_size, :brake)
+
+  def self.for(pair:, place:, kind:, preferences:, day:, languages:, pair_shares:)
+    new(pair: pair, place: place, kind: kind, preferences: preferences, day: day,
+        languages: languages, pair_shares: pair_shares).result
   end
 
-  def initialize(pair:, place:, kind:, preferences:, setting:, planned_size:, languages:)
-    @pair         = pair
-    @kind         = kind
-    @outgoing     = pair[place]
-    @proposed     = pair.dup.tap { |kinds| kinds[place] = kind }
-    @preferences  = preferences
-    @setting      = setting
-    @planned_size = planned_size
-    @languages    = languages
+  def self.shares_a_concept?(pair, languages)
+    languages.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys).any? do |language, mode|
+      hosts  = DayHosts.new(language, mode: mode)
+      bucket = ConceptBucket.for(pair.first.key, language)
+      ConceptVocabulary.selectable_for_section(pair.first.key, language, mode: mode)
+        .any? { |concept| pair.all? { |kind| hosts.can_tag?(kind, concept, bucket) } }
+    end
+  end
+
+  def initialize(pair:, place:, kind:, preferences:, day:, languages:, pair_shares:)
+    @kind        = kind
+    @outgoing    = pair[place]
+    @proposed    = pair.dup.tap { |kinds| kinds[place] = kind }
+    @preferences = preferences
+    @day         = day
+    @languages   = languages
+    @pair_shares = pair_shares
   end
 
   def result = Result.new(sentences: sentences, warning: warning)
@@ -35,7 +45,7 @@ class DailyKindSwap::Consequences
   end
 
   def shared_concept
-    line(:shared_concept) if can_share?(@pair) && !can_share?(@proposed)
+    line(:shared_concept) if @pair_shares && !self.class.shares_a_concept?(@proposed, @languages)
   end
 
   def stored_weight
@@ -49,13 +59,14 @@ class DailyKindSwap::Consequences
     line(:excluded_incoming, kind: name(@kind)) if @preferences.excluded?(@kind)
   end
 
-  # Suppression outranks size: neither a larger day nor coverage brings back a kind D1 or an exclusion keeps out.
+  # Suppression outranks size: neither a larger day nor coverage brings back a kind a daily fourth or an exclusion keeps out.
   def warning
     return [ line(:outgoing_one_fourth, outgoing: name(@outgoing), kind: name(@kind)) ] if @outgoing.fourth? && @kind.fourth?
     return [ outgoing_excluded ] if rotation_skips_outgoing?
-    return [] unless two_sections?
-    return [ line(:outgoing_fixed_two, outgoing: name(@outgoing)) ] if @setting == DailyKinds::COUNT
+    return [ line(:outgoing_fixed_two, outgoing: name(@outgoing)) ] if @day.setting == DailyKinds::COUNT
+    return [] unless coverage_day?(brake: false)
     return [ outgoing_excluded ] if @preferences.excluded?(@outgoing)
+    return [ line(:outgoing_braked, outgoing: name(@outgoing)), line(:outgoing_gate) ] unless coverage_day?(brake: @day.brake)
 
     [ line(:outgoing_weeks, outgoing: name(@outgoing), weeks: coverage_weeks), line(:outgoing_gate) ]
   end
@@ -64,30 +75,18 @@ class DailyKindSwap::Consequences
 
   def rotation_skips_outgoing?
     group = ExerciseSection.optional_slots(daily: @proposed).values.find { |kinds| kinds.include?(@outgoing) }
-    @preferences.excluded?(@outgoing) && group.present? && !@preferences.all_excluded?(group)
+    group.present? && !@preferences.eligible(group).include?(@outgoing)
   end
 
-  def two_sections?
-    return @setting == DailyKinds::COUNT if @setting
-
-    @planned_size == DailyKinds::COUNT
+  def coverage_day?(brake:)
+    @day.planned_size.present? &&
+      CoverageException.applies_to_day?(count: @day.planned_size, fixed: @day.setting, brake: brake)
   end
 
-  # Coverage adds at most one kind per CAP_WEEKDAYS + 1 weekdays, each unseen past GAP_WEEKDAYS, so the kinds take turns.
   def coverage_weeks
-    candidates = ExerciseSection.optional_slots(daily: @proposed).values.flatten.count { |kind| !@preferences.excluded?(kind) }
-    weekdays   = [ CoverageException::GAP_WEEKDAYS + 1, (CoverageException::CAP_WEEKDAYS + 1) * candidates ].max
+    candidates = CoverageException.candidate_kinds(daily: @proposed, preferences: @preferences).size
 
-    (weekdays.to_f / WEEKDAYS_PER_WEEK).round
-  end
-
-  def can_share?(pair)
-    @languages.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys).any? do |language, mode|
-      hosts  = DayHosts.new(language, mode: mode)
-      bucket = ConceptBucket.for(pair.first.key, language)
-      ConceptVocabulary.selectable_for_section(pair.first.key, language, mode: mode)
-        .any? { |concept| pair.all? { |kind| hosts.can_tag?(kind, concept, bucket) } }
-    end
+    (CoverageException.expected_gap_weekdays(candidates: candidates).to_f / WEEKDAYS_PER_WEEK).round
   end
 
   def line(key, **values) = I18n.t("daily_kinds.picker.consequences.#{key}", **values)

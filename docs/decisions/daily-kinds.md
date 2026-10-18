@@ -245,7 +245,10 @@ has no control and no control moves onto a rotating card.
 are pure reads of server state, and the `daily-kind-swap` Stimulus
 controller only reveals what they rendered.
 
-- The trigger reads "Swap Code Review". The picker is a fieldset with one
+- The trigger names the card's own kind ("Swap Code Review"). After a swap
+  the card still shows today's kind, so a line under the trigger says what
+  the next set uses there, and the options mark that kind "In your next set"
+  and the card's kind "In today's set". The picker is a fieldset with one
   radio per kind; each radio's `aria-describedby` names the kind's
   `SectionKindGuide` text (the `responses/_kind_guide` partial, which
   `_kind_about` renders too), its disabled reason and its consequences.
@@ -266,7 +269,9 @@ controller only reveals what they rendered.
   won't appear at all, and neither will an excluded kind whose group still
   has a kind turned on. Then, only on a two-section day: a fixed setting of 2
   means the kind won't appear at all; on Automatic, an excluded kind won't
-  appear at all, and any other kind appears about once every N weeks as a
+  appear at all, a braked day (the row's `plan_notes["brake"]`) gets "will
+  rarely appear until your sets grow" with no figure, since the brake blocks
+  coverage, and any other kind appears about once every N weeks as a
   coverage addition, followed by the line that the pair also decides when
   sets grow. N counts the new pair's optional kinds the user hasn't
   excluded; `docs/code-notes/app/models/daily_kind_swap/consequences.md` has

@@ -48,6 +48,8 @@ class DailyExercise < ApplicationRecord
 
   def planned_by_setting? = plan_notes["size_reason"] == "setting"
 
+  def planned_under_brake? = plan_notes["brake"] == true
+
   def daily_kinds = DailyKinds.recorded(plan_notes)
 
   def shared_concept_shown?

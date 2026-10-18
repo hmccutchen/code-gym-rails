@@ -6,7 +6,7 @@
   <%= tag.input type: "radio", form: "daily-kind-swap", name: "daily_kind_#{place}", id: id, value: key,
                 checked: option.now?, disabled: !(option.available? || option.now?), aria: { describedby: described.join(" ") },
                 data: { daily_kind_swap_target: "option", state: option.state } %>
-  <label for="<%= id %>"><%= t("sections.#{key}.name") %><% if option.now? %> <span class="daily-kind-now"><%= t("daily_kinds.picker.now") %></span><% end %></label>
+  <label for="<%= id %>"><%= t("sections.#{key}.name") %><% if option.mark %> <span class="daily-kind-now"><%= option.mark %></span><% end %></label>
   <% if option.note %>
     <p class="hint" id="<%= id %>-note"><%= option.note %></p>
   <% end %>

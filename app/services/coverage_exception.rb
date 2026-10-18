@@ -20,11 +20,19 @@ class CoverageException
     return nil unless applies_to_day?(count: count, fixed: fixed, brake: brake)
     return nil if capped?(history.coverage_dates, today)
 
-    optional   = ExerciseSection.optional_slots(daily: daily).values.flatten
-    gaps       = optional.reject { |kind| preferences.excluded?(kind) }.index_with { |kind| gap(kind, history, today) }
+    gaps       = candidate_kinds(daily: daily, preferences: preferences).index_with { |kind| gap(kind, history, today) }
     candidates = gaps.keys.sort_by { |kind| [ -gaps[kind], history.last_seen.key?(kind.key) ? 1 : 0, ExerciseSection.all.index(kind) ] }
 
     due_check_addition(checks, candidates, hosts) || gap_addition(candidates.first, gaps)
+  end
+
+  def self.candidate_kinds(daily:, preferences:)
+    ExerciseSection.optional_slots(daily: daily).values.flatten.reject { |kind| preferences.excluded?(kind) }
+  end
+
+  # How often one of `candidates` stale kinds recurs once additions take turns: never sooner than the gap, never faster than the cap.
+  def self.expected_gap_weekdays(candidates:)
+    [ GAP_WEEKDAYS + 1, (CAP_WEEKDAYS + 1) * candidates ].max
   end
 
   def self.due_check_addition(checks, candidates, hosts)

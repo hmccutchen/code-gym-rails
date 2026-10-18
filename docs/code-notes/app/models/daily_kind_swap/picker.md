@@ -13,6 +13,15 @@ daily section, so a dropped daily section simply has no control. The place's
 kind is then read from the user's current pair, since a swap made after the
 set was planned changes the next set and not this one.
 
+## The card's kind and the stored kind
+
+A swap changes the next set, so after one the card on screen (the row's
+recorded kind) and the place's stored kind differ. The trigger names the
+card ("Swap Code Review"), a line under it says what the next set uses
+there, and the options mark the stored kind "In your next set" and the
+card's kind "In today's set". When the two agree only "Now" shows, so a
+default account renders as before.
+
 ## Every state comes from `DailyKindSwap`
 
 An option's state is `DailyKindSwap#refusal` for that kind with no version:

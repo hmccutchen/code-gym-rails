@@ -7,11 +7,14 @@ the code is shaped the way it is.
 
 ## Pure, with every input passed in
 
-It takes the pair, the place, the incoming kind, a `KindPreferences`, the size
-setting, today's planned size and the user's language buckets, and reads no
-record. `DailyKindSwap::Picker` gathers those once per card, so one page
-render builds each preferences object once, and the spec drives every case
-without a database.
+It takes the pair, the place, the incoming kind, a `KindPreferences`, a `Day`
+(the size setting, today's planned size and whether the gate's brake held,
+from the row's `plan_notes["brake"]`), the user's language buckets, and
+whether the stored pair can share a concept. It reads no record.
+`DailyKindSwap::Picker` gathers those once per card, including the stored
+pair's sharing answer, which is the same for every option; only the proposed
+pair's answer is computed per option. The spec drives every case without a
+database.
 
 ## Sentences and the warning are separate
 
@@ -24,27 +27,29 @@ each without the browser deciding which is which.
 ## The order of the warning
 
 Suppression comes first. A daily fourth hides its siblings at every size, and
-an excluded outgoing kind that rotation would skip (its group still has a kind
-left on) never comes back either. Neither depends on how many sections the
-day has, so both are checked before the two-section test, and a larger day
-or a coverage addition never contradicts them. When the outgoing kind's
-whole group is excluded, rotation falls back to the group
-(`KindPreferences#eligible`), so it still rotates at three or more sections;
-that case reaches the size checks like any other kind.
+an outgoing kind rotation would skip never comes back either. "Would skip" is
+`!KindPreferences#eligible(group).include?(outgoing)`, the same call rotation
+makes, so its fallback (a wholly excluded group rotates anyway) is not
+restated. Neither depends on how many sections the day has, so both are
+checked before any size rule.
 
-At two sections a fixed setting of 2 is exact (coverage never runs on a fixed
-setting). On Automatic, an excluded outgoing kind is never added by coverage,
-and otherwise the weeks figure applies.
+A fixed setting of 2 is exact (coverage never runs on a fixed setting). Every
+other size question goes to `CoverageException.applies_to_day?`: asked
+without the brake it says whether the day is a two-section Automatic day;
+asked with the row's brake it says whether coverage can add a section at
+all. An excluded outgoing kind is never added by coverage. While the brake
+holds, the copy says the kind will rarely appear until sets grow and gives
+no figure. Otherwise the weeks figure applies.
 
 ## The weeks figure
 
-Coverage adds at most one section per `CAP_WEEKDAYS + 1` weekdays and only
-for a kind unseen past `GAP_WEEKDAYS`, so the candidate kinds take turns. The
-wait for one kind is the larger of `GAP_WEEKDAYS + 1` and
-`(CAP_WEEKDAYS + 1) × candidates`, rounded to weeks of five weekdays. The
-candidates are the new pair's optional kinds the user has not excluded,
-because coverage never adds an excluded kind. Both constants are read from
-`CoverageException`, so the figure follows a change there.
+`CoverageException.expected_gap_weekdays(candidates:)` owns the cadence: the
+larger of `GAP_WEEKDAYS + 1` and `(CAP_WEEKDAYS + 1) × candidates`, and the
+candidates are `CoverageException.candidate_kinds`, the same list `.for`
+picks from. The picker only rounds it to weeks of five weekdays.
+`spec/services/coverage_exception_cadence_spec.rb` runs the real `.for` over
+400 synthetic weekdays and checks the steady recurrence equals that figure
+for several candidate counts.
 
 ## Sharing comes from `DayHosts`
 

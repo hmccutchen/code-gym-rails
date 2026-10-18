@@ -1142,6 +1142,7 @@ RSpec.describe DailyPlan, "the coverage exception" do
     plan = described_class.for(user, language: "ruby_rails")
 
     expect(plan.size.brake?).to be(true)
+    expect(plan.notes).to include("brake" => true)
     expect(plan.coverage).to be_nil
     expect(plan.rotation.values.compact).to eq([])
     expect(plan.waiting_checks.map { |w| w.slice(:concept, :reason) }).to eq([ { concept: "service_boundaries", reason: :no_host } ])

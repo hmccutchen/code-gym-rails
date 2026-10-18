@@ -33,7 +33,8 @@ RSpec.describe "Swapping a daily section kind", type: :request do
     version = user.reload.section_kind_preferences_version
     expect(body["panels"].keys).to eq(%w[0 1])
     expect(body["panels"].values).to all(include(%(data-version="#{version}")))
-    expect(body["panels"]["1"]).to include("Swap Architecture").and include(%(id="daily-kind-1-design_comparison"))
+    expect(body["panels"]["1"]).to include("Swap Design Comparison").and include("Your next set uses #{I18n.t("sections.architecture.name")} here.")
+      .and include(%(id="daily-kind-1-design_comparison"))
     expect(body["panels"]["0"]).to include("Already a daily section")
     expect(exercise.reload.problem_set.keys).to eq(%w[code_review design_comparison])
   end
@@ -88,7 +89,8 @@ RSpec.describe "Swapping a daily section kind", type: :request do
     swap(1, "architecture", version: stale)
 
     expect(body["panels"].keys).to eq(%w[0 1])
-    expect(body["panels"]["0"]).to include("Swap #{I18n.t("sections.pattern.name")}").and include(%(data-version="#{user.reload.section_kind_preferences_version}"))
+    expect(body["panels"]["0"]).to include(%(data-version="#{user.reload.section_kind_preferences_version}"))
+      .and include("Swap Code Review").and include("Your next set uses #{I18n.t("sections.pattern.name")} here.")
 
     swap(1, "design_comparison")
     expect(response).to have_http_status(:unprocessable_content)

@@ -2,12 +2,12 @@
 class DailyKindSwap::Picker
   HINT_UNTIL_SUBMITTED_DAYS = 5
 
-  Option = Data.define(:kind, :state, :note, :consequences) do
+  Option = Data.define(:kind, :state, :note, :consequences, :mark) do
     def now? = state == :now
     def available? = state == :available
   end
 
-  attr_reader :place, :current, :options
+  attr_reader :place, :current, :card_kind, :options, :closed
 
   # Keyed by card: membership in the row's pair, never position, so a dropped daily section moves no control.
   def self.for_day(user, exercise:, response:)
@@ -29,17 +29,16 @@ class DailyKindSwap::Picker
   private_class_method :hint?
 
   def initialize(user, place:, exercise:, hint: false)
-    @user     = user
-    @place    = place
-    @exercise = exercise
-    @hint     = hint
-    @pair     = DailyKinds.for(user)
-    @current  = @pair[place]
-    @closed   = closing_message
-    @options  = @closed ? [] : ExerciseSection.all.map { |kind| option(kind) }
+    @user      = user
+    @place     = place
+    @exercise  = exercise
+    @hint      = hint
+    @pair      = DailyKinds.for(user)
+    @current   = @pair[place]
+    @card_kind = exercise.daily_kinds[place]
+    @closed    = closing_message
+    @options   = @closed ? [] : ExerciseSection.all.map { |kind| option(kind) }
   end
-
-  attr_reader :closed
 
   def hint? = @hint && !@closed
 
@@ -47,6 +46,10 @@ class DailyKindSwap::Picker
 
   def next_set_line
     I18n.t(@user.paused_generation_at? ? "daily_kinds.picker.next_set_paused" : "daily_kinds.picker.next_set")
+  end
+
+  def next_kind_line
+    I18n.t("daily_kinds.picker.next_kind", kind: I18n.t("sections.#{@current.key}.name")) unless @current == @card_kind
   end
 
   private
@@ -61,10 +64,19 @@ class DailyKindSwap::Picker
   def option(kind)
     swap    = DailyKindSwap.new(@user, place: @place, kind: kind.key, version: nil)
     refusal = swap.refusal
-    return Option.new(kind: kind, state: :now, note: nil, consequences: nil) if refusal == :unchanged
-    return Option.new(kind: kind, state: :disabled, note: note(swap, refusal), consequences: nil) if refusal
+    mark    = mark_for(kind)
+    return Option.new(kind: kind, state: :now, note: nil, consequences: nil, mark: mark) if refusal == :unchanged
+    return Option.new(kind: kind, state: :disabled, note: note(swap, refusal), consequences: nil, mark: mark) if refusal
 
-    Option.new(kind: kind, state: :available, note: nil, consequences: consequences(kind))
+    Option.new(kind: kind, state: :available, note: nil, consequences: consequences(kind), mark: mark)
+  end
+
+  def mark_for(kind)
+    if kind == @current
+      I18n.t(@current == @card_kind ? "daily_kinds.picker.now" : "daily_kinds.picker.next_set_mark")
+    elsif kind == @card_kind
+      I18n.t("daily_kinds.picker.today_mark")
+    end
   end
 
   def note(swap, refusal)
@@ -72,9 +84,21 @@ class DailyKindSwap::Picker
   end
 
   def consequences(kind)
-    @preferences ||= KindPreferences.for(@user)
-    DailyKindSwap::Consequences.for(pair: @pair, place: @place, kind: kind, preferences: @preferences,
-                                    setting: @user.daily_section_count, planned_size: @exercise.plan_notes["size"],
-                                    languages: ConceptBucket.language_buckets_for(@user.language))
+    DailyKindSwap::Consequences.for(pair: @pair, place: @place, kind: kind, preferences: preferences, day: day,
+                                    languages: languages, pair_shares: pair_shares?)
+  end
+
+  def preferences = @preferences ||= KindPreferences.for(@user)
+
+  def languages = @languages ||= ConceptBucket.language_buckets_for(@user.language)
+
+  def day
+    @day ||= DailyKindSwap::Consequences::Day.new(setting: @user.daily_section_count, planned_size: @exercise.planned_size,
+                                                  brake: @exercise.planned_under_brake?)
+  end
+
+  def pair_shares?
+    @pair_shares = DailyKindSwap::Consequences.shares_a_concept?(@pair, languages) if @pair_shares.nil?
+    @pair_shares
   end
 end
