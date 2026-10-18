@@ -39,3 +39,13 @@ for that long instead of six minutes.
 The generating poller sizes its attempts from the larger of this window and
 `AiService::JUDGED_GENERATION_BUDGET`, so it keeps polling for the whole
 window.
+
+## `#regeneration_offered?`
+
+The regenerate button's three conditions: the response is not reviewed, the
+day has not already regenerated, and the trial has not ended. The dashboard's
+button reads it, and `DailyKindSwap` reads it plus "nothing submitted" before
+offering its "Want it in today's set?" line, so the two cannot drift. The line
+is stricter than the button on purpose: the button still shows on a submitted
+but unreviewed set, and offering a swap's "apply it today" there would mean
+throwing away submitted work.

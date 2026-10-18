@@ -61,6 +61,11 @@ read it before changing that area.
   re-introduce a global slot list. A default account must stay byte-identical,
   which the prompt, page and request snapshots hold. A daily fourth takes the
   fourth slot out of rotation. `CompetencyGate` reads each day's own pair.
+  `DailyKindSwap` (`PATCH /daily_kinds/:place`) is the one writer of a
+  non-default pair: it refuses a stale version, a repeat, a second fourth or a
+  pair that empties an optional slot, saves under the user-row lock and writes
+  one `DailyKindSwapEvent`. An Exercise mix save keeps a daily kind's stored
+  weight or exclusion (`User#keep_daily_kind_entries`).
 - **Daily sections setting** (`docs/decisions/daily-sections-setting.md`):
   `User#daily_section_count` is Automatic (nil) or a count in
   `User::DAILY_SECTION_COUNTS`. `DaySize.for` returns a fixed count before

@@ -195,7 +195,20 @@ name a provider while holding no keys.
 
 It reads the slot roster from `ExerciseSection.optional_slots` for the
 user's own pair (`DailyKinds.for`), so a future slot that holds several
-kinds needs no edit here. It runs only when the exclusions change. A new pair
-can leave its old slot holding only excluded kinds, and that save still goes
-through: `KindPreferences#eligible` already falls back to the whole slot
-when every kind in it is excluded. Single-kind slots are skipped.
+kinds needs no edit here. It runs when the exclusions or the pair change, and
+reads `#emptied_slots`, which `DailyKindSwap` also asks to name the kinds in
+its refusal. A pair that leaves an optional slot holding only excluded kinds
+is refused, the same as an exclusion that would: rotation would otherwise
+fall back to the excluded kinds (`KindPreferences#eligible`), quietly undoing
+"never show me this". Single-kind slots are skipped.
+
+## `#keep_daily_kind_entries` and the rotatable-kind validations
+
+A daily kind has no Exercise mix row, so the form never posts its weight or
+exclusion. `ProfileController#profile_params` passes every save through
+`#keep_daily_kind_entries`, which merges the stored entries for the current
+daily kinds back in, so a swap can be undone without losing the setting.
+`section_kind_weights_name_rotatable_kinds` and
+`excluded_section_kinds_name_rotatable_kinds` check only the entries a save
+adds or changes against `#rotatable_keys`; a kept entry was valid when it
+was stored and must not refuse an unrelated save.

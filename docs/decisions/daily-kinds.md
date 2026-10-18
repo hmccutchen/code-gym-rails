@@ -159,22 +159,63 @@ be added for a daily kind. Rotation and coverage read only optional slots, so
 a weight or exclusion stored on a kind before it became daily is ignored while
 it is daily.
 
-Keeping that entry across a swap is not built yet. PR 2 or PR 3 has to add
-two things:
+The entry is kept across a swap, so swapping a kind back restores its
+setting:
 
 - The Exercise mix form posts only the rows on screen, and a daily kind has no
-  row there, so the next save overwrites the stored weights and exclusions
-  without the daily kind's entry. The save has to merge stored entries for
-  daily kinds back in.
+  row there. `ProfileController` passes every save through
+  `User#keep_daily_kind_entries`, which merges the stored entries for the
+  current daily kinds back in.
 - `section_kind_weights_name_rotatable_kinds` and
-  `excluded_section_kinds_name_rotatable_kinds` check every stored entry
-  against the current layout. They have to check only the entries a save adds
-  or changes, or a kept entry for a daily kind refuses the save.
+  `excluded_section_kinds_name_rotatable_kinds` check only the entries a save
+  adds or changes, so a kept entry for a daily kind never refuses a save, and
+  a new entry for one still is.
 
-`User#every_slot_keeps_a_kind` runs only when the exclusions change. A new
-pair can therefore leave its old slot with every kind excluded, and the save
-still goes through, because `KindPreferences#eligible` falls back to the whole
-slot in that case.
+`User#every_slot_keeps_a_kind` runs when the exclusions or the pair change. A
+pair that leaves an optional slot with every kind excluded is refused, and
+`DailyKindSwap` names those kinds in its refusal. Without that, rotation would
+fall back to the excluded kinds (`KindPreferences#eligible`) and the user's
+exclusion would stop holding.
+
+## The swap
+
+`PATCH /daily_kinds/:place` (`DailyKindsController#update`) saves one place of
+the pair through `DailyKindSwap`. Under the user-row lock it refuses, in
+order:
+
+1. a place outside `0...COUNT` (`invalid_place`) or an unknown kind
+   (`unknown_kind`);
+2. a posted `section_kind_preferences_version` that is not the stored one
+   (`stale`, answered 409 with the current pair and version);
+3. the kind already in that place (`unchanged`), the other daily kind
+   (`already_daily`), a second fourth kind (`second_fourth`), or a pair that
+   empties an optional slot of everything not excluded (`empties_a_slot`).
+
+Every other refusal is a 422, and none writes anything. A saved swap stores
+the pair (an empty list when it is the default again, so storage stays
+sparse), bumps the preferences version through `User`'s `before_save`, so an
+Exercise mix open elsewhere gets its usual 409, and writes one
+`daily_kind_swaps` row (`DailyKindSwapEvent`). It never touches today's
+exercise, its response, a claim or a provider.
+
+The reply sentence comes from the server: "Saved. This starts with your next
+set.", with the paused wording while `paused_generation_at` is set, and a
+separate `want_it_today` line only while
+`DailyExercise#regeneration_offered?` holds and today's response is not
+submitted. That method is the regenerate button's three conditions (not
+reviewed, not already regenerated, trial not ended); the button reads it too.
+
+`DailyKindSwap.refusal(user, place:, kind:)` answers the pair rules without a
+version, for the card's picker to mark the options it can't offer.
+
+The event's `today_section` is checked in this order: `no_set` (no set
+today), `not_in_set` (today's set does not hold the outgoing kind, as after
+an earlier swap or a judge drop), `submitted`, then `answered` or
+`unanswered` through `DailyResponse#answered?`. `planned_size` copies today's
+`plan_notes["size"]` and stays null for `no_set`, and also for a held set
+planned before `plan_notes` recorded a size. The model is
+`DailyKindSwapEvent` on the `daily_kind_swaps` table, since `DailyKindSwap`
+is the swap itself.
 
 ## The competency gate
 
@@ -215,7 +256,9 @@ them point at a section that is not there. PR 2 either gates them on
 
 - Deploy order: the worker must run this PR's code before any pair other
   than the default can be stored. A worker still on older code writes rows
-  without `daily_kinds`, and those rows read as the default pair.
+  without `daily_kinds`, and those rows read as the default pair. Satisfied:
+  #408 is already on `main`, a release ahead of the swap endpoint, so even a
+  worker one release behind the web service writes the key.
 - Pair-dependent view logic: `api_keys/edit.html.erb` reads
   `DailyKinds.for` four times per render, and
   `dashboard/_level_suggestion.html.erb` decides `in_place` from

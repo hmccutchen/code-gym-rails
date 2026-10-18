@@ -132,9 +132,10 @@ RSpec.describe DailyKindSwap do
       expect_refused(:unknown_kind, kind: "retired_kind")
     end
 
-    it "refuses a page whose preferences version is behind" do
+    it "refuses a page whose preferences version is behind or missing" do
       expect(expect_refused(:stale, version: user.section_kind_preferences_version - 1).message)
         .to eq("Your daily sections changed in another tab. Reload the page to see them.")
+      expect_refused(:stale, version: nil)
     end
 
     it "refuses the kind already in the place, and the other daily kind" do
