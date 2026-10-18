@@ -3,6 +3,8 @@ import request from "code_gym/request"
 
 const CARRIED = "code-gym-save-status-carried";
 const RETRY_DELAYS_MS = [5000, 10000, 20000, 30000];
+const SETTLE_POLL_MS = 200;
+const SETTLE_WAIT_LIMIT_MS = 10000;
 
 const failures = new Map();
 const issued = new Map();
@@ -26,6 +28,12 @@ export function queued(key) {
 
 export function pending() {
   return requests > 0 || [...queues.values()].some((line) => line.busy || line.waiting.length > 0) || probes.some((probe) => probe());
+}
+
+export function reloadWhenSaved(stranded, waited = 0) {
+  if (!pending()) return window.location.reload();
+  if (waited >= SETTLE_WAIT_LIMIT_MS) return stranded();
+  setTimeout(() => reloadWhenSaved(stranded, waited + SETTLE_POLL_MS), SETTLE_POLL_MS);
 }
 
 function render() {
@@ -153,4 +161,4 @@ function reportCarried() {
 
 reportCarried();
 
-export default { save, queue, queued, watch, pending, carry, report, clear };
+export default { save, queue, queued, watch, pending, reloadWhenSaved, carry, report, clear };

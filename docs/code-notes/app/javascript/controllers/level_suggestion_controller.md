@@ -32,8 +32,9 @@ why its failure text says the choice was saved.
 
 A 409 means the stored version or a shown rung moved, so the page is out of
 date and must be read again. Apply and Not now both handle it this way. Reloading over an unfinished save would lose it, so
-`reloadWhenSaved` polls `saveStatus.pending()` first. Past ten seconds it
-stops polling and offers a reload button instead, so a refused proposal can
+`reloadWhenSaved` goes through `saveStatus.reloadWhenSaved`, which waits for
+`saveStatus.pending()` first. Past ten seconds it stops waiting and the card
+offers a reload button instead, so a refused proposal can
 never leave the page stuck with no way forward.
 
 ## No double-wire guard
