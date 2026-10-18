@@ -179,7 +179,7 @@ class ProfileController < ApplicationController
   end
 
   def locked_save?(user_params, posted)
-    !posted.nil? || !shown_steps.nil? || !params[:layout].nil? || LOCKED_KEYS.any? { |key| user_params.key?(key) }
+    !posted.nil? || !shown_steps.nil? || !params[:layout].nil? || (LOCKED_KEYS | PREFERENCE_KEYS).any? { |key| user_params.key?(key) }
   end
 
   def layout_moved?

@@ -59,4 +59,14 @@ RSpec.describe User, "daily section kinds" do
                         excluded_section_kinds: %w[parsons_problem])
     expect(user.keep_unrendered_preferences(name: "Kept")).to eq(name: "Kept")
   end
+
+  it "drops a retired kind's stored entries instead of carrying them into the next save" do
+    user.update_columns(section_kind_weights: { "retired_kind" => 2.0 }, excluded_section_kinds: %w[retired_kind],
+                        section_kind_levels: { "retired_kind" => "senior" }, locked_section_kinds: %w[retired_kind])
+
+    attrs = user.keep_unrendered_preferences(section_kind_weights: {}, excluded_section_kinds: [],
+                                             section_kind_levels: {}, locked_section_kinds: [])
+
+    expect(attrs).to eq(section_kind_weights: {}, excluded_section_kinds: [], section_kind_levels: {}, locked_section_kinds: [])
+  end
 end

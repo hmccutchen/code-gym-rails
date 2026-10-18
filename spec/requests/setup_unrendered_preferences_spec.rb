@@ -16,6 +16,24 @@ RSpec.describe "Exercise mix settings Setup does not render", type: :request do
                                   layout: layout }.to_json, headers: json
   end
 
+  it "merges a save that carries only weights, exclusions or locks under the user-row lock" do
+    user.update!(section_kind_levels: { "architecture" => "senior" })
+    outside = User.connection.open_transactions
+    merged_inside = []
+    allow_any_instance_of(User).to receive(:keep_unrendered_preferences).and_wrap_original do |original, *args|
+      merged_inside << (User.connection.open_transactions > outside)
+      original.call(*args)
+    end
+
+    { section_kind_weights: { "architecture" => 0.5 }, excluded_section_kinds: %w[security_review],
+      locked_section_kinds: %w[architecture] }.each do |field, value|
+      patch profile_path, params: { user: { field => value } }.to_json, headers: json
+
+      expect(response).to have_http_status(:ok), field.to_s
+    end
+    expect(merged_inside).to eq([ true, true, true ])
+  end
+
   it "renders weights for exactly the rotatable kinds and difficulty for exactly the pickable kinds" do
     [ [], %w[code_review plan_review], %w[architecture code_review] ].each do |pair|
       user.update!(daily_section_kinds: pair)

@@ -531,7 +531,8 @@ class User < ApplicationRecord
   def keep_hidden(attrs, field, hidden)
     return unless attrs.key?(field)
 
-    attrs[field] = hidden.is_a?(Hash) ? hidden.merge(attrs[field]) : attrs[field] | hidden
+    known = ExerciseSection.keys
+    attrs[field] = hidden.is_a?(Hash) ? hidden.slice(*known).merge(attrs[field]) : attrs[field] | (hidden & known)
   end
 
   def rotatable_keys

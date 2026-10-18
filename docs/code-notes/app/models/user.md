@@ -217,6 +217,8 @@ while a fourth kind is daily its two siblings have no row at all (D1).
 exclusions for kinds outside `rotatable` and the stored difficulty targets and
 locks for kinds outside `pickable`. A swap can therefore be undone without
 losing any of those settings, and an unrelated save never deletes them.
+Only entries for kinds still in `ExerciseSection.keys` are kept, so a retired
+kind's stored entries drop out on the next save that posts that field.
 `section_kind_weights_name_rotatable_kinds` and
 `excluded_section_kinds_name_rotatable_kinds` check only the entries a save
 adds or changes against `#rotatable_keys`; a kept entry was valid when it

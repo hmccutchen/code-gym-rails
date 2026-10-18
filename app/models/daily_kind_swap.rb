@@ -48,7 +48,7 @@ class DailyKindSwap
 
   def shape_refusal
     return :trial_ended if @user.trial_ended?
-    return :invalid_place unless @place && (0...DailyKinds::COUNT).cover?(@place)
+    return :invalid_place unless DailyKinds.place?(@place)
 
     :unknown_kind unless @kind
   end
@@ -61,10 +61,9 @@ class DailyKindSwap
 
   def save!
     from = current[@place].key
-    keys = proposed.map(&:key)
-    @user.update!(daily_section_kinds: keys == DailyKinds::DEFAULT.map(&:key) ? [] : keys)
+    @user.update!(daily_section_kinds: DailyKinds.stored(proposed.map(&:key)))
     @user.daily_kind_swap_events.create!(place: @place, from_kind: from, to_kind: @kind.key,
-                                         today_section: today_section(from), planned_size: exercise&.plan_notes&.dig("size"),
+                                         today_section: today_section(from), planned_size: exercise&.planned_size,
                                          size_setting: @user.daily_section_count)
   end
 

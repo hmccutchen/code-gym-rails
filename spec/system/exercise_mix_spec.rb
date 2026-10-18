@@ -123,7 +123,7 @@ RSpec.describe "Exercise mix", type: :system do
     expect(user.reload.skill_level).to eq(level)
   end
 
-  it "keeps the page and the unsaved skill level when the save queued behind the swapped-layout reply fails" do
+  it "keeps the page and the unsaved skill level when the save queued behind the swapped-layout reply fails, and still recovers from the next conflict" do
     visit_as(user)
     visit setup_path
     find("#exercise-mix summary").click
@@ -150,6 +150,13 @@ RSpec.describe "Exercise mix", type: :system do
     expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
     expect(find("#skill-level").value).to eq(level)
     expect(user.reload.skill_level).to eq(stored)
+
+    page.execute_script("window.releaseMixSave = null")
+    find("#weight-architecture").set(4)
+    wait_for(5) { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
+    page.execute_script("window.releaseMixSave()")
+    wait_for(5) { page.evaluate_script("window.renderedBeforeSwap === undefined") }
+    expect(page.evaluate_script("window.renderedBeforeSwap === undefined")).to be(true)
   end
 
   it "leaves the reload to the user when a save queued behind the swapped-layout reply never finishes" do

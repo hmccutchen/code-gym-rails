@@ -196,4 +196,6 @@ The reply arrives while a skill level change may still wait behind it on the
 `exercise_mix` line, so the reload goes through `saveStatus.reloadWhenSaved`
 and happens only once that save has landed. If that save fails, or is still
 running after ten seconds, the banner shows `exercise_mix.layout_stranded` and
-the user reloads. `reloading` keeps a second refused save from starting a second wait.
+the user reloads. `reloading` keeps a second refused save from starting a second wait,
+and clears when the banner shows, so a later conflict in the same tab starts
+a new wait.

@@ -50,6 +50,15 @@ RSpec.describe DailyKinds do
     end
   end
 
+  describe ".place? and .stored" do
+    it "accepts only an integer index into the pair, and stores the default pair as empty" do
+      expect((0...described_class::COUNT).map { |place| described_class.place?(place) }).to all(be(true))
+      expect([ -1, described_class::COUNT, "0", nil ].map { |place| described_class.place?(place) }).to all(be(false))
+      expect(described_class.stored(described_class::DEFAULT.map(&:key))).to eq([])
+      expect(described_class.stored(%w[architecture code_review])).to eq(%w[architecture code_review])
+    end
+  end
+
   describe ".conflict" do
     it "names the rule a kind would break beside the others, the one statement the swap and normalize share" do
       expect(described_class.conflict(ExerciseSection::CodeReview, kinds("code_review"))).to eq(:repeat)

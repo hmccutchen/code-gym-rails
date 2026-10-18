@@ -25,6 +25,10 @@ every account plans, prompts and renders exactly as before.
   accepts an empty list, or a list of `COUNT` key strings that `.normalize`
   leaves unchanged. The rules about which pairs are allowed are therefore
   stated once, in `.normalize`, and validation can't drift from them.
+- `DailyKinds.place?(n)` says whether `n` names a daily place, and
+  `DailyKinds.stored(keys)` gives a pair's stored form, `[]` for the default
+  pair. The swap and its event row ask them, so neither restates the range or
+  the sparse storage rule.
 - `DailyKinds::DEFAULT` reads `ExerciseSection.default_daily`, so the
   registry never depends on `DailyKinds`.
 
