@@ -57,14 +57,20 @@ start, so a slow pickup comes out of the same budget.
   preparation spends time too. A draft that no longer fits ends the run
   before any request, releases the claim and leaves today's set, shown as a
   timeout. `#judged_generation_provider(deadline)` passes the deadline to
-  `#judge_section` and `#retry_section`, so `JudgedGeneration` needs no
-  change. A judge that can't start is a fallback that keeps the draft (reason
-  `deadline`, kept apart from `timeout` so queue delay doesn't read as a slow
-  judge). A retry reserves its re-judge too: it starts only when its own
-  worst case plus a judge's still fits, through `GenerationDeadline#leaving`,
-  so a retry never starts without room for the judge that checks it. A
-  retry that can't start
-  returns nil and drops that section. The draft reserves only itself, since a
+  `#judge_section` and `#retry_section`. A judge that can't start is a
+  fallback that keeps the draft (reason `deadline`, kept apart from `timeout`
+  so queue delay doesn't read as a slow judge). A retry reserves its re-judge
+  too: it starts only when its own worst case plus a judge's still fits,
+  through `GenerationDeadline#leaving`. A retry that can't start returns nil
+  and drops that section. The reservation can still come up short, since
+  logging the retry's usage and ingesting it (formatting its code included)
+  run between the two calls. So when the deadline stops a retry's re-judge,
+  `JudgedGeneration#rejudge` drops the section rather than keep it: a retry
+  replaces a section the judge already rejected, and shipping it unchecked
+  would undo that rejection. No further retry starts. Any other re-judge
+  fallback still keeps the retry, as before: a provider failure on the
+  judge is rare and says nothing about the section, while a deadline stop
+  is the expected result of a slow run. The draft reserves only itself, since a
   draft whose judge can't start still ships. The sections already kept land,
   since throwing away a judged day over one late retry costs more than one
   dropped section. If nothing is left, `AllSectionsRejectedError` keeps
@@ -200,7 +206,9 @@ section stands unedited, `fallback` records the reason from
 `invalid_json`, `refusal`, `timeout`, `deadline` when a regeneration's
 deadline left no time to start the call, the shared error code, or
 `http_<status>` when the provider refused the request itself), and
-`[judge_fallback]` warns. Provider errors carry the response's HTTP status
+`[judge_fallback]` warns. The one exception is a retry's re-judge stopped by
+the deadline, which drops the section (see the regeneration deadline above).
+Provider errors carry the response's HTTP status
 (`AiService::Error#http_status`); authentication and rate-limit errors keep
 their own codes. The judge is never retried. The review prose
 judge reads the same table, so the two judges' fallback rates compare.

@@ -40,6 +40,8 @@ class AiService
     def initialize(purpose = nil)
       super("The generation deadline left no time for a #{purpose || "further"} call.")
     end
+
+    FALLBACK_REASON = "deadline".freeze
   end
 
   class AllSectionsRejectedError < Error
@@ -769,7 +771,7 @@ class AiService
     when TruncatedResponseError                              then "truncated"
     when InvalidResponseError                                then "invalid_json"
     when RefusalError                                        then "refusal"
-    when DeadlineError                                       then "deadline"
+    when DeadlineError                                       then DeadlineError::FALLBACK_REASON
     when TimeoutError, Timeout::Error                        then "timeout"
     else                                                          http_status_code_for(error) || error_code_for(error)
     end

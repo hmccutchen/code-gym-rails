@@ -35,7 +35,8 @@ read it before changing that area.
   claim (`DailyExercise::REGENERATION_DEADLINE`; the claim window adds
   `WRITE_MARGIN` for the write after the last call): `#call_and_log` starts
   no call unless its worst case ends in time, a retry also reserves its
-  re-judge, a late retry drops only its section, and kept sections land.
+  re-judge, a late retry or a retry whose re-judge the deadline stops drops
+  only its section, and kept sections land.
   `JudgeVerdict.parse` is the boundary, and evidence is deliberately not
   matched against the section text. A rejection buys
   `DailyPlan::Result#judge_retries` retries (two for a daily kind, one

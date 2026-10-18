@@ -5126,6 +5126,31 @@ RSpec.describe AiService, "#generate_judged_exercise" do
         .to raise_error(AiService::DeadlineError)
       expect(purposes).not_to include("retry_section")
     end
+
+    it "drops a retried section whose re-judge the deadline stops, rather than shipping it unchecked" do
+      now = [ start ]
+      ends_at = start + 1.hour
+      allow(ProblemSetIngest).to receive(:call).and_wrap_original do |original, *args, **kwargs|
+        original.call(*args, **kwargs).tap do
+          now[0] = ends_at - AiService.worst_case_seconds_for("judge_section") + 1 if kwargs[:expected_keys] == [ "code_review" ]
+        end
+      end
+      allow_any_instance_of(FakeService).to receive(:judge_section).and_wrap_original do |original, user, kind, section, **options|
+        next original.call(user, kind, section, **options) unless kind == ExerciseSection::CodeReview && now.first == start
+
+        verdict({ "status" => "reject", "principle" => "underdetermined", "evidence" => "x", "reason" => "r" }, kind)
+      end
+
+      judged = FakeService.new("fake-key").generate_judged_exercise(
+        user, language: "ruby_rails", deadline: GenerationDeadline.new(ends_at, clock: -> { now.first })
+      )
+
+      expect(purposes.count("retry_section")).to eq(1)
+      expect(judged.problem_set).not_to have_key("code_review")
+      expect(judged.dropped_sections).to include("code_review")
+      expect(judged.outcomes["code_review"]).to include(dropped: true, fallback: "deadline", retries: 1)
+      expect(judged.outcomes["design_comparison"]).to include(status: :keep, fallback: nil)
+    end
   end
 
   it "keeps a set the judge keeps, with every section still present and stamped" do
