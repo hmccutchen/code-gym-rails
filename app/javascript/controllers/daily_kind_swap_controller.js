@@ -27,6 +27,7 @@ export default class extends Controller {
     this.choose()
     const checked = this.optionTargets.find((option) => option.checked)
     if (checked) checked.focus()
+    else this.cancelTarget.focus()
   }
 
   close() {
@@ -73,7 +74,8 @@ export default class extends Controller {
 
     this.setBusy(true)
     const kind = chosen.value
-    const result = await saveStatus.queue("daily_kind_swap", "PATCH", this.urlValue, () => this.body(kind))
+    const result = await saveStatus.queue(`daily_kind_swap:${this.urlValue}`, "PATCH", this.urlValue, () => this.body(kind),
+      { line: "daily_kind_swap" })
     this.busy = false
     if (result && result.ok && result.data) return this.saved(result.data)
     if (result && result.status === 409 && result.data) return this.refreshStale(result.data)

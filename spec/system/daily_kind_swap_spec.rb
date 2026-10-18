@@ -183,6 +183,30 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
   end
 
+  it "keeps one card's failure showing after the other card saves, until that card saves" do
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.swapCalls = 0;
+      window.fetch = (url, options) => {
+        if (!url.includes("/daily_kinds/")) return originalFetch(url, options);
+        window.swapCalls += 1;
+        if (window.swapCalls > 1) return originalFetch(url, options);
+        return new Promise((resolve) => { window.releaseSwap = () => resolve(new Response("unavailable", { status: 503 })); });
+      };
+    JS
+    confirm_swap(0, "challenge")
+    confirm_swap(1, "pattern")
+    release_swap
+
+    expect(page).to have_css("#daily-kind-swap-panel-1[data-current='pattern']")
+    expect(page).to have_css("#save-status", visible: :visible)
+    expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
+
+    confirm_swap(0, "challenge")
+    expect(page).to have_css("#daily-kind-swap-panel-0[data-current='challenge']")
+    expect(page).to have_no_css("#save-status", visible: :visible)
+  end
+
   it "keeps Confirm disabled while a swap is on its way, whatever radio is chosen" do
     hold_swap_replies
     confirm_swap(0, "challenge")
@@ -233,6 +257,21 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(trigger["aria-expanded"]).to eq("false")
     expect(page.evaluate_script("document.activeElement.classList.contains('daily-kind-trigger')")).to be(true)
     expect(find("#daily-kind-0-code_review", visible: :all)).to be_checked
+  end
+
+  it "opens an ended trial's empty picker onto Cancel, and Escape closes it" do
+    allow_any_instance_of(User).to receive(:trial_ended?).and_return(true)
+    refresh
+    wait_for_js
+    trigger = within(panel(0)) { find("button.daily-kind-trigger") }
+    trigger.send_keys(:enter)
+
+    expect(page).to have_css("#daily-kind-0-picker", visible: :visible, text: I18n.t("daily_kinds.swap.refused.trial_ended"))
+    expect(page.evaluate_script("document.activeElement.textContent")).to eq("Cancel")
+    page.driver.with_playwright_page { |pw| pw.keyboard.press("Escape") }
+
+    expect(page).to have_css("#daily-kind-0-picker", visible: :hidden)
+    expect(page.evaluate_script("document.activeElement.classList.contains('daily-kind-trigger')")).to be(true)
   end
 
   it "confirms a keyboard choice with Enter on Confirm" do

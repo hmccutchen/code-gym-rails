@@ -13,7 +13,10 @@ attribute is the server's answer too.
 
 ## Swaps go one at a time through `CodeGymSaveStatus.queue`
 
-Every card's controller queues on the one `daily_kind_swap` line. Two
+Every card's controller queues on the one `daily_kind_swap` line, under a
+status key of its own (`daily_kind_swap:<url>`). The shared line keeps the
+swaps in order; the separate keys keep one card's failure in the banner
+when the other card's swap then saves, until the failed card saves. Two
 confirms in quick succession, on two cards or after changing the radio on
 one, would otherwise post the same version: the second would get a 409, and
 `save` would drop the first reply even though that swap was saved. The body
@@ -31,6 +34,9 @@ panel for this card anyway, the controller clears its busy state itself, so
 Cancel and Confirm never stay disabled.
 
 ## Failures
+
+An ended trial's picker has no radios, so opening it focuses Cancel, which
+sits inside the fieldset, so Escape still closes it.
 
 A failure shows in the shared `#save-status` banner like every other save on
 the page. On a refusal or a request that never got a usable reply, the
