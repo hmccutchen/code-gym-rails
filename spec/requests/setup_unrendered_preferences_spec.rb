@@ -51,6 +51,39 @@ RSpec.describe "Exercise mix settings Setup does not render", type: :request do
     expect(user.locked_section_kinds).to eq(%w[ambiguity_hunt])
   end
 
+  it "refuses a mix save from a page rendered for an old pair even after a track reply gave it the current version" do
+    user.update!(section_kind_weights: { "ambiguity_hunt" => 2.0 })
+    user.update!(daily_section_kinds: %w[code_review plan_review])
+    rendered = DailyKinds.for(user.reload).map(&:key)
+    swap(1, "design_comparison")
+    patch profile_path, params: { user: { skill_level: "senior" } }.to_json, headers: json
+    version = JSON.parse(response.body).fetch("section_kind_preferences_version")
+
+    patch profile_path, params: { user: { section_kind_weights: {}, excluded_section_kinds: [], section_kind_levels: {},
+                                          locked_section_kinds: [], section_kind_preferences_version: version },
+                                  layout: rendered }.to_json, headers: json
+
+    expect(response).to have_http_status(:conflict)
+    expect(JSON.parse(response.body)).to include("layout_changed" => true)
+    expect(user.reload.section_kind_weights).to eq("ambiguity_hunt" => 2.0)
+  end
+
+  it "syncs only the exclusions Setup shows, so a daily kind's dormant exclusion never disables its difficulty controls" do
+    user.update!(excluded_section_kinds: %w[challenge])
+    swap(1, "challenge")
+    stale = user.reload.section_kind_preferences_version - 1
+
+    patch profile_path, params: { user: { section_kind_weights: {}, section_kind_preferences_version: stale },
+                                  layout: DailyKinds.for(user).map(&:key) }.to_json, headers: json
+    expect(response).to have_http_status(:conflict)
+    expect(JSON.parse(response.body)).to include("layout_changed" => false)
+    expect(JSON.parse(response.body).dig("current", "excluded_section_kinds")).to eq([])
+
+    patch profile_path, params: { user: { skill_level: "senior" } }.to_json, headers: json
+    expect(JSON.parse(response.body).dig("preferences", "excluded_section_kinds")).to eq([])
+    expect(user.reload.excluded_section_kinds).to eq(%w[challenge])
+  end
+
   it "tells a stale page whether it was rendered for another pair, so it reloads instead of saving with missing controls" do
     rendered = DailyKinds.for(user).map(&:key)
     stale = user.section_kind_preferences_version
