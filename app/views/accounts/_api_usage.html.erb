@@ -1,0 +1,31 @@
+<%# Required locals: totals (ApiUsage.own_key_totals rows), since (the period's first moment). %>
+<div class="api-usage">
+  <h2><%= t("accounts.api_usage.heading") %></h2>
+  <% since_day = since.strftime("%B %-d") %>
+  <% if totals.empty? %>
+    <p><%= t("accounts.api_usage.empty", since: since_day) %></p>
+  <% else %>
+    <p><%= t("accounts.api_usage.intro", since: since_day) %></p>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col"><%= t("accounts.api_usage.provider") %></th>
+          <th scope="col"><%= t("accounts.api_usage.requests") %></th>
+          <th scope="col"><%= t("accounts.api_usage.input_tokens") %></th>
+          <th scope="col"><%= t("accounts.api_usage.output_tokens") %></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% totals.each do |total| %>
+          <tr>
+            <td><%= AiProvider.label(total.provider) %></td>
+            <td><%= number_with_delimiter(total.requests) %></td>
+            <td><%= number_with_delimiter(total.input_tokens) %></td>
+            <td><%= number_with_delimiter(total.output_tokens) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <p><%= t("accounts.api_usage.note") %></p>
+  <% end %>
+</div>

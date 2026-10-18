@@ -3,7 +3,10 @@ class AccountsController < ApplicationController
   skip_before_action :require_provider
 
   # GET /account
-  def show; end
+  def show
+    @usage_since = Time.current.in_time_zone(current_user.effective_time_zone).beginning_of_month
+    @usage_totals = ApiUsage.own_key_totals(current_user, since: @usage_since)
+  end
 
   # DELETE /account
   def destroy

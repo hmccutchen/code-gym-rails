@@ -11,6 +11,15 @@ provider: `TrialMode.providers` lists those with a data notice to consent
 to and a house key set (Gemini, Claude and OpenAI), and none under the kill
 switch.
 
+**Trials are paused (October 2026).** The login page no longer links to
+`/trial/start`, so nobody finds a trial without being sent the link. The
+routes, invite codes and house-key gates are unchanged, and an existing
+trial runs to its end. The open question is cost: on a paid house key the
+app pays for every trial call, and Gemini's free tier is one shared pool
+too small for a group starting their day at once. Restoring the link (and
+the `sessions.new.trial_link` copy) reopens trials. Until then, the Account
+page's monthly usage table shows own-key accounts what they send.
+
 **Two ways in.** `/trial/start` is public: an email, the code, a
 provider and the consent checkbox. It checks the code (`#available?`)
 before mailing anything, mails a login code through the same

@@ -13,6 +13,14 @@
   .reminder-nudges label { display: flex; align-items: flex-start; gap: .5rem;
                            color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
   .reminder-nudges input[type="checkbox"] { margin-top: .2rem; flex: none; }
+  .api-usage { margin-top: 2.5rem; }
+  .api-usage h2 { font-size: 1rem; margin-bottom: .4rem; }
+  .api-usage p { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
+  .api-usage table { width: 100%; border-collapse: collapse; font-size: .85rem; margin-bottom: .75rem; }
+  .api-usage th, .api-usage td { padding: .4rem .5rem; border-bottom: 1px solid var(--border); text-align: right; }
+  .api-usage th:first-child, .api-usage td:first-child { text-align: left; padding-left: 0; }
+  .api-usage th { color: var(--muted); font-weight: normal; }
+  .api-usage td { font-variant-numeric: tabular-nums; }
   .danger-zone { margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 2rem; }
   .danger-zone h2 { font-size: 1rem; color: var(--red); margin-bottom: .4rem; }
   .danger-zone p { color: var(--muted); font-size: .85rem; margin-bottom: 1rem; }
@@ -42,6 +50,8 @@
   </div>
 
   <%= render "accounts/push_reminders" if WebPushCredentials.configured? %>
+
+  <%= render "accounts/api_usage", totals: @usage_totals, since: @usage_since %>
 
   <div class="danger-zone">
     <h2><%= t("accounts.show.danger_heading") %></h2>

@@ -25,7 +25,12 @@ read it before changing that area.
   entered. `ProviderCredential.for` picks the key, `TrialAllowance.check!`
   runs before every house-key call, and generation, judges and mastery code
   never read trial state (`trial_isolation_spec`); trial branches render only
-  for `User#on_trial?`.
+  for `User#on_trial?`. Trials are paused: the login page carries no trial
+  link, while the routes and gates stay in place.
+- **Account usage table**: `/account` shows this calendar month's own-key
+  requests and tokens per provider from `ApiUsage.own_key_totals`, in the
+  user's zone. House-key rows stay out, since the account's key did not pay
+  for them. Input counts cache reads and writes; no cost is shown.
 - **Emailed-code auth**: No passwords and no links. `User#generate_login_code!`
   mints a 6-digit code, stores a BCrypt digest, and returns the raw code for
   the mailer; `User.authenticate_login_code` verifies it against the stored

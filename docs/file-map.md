@@ -113,6 +113,7 @@ What each listed file does.
 - `app/controllers/concerns/json_errors.rb` — `render_json_error`: the one shape of a JSON error reply
 - `app/views/shared/_push_script.html.erb` — mounts the `push-launch` controller, which re-subscribes on launch through `app/javascript/code_gym/push.js`; rendered from the layout for a signed-in user when push is configured
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
+- `app/views/accounts/_api_usage.html.erb` — the Account page's table of this month's own-key requests and tokens per provider, from `ApiUsage.own_key_totals`
 - `app/views/pwa/service-worker.js.erb` — shows the notification, with the versioned icon. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing
 - `app/services/schema_wait.rb` — blocks the worker's Railway pre-deploy step until the schema the Solid Queue supervisor boots against exists; waits rather than migrating, so migrations keep exactly one owner
 - `app/services/preview_environment.rb` — single authority for "is this a Railway PR deployment," derived from `PREVIEW_APP`
