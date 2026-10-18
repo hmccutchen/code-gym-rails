@@ -94,7 +94,8 @@ read it before changing that area.
   the order vary. The fourth-track lines render only when the fourth kind is
   requested, so a retry never names an absent key, and a line comparing
   with another section (`code_review`, `pattern`) renders only when
-  `alongside:` holds it; `generation_prompt_pair_coverage_spec` renders every
+  `alongside:` (the kinds requested together, so a retry passes none) holds
+  it; `generation_prompt_pair_coverage_spec` renders every
   reachable pair to hold both.
   `generation_prompt_section_names_spec` fails on "third section" and the
   like in any prompt snapshot or any Ruby file under `app/` or `lib/`.

@@ -25,13 +25,13 @@ class ExerciseSection::SecurityReview < ExerciseSection
   end
 
   def self.broader_vocabulary_owner(alongside)
-    named = %w[code_review pattern] & alongside
+    named = [ ExerciseSection::CodeReview.key, ExerciseSection::Pattern.key ] & alongside
     named.any? ? "#{named.join("/")}'s" : "another section's"
   end
   private_class_method :broader_vocabulary_owner
 
   def self.snippet_bar(alongside)
-    alongside.include?("code_review") ? " — the same bar as code_review's snippet" : ""
+    alongside.include?(ExerciseSection::CodeReview.key) ? " — the same bar as #{ExerciseSection::CodeReview.key}'s snippet" : ""
   end
   private_class_method :snippet_bar
 

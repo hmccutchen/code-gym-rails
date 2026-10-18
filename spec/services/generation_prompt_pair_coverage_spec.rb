@@ -1,15 +1,17 @@
 require "rails_helper"
 
-# A swapped pair can leave any kind out of a day, so a prompt line naming another section must only render beside it.
+# Each pair renders index-wise rotations, not every combination, and every kind's retry; mentions are checked against the schema.
 RSpec.describe "Generation prompt over every reachable daily pair" do
+  # ConceptGuidance's idiom line names a kind's answer shape, not a sibling section; kept on purpose (kind-named-prompt-sections.md).
+  KIND_IDIOM_PHRASES = [ "The challenge section is the exception" ].freeze
+
   let(:user) { User.new(email: "pairs@example.com", name: "Pairs", skill_level: "junior", focus_areas: []) }
-  let(:section_keys) { ExerciseSection.keys }
 
   def reachable_pairs
-    ExerciseSection.all.combination(2).reject { |pair| pair.count(&:fourth?) > 1 }
+    ExerciseSection.all.combination(DailyKinds::COUNT).select { |pair| DailyKinds.problems_with(pair.map(&:key)).empty? }
   end
 
-  def rotations_for(pair)
+  def index_wise_rotations(pair)
     slots = ExerciseSection.optional_slots(daily: pair)
     widest = slots.values.map(&:size).max
 
@@ -32,28 +34,27 @@ RSpec.describe "Generation prompt over every reachable daily pair" do
   end
 
   def instructions(prompt)
-    prompt.split("Return JSON matching this schema exactly:").first
+    text = prompt.split("Return JSON matching this schema exactly:").first
+    KIND_IDIOM_PHRASES.reduce(text) { |stripped, phrase| stripped.gsub(phrase, "") }
   end
 
   def named_sections(prompt)
-    instructions(prompt).scan(/"(\w+)"/).flatten.uniq & section_keys
+    instructions(prompt).scan(/"(\w+)"/).flatten.uniq & ExerciseSection.keys
   end
 
-  def absent_mentions(prompt, present)
+  def absent_mentions(prompt)
     text = instructions(prompt)
-    mentions = []
-    mentions << "the code review" if present.exclude?("code_review") && text.match?(/code review's|code_review's|from the code review/)
-    mentions << "pattern's vocabulary" if present.exclude?("pattern") && text.include?("pattern's broader vocabulary")
-    mentions
+    (ExerciseSection.keys - schema_keys(prompt)).flat_map do |key|
+      [ key, key.tr("_", " ") ].uniq.filter_map { |name| text[/\b#{Regexp.escape(name)}('s| section)\b/i] }
+    end
   end
 
   def each_render
     DailyExercise::LANGUAGES.each do |language|
       reachable_pairs.each do |pair|
-        rotations_for(pair).each do |rotation|
-          kinds = ExerciseSection.for_plan(daily: pair, rotation: rotation)
+        index_wise_rotations(pair).each do |rotation|
           yield render(pair, rotation, language), "#{language} #{pair.map(&:key)} #{rotation.compact}"
-          kinds.each do |kind|
+          ExerciseSection.for_plan(daily: pair, rotation: rotation).each do |kind|
             yield render(pair, rotation, language, only: kind), "#{language} #{pair.map(&:key)} retry #{kind.key}"
           end
         end
@@ -61,22 +62,23 @@ RSpec.describe "Generation prompt over every reachable daily pair" do
     end
   end
 
-  it "names only sections that are in the prompt's own schema" do
+  def offenders_for
     offenders = []
     each_render do |prompt, label|
-      missing = named_sections(prompt) - schema_keys(prompt)
-      offenders << "#{label}: #{missing.join(', ')}" if missing.any?
+      found = yield(prompt)
+      offenders << "#{label}: #{found.join(', ')}" if found.any?
     end
+    offenders
+  end
+
+  it "names only sections that are in the prompt's own schema" do
+    offenders = offenders_for { |prompt| named_sections(prompt) - schema_keys(prompt) }
 
     expect(offenders).to be_empty, offenders.first(5).join("\n")
   end
 
-  it "compares against code_review or pattern only on a day that has them" do
-    offenders = []
-    each_render do |prompt, label|
-      mentions = absent_mentions(prompt, schema_keys(prompt))
-      offenders << "#{label}: #{mentions.join(', ')}" if mentions.any?
-    end
+  it "compares with a section only when it is in the prompt's own schema" do
+    offenders = offenders_for { |prompt| absent_mentions(prompt) }
 
     expect(offenders).to be_empty, offenders.first(5).join("\n")
   end
@@ -89,11 +91,20 @@ RSpec.describe "Generation prompt over every reachable daily pair" do
                               "the same bar as code_review's snippet")
   end
 
-  it "covers every reachable pair in both languages" do
-    count = 0
-    each_render { count += 1 }
+  it "leaves the code-review overlap out of a design_comparison retry, which requests no code_review alongside it" do
+    prompt = render(DailyKinds::DEFAULT, { pattern: :pattern, third: :challenge, fourth: nil }, "ruby_rails",
+                    only: ExerciseSection::DesignComparison)
 
-    expect(reachable_pairs.size).to eq(42)
-    expect(count).to be > 42 * DailyExercise::LANGUAGES.size * 2
+    expect(prompt).not_to include("the same as the code review's")
+  end
+
+  it "reports a comparison with a section the prompt does not hold" do
+    prompt = "- Match the challenge's difficulty.\nReturn JSON matching this schema exactly:\n{\n  \"pattern\": {\n"
+
+    expect(absent_mentions(prompt)).to eq([ "challenge's" ])
+  end
+
+  it "covers at least the pairs the registry offered when this spec was written, in both languages" do
+    expect(reachable_pairs.size).to be >= 42
   end
 end

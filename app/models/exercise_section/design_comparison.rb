@@ -217,7 +217,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
     end
 
     def code_review_overlap_line(alongside)
-      return "" unless alongside.include?("code_review")
+      return "" unless alongside.include?(ExerciseSection::CodeReview.key)
 
       "\n- When this section's concept is the same as the code review's, test it through a choice between two working designs " \
         "in a different scenario from the code review, never by restating a defect to find."

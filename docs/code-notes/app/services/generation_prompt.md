@@ -73,6 +73,8 @@ had its labels truncated mid-word (issue #164).
 
 Forwards the code-review mode to every kind. Only `CodeReview` reads it, which
 `generation_prompt_spec` pins at every language, mode and rung, so no kind
-branch is needed here. `alongside:` is the other kinds in the same request,
-so a kind's guidance can leave out a comparison with a section the request
-does not hold; a retry passes none.
+branch is needed here. `alongside:` is the other kinds requested with this
+one, not the day's kinds, so a kind's guidance can leave out a comparison
+with a section the request does not hold. A single-section retry passes
+none, so a `design_comparison` retry drops its code-review overlap line even
+on a day with a code review; `generation_prompt_pair_coverage_spec` pins it.

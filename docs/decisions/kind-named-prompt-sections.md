@@ -34,13 +34,28 @@ snippet line ends at "not a contrived toy example", and the vocabulary line
 names only the kinds present, or "another section's" when neither is. On a
 default day only the vocabulary line changed, where `pattern` was not
 planned: it now says "code_review's" instead of "code_review/pattern's".
-`generation_prompt_pair_coverage_spec` renders every reachable pair in both
-languages, with each optional slot's kinds and an empty rotation, plus a
-single-section retry for every kind in each, and fails when a prompt names a
-quoted section key its schema lacks or compares against an absent
-`code_review` or `pattern`.
+`alongside:` is the kinds requested together, not the day's kinds, so a
+single-section retry passes none: a `design_comparison` retry leaves the
+overlap line out even on a day that has a code review, the same way a retry
+leaves out the fourth-section lines.
 
-The concept-group lines in `GenerationPrompt::ConceptGuidance` still list
-how each kind expresses a concept ("a pattern, which shows no code…", "The
-challenge section is the exception…"). They describe a kind's idiom, not
-another section of the same day, so they stay as they are.
+`generation_prompt_pair_coverage_spec` takes every pair `DailyKinds` accepts
+(`DailyKinds.problems_with` empty), renders each in both languages with
+index-wise rotations (each optional slot's first kind, then its second, and
+so on, plus an empty rotation, not every combination) and a single-section
+retry of every kind in each. It fails when the instruction text names a
+quoted section key the schema lacks, or names any kind's key or label
+followed by "'s" or " section" when that kind is not in the schema.
+
+**Idiom lines kept on purpose.** The concept-group lines in
+`GenerationPrompt::ConceptGuidance` describe how each kind expresses a
+concept, not a sibling section of the same day: "a code_review tagged
+reading_for_intent plants…", "A challenge tagged separating_symptom_from_cause
+states…", "Where no code is shown (pattern)…", "a pattern, which shows no
+code, describes…", "a design_comparison shows…" and "The challenge section is
+the exception to the answer shape, since its answer is code". They render on
+every day because a concept may land on any kind that hosts it. Only the last
+matches the spec's "<kind> section" check, so it is the one named exception
+(`KIND_IDIOM_PHRASES`). Its wording reads like a reference to a sibling
+section, and a later change may reword it, for example to "When the challenge
+kind hosts this concept…".
