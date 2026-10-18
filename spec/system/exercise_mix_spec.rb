@@ -123,7 +123,7 @@ RSpec.describe "Exercise mix", type: :system do
     expect(user.reload.skill_level).to eq(level)
   end
 
-  it "keeps the page and the unsaved skill level when the save queued behind the swapped-layout reply fails, and still recovers from the next conflict" do
+  it "keeps the page and the unsaved skill level when the save queued behind the swapped-layout reply fails, and through a repeated conflict" do
     visit_as(user)
     visit setup_path
     find("#exercise-mix summary").click
@@ -151,12 +151,38 @@ RSpec.describe "Exercise mix", type: :system do
     expect(find("#skill-level").value).to eq(level)
     expect(user.reload.skill_level).to eq(stored)
 
-    page.execute_script("window.releaseMixSave = null")
+    page.execute_script("window.releaseMixSave = null; window.CodeGymSaveStatus.clear('exercise_mix')")
     find("#weight-architecture").set(4)
     wait_for(5) { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
     page.execute_script("window.releaseMixSave()")
-    wait_for(5) { page.evaluate_script("window.renderedBeforeSwap === undefined") }
-    expect(page.evaluate_script("window.renderedBeforeSwap === undefined")).to be(true)
+
+    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"), wait: 5)
+    expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
+    expect(find("#skill-level").value).to eq(level)
+  end
+
+  it "keeps the page when another control's save failed before the swapped-layout reply arrived" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    page.execute_script(<<~JS)
+      window.renderedBeforeSwap = true;
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (body.includes('"time_zone"')) return Promise.resolve(new Response("", { status: 503 }));
+        return send(url, options);
+      };
+    JS
+
+    find("#tz-select").select(I18n.t("api_keys.edit.time_zones.hawaii"))
+    expect(page).to have_css("#save-status:not([hidden])", wait: 5)
+    user.update!(daily_section_kinds: %w[code_review challenge])
+    find("#weight-architecture").set(0)
+
+    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"), wait: 5)
+    expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
+    expect(find("#tz-select").value).to eq("Pacific/Honolulu")
   end
 
   it "leaves the reload to the user when a save queued behind the swapped-layout reply never finishes" do
