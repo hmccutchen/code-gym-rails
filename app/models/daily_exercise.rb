@@ -59,6 +59,10 @@ class DailyExercise < ApplicationRecord
     ExerciseSection.resolved_keys(problem_set, daily: daily_kinds)
   end
 
+  def regeneration_offered?(response)
+    !(response&.persisted? && response.reviewed?) && regenerated_at.nil? && !user.trial_ended?
+  end
+
   def with_response_locked
     transaction do
       lock!

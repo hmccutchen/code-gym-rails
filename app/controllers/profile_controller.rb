@@ -275,6 +275,6 @@ class ProfileController < ApplicationController
     %i[section_kind_weights section_kind_levels display_preferences].each do |key|
       permitted[key] = permitted[key].to_h if permitted.key?(key)
     end
-    permitted
+    current_user.keep_daily_kind_entries(permitted.to_h)
   end
 end

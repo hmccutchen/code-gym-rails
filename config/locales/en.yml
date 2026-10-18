@@ -439,6 +439,19 @@ en:
     setup_link: "Change the mix"
   save_status:
     generic: "Couldn't save your last change. It hasn't reached the server — check your connection and try again."
+  daily_kinds:
+    swap:
+      saved: "Saved. This starts with your next set."
+      saved_paused: "Saved. This starts with your next set. Generation is paused, so that's the next set you generate or the first one after you resume."
+      want_it_today: "Want it in today's set? Generate a new set. This replaces every answer you've typed so far."
+      refused:
+        invalid_place: "That daily section doesn't exist."
+        unknown_kind: "That section kind doesn't exist."
+        stale: "Your daily sections changed in another tab. Reload the page to see them."
+        unchanged: "That kind is already in this daily section."
+        already_daily: "That kind is already a daily section."
+        second_fourth: "Only one of %{kinds} can be a daily section."
+        empties_a_slot: "You turned off %{kinds} in Exercise mix, so this swap would leave that group with nothing to rotate. Turn one of them back on first."
   daily_sections:
     legend: "Daily sections"
     automatic: "Automatic"

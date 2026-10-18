@@ -12,9 +12,7 @@
       <p class="hint"><%= t("dashboard.exercise.reviewed") %></p>
     <% elsif exercise.regenerated_at.present? %>
       <p class="hint"><%= t("dashboard.exercise.already_regenerated") %></p>
-    <% elsif current_user.trial_ended? %>
-      <%# Nothing: an ended trial cannot regenerate, the banner says so, and #regenerate refuses it too. %>
-    <% else %>
+    <% elsif exercise.regeneration_offered?(response) %>
       <% has_progress = response.persisted? && (response.submitted? || response.answers.values.any?(&:present?)) %>
       <% confirm_msg = has_progress ?
            t("dashboard.exercise.regenerate_confirm_with_progress") :
@@ -24,6 +22,8 @@
             form: { data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore",
                             loading_form_label_value: t("dashboard.generating_label"),
                             loading_form_confirm_message_value: confirm_msg } } %>
+    <% else %>
+      <%# Nothing: an ended trial cannot regenerate, the banner says so, and #regenerate refuses it too. %>
     <% end %>
   </div>
 
