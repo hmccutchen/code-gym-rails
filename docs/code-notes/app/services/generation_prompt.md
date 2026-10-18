@@ -73,4 +73,6 @@ had its labels truncated mid-word (issue #164).
 
 Forwards the code-review mode to every kind. Only `CodeReview` reads it, which
 `generation_prompt_spec` pins at every language, mode and rung, so no kind
-branch is needed here.
+branch is needed here. `alongside:` is the other kinds in the same request,
+so a kind's guidance can leave out a comparison with a section the request
+does not hold; a retry passes none.

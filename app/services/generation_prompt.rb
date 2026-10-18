@@ -229,11 +229,12 @@ class GenerationPrompt
 
   def sections_guidance(kinds, rungs)
     kinds.map { |kind|
-      generation_guidance_for(kind, mode: @plan.code_review_mode, source: @plan.code_review_source, rung: rungs[kind])
+      generation_guidance_for(kind, mode: @plan.code_review_mode, source: @plan.code_review_source, rung: rungs[kind],
+                                    alongside: (kinds - [ kind ]).map(&:key))
     }.join("\n")
   end
 
-  def generation_guidance_for(kind, mode:, source:, rung:)
+  def generation_guidance_for(kind, mode:, source:, rung:, alongside:)
     language_config = config
 
     kind.generation_guidance(
@@ -243,7 +244,8 @@ class GenerationPrompt
       artifact:       language_config[:schema_artifact],
       test_framework: language_config[:test_framework],
       source:         source,
-      rung:           rung
+      rung:           rung,
+      alongside:      alongside
     )
   end
 end
