@@ -7,10 +7,14 @@ class GenerationDeadline
     @clock   = clock
   end
 
-  def ensure_fits!(purpose)
-    return if @ends_at.nil? || @clock.call + AiService.worst_case_seconds_for(purpose) <= @ends_at
+  def ensure_fits!(request)
+    return if @ends_at.nil? || @clock.call + request.worst_case_seconds <= @ends_at
 
-    raise AiService::DeadlineError, purpose
+    raise AiService::DeadlineError, request.purpose
+  end
+
+  def leaving(seconds)
+    @ends_at.nil? ? self : self.class.new(@ends_at - seconds, clock: @clock)
   end
 
   NONE = new(nil)

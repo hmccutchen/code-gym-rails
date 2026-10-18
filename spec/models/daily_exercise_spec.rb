@@ -270,11 +270,6 @@ RSpec.describe DailyExercise, type: :model do
 
       expect(DailyExercise::REGENERATION_DEADLINE.to_i).to eq(first_pass + DailyExercise::JOB_PICKUP_MARGIN.to_i)
     end
-
-    it "keeps the deadline at 1,187 s, the figure the decision doc quotes, until the doc is updated with it" do
-      expect(DailyExercise::REGENERATION_DEADLINE.to_i).to eq(1_187)
-    end
-
     it "still holds a claim taken seven minutes ago, past the old six-minute window" do
       held = exercise(regenerating_since: 7.minutes.ago)
 

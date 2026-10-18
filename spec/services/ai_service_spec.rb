@@ -4843,7 +4843,7 @@ RSpec.describe AiService, "#judge_section" do
   it "sends the section, its concept, rung, lock state and the kind's task, and never another section or history" do
     svc = FakeService.new("fake-key")
     captured = nil
-    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **options| captured = args.last; m.call(*args, **options) }
 
     svc.judge_section(user, ExerciseSection::CodeReview, section, rung: "senior", locked: true)
 
@@ -4861,7 +4861,7 @@ RSpec.describe AiService, "#judge_section" do
   it "asks the provider for a reply shaped by the kind's verdict schema" do
     svc = FakeService.new("fake-key")
     captured = nil
-    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **options| captured = args.last; m.call(*args, **options) }
 
     svc.judge_section(user, ExerciseSection::Pattern, section, rung: "senior", locked: false)
 
@@ -4875,7 +4875,7 @@ RSpec.describe AiService, "#judge_section" do
   it "never sends the design comparison's answer key, and asks for its blind solve" do
     svc = FakeService.new("fake-key")
     captured = nil
-    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **options| captured = args.last; m.call(*args, **options) }
     comparison = { "title" => "Rates", "scenario" => "A carrier a month.", "question" => "Which fits?",
                    "piece_a" => "class A; end", "piece_b" => "class B; end", "concept" => "open_closed",
                    "answer_key" => { "better" => "b", "deciding_fact" => "SECRET", "principle" => "SECRET",
@@ -4903,7 +4903,7 @@ RSpec.describe AiService, "#judge_section" do
   it "never sends the ambiguity hunt's answer key" do
     svc = FakeService.new("fake-key")
     captured = nil
-    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **options| captured = args.last; m.call(*args, **options) }
     hunt = { "request" => "Build a leaderboard", "question" => "q", "teaching_note" => "t", "concept" => "scope_creep", "planted_ambiguities" => [ "SECRET" ] }
 
     svc.judge_section(user, ExerciseSection::AmbiguityHunt, hunt, rung: "junior", locked: false)
@@ -4914,7 +4914,7 @@ RSpec.describe AiService, "#judge_section" do
   it "never sends the server's own stamps, and still sends the current schema" do
     svc = FakeService.new("fake-key")
     captured = nil
-    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **options| captured = args.last; m.call(*args, **options) }
     stamped = section.merge("eased" => true, "source" => "excerpt-trace-id",
                             "current_schema" => "create_table :orders do |t|")
 
@@ -4929,7 +4929,7 @@ RSpec.describe AiService, "#judge_section" do
     def judge_prompt_for(kind)
       svc = FakeService.new("fake-key")
       captured = nil
-      allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
+      allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **options| captured = args.last; m.call(*args, **options) }
       svc.judge_section(user, kind, section.except("pitched_at"), rung: "senior", locked: false)
       captured.prompt
     end
@@ -5105,7 +5105,8 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       service = FakeService.new("fake-key")
       draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false)
       now = [ start ]
-      deadline = GenerationDeadline.new(start + AiService.worst_case_seconds_for("retry_section"), clock: -> { now.first })
+      retry_and_judge = AiService.worst_case_seconds_for("retry_section") + AiService.worst_case_seconds_for("judge_section")
+      deadline = GenerationDeadline.new(start + retry_and_judge, clock: -> { now.first })
       allow(service).to receive(:retry_ladders).and_wrap_original do |original, *args|
         original.call(*args).tap { now[0] = start + 1 }
       end
@@ -5113,6 +5114,16 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       expect { service.send(:retry_section, user, "ruby_rails", draft, ExerciseSection::Pattern, "service_objects", deadline: deadline) }
         .to raise_error(AiService::DeadlineError)
       expect(service).to have_received(:retry_ladders)
+      expect(purposes).not_to include("retry_section")
+    end
+
+    it "starts a retry only when its re-judge fits after it, so a retried section is never shipped unjudged" do
+      service = FakeService.new("fake-key")
+      draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false)
+      retry_alone = GenerationDeadline.new(Time.current + AiService.worst_case_seconds_for("retry_section"))
+
+      expect { service.send(:retry_section, user, "ruby_rails", draft, ExerciseSection::Pattern, "service_objects", deadline: retry_alone) }
+        .to raise_error(AiService::DeadlineError)
       expect(purposes).not_to include("retry_section")
     end
   end
@@ -5220,7 +5231,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     end
     svc = FakeService.new("fake-key")
     prompts = []
-    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original { |m, *args| prompts << args.last.prompt; m.call(*args) }
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original { |m, *args, **options| prompts << args.last.prompt; m.call(*args, **options) }
 
     svc.generate_judged_exercise(user, language: "ruby_rails")
 
@@ -5244,12 +5255,12 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     generate_calls = 0
     svc = FakeService.new("fake-key")
-    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args|
+    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args, **options|
       if args.last.purpose == "generate_exercise"
         generate_calls += 1
         { text: draft.to_json, input_tokens: 0, output_tokens: 0 }
       else
-        m.call(*args)
+        m.call(*args, **options)
       end
     end
 
@@ -5276,12 +5287,12 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     generate_calls = 0
     svc = FakeService.new("fake-key")
-    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args|
+    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args, **options|
       if args.last.purpose == "generate_exercise"
         generate_calls += 1
         { text: draft.to_json, input_tokens: 0, output_tokens: 0 }
       else
-        m.call(*args)
+        m.call(*args, **options)
       end
     end
 
@@ -5310,13 +5321,13 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     prompts = []
     generate_calls = 0
     svc = FakeService.new("fake-key")
-    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args|
+    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args, **options|
       if args.last.purpose == "generate_exercise"
         generate_calls += 1
         prompts << args.last.prompt
         { text: draft.to_json, input_tokens: 0, output_tokens: 0 }
       else
-        m.call(*args)
+        m.call(*args, **options)
       end
     end
 
@@ -5455,12 +5466,12 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       kind == ExerciseSection::Pattern ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
     end
     timeouts = {}
-    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args|
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **options|
       request = args.last
       if %w[generate_exercise retry_section].include?(request.purpose)
         timeouts[request.purpose] = request.read_timeout
       end
-      m.call(*args)
+      m.call(*args, **options)
     end
 
     FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
@@ -5545,11 +5556,11 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     draft = FakeService::EXERCISE_PROBLEM_SET.deep_dup
     draft["design_comparison"]["other_piece"] = ""
     retry_prompts = []
-    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args|
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **options|
       next { text: draft.to_json, input_tokens: 0, output_tokens: 0 } if args.last.purpose == "generate_exercise"
 
       retry_prompts << args.last.prompt if args.last.purpose == "retry_section"
-      m.call(*args)
+      m.call(*args, **options)
     end
     allow(Rails.logger).to receive(:warn)
 
@@ -5576,11 +5587,11 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     end
     svc = FakeService.new("fake-key")
     drafted = false
-    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args|
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **options|
       raise AiService::RateLimitError, "slow down" if drafted
 
       drafted = true
-      m.call(*args)
+      m.call(*args, **options)
     end
     allow(Rails.logger).to receive(:warn)
 
@@ -5615,10 +5626,10 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     end
     svc = FakeService.new("fake-key")
     drafted = false
-    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args|
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **options|
       raise AiService::RateLimitError, "slow down" if drafted
       drafted = true
-      m.call(*args)
+      m.call(*args, **options)
     end
     allow(Rails.logger).to receive(:warn)
     expect(Rails.logger).to receive(:warn).with(/judge_retry_failed/).at_least(:once)
@@ -5784,7 +5795,7 @@ RSpec.describe AiService, "#judge_review_prose" do
 
   def captured_call
     captured = nil
-    allow(service).to receive(:call_and_log).and_wrap_original { |m, *args| captured = args.last; m.call(*args) }
+    allow(service).to receive(:call_and_log).and_wrap_original { |m, *args, **options| captured = args.last; m.call(*args, **options) }
     service.judge_review_prose(user, ExerciseSection::CodeReview, review, coach: "Rails")
     captured
   end
@@ -5835,6 +5846,14 @@ RSpec.describe AiService, "REVIEW_PROSE_JUDGE_SYSTEM_PROMPT" do
     expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).not_to match(/needless hedging|names more than one thing/)
     expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include("Keep how sure each claim is")
       .and include("Keep every topic a next step names")
+  end
+end
+
+RSpec.describe AiService, ".judged_on?" do
+  it "judges a weekday's set and leaves a weekend's single-stage" do
+    expect(described_class.judged_on?(Date.new(2026, 10, 16))).to be(true)
+    expect(described_class.judged_on?(Date.new(2026, 10, 17))).to be(false)
+    expect(described_class.judged_on?(Date.new(2026, 10, 18))).to be(false)
   end
 end
 

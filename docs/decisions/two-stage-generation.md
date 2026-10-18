@@ -23,8 +23,10 @@ spinner on the dashboard, which is why `dashboard/_generating` polls for
 A weekend "generate anyway" set stays on the single-stage path.
 
 **Regeneration is judged on a weekday, under a deadline.**
-`RegenerateExerciseJob` calls `#generate_judged_exercise` on a weekday and
-`#generate_unjudged_exercise` at a weekend, matching first generation.
+`RegenerateExerciseJob` calls `#generate_judged_exercise` on a day
+`AiService.judged_on?` and `#generate_unjudged_exercise` otherwise, the same
+predicate first generation asks, so the two can't disagree on which days are
+judged.
 Regeneration is the way to get a saved pair of daily kinds into today, so it
 should not ship sections first generation would have rejected. A judged day
 can take `JUDGED_GENERATION_BUDGET`, 2,302 s, and a claim window that long
@@ -34,29 +36,39 @@ start, so a slow pickup comes out of the same budget.
 
 - **The deadline** is `DailyExercise::REGENERATION_DEADLINE`: one worst-case
   draft plus one worst-case judge plus `JOB_PICKUP_MARGIN`, 946 + 181 + 60 =
-  1,187 s, about 20 minutes. A slow but working provider still gets one
-  judged answer. `REGENERATION_STALE_AFTER` adds `WRITE_MARGIN` (60 s) for
-  the work after the last call, 1,247 s in all, up from 1,006 s.
-- **The rule.** Before each provider call, the deadline checks that the
-  call's own worst case (`AiService.worst_case_seconds_for` its purpose)
-  still ends in time, and raises `AiService::DeadlineError`, a
-  `TimeoutError`, if it doesn't. Checking the worst case rather than the
-  clock alone makes the deadline a ceiling on the job: a call begun just
-  before it can't overrun.
-- **What a stop costs.** The draft check runs in `AiService`'s draft path,
-  after the plan, history, ladders and prompt are built and just before the
-  call, since that preparation spends time too. A draft that no longer fits
-  ends the run before any request, releases the claim and leaves today's set,
-  shown as a timeout. `#judge_section` and `#retry_section` make the same
-  check after building their own requests (a retry loads ladders and renders
-  a prompt first). `#judged_generation_provider(deadline)` passes the
-  deadline to both, so `JudgedGeneration` needs no change: a judge that can't
-  start is a fallback that keeps the draft (reason `deadline`, kept apart
-  from `timeout` so queue delay doesn't read as a slow judge), and a retry
-  that can't start returns nil and drops that section. The sections already kept land, since
-  throwing away a judged day over one late retry costs more than one dropped
-  section. If nothing is left, `AllSectionsRejectedError` keeps today's set,
-  and the job says the new set failed its quality check.
+  1,187 s, about 20 minutes. When the job starts within the pickup margin,
+  that is room for one draft and one judge even if both run to their worst
+  case. A slower pickup, or a draft that runs long, can leave too little for
+  the judge; the draft then ships unjudged with judge fallback `deadline`,
+  as any judge failure keeps the draft. `REGENERATION_STALE_AFTER` adds
+  `WRITE_MARGIN` (60 s) for the work after the last call, 1,247 s in all, up
+  from 1,006 s.
+- **The rule.** `AiService#call_and_log` takes the deadline and checks it
+  first, before the trial allowance and before any request is sent: the
+  call's own worst case (`AiService::Request#worst_case_seconds`, retries
+  included) must still end in time, or it raises `AiService::DeadlineError`,
+  a `TimeoutError`. The worst case comes from the request itself, so a
+  blocking request reserves its shorter read and not the profile's. It shares
+  one formula with `AiService.worst_case_seconds_for`, which the constants
+  above use. Checking the worst case rather than the clock alone makes the
+  deadline a ceiling on the job: a call begun just before it can't overrun.
+- **What a stop costs.** Because the check sits in `call_and_log`, it runs
+  after the plan, history, ladders and prompt are built, since that
+  preparation spends time too. A draft that no longer fits ends the run
+  before any request, releases the claim and leaves today's set, shown as a
+  timeout. `#judged_generation_provider(deadline)` passes the deadline to
+  `#judge_section` and `#retry_section`, so `JudgedGeneration` needs no
+  change. A judge that can't start is a fallback that keeps the draft (reason
+  `deadline`, kept apart from `timeout` so queue delay doesn't read as a slow
+  judge). A retry reserves its re-judge too: it starts only when its own
+  worst case plus a judge's still fits, through `GenerationDeadline#leaving`,
+  so a retry never starts without room for the judge that checks it. A
+  retry that can't start
+  returns nil and drops that section. The draft reserves only itself, since a
+  draft whose judge can't start still ships. The sections already kept land,
+  since throwing away a judged day over one late retry costs more than one
+  dropped section. If nothing is left, `AllSectionsRejectedError` keeps
+  today's set, and the job says the new set failed its quality check.
 - **What it costs.** A weekday regeneration makes one draft call plus one
   judge call per section (two to four), and up to two retries and re-judges
   per rejected daily kind or one per rotated kind, all within the deadline.

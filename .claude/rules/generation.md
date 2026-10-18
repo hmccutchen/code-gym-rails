@@ -29,11 +29,13 @@ read it before changing that area.
 - **Two-stage generation** (`docs/decisions/two-stage-generation.md`): Weekday
   generation, regeneration included, drafts a set, then `JudgedGeneration`
   judges each section: keep, edit prose (`.prose_fields` only, never code or
-  the planted defect) or reject. Weekend sets stay single-stage.
+  the planted defect) or reject; `AiService.judged_on?` names the judged days,
+  for both jobs. Weekend sets stay single-stage.
   `RegenerateExerciseJob` runs under a `GenerationDeadline` measured from its
   claim (`DailyExercise::REGENERATION_DEADLINE`; the claim window adds
-  `WRITE_MARGIN` for the write after the last call): no call starts unless its worst case ends in time, a late retry
-  drops only its section, and kept sections land.
+  `WRITE_MARGIN` for the write after the last call): `#call_and_log` starts
+  no call unless its worst case ends in time, a retry also reserves its
+  re-judge, a late retry drops only its section, and kept sections land.
   `JudgeVerdict.parse` is the boundary, and evidence is deliberately not
   matched against the section text. A rejection buys
   `DailyPlan::Result#judge_retries` retries (two for a daily kind, one

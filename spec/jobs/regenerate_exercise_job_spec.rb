@@ -444,8 +444,21 @@ RSpec.describe RegenerateExerciseJob, type: :job do
       described_class.new.perform(user_id: user.id)
 
       expect(fake_service).to have_received(:generate_unjudged_exercise)
+        .with(user, hash_including(deadline: an_instance_of(GenerationDeadline)))
       expect(fake_service).not_to have_received(:generate_judged_exercise)
     end
+  end
+
+  it "asks AiService which days are judged rather than deciding itself" do
+    claimed_exercise
+    fake_service = stub_provider({ "code_review" => { "question" => "new" } })
+    allow(fake_service).to receive(:generate_unjudged_exercise).and_return(unjudged({ "code_review" => { "question" => "new" } }))
+    allow(AiService).to receive(:judged_on?).and_return(false)
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(AiService).to have_received(:judged_on?).with(Date.current)
+    expect(fake_service).to have_received(:generate_unjudged_exercise)
   end
 
   it "hands the provider a deadline measured from the claim, not from when the job started" do
