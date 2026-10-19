@@ -475,6 +475,21 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
   end
 
+  it "leaves focus in an answer the reader moved to while a swap reply was on its way" do
+    hold_swap_replies
+    confirm_swap(1, "pattern")
+    area = find(%(textarea[data-field="code_review"]))
+    area.click
+    page.driver.with_playwright_page { |pw| pw.keyboard.type("Typed while the swap was saving") }
+    release_swap
+
+    expect(page).to have_css("#daily-kind-swap-panel-1[data-current='pattern']")
+    expect(page.evaluate_script(%(document.activeElement.matches('textarea[data-field="code_review"]')))).to be(true)
+    expect(area.value).to include("Typed while the swap was saving")
+    page.driver.with_playwright_page { |pw| pw.keyboard.type(" and after") }
+    expect(area.value).to include("Typed while the swap was saving and after")
+  end
+
   it "holds the review poll's reload while a swap has failed, and reloads once it saves" do
     response = DailyResponse.create!(user: user, daily_exercise: user.daily_exercises.sole, date: Date.current, submitted_at: Time.current,
                                      reviewing_since: Time.current, answers: { "code_review" => "Submitted with enough detail to count." },

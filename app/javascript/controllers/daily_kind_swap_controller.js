@@ -2,6 +2,8 @@
 import { Controller } from "@hotwired/stimulus"
 import saveStatus from "code_gym/save_status"
 
+let lastConfirmed = null
+
 export default class extends Controller {
   static targets = ["panel", "trigger", "picker", "option", "summary", "confirm", "cancel", "status", "reply"]
 
@@ -31,19 +33,20 @@ export default class extends Controller {
     else this.close()
   }
 
-  open() {
+  open(focus = true) {
     this.pickerTarget.hidden = false
     this.triggerTarget.setAttribute("aria-expanded", "true")
     this.choose()
+    if (!focus) return
     const checked = this.optionTargets.find((option) => option.checked)
     if (checked) checked.focus()
     else this.cancelTarget.focus()
   }
 
-  close() {
+  close(focus = true) {
     this.pickerTarget.hidden = true
     this.triggerTarget.setAttribute("aria-expanded", "false")
-    this.triggerTarget.focus()
+    if (focus) this.triggerTarget.focus()
   }
 
   cancel() {
@@ -82,11 +85,14 @@ export default class extends Controller {
     const chosen = this.chosen()
     if (this.busy || !chosen || chosen.dataset.state !== "available") return
 
+    lastConfirmed = this
     this.setBusy(true)
     const kind = chosen.value
     const result = await saveStatus.queue(this.statusKey, "PATCH", this.urlValue, () => this.body(kind),
       { line: "daily_kind_swap" })
     this.busy = false
+    const before = document.activeElement
+    this.replyMayFocus = this.element.contains(before) || ((!before || before === document.body) && lastConfirmed === this)
     this.attempted = result && result.ok ? null : kind
     if (result && result.ok && result.data) return this.saved(result.data)
     if (result && result.status === 409 && result.data) return this.refreshStale(result.data)
@@ -98,8 +104,12 @@ export default class extends Controller {
   reopenWith(kind) {
     const submitted = this.optionTargets.find((option) => option.value === kind)
     if (submitted && submitted.dataset.state === "available") submitted.checked = true
-    this.open()
-    if (!this.confirmTarget.disabled) this.confirmTarget.focus()
+    this.open(this.replyMayFocus)
+    if (this.replyMayFocus && !this.confirmTarget.disabled) this.confirmTarget.focus()
+  }
+
+  get statusKey() {
+    return `daily_kind_swap:${this.urlValue}`
   }
 
   // Read when the queue sends it, so a swap queued behind another posts the version that one's reply left.
@@ -112,19 +122,15 @@ export default class extends Controller {
     if (!this.replacePanels(data.panels)) this.leaveCards()
     this.announce(data.message, data.want_it_today, data.want_it_today_link)
     if (data.set_changed) this.replyTarget.append(this.paragraph(data.set_changed))
-    this.triggerTarget.focus()
+    if (this.replyMayFocus) this.triggerTarget.focus()
   }
 
   leaveCards() {
     this.setBusy(false)
-    this.close()
+    this.close(this.replyMayFocus)
   }
 
   // Another tab changed the pair or the mix, so the picker reopens on the stored pair before the reader tries again.
-  get statusKey() {
-    return `daily_kind_swap:${this.urlValue}`
-  }
-
   refreshStale(data) {
     if (this.replacePanels(data.panels)) return this.settleStale()
 
@@ -133,17 +139,20 @@ export default class extends Controller {
   }
 
   settleStale() {
-    if (this.reconcile()) return this.close()
+    if (this.reconcile()) return this.close(this.replyMayFocus)
 
-    this.open()
+    this.open(this.replyMayFocus)
   }
 
   replacePanels(panels) {
     const mine = this.panelTarget
+    const focused = document.activeElement
+    const holder = focused?.closest(".daily-kind-swap-panel")?.id
     Object.entries(panels || {}).forEach(([place, html]) => {
       const panel = document.getElementById(`daily-kind-swap-panel-${place}`)
       if (panel) panel.outerHTML = html
     })
+    if (holder && holder !== mine.id && !focused.isConnected) document.querySelector(`#${holder} .daily-kind-trigger`)?.focus()
     return !mine.isConnected
   }
 

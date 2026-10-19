@@ -90,3 +90,15 @@ never starts a regeneration itself.
 Each radio names `form="daily-kind-swap"`, an empty form outside the answer
 form, so the day's submit never posts it. Its `change` event still bubbles to
 `answer-form`, which ignores anything without `data-field`.
+
+## A reply moves focus only if focus was the card's
+
+A reply can arrive long after Confirm, when the reader is typing an answer.
+So when a reply arrives, the card notes where focus is. It may move focus
+(to its trigger, its reopened picker or Confirm) only if focus was inside
+this card, or nowhere because this card's own Confirm was disabled for the
+save it last sent (`lastConfirmed`). Otherwise focus stays where the reader
+put it. If a reply replaces another card's panel that held focus, the
+replacement would drop it, so `replacePanels` moves it to that card's new
+trigger. Opening and closing the picker by hand always focus as before.
+
