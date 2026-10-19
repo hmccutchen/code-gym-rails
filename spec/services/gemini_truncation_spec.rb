@@ -33,6 +33,31 @@ RSpec.describe "Gemini truncation through AiService" do
     expect(ApiUsage.last).to have_attributes(tokens_in: 21, tokens_out: 56)
   end
 
+  describe "an interaction that did not finish" do
+    def logged_call(**options)
+      service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p", **options))
+    end
+
+    %w[failed cancelled queued in_progress requires_action unknown].each do |status|
+      it "rejects status #{status.inspect} after recording billed usage, even when partial prose is allowed" do
+        reply_with(status: status, text: "Unfinished prose")
+
+        expect {
+          expect { logged_call(allow_truncated: true) }
+            .to raise_error(AiService::Error, "Gemini did not complete its response. Try again.")
+        }.to change { ApiUsage.where(purpose: "duck_thread", failure: "provider_error").count }.by(1)
+
+        expect(ApiUsage.last).to have_attributes(tokens_in: 21, tokens_out: 56)
+      end
+    end
+
+    it "accepts a reply with no status, as before" do
+      reply_with(status: nil, text: "A reply")
+
+      expect(logged_call[:text]).to eq("A reply")
+    end
+  end
+
   describe "the thinking partner, which accepts a partial reply" do
     let(:exercise) do
       DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,

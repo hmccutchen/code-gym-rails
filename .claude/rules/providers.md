@@ -82,7 +82,8 @@ read it before changing that area.
   truncation as data and `AiService#call_and_log` decides it is fatal after
   writing the usage row: Claude `stop_reason == "max_tokens"`, Gemini status
   `incomplete`, OpenAI `incomplete` unless the reason is `content_filter` (a
-  refusal). A request with `allow_truncated` set, which only the
+  refusal). Any other status from Gemini or OpenAI is an error, raised after
+  the usage row too. A request with `allow_truncated` set, which only the
   `duck_thread` profile does, shows partial prose. Auth errors go
   through `AiService#raise_if_key_rejected` and never log the provider body.
 - **What a person is told when a provider fails**
