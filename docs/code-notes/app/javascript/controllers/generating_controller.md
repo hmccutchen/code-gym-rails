@@ -34,6 +34,6 @@ than deriving one.
 ## The reload waits for other saves
 
 On the submitted dashboard the review poll shares the page with the daily
-cards' swaps. Its reload goes through `saveStatus.leaveWhenSaved`; while
-another save is pending or has failed, it polls again instead, so it reloads
-once that save lands.
+cards' swaps. Its reload goes through `saveStatus.leaveWhenSaved`. While
+another save is pending or has failed, the leave is held and stays armed, so
+the page reloads once that save lands.

@@ -35,7 +35,7 @@ export default class extends Controller {
     if (this.stopped) return
 
     if (data?.status === "ready" || data?.status === "failed") {
-      saveStatus.leaveWhenSaved(() => window.location.reload(), () => this.schedule())
+      saveStatus.leaveWhenSaved(() => window.location.reload(), () => {})
       return
     }
 

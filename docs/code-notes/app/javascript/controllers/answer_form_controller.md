@@ -98,13 +98,17 @@ other card's, or a save that failed and is waiting for a retry; leaving
 would drop it. When nothing is pending and no other key has a failure,
 `settled` resolves at once, so a normal submit leaves as before.
 
-When the gate holds a submit, the server already has the answers, so
-`holdAfterSubmit` sets `submitHeld` and unlocks the form without starting a
-draft autosave; `autoSave` and `sendSave` do nothing from then on. Submit
-stays enabled, and pressing it again is safe, because a repeated submit
-returns the existing review URL and goes through the gate again. The
-autosave reloads set `submitHeld` too, since the page is about to leave and
-its drafts no longer apply. The `answers` and `submit` keys are ignored,
+Each of those leaves goes through `leaveWhenOtherSavesLand`, which sets
+`submitHeld` first, so `autoSave` and `sendSave` do nothing from then on: the
+page is about to leave, and the server would ignore an edit to a submitted
+response or one for a replaced set. When the gate holds, `holdForOtherSaves`
+puts the form in one held state. Every answer, rating and section control is
+`inert`, so no edit can be made and then dropped, while each section's
+summary and the daily cards' swap rows stay usable, so the save that blocks
+the page can be retried. Submit is disabled, and a notice with a Reload
+button explains the wait. The leave stays armed in `save_status`: once the
+retried save lands, the held submit goes on to the review, and a held
+autosave reload reloads. The `answers` and `submit` keys are ignored,
 because the submit carries every answer. `docs/code-notes/app/javascript/code_gym/save_status.md`
 lists which paths use the gate and which deliberately don't.
 

@@ -327,6 +327,8 @@ en:
       submit_offline: "You're offline, so your answers weren't submitted. They're kept on this device; submit again once you're back online."
       stale_reloaded: "The set changed, so that last change wasn't saved. This is the current set — your saved work is still there."
       review_start_failed: "Your answers were saved, but the review couldn't start. Start it again with the button below your answers."
+      leave_held: "Another change on this page hasn't saved, so the page waits for it before moving on. Your answers can't be edited now, since the server already has them or has a newer set. Retry the change above, or reload now."
+      reload_now: "Reload now"
       controls_not_ready: "Part of this page didn't finish loading, so your answers weren't submitted. Reload the page and submit again."
   learn:
     preparing_limited: "You've started several write-ups in the last hour. Try again later."

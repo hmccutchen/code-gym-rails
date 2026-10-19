@@ -248,8 +248,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     submit_one_answer
     release_swap
 
-    expect(page).to have_css("#save-status", visible: :visible)
-    expect(page).to have_button("Submit answers", disabled: false)
+    expect_held
     sleep 1.5
     expect(page.evaluate_script("window.swapPage")).to be(true)
     expect(page.evaluate_script("window.CodeGymSaveStatus.pending()")).to be(false)
@@ -258,10 +257,36 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(find("#daily-kind-1-pattern")).to be_checked
     within("#daily-kind-1-picker") { click_button "Confirm" }
     release_swap
-    expect(page).to have_css("#daily-kind-swap-panel-1[data-current='pattern']")
-    click_button "Submit answers"
     expect(page).to have_content("✓ Submitted", wait: 10)
     expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
+  end
+
+  def expect_held
+    expect(page).to have_css("#save-status", visible: :visible)
+    expect(page).to have_css("#leave-held", text: I18n.t("dashboard.exercise.leave_held"))
+    expect(page).to have_css("#leave-held button", text: I18n.t("dashboard.exercise.reload_now"))
+    expect(page).to have_button("Submit answers", disabled: true)
+  end
+
+  it "keeps answers read-only while a submit is held, so no edit is silently dropped" do
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.fetch = (url, options) => url.includes("/daily_kinds/")
+        ? Promise.resolve(new Response("unavailable", { status: 503 }))
+        : originalFetch(url, options);
+    JS
+    confirm_swap(1, "pattern")
+    submit_one_answer
+    expect_held
+
+    area = find(%(textarea[data-field="code_review"]))
+    before = area.value
+    page.execute_script(%(document.querySelector('textarea[data-field="code_review"]').focus()))
+    page.driver.with_playwright_page { |pw| pw.keyboard.type(" more") }
+    expect(area.value).to eq(before)
+    expect(page.evaluate_script(%(document.activeElement.matches('textarea[data-field="code_review"]')))).to be(false)
+    expect(page.evaluate_script(%(Boolean(document.querySelector('button[data-rating-for="code_review"]').closest("[inert]"))))).to be(true)
+    expect(page.evaluate_script("Boolean(document.querySelector('.daily-kind-swap').closest('[inert]'))")).to be(false)
   end
 
   def fail_first_swap
@@ -294,8 +319,19 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
     expect(response.reload).to be_submitted
     expect(page.evaluate_script("window.swapPage")).to be(true)
+    expect_held_autosave
+    retry_swap_and_expect_reload
+  end
+
+  def expect_held_autosave
     expect(page).to have_css("#save-status", visible: :visible)
-    expect(page).to have_css("#daily-kind-swap-panel-1")
+    expect(page).to have_css("#leave-held button", text: I18n.t("dashboard.exercise.reload_now"))
+  end
+
+  def retry_swap_and_expect_reload
+    within("#daily-kind-1-picker") { click_button "Confirm" }
+    wait_for_js_condition("window.swapPage === undefined", timeout: 8)
+    expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
   end
 
   it "holds the review poll's reload while a swap has failed, and reloads once it saves" do
@@ -310,10 +346,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     sleep 4
 
     expect(page.evaluate_script("window.swapPage")).to be(true)
-    within("#daily-kind-1-picker") { click_button "Confirm" }
-    expect(page).to have_css(".daily-kind-reply", text: I18n.t("daily_kinds.swap.saved"))
-    wait_for_js_condition("window.swapPage === undefined", timeout: 8)
-    expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
+    retry_swap_and_expect_reload
   end
 
   it "does not reload over a failed swap when an autosave finds the set regenerated" do
@@ -322,7 +355,8 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     type_an_answer
 
     expect(page.evaluate_script("window.swapPage")).to be(true)
-    expect(page).to have_css("#save-status", visible: :visible)
+    expect_held_autosave
+    retry_swap_and_expect_reload
   end
 
   it "keeps Confirm disabled while a swap is on its way, whatever radio is chosen" do

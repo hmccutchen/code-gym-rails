@@ -32,7 +32,9 @@ export default class extends Controller {
     savingOffline: String,
     submitOffline: String,
     reviewStartFailed: String,
-    controlsNotReady: String
+    controlsNotReady: String,
+    leaveHeld: String,
+    reloadNow: String
   }
 
   connect() {
@@ -180,8 +182,18 @@ export default class extends Controller {
   }
 
   reloadWhenOtherSavesLand() {
+    this.leaveWhenOtherSavesLand(() => window.location.reload())
+  }
+
+  leaveWhenOtherSavesLand(leave, ...ignored) {
     this.submitHeld = true
-    saveStatus.leaveWhenSaved(() => window.location.reload(), () => {}, "answers")
+    clearTimeout(this.saveTimer)
+    this.saveTimer = null
+    return saveStatus.leaveWhenSaved(leave, () => this.holdForOtherSaves(), "answers", ...ignored)
+  }
+
+  leaveAfterSubmit(result, stale) {
+    this.startReview(result) || this.reloadAfterSubmit(result, stale)
   }
 
   autoSave() {
@@ -254,8 +266,7 @@ export default class extends Controller {
     if (result.ok) saveStatus.clear("submit")
     if (result.ok) draftStore.clear()
     const stale = result.status === 409
-    if ((result.ok || stale) && !(await saveStatus.settled("answers", "submit"))) return this.holdAfterSubmit()
-    if (this.startReview(result) || this.reloadAfterSubmit(result, stale)) return
+    if (result.ok || stale) return this.leaveWhenOtherSavesLand(() => this.leaveAfterSubmit(result, stale), "submit")
 
     const refused = result.status === 422 && Boolean(result.data?.submit_blocker)
     if (refused) {
@@ -317,10 +328,32 @@ export default class extends Controller {
     return true
   }
 
-  // The server already holds this submit, so no draft autosave may start again; Submit stays to retry leaving.
-  holdAfterSubmit() {
-    this.submitHeld = true
-    this.unlock()
+  // Answers stay read-only, since the server would drop any edit now; the swap rows stay usable so the held save can land.
+  holdForOtherSaves() {
+    this.formTarget.inert = false
+    this.formTarget.querySelectorAll(":scope > *, details.section > *").forEach((element) => {
+      if (!element.matches("details.section, summary, .daily-kind-swap")) element.inert = true
+    })
+    this.submitButtonTarget.disabled = true
+    this.submitButtonTarget.classList.remove("btn-loading")
+    this.submitButtonTarget.textContent = this.submitLabelValue
+    this.showHeldNotice()
+  }
+
+  showHeldNotice() {
+    if (this.element.querySelector("#leave-held")) return
+    const notice = document.createElement("p")
+    notice.className = "hint"
+    notice.id = "leave-held"
+    notice.setAttribute("role", "status")
+    notice.textContent = `${this.leaveHeldValue} `
+    const reload = document.createElement("button")
+    reload.type = "button"
+    reload.className = "btn btn-ghost btn-sm"
+    reload.textContent = this.reloadNowValue
+    reload.addEventListener("click", () => window.location.reload())
+    notice.append(reload)
+    this.element.append(notice)
   }
 
   unlock() {

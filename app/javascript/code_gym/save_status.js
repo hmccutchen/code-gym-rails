@@ -13,6 +13,7 @@ let counter = 0;
 
 let requests = 0;
 const probes = [];
+const held = [];
 
 function generic() {
   return document.body?.dataset?.saveFailedText ?? "";
@@ -39,11 +40,29 @@ function waitToSettle(ignored, resolve, waited) {
     setTimeout(() => waitToSettle(ignored, resolve, waited + SETTLE_POLL_MS), SETTLE_POLL_MS);
     return;
   }
-  resolve(!pending() && ![...failures.keys()].some((key) => !ignored.includes(key)));
+  resolve(clean(ignored));
+}
+
+function clean(ignored) {
+  return !pending() && ![...failures.keys()].some((key) => !ignored.includes(key));
 }
 
 export function leaveWhenSaved(leave, stranded, ...ignored) {
-  return settled(...ignored).then((clean) => (clean ? leave() : stranded()));
+  return settled(...ignored).then((ready) => {
+    if (ready) return leave();
+    held.push({ leave: leave, ignored: ignored });
+    stranded();
+  });
+}
+
+function resumeHeld() {
+  if (held.length === 0) return;
+  setTimeout(() => {
+    held.filter((entry) => clean(entry.ignored)).forEach((entry) => {
+      held.splice(held.indexOf(entry), 1);
+      entry.leave();
+    });
+  }, 0);
 }
 
 export function reloadWhenSaved(conflict, stranded) {
@@ -80,6 +99,7 @@ export function report(key, message) {
 export function clear(key) {
   failures.delete(key);
   render();
+  resumeHeld();
 }
 
 export function save(method, url, body, key, failureMessage = null) {
@@ -94,7 +114,10 @@ export function save(method, url, body, key, failureMessage = null) {
       else report(key, failureMessage || result.message);
     }
     return { ok: result.ok, status: result.status || undefined, data: result.data, unreached: result.status === 0, message: result.message };
-  }).finally(() => { requests--; });
+  }).finally(() => {
+    requests--;
+    resumeHeld();
+  });
 }
 
 // A body given as a function is read when the save is sent; returning null drops that save.

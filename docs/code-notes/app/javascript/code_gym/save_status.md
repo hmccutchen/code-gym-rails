@@ -66,7 +66,11 @@ that failed. `settled(...ignored)` is the one gate: it polls `pending()` every
 has a failure, or `false` after the wait limit or on such a failure.
 `leaveWhenSaved(leave, stranded, ...ignored)` runs `leave` or `stranded` on
 its answer, and `reloadWhenSaved(conflict, stranded)` is `leaveWhenSaved`
-with a reload. When nothing is pending and nothing has failed, `settled`
+with a reload. A stranded leave stays armed: every finished save and every
+`clear` checks the held leaves on the next task, and runs each one whose
+blocking failures have cleared with nothing left pending. So a retried save
+that lands lets the page leave as it meant to, and `stranded` only has to
+explain the wait and offer a Reload button. When nothing is pending and nothing has failed, `settled`
 resolves on the next microtask, so a path behind it leaves as fast as before.
 
 Every automatic way the dashboard leaves goes through the gate:
@@ -76,8 +80,8 @@ Every automatic way the dashboard leaves goes through the gate:
 - the answer form's autosave reloads, for a 409 that says the set changed
   and for a reply that says another tab submitted
   (`leaveWhenSaved(..., "answers")`);
-- the review-in-progress poll (`generating_controller`), whose stranded
-  callback polls again, so it reloads once the other save lands;
+- the review-in-progress poll (`generating_controller`), which reloads
+  through the re-armed leave once the other save lands;
 - the level suggestion card's and the exercise mix's conflict reloads
   (`reloadWhenSaved`).
 
