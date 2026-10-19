@@ -57,7 +57,11 @@ A 409 means another tab changed the pair or the Exercise mix, so the panels
 on this page describe settings that are no longer stored. When the set on
 the page is still current, the 409 reply carries the same freshly rendered
 panels a save does, and the controller swaps them in and reopens this card's
-picker on the stored pair, with focus on its checked radio. The next Confirm posts the stored version and saves. This is
+picker on the stored pair, with focus on its checked radio. If the refreshed
+panel already shows the kind this card tried to swap in, an earlier attempt
+saved it and only its reply was lost, so the controller clears this card's
+failure and closes the picker instead. A different stored kind keeps the
+failure, so the page still won't leave past it. The next Confirm posts the stored version and saves. This is
 the card's counterpart to Exercise mix reloading on `layout_changed`; the
 card can refresh in place because its whole state is one server-rendered
 panel.

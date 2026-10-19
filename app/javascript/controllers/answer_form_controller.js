@@ -165,7 +165,7 @@ export default class extends Controller {
     this.storeDraft()
     saveStatus.queue("answers", "POST", this.formTarget.action, () => this.nextSave(), { latest: true, offline: () => this.offlineSentence() })
       .then(({ ok, status, data, skipped }) => {
-        if (skipped) return
+        if (skipped || this.submitHeld) return
         if (ok) this.settleSubmitFailure()
         if (ok) this.settleDraft(data)
         if (!ok && status === 409 && data?.status === "stale") {

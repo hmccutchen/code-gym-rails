@@ -357,6 +357,50 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
   end
 
+  it "lets only the review handoff run when an autosave outlasts a held submit" do
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options?.body ? JSON.parse(options.body) : {};
+        if (!body.response || body.response.submit === "1" || window.releaseAutosave) return originalFetch(url, options);
+        return new Promise((resolve) => { window.releaseAutosave = () => resolve(originalFetch(url, options)); });
+      };
+      HTMLFormElement.prototype.submit = function () { window.reviewHandoffs = (window.reviewHandoffs || 0) + 1; };
+    JS
+    fill_in_answer("code_review", "The answer an autosave is still carrying when the submit goes out.")
+    wait_for_js_condition("window.releaseAutosave")
+    submit_one_answer
+    expect(page).to have_css("#leave-held", wait: 15)
+
+    page.execute_script("window.releaseAutosave()")
+    wait_for_js_condition("window.reviewHandoffs === 1")
+    sleep 1.5
+    expect(page.evaluate_script("window.swapPage")).to be(true)
+    expect(page.evaluate_script("window.reviewHandoffs")).to eq(1)
+  end
+
+  it "clears a card's failure when the retry finds its lost swap already stored" do
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.swapCalls = 0;
+      window.fetch = async (url, options) => {
+        if (!url.includes("/daily_kinds/")) return originalFetch(url, options);
+        window.swapCalls += 1;
+        const response = await originalFetch(url, options);
+        if (window.swapCalls === 1) throw new TypeError("Response lost after commit");
+        return response;
+      };
+    JS
+    confirm_swap(1, "pattern")
+    expect(page).to have_css("#save-status", visible: :visible)
+    expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
+
+    within("#daily-kind-1-picker") { click_button "Confirm" }
+    expect(page).to have_css("#daily-kind-swap-panel-1[data-current='pattern']")
+    expect(page).to have_no_css("#save-status", visible: :visible)
+    expect(page).to have_css("#daily-kind-1-picker", visible: :hidden)
+  end
+
   it "holds the review poll's reload while a swap has failed, and reloads once it saves" do
     response = DailyResponse.create!(user: user, daily_exercise: user.daily_exercises.sole, date: Date.current, submitted_at: Time.current,
                                      reviewing_since: Time.current, answers: { "code_review" => "Submitted with enough detail to count." },

@@ -74,11 +74,11 @@ export default class extends Controller {
 
     this.setBusy(true)
     const kind = chosen.value
-    const result = await saveStatus.queue(`daily_kind_swap:${this.urlValue}`, "PATCH", this.urlValue, () => this.body(kind),
+    const result = await saveStatus.queue(this.statusKey, "PATCH", this.urlValue, () => this.body(kind),
       { line: "daily_kind_swap" })
     this.busy = false
     if (result && result.ok && result.data) return this.saved(result.data)
-    if (result && result.status === 409 && result.data) return this.refreshStale(result.data)
+    if (result && result.status === 409 && result.data) return this.refreshStale(result.data, kind)
 
     this.setBusy(false)
     this.reopenWith(kind)
@@ -110,11 +110,22 @@ export default class extends Controller {
   }
 
   // Another tab changed the pair or the mix, so the picker reopens on the stored pair before the reader tries again.
-  refreshStale(data) {
-    if (this.replacePanels(data.panels)) return this.open()
+  get statusKey() {
+    return `daily_kind_swap:${this.urlValue}`
+  }
+
+  refreshStale(data, kind) {
+    if (this.replacePanels(data.panels)) return this.settleStale(kind)
 
     this.leaveCards()
     this.replyTarget.replaceChildren(this.paragraph(data.set_changed || data.error))
+  }
+
+  settleStale(kind) {
+    if (this.panelTarget.dataset.current !== kind) return this.open()
+
+    saveStatus.clear(this.statusKey)
+    this.close()
   }
 
   replacePanels(panels) {

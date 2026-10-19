@@ -99,7 +99,9 @@ would drop it. When nothing is pending and no other key has a failure,
 `settled` resolves at once, so a normal submit leaves as before.
 
 Each of those leaves goes through `leaveWhenOtherSavesLand`, which sets
-`submitHeld` first, so `autoSave` and `sendSave` do nothing from then on: the
+`submitHeld` first, so `autoSave` and `sendSave` do nothing from then on, and
+the reply to an autosave already on the wire is ignored, so a late
+`submitted: true` can't start a reload that competes with the armed leave: the
 page is about to leave, and the server would ignore an edit to a submitted
 response or one for a replaced set. It also calls `freezeAnswers` at once,
 before the gate answers, unless the form is already inert from a submit:
