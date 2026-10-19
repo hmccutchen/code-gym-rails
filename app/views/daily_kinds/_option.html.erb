@@ -3,16 +3,18 @@
 <% id = "#{prefix}-#{key}" %>
 <% name = t("sections.#{key}.name") %>
 <% line_id = option.note ? "#{id}-note" : "#{id}-short" %>
+<% badge_ids = option.marks.each_index.map { |index| "#{id}-badge-#{index}" } %>
 <% described = [ line_id, "#{id}-guide", ("#{id}-consequences" if option.available?) ].compact %>
 <label class="daily-kind-option" for="<%= id %>" data-kind="<%= key %>">
   <span class="daily-kind-option-name">
     <%= tag.input type: "radio", form: "daily-kind-swap", name: "daily_kind_#{picker.place}", id: id, value: key,
-                  checked: option.now?, disabled: !(option.available? || option.now?), aria: { describedby: described.join(" ") },
+                  checked: option.now?, disabled: !(option.available? || option.now?),
+                  aria: { labelledby: [ "#{id}-name", *badge_ids ].join(" "), describedby: described.join(" ") },
                   data: { daily_kind_swap_target: "option", state: option.state,
                           confirm_label: (t("daily_kinds.picker.confirm_kind", kind: name) if option.available?) } %>
-    <span><%= name %></span>
-    <% if option.mark %>
-      <span class="daily-kind-badge<%= " daily-kind-badge-now" if picker.accent_mark?(option) %>"><%= option.mark %></span>
+    <span class="daily-kind-name" id="<%= id %>-name"><%= name %></span>
+    <% option.marks.zip(badge_ids).each do |mark, badge_id| %>
+      <span class="daily-kind-badge<%= " daily-kind-badge-now" if picker.accent_mark?(option) %>" id="<%= badge_id %>"><%= mark %></span>
     <% end %>
   </span>
   <span class="daily-kind-line" id="<%= line_id %>"><%= option.note || SectionKindGuide.for(key)[:short] %></span>

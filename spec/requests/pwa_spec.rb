@@ -136,6 +136,18 @@ RSpec.describe "PWA", type: :request do
     end
   end
 
+  describe "the swap sheet's scrim" do
+    it "gives older iOS, whose ::backdrop may not see custom properties, a literal --bg at 70% before the color-mix" do
+      layout = Rails.root.join("app/views/layouts/application.html.erb").read
+      rule = layout[/^\s*\.daily-kind-sheet::backdrop \{([^}]*)\}/, 1]
+      red, green, blue = layout_color("bg").delete("#").scan(/../).map(&:hex)
+
+      expect(rule.scan(/background:\s*([^;]+);/).flatten).to eq(
+        [ "rgba(#{red}, #{green}, #{blue}, .7)", "color-mix(in srgb, var(--bg) 70%, transparent)" ]
+      )
+    end
+  end
+
   describe "section slot accents" do
     let(:rules) { ViewStyles.rules(Rails.root.join("app/views/layouts/application.html.erb").read) }
 
@@ -164,7 +176,9 @@ RSpec.describe "PWA", type: :request do
     it "leaves the native bounce suppression scoped as it was" do
       expect(standalone_block).to include("html, body { overscroll-behavior-y: none; }")
       rules = layout.lines.grep(/overscroll-behavior/)
-      expect(rules.grep(/\.daily-kind-list \{/)).to all(include("overscroll-behavior: contain;"))
+      list_rules = rules.grep(/\.daily-kind-list \{/)
+      expect(list_rules.size).to eq(1)
+      expect(list_rules.first).to include("overscroll-behavior: contain;")
       expect(rules.grep_v(/\.daily-kind-list \{/).size).to eq(1)
     end
 

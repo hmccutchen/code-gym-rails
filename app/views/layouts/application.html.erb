@@ -253,6 +253,7 @@
     details.section:has(> .daily-kind-swap) { position: relative; }
     details.section:has(> .daily-kind-swap) > summary { padding-inline-end: calc(44px + .5rem); }
     .daily-kind-trigger, .daily-kind-close { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; padding: 0; background: none; border: 1px solid transparent; border-radius: 999px; color: var(--muted); cursor: pointer; }
+    /* Tracks .section's padding (and its 600px override) and the summary's 12.5px padding-block; change them together. */
     .daily-kind-trigger { position: absolute; top: calc(1.5rem - 12.5px); right: 1.5rem; }
     .daily-kind-trigger:hover, .daily-kind-close:hover { color: var(--accent-text); border-color: var(--border); }
     .daily-kind-trigger:focus-visible, .daily-kind-close:focus-visible, .daily-kind-option:has(input:focus-visible) { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
@@ -261,7 +262,7 @@
     html:has(dialog.daily-kind-sheet[open]) { overflow: hidden; }
     .daily-kind-sheet { position: fixed; inset: auto 0 0; width: 100%; max-width: 36rem; max-height: 85vh; max-height: 85dvh; margin: 0 auto; padding: 0; overflow: hidden; background: var(--surface); color: var(--text); border: none; border-top: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; box-shadow: var(--shadow); }
     .daily-kind-sheet[open] { display: flex; flex-direction: column; animation: daily-kind-sheet-up .2s ease-out; }
-    .daily-kind-sheet::backdrop { background: color-mix(in srgb, var(--bg) 70%, transparent); }
+    .daily-kind-sheet::backdrop { background: rgba(15, 15, 26, .7); background: color-mix(in srgb, var(--bg) 70%, transparent); }
     @keyframes daily-kind-sheet-up { from { transform: translateY(100%); } }
     .daily-kind-sheet-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 1.25rem; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)); }
     .daily-kind-sheet-header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: -.5rem -.5rem 0 0; }
@@ -272,16 +273,19 @@
     .daily-kind-option { display: block; min-height: 44px; padding: .75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; }
     .daily-kind-option + .daily-kind-option { margin-top: .5rem; }
     .daily-kind-option:has(input:checked) { background: var(--surface-raised); border-color: var(--accent); }
-    .daily-kind-option:has(input:disabled) { opacity: .6; cursor: default; }
+    .daily-kind-option:has(input:disabled) { cursor: default; }
+    .daily-kind-option input:disabled, .daily-kind-option:has(input:disabled) .daily-kind-name { opacity: .6; }
     .daily-kind-option-name { display: flex; align-items: center; gap: .5rem; font-weight: 600; }
+    .daily-kind-name { margin-right: auto; }
     .daily-kind-option input { flex-shrink: 0; width: 1rem; height: 1rem; margin: 0; accent-color: var(--accent); outline: none; }
-    .daily-kind-badge { margin-left: auto; flex-shrink: 0; font-size: .7rem; font-weight: 400; letter-spacing: .04em; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: .05rem .5rem; }
+    .daily-kind-badge { flex-shrink: 0; font-size: .7rem; font-weight: 400; letter-spacing: .04em; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: .05rem .5rem; }
     .daily-kind-badge-now { color: var(--accent-text); border-color: var(--accent); }
     .daily-kind-line, .daily-kind-example { display: block; margin-top: .25rem; padding-inline-start: 1.5rem; font-size: .85rem; color: var(--muted); }
     .daily-kind-example[hidden], .daily-kind-choosing[hidden], .daily-kind-saved[hidden], .daily-kind-consequences[hidden] { display: none; }
     .daily-kind-sheet-footer { display: flex; flex-direction: column; gap: .75rem; }
     .daily-kind-consequences { display: flex; flex-direction: column; gap: .5rem; max-height: 30vh; max-height: 30dvh; overflow-y: auto; font-size: .85rem; }
-    .daily-kind-consequences:not(:has(*)), .daily-kind-error:empty, .daily-kind-saving:empty { display: none; }
+    .daily-kind-consequences:not(:has(*)) { display: none; }
+    .daily-kind-error:empty, .daily-kind-saving:empty { margin-top: -.75rem; }
     .daily-kind-warning { border-left: 3px solid var(--yellow); padding-left: .75rem; }
     .daily-kind-error { font-size: .85rem; color: var(--red); }
     .daily-kind-actions { display: flex; flex-direction: row-reverse; flex-wrap: wrap; gap: .75rem; }

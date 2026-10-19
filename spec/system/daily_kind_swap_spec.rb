@@ -169,6 +169,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page).to have_css("#save-status", text: "That swap couldn't be saved.")
     expect(page).to have_css("#{sheet(0)}[open]")
     expect(focused("textContent")).to eq("Swap to Coding Challenge")
+    expect(primary(0)["aria-describedby"].split).to eq(%w[daily-kind-0-challenge-consequences daily-kind-0-error])
   end
 
   def hold_swap_replies
@@ -331,8 +332,10 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page.evaluate_script("window.CodeGymSaveStatus.pending()")).to be(false)
     expect(user.reload.daily_section_kinds).to eq(%w[challenge design_comparison])
 
-    expect(page).to have_css("#{sheet(1)}[open]")
+    expect(page).to have_no_css("#{sheet(1)}[open]")
+    open_sheet(1)
     expect(find("#daily-kind-1-pattern")).to be_checked
+    expect(page).to have_css("#{sheet(1)} .daily-kind-error", text: I18n.t("save_status.generic"))
     primary(1).click
     release_swap
     expect(page).to have_content("✓ Submitted", wait: 10)
@@ -818,5 +821,139 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     finish_saved(1)
     expect(panel(0)).to have_no_css(".daily-kind-hint")
     expect(panel(1)).to have_css(".daily-kind-next", text: "Your next set uses Pattern of the Month here.")
+  end
+
+  def card_reply(place) = ".daily-kind-swap:has(#daily-kind-swap-panel-#{place}) .daily-kind-reply"
+
+  it "puts the offer for today and its link on the card when the sheet was left during the save" do
+    hold_swap_replies
+    confirm_swap(1, "pattern")
+    leave_sheet_saving(1)
+    find(%(textarea[data-field="code_review"])).click
+    release_swap
+
+    expect(page).to have_css("#daily-kind-swap-panel-1[data-current='pattern']")
+    expect(page).to have_no_css("#{sheet(1)}[open]")
+    expect(page).to have_css("#{card_reply(1)} p.daily-kind-note", text: I18n.t("daily_kinds.swap.saved"))
+    expect(page).to have_css("#{card_reply(1)} p.daily-kind-note", text: I18n.t("daily_kinds.swap.want_it_today"))
+    within(card_reply(1)) { click_link I18n.t("daily_kinds.picker.generate_link") }
+    expect(page.evaluate_script("document.activeElement === document.querySelector('.regenerate-row form button')")).to be(true)
+  end
+
+  it "opens no sheet for a reply that lands while the form is locked for a submit, and puts the offer on the card" do
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options?.body ? JSON.parse(options.body) : {};
+        if (url.includes("/daily_kinds/")) return new Promise((resolve) => { window.releaseSwap = () => resolve(originalFetch(url, options)); });
+        if (body.response?.submit === "1") return new Promise(() => {});
+        return originalFetch(url, options);
+      };
+    JS
+    confirm_swap(0, "challenge")
+    leave_sheet_saving(0)
+    fill_in_answer("code_review", "An answer submitted while the swap reply is still on its way.")
+    rate_section("code_review")
+    click_button "Submit answers"
+    wait_for_js_condition("document.getElementById('gym-form').inert")
+    release_swap
+
+    expect(page).to have_css("#daily-kind-swap-panel-0[data-current='challenge']")
+    sleep 0.3
+    expect(page.evaluate_script("Boolean(document.querySelector('dialog[open]'))")).to be(false)
+    expect(page).to have_css("#{card_reply(0)} p.daily-kind-note", text: I18n.t("daily_kinds.swap.want_it_today"))
+    expect(user.reload.daily_section_kinds).to eq(%w[challenge design_comparison])
+  end
+
+  def fail_held_swap
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.fetch = (url, options) => {
+        if (!url.includes("/daily_kinds/")) return originalFetch(url, options);
+        return new Promise((resolve) => { window.releaseSwap = () => resolve(new Response("unavailable", { status: 503 })); });
+      };
+    JS
+  end
+
+  it "keeps a sheet left during the save closed when its failure lands, and shows the choice and error on the next open" do
+    fail_held_swap
+    confirm_swap(0, "challenge")
+    leave_sheet_saving(0)
+    expect(trigger_focused?).to be(true)
+    release_swap
+
+    expect(page).to have_css("#save-status", visible: :visible)
+    sleep 0.3
+    expect(page).to have_no_css("#{sheet(0)}[open]")
+    expect(trigger_focused?).to be(true)
+    open_sheet(0)
+    expect(find("#daily-kind-0-challenge")).to be_checked
+    expect(page).to have_css("#{sheet(0)} .daily-kind-error", text: I18n.t("save_status.generic"))
+    expect(primary(0)["aria-describedby"].split).to include("daily-kind-0-error")
+  end
+
+  it "keeps a sheet left during the save closed when a stale reply lands, and shows the stored pair and message on the next open" do
+    hold_swap_replies
+    confirm_swap(0, "architecture")
+    leave_sheet_saving(0)
+    user.update!(daily_section_kinds: %w[pattern design_comparison])
+    release_swap
+
+    expect(page).to have_css("#daily-kind-swap-panel-0[data-current='pattern']")
+    sleep 0.3
+    expect(page).to have_no_css("#{sheet(0)}[open]")
+    open_sheet(0)
+    expect(find("#daily-kind-0-pattern")).to be_checked
+    expect(page).to have_css("#{sheet(0)} .daily-kind-error", text: I18n.t("daily_kinds.swap.refused.stale"))
+  end
+
+  it "keeps a sheet's saved state when the next card's reply replaces its panel" do
+    hold_swap_replies
+    confirm_swap(0, "challenge")
+    leave_sheet_saving(0)
+    confirm_swap(1, "pattern")
+    leave_sheet_saving(1)
+    open_sheet(0)
+    release_swap
+    expect(page).to have_css("#{sheet(0)}[open] .daily-kind-saved", text: I18n.t("daily_kinds.swap.saved"))
+
+    wait_for_js_condition("window.heldSwaps.length === 2")
+    release_swap
+    expect(page).to have_css("#daily-kind-swap-panel-1[data-current='pattern']")
+    expect(page).to have_css("#{sheet(0)}[open] .daily-kind-saved", text: I18n.t("daily_kinds.swap.want_it_today"))
+    expect(page).to have_link(I18n.t("daily_kinds.picker.generate_link"))
+    expect(page).to have_no_css("#{sheet(0)} .daily-kind-picker", visible: :visible)
+    expect(focused("textContent")).to eq("Done")
+
+    finish_saved(0)
+    open_sheet(0)
+    expect(page).to have_css("#{sheet(0)} .daily-kind-picker", visible: :visible)
+  end
+
+  it "keeps the error and saving live regions rendered while they are empty" do
+    open_sheet(0)
+
+    %w[error status].each do |target|
+      display = page.evaluate_script("getComputedStyle(document.querySelector('#{sheet(0)} [data-daily-kind-swap-target=\"#{target}\"]')).display")
+      expect(display).not_to eq("none"), target
+    end
+  end
+
+  it "names each radio by its kind and badges only, and keeps a disabled row's reason and badge undimmed" do
+    open_sheet(0)
+    names = ->(name) { page.driver.with_playwright_page { |pw| pw.get_by_role("radio", name: name, exact: true).count } }
+
+    expect(names.("Code Review Now")).to eq(1)
+    expect(names.("Design Comparison Already daily")).to eq(1)
+    expect(names.("Coding Challenge")).to eq(1)
+    expect(find("#daily-kind-0-challenge")["aria-describedby"].split).to include("daily-kind-0-challenge-short")
+
+    opacity = ->(selector) { page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).opacity") }
+    row = "label[data-kind='design_comparison']"
+    expect(opacity.("#{row} .daily-kind-name")).to eq("0.6")
+    expect(opacity.("#{row} input")).to eq("0.6")
+    expect(opacity.(row)).to eq("1")
+    expect(opacity.("#{row} .daily-kind-badge")).to eq("1")
+    expect(opacity.("#{row} .daily-kind-line")).to eq("1")
   end
 end

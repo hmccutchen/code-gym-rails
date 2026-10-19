@@ -203,6 +203,45 @@ RSpec.describe "Pull to refresh", type: :system do
     expect(still_the_same_page?).to be(true)
   end
 
+  it "still stops for a modal dialog in a browser whose selector engine has no :modal, as Safari before 15.6" do
+    launch_standalone
+    visit_as(user)
+    visit learn_path
+    page.execute_script(<<~JS)
+      const matches = Element.prototype.matches;
+      Element.prototype.matches = function (selector) {
+        if (selector.includes(":modal")) throw new DOMException("unsupported", "SyntaxError");
+        return matches.call(this, selector);
+      };
+      const sheet = document.createElement("dialog");
+      document.body.appendChild(sheet);
+      sheet.showModal();
+    JS
+    mark_page
+
+    pull(200, from: "dialog")
+
+    expect(still_the_same_page?).to be(true)
+  end
+
+  it "still refreshes under a dialog that is open but not modal" do
+    launch_standalone
+    visit_as(user)
+    visit learn_path
+    page.execute_script(<<~JS)
+      const note = document.createElement("dialog");
+      document.body.appendChild(note);
+      note.show();
+      note.blur();
+      window.scrollTo(0, 0);
+    JS
+    mark_page
+
+    pull(200)
+
+    expect(reloaded?).to be(true)
+  end
+
   it "puts the indicator away when a second finger lands mid-pull" do
     launch_standalone
     visit_as(user)

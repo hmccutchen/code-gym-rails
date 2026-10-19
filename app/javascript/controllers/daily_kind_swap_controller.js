@@ -14,13 +14,14 @@ export default class extends Controller {
     this.busy = false
     this.attempted = null
     this.wanted = false
+    this.savedReply = null
   }
 
-  // Any reply re-renders this panel, closing its sheet; one still wanted reopens, and a queued swap keeps showing as saving.
+  // Any reply re-renders this panel, closing its sheet; one still wanted reopens as it was, and a queued swap keeps showing as saving.
   panelTargetConnected() {
     if (this.busy) this.setBusy(true)
     else this.reconcile()
-    if (this.wanted && !this.sheetTarget.open) this.reshow()
+    if (this.wanted && !this.sheetTarget.open && this.sheetMayOpen()) this.reshow()
   }
 
   reconcile() {
@@ -31,8 +32,18 @@ export default class extends Controller {
     return true
   }
 
+  // A modal inside an inert ancestor would cover the page with nothing in it reachable.
+  sheetMayOpen() {
+    return !this.element.closest("[inert]")
+  }
+
+  replyMayShowSheet() {
+    return this.wanted && this.replyMayFocus && this.sheetMayOpen()
+  }
+
   open() {
     this.wanted = true
+    this.savedReply = null
     this.showSaved(false)
     if (!this.sheetTarget.open) this.sheetTarget.showModal()
     this.choose()
@@ -40,6 +51,8 @@ export default class extends Controller {
   }
 
   reshow() {
+    if (this.savedReply) return this.showSavedSheet()
+
     this.sheetTarget.showModal()
     this.choose()
     if (!this.busy) this.focusChoice()
@@ -59,6 +72,7 @@ export default class extends Controller {
 
   dismiss() {
     if (this.busy) return
+    this.savedReply = null
     this.resetChoice()
     this.hide()
   }
@@ -73,11 +87,12 @@ export default class extends Controller {
     this.dismiss()
   }
 
-  // Chrome closes a sheet on a second Escape even when the first was refused, so a close this controller didn't ask for still tidies up.
+  // Chrome closes a sheet on a second Escape even when the first was refused; a swap still saving keeps its choice for the reply.
   closed(event) {
     if (!event.target.isConnected || event.target.open || !this.wanted) return
 
     this.wanted = false
+    this.savedReply = null
     if (!this.busy) this.resetChoice()
     this.triggerTarget.focus()
   }
@@ -100,7 +115,12 @@ export default class extends Controller {
     this.consequencesTargets.forEach((element) => { element.hidden = element !== block })
     this.confirmTarget.disabled = this.busy || !available
     this.confirmTarget.textContent = available ? chosen.dataset.confirmLabel : this.confirmTarget.dataset.label
-    if (block) this.confirmTarget.setAttribute("aria-describedby", block.id)
+    this.describePrimary(block)
+  }
+
+  describePrimary(block) {
+    const ids = [block && block.id, this.errorTarget.textContent ? this.errorTarget.id : null].filter(Boolean)
+    if (ids.length) this.confirmTarget.setAttribute("aria-describedby", ids.join(" "))
     else this.confirmTarget.removeAttribute("aria-describedby")
   }
 
@@ -142,7 +162,7 @@ export default class extends Controller {
     const submitted = this.optionTargets.find((option) => option.value === kind)
     if (submitted && submitted.dataset.state === "available") submitted.checked = true
     this.errorTarget.textContent = message || ""
-    if (!this.replyMayFocus) return this.choose()
+    if (!this.replyMayShowSheet()) return this.choose()
 
     this.open()
     if (!this.confirmTarget.disabled) this.confirmTarget.focus()
@@ -160,11 +180,12 @@ export default class extends Controller {
 
   saved(data) {
     const replaced = this.replacePanels(data.panels)
-    if (replaced && data.want_it_today && this.replyMayFocus) return this.offerToday(data)
+    this.savedReply = data.want_it_today ? { message: data.message, offer: data.want_it_today, link: data.want_it_today_link } : null
+    if (replaced && this.savedReply && this.replyMayShowSheet()) return this.showSavedSheet()
 
     if (replaced) this.hide(this.replyMayFocus)
     else this.leaveCards()
-    this.announce(data.message, data.want_it_today)
+    this.announce(data.message)
     if (data.set_changed) this.replyTarget.append(this.paragraph(data.set_changed, "daily-kind-note"))
   }
 
@@ -184,7 +205,8 @@ export default class extends Controller {
     if (this.reconcile()) return this.hide(this.replyMayFocus)
 
     this.errorTarget.textContent = message || ""
-    if (this.replyMayFocus) this.open()
+    if (this.replyMayShowSheet()) this.open()
+    else this.choose()
   }
 
   replacePanels(panels) {
@@ -199,12 +221,12 @@ export default class extends Controller {
     return !mine.isConnected
   }
 
-  offerToday(data) {
+  showSavedSheet() {
     this.wanted = true
-    this.savedMessageTarget.textContent = data.message
-    this.savedOfferTarget.replaceChildren(data.want_it_today, " ", this.regenerateLink(data.want_it_today_link))
+    this.savedMessageTarget.textContent = this.savedReply.message
+    this.savedOfferTarget.replaceChildren(this.savedReply.offer, " ", this.regenerateLink(this.savedReply.link))
     this.showSaved(true)
-    this.sheetTarget.showModal()
+    if (!this.sheetTarget.open) this.sheetTarget.showModal()
     this.doneTarget.focus()
   }
 
@@ -217,8 +239,12 @@ export default class extends Controller {
     if (saved) this.consequencesTargets.forEach((element) => { element.hidden = true })
   }
 
-  announce(message, wantItToday) {
-    this.replyTarget.replaceChildren(...[message, wantItToday].filter(Boolean).map((text) => this.paragraph(text, "visually-hidden")))
+  announce(message) {
+    if (!this.savedReply) return this.replyTarget.replaceChildren(this.paragraph(message, "visually-hidden"))
+
+    const offer = this.paragraph(this.savedReply.offer, "daily-kind-note")
+    offer.append(" ", this.regenerateLink(this.savedReply.link))
+    this.replyTarget.replaceChildren(this.paragraph(this.savedReply.message, "daily-kind-note"), offer)
   }
 
   paragraph(text, className) {
@@ -239,6 +265,7 @@ export default class extends Controller {
   focusRegenerate(event) {
     event.preventDefault()
     const button = document.querySelector(".regenerate-row form button")
+    this.savedReply = null
     this.hide(!button)
     if (!button) return
     button.scrollIntoView({ block: "center" })

@@ -330,6 +330,7 @@
     details.section:has(> .daily-kind-swap) { position: relative; }
     details.section:has(> .daily-kind-swap) > summary { padding-inline-end: calc(44px + .5rem); }
     .daily-kind-trigger, .daily-kind-close { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; padding: 0; background: none; border: 1px solid transparent; border-radius: 999px; color: var(--muted); cursor: pointer; }
+    /* Tracks .section's padding (and its 600px override) and the summary's 12.5px padding-block; change them together. */
     .daily-kind-trigger { position: absolute; top: calc(1.5rem - 12.5px); right: 1.5rem; }
     .daily-kind-trigger:hover, .daily-kind-close:hover { color: var(--accent-text); border-color: var(--border); }
     .daily-kind-trigger:focus-visible, .daily-kind-close:focus-visible, .daily-kind-option:has(input:focus-visible) { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
@@ -338,7 +339,7 @@
     html:has(dialog.daily-kind-sheet[open]) { overflow: hidden; }
     .daily-kind-sheet { position: fixed; inset: auto 0 0; width: 100%; max-width: 36rem; max-height: 85vh; max-height: 85dvh; margin: 0 auto; padding: 0; overflow: hidden; background: var(--surface); color: var(--text); border: none; border-top: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; box-shadow: var(--shadow); }
     .daily-kind-sheet[open] { display: flex; flex-direction: column; animation: daily-kind-sheet-up .2s ease-out; }
-    .daily-kind-sheet::backdrop { background: color-mix(in srgb, var(--bg) 70%, transparent); }
+    .daily-kind-sheet::backdrop { background: rgba(15, 15, 26, .7); background: color-mix(in srgb, var(--bg) 70%, transparent); }
     @keyframes daily-kind-sheet-up { from { transform: translateY(100%); } }
     .daily-kind-sheet-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 1.25rem; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)); }
     .daily-kind-sheet-header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: -.5rem -.5rem 0 0; }
@@ -349,16 +350,19 @@
     .daily-kind-option { display: block; min-height: 44px; padding: .75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; }
     .daily-kind-option + .daily-kind-option { margin-top: .5rem; }
     .daily-kind-option:has(input:checked) { background: var(--surface-raised); border-color: var(--accent); }
-    .daily-kind-option:has(input:disabled) { opacity: .6; cursor: default; }
+    .daily-kind-option:has(input:disabled) { cursor: default; }
+    .daily-kind-option input:disabled, .daily-kind-option:has(input:disabled) .daily-kind-name { opacity: .6; }
     .daily-kind-option-name { display: flex; align-items: center; gap: .5rem; font-weight: 600; }
+    .daily-kind-name { margin-right: auto; }
     .daily-kind-option input { flex-shrink: 0; width: 1rem; height: 1rem; margin: 0; accent-color: var(--accent); outline: none; }
-    .daily-kind-badge { margin-left: auto; flex-shrink: 0; font-size: .7rem; font-weight: 400; letter-spacing: .04em; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: .05rem .5rem; }
+    .daily-kind-badge { flex-shrink: 0; font-size: .7rem; font-weight: 400; letter-spacing: .04em; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: .05rem .5rem; }
     .daily-kind-badge-now { color: var(--accent-text); border-color: var(--accent); }
     .daily-kind-line, .daily-kind-example { display: block; margin-top: .25rem; padding-inline-start: 1.5rem; font-size: .85rem; color: var(--muted); }
     .daily-kind-example[hidden], .daily-kind-choosing[hidden], .daily-kind-saved[hidden], .daily-kind-consequences[hidden] { display: none; }
     .daily-kind-sheet-footer { display: flex; flex-direction: column; gap: .75rem; }
     .daily-kind-consequences { display: flex; flex-direction: column; gap: .5rem; max-height: 30vh; max-height: 30dvh; overflow-y: auto; font-size: .85rem; }
-    .daily-kind-consequences:not(:has(*)), .daily-kind-error:empty, .daily-kind-saving:empty { display: none; }
+    .daily-kind-consequences:not(:has(*)) { display: none; }
+    .daily-kind-error:empty, .daily-kind-saving:empty { margin-top: -.75rem; }
     .daily-kind-warning { border-left: 3px solid var(--yellow); padding-left: .75rem; }
     .daily-kind-error { font-size: .85rem; color: var(--red); }
     .daily-kind-actions { display: flex; flex-direction: row-reverse; flex-wrap: wrap; gap: .75rem; }
@@ -696,8 +700,8 @@
               <legend class="visually-hidden">Choose the kind for this daily section</legend>
                 <label class="daily-kind-option" for="daily-kind-0-code_review" data-kind="code_review">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-code_review" value="code_review" aria-describedby="daily-kind-0-code_review-short daily-kind-0-code_review-guide daily-kind-0-code_review-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Code Review">
-    <span>Code Review</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-code_review" value="code_review" aria-labelledby="daily-kind-0-code_review-name" aria-describedby="daily-kind-0-code_review-short daily-kind-0-code_review-guide daily-kind-0-code_review-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Code Review">
+    <span class="daily-kind-name" id="daily-kind-0-code_review-name">Code Review</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-0-code_review-short">Find the one problem in a short piece of code.</span>
   <span id="daily-kind-0-code_review-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="code_review"><strong>Example:</strong> You see a ten-line method from a library app that emails members about overdue books. The question asks what&#39;s wrong with it and how you&#39;d fix it. On some days the code is a test file or a database migration instead.</span>
@@ -705,9 +709,9 @@
 
                 <label class="daily-kind-option" for="daily-kind-0-design_comparison" data-kind="design_comparison">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-design_comparison" value="design_comparison" disabled="disabled" aria-describedby="daily-kind-0-design_comparison-short daily-kind-0-design_comparison-guide" data-daily-kind-swap-target="option" data-state="disabled">
-    <span>Design Comparison</span>
-      <span class="daily-kind-badge">Already daily</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-design_comparison" value="design_comparison" disabled="disabled" aria-labelledby="daily-kind-0-design_comparison-name daily-kind-0-design_comparison-badge-0" aria-describedby="daily-kind-0-design_comparison-short daily-kind-0-design_comparison-guide" data-daily-kind-swap-target="option" data-state="disabled">
+    <span class="daily-kind-name" id="daily-kind-0-design_comparison-name">Design Comparison</span>
+      <span class="daily-kind-badge" id="daily-kind-0-design_comparison-badge-0">Already daily</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-0-design_comparison-short">Both work — pick the one that suits the system.</span>
   <span id="daily-kind-0-design_comparison-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="design_comparison"><strong>Example:</strong> A grocery list app will add new kinds of items later. Piece A and Piece B both save an item today, built two different ways. You choose one and point to the sentence that settles it.</span>
@@ -715,8 +719,8 @@
 
                 <label class="daily-kind-option" for="daily-kind-0-pattern" data-kind="pattern">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-pattern" value="pattern" aria-describedby="daily-kind-0-pattern-short daily-kind-0-pattern-guide daily-kind-0-pattern-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Pattern of the Month">
-    <span>Pattern of the Month</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-pattern" value="pattern" aria-labelledby="daily-kind-0-pattern-name" aria-describedby="daily-kind-0-pattern-short daily-kind-0-pattern-guide daily-kind-0-pattern-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Pattern of the Month">
+    <span class="daily-kind-name" id="daily-kind-0-pattern-name">Pattern of the Month</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-0-pattern-short">Apply a named pattern to a real problem.</span>
   <span id="daily-kind-0-pattern-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="pattern"><strong>Example:</strong> The setting is a gym log, where one button saves a workout, updates a streak and sends a message. You&#39;re asked how you&#39;d structure the work using the day&#39;s pattern, and you describe it in words.</span>
@@ -724,8 +728,8 @@
 
                 <label class="daily-kind-option" for="daily-kind-0-challenge" data-kind="challenge">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-challenge" value="challenge" aria-describedby="daily-kind-0-challenge-short daily-kind-0-challenge-guide daily-kind-0-challenge-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Coding Challenge">
-    <span>Coding Challenge</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-challenge" value="challenge" aria-labelledby="daily-kind-0-challenge-name" aria-describedby="daily-kind-0-challenge-short daily-kind-0-challenge-guide daily-kind-0-challenge-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Coding Challenge">
+    <span class="daily-kind-name" id="daily-kind-0-challenge-name">Coding Challenge</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-0-challenge-short">Write code for a small, self-contained task.</span>
   <span id="daily-kind-0-challenge-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="challenge"><strong>Example:</strong> The task is a method that sorts a shopping list by aisle, with a sentence saying what it should return. You write the method in the answer box.</span>
@@ -733,9 +737,9 @@
 
                 <label class="daily-kind-option" for="daily-kind-0-architecture" data-kind="architecture">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-architecture" value="architecture" checked="checked" aria-describedby="daily-kind-0-architecture-short daily-kind-0-architecture-guide" data-daily-kind-swap-target="option" data-state="now">
-    <span>Architecture Decision</span>
-      <span class="daily-kind-badge daily-kind-badge-now">Now</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-architecture" value="architecture" checked="checked" aria-labelledby="daily-kind-0-architecture-name daily-kind-0-architecture-badge-0" aria-describedby="daily-kind-0-architecture-short daily-kind-0-architecture-guide" data-daily-kind-swap-target="option" data-state="now">
+    <span class="daily-kind-name" id="daily-kind-0-architecture-name">Architecture Decision</span>
+      <span class="daily-kind-badge daily-kind-badge-now" id="daily-kind-0-architecture-badge-0">Now</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-0-architecture-short">Choose an approach and name what it costs.</span>
   <span id="daily-kind-0-architecture-guide" class="daily-kind-example" data-daily-kind-swap-target="example" data-kind="architecture"><strong>Example:</strong> A library app has to tell members when a book they reserved comes back. One option checks every few minutes, and another reacts the moment the book is returned. You pick one for the situation described and say what you&#39;d give up.</span>
@@ -743,8 +747,8 @@
 
                 <label class="daily-kind-option" for="daily-kind-0-security_review" data-kind="security_review">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-security_review" value="security_review" aria-describedby="daily-kind-0-security_review-short daily-kind-0-security_review-guide daily-kind-0-security_review-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Security Review">
-    <span>Security Review</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-security_review" value="security_review" aria-labelledby="daily-kind-0-security_review-name" aria-describedby="daily-kind-0-security_review-short daily-kind-0-security_review-guide daily-kind-0-security_review-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Security Review">
+    <span class="daily-kind-name" id="daily-kind-0-security_review-name">Security Review</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-0-security_review-short">Find the weakness an attacker could use.</span>
   <span id="daily-kind-0-security_review-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="security_review"><strong>Example:</strong> You see a short controller action that shows a shared shopping list. The question asks what someone could exploit here and how you&#39;d stop it.</span>
@@ -752,8 +756,8 @@
 
                 <label class="daily-kind-option" for="daily-kind-0-parsons_problem" data-kind="parsons_problem">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-parsons_problem" value="parsons_problem" aria-describedby="daily-kind-0-parsons_problem-short daily-kind-0-parsons_problem-guide daily-kind-0-parsons_problem-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Parsons Problem">
-    <span>Parsons Problem</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-parsons_problem" value="parsons_problem" aria-labelledby="daily-kind-0-parsons_problem-name" aria-describedby="daily-kind-0-parsons_problem-short daily-kind-0-parsons_problem-guide daily-kind-0-parsons_problem-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Parsons Problem">
+    <span class="daily-kind-name" id="daily-kind-0-parsons_problem-name">Parsons Problem</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-0-parsons_problem-short">Put shuffled pieces of code back in order.</span>
   <span id="daily-kind-0-parsons_problem-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="parsons_problem"><strong>Example:</strong> A short method that totals a gym member&#39;s weekly workouts arrives in a random order. You arrange the pieces until the method would run and give the right total.</span>
@@ -761,8 +765,8 @@
 
                 <label class="daily-kind-option" for="daily-kind-0-plan_review" data-kind="plan_review">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-plan_review" value="plan_review" aria-describedby="daily-kind-0-plan_review-short daily-kind-0-plan_review-guide daily-kind-0-plan_review-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Plan Review">
-    <span>Plan Review</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-plan_review" value="plan_review" aria-labelledby="daily-kind-0-plan_review-name" aria-describedby="daily-kind-0-plan_review-short daily-kind-0-plan_review-guide daily-kind-0-plan_review-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Plan Review">
+    <span class="daily-kind-name" id="daily-kind-0-plan_review-name">Plan Review</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-0-plan_review-short">Find the flaws in a plan before any code.</span>
   <span id="daily-kind-0-plan_review-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="plan_review"><strong>Example:</strong> The plan lays out five steps for letting gym members export their workout history. You&#39;re asked what you&#39;d want changed before you approve it.</span>
@@ -770,8 +774,8 @@
 
                 <label class="daily-kind-option" for="daily-kind-0-ambiguity_hunt" data-kind="ambiguity_hunt">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-ambiguity_hunt" value="ambiguity_hunt" aria-describedby="daily-kind-0-ambiguity_hunt-short daily-kind-0-ambiguity_hunt-guide daily-kind-0-ambiguity_hunt-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Ambiguity Hunt">
-    <span>Ambiguity Hunt</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-ambiguity_hunt" value="ambiguity_hunt" aria-labelledby="daily-kind-0-ambiguity_hunt-name" aria-describedby="daily-kind-0-ambiguity_hunt-short daily-kind-0-ambiguity_hunt-guide daily-kind-0-ambiguity_hunt-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Ambiguity Hunt">
+    <span class="daily-kind-name" id="daily-kind-0-ambiguity_hunt-name">Ambiguity Hunt</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-0-ambiguity_hunt-short">Find what a request leaves undecided.</span>
   <span id="daily-kind-0-ambiguity_hunt-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="ambiguity_hunt"><strong>Example:</strong> A product manager writes: “Let people pause their daily practice while they&#39;re on holiday.” You&#39;re asked what you&#39;d need answered before building it.</span>
@@ -779,8 +783,8 @@
 
                 <label class="daily-kind-option" for="daily-kind-0-pseudocode_to_code" data-kind="pseudocode_to_code">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-pseudocode_to_code" value="pseudocode_to_code" aria-describedby="daily-kind-0-pseudocode_to_code-short daily-kind-0-pseudocode_to_code-guide daily-kind-0-pseudocode_to_code-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Pseudocode to Code">
-    <span>Pseudocode to Code</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-pseudocode_to_code" value="pseudocode_to_code" aria-labelledby="daily-kind-0-pseudocode_to_code-name" aria-describedby="daily-kind-0-pseudocode_to_code-short daily-kind-0-pseudocode_to_code-guide daily-kind-0-pseudocode_to_code-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Pseudocode to Code">
+    <span class="daily-kind-name" id="daily-kind-0-pseudocode_to_code-name">Pseudocode to Code</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-0-pseudocode_to_code-short">Write steps in plain words, then see the code.</span>
   <span id="daily-kind-0-pseudocode_to_code-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="pseudocode_to_code"><strong>Example:</strong> The problem is merging overlapping bookings in a meeting room&#39;s calendar. You write your steps, and “Check my plan” can point out gaps before you submit.</span>
@@ -823,7 +827,7 @@
         <p class="daily-kind-warning">Your sets have two sections right now, so after this swap Architecture Decision will appear about once every 5 weeks, as an extra section. Swap it back to have it every day.</p>
         <p class="daily-kind-warning">Your two daily sections are also what decides when your sets grow.</p>
         <p>Plan Review and Ambiguity Hunt won&#39;t appear on their own while Pseudocode to Code is a daily section. Swap one of them in to get it back.</p>
-</div>  <p class="daily-kind-error" role="status" data-daily-kind-swap-target="error"></p>
+</div>  <p class="daily-kind-error" id="daily-kind-0-error" role="status" data-daily-kind-swap-target="error"></p>
   <div class="daily-kind-actions">
     <button type="button" class="btn btn-primary" disabled data-label="Swap"
             data-daily-kind-swap-target="confirm" data-action="daily-kind-swap#confirm">Swap</button>
@@ -930,8 +934,8 @@ Tradeoffs you considered:
               <legend class="visually-hidden">Choose the kind for this daily section</legend>
                 <label class="daily-kind-option" for="daily-kind-1-code_review" data-kind="code_review">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-code_review" value="code_review" aria-describedby="daily-kind-1-code_review-short daily-kind-1-code_review-guide daily-kind-1-code_review-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Code Review">
-    <span>Code Review</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-code_review" value="code_review" aria-labelledby="daily-kind-1-code_review-name" aria-describedby="daily-kind-1-code_review-short daily-kind-1-code_review-guide daily-kind-1-code_review-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Code Review">
+    <span class="daily-kind-name" id="daily-kind-1-code_review-name">Code Review</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-1-code_review-short">Find the one problem in a short piece of code.</span>
   <span id="daily-kind-1-code_review-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="code_review"><strong>Example:</strong> You see a ten-line method from a library app that emails members about overdue books. The question asks what&#39;s wrong with it and how you&#39;d fix it. On some days the code is a test file or a database migration instead.</span>
@@ -939,9 +943,9 @@ Tradeoffs you considered:
 
                 <label class="daily-kind-option" for="daily-kind-1-design_comparison" data-kind="design_comparison">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-design_comparison" value="design_comparison" checked="checked" aria-describedby="daily-kind-1-design_comparison-short daily-kind-1-design_comparison-guide" data-daily-kind-swap-target="option" data-state="now">
-    <span>Design Comparison</span>
-      <span class="daily-kind-badge daily-kind-badge-now">Now</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-design_comparison" value="design_comparison" checked="checked" aria-labelledby="daily-kind-1-design_comparison-name daily-kind-1-design_comparison-badge-0" aria-describedby="daily-kind-1-design_comparison-short daily-kind-1-design_comparison-guide" data-daily-kind-swap-target="option" data-state="now">
+    <span class="daily-kind-name" id="daily-kind-1-design_comparison-name">Design Comparison</span>
+      <span class="daily-kind-badge daily-kind-badge-now" id="daily-kind-1-design_comparison-badge-0">Now</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-1-design_comparison-short">Both work — pick the one that suits the system.</span>
   <span id="daily-kind-1-design_comparison-guide" class="daily-kind-example" data-daily-kind-swap-target="example" data-kind="design_comparison"><strong>Example:</strong> A grocery list app will add new kinds of items later. Piece A and Piece B both save an item today, built two different ways. You choose one and point to the sentence that settles it.</span>
@@ -949,8 +953,8 @@ Tradeoffs you considered:
 
                 <label class="daily-kind-option" for="daily-kind-1-pattern" data-kind="pattern">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-pattern" value="pattern" aria-describedby="daily-kind-1-pattern-short daily-kind-1-pattern-guide daily-kind-1-pattern-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Pattern of the Month">
-    <span>Pattern of the Month</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-pattern" value="pattern" aria-labelledby="daily-kind-1-pattern-name" aria-describedby="daily-kind-1-pattern-short daily-kind-1-pattern-guide daily-kind-1-pattern-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Pattern of the Month">
+    <span class="daily-kind-name" id="daily-kind-1-pattern-name">Pattern of the Month</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-1-pattern-short">Apply a named pattern to a real problem.</span>
   <span id="daily-kind-1-pattern-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="pattern"><strong>Example:</strong> The setting is a gym log, where one button saves a workout, updates a streak and sends a message. You&#39;re asked how you&#39;d structure the work using the day&#39;s pattern, and you describe it in words.</span>
@@ -958,8 +962,8 @@ Tradeoffs you considered:
 
                 <label class="daily-kind-option" for="daily-kind-1-challenge" data-kind="challenge">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-challenge" value="challenge" aria-describedby="daily-kind-1-challenge-short daily-kind-1-challenge-guide daily-kind-1-challenge-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Coding Challenge">
-    <span>Coding Challenge</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-challenge" value="challenge" aria-labelledby="daily-kind-1-challenge-name" aria-describedby="daily-kind-1-challenge-short daily-kind-1-challenge-guide daily-kind-1-challenge-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Coding Challenge">
+    <span class="daily-kind-name" id="daily-kind-1-challenge-name">Coding Challenge</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-1-challenge-short">Write code for a small, self-contained task.</span>
   <span id="daily-kind-1-challenge-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="challenge"><strong>Example:</strong> The task is a method that sorts a shopping list by aisle, with a sentence saying what it should return. You write the method in the answer box.</span>
@@ -967,9 +971,9 @@ Tradeoffs you considered:
 
                 <label class="daily-kind-option" for="daily-kind-1-architecture" data-kind="architecture">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-architecture" value="architecture" disabled="disabled" aria-describedby="daily-kind-1-architecture-short daily-kind-1-architecture-guide" data-daily-kind-swap-target="option" data-state="disabled">
-    <span>Architecture Decision</span>
-      <span class="daily-kind-badge">Already daily</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-architecture" value="architecture" disabled="disabled" aria-labelledby="daily-kind-1-architecture-name daily-kind-1-architecture-badge-0" aria-describedby="daily-kind-1-architecture-short daily-kind-1-architecture-guide" data-daily-kind-swap-target="option" data-state="disabled">
+    <span class="daily-kind-name" id="daily-kind-1-architecture-name">Architecture Decision</span>
+      <span class="daily-kind-badge" id="daily-kind-1-architecture-badge-0">Already daily</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-1-architecture-short">Choose an approach and name what it costs.</span>
   <span id="daily-kind-1-architecture-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="architecture"><strong>Example:</strong> A library app has to tell members when a book they reserved comes back. One option checks every few minutes, and another reacts the moment the book is returned. You pick one for the situation described and say what you&#39;d give up.</span>
@@ -977,8 +981,8 @@ Tradeoffs you considered:
 
                 <label class="daily-kind-option" for="daily-kind-1-security_review" data-kind="security_review">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-security_review" value="security_review" aria-describedby="daily-kind-1-security_review-short daily-kind-1-security_review-guide daily-kind-1-security_review-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Security Review">
-    <span>Security Review</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-security_review" value="security_review" aria-labelledby="daily-kind-1-security_review-name" aria-describedby="daily-kind-1-security_review-short daily-kind-1-security_review-guide daily-kind-1-security_review-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Security Review">
+    <span class="daily-kind-name" id="daily-kind-1-security_review-name">Security Review</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-1-security_review-short">Find the weakness an attacker could use.</span>
   <span id="daily-kind-1-security_review-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="security_review"><strong>Example:</strong> You see a short controller action that shows a shared shopping list. The question asks what someone could exploit here and how you&#39;d stop it.</span>
@@ -986,8 +990,8 @@ Tradeoffs you considered:
 
                 <label class="daily-kind-option" for="daily-kind-1-parsons_problem" data-kind="parsons_problem">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-parsons_problem" value="parsons_problem" aria-describedby="daily-kind-1-parsons_problem-short daily-kind-1-parsons_problem-guide daily-kind-1-parsons_problem-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Parsons Problem">
-    <span>Parsons Problem</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-parsons_problem" value="parsons_problem" aria-labelledby="daily-kind-1-parsons_problem-name" aria-describedby="daily-kind-1-parsons_problem-short daily-kind-1-parsons_problem-guide daily-kind-1-parsons_problem-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Parsons Problem">
+    <span class="daily-kind-name" id="daily-kind-1-parsons_problem-name">Parsons Problem</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-1-parsons_problem-short">Put shuffled pieces of code back in order.</span>
   <span id="daily-kind-1-parsons_problem-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="parsons_problem"><strong>Example:</strong> A short method that totals a gym member&#39;s weekly workouts arrives in a random order. You arrange the pieces until the method would run and give the right total.</span>
@@ -995,8 +999,8 @@ Tradeoffs you considered:
 
                 <label class="daily-kind-option" for="daily-kind-1-plan_review" data-kind="plan_review">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-plan_review" value="plan_review" aria-describedby="daily-kind-1-plan_review-short daily-kind-1-plan_review-guide daily-kind-1-plan_review-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Plan Review">
-    <span>Plan Review</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-plan_review" value="plan_review" aria-labelledby="daily-kind-1-plan_review-name" aria-describedby="daily-kind-1-plan_review-short daily-kind-1-plan_review-guide daily-kind-1-plan_review-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Plan Review">
+    <span class="daily-kind-name" id="daily-kind-1-plan_review-name">Plan Review</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-1-plan_review-short">Find the flaws in a plan before any code.</span>
   <span id="daily-kind-1-plan_review-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="plan_review"><strong>Example:</strong> The plan lays out five steps for letting gym members export their workout history. You&#39;re asked what you&#39;d want changed before you approve it.</span>
@@ -1004,8 +1008,8 @@ Tradeoffs you considered:
 
                 <label class="daily-kind-option" for="daily-kind-1-ambiguity_hunt" data-kind="ambiguity_hunt">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-ambiguity_hunt" value="ambiguity_hunt" aria-describedby="daily-kind-1-ambiguity_hunt-short daily-kind-1-ambiguity_hunt-guide daily-kind-1-ambiguity_hunt-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Ambiguity Hunt">
-    <span>Ambiguity Hunt</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-ambiguity_hunt" value="ambiguity_hunt" aria-labelledby="daily-kind-1-ambiguity_hunt-name" aria-describedby="daily-kind-1-ambiguity_hunt-short daily-kind-1-ambiguity_hunt-guide daily-kind-1-ambiguity_hunt-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Ambiguity Hunt">
+    <span class="daily-kind-name" id="daily-kind-1-ambiguity_hunt-name">Ambiguity Hunt</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-1-ambiguity_hunt-short">Find what a request leaves undecided.</span>
   <span id="daily-kind-1-ambiguity_hunt-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="ambiguity_hunt"><strong>Example:</strong> A product manager writes: “Let people pause their daily practice while they&#39;re on holiday.” You&#39;re asked what you&#39;d need answered before building it.</span>
@@ -1013,8 +1017,8 @@ Tradeoffs you considered:
 
                 <label class="daily-kind-option" for="daily-kind-1-pseudocode_to_code" data-kind="pseudocode_to_code">
   <span class="daily-kind-option-name">
-    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-pseudocode_to_code" value="pseudocode_to_code" aria-describedby="daily-kind-1-pseudocode_to_code-short daily-kind-1-pseudocode_to_code-guide daily-kind-1-pseudocode_to_code-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Pseudocode to Code">
-    <span>Pseudocode to Code</span>
+    <input type="radio" form="daily-kind-swap" name="daily_kind_1" id="daily-kind-1-pseudocode_to_code" value="pseudocode_to_code" aria-labelledby="daily-kind-1-pseudocode_to_code-name" aria-describedby="daily-kind-1-pseudocode_to_code-short daily-kind-1-pseudocode_to_code-guide daily-kind-1-pseudocode_to_code-consequences" data-daily-kind-swap-target="option" data-state="available" data-confirm-label="Swap to Pseudocode to Code">
+    <span class="daily-kind-name" id="daily-kind-1-pseudocode_to_code-name">Pseudocode to Code</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-1-pseudocode_to_code-short">Write steps in plain words, then see the code.</span>
   <span id="daily-kind-1-pseudocode_to_code-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="pseudocode_to_code"><strong>Example:</strong> The problem is merging overlapping bookings in a meeting room&#39;s calendar. You write your steps, and “Check my plan” can point out gaps before you submit.</span>
@@ -1057,7 +1061,7 @@ Tradeoffs you considered:
         <p class="daily-kind-warning">Your sets have two sections right now, so after this swap Design Comparison will appear about once every 5 weeks, as an extra section. Swap it back to have it every day.</p>
         <p class="daily-kind-warning">Your two daily sections are also what decides when your sets grow.</p>
         <p>Plan Review and Ambiguity Hunt won&#39;t appear on their own while Pseudocode to Code is a daily section. Swap one of them in to get it back.</p>
-</div>  <p class="daily-kind-error" role="status" data-daily-kind-swap-target="error"></p>
+</div>  <p class="daily-kind-error" id="daily-kind-1-error" role="status" data-daily-kind-swap-target="error"></p>
   <div class="daily-kind-actions">
     <button type="button" class="btn btn-primary" disabled data-label="Swap"
             data-daily-kind-swap-target="confirm" data-action="daily-kind-swap#confirm">Swap</button>

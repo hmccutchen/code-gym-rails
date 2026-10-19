@@ -38,7 +38,7 @@ RSpec.describe "Swapping a daily section kind", type: :request do
     expect(body["panels"]["1"]).to include(%(aria-label="Swap Design Comparison for another kind"))
       .and include("Your next set uses #{I18n.t("sections.architecture.name")} here.")
       .and include(%(id="daily-kind-1-design_comparison"))
-    expect(body["panels"]["0"]).to include(%(<span class="daily-kind-badge">Already daily</span>))
+    expect(body["panels"]["0"]).to include(%(<span class="daily-kind-badge" id="daily-kind-0-architecture-badge-0">Already daily</span>))
     expect(exercise.reload.problem_set.keys).to eq(%w[code_review design_comparison])
   end
 

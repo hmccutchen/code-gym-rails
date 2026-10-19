@@ -13,6 +13,14 @@ function isEditable(element) {
   return element instanceof Element && element.matches("input, textarea, select, [contenteditable]")
 }
 
+function isModal(dialog) {
+  try { return dialog.matches(":modal") } catch (_) { return true }
+}
+
+function modalOpen() {
+  return [...document.querySelectorAll("dialog[open]")].some(isModal)
+}
+
 function insideScrolledArea(element) {
   for (let node = element; node instanceof Element; node = node.parentElement) {
     if (node.scrollTop > 0) return true
@@ -66,7 +74,8 @@ export default class extends Controller {
            window.scrollY <= 0 &&
            !isEditable(document.activeElement) &&
            !isEditable(event.target) &&
-           !document.querySelector("form[inert], dialog:modal") &&
+           !document.querySelector("form[inert]") &&
+           !modalOpen() &&
            !insideScrolledArea(event.target)
   }
 
