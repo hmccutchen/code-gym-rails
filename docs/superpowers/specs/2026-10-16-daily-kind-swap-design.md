@@ -791,45 +791,40 @@ wide wraps onto a second line rather than being truncated.
 | Kind | Line | Width |
 |---|---|---|
 | Code Review | Find the one problem in a short piece of code. | 296 px |
-| Design Comparison | Pick which of two working designs suits the system. | 335 px, wraps |
-| Pattern of the Month | Apply a named design pattern to a real problem. | 309 px, wraps |
+| Design Comparison | Both work — pick the one that suits the system. | 306 px, wraps |
+| Pattern of the Month | Apply a named pattern to a real problem. | 262 px |
 | Coding Challenge | Write code for a small, self-contained task. | 275 px |
 | Architecture Decision | Choose an approach and name what it costs. | 290 px |
 | Security Review | Find the weakness an attacker could use. | 266 px |
-| Parsons Problem | Put shuffled lines of code back in order. | 255 px |
-| Plan Review | Find what a plan misses before any code. | 266 px |
+| Parsons Problem | Put shuffled pieces of code back in order. | 268 px |
+| Plan Review | Find the flaws in a plan before any code. | 260 px |
 | Ambiguity Hunt | Find what a request leaves undecided. | 248 px |
-| Pseudocode to Code | Write the steps in plain words, then in code. | 281 px |
+| Pseudocode to Code | Write steps in plain words, then see the code. | 293 px |
 
-**Wording that is deliberate.** Three lines corrected an earlier draft.
-Keep them as they are:
+**Wording that is deliberate.** Keep these as they are:
 
 - **Code Review says "problem", not "bug".** The guide says problem, and the
   day's code is sometimes a test file or a database migration, where the
   issue isn't a bug.
-- **Design Comparison says "suits the system", not "the better of two".**
-  The choice is about which design fits the system described. Neither is
-  better in general.
-- **Plan Review doesn't say "push back on".** That phrasing presumes the plan
-  is wrong before it has been read.
-
-**Two lines still differ from the exercise their kind runs.** Each line was
-checked against its kind's guide summary and its generation guidance:
-
-- **Plan Review.** The generation guidance plants 2-3 flaws in every plan:
-  one technical anti-pattern, one scope-creep item and one unflagged
-  behaviour change. Most of those are things the plan does wrong or adds,
-  not things it misses, so "Find what a plan misses" describes a narrower
-  exercise. The plan is also never sound, since every one carries planted
-  flaws. A line that fits both the exercise and the concern above:
-  "Find the flaws in a plan before any code." (260 px).
-- **Pseudocode to Code.** The engineer writes only the steps. Code Gym turns
-  them into code when the answer is reviewed, and the guide says so. "then
-  in code" says the engineer writes the code too. A line that keeps the
-  shape: "Write plain steps; see them turned into code." (287 px).
-- The other eight match their guides. Parsons blocks can hold more than one
-  line, where the guide says "pieces", but "lines" reads correctly for the
-  usual one-line block.
+- **Design Comparison says both pieces work, and "suits the system".**
+  That both work is what separates it from Code Review, and the choice is
+  about which design fits the system described, not which is better in
+  general. The line is 2 px over the limit at 390 px and wraps there. Let
+  it wrap. Dropping "work" to make it fit would lose the distinction.
+- **Plan Review says "flaws".** Every plan carries 2-3 planted flaws, and
+  most of them are things the plan does (an anti-pattern, scope creep, an
+  unflagged behaviour change), not things it leaves out, so "misses" would
+  be wrong. "Flaws" also keeps it apart from Code Review's "problem". It
+  avoids "push back on", which presumes the plan is wrong before it has
+  been read.
+- **Pseudocode to Code says "see the code".** The engineer writes only the
+  steps, and Code Gym turns them into code when the answer is reviewed.
+  "then in code" would say the engineer writes the code too.
+- **Parsons Problem says "pieces", not "lines".** A block can hold more than
+  one line, and the guide says pieces.
+- **Pattern of the Month says "a named pattern".** The kind's name already
+  supplies "design".
+- No line uses a semicolon.
 
 `ambiguity_hunt`'s guide carries a comment that it names no gap and no kind
 of gap. Its line keeps that rule.
