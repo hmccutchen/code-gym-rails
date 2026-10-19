@@ -30,3 +30,10 @@ a late reply cannot reload the page or schedule another attempt.
 and `DailyExercise::REGENERATION_STALE_AFTER`. Those are the authorities for
 how long a generation may take, and the controller reads the answer rather
 than deriving one.
+
+## The reload waits for other saves
+
+On the submitted dashboard the review poll shares the page with the daily
+cards' swaps. Its reload goes through `saveStatus.leaveWhenSaved`. While
+another save is pending or has failed, the leave is held and stays armed, so
+the page reloads once that save lands.

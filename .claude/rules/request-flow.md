@@ -69,7 +69,9 @@ User interacts:
        then returns to the dashboard (where the button lives)
   └→ DailyKindsController#update     → swaps one daily kind (DailyKindSwap): saves
        the pair under the user-row lock, writes one daily_kind_swaps row, and
-       never touches today's set; the new pair starts with the next set planned
+       never touches today's set; the new pair starts with the next set planned.
+       The reply re-renders every daily card's picker panel, so both carry the
+       new version
   └→ DailyExercisesController#regenerate → replaces today's set in place (once/day),
        destroying today's response — so it is blocked once that response has been
        reviewed, the same invariant ResponsesController#start_over is blocked on

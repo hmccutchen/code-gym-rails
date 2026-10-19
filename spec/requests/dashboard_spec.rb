@@ -96,7 +96,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include('data-answer-form-stale-reloaded-value')
 
     source = Rails.root.join("app/javascript/controllers/answer_form_controller.js").read
-    carried = source.scan(/saveStatus\.carry\("answers",[^\n]*\n\s*window\.location\.reload\(\)/)
+    carried = source.scan(/saveStatus\.carry\("answers",[^\n]*\n\s*(?:window\.location\.reload\(\)|return this\.reloadWhenOtherSavesLand\(\))/)
     expect(carried.length).to eq(source.scan(/status === 409/).length)
     expect(carried).not_to be_empty
   end

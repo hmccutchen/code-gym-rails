@@ -6,7 +6,7 @@ class DailyPlan
                         :shared_concept, :coverage, :waiting_checks, :size) do
     def notes
       { "daily_kinds" => daily_kinds.map(&:key), "size" => size&.count, "size_reason" => size&.reason&.to_s,
-        "coverage" => coverage&.kind&.key, "coverage_reason" => coverage&.reason&.to_s,
+        "brake" => (true if size&.brake?), "coverage" => coverage&.kind&.key, "coverage_reason" => coverage&.reason&.to_s,
         "shared_concept" => shared_concept }.compact
     end
 

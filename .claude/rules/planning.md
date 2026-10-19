@@ -14,6 +14,12 @@ paths:
   - "app/models/daily_response.rb"
   - "spec/**/competency_gate/**"
   - "spec/**/*{weighted_roll,daily_exercise}*"
+  - "app/models/{daily_kinds,daily_kind_swap}.rb"
+  - "app/models/daily_kind_swap/**"
+  - "app/controllers/daily_kinds_controller.rb"
+  - "app/views/daily_kinds/**"
+  - "app/javascript/controllers/daily_kind_swap_controller.js"
+  - "spec/**/*daily_kind*"
 ---
 
 # Day planning, sizing and mastery
@@ -60,7 +66,12 @@ read it before changing that area.
   `ExerciseSection.layout(daily:)` or `.optional_slots(daily:)`; never
   re-introduce a global slot list. A default account must stay byte-identical,
   which the prompt, page and request snapshots hold. A daily fourth takes the
-  fourth slot out of rotation. `CompetencyGate` reads each day's own pair.
+  fourth slot out of rotation. `CompetencyGate` reads each day's own pair. The card's swap control (`DailyKindSwap::Picker`,
+  `DailyKindSwap::Consequences`) restates no pair rule: option states come
+  from `DailyKindSwap.refusal`, sharing from `DayHosts`, the weeks figure
+  from `CoverageException.expected_gap_weekdays` (pinned to the real planner
+  by `coverage_exception_cadence_spec`), and whether coverage runs from
+  `CoverageException.applies_to_day?` with the row's `brake` note.
   `DailyKindSwap` (`PATCH /daily_kinds/:place`) is the one writer of a
   non-default pair: it refuses a stale version, a repeat, a second fourth or a
   pair that empties an optional slot, saves under the user-row lock and writes
@@ -79,8 +90,8 @@ read it before changing that area.
 - **What the plan did, on the row**
   (`docs/decisions/what-the-plan-did-on-the-row.md`):
   `daily_exercises.plan_notes` records the planned size and reason on every
-  plan and the day's daily kinds (`daily_kinds`), plus coverage and shared
-  concept when they applied (`DailyPlan::Result#notes`). It is server-owned, written with the row from
+  plan and the day's daily kinds (`daily_kinds`), plus coverage, shared
+  concept and `brake` when they applied (`DailyPlan::Result#notes`). It is server-owned, written with the row from
   the plan that produced it and never recomputed while rendering; the size
   excludes any coverage addition, and `RegenerateExerciseJob` rewrites it from
   the new plan.

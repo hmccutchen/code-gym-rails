@@ -1,7 +1,8 @@
-<%# Locals: exercise, response, submitted. The one section loop; a slot number is its position here, never set per kind. %>
+<%# Locals: exercise, response, submitted, pickers (optional; History passes none). The one section loop; a slot number is its position here, never set per kind. %>
 <% exercise.active_section_keys.each_with_index do |key, index| %>
   <%= render "responses/section",
         kind: ExerciseSection.for(key), key: key,
         data: exercise.problem_set[key], slot: index + 1,
-        exercise: exercise, response: response, submitted: submitted %>
+        exercise: exercise, response: response, submitted: submitted,
+        picker: local_assigns[:pickers]&.[](key) %>
 <% end %>

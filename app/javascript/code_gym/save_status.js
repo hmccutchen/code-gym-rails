@@ -13,6 +13,8 @@ let counter = 0;
 
 let requests = 0;
 const probes = [];
+const held = [];
+const carriedKeys = new Set();
 
 function generic() {
   return document.body?.dataset?.saveFailedText ?? "";
@@ -30,13 +32,42 @@ export function pending() {
   return requests > 0 || [...queues.values()].some((line) => line.busy || line.waiting.length > 0) || probes.some((probe) => probe());
 }
 
-export function reloadWhenSaved(conflict, stranded, waited = 0) {
+export function settled(...ignored) {
+  return new Promise((resolve) => waitToSettle(ignored, resolve, 0));
+}
+
+function waitToSettle(ignored, resolve, waited) {
   if (pending() && waited < SETTLE_WAIT_LIMIT_MS) {
-    setTimeout(() => reloadWhenSaved(conflict, stranded, waited + SETTLE_POLL_MS), SETTLE_POLL_MS);
+    setTimeout(() => waitToSettle(ignored, resolve, waited + SETTLE_POLL_MS), SETTLE_POLL_MS);
     return;
   }
-  if (pending() || [...failures.keys()].some((key) => key !== conflict)) return stranded();
-  window.location.reload();
+  resolve(clean(ignored));
+}
+
+function clean(ignored) {
+  return !pending() && ![...failures.keys()].some((key) => !ignored.includes(key) && !carriedKeys.has(key));
+}
+
+export function leaveWhenSaved(leave, stranded, ...ignored) {
+  return settled(...ignored).then((ready) => {
+    if (ready) return leave();
+    held.push({ leave: leave, ignored: ignored });
+    stranded();
+  });
+}
+
+function resumeHeld() {
+  if (held.length === 0) return;
+  setTimeout(() => {
+    held.filter((entry) => clean(entry.ignored)).forEach((entry) => {
+      held.splice(held.indexOf(entry), 1);
+      entry.leave();
+    });
+  }, 0);
+}
+
+export function reloadWhenSaved(conflict, stranded) {
+  return leaveWhenSaved(() => window.location.reload(), stranded, conflict);
 }
 
 function render() {
@@ -61,6 +92,7 @@ function render() {
 }
 
 export function report(key, message) {
+  carriedKeys.delete(key);
   failures.delete(key);
   failures.set(key, message);
   render();
@@ -69,6 +101,7 @@ export function report(key, message) {
 export function clear(key) {
   failures.delete(key);
   render();
+  resumeHeld();
 }
 
 export function save(method, url, body, key, failureMessage = null) {
@@ -83,7 +116,10 @@ export function save(method, url, body, key, failureMessage = null) {
       else report(key, failureMessage || result.message);
     }
     return { ok: result.ok, status: result.status || undefined, data: result.data, unreached: result.status === 0, message: result.message };
-  }).finally(() => { requests--; });
+  }).finally(() => {
+    requests--;
+    resumeHeld();
+  });
 }
 
 // A body given as a function is read when the save is sent; returning null drops that save.
@@ -156,7 +192,9 @@ function reportCarried() {
     if (!carried) return;
     sessionStorage.removeItem(CARRIED);
     const parsed = JSON.parse(carried);
-    if (parsed && parsed.message && parsed.path === location.pathname) report(parsed.key || "carried", parsed.message);
+    if (!parsed || !parsed.message || parsed.path !== location.pathname) return;
+    report(parsed.key || "carried", parsed.message);
+    carriedKeys.add(parsed.key || "carried");
   } catch (_) {
     try { sessionStorage.removeItem(CARRIED); } catch (_) { /* storage is unavailable; the page shows no carried message */ }
   }
@@ -164,4 +202,4 @@ function reportCarried() {
 
 reportCarried();
 
-export default { save, queue, queued, watch, pending, reloadWhenSaved, carry, report, clear };
+export default { save, queue, queued, watch, pending, settled, leaveWhenSaved, reloadWhenSaved, carry, report, clear };

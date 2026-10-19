@@ -1,0 +1,19 @@
+<%# Locals: option (DailyKindSwap::Picker::Option), prefix (this place's id prefix), place. %>
+<% key = option.kind.key %>
+<% id = "#{prefix}-#{key}" %>
+<% described = [ "#{id}-guide", ("#{id}-note" if option.note), ("#{id}-consequences" if option.consequences&.sentences&.any?) ].compact %>
+<div class="daily-kind-option" data-kind="<%= key %>">
+  <%= tag.input type: "radio", form: "daily-kind-swap", name: "daily_kind_#{place}", id: id, value: key,
+                checked: option.now?, disabled: !(option.available? || option.now?), aria: { describedby: described.join(" ") },
+                data: { daily_kind_swap_target: "option", state: option.state } %>
+  <label for="<%= id %>"><%= t("sections.#{key}.name") %><% if option.mark %> <span class="daily-kind-now"><%= option.mark %></span><% end %></label>
+  <% if option.note %>
+    <p class="hint" id="<%= id %>-note"><%= option.note %></p>
+  <% end %>
+  <%= render "responses/kind_guide", key: key, id: "#{id}-guide" %>
+  <% if option.consequences&.sentences&.any? %>
+    <ul class="daily-kind-consequences" id="<%= id %>-consequences">
+      <% option.consequences.sentences.each do |sentence| %><li><%= sentence %></li><% end %>
+    </ul>
+  <% end %>
+</div>

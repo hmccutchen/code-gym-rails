@@ -32,7 +32,9 @@ export default class extends Controller {
     savingOffline: String,
     submitOffline: String,
     reviewStartFailed: String,
-    controlsNotReady: String
+    controlsNotReady: String,
+    leaveHeld: String,
+    reloadNow: String
   }
 
   connect() {
@@ -159,28 +161,49 @@ export default class extends Controller {
   sendSave() {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
-    if (this.formTarget.inert) return
+    if (this.formTarget.inert || this.submitHeld) return
     this.storeDraft()
     saveStatus.queue("answers", "POST", this.formTarget.action, () => this.nextSave(), { latest: true, offline: () => this.offlineSentence() })
       .then(({ ok, status, data, skipped }) => {
-        if (skipped) return
+        if (skipped || this.submitHeld) return
         if (ok) this.settleSubmitFailure()
         if (ok) this.settleDraft(data)
         if (!ok && status === 409 && data?.status === "stale") {
           this.clearOwnDraft()
           saveStatus.carry("answers", this.staleReloadedValue)
-          window.location.reload()
-          return
+          return this.reloadWhenOtherSavesLand()
         }
         if (ok && data?.submitted && !this.formTarget.inert && !this.reviewRequested) {
           draftStore.clear()
-          return window.location.reload()
+          return this.reloadWhenOtherSavesLand()
         }
         if (ok && this.saveTimer === null && !saveStatus.queued("answers") && !this.formTarget.inert) this.applyServerState(data)
       })
   }
 
+  reloadWhenOtherSavesLand() {
+    this.leaveWhenOtherSavesLand(() => window.location.reload())
+  }
+
+  leaveWhenOtherSavesLand(leave, ...ignored) {
+    this.submitHeld = true
+    clearTimeout(this.saveTimer)
+    this.saveTimer = null
+    if (!this.formTarget.inert) this.freezeAnswers()
+    return saveStatus.leaveWhenSaved(() => this.relockAndLeave(leave), () => this.holdForOtherSaves(), "answers", ...ignored)
+  }
+
+  relockAndLeave(leave) {
+    this.formTarget.inert = true
+    leave()
+  }
+
+  leaveAfterSubmit(result, stale) {
+    this.startReview(result) || this.reloadAfterSubmit(result, stale)
+  }
+
   autoSave() {
+    if (this.submitHeld) return
     clearTimeout(this.saveTimer)
     this.storeDraft()
     this.saveTimer = this.formTarget.inert ? null : setTimeout(() => this.sendSave(), AUTOSAVE_DELAY_MS)
@@ -248,7 +271,8 @@ export default class extends Controller {
     const result = await request.send("POST", this.formTarget.action, this.payload({ submit: "1" }), { fallback: this.submitFailedValue })
     if (result.ok) saveStatus.clear("submit")
     if (result.ok) draftStore.clear()
-    if (this.startReview(result) || this.reloadAfterSubmit(result)) return
+    const stale = result.status === 409
+    if (result.ok || stale) return this.leaveWhenOtherSavesLand(() => this.leaveAfterSubmit(result, stale), "submit")
 
     const refused = result.status === 422 && Boolean(result.data?.submit_blocker)
     if (refused) {
@@ -302,13 +326,44 @@ export default class extends Controller {
   }
 
   // Stays inert behind the reload: restoring the form would queue an autosave of the refused payload.
-  reloadAfterSubmit(result) {
-    const stale = result.status === 409
+  reloadAfterSubmit(result, stale) {
     if (!result.ok && !stale) return false
     this.clearOwnDraft()
     saveStatus.carry("answers", result.ok ? this.reviewStartFailedValue : this.staleReloadedValue)
     window.location.reload()
     return true
+  }
+
+  // Answers stay read-only, since the server would drop any edit now; the swap rows stay usable so the held save can land.
+  freezeAnswers() {
+    this.formTarget.inert = false
+    this.formTarget.querySelectorAll(":scope > *, details.section > *").forEach((element) => {
+      if (!element.matches("details.section, summary, .daily-kind-swap")) element.inert = true
+    })
+    this.submitButtonTarget.disabled = true
+  }
+
+  holdForOtherSaves() {
+    this.freezeAnswers()
+    this.submitButtonTarget.classList.remove("btn-loading")
+    this.submitButtonTarget.textContent = this.submitLabelValue
+    this.showHeldNotice()
+  }
+
+  showHeldNotice() {
+    if (this.element.querySelector("#leave-held")) return
+    const notice = document.createElement("p")
+    notice.className = "hint"
+    notice.id = "leave-held"
+    notice.setAttribute("role", "status")
+    notice.textContent = `${this.leaveHeldValue} `
+    const reload = document.createElement("button")
+    reload.type = "button"
+    reload.className = "btn btn-ghost btn-sm"
+    reload.textContent = this.reloadNowValue
+    reload.addEventListener("click", () => window.location.reload())
+    notice.append(reload)
+    this.element.append(notice)
   }
 
   unlock() {

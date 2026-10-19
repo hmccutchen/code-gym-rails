@@ -87,6 +87,37 @@ the module has connected. `spec/system/deferred_module_spec.rb` answers the
 missing comparison module with a 404 and expects the stale pick to stay
 unsubmitted.
 
+## Leaving the page waits for other saves
+
+Every way the form leaves the page by itself goes through
+`saveStatus.settled`: the submit, before it starts the review or reloads
+after a 409, and the autosave's two reloads, for a 409 saying the set
+changed and for a reply saying another tab submitted. Another control may
+still have a save queued, such as a daily card's swap waiting behind the
+other card's, or a save that failed and is waiting for a retry; leaving
+would drop it. When nothing is pending and no other key has a failure,
+`settled` resolves at once, so a normal submit leaves as before.
+
+Each of those leaves goes through `leaveWhenOtherSavesLand`, which sets
+`submitHeld` first, so `autoSave` and `sendSave` do nothing from then on, and
+the reply to an autosave already on the wire is ignored, so a late
+`submitted: true` can't start a reload that competes with the armed leave: the
+page is about to leave, and the server would ignore an edit to a submitted
+response or one for a replaced set. It also calls `freezeAnswers` at once,
+before the gate answers, unless the form is already inert from a submit:
+every answer, rating and section control becomes `inert`, so no edit can be
+made during the wait and then dropped by the leave. Each section's summary
+and the daily cards' swap rows stay usable, so the save that blocks the page
+can be retried, and Submit is disabled. When the gate holds,
+`holdForOtherSaves` applies the same freeze (to a submit's form too) and adds
+a notice with a Reload button. When the armed leave finally runs, `relockAndLeave`
+makes the whole form inert again, swap rows included, so no new swap can be
+queued while the review POST or the reload is on its way. The leave stays armed in `save_status`: once the
+retried save lands, the held submit goes on to the review, and a held
+autosave reload reloads. The `answers` and `submit` keys are ignored,
+because the submit carries every answer. `docs/code-notes/app/javascript/code_gym/save_status.md`
+lists which paths use the gate and which deliberately don't.
+
 ## The copy on the device
 
 Every edit writes the answers and ratings to `code_gym/draft_store` with the
