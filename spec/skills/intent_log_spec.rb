@@ -80,6 +80,23 @@ RSpec.describe "The intent-log skill's scripts" do
       expect(output).to include("`#2 open` marks a merged PR", "#3 (merged) by teammate is in no entry")
     end
 
+    it "reads a Feb 29 heading in the year it names or inherits" do
+      prs.push(pr(1, author: "me"))
+      write("docs/intent/me.md", "# me\n\n## Wed Feb 28, 2024\n\n- the day before\n\n## Thu Feb 29\n\n- leap day\n\n" \
+                                 "## Tue Oct 20, 2026\n\n- today `#1`\n")
+
+      output, status = check
+      expect(status).to be_success, output
+    end
+
+    it "hands --repo to gh as an argument, never to a shell" do
+      prs.push(pr(1, author: "me"))
+      entry("me", "today `#1`")
+
+      check("--repo", "$(touch injected)")
+      expect(File.exist?(File.join(repo, "injected"))).to be(false)
+    end
+
     it "does not let a teammate's mention account for your PR" do
       prs.push(pr(1, author: "me"))
       entry("me", "something else")
@@ -148,8 +165,8 @@ RSpec.describe "The intent-log skill's scripts" do
                                                   "prompt" => text, "origin" => { "kind" => "human" } } }
     end
 
-    def transcript(*records, project: File.expand_path(repo).tr("/", "-"))
-      write("home/.claude/projects/#{project}/s.jsonl", records.map { JSON.generate(_1) }.join("\n") + "\n")
+    def transcript(*records, project: File.expand_path(repo).tr("/", "-"), file: "s")
+      write("home/.claude/projects/#{project}/#{file}.jsonl", records.map { JSON.generate(_1) }.join("\n") + "\n")
     end
 
     def dump
@@ -190,6 +207,23 @@ RSpec.describe "The intent-log skill's scripts" do
 
       expect(dump.scan("use a bottom sheet").size).to eq(2)
       expect(dump.scan("add a cancel button").size).to eq(1)
+    end
+
+    it "keeps a request asked again within two minutes, and a copied turn once" do
+      transcript(typed("15:00:00", "use a bottom sheet"), typed("15:00:20", "switch to an inline picker"),
+                 typed("15:00:50", "use a bottom sheet"))
+      transcript(typed("15:00:20", "switch to an inline picker"), file: "resumed")
+
+      expect(dump.scan("use a bottom sheet").size).to eq(2)
+      expect(dump.scan("switch to an inline picker").size).to eq(1)
+    end
+
+    it "hands --repo to git as an argument, never to a shell" do
+      odd = File.join(repo, "odd $(touch injected)")
+      FileUtils.mkdir_p(odd)
+
+      run("extract.rb", "sources", "--repo", odd, env: { "HOME" => File.join(repo, "home") })
+      expect(File.exist?(File.join(repo, "injected"))).to be(false)
     end
   end
 

@@ -79,10 +79,10 @@ end
 # A tag is checked against every PR the repo has, so a listing cut short would
 # read an old tag as a PR that does not exist. Refuse rather than guess.
 def pull_requests(repo, limit)
-  target = repo ? "--repo #{repo}" : ""
+  target = repo ? ["--repo", repo] : []
   fields = "number,state,title,author,headRefName,createdAt"
-  raw = `gh pr list #{target} --state all --limit #{limit} --json #{fields}`
-  abort "gh pr list failed" unless $?.success?
+  raw, status = Open3.capture2("gh", "pr", "list", *target, "--state", "all", "--limit", limit.to_s, "--json", fields)
+  abort "gh pr list failed" unless status.success?
   list = JSON.parse(raw)
   abort "gh pr list returned #{list.size} PRs, the --limit; raise it" if list.size >= limit
   list.to_h { [_1["number"], _1] }
@@ -107,6 +107,18 @@ def carry_years(headings, fallback)
     named = heading[/\b(20\d{2})\b/, 1]&.to_i
     year = named || year || fallback
     [heading, year, named]
+  end
+end
+
+# Entries whose heading names a month and day, each with its date. The year is
+# resolved before the date is built, so Feb 29 meets the year it was written in.
+def dated_entries(body, fallback)
+  found = entries(body).select do |heading, _|
+    month = heading[/([A-Z][a-z]{2}) +\d{1,2}/, 1]
+    month && Date::ABBR_MONTHNAMES.index(month)
+  end
+  found.zip(carry_years(found.map(&:first), fallback)).map do |(heading, text), (_, year, named)|
+    [heading, text, heading_date(heading, year), year, named]
   end
 end
 
@@ -176,8 +188,8 @@ branch = nil if branch.empty? || branch == "HEAD"
 # date in <dir>/_since on, so a backfilled entry cannot move the cutoff.
 since_file = File.join(options[:dir], "_since")
 first_day = Date.parse(File.read(since_file)) if File.exist?(since_file)
-logged = entries(body).map(&:first).select { heading_date(_1, options[:year]) }
-first_day ||= heading_date(logged.first, carry_years(logged, options[:year]).first[1]) if logged.any?
+dated = dated_entries(body, options[:year])
+first_day ||= dated.first&.at(2)
 
 # Only the author can write a PR's entry, so a run answers for the PRs you
 # opened and the one checked out; --all audits everybody's.
@@ -230,11 +242,6 @@ body.lines.each.with_index(1) do |line, number|
 end
 
 # entries run oldest first, hold lists rather than prose, and stay short
-found = entries(body).select { heading_date(_1.first, options[:year]) }
-carried = carry_years(found.map(&:first), options[:year])
-dated = found.zip(carried).map do |(heading, text), (_, year, named)|
-  [heading, text, heading_date(heading, year), year, named]
-end
 
 if dated.any? && dated.first[4].nil?
   failures << "'#{dated.first[0]}' names no year; write it as " \

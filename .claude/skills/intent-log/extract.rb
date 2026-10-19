@@ -5,6 +5,7 @@
 # blocks. The log records what the human wanted, so only user turns are read.
 
 require "optparse"
+require "open3"
 require_relative "transcript"
 
 Prompt = Struct.new(:at, :source, :text)
@@ -12,7 +13,12 @@ Prompt = Struct.new(:at, :source, :text)
 # Every Claude Code project dir for this checkout and its worktrees, by exact
 # name: a prefix would also take in code-gym-rails-api beside code-gym-rails.
 def project_dirs(repo)
-  worktrees = `git -C "#{repo}" worktree list --porcelain 2>/dev/null`.scan(/^worktree (.+)$/).flatten
+  listing = begin
+    Open3.capture2("git", "-C", repo, "worktree", "list", "--porcelain", err: File::NULL).first
+  rescue SystemCallError
+    ""
+  end
+  worktrees = listing.scan(/^worktree (.+)$/).flatten
   names = [File.expand_path(repo), *worktrees].flat_map { [_1.tr("/", "-"), _1.gsub(/[^A-Za-z0-9]/, "-")] }.uniq
   names.map { File.expand_path("~/.claude/projects/#{_1}") }.select { File.directory?(_1) }.sort
 end
@@ -21,15 +27,11 @@ def prompts_in(file, source)
   Transcript.prompts(file).map { |at, text| Prompt.new(at, source, text) }
 end
 
-# Parallel sessions on one day repeat each other's prompts.
+# A resumed or forked session copies earlier turns, timestamps and all, into
+# its own transcript. Those are one prompt; the same words asked again later
+# are a second request, and often the one that decided it.
 def dedupe(prompts)
-  seen = {}
-  prompts.reject do |prompt|
-    key = prompt.text
-    repeat = seen[key] && prompt.at - seen[key] < 120
-    seen[key] = prompt.at
-    repeat
-  end
+  prompts.uniq { [_1.at, _1.text] }
 end
 
 def load_prompts(repo)
