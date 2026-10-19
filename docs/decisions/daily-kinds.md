@@ -282,12 +282,17 @@ or `Consequences`.
   natively, but Safari doesn't support it yet.
 - After a swap the card still shows today's kind, so a line under the title
   row says what the next set uses there, and the rows badge that kind "In
-  your next set" and the card's kind "In today's set".
-- Each kind is one row: a `<label>` around its radio, with the name and a
-  state badge on the first line and the kind's `SectionKindGuide` `short`
+  your next set" and the card's kind "In today's set". A row can carry two
+  badges: when the card's own kind is now the other place's stored kind, it
+  is both "In today's set" and "Already daily", and both show.
+- Each kind is one row: a `<label>` around its radio, with the name and its
+  state badges on the first line and the kind's `SectionKindGuide` `short`
   line under it. The checked row also shows the kind's example; the others
-  render it `hidden`. Each radio's `aria-describedby` names its line, its
-  example and, for an available kind, its consequence block in the footer.
+  render it `hidden`. Each radio is named by `aria-labelledby` (its name and
+  badges only), and its `aria-describedby` names its line, its example and,
+  for an available kind, its consequence block in the footer. A disabled
+  row dims only its radio and name, so the reason and badge keep their
+  contrast.
 - An option's state is `DailyKindSwap.refusal` for that kind: `unchanged` is
   "Now", the other daily kind is disabled under an "Already daily" badge, any
   other reason disables it with that reason's sentence in place of its
@@ -334,16 +339,26 @@ or `Consequences`.
   second swap works without a reload. When the reply carries `want_it_today`,
   the sheet stays open in a saved state: the reply's sentence, the "Want it
   in today's set?" line with its cost and a link to the existing "Generate
-  new set" button, and one "Done" button. Otherwise the sheet closes, the
+  new set" button, and one "Done" button. The saved state survives another
+  card's reply replacing the panel. Otherwise the sheet closes, the
   sentence is announced in the card's polite live region, focus returns to
   the trigger, and the stored-kind line under the title row shows the
   change. The offer comes only after a save, so regeneration never sits
   next to the swap's own button as a second choice.
+- A reply shows in the sheet only while the sheet is still wanted, focus is
+  the card's, and no ancestor is inert. Otherwise the sheet stays closed: it
+  never comes back after the reader left it during the save, and a submit
+  that holds the form inert never gets a modal over it. In that case the
+  sentence and the want-it-today offer, with its link, show visibly on the
+  card instead.
 - A failure shows in a line in the sheet's footer and in the save-status
-  banner, which the leave gate reads but which sits behind the scrim. The
-  sheet stays open, keeps the submitted kind when it is still offered, and
-  focuses an enabled control; a 409 also carries fresh panels, and the
-  sheet stays open on the stored pair and version, so the next try saves.
+  banner, which the leave gate reads but which sits behind the scrim. Under
+  the rule above, the sheet stays open, keeps the submitted kind when it is
+  still offered, and focuses an enabled control; a 409 also carries fresh
+  panels, and the sheet stays open on the stored pair and version, so the
+  next try saves. When focus has moved elsewhere, or the reader left the
+  sheet during the save, the sheet stays closed, and opening it by hand
+  shows the kept choice (or the stored pair, after a 409) and the error.
 - When the answer form's leave gate locks the form (`relockAndLeave`), any
   open sheet closes first, since a modal dialog inside a subtree that turns
   inert would stay on screen with nothing reachable.

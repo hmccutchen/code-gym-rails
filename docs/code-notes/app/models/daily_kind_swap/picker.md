@@ -16,19 +16,35 @@ set was planned changes the next set and not this one.
 ## The card's kind and the stored kind
 
 A swap changes the next set, so after one the card on screen (the row's
-recorded kind) and the place's stored kind differ. The trigger names the
-card ("Swap Code Review"), a line under it says what the next set uses
-there, and the options mark the stored kind "In your next set" and the
-card's kind "In today's set". When the two agree only "Now" shows, so a
-default account renders as before.
+recorded kind) and the place's stored kind differ. The trigger's label names
+the card ("Swap Code Review for another kind"), and a line under the title
+row says what the next set uses there (`next_kind_line`, shown unless
+`card_shows_current?`).
+
+## Badges
+
+`marks_for(kind, refusal)` gives each option its badges, in order:
+
+- the place's stored kind gets "Now" when the card shows it, and "In your
+  next set" when a swap has already changed this place;
+- the card's own kind gets "In today's set" when it is not the stored kind;
+- the other daily kind gets "Already daily", from its `already_daily`
+  refusal.
+
+An option can carry two badges: after swaps that move the card's kind to the
+other place, that kind is both in today's set here and already daily there.
+Section 7 of the spec lists both badges, and #421 showed both facts, so
+neither is dropped. `accent_mark?` is true only for the "Now" badge, the one
+the view draws in the accent colour.
 
 ## Every state comes from `DailyKindSwap`
 
 An option's state is `DailyKindSwap#refusal` for that kind with no version:
 `unchanged` is "Now", any other reason disables it, and no reason makes it
-available. The note is the refusal's own sentence, except `already_daily`,
-which reads shorter on a list of options. So the picker restates no pair
-rule; a new refusal reason shows up here with its message and no code change.
+available. The note, which the sheet shows in place of the kind's short
+line, is the refusal's own sentence. `already_daily` has no note, because
+its badge already says it. So the picker restates no pair rule; a new
+refusal reason shows up here with its message and no code change.
 
 ## A refusal of the current kind closes the picker
 

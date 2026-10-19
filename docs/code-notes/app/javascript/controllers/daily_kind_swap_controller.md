@@ -38,9 +38,10 @@ dismisses only when both did.
 
 Chrome closes a modal dialog on a second Escape even after the page refused
 the first, when there has been no user activation in between. `closed`
-handles a `close` the controller didn't ask for: it clears `wanted`, resets
-the choice unless a swap is saving, and focuses the trigger. A swap left
-saving that way finishes in the queue as usual. That close is also why two
+handles a `close` the controller didn't ask for: it clears `wanted` and any
+saved reply, resets the choice unless a swap is saving, and focuses the
+trigger. A swap left saving that way finishes in the queue as usual, and its
+reply never brings the sheet back (see "Where a reply shows"). That close is also why two
 swaps can still overlap, and why the queue below matters.
 
 ## Swaps go one at a time through `CodeGymSaveStatus.queue`
@@ -89,43 +90,81 @@ panel is replaced and its sheet was wanted, `panelTargetConnected` shows the
 new one. Targets are read from the DOM on each access, so a reply handler
 that runs before Stimulus sees the new panel already works on it.
 
+## Where a reply shows
+
+A reply can arrive long after the swap was sent: the reader may have left
+the sheet with a second Escape and be typing an answer, or have pressed
+Submit, which makes the whole answer form inert. A reply may show the sheet
+only when all three hold (`replyMayShowSheet`):
+
+- the sheet is still wanted, so the reader didn't leave it;
+- focus permits: it was inside this card, or nowhere because this card's own
+  button was disabled for the save it last sent (`lastConfirmed`);
+- no ancestor is inert (`sheetMayOpen`). A modal opened inside an inert
+  subtree would cover the page with nothing in it reachable, and a submit
+  can hold the form inert for as long as its request takes, since
+  `request.js` has no timeout. `reshow` checks the same thing.
+
+Otherwise the reply is shown on the card, and the sheet stays closed.
+
 ## Saved, and "Want it today?"
 
-When the reply carries `want_it_today`, the sheet stays open in its saved
-state: the list, the next-set line and the consequence blocks are hidden,
-the reply's sentence and the want-it-today line show in their place, and
-Done replaces the two buttons and takes focus. Done's `aria-describedby`
-names both lines, so a screen reader reads them with it. The offer appears
-only after a save, so regenerating never sits next to the swap as a second
-choice before anything is saved.
+A reply that carries `want_it_today` becomes `savedReply`: its sentence, the
+offer and the link's label. That one piece of state is drawn in one of two
+places.
+
+- **In the sheet,** when the reply may show it. The list, the next-set line
+  and the consequence blocks are hidden, the sentence and the offer show in
+  their place, and Done replaces the two buttons and takes focus. Done's
+  `aria-describedby` names both lines, so a screen reader reads them with
+  it. If another card's reply later replaces this panel, `reshow` draws the
+  saved state again from `savedReply`, so the message, link and Done
+  survive.
+- **On the card,** when it may not. The sentence and the offer, with its
+  link, show visibly in the card's `.daily-kind-reply`, as #421 showed them.
+
+`savedReply` is cleared by any dismissal (Done, Close, Cancel, Escape, the
+backdrop, a close the browser forced), by the link, and when a new choice
+starts (`open`). The offer appears only after a save, so regenerating never
+sits next to the swap as a second choice before anything is saved.
 
 The link only closes the sheet and focuses the existing "Generate new set"
 button. That button keeps its own confirmation and states the cost, so the
-sheet never starts a regeneration itself.
+card never starts a regeneration itself.
 
-Without `want_it_today`, the sheet closes, focus returns to the trigger and
-the sentence is announced in the card's polite live region, visually
-hidden, since the stored-kind line under the title row now shows the change.
+Without `want_it_today`, the sheet closes, focus returns to the trigger when
+focus permits, and the sentence is announced in the card's polite live
+region, visually hidden, since the stored-kind line under the title row now
+shows the change.
 
 ## Failures
 
 A failure shows in the shared `#save-status` banner like every other save on
 the page, because the leave gate reads it, and in the sheet's own error line,
-because the banner sits behind the scrim. On a refusal or a request that
-never got a usable reply, the sheet stays open or opens again, even when
-another card's reply re-rendered this panel while the swap waited in the
-queue. The submitted kind is checked again only if the current panel still
-offers it, and focus goes to the primary button when it is enabled,
-otherwise to the checked radio. So two cards that both chose Coding
-Challenge leave the second open on its current kind, and a 503 leaves the
-choice in place for one more try.
+because the banner sits behind the scrim. While the error line has text, the
+primary button's `aria-describedby` names it as well as the consequence
+block. The error line and the "Saving…" line are live regions, so both stay
+rendered while empty, never `display: none`, and a negative margin takes back
+the footer's gap they would otherwise leave.
+
+On a refusal or a request that never got a usable reply, the submitted kind
+is checked again if the current panel still offers it, and the error line
+gets the message. When the reply may show the sheet (above), the sheet stays
+open, or opens again if another card's reply re-rendered this panel while
+the swap waited in the queue, and focus goes to the primary button when it
+is enabled, otherwise to the checked radio. So two cards that both chose
+Coding Challenge leave the second open on its current kind, and a 503 leaves
+the choice in place for one more try. When it may not, the sheet stays
+closed, and the next open by hand shows the same choice and error, because
+`open` resets neither.
 
 A 409 means another tab changed the pair or the Exercise mix, so the panels
 on this page describe settings that are no longer stored. When the set on
 the page is still current, the 409 reply carries the same freshly rendered
-panels a save does, and the controller swaps them in and keeps this card's
-sheet open on the stored pair, with focus on its checked radio and the
-message in the error line. Each card keeps the kind of its last unsaved
+panels a save does, and the controller swaps them in with the stored pair
+checked and the message in the error line. The sheet stays open, with focus
+on its checked radio, under the same rule as a failure; otherwise the next
+open shows the stored pair and the message. Each card keeps the kind of its last unsaved
 attempt. Whenever its panel is replaced, by its own reply or another card's,
 it reconciles: if the panel now shows that kind as stored, an earlier
 attempt saved it and only its reply was lost, so the card clears its failure
@@ -144,13 +183,20 @@ form, so the day's submit never posts it. Its `change` event still bubbles to
 
 ## A reply moves focus only if focus was the card's
 
-A reply can arrive long after the swap was sent, when the reader has left
-the sheet and is typing an answer. So when a reply arrives, the card notes
-where focus is. It may move focus or show its sheet only if focus was inside
-this card, or nowhere because this card's own button was disabled for the
-save it last sent (`lastConfirmed`). A modal can't open without taking
-focus, so otherwise the sheet stays closed and the failure stays in the
-banner, with the submitted kind still checked for the next open. If a reply
-replaces another card's panel that held focus on its trigger, the
-replacement would drop it, so `replacePanels` moves it to that card's new
-trigger. Opening and closing the sheet by hand always focus as before.
+When a reply arrives, the card notes where focus is (`replyMayFocus`). It
+moves focus, to its trigger or into its sheet, only under the focus rule in
+"Where a reply shows", and a modal can't open without taking focus, so the
+same rule decides whether the sheet may show. If a reply replaces another
+card's panel that held focus on its trigger, the replacement would drop it,
+so `replacePanels` moves it to that card's new trigger. Opening and closing
+the sheet by hand always focus as before.
+
+## Each radio's name
+
+Each row's `<label>` wraps the name, the badges, the short line and the
+example, so without more the whole row would be the radio's accessible name
+and its description would repeat it. Each radio's `aria-labelledby` names
+only the kind's name and its badges ("Design Comparison Already daily"), and
+`aria-describedby` carries the rest. A disabled row dims only its radio and
+name; the reason line and the badge stay at full `--muted`, so they keep
+their contrast.

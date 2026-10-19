@@ -18,10 +18,12 @@ database.
 
 ## Sentences and the warning are separate
 
-`sentences` describe the incoming kind and go in the option's
-`aria-describedby`. `warning` describes the outgoing kind, which is the
-strongest consequence, so it renders as its own paragraph above Confirm and
-Confirm points at it. Keeping them apart in the `Result` lets the view place
+`sentences` describe the incoming kind and `warning` the outgoing kind. Both
+render in the option's consequence block in the swap sheet's footer, which
+the option's radio names in its `aria-describedby`. The warning is the
+strongest consequence, so it comes first, as its own paragraph with a
+warning border, directly above the buttons, and the primary button points at
+the block while that kind is checked. Keeping them apart in the `Result` lets the view place
 each without the browser deciding which is which.
 
 ## The order of the warning
