@@ -4,16 +4,18 @@
 
 # Code Gym
 
-Code Gym gives an engineer a short set of coding exercises every
-weekday morning, written by an AI model from that person's own history. You
-answer, rate how hard each one felt, and get a graded review, and the next
-day's set goes back to what you missed. Most exercises train the judgment the
-job runs on, like reviewing code, comparing two designs or questioning a vague
-spec, and each engineer runs it on their own AI provider key.
+**[coding-gym.pro](https://coding-gym.pro)**
 
-It was built for engineers, as daily practice
-alongside pairing and code review rather than a replacement for them. It is not
-a general practice product and the exercises stay with Ruby on Rails and JavaScript.
+Code Gym gives you a short set of coding exercises every weekday morning,
+written by an AI model from your own history. You answer, rate how hard each
+one felt, and get a graded review, and the next day's set goes back to what you
+missed. Most exercises train the judgment the job runs on, like reviewing code,
+comparing two designs or questioning a vague spec, and you run it on your own
+AI provider key.
+
+It's for individual engineers who want a few minutes of deliberate practice
+each day, alongside pairing and code review rather than in place of them. The
+exercises cover Ruby on Rails and JavaScript.
 
 - **Ten kinds of exercise.** Code review, design comparison, security review,
   architecture decisions, coding challenges, Parsons problems (put shuffled
@@ -36,7 +38,7 @@ a general practice product and the exercises stay with Ruby on Rails and JavaScr
 - **Works on a phone.** Add it to your home screen, get a push reminder when
   your set is ready, and keep a draft answer if the connection drops.
 
-Here is a code review exercise, the sample the test suite uses:
+Here is a code review exercise:
 
 > **Code Review.** This method recalculates a customer's loyalty tier every
 > time it's called, even inside a loop over the whole customer list. What's
@@ -57,9 +59,9 @@ customers.each { |c| puts loyalty_tier(c) }
 
 ---
 
-## Using it
+## Getting started
 
-1. Sign in with your email. You'll get a 6-digit code; there are no passwords.
+1. Go to [coding-gym.pro](https://coding-gym.pro) and sign in with your email. You'll get a 6-digit code; there are no passwords.
    Your first sign-in creates your account.
 2. On the Setup page, add an API key from one of these providers. The app uses
    your own key, so you pay only for your own exercises.
@@ -74,5 +76,3 @@ dashboard before then, it generates one on the spot.
 
 If something is broken or confusing, open an issue or tell
 [@hmccutchen](https://github.com/hmccutchen).
-
-
