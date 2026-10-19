@@ -15,21 +15,36 @@ export default class extends Controller {
     this.attempted = null
     this.wanted = false
     this.savedReply = null
+    this.failedReply = null
   }
 
-  // Any reply re-renders this panel, closing its sheet; one still wanted reopens as it was, and a queued swap keeps showing as saving.
+  // Any reply re-renders this panel; a kept failure, a sheet that was open (data-sheet-open) and a queued swap's saving state come back.
   panelTargetConnected() {
+    const reopen = this.panelTarget.dataset.sheetOpen === "true"
+    delete this.panelTarget.dataset.sheetOpen
+    if (!reopen && !this.sheetTarget.open) this.wanted = false
     if (this.busy) this.setBusy(true)
     else this.reconcile()
-    if (this.wanted && !this.sheetTarget.open && this.sheetMayOpen()) this.reshow()
+    this.restoreFailure()
+    if (reopen && this.wanted && this.sheetMayOpen()) this.reshow()
   }
 
   reconcile() {
     if (!this.attempted || this.panelTarget.dataset.current !== this.attempted) return false
 
     this.attempted = null
+    this.failedReply = null
     saveStatus.clear(this.statusKey)
     return true
+  }
+
+  restoreFailure() {
+    if (!this.failedReply) return
+
+    const kept = this.optionTargets.find((option) => option.value === this.failedReply.kind)
+    if (kept && kept.dataset.state === "available") kept.checked = true
+    this.errorTarget.textContent = this.failedReply.message
+    this.choose()
   }
 
   // A modal inside an inert ancestor would cover the page with nothing in it reachable.
@@ -78,6 +93,7 @@ export default class extends Controller {
   }
 
   resetChoice() {
+    this.failedReply = null
     this.optionTargets.forEach((option) => { option.checked = option.dataset.state === "now" })
     this.errorTarget.textContent = ""
   }
@@ -142,12 +158,14 @@ export default class extends Controller {
     if (this.busy || !chosen || chosen.dataset.state !== "available") return
 
     lastConfirmed = this
+    this.failedReply = null
     this.errorTarget.textContent = ""
     this.setBusy(true)
     const kind = chosen.value
     const result = await saveStatus.queue(this.statusKey, "PATCH", this.urlValue, () => this.body(kind),
       { line: "daily_kind_swap" })
     this.busy = false
+    this.wanted = this.wanted && this.sheetTarget.open
     const before = document.activeElement
     this.replyMayFocus = this.element.contains(before) || ((!before || before === document.body) && lastConfirmed === this)
     this.attempted = result && result.ok ? null : kind
@@ -159,10 +177,9 @@ export default class extends Controller {
   }
 
   reopenWith(kind, message) {
-    const submitted = this.optionTargets.find((option) => option.value === kind)
-    if (submitted && submitted.dataset.state === "available") submitted.checked = true
-    this.errorTarget.textContent = message || ""
-    if (!this.replyMayShowSheet()) return this.choose()
+    this.failedReply = { kind: kind, message: message || "" }
+    this.restoreFailure()
+    if (!this.replyMayShowSheet()) return
 
     this.open()
     if (!this.confirmTarget.disabled) this.confirmTarget.focus()
@@ -204,9 +221,9 @@ export default class extends Controller {
   settleStale(message) {
     if (this.reconcile()) return this.hide(this.replyMayFocus)
 
-    this.errorTarget.textContent = message || ""
+    this.failedReply = { kind: null, message: message || "" }
+    this.restoreFailure()
     if (this.replyMayShowSheet()) this.open()
-    else this.choose()
   }
 
   replacePanels(panels) {
@@ -215,7 +232,10 @@ export default class extends Controller {
     const holder = focused?.closest(".daily-kind-swap-panel")?.id
     Object.entries(panels || {}).forEach(([place, html]) => {
       const panel = document.getElementById(`daily-kind-swap-panel-${place}`)
-      if (panel) panel.outerHTML = html
+      if (!panel) return
+      const reopen = panel !== mine && Boolean(panel.querySelector("dialog")?.open)
+      panel.outerHTML = html
+      if (reopen) document.getElementById(`daily-kind-swap-panel-${place}`).dataset.sheetOpen = "true"
     })
     if (holder && holder !== mine.id && !focused.isConnected) document.querySelector(`#${holder} .daily-kind-trigger`)?.focus()
     return !mine.isConnected

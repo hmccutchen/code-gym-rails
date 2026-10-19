@@ -302,13 +302,21 @@ own markup is the same with or without a swap control.
 
 ## `.daily-kind-sheet::backdrop`
 
-Older iOS doesn't let `::backdrop` inherit custom properties, so
-`var(--bg)` inside its `color-mix()` would leave the scrim transparent there.
-The rule first sets a literal `rgba(15, 15, 26, .7)`, which is `--bg`
-(`#0f0f1a`) at 70%, and a browser that resolves the `color-mix()` overrides
-it. `pwa_spec` reads `--bg` from the layout and fails if the literal drifts
-from it. The literal is the dark palette's; the light palette only gets the
-exact scrim where `color-mix()` works.
+Older iOS doesn't let `::backdrop` inherit custom properties. Two fallbacks
+cover the two ways that can go:
+
+- **A browser without `color-mix()`** drops the second declaration while
+  parsing and keeps the first, a literal `rgba(15, 15, 26, .7)`, which is
+  `--bg` (`#0f0f1a`) at 70%.
+- **A browser with `color-mix()` but no inherited `--bg`** keeps the second
+  declaration, so the first can't help: an unresolved `var()` makes the
+  declaration invalid at computed-value time, and the background becomes
+  transparent rather than the earlier value. The `var()` therefore carries
+  its own fallback, `var(--bg, #0f0f1a)`.
+
+`pwa_spec` reads `--bg` from the layout and fails if either literal drifts
+from it. Both literals are the dark palette's. Where `::backdrop` does see
+custom properties, the light palette gets its own `--bg`.
 
 ## Swap sheet live regions
 

@@ -41,7 +41,13 @@ the first, when there has been no user activation in between. `closed`
 handles a `close` the controller didn't ask for: it clears `wanted` and any
 saved reply, resets the choice unless a swap is saving, and focuses the
 trigger. A swap left saving that way finishes in the queue as usual, and its
-reply never brings the sheet back (see "Where a reply shows"). That close is also why two
+reply never brings the sheet back (see "Where a reply shows"). That doesn't
+depend on `closed` having run: the event can arrive after the reply, so the
+reply reads the dialog's own `open` state. The system spec closes a saving
+sheet from script rather than with two Escapes, because whether Chrome lets
+a second Escape close it depends on user activation, which differs between
+builds. Two of its examples close the sheet and release the reply in the
+same script, so the reply always lands before the `close` event. That close is also why two
 swaps can still overlap, and why the queue below matters.
 
 ## Swaps go one at a time through `CodeGymSaveStatus.queue`
@@ -85,9 +91,15 @@ replacement.
 
 Each panel holds its card's trigger, the stored-kind line, the first-time
 hint and the dialog, so replacing a panel removes an open sheet from the
-page. `wanted` records whether this card's sheet should be open; when a
-panel is replaced and its sheet was wanted, `panelTargetConnected` shows the
-new one. Targets are read from the DOM on each access, so a reply handler
+page. Whether a sheet should come back is read from the DOM at the moment of
+the replacement, never from the `close` event. Chrome fires `close` as a
+queued task after the dialog has already closed, so a reply that lands in
+between would still see the sheet as wanted and reopen one the reader just
+left. CI hit exactly that. So `replacePanels` checks each other card's dialog
+for `open` before replacing it, and marks the new panel `data-sheet-open`
+when it was. `panelTargetConnected` reshows only a marked panel, and clears
+`wanted` when its sheet is neither marked nor open. A card's own reply re-reads
+its sheet's `open` state as soon as it lands, before deciding anything. Targets are read from the DOM on each access, so a reply handler
 that runs before Stimulus sees the new panel already works on it.
 
 ## Where a reply shows
@@ -157,6 +169,19 @@ Coding Challenge leave the second open on its current kind, and a 503 leaves
 the choice in place for one more try. When it may not, the sheet stays
 closed, and the next open by hand shows the same choice and error, because
 `open` resets neither.
+
+The choice and the error live in the panel's DOM, which the next reply on
+any card replaces. So the failure is also kept as `failedReply`: the
+submitted kind and the message (after a 409, the message alone, since the
+fresh panel already checks the stored kind). `restoreFailure` puts it back
+whenever the panel is reconnected, checking the kind again only while the
+new panel still offers it as available. Without it, card 0's sheet would
+show its current kind and no error after card 1's reply, while the failure
+still held the page and the banner sat behind the scrim. `failedReply` is
+cleared when the failure resolves: `reconcile` finds the swap stored, or the
+next try is sent (`confirm`) and saves. An explicit dismissal clears it with
+the rest of the choice, as `resetChoice` always has; a close Chrome forces
+while the swap is saving keeps it.
 
 A 409 means another tab changed the pair or the Exercise mix, so the panels
 on this page describe settings that are no longer stored. When the set on

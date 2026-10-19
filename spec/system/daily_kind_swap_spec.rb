@@ -20,7 +20,15 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
   def focused(script) = page.evaluate_script("document.activeElement.#{script}")
 
-  def trigger_focused? = page.evaluate_script("document.activeElement.classList.contains('daily-kind-trigger')")
+  def trigger_focused?
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Capybara.default_max_wait_time
+    loop do
+      return true if page.evaluate_script("document.activeElement.classList.contains('daily-kind-trigger')")
+      return false if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+
+      sleep 0.05
+    end
+  end
 
   def open_sheet(place)
     within(panel(place)) { find("button.daily-kind-trigger").click }
@@ -43,11 +51,10 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page).to have_no_css("#{sheet(place)}[open]")
   end
 
-  # Chrome closes a sheet on a second Escape even while it refuses the first, so a swap can still be queued behind another.
-  def leave_sheet_saving(place)
+  # Stands in for Chrome closing a saving sheet on a second Escape, whose activation rule varies between builds.
+  def leave_sheet_saving(place, and_run: nil)
     expect(page).to have_css("#{sheet(place)} [data-daily-kind-swap-target='status']", text: I18n.t("daily_kinds.picker.saving"))
-    press("Escape")
-    press("Escape")
+    page.execute_script("document.querySelector(#{sheet(place).to_json}).close(); #{and_run}")
     expect(page).to have_no_css("#{sheet(place)}[open]")
   end
 
@@ -276,7 +283,11 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page).to have_no_css("#{sheet(0)}[open]")
 
     finish_saved(1)
-    confirm_swap(0, "challenge")
+    open_sheet(0)
+    expect(find("#daily-kind-0-challenge")).to be_checked
+    expect(page).to have_css("#{sheet(0)} .daily-kind-error", text: I18n.t("save_status.generic"))
+    expect(primary(0)["aria-describedby"].split).to include("daily-kind-0-error")
+    primary(0).click
     expect(page).to have_css("#daily-kind-swap-panel-0[data-current='challenge']")
     expect(page).to have_no_css("#save-status", visible: :visible)
   end
@@ -627,6 +638,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page.evaluate_script("document.getElementById('daily-kind-0-picker').inert")).to be(true)
     expect(find("#{sheet(0)} .daily-kind-close")).to be_disabled
     expect(find("#{sheet(0)} [data-daily-kind-swap-target='cancel']")).to be_disabled
+    find("#daily-kind-0-title").click
     press("Escape")
     page.driver.with_playwright_page { |pw| pw.mouse.click(10, 10) }
     expect(page).to have_css("#{sheet(0)}[open]")
@@ -707,7 +719,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     press("Escape")
     expect(page).to have_no_css("#{sheet(0)}[open]")
     expect(trigger_focused?).to be(true)
-    expect(find("#daily-kind-0-code_review", visible: :all)).to be_checked
+    expect(page).to have_css("#daily-kind-0-code_review:checked", visible: :all)
   end
 
   it "opens with Space, and the close button resets the choice and returns focus" do
@@ -718,7 +730,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     find("#{sheet(0)} .daily-kind-close").click
     expect(page).to have_no_css("#{sheet(0)}[open]")
     expect(trigger_focused?).to be(true)
-    expect(find("#daily-kind-0-code_review", visible: :all)).to be_checked
+    expect(page).to have_css("#daily-kind-0-code_review:checked", visible: :all)
   end
 
   it "reaches the primary and Cancel with Tab, and Cancel returns focus to the trigger" do
@@ -769,7 +781,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     page.driver.with_playwright_page { |pw| pw.mouse.click(10, 10) }
     expect(page).to have_no_css("#{sheet(0)}[open]")
     expect(trigger_focused?).to be(true)
-    expect(find("#daily-kind-0-code_review", visible: :all)).to be_checked
+    expect(page).to have_css("#daily-kind-0-code_review:checked", visible: :all)
   end
 
   it "keeps the page behind the sheet from scrolling" do
@@ -878,9 +890,9 @@ RSpec.describe "Swapping a daily section kind", type: :system do
   it "keeps a sheet left during the save closed when its failure lands, and shows the choice and error on the next open" do
     fail_held_swap
     confirm_swap(0, "challenge")
-    leave_sheet_saving(0)
-    expect(trigger_focused?).to be(true)
-    release_swap
+    wait_for_js_condition("window.releaseSwap")
+    leave_sheet_saving(0, and_run: "window.releaseSwap()")
+    wait_for_js_condition("document.activeElement.classList.contains('daily-kind-trigger')")
 
     expect(page).to have_css("#save-status", visible: :visible)
     sleep 0.3
@@ -895,9 +907,9 @@ RSpec.describe "Swapping a daily section kind", type: :system do
   it "keeps a sheet left during the save closed when a stale reply lands, and shows the stored pair and message on the next open" do
     hold_swap_replies
     confirm_swap(0, "architecture")
-    leave_sheet_saving(0)
+    wait_for_js_condition("window.releaseSwap")
     user.update!(daily_section_kinds: %w[pattern design_comparison])
-    release_swap
+    leave_sheet_saving(0, and_run: "window.releaseSwap()")
 
     expect(page).to have_css("#daily-kind-swap-panel-0[data-current='pattern']")
     sleep 0.3

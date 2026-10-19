@@ -137,13 +137,14 @@ RSpec.describe "PWA", type: :request do
   end
 
   describe "the swap sheet's scrim" do
-    it "gives older iOS, whose ::backdrop may not see custom properties, a literal --bg at 70% before the color-mix" do
+    it "falls back to a literal --bg where ::backdrop doesn't see custom properties, with or without color-mix()" do
       layout = Rails.root.join("app/views/layouts/application.html.erb").read
       rule = layout[/^\s*\.daily-kind-sheet::backdrop \{([^}]*)\}/, 1]
-      red, green, blue = layout_color("bg").delete("#").scan(/../).map(&:hex)
+      bg = layout_color("bg")
+      red, green, blue = bg.delete("#").scan(/../).map(&:hex)
 
       expect(rule.scan(/background:\s*([^;]+);/).flatten).to eq(
-        [ "rgba(#{red}, #{green}, #{blue}, .7)", "color-mix(in srgb, var(--bg) 70%, transparent)" ]
+        [ "rgba(#{red}, #{green}, #{blue}, .7)", "color-mix(in srgb, var(--bg, #{bg}) 70%, transparent)" ]
       )
     end
   end

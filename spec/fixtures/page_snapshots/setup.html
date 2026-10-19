@@ -340,7 +340,7 @@
     html:has(dialog.daily-kind-sheet[open]) { overflow: hidden; }
     .daily-kind-sheet { position: fixed; inset: auto 0 0; width: 100%; max-width: 36rem; max-height: 85vh; max-height: 85dvh; margin: 0 auto; padding: 0; overflow: hidden; background: var(--surface); color: var(--text); border: none; border-top: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; box-shadow: var(--shadow); }
     .daily-kind-sheet[open] { display: flex; flex-direction: column; animation: daily-kind-sheet-up .2s ease-out; }
-    .daily-kind-sheet::backdrop { background: rgba(15, 15, 26, .7); background: color-mix(in srgb, var(--bg) 70%, transparent); }
+    .daily-kind-sheet::backdrop { background: rgba(15, 15, 26, .7); background: color-mix(in srgb, var(--bg, #0f0f1a) 70%, transparent); }
     @keyframes daily-kind-sheet-up { from { transform: translateY(100%); } }
     .daily-kind-sheet-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 1.25rem; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)); }
     .daily-kind-sheet-header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: -.5rem -.5rem 0 0; }
