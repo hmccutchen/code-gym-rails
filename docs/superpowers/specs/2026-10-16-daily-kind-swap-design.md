@@ -12,8 +12,13 @@ Implementation log:
 
 - PR A, the regeneration claim window: #406, merged.
 - PR 0, the schema: #407, merged.
-- PR 1, the per-user layout: #408.
-- PR 1b, per-day pairs in the gate: #411, stacked on #408.
+- PR 1, the per-user layout: #408, merged.
+- PR 1b, per-day pairs in the gate: #411, merged.
+- PR 2a, the prompt preconditions for PR 2: #418, merged.
+- PR 4, judged regeneration: #419, merged.
+- PR 2, the swap, server side: #420, merged.
+- PR 3, the card control: #421, merged, with the inline picker. Section 7
+  now describes the sheet that replaces it, in PR 3b.
 - Two additions not in the original order:
   - #413 filters history-derived reinforcement by what today's sections can
     tag, as drills already were. It changes which reinforcement concepts a
@@ -422,164 +427,489 @@ current behaviour landed in #411 (`competency_gate_daily_pairs_spec`).
 
 ## 7. UI
 
-**Placement.**
+#421 shipped a first version: a text trigger row under each daily card's
+heading, and a picker that expands inline. This section describes the design
+that replaces it, built in PR 3b (see "PR order"). The server side, the
+consequence sentences, the reply and every rule the picker shows stay as
+#420 and #421 built them. What changes is how the page shows them.
 
-- **The control can't go in the card's `<summary>`.** `_section.html.erb:7`
-  forbids a control inside the summary.
-- **It goes in a row directly after the `kind_about` disclosure,** on the first
-  `DailyKinds::COUNT` cards only, in both the answer form and the submitted
-  dashboard. It behaves the same on both, since a swap never touches the set
-  on screen.
-- **History never shows it.**
+### The trigger
 
-**Markup.**
-
-- **The trigger** is `<button type="button" aria-expanded aria-controls>`,
-  labelled "Swap Code review". The pattern matches the duck thread toggle.
+- **An icon button on the section's title row,** right-aligned, on daily
+  cards only, in both the answer form and the submitted dashboard. History
+  never shows it. It behaves the same on both pages, since a swap never
+  touches the set on screen.
+- **Markup:** `<button type="button" class="daily-kind-trigger"
+  aria-haspopup="dialog" aria-label="Swap Code Review for another kind">`,
+  44×44 px, holding an inline stroke SVG of two opposed horizontal arrows
+  with `aria-hidden="true"` and `focusable="false"`. The SVG strokes with
+  `currentColor`, so its color comes from the button's own `color`.
   `type="button"` matters because the card sits inside `#gym-form`, where a
-  default button would submit the day.
-- **The picker** is a `<fieldset>` with a `<legend>` ("Choose the kind for this
-  daily section") and one radio per kind. Each label holds the kind's name,
-  and the `SectionKindGuide` summary and example are tied to the radio with
-  `aria-describedby`. The guide body is extracted from `responses/_kind_about`
-  into a partial both use, so #391's text has one home.
-- **The radios carry `form="daily-kind-swap"`,** pointing at an empty form
-  outside `#gym-form`. Otherwise they would post with the day's answers.
-  Their `change` still bubbles to `answer-form#change`, which ignores anything
+  default button would submit the day. The label's kind is the card's own
+  kind, the one recorded in today's set.
+- **It can't go inside the `<summary>`.** `_section.html.erb` forbids a
+  control in the summary: a button there is a control inside a control, and
+  clicking it would also fold the card. The button is the first element
+  after the summary instead, positioned over the title row's right edge:
+  - `details.section` gets `position: relative`, and the trigger sits
+    `position: absolute` at the card's top padding and right padding. The
+    mobile rule for `.section` (`padding: 1.25rem 1rem`) needs the matching
+    offsets.
+  - The summary on a daily card reserves the button's width plus a gap with
+    `padding-inline-end`. The answer form's `.section-status` ("Answered",
+    "Not started") is already pushed right with `margin-left: auto`, so on a
+    daily card it now sits to the left of the button rather than under it.
+  - The title row is already 44 px tall (`padding-block: 12.5px` around the
+    label), so the button fits it without changing its height.
+  - A folded card shows no trigger. A closed `<details>` does not render its
+    content, and the trigger is content. To swap, the user unfolds the card
+    first. That is acceptable, since a folded card is one the user has put
+    away.
+- **With the `kind_about` disclosure.** On the answer form, "About Code
+  Review" stays where it is: the first line under the heading, left-aligned,
+  in muted text, for kinds the user hasn't answered before. The two don't
+  read as a pair, because they differ in place, in shape and in what they do:
+  - the disclosure is text on its own line that opens explanation in place,
+    and it is about the card in front of you;
+  - the swap is an icon at the end of the title row that opens a sheet, and
+    it changes your next set.
+  - The selected row in the sheet shows the same guide example the
+    disclosure does, from the same `responses/_kind_guide` source, so the
+    text has one home.
+- **What leaves the card.** The trigger pill, its row and the visible reply
+  under it are gone. The scenario and question now start directly under the
+  heading on the submitted dashboard, and directly under the `kind_about`
+  line on the answer form. Two lines stay on the card, each only when it
+  applies:
+  - **The stored-kind line,** "Your next set uses Coding Challenge here.",
+    directly under the title row in muted text, when the stored pair has
+    already changed this place. It is rare, from a swap until the next set,
+    and without it nothing on the card would show that a swap was saved.
+  - **The first-time hint,** in the same place, on the first daily card of an
+    unsubmitted set, under the same conditions as before.
+
+### The sheet
+
+- **A native `<dialog>`, opened with `showModal()`,** one per daily place,
+  rendered inside that card's swap wrapper where the inline picker is now.
+  `showModal()` is chosen over a positioned `<div>` for three reasons:
+  - **The page moves under the sheet.** `html.pull-resuming
+    [data-pull-content]` puts a `transform` on the container that holds
+    every card. A transformed ancestor turns `position: fixed` into
+    positioning relative to that ancestor, so a fixed-position sheet would
+    slide with the content during a pull-to-refresh resume. A modal dialog
+    renders in the top layer, which no ancestor's transform affects.
+  - **It brings most of the behaviour for free.** The rest of the page
+    becomes inert, so focus stays in the sheet. Escape fires `cancel`, and
+    the `::backdrop` is the scrim.
+  - **It sits above the tab bar and the save-status banner,** which are
+    `position: fixed` with their own `z-index`, without a z-index race.
+- **Shape:**
+  - The sheet is pinned to the bottom of the viewport and is full width up
+    to 36rem, then centered. It is at most 85% of the viewport's height, so
+    a strip of the dimmed page always shows above it.
+  - It uses `--surface`, a `--border` top edge, `--shadow`, and `--radius`
+    on the top two corners only.
+  - Its bottom padding adds `env(safe-area-inset-bottom)`, so the footer
+    clears the home indicator in the home-screen app.
+- **Inside, top to bottom:**
+  1. **A header row.**
+     - The title is "Swap this daily section". It is an `<h2>`, and the
+       dialog is labelled by it (`aria-labelledby`).
+     - A 44×44 close button sits at the end, labelled "Close". It does what
+       Cancel does.
+  2. **The next-set line** under the title, in muted text: "Your current
+     set keeps its sections. This starts with your next set." It adds the
+     paused sentence while generation is paused. When the trial has ended,
+     this line is the `trial_ended` message instead and no list follows.
+  3. **The list.** This is the only part that scrolls, with
+     `overscroll-behavior: contain`. It is the `<fieldset>`, whose
+     `<legend>` ("Choose the kind for this daily section") is visually
+     hidden, since the title already says it.
+  4. **The footer,** pinned below the list: the consequence block, then the
+     buttons (below).
+- **The page behind does not scroll.**
+  - `html:has(dialog.daily-kind-sheet[open])` sets `overflow: hidden`.
+  - The pull-to-refresh controller ignores a touch that starts while a modal
+    dialog is open. Otherwise a downward drag on the list, with the page
+    scrolled to the top, would start a refresh behind the sheet.
+- **No drag handle and no swipe.** A handle that doesn't drag would be a
+  false affordance, and a drag gesture would be more touch-event code
+  that has to coexist with pull-to-refresh, which this feature has already
+  collided with once. Close, Cancel, Escape and a click on the backdrop
+  cover dismissal.
+- **A click on the backdrop dismisses the sheet,** the same as Cancel.
+  - With `showModal()`, a click on the `::backdrop` is dispatched to the
+    `<dialog>` element itself. The dialog has no padding, and all of its
+    content sits in one wrapper that fills it. So a click whose target is
+    the dialog element came from the backdrop, and a click anywhere in the
+    sheet has a target inside the wrapper.
+  - A drag that starts inside the sheet and ends on the backdrop, such as
+    selecting text, also produces a click whose target is the dialog,
+    since that is the nearest ancestor of both ends. So the controller
+    records the `pointerdown` target too, and dismisses only when both the
+    `pointerdown` and the `click` landed on the dialog itself.
+  - A backdrop click is ignored while a swap is saving, as Escape is.
+  - The newer `closedby="any"` attribute does this natively, but Safari
+    doesn't support it yet, so the sheet doesn't rely on it.
+- **Scrim:** `::backdrop` in `color-mix(in srgb, var(--bg) 70%,
+  transparent)`, darkening the page with the page's own background color.
+- **Motion:** the sheet slides up over 200 ms. Under `prefers-reduced-motion:
+  reduce` it appears without the slide, as the layout already does for
+  other motion.
+
+### Each kind is one row
+
+- **A `<label>` wrapping its radio,** full width, at least 44 px tall, laid
+  out in two lines:
+  - **Line 1:** the radio, the kind's name, and the state badge pushed to the
+    end of the line.
+  - **Line 2:** a one-line summary, in muted text, aligned under the name.
+- **The selected row** also shows the kind's guide example, under the
+  summary, from `responses/_kind_guide`. Every other row's example is
+  rendered `hidden`, and the controller shows the checked one. Choosing a row
+  is the only thing that reveals text, so the list stays scannable at ten
+  kinds.
+- **The summary line is new copy,** one short field per kind (see "One-line
+  summaries" below). The existing two- and three-sentence summaries stay
+  where they are, in the `kind_about` disclosure, in Exercise mix and on
+  Learn.
+- **The radios keep `form="daily-kind-swap"`,** pointing at the empty form
+  outside `#gym-form`, so they never post with the day's answers. Their
+  `change` still bubbles to `answer-form#change`, which ignores anything
   outside `[data-field]`.
-- **A `daily-kind-swap` Stimulus controller** posts through
-  `CodeGymRequest.send` and shows the server's reply. The page holds no copy
-  of any rule in this spec: which options are disabled, every consequence
-  sentence and the reply sentence all come from the server.
+- **Each radio's `aria-describedby`** points at its summary line, its
+  example, its disabled reason when it has one, and its consequence block in
+  the footer. A hidden element can still be a description, so VoiceOver
+  reads every one of them on every row, as it does now.
+- **Rows use** `--radius-sm`, `--surface-raised` for the checked row with an
+  `--accent` border, and the app's focus ring tokens (`--focus-ring`,
+  `--focus-ring-width`, `--focus-ring-offset`) on `:focus-visible` inside the
+  label.
 
-**Picker states.**
+### State is a badge
 
-- **Options:**
-  - the current kind is checked and marked "Now";
-  - the other daily kind is disabled, with "Already a daily section";
-  - while the other daily kind is a fourth, the two remaining fourths are
-    disabled, with "Only one of Plan review, Ambiguity hunt and Pseudocode to
-    code can be a daily section." The names come from `ExerciseSection.fourths`;
-  - every other kind is available.
-- **A line above the options,** always: "Your current set keeps its sections.
-  This starts with your next set." When the account is paused, the line adds
-  "Generation is paused, so that's the next set you generate or the first one
-  after you resume."
-- **Consequences, shown before Confirm.** Each sentence below is rendered by
-  the server into the option it applies to, tied to that radio with
-  `aria-describedby` alongside the guide text, and repeated as the confirm
-  sentence when that option is selected. The browser decides none of them.
-  - *Choosing a fourth* (D1), naming its two siblings: "Ambiguity hunt and
-    Pseudocode to code won't appear on their own while Plan review is a daily
-    section. Swap one of them in to get it back."
-  - *Choosing a fourth*, for the shared concept: "Your two daily sections will
-    no longer look at the same idea from different sides on the same day."
-    - This wording is deliberate. It is the dashboard's existing
-      `dashboard.shared_concept` phrasing, and it says nothing about why the
-      sections share a concept, since that would expose the mastery tier
-      (`shared-concept-on-a-real-struggle.md`).
-    - It is shown only for pairs holding a fourth. Those are the pairs where
-      `SharedConcept` can never apply; other pairs may share less often, but
-      not never.
-  - *A kind with a stored weight* other than the default: "You set Challenge to
-    appear more often in Exercise mix. That setting does nothing while
-    Challenge is a daily section, and applies again if you swap it out." The
-    sentence uses "less often" for a weight below 1.
-  - *A kind the user excluded*: "You turned Challenge off in Exercise mix. As a
-    daily section it will be in every set anyway. The setting applies again if
-    you swap it out."
-  - *The outgoing kind, at two sections.* This is the strongest consequence.
-    It is shown as a visible warning paragraph directly above Confirm, not
-    only as option description text, and Confirm points at it with
-    `aria-describedby`. Its wording depends on why the day has two sections:
-    - **The Daily sections setting is fixed at 2:** "Your Daily sections
-      setting is 2, so after this swap Code review won't appear at all. Swap
-      it back, or raise the setting in Setup, to see it again." This is
-      exact, because coverage never runs on a fixed setting.
-    - **Automatic, and today's planned size is 2** (the row's
-      `plan_notes["size"]`): "Your sets have two sections right now, so after
-      this swap Code review will appear about once every 8 weeks, as an extra
-      section. Swap it back to have it every day."
-      - The figure is computed from `CoverageException::GAP_WEEKDAYS`,
-        `CAP_WEEKDAYS` and the number of optional kinds the new pair leaves
-        that the user has not excluded, since coverage never adds an
-        excluded kind. It is rounded to whole weeks and isn't a stored
-        number.
-      - **The outgoing kind is excluded in Exercise mix:** coverage will
-        never add it, so the warning reads: "You turned Code review off in
-        Exercise mix, so after this swap it won't appear at all. Swap it
-        back, or turn it on again, to see it."
-      - A second sentence follows: "Your two daily sections are also what
-        decides when your sets grow." It states that the pair feeds the
-        gate, without exposing any rating or tier.
-    - **Three or more sections:** no warning. Section 6's simulation puts
-      every optional kind within 11 days there.
-- **Confirming:** Confirm stays disabled until a different kind is picked.
-- **Saving:** both buttons are disabled and a polite live region says
-  "Saving…".
-- **Saved:** the reply carries the sentence from section 3. The picker
-  closes, the sentence is announced, and focus returns to the trigger. When
-  regeneration is offered and nothing is submitted (section 3), the "Want it
-  in today's set?" line appears under the sentence, cost included, as a link
-  to the existing "Generate new set" button.
-- **Error:** the reply comes from `render_json_error`, the message shows in the
-  save-status banner, the picker stays open and focus stays on Confirm.
+- **A pill at the end of line 1,** in the `.featured-marker` style: a 999px
+  radius, a 1px border, small type, never uppercase. A badge is a separate
+  element, so "Design Comparison" and "Now" can no longer read as one name.
+- **The badges, all existing server copy in `daily_kinds.picker`:**
+  - **"Now":** the current kind, checked. The border and text are
+    `--accent` and `--accent-text`.
+  - **"Already daily":** the other daily kind. This shortens
+    `daily_kinds.picker.already_daily`, since the badge carries it now. The
+    row is dimmed and its input is `disabled`.
+  - **"In your next set" / "In today's set":** when the stored pair has
+    already changed this place, the stored kind and the card's own kind, as
+    now.
+  - The last three use `--border` and `--muted`.
+- **The D1 reason stays a disabled reason.** While the other daily kind is a
+  fourth, the two other fourths are dimmed with `disabled` inputs and no
+  badge. Their line 2 is the refusal sentence ("Only one of Plan review,
+  Ambiguity hunt and Pseudocode to code can be a daily section.") in place
+  of the summary. That sentence can wrap. The same goes for every other
+  disabled reason `DailyKindSwap#refusal` gives, such as
+  `empties_a_slot`.
+- **`disabled`, not `aria-disabled`:** the arrow keys skip a disabled radio,
+  which is right for a choice that can't be made. VoiceOver still reaches it
+  in browse mode and reads its reason.
 
-**Keyboard and VoiceOver.**
+### The footer
 
-- Tab reaches the trigger, and Enter or Space opens the picker. Focus moves to
-  the checked radio, the arrow keys move between radios (native behaviour),
-  and Tab reaches Confirm and Cancel.
-- Escape or Cancel closes the picker, sets `aria-expanded="false"` and returns
-  focus to the trigger, as `nav_menu_controller.js` does.
-- VoiceOver reads the trigger's state, the legend, the "next set" line, each
-  option's name with its guide text and consequences as the description, and
-  the disabled reasons. The reply is announced through the live region.
-- A system spec covers keyboard open, arrow, confirm, Escape and focus return,
-  plus one VoiceOver-relevant check that the radios carry `aria-describedby`
-  pointing at the guide text.
+- **The consequence block** sits directly above the buttons, so it is the
+  last thing read before committing.
+  - It holds the selected option's server-rendered sentences, with the
+    outgoing-kind warning first as a warning paragraph. The sentences are
+    the two-section warning in its five forms, the fourth's siblings, the
+    shared-concept loss, and a stored weight or exclusion being set aside.
+  - Each available kind has its own block, rendered `hidden`. The
+    controller shows the checked kind's block and points the primary
+    button's `aria-describedby` at it, as `_summary.html.erb` does now.
+  - The block is empty and takes no space when the selected option carries
+    nothing. It scrolls on its own above 35% of the sheet's height, so the
+    longest one (the warning, the gate sentence, sharing and a weight) never
+    pushes the buttons off a short phone.
+  - The warning paragraph keeps a left border in `--yellow`, the app's
+    existing warning color.
+- **The buttons:** Cancel (`.btn .btn-ghost`) and the primary (`.btn
+  .btn-primary`), in one row with the primary on the right, where the thumb
+  is. The row is pinned, so it is on screen whatever the list's scroll.
+  - **The primary is disabled until a different, available kind is
+    checked.** It is disabled again while the swap is saving.
+  - **Its label is "Swap to Architecture Decision",** naming the chosen kind
+    (below). With nothing new chosen, it reads "Swap". The server renders
+    each kind's label onto its option (`data-confirm-label`), and the
+    controller copies the checked one across. The page builds no sentence of
+    its own.
+- **The label, checked at 390 px.**
+  - The sheet's inner width at 390 px is 358 px, after the 16 px gutters.
+  - The longest label, "Swap to Architecture Decision", measures 249 px in
+    `.btn` type (0.9rem, weight 600, 1.25rem side padding), with Inter as
+    the stand-in for the system font. "Pattern of the Month" is 241 px.
+  - Cancel is 89 px. Label, Cancel and a 0.75rem gap total 350 px: it fits
+    on one line with 8 px to spare.
+  - 8 px is too little to rely on under a larger text size, so the button
+    text gets `white-space: nowrap` and the row gets `flex-wrap: wrap`.
+    Above the default size, Cancel moves under the primary. The label never
+    wraps or truncates.
+  - "Swap to <Kind>" ships because it says what will happen, and because
+    VoiceOver reads the same label. A bare "Swap" would be read after the
+    radio, with nothing to say which kind it means.
+- **Errors show in the sheet.**
+  - A refusal or a failed request shows its `render_json_error` message in a
+    line between the consequence block and the buttons, in a
+    `role="status"` region. The sheet stays open and focus stays on the
+    primary.
+  - The save-status banner still records the failure, since the leave gate
+    reads it, but the banner sits behind the scrim. The line in the sheet is
+    what the user reads.
 
-**Discoverability.** Nothing on main would tell a new account that the swap
-exists. Two small additions, both static copy with no new state:
+### "Want it today?"
 
-- **One line on the welcome page,** under the track buttons, after
-  `welcome.note`, in a new `welcome.daily_sections` key: "Every set starts
-  with two daily sections, Code review and Design comparison. You can swap
-  either one for another kind from its card." The names come from
-  `DailyKinds::DEFAULT`.
-- **A first-time hint on the first daily card's swap row,** answer form only:
-  "New: you can swap this daily section for another kind." It shows while the
-  account has no `daily_kind_swaps` row and fewer than 5 submitted days. Both
-  are existing reads, so nothing is stored to dismiss it. After that the
-  trigger's own label carries the feature.
+- It appears after a save, never before. Before the swap is saved there is
+  nothing to apply today, and offering regeneration next to Confirm would
+  blur the two choices.
+- When the reply carries `want_it_today`, the sheet stays open and switches
+  to a saved state:
+  - the list and the consequence block are replaced by the reply's sentence
+    ("Saved. This starts with your next set."), then the "Want it in today's
+    set?" line with its cost ("Generate a new set. This replaces every
+    answer you've typed so far.");
+  - the link "Go to Generate new set" closes the sheet and moves focus to
+    the existing Generate new set button, which keeps its own confirm;
+  - the footer's buttons become one, "Done", which closes the sheet.
+- When the reply doesn't carry it, the sheet closes, the sentence is
+  announced in the card's polite live region, and focus returns to the
+  trigger. The stored-kind line under the heading then shows the change.
 
-**Exercise mix.** "In every set" lists the user's daily kinds with their
-difficulty controls only. A kind that is daily drops out of its group's
-weight and exclusion rows. `code_review` and `design_comparison`, when not
-daily, show as single-kind groups with difficulty only, like `pattern`. Setup
-does not get a swap control; that stays on the cards.
+### Sheet states
 
-**Snapshots that change.**
+- **Options:** the current kind is checked and badged "Now". The other
+  daily kind is disabled and badged "Already daily". Each other refusal
+  disables its kind with its sentence. Every other kind is available. The
+  names come from `ExerciseSection.fourths` and the `sections.*.name` keys,
+  and every state from `DailyKindSwap#refusal`.
+- **Consequences:** the sentences and their conditions are
+  `DailyKindSwap::Consequences` and the `daily_kinds.picker.consequences`
+  keys. They render only in the footer.
+- **Saving:** both buttons and the close button are disabled, the list is
+  `inert`, and a polite live region in the footer says "Saving…". Escape is
+  ignored until the reply lands.
+- **Stale 409:** the reply's panels replace both sheets' contents. The sheet
+  stays open on the stored pair, with the current kind checked and focus on
+  it.
+- **Set changed:** when the reply has no panels and carries `set_changed`,
+  the sheet closes, its sentence shows on the card, and focus returns to the
+  trigger. Nothing reloads by itself.
+- **Leaving the page:** when the answer form's leave gate locks the form
+  (`relockAndLeave`), any open sheet closes first. A modal dialog inside a
+  subtree that turns `inert` would stay on screen with nothing in it
+  reachable.
 
-- **Page snapshots:**
-  - `dashboard_unsubmitted.html` gains the control and the first-time hint on
-    the `code_review` card. The fixture account has no swaps and at most one
-    submitted day.
-  - `dashboard_submitted.html` gains the control only.
-  - The fixture day is code review, pattern and challenge, so only one card
-    is daily and the fixture shows the default-pair markup. Add a fixture
-    with a swapped pair to the same spec.
-  - `setup.html` should not change for a default account. If it does, that is
-    a regression to investigate, not a rebaseline.
-  - The welcome page has no page snapshot, so its line is covered by a
-    request spec and `spec/system/welcome_spec.rb`.
-- **Request snapshots:** none change, since a swap makes no provider call.
-- **Prompt snapshots:** PR 1 and PR 1b leave every existing file
-  byte-identical, which is their proof that a default account is untouched.
-  #415 is the one planned rewrite of all 263 files, to name each section by
-  its kind. PR 2 adds new shapes: a full prompt for a non-default pair, for
-  example `pattern` + `architecture`, and `code_review` + `plan_review` for a
-  pair holding a fourth.
+### Keyboard and VoiceOver
+
+These carry over unchanged:
+
+- Tab reaches the trigger, and Enter or Space opens the sheet.
+- The arrow keys move between the enabled radios (native behaviour).
+- Tab reaches the primary and Cancel.
+- VoiceOver reads the legend, the next-set line, each option's name with
+  its description, and the disabled reasons, and the reply is announced
+  through the live region.
+
+New with the sheet:
+
+- **Opening** moves focus into the sheet, onto the checked radio. When the
+  trial has ended and there is no list, focus goes to the close button.
+- **While open,** focus can't leave the sheet: `showModal()` makes the rest
+  of the page inert, so Tab cycles through the sheet's controls and the
+  browser's own UI.
+- **Escape, the close button, Cancel and a backdrop click** each dismiss the sheet, reset the
+  choice to the current kind, and return focus to the trigger. Escape
+  arrives as the dialog's `cancel` event. The controller handles it and
+  doesn't rely on the browser's own focus return, which Safari and Chrome
+  don't do the same way.
+- **The trigger's name** is its `aria-label`, "Swap Code Review for another
+  kind", and `aria-haspopup="dialog"` tells VoiceOver it opens one. It has no
+  `aria-expanded`, since a modal hides the page that would report it.
+- **The page behind does not scroll** while the sheet is open (above).
+- **Specs:**
+  - keyboard open, the arrow keys, confirm, Escape, the close button and
+    focus return;
+  - a backdrop click dismisses the sheet, and a click inside it, or a drag
+    from inside it out onto the backdrop, does not;
+  - focus can't reach a control outside the sheet while it is open;
+  - every radio carries `aria-describedby` pointing at its summary and its
+    consequence block;
+  - the primary's label follows the checked kind;
+  - a refusal shows in the sheet;
+  - a save with `want_it_today` shows the saved state, and "Done" returns
+    focus to the trigger;
+  - an open sheet closes when a held submit resumes into the review.
+
+### Rendering: inline, as now
+
+The sheet is rendered with the dashboard and hidden until opened, not
+fetched when it opens. These are the numbers, from the page snapshots on
+`main` at `a52a55a`, which already render the inline picker:
+
+| Snapshot | Whole page | Picker markup | Share |
+|---|---|---|---|
+| `dashboard_unsubmitted` (one daily card) | 76.2 KB | 14.3 KB | 19% |
+| `dashboard_submitted` (one daily card) | 70.7 KB | 14.2 KB | 20% |
+| `dashboard_swapped_pair` (two daily cards) | 92.3 KB | 32.7 KB | 35% |
+
+- **Over the wire,** both pickers on the two-card page cost 3.1 KB gzipped:
+  15.7 KB against 12.5 KB without them.
+- **About 10.2 KB of each card's picker is the ten options,** mostly each
+  kind's two- or three-sentence summary and its example. The sheet replaces
+  the long summary with a one-line one, and shows the example on only the
+  selected row. It still renders every example hidden, so each card's markup
+  should come out about the same or slightly smaller. PR 3b measures it.
+- **Fetching would cost more than it saves:**
+  - a new `GET /daily_kinds/:place` and a loading state in the sheet;
+  - a failure state for a sheet that can't open offline or on a slow network;
+  - a second way to render the panel, beside the PATCH reply's.
+- **What it would save** is about 3 KB gzipped per dashboard, and smaller
+  snapshot diffs. Snapshot size is a review cost, not a cost to the person
+  using the page.
+- **Inline also keeps one rendering path.** The PATCH reply already returns
+  each place's panel HTML (`panels`), and the sheet's body becomes that
+  partial.
+
+### One-line summaries
+
+`SectionKindGuide` has no short field. Every `summary` entry is two
+sentences, the longer ones running past 200 characters, so a row needs one
+new line of copy per kind. Truncating the existing text would
+cut sentences mid-thought. The new lines go in a `short` field beside
+`summary` and `example`, with a spec that every kind has one.
+
+The lines below are decided. Each width is measured at 0.85rem in Inter,
+against the 304 px a row's second line has at 390 px. A line that is too
+wide wraps onto a second line rather than being truncated.
+
+| Kind | Line | Width |
+|---|---|---|
+| Code Review | Find the one problem in a short piece of code. | 296 px |
+| Design Comparison | Both work — pick the one that suits the system. | 306 px, wraps |
+| Pattern of the Month | Apply a named pattern to a real problem. | 262 px |
+| Coding Challenge | Write code for a small, self-contained task. | 275 px |
+| Architecture Decision | Choose an approach and name what it costs. | 290 px |
+| Security Review | Find the weakness an attacker could use. | 266 px |
+| Parsons Problem | Put shuffled pieces of code back in order. | 268 px |
+| Plan Review | Find the flaws in a plan before any code. | 260 px |
+| Ambiguity Hunt | Find what a request leaves undecided. | 248 px |
+| Pseudocode to Code | Write steps in plain words, then see the code. | 293 px |
+
+**Wording that is deliberate.** Keep these as they are:
+
+- **Code Review says "problem", not "bug".** The guide says problem, and the
+  day's code is sometimes a test file or a database migration, where the
+  issue isn't a bug.
+- **Design Comparison says both pieces work, and "suits the system".**
+  That both work is what separates it from Code Review, and the choice is
+  about which design fits the system described, not which is better in
+  general. The line is 2 px over the limit at 390 px and wraps there. Let
+  it wrap. Dropping "work" to make it fit would lose the distinction.
+- **Plan Review says "flaws".** Every plan carries 2-3 planted flaws, and
+  most of them are things the plan does (an anti-pattern, scope creep, an
+  unflagged behaviour change), not things it leaves out, so "misses" would
+  be wrong. "Flaws" also keeps it apart from Code Review's "problem". It
+  avoids "push back on", which presumes the plan is wrong before it has
+  been read.
+- **Pseudocode to Code says "see the code".** The engineer writes only the
+  steps, and Code Gym turns them into code when the answer is reviewed.
+  "then in code" would say the engineer writes the code too.
+- **Parsons Problem says "pieces", not "lines".** A block can hold more than
+  one line, and the guide says pieces.
+- **Pattern of the Month says "a named pattern".** The kind's name already
+  supplies "design".
+- No line uses a semicolon.
+
+`ambiguity_hunt`'s guide carries a comment that it names no gap and no kind
+of gap. Its line keeps that rule.
+
+### Tokens
+
+- **Color:** `--surface`, `--surface-raised`, `--border`, `--accent`,
+  `--accent-text`, `--text`, `--muted`, `--yellow`, `--bg` (for the scrim),
+  `--button-bg` through the existing `.btn-primary`, and the focus ring
+  tokens.
+- **Radius:** `--radius` for the sheet's top corners, `--radius-sm` for
+  rows, and 999px for badges, as `.featured-marker` and `.btn` already use.
+- **Shadow:** `--shadow`.
+- **Spacing:** the layout defines no spacing tokens. Every rule in it uses
+  literal `rem` values, and the steps that recur are 0.5, 0.75, 1, 1.25 and
+  1.5rem. The sheet uses those same steps: 1rem gutters, 0.75rem row
+  padding and gaps, 1.25rem between header, list and footer. Adding a
+  spacing scale for one component would be a second convention, so this PR
+  doesn't.
+- The app has one theme, dark. There is no light variant to define.
+
+### Discoverability
+
+The welcome line is unchanged. The first-time hint keeps its conditions,
+and now sits directly under the first daily card's title row, since there
+is no swap row. Its text points at the trigger by position:
+
+> New: the button at the top of this card swaps this daily section for
+> another kind.
+
+It names no glyph. An arrow character renders differently across fonts and
+reads badly in VoiceOver. The `daily_kinds.picker.first_time_hint` key
+changes to this text.
+
+### Exercise mix
+
+Unchanged. "In every set" lists the user's daily kinds with their difficulty
+controls only. A kind that is daily drops out of its group's weight and
+exclusion rows. `code_review` and `design_comparison`, when not daily, show
+as single-kind groups with difficulty only, like `pattern`. Setup does not
+get a swap control; that stays on the cards.
+
+### Snapshots that change
+
+- **Every page snapshot changes once.** #421 added no CSS, because every
+  style lives in the layout's inline `<style>`, so any new rule changes every
+  page snapshot. The sheet needs new rules:
+  - the trigger's position and size;
+  - the summary's reserved width;
+  - the dialog, backdrop, rows, badges and footer;
+  - the scroll lock;
+  - the reduced-motion case.
+  That is an estimated 2-3 KB of CSS. All six page snapshots (`setup`,
+  `account`, `history` and the three dashboards) rebaseline in PR 3b for it,
+  and each diff outside the dashboards should be that CSS and nothing else.
+- **The dashboard snapshots** also change their swap markup: the pill
+  becomes the icon button, the fieldset moves into a dialog, the rows gain
+  the summary line and badge, and the consequence blocks move to the footer.
+- **What moves on the card.**
+  - On a daily card, the content moves up by the old swap row's height: the
+    pill and its margins, plus the stored-kind line and the hint when they
+    show. The stored-kind line and the hint still show, one line each.
+  - The title row keeps its 44 px height. `.section-status` moves left by
+    the button's width plus the gap.
+  - Non-daily cards don't change.
+  - A long title with a featured marker can wrap earlier than before,
+    because of the reserved width. The summary already wraps
+    (`flex-wrap: wrap`).
+- **Request and prompt snapshots:** none change.
+
+### The reply
+
+The sheet needs nothing new from `PATCH /daily_kinds/:place`. The reply
+already carries:
+- the sentence (`message`);
+- `want_it_today` and `want_it_today_link`;
+- each place's panel HTML (`panels`), or `set_changed`;
+- the refusal message through `render_json_error`;
+- the new version.
+
+What changes is the panel partial the reply renders. It now holds the
+sheet's body: the rows, the summary lines, the badges, the hidden
+examples, the per-kind consequence blocks and the per-kind primary labels.
+That is a view change in PR 3b, not a change to the reply's shape. The
+`exercise_id` and `draft_scope` the page posts stay as they are.
 
 ## 8. Events
 
@@ -695,7 +1025,9 @@ daily_kind_swaps
 | 4a | **#413. Reinforcement only where today can host it** (not in the original order) | `User#concepts_needing_reinforcement(hostable:)` filters history entries as well as drills, through `DailyPlan.host_test`. It changes default accounts: a reinforcement concept no section today can tag waits for a day that can. Docs: `personalization-loop.md`, `drills.md` |
 | 4b | **#415. Name prompt sections by kind** (not in the original order) | Every prompt names a section by its JSON key instead of its position, the fourth-track lines render only when the fourth kind is requested, and `generation_prompt_section_names_spec` scans the snapshots and all Ruby under `app/` and `lib/`. Rewrites all 263 prompt snapshots. Docs: `docs/decisions/kind-named-prompt-sections.md` |
 | 5 | **2. The swap, server side** | **Preconditions:** #415 merged; the two lines that assume `code_review` is in the day (`DesignComparison`'s "the same as the code review's" and `SecurityReview`'s "the same bar as code_review's snippet") gated on `code_review` being planned or reworded to stand alone; and a spec that renders the prompt for every reachable pair and asserts each quoted section key it names is in that prompt's schema. Covers `PATCH /daily_kinds/:place` (`DailyKindsController#update`), the `DailyKindSwap` outcome object (`saved` or a refusal reason), the save under the user-row lock with the version bump, the event row with `today_section`, and the reply sentence from section 3. The request spec keeps one example per outcome. It also keeps a weight or exclusion stored on a kind that becomes daily: the Exercise mix save merges stored entries for daily kinds back in, and the `*_name_rotatable_kinds` validations check only the entries a save adds or changes |
-| 6 | **3. The card control** | Covers the swap row and picker partial, the extracted guide partial, the `daily-kind-swap` controller, the consequence sentences, the "next set" line and the "Want it today?" line, the welcome line, the first-time hint, the page snapshots and the system specs |
+| 6 | **3. The card control** (#421, merged) | Shipped the inline version: the swap row and picker partial, the extracted guide partial, the `daily-kind-swap` controller, the consequence sentences, the "next set" line and the "Want it today?" line, the welcome line, the first-time hint, the shared leave gate in `save_status.js`, the page snapshots and the system specs |
+| 5a | **2b. A held set is the set the swap was made on** | Before 3b. `DailyKindSwap` records `today_section` and `planned_size` from today's row, and when there is none, from the held set (`User#held_exercise`). Without this, a paused user whose held set hasn't yet moved to today records `no_set`. That happens when the page stayed open past midnight and no dashboard load has run since. `no_set` under-counts exactly the swaps that column exists to find. The reply's "Want it today?" line still reads today's row only, since regeneration acts on today's set |
+| 6a | **3b. The swap sheet** | Replaces #421's trigger row and inline picker with section 7's design. **View:** the icon trigger after the summary, absolutely placed on the title row, with the summary's reserved width; the panel partial becomes a `<dialog class="daily-kind-sheet">` with header, next-set line, list, footer and the saved state; `_option` becomes a one-row label with badge, short line, hidden example, and its consequence block and primary label moved to the footer; `_summary` folds into the footer block. **Copy:** a `short` field on every `SectionKindGuide` entry (ten lines, drafted in section 7, to be edited), the dialog title, "Close", "Done", the "Swap" and "Swap to %{kind}" labels, and the trigger's `aria-label`; `already_daily` shortens to "Already daily", and `first_time_hint` becomes the positional wording in section 7. **Script:** `daily_kind_swap_controller.js` opens with `showModal()`, handles `cancel`, the close button, a backdrop click (both the `pointerdown` and the `click` on the dialog itself), the saved state and the in-sheet error line, and copies the checked option's label to the primary. `answer_form_controller.js#relockAndLeave` closes any open sheet first. `pull_to_refresh_controller.js` ignores a touch while a modal dialog is open. **CSS:** the trigger, dialog, backdrop, rows, badges, footer, scroll lock and reduced-motion rules, in the layout. **Specs:** the keyboard, focus and VoiceOver list in section 7, a `SectionKindGuide` spec that every kind has a `short` line, and the snapshots: all six page snapshots rebaseline once for the CSS, and only the three dashboards change in markup. **Docs:** `docs/decisions/daily-kinds.md` ("The card control") and the controller's code note. **Unchanged:** `PATCH /daily_kinds/:place`, its reply, `DailyKindSwap`, `Picker`'s rules and `Consequences` |
 | 7 | **4. Judged regeneration (separate, from D4)** | `RegenerateExerciseJob` moves to `generate_judged_exercise`. It needs its own deadline, because it no longer inherits one from an in-place swap. The in-place alternative's PR 4 entry has the derivation: `REGENERATION_DEADLINE` of 1,187 s from the claim, with the window raised to match and late sections dropped while kept ones land. It matters more now that regeneration is the "apply now" path. It can follow at any point after PR A |
 
 PR 2 and PR 3 could merge into one, since PR 2 is now small. Keeping them
