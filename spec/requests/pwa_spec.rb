@@ -163,7 +163,9 @@ RSpec.describe "PWA", type: :request do
 
     it "leaves the native bounce suppression scoped as it was" do
       expect(standalone_block).to include("html, body { overscroll-behavior-y: none; }")
-      expect(layout.scan("overscroll-behavior").size).to eq(1)
+      rules = layout.lines.grep(/overscroll-behavior/)
+      expect(rules.grep(/\.daily-kind-list \{/)).to all(include("overscroll-behavior: contain;"))
+      expect(rules.grep_v(/\.daily-kind-list \{/).size).to eq(1)
     end
 
     it "is rendered on every page, signed in or not" do

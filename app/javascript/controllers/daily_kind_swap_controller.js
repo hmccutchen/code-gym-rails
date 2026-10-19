@@ -5,19 +5,22 @@ import saveStatus from "code_gym/save_status"
 let lastConfirmed = null
 
 export default class extends Controller {
-  static targets = ["panel", "trigger", "picker", "option", "summary", "confirm", "cancel", "status", "reply"]
+  static targets = ["panel", "trigger", "sheet", "choosing", "picker", "option", "example", "consequences", "saved",
+                    "savedMessage", "savedOffer", "error", "confirm", "done", "cancel", "close", "status", "reply"]
 
   static values = { url: String, exercise: Number, draftScope: String, savingText: String }
 
   connect() {
     this.busy = false
     this.attempted = null
+    this.wanted = false
   }
 
-  // Another card's reply re-renders this panel too; a swap still queued here keeps showing as saving.
+  // Any reply re-renders this panel, closing its sheet; one still wanted reopens, and a queued swap keeps showing as saving.
   panelTargetConnected() {
     if (this.busy) this.setBusy(true)
     else this.reconcile()
+    if (this.wanted && !this.sheetTarget.open) this.reshow()
   }
 
   reconcile() {
@@ -28,45 +31,76 @@ export default class extends Controller {
     return true
   }
 
-  toggle() {
-    if (this.pickerTarget.hidden) this.open()
-    else this.close()
-  }
-
-  open(focus = true) {
-    this.pickerTarget.hidden = false
-    this.triggerTarget.setAttribute("aria-expanded", "true")
+  open() {
+    this.wanted = true
+    this.showSaved(false)
+    if (!this.sheetTarget.open) this.sheetTarget.showModal()
     this.choose()
-    if (!focus) return
-    const checked = this.optionTargets.find((option) => option.checked)
-    if (checked) checked.focus()
-    else this.cancelTarget.focus()
+    this.focusChoice()
   }
 
-  close(focus = true) {
-    this.pickerTarget.hidden = true
-    this.triggerTarget.setAttribute("aria-expanded", "false")
+  reshow() {
+    this.sheetTarget.showModal()
+    this.choose()
+    if (!this.busy) this.focusChoice()
+  }
+
+  focusChoice() {
+    const checked = this.chosen()
+    if (checked) checked.focus()
+    else this.closeTarget.focus()
+  }
+
+  hide(focus = true) {
+    this.wanted = false
+    if (this.sheetTarget.open) this.sheetTarget.close()
     if (focus) this.triggerTarget.focus()
   }
 
-  cancel() {
-    this.optionTargets.forEach((option) => { option.checked = option.dataset.state === "now" })
-    this.close()
+  dismiss() {
+    if (this.busy) return
+    this.resetChoice()
+    this.hide()
   }
 
-  closeOnEscape(event) {
-    if (event.key !== "Escape") return
+  resetChoice() {
+    this.optionTargets.forEach((option) => { option.checked = option.dataset.state === "now" })
+    this.errorTarget.textContent = ""
+  }
+
+  escape(event) {
     event.preventDefault()
-    this.cancel()
+    this.dismiss()
+  }
+
+  // Chrome closes a sheet on a second Escape even when the first was refused, so a close this controller didn't ask for still tidies up.
+  closed(event) {
+    if (!event.target.isConnected || event.target.open || !this.wanted) return
+
+    this.wanted = false
+    if (!this.busy) this.resetChoice()
+    this.triggerTarget.focus()
+  }
+
+  press(event) {
+    this.pressedSheet = event.target === this.sheetTarget
+  }
+
+  backdrop(event) {
+    const fromBackdrop = this.pressedSheet && event.target === this.sheetTarget
+    this.pressedSheet = false
+    if (fromBackdrop) this.dismiss()
   }
 
   choose() {
     const chosen = this.chosen()
-    const available = chosen && chosen.dataset.state === "available"
-    this.summaryTargets.forEach((summary) => { summary.hidden = !available || summary.dataset.kind !== chosen.value })
+    const available = Boolean(chosen) && chosen.dataset.state === "available"
+    const block = available && this.consequencesTargets.find((element) => element.dataset.kind === chosen.value)
+    this.exampleTargets.forEach((example) => { example.hidden = !chosen || example.dataset.kind !== chosen.value })
+    this.consequencesTargets.forEach((element) => { element.hidden = element !== block })
     this.confirmTarget.disabled = this.busy || !available
-    const summary = available && this.summaryTargets.find((element) => element.dataset.kind === chosen.value)
-    if (summary) this.confirmTarget.setAttribute("aria-describedby", summary.id)
+    this.confirmTarget.textContent = available ? chosen.dataset.confirmLabel : this.confirmTarget.dataset.label
+    if (block) this.confirmTarget.setAttribute("aria-describedby", block.id)
     else this.confirmTarget.removeAttribute("aria-describedby")
   }
 
@@ -76,9 +110,11 @@ export default class extends Controller {
 
   setBusy(busy) {
     this.busy = busy
-    this.confirmTarget.disabled = busy
     this.cancelTarget.disabled = busy
+    this.closeTarget.disabled = busy
+    if (this.hasPickerTarget) this.pickerTarget.inert = busy
     this.statusTarget.textContent = busy ? this.savingTextValue : ""
+    this.choose()
   }
 
   async confirm() {
@@ -86,6 +122,7 @@ export default class extends Controller {
     if (this.busy || !chosen || chosen.dataset.state !== "available") return
 
     lastConfirmed = this
+    this.errorTarget.textContent = ""
     this.setBusy(true)
     const kind = chosen.value
     const result = await saveStatus.queue(this.statusKey, "PATCH", this.urlValue, () => this.body(kind),
@@ -98,14 +135,17 @@ export default class extends Controller {
     if (result && result.status === 409 && result.data) return this.refreshStale(result.data)
 
     this.setBusy(false)
-    this.reopenWith(kind)
+    this.reopenWith(kind, result?.message)
   }
 
-  reopenWith(kind) {
+  reopenWith(kind, message) {
     const submitted = this.optionTargets.find((option) => option.value === kind)
     if (submitted && submitted.dataset.state === "available") submitted.checked = true
-    this.open(this.replyMayFocus)
-    if (this.replyMayFocus && !this.confirmTarget.disabled) this.confirmTarget.focus()
+    this.errorTarget.textContent = message || ""
+    if (!this.replyMayFocus) return this.choose()
+
+    this.open()
+    if (!this.confirmTarget.disabled) this.confirmTarget.focus()
   }
 
   get statusKey() {
@@ -119,29 +159,32 @@ export default class extends Controller {
   }
 
   saved(data) {
-    if (!this.replacePanels(data.panels)) this.leaveCards()
-    this.announce(data.message, data.want_it_today, data.want_it_today_link)
-    if (data.set_changed) this.replyTarget.append(this.paragraph(data.set_changed))
-    if (this.replyMayFocus) this.triggerTarget.focus()
+    const replaced = this.replacePanels(data.panels)
+    if (replaced && data.want_it_today && this.replyMayFocus) return this.offerToday(data)
+
+    if (replaced) this.hide(this.replyMayFocus)
+    else this.leaveCards()
+    this.announce(data.message, data.want_it_today)
+    if (data.set_changed) this.replyTarget.append(this.paragraph(data.set_changed, "daily-kind-note"))
   }
 
   leaveCards() {
     this.setBusy(false)
-    this.close(this.replyMayFocus)
+    this.hide(this.replyMayFocus)
   }
 
-  // Another tab changed the pair or the mix, so the picker reopens on the stored pair before the reader tries again.
   refreshStale(data) {
-    if (this.replacePanels(data.panels)) return this.settleStale()
+    if (this.replacePanels(data.panels)) return this.settleStale(data.error)
 
     this.leaveCards()
-    this.replyTarget.replaceChildren(this.paragraph(data.set_changed || data.error))
+    this.replyTarget.replaceChildren(this.paragraph(data.set_changed || data.error, "daily-kind-note"))
   }
 
-  settleStale() {
-    if (this.reconcile()) return this.close(this.replyMayFocus)
+  settleStale(message) {
+    if (this.reconcile()) return this.hide(this.replyMayFocus)
 
-    this.open(this.replyMayFocus)
+    this.errorTarget.textContent = message || ""
+    if (this.replyMayFocus) this.open()
   }
 
   replacePanels(panels) {
@@ -156,30 +199,47 @@ export default class extends Controller {
     return !mine.isConnected
   }
 
-  announce(message, wantItToday, linkLabel) {
-    this.replyTarget.replaceChildren(this.paragraph(message))
-    if (!wantItToday) return
-
-    const line = this.paragraph(wantItToday)
-    const link = document.createElement("a")
-    link.href = "#"
-    link.textContent = linkLabel
-    link.addEventListener("click", (event) => this.focusRegenerate(event))
-    line.append(" ", link)
-    this.replyTarget.append(line)
+  offerToday(data) {
+    this.wanted = true
+    this.savedMessageTarget.textContent = data.message
+    this.savedOfferTarget.replaceChildren(data.want_it_today, " ", this.regenerateLink(data.want_it_today_link))
+    this.showSaved(true)
+    this.sheetTarget.showModal()
+    this.doneTarget.focus()
   }
 
-  paragraph(text) {
+  showSaved(saved) {
+    this.choosingTarget.hidden = saved
+    this.savedTarget.hidden = !saved
+    this.confirmTarget.hidden = saved
+    this.cancelTarget.hidden = saved
+    this.doneTarget.hidden = !saved
+    if (saved) this.consequencesTargets.forEach((element) => { element.hidden = true })
+  }
+
+  announce(message, wantItToday) {
+    this.replyTarget.replaceChildren(...[message, wantItToday].filter(Boolean).map((text) => this.paragraph(text, "visually-hidden")))
+  }
+
+  paragraph(text, className) {
     const line = document.createElement("p")
-    line.className = "hint"
+    line.className = className
     line.textContent = text
     return line
   }
 
-  // The existing button keeps its own confirm and cost, so the link only takes the reader to it.
+  regenerateLink(label) {
+    const link = document.createElement("a")
+    link.href = "#"
+    link.textContent = label
+    link.addEventListener("click", (event) => this.focusRegenerate(event))
+    return link
+  }
+
   focusRegenerate(event) {
     event.preventDefault()
     const button = document.querySelector(".regenerate-row form button")
+    this.hide(!button)
     if (!button) return
     button.scrollIntoView({ block: "center" })
     button.focus()

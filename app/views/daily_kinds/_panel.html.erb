@@ -2,34 +2,46 @@
 <% prefix = "daily-kind-#{picker.place}" %>
 <%= tag.div id: "daily-kind-swap-panel-#{picker.place}", class: "daily-kind-swap-panel",
       data: { daily_kind_swap_target: "panel", version: picker.version, current: picker.current.key } do %>
+  <button type="button" class="daily-kind-trigger" aria-haspopup="dialog"
+          aria-label="<%= t("daily_kinds.picker.trigger", name: t("sections.#{picker.card_kind.key}.name")) %>"
+          data-daily-kind-swap-target="trigger" data-action="daily-kind-swap#open">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4"/></svg>
+  </button>
   <% if picker.next_kind_line %>
-    <p class="hint daily-kind-next"><%= picker.next_kind_line %></p>
+    <p class="daily-kind-note daily-kind-next"><%= picker.next_kind_line %></p>
   <% end %>
   <% if picker.hint? %>
-    <p class="hint daily-kind-hint"><%= t("daily_kinds.picker.first_time_hint") %></p>
+    <p class="daily-kind-note daily-kind-hint"><%= t("daily_kinds.picker.first_time_hint") %></p>
   <% end %>
-  <button type="button" class="btn btn-ghost btn-sm daily-kind-trigger" aria-expanded="false" aria-controls="<%= prefix %>-picker"
-          data-daily-kind-swap-target="trigger" data-action="daily-kind-swap#toggle"><%= t("daily_kinds.picker.trigger", name: t("sections.#{picker.card_kind.key}.name")) %></button>
-  <fieldset id="<%= prefix %>-picker" class="daily-kind-picker" hidden data-daily-kind-swap-target="picker"
-            data-action="change->daily-kind-swap#choose keydown->daily-kind-swap#closeOnEscape">
-    <legend><%= t("daily_kinds.picker.legend") %></legend>
-    <% if picker.closed %>
-      <p class="hint" id="<%= prefix %>-closed"><%= picker.closed %></p>
-    <% else %>
-      <p class="hint" id="<%= prefix %>-next-set"><%= picker.next_set_line %></p>
-    <% end %>
-    <% picker.options.each do |option| %>
-      <%= render "daily_kinds/option", option: option, prefix: prefix, place: picker.place %>
-    <% end %>
-    <% picker.options.select(&:available?).each do |option| %>
-      <%= render "daily_kinds/summary", option: option, prefix: prefix %>
-    <% end %>
-    <div class="daily-kind-actions">
-      <button type="button" class="btn btn-primary btn-sm" disabled data-daily-kind-swap-target="confirm"
-              data-action="daily-kind-swap#confirm"><%= t("daily_kinds.picker.confirm") %></button>
-      <button type="button" class="btn btn-ghost btn-sm" data-daily-kind-swap-target="cancel"
-              data-action="daily-kind-swap#cancel"><%= t("daily_kinds.picker.cancel") %></button>
-      <span class="hint" aria-live="polite" data-daily-kind-swap-target="status"></span>
+  <dialog id="<%= prefix %>-sheet" class="daily-kind-sheet" aria-labelledby="<%= prefix %>-title" data-daily-kind-swap-target="sheet"
+          data-action="cancel->daily-kind-swap#escape close->daily-kind-swap#closed pointerdown->daily-kind-swap#press click->daily-kind-swap#backdrop">
+    <div class="daily-kind-sheet-body">
+      <div class="daily-kind-sheet-header">
+        <h2 id="<%= prefix %>-title"><%= t("daily_kinds.picker.title") %></h2>
+        <button type="button" class="daily-kind-close" aria-label="<%= t("daily_kinds.picker.close") %>"
+                data-daily-kind-swap-target="close" data-action="daily-kind-swap#dismiss">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="daily-kind-choosing" data-daily-kind-swap-target="choosing">
+        <p class="daily-kind-note" id="<%= prefix %>-next-set"><%= picker.closed || picker.next_set_line %></p>
+        <% unless picker.closed %>
+          <div class="daily-kind-list">
+            <fieldset id="<%= prefix %>-picker" class="daily-kind-picker" data-daily-kind-swap-target="picker"
+                      data-action="change->daily-kind-swap#choose">
+              <legend class="visually-hidden"><%= t("daily_kinds.picker.legend") %></legend>
+              <% picker.options.each do |option| %>
+                <%= render "daily_kinds/option", option: option, picker: picker, prefix: prefix %>
+              <% end %>
+            </fieldset>
+          </div>
+        <% end %>
+      </div>
+      <div class="daily-kind-saved" role="status" hidden data-daily-kind-swap-target="saved">
+        <p id="<%= prefix %>-saved-message" data-daily-kind-swap-target="savedMessage"></p>
+        <p class="daily-kind-note" id="<%= prefix %>-saved-offer" data-daily-kind-swap-target="savedOffer"></p>
+      </div>
+      <%= render "daily_kinds/footer", picker: picker, prefix: prefix %>
     </div>
-  </fieldset>
+  </dialog>
 <% end %>

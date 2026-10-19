@@ -35,10 +35,32 @@ RSpec.describe "Swapping a daily section kind", type: :request do
     version = user.reload.section_kind_preferences_version
     expect(body["panels"].keys).to eq(%w[0 1])
     expect(body["panels"].values).to all(include(%(data-version="#{version}")))
-    expect(body["panels"]["1"]).to include("Swap Design Comparison").and include("Your next set uses #{I18n.t("sections.architecture.name")} here.")
+    expect(body["panels"]["1"]).to include(%(aria-label="Swap Design Comparison for another kind"))
+      .and include("Your next set uses #{I18n.t("sections.architecture.name")} here.")
       .and include(%(id="daily-kind-1-design_comparison"))
-    expect(body["panels"]["0"]).to include("Already a daily section")
+    expect(body["panels"]["0"]).to include(%(<span class="daily-kind-badge">Already daily</span>))
     expect(exercise.reload.problem_set.keys).to eq(%w[code_review design_comparison])
+  end
+
+  it "renders each panel as a sheet with the server's badges, refusal lines and primary labels" do
+    DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,
+                          problem_set: { "code_review" => { "question" => "q" }, "design_comparison" => { "question" => "q" } },
+                          plan_notes: { "daily_kinds" => %w[code_review design_comparison], "size" => 2 })
+    swap(1, "plan_review")
+
+    sheet = Nokogiri::HTML.fragment(body["panels"]["0"]).at_css("dialog#daily-kind-0-sheet.daily-kind-sheet")
+    expect(sheet["aria-labelledby"]).to eq("daily-kind-0-title")
+    expect(sheet.at_css("#daily-kind-0-title").text).to eq(I18n.t("daily_kinds.picker.title"))
+    expect(sheet.at_css("label[data-kind='code_review'] .daily-kind-badge.daily-kind-badge-now").text).to eq("Now")
+    expect(sheet.at_css("label[data-kind='plan_review'] .daily-kind-badge:not(.daily-kind-badge-now)").text).to eq("Already daily")
+    expect(sheet.at_css("#daily-kind-0-ambiguity_hunt")["disabled"]).not_to be_nil
+    expect(sheet.at_css("#daily-kind-0-ambiguity_hunt-note").text)
+      .to eq("Only one of Plan Review, Ambiguity Hunt and Pseudocode to Code can be a daily section.")
+    expect(sheet.at_css("#daily-kind-0-ambiguity_hunt-short")).to be_nil
+    expect(sheet.at_css("#daily-kind-0-challenge-short").text).to eq(SectionKindGuide.for("challenge")[:short])
+    expect(sheet.at_css("#daily-kind-0-challenge")["data-confirm-label"]).to eq("Swap to Coding Challenge")
+    expect(sheet.at_css("#daily-kind-0-ambiguity_hunt")["data-confirm-label"]).to be_nil
+    expect(sheet.at_css(".daily-kind-sheet-footer #daily-kind-0-challenge-consequences")).to be_present
   end
 
   it "renders the panels for the set the page shows, so a dashboard left open past midnight still refreshes" do

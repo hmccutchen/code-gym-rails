@@ -186,6 +186,23 @@ RSpec.describe "Pull to refresh", type: :system do
     expect(still_the_same_page?).to be(true)
   end
 
+  it "does not start while a modal dialog is open, as a daily card's swap sheet is" do
+    launch_standalone
+    visit_as(user)
+    visit learn_path
+    page.execute_script(<<~JS)
+      const sheet = document.createElement("dialog");
+      sheet.textContent = "A sheet over the page";
+      document.body.appendChild(sheet);
+      sheet.showModal();
+    JS
+    mark_page
+
+    pull(200, from: "dialog")
+
+    expect(still_the_same_page?).to be(true)
+  end
+
   it "puts the indicator away when a second finger lands mid-pull" do
     launch_standalone
     visit_as(user)

@@ -66,7 +66,7 @@ export default class extends Controller {
            window.scrollY <= 0 &&
            !isEditable(document.activeElement) &&
            !isEditable(event.target) &&
-           !document.querySelector("form[inert]") &&
+           !document.querySelector("form[inert], dialog:modal") &&
            !insideScrolledArea(event.target)
   }
 
