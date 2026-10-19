@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/icon-512.png" alt="Code Gym icon: a kettlebell between curly braces" width="128" height="128">
+</p>
+
 # Code Gym
 
 Code Gym gives an engineer a short set of coding exercises every
