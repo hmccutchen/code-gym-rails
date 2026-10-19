@@ -58,14 +58,43 @@ These count work the page shows but the server has not stored yet: a request on
 the wire, or a delayed save a page registered through `watch()`.
 Pull-to-refresh waits on `pending()` so a reload cannot drop an edit mid-save.
 
-## `settled()` and `reloadWhenSaved()`
+## `settled()`, `leaveWhenSaved()` and `reloadWhenSaved()`
 
-A page that leaves itself must not leave over a save that has not landed.
-`settled(...ignored)` polls `pending()` every 200 ms and resolves `true` once
-nothing is left and no key outside `ignored` has a failure, or `false` after
-the wait limit or on such a failure. The answer form awaits it before a
-submit navigates. `reloadWhenSaved(conflict, stranded)` is `settled(conflict)`
-followed by a reload or by `stranded`. It reloads once nothing is left. A save that hangs or fails must never
+A page that leaves itself must not leave over a save that has not landed or
+that failed. `settled(...ignored)` is the one gate: it polls `pending()` every
+200 ms and resolves `true` once nothing is left and no key outside `ignored`
+has a failure, or `false` after the wait limit or on such a failure.
+`leaveWhenSaved(leave, stranded, ...ignored)` runs `leave` or `stranded` on
+its answer, and `reloadWhenSaved(conflict, stranded)` is `leaveWhenSaved`
+with a reload. When nothing is pending and nothing has failed, `settled`
+resolves on the next microtask, so a path behind it leaves as fast as before.
+
+Every automatic way the dashboard leaves goes through the gate:
+
+- the answer form's submit, before it starts the review or reloads after a
+  409 (`settled("answers", "submit")`);
+- the answer form's autosave reloads, for a 409 that says the set changed
+  and for a reply that says another tab submitted
+  (`leaveWhenSaved(..., "answers")`);
+- the review-in-progress poll (`generating_controller`), whose stranded
+  callback polls again, so it reloads once the other save lands;
+- the level suggestion card's and the exercise mix's conflict reloads
+  (`reloadWhenSaved`).
+
+These deliberately don't:
+
+- the answer form's `pageshow` reload of a bfcache-restored page, which only
+  fires on a page that already left through the gate;
+- pull-to-refresh, which the user asked for; it still waits for pending
+  saves in its own cancellable loop, but a failure doesn't stop it, the same
+  as a user-clicked Reload button;
+- the stranded Reload buttons, which the user clicks;
+- the push-reminder and write-up reloads, which run on pages without these
+  saves.
+
+The answer form ignores `answers` and `submit` because the submit carries
+every answer. The level card and the exercise mix ignore their own conflict
+key because the refusal that started the wait reports under it. A save that hangs or fails must never
 cost an edit to a forced reload. So after ten seconds, or while any key but
 `conflict` still has a failure in `failures`, it calls `stranded` instead,
 which hands the reload to the user and leaves the failed selection on the page

@@ -89,16 +89,24 @@ unsubmitted.
 
 ## Leaving the page waits for other saves
 
-A submit that would leave the page, to start the review or to reload after a
-409, first awaits `saveStatus.settled("answers", "submit")`. Another control
-may still have a save queued, such as a daily card's swap waiting behind the
-other card's, and navigating would drop it. When nothing is pending and no
-other key has a failure, `settled` resolves at once, so a normal submit
-leaves as before. When another save fails or does not land within the wait,
-the form unlocks and stays on the page with that failure in the banner;
-pressing Submit again is safe, because a repeated submit returns the
-existing review URL. The two keys are ignored because the submit itself
-carries every answer, so an earlier autosave failure is already superseded.
+Every way the form leaves the page by itself goes through
+`saveStatus.settled`: the submit, before it starts the review or reloads
+after a 409, and the autosave's two reloads, for a 409 saying the set
+changed and for a reply saying another tab submitted. Another control may
+still have a save queued, such as a daily card's swap waiting behind the
+other card's, or a save that failed and is waiting for a retry; leaving
+would drop it. When nothing is pending and no other key has a failure,
+`settled` resolves at once, so a normal submit leaves as before.
+
+When the gate holds a submit, the server already has the answers, so
+`holdAfterSubmit` sets `submitHeld` and unlocks the form without starting a
+draft autosave; `autoSave` and `sendSave` do nothing from then on. Submit
+stays enabled, and pressing it again is safe, because a repeated submit
+returns the existing review URL and goes through the gate again. The
+autosave reloads set `submitHeld` too, since the page is about to leave and
+its drafts no longer apply. The `answers` and `submit` keys are ignored,
+because the submit carries every answer. `docs/code-notes/app/javascript/code_gym/save_status.md`
+lists which paths use the gate and which deliberately don't.
 
 ## The copy on the device
 

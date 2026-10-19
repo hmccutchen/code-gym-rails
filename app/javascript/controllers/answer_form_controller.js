@@ -159,7 +159,7 @@ export default class extends Controller {
   sendSave() {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
-    if (this.formTarget.inert) return
+    if (this.formTarget.inert || this.submitHeld) return
     this.storeDraft()
     saveStatus.queue("answers", "POST", this.formTarget.action, () => this.nextSave(), { latest: true, offline: () => this.offlineSentence() })
       .then(({ ok, status, data, skipped }) => {
@@ -169,18 +169,23 @@ export default class extends Controller {
         if (!ok && status === 409 && data?.status === "stale") {
           this.clearOwnDraft()
           saveStatus.carry("answers", this.staleReloadedValue)
-          window.location.reload()
-          return
+          return this.reloadWhenOtherSavesLand()
         }
         if (ok && data?.submitted && !this.formTarget.inert && !this.reviewRequested) {
           draftStore.clear()
-          return window.location.reload()
+          return this.reloadWhenOtherSavesLand()
         }
         if (ok && this.saveTimer === null && !saveStatus.queued("answers") && !this.formTarget.inert) this.applyServerState(data)
       })
   }
 
+  reloadWhenOtherSavesLand() {
+    this.submitHeld = true
+    saveStatus.leaveWhenSaved(() => window.location.reload(), () => {}, "answers")
+  }
+
   autoSave() {
+    if (this.submitHeld) return
     clearTimeout(this.saveTimer)
     this.storeDraft()
     this.saveTimer = this.formTarget.inert ? null : setTimeout(() => this.sendSave(), AUTOSAVE_DELAY_MS)
@@ -249,7 +254,7 @@ export default class extends Controller {
     if (result.ok) saveStatus.clear("submit")
     if (result.ok) draftStore.clear()
     const stale = result.status === 409
-    if ((result.ok || stale) && !(await saveStatus.settled("answers", "submit"))) return this.unlock()
+    if ((result.ok || stale) && !(await saveStatus.settled("answers", "submit"))) return this.holdAfterSubmit()
     if (this.startReview(result) || this.reloadAfterSubmit(result, stale)) return
 
     const refused = result.status === 422 && Boolean(result.data?.submit_blocker)
@@ -310,6 +315,12 @@ export default class extends Controller {
     saveStatus.carry("answers", result.ok ? this.reviewStartFailedValue : this.staleReloadedValue)
     window.location.reload()
     return true
+  }
+
+  // The server already holds this submit, so no draft autosave may start again; Submit stays to retry leaving.
+  holdAfterSubmit() {
+    this.submitHeld = true
+    this.unlock()
   }
 
   unlock() {

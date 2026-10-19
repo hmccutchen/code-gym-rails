@@ -250,8 +250,79 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
     expect(page).to have_css("#save-status", visible: :visible)
     expect(page).to have_button("Submit answers", disabled: false)
+    sleep 1.5
     expect(page.evaluate_script("window.swapPage")).to be(true)
+    expect(page.evaluate_script("window.CodeGymSaveStatus.pending()")).to be(false)
     expect(user.reload.daily_section_kinds).to eq(%w[challenge design_comparison])
+
+    expect(find("#daily-kind-1-pattern")).to be_checked
+    within("#daily-kind-1-picker") { click_button "Confirm" }
+    release_swap
+    expect(page).to have_css("#daily-kind-swap-panel-1[data-current='pattern']")
+    click_button "Submit answers"
+    expect(page).to have_content("✓ Submitted", wait: 10)
+    expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
+  end
+
+  def fail_first_swap
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.swapCalls = 0;
+      window.fetch = (url, options) => {
+        if (!url.includes("/daily_kinds/")) return originalFetch(url, options);
+        window.swapCalls += 1;
+        if (window.swapCalls === 1) return Promise.resolve(new Response("unavailable", { status: 503 }));
+        return originalFetch(url, options);
+      };
+    JS
+    confirm_swap(1, "pattern")
+    expect(page).to have_css("#save-status", visible: :visible)
+    page.execute_script("window.swapPage = true")
+  end
+
+  def type_an_answer
+    fill_in_answer("code_review", "An edit typed after another tab changed the set on the server.")
+    sleep 1.5
+  end
+
+  it "does not reload over a failed swap when an autosave finds the set submitted in another tab" do
+    fail_first_swap
+    response = DailyResponse.create!(user: user, daily_exercise: user.daily_exercises.sole, date: Date.current, submitted_at: Time.current,
+                                     answers: { "code_review" => "Submitted from another tab with enough detail." },
+                                     section_ratings: { "code_review" => "right_level" })
+    type_an_answer
+
+    expect(response.reload).to be_submitted
+    expect(page.evaluate_script("window.swapPage")).to be(true)
+    expect(page).to have_css("#save-status", visible: :visible)
+    expect(page).to have_css("#daily-kind-swap-panel-1")
+  end
+
+  it "holds the review poll's reload while a swap has failed, and reloads once it saves" do
+    response = DailyResponse.create!(user: user, daily_exercise: user.daily_exercises.sole, date: Date.current, submitted_at: Time.current,
+                                     reviewing_since: Time.current, answers: { "code_review" => "Submitted with enough detail to count." },
+                                     section_ratings: { "code_review" => "right_level" })
+    refresh
+    wait_for_js
+    expect(page).to have_css("[data-controller='generating']")
+    fail_first_swap
+    response.update!(reviewing_since: nil)
+    sleep 4
+
+    expect(page.evaluate_script("window.swapPage")).to be(true)
+    within("#daily-kind-1-picker") { click_button "Confirm" }
+    expect(page).to have_css(".daily-kind-reply", text: I18n.t("daily_kinds.swap.saved"))
+    wait_for_js_condition("window.swapPage === undefined", timeout: 8)
+    expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
+  end
+
+  it "does not reload over a failed swap when an autosave finds the set regenerated" do
+    fail_first_swap
+    user.daily_exercises.sole.update!(generated_at: Time.current + 1.minute, regenerated_at: Time.current)
+    type_an_answer
+
+    expect(page.evaluate_script("window.swapPage")).to be(true)
+    expect(page).to have_css("#save-status", visible: :visible)
   end
 
   it "keeps Confirm disabled while a swap is on its way, whatever radio is chosen" do

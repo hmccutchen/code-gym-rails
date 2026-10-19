@@ -1,6 +1,7 @@
 // Design notes: docs/code-notes/app/javascript/controllers/generating_controller.md
 import { Controller } from "@hotwired/stimulus"
 import request from "code_gym/request"
+import saveStatus from "code_gym/save_status"
 
 export default class extends Controller {
   static targets = ["hint"]
@@ -34,7 +35,7 @@ export default class extends Controller {
     if (this.stopped) return
 
     if (data?.status === "ready" || data?.status === "failed") {
-      window.location.reload()
+      saveStatus.leaveWhenSaved(() => window.location.reload(), () => this.schedule())
       return
     }
 

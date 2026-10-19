@@ -42,8 +42,12 @@ function waitToSettle(ignored, resolve, waited) {
   resolve(!pending() && ![...failures.keys()].some((key) => !ignored.includes(key)));
 }
 
+export function leaveWhenSaved(leave, stranded, ...ignored) {
+  return settled(...ignored).then((clean) => (clean ? leave() : stranded()));
+}
+
 export function reloadWhenSaved(conflict, stranded) {
-  settled(conflict).then((clean) => (clean ? window.location.reload() : stranded()));
+  return leaveWhenSaved(() => window.location.reload(), stranded, conflict);
 }
 
 function render() {
@@ -171,4 +175,4 @@ function reportCarried() {
 
 reportCarried();
 
-export default { save, queue, queued, watch, pending, settled, reloadWhenSaved, carry, report, clear };
+export default { save, queue, queued, watch, pending, settled, leaveWhenSaved, reloadWhenSaved, carry, report, clear };
