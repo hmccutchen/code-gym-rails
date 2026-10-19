@@ -110,7 +110,9 @@ made during the wait and then dropped by the leave. Each section's summary
 and the daily cards' swap rows stay usable, so the save that blocks the page
 can be retried, and Submit is disabled. When the gate holds,
 `holdForOtherSaves` applies the same freeze (to a submit's form too) and adds
-a notice with a Reload button. The leave stays armed in `save_status`: once the
+a notice with a Reload button. When the armed leave finally runs, `relockAndLeave`
+makes the whole form inert again, swap rows included, so no new swap can be
+queued while the review POST or the reload is on its way. The leave stays armed in `save_status`: once the
 retried save lands, the held submit goes on to the review, and a held
 autosave reload reloads. The `answers` and `submit` keys are ignored,
 because the submit carries every answer. `docs/code-notes/app/javascript/code_gym/save_status.md`

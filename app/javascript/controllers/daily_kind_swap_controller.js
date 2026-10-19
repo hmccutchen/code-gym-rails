@@ -9,11 +9,21 @@ export default class extends Controller {
 
   connect() {
     this.busy = false
+    this.attempted = null
   }
 
   // Another card's reply re-renders this panel too; a swap still queued here keeps showing as saving.
   panelTargetConnected() {
     if (this.busy) this.setBusy(true)
+    else this.reconcile()
+  }
+
+  reconcile() {
+    if (!this.attempted || this.panelTarget.dataset.current !== this.attempted) return false
+
+    this.attempted = null
+    saveStatus.clear(this.statusKey)
+    return true
   }
 
   toggle() {
@@ -77,8 +87,9 @@ export default class extends Controller {
     const result = await saveStatus.queue(this.statusKey, "PATCH", this.urlValue, () => this.body(kind),
       { line: "daily_kind_swap" })
     this.busy = false
+    this.attempted = result && result.ok ? null : kind
     if (result && result.ok && result.data) return this.saved(result.data)
-    if (result && result.status === 409 && result.data) return this.refreshStale(result.data, kind)
+    if (result && result.status === 409 && result.data) return this.refreshStale(result.data)
 
     this.setBusy(false)
     this.reopenWith(kind)
@@ -114,18 +125,17 @@ export default class extends Controller {
     return `daily_kind_swap:${this.urlValue}`
   }
 
-  refreshStale(data, kind) {
-    if (this.replacePanels(data.panels)) return this.settleStale(kind)
+  refreshStale(data) {
+    if (this.replacePanels(data.panels)) return this.settleStale()
 
     this.leaveCards()
     this.replyTarget.replaceChildren(this.paragraph(data.set_changed || data.error))
   }
 
-  settleStale(kind) {
-    if (this.panelTarget.dataset.current !== kind) return this.open()
+  settleStale() {
+    if (this.reconcile()) return this.close()
 
-    saveStatus.clear(this.statusKey)
-    this.close()
+    this.open()
   }
 
   replacePanels(panels) {

@@ -190,7 +190,12 @@ export default class extends Controller {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
     if (!this.formTarget.inert) this.freezeAnswers()
-    return saveStatus.leaveWhenSaved(leave, () => this.holdForOtherSaves(), "answers", ...ignored)
+    return saveStatus.leaveWhenSaved(() => this.relockAndLeave(leave), () => this.holdForOtherSaves(), "answers", ...ignored)
+  }
+
+  relockAndLeave(leave) {
+    this.formTarget.inert = true
+    leave()
   }
 
   leaveAfterSubmit(result, stale) {
