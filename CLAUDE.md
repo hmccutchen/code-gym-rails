@@ -13,17 +13,20 @@ skill (`.claude/skills/intent-log/SKILL.md`): once the PR is open, append the
 day's entry to your own `docs/intent/<github-login>.md`, tag it with the PR
 number, run the skill's `compose.rb` and `check.rb`, and commit the result to
 the PR's branch. The entry records what you asked for and why, read from your
-own prompts, so a reviewer can tell your decisions from the agent's. Never edit
-`docs/intent-log.md` by hand, since `compose.rb` generates it. The skill's
-scripts are kept as the skill ships them, and the comment rules below don't
-apply to them; RuboCop doesn't scan `.claude/`.
+own prompts, so a reviewer can tell your decisions from the agent's. Run it on
+the PR's branch, not a detached HEAD, and with `gh` signed in, since `check.rb`
+reads the PR list from GitHub. It answers only for PRs you opened since the date
+in `docs/intent/_since`. Never edit `docs/intent-log.md` by hand, since
+`compose.rb` generates it.
 
 ## Code Style
 
 ### Comment rules — never ignored
 
 These rules hold in every file, in every change, with no exceptions for a
-deadline or a "temporary" comment. CI enforces the first three, so a
+deadline or a "temporary" comment. The one exemption is a skill vendored under
+`.claude/skills/`, which keeps the comments it came with; neither RuboCop nor
+`bin/comment-check` scans that folder. CI enforces the first three, so a
 broken one fails the build: RuboCop in Ruby files, and `bin/comment-check` in
 ERB (including its `<script>` and `<style>` blocks), JavaScript, CSS, YAML and
 Python. The cop names below are the Ruby side.

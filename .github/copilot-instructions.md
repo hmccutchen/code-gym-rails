@@ -145,7 +145,8 @@ validation.
 the code cannot?** Keep it — a hidden constraint, a workaround, an invariant a
 future reader would otherwise break.
 
-The comment rules in CLAUDE.md's Code Style section are never waived: each
+The comment rules in CLAUDE.md's Code Style section are never waived outside a
+skill vendored under `.claude/skills/`: each
 comment is one line, attached to the code directly below it (or trailing it),
 and a file holds at most 5. RuboCop enforces those three in Ruby
 files and `bin/comment-check` in ERB, JavaScript, CSS, YAML and Python. Business

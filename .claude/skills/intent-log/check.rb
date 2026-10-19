@@ -10,7 +10,7 @@ require "optparse"
 require "time"
 
 options = {log: "docs/intent-log.md", year: Date.today.year, max_words: 400,
-           max_bullet: 20, width: 79, fix: false, repo: nil, dir: "docs/intent"}
+           max_bullet: 20, width: 79, fix: false, repo: nil, dir: "docs/intent", all: false}
 parser = OptionParser.new do |opts|
   opts.banner = "usage: check.rb [docs/intent-log.md] [options]"
   opts.on("--year YEAR", Integer, "year the headings belong to") { options[:year] = _1 }
@@ -20,6 +20,7 @@ parser = OptionParser.new do |opts|
   opts.on("--repo OWNER/NAME", "repo the PRs belong to (default: cwd)") { options[:repo] = _1 }
   opts.on("--dir PATH", "per-person sources, if any (default: docs/intent)") { options[:dir] = _1 }
   opts.on("--fix", "rewrap the file rather than report on it") { options[:fix] = true }
+  opts.on("--all", "answer for every author's PRs, not only yours") { options[:all] = true }
 end
 parser.parse!
 options[:log] = ARGV.shift if ARGV.any?
@@ -148,14 +149,22 @@ expected = {"MERGED" => nil, "CLOSED" => "dropped", "OPEN" => "open"}
 # minute later: on that one branch a bare tag is right rather than early.
 branch = `git rev-parse --abbrev-ref HEAD 2>/dev/null`.strip
 branch = nil if branch.empty? || branch == "HEAD"
-# A log started partway through a repo answers for the PRs opened from its
-# first day on, and nobody asked for a bot's PR, so neither needs a bullet.
+# A log started partway through a repo answers for the PRs opened from the
+# date in <dir>/_since on, so a backfilled entry cannot move the cutoff.
+since_file = File.join(options[:dir], "_since")
+first_day = Date.parse(File.read(since_file)) if File.exist?(since_file)
 logged = entries(body).map(&:first).select { heading_date(_1, options[:year]) }
-first_day = logged.any? ? heading_date(logged.first, carry_years(logged, options[:year]).first[1]) : nil
+first_day ||= heading_date(logged.first, carry_years(logged, options[:year]).first[1]) if logged.any?
+
+# Only the author can write a PR's entry, so a run answers for the PRs you
+# opened and the one checked out; --all audits everybody's.
+me = options[:all] ? nil : `gh api user -q .login 2>/dev/null`.strip
+abort "gh api user failed; is gh signed in?" if me&.empty?
 owed = lambda do |pr|
   next false if pr.dig("author", "is_bot")
+  next false if first_day && Time.parse(pr["createdAt"]).localtime.to_date < first_day
 
-  first_day.nil? || Time.parse(pr["createdAt"]).localtime.to_date >= first_day
+  options[:all] || pr.dig("author", "login") == me || pr["headRefName"] == branch
 end
 
 known.sort.each do |number, pr|
@@ -266,4 +275,4 @@ if failures.any?
   exit 1
 end
 
-puts "ok: #{known.values.count(&owed)} PRs accounted for across #{dated.size} entries"
+puts "ok: #{known.values.count(&owed)} PR(s) owed an entry, all accounted for, across #{dated.size} entries"

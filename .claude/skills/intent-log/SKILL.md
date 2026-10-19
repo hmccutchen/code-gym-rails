@@ -273,12 +273,11 @@ These each produced a wrong log before the scripts existed:
 
 ## Verifying
 
-`check.rb` asserts every PR opened since the log's first day appears exactly
-once with the right state marker (a bot's PR is exempt, since nobody asked for
-it),
-entries run oldest first, every day is a list, no bullet runs to a paragraph,
-and no day runs long. Run it after every write; it
-catches dropped PRs that reading cannot. `--fix` rewraps the file, keeping
+`check.rb` asserts every PR you opened since the date in `docs/intent/_since`
+appears exactly once with the right state marker, entries run oldest first,
+every day is a list, no bullet runs to a paragraph, and no day runs long.
+`--all` checks everybody's PRs instead of yours, and a bot's PR is never owed.
+Run it after every write; it catches dropped PRs that reading cannot. `--fix` rewraps the file, keeping
 bullets hanging-indented.
 
 ## Capturing as you go
@@ -306,10 +305,10 @@ Register both per-person in `.claude/settings.local.json`, never in the committe
 ```json
 {"hooks": {
   "SessionEnd": [{"hooks": [
-    {"type": "command", "command": "ruby \"$CLAUDE_PROJECT_DIR/.claude/hooks/intent-stage.rb\"", "timeout": 15}
+    {"type": "command", "command": "ruby \"$CLAUDE_PROJECT_DIR/.claude/skills/intent-log/intent-stage.rb\"", "timeout": 15}
   ]}],
   "Stop": [{"hooks": [
-    {"type": "command", "command": "ruby \"$CLAUDE_PROJECT_DIR/.claude/hooks/intent-nag.rb\"", "timeout": 15}
+    {"type": "command", "command": "ruby \"$CLAUDE_PROJECT_DIR/.claude/skills/intent-log/intent-nag.rb\"", "timeout": 15}
   ]}]
 }}
 ```
