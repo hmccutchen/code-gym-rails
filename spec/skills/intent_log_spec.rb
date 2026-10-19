@@ -80,6 +80,16 @@ RSpec.describe "The intent-log skill's scripts" do
       expect(output).to include("`#2 open` marks a merged PR", "#3 (merged) by teammate is in no entry")
     end
 
+    it "does not let a teammate's mention account for your PR" do
+      prs.push(pr(1, author: "me"))
+      entry("me", "something else")
+      entry("teammate", "reviewed `#1`")
+
+      output, status = check("--all")
+      expect(status).not_to be_success
+      expect(output).to include("#1 by me is tagged only in somebody else's entry")
+    end
+
     it "owes nothing for a bot's PR or one opened before _since, even after an older entry is backfilled" do
       prs.push(pr(1, author: "dependabot", bot: true), pr(2, author: "me", created: "2026-10-18T15:00:00Z"))
       write("docs/intent/me.md", "# me\n\n## Mon Oct 12, 2026\n\n- backfilled\n\n## Tue Oct 20\n\n- today\n")
@@ -131,18 +141,55 @@ RSpec.describe "The intent-log skill's scripts" do
   end
 
   describe "extract.rb" do
-    it "keeps two quick prompts that share a long opening but differ after it" do
-      shared = "Here is the stack trace from the failing job, pasted in full so you can see it: #{"x" * 80}"
-      turns = [ [ "15:00:00", "#{shared} fix the retry" ], [ "15:01:00", "#{shared} actually, revert it instead" ] ]
-      encoded = File.expand_path(repo).tr("/", "-")
-      write("home/.claude/projects/#{encoded}/s.jsonl", turns.map do |time, text|
-        JSON.generate("type" => "user", "timestamp" => "2026-10-20T#{time}Z", "message" => { "content" => text })
-      end.join("\n") + "\n")
+    def typed(time, text) = { "type" => "user", "timestamp" => "2026-10-20T#{time}Z", "message" => { "content" => text } }
 
+    def queued(time, text)
+      { "type" => "attachment", "attachment" => { "type" => "queued_command", "timestamp" => "2026-10-20T#{time}Z",
+                                                  "prompt" => text, "origin" => { "kind" => "human" } } }
+    end
+
+    def transcript(*records, project: File.expand_path(repo).tr("/", "-"))
+      write("home/.claude/projects/#{project}/s.jsonl", records.map { JSON.generate(_1) }.join("\n") + "\n")
+    end
+
+    def dump
       output, status = run("extract.rb", "dump", "2026-10-20", "--repo", repo, "--cap", "1000",
                            env: { "HOME" => File.join(repo, "home"), "TZ" => "UTC" })
-      expect(status).to be_success, output
-      expect(output).to include("fix the retry", "actually, revert it instead")
+      raise output unless status.success?
+
+      output
+    end
+
+    it "keeps two quick prompts that share a long opening but differ after it" do
+      shared = "Here is the stack trace from the failing job, pasted in full so you can see it: #{"x" * 80}"
+      transcript(typed("15:00:00", "#{shared} fix the retry"), typed("15:01:00", "#{shared} actually, revert it instead"))
+
+      expect(dump).to include("fix the retry", "actually, revert it instead")
+    end
+
+    it "reads no transcript from another repo whose path only starts with this one's" do
+      transcript(typed("15:00:00", "work on this repo"))
+      transcript(typed("15:05:00", "work on the api repo"), project: "#{File.expand_path(repo).tr("/", "-")}-api")
+
+      expect(dump).to include("work on this repo")
+      expect(dump).not_to include("work on the api repo")
+    end
+
+    it "keeps a prompt that opens with markup and drops Claude Code's own tags" do
+      transcript(typed("15:00:00", "<button>Save</button> make this accessible"),
+                 typed("15:05:00", "<task-notification>agent finished</task-notification>"))
+
+      expect(dump).to include("<button>Save</button> make this accessible")
+      expect(dump).not_to include("agent finished")
+    end
+
+    it "drops a queued prompt only when a later delivery repeats it" do
+      transcript(typed("15:00:00", "use a bottom sheet for the swap"), typed("15:05:00", "switch to an inline picker"),
+                 queued("15:10:00", "use a bottom sheet for the swap"),
+                 queued("15:20:00", "add a cancel button"), typed("15:21:00", "add a cancel button"))
+
+      expect(dump.scan("use a bottom sheet").size).to eq(2)
+      expect(dump.scan("add a cancel button").size).to eq(1)
     end
   end
 

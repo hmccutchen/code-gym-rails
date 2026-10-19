@@ -7,6 +7,7 @@
 require "json"
 require "date"
 require "optparse"
+require "set"
 require "open3"
 require "time"
 
@@ -156,6 +157,14 @@ unlogged = Hash.new { |h, k| h[k] = [] }
 tagged = Hash.new { |h, k| h[k] = [] }
 body.scan(/#(\d+)(?: (dropped|open))?/) { |number, marker| tagged[number.to_i] << marker }
 
+# In a team log a PR is accounted for in its author's own file, never by a
+# teammate mentioning it in theirs.
+source_tags = if Dir.exist?(options[:dir])
+  Dir.glob(File.join(options[:dir], "*.md")).reject { File.basename(_1).start_with?("_") }.to_h do |path|
+    [File.basename(path, ".md"), File.read(path).scan(/#(\d+)/).flatten.map(&:to_i).to_set]
+  end
+end
+
 expected = {"MERGED" => nil, "CLOSED" => "dropped", "OPEN" => "open"}
 
 # The branch this is run on. An entry is written as the last thing before its
@@ -192,6 +201,11 @@ known.sort.each do |number, pr|
     by = who ? " by #{who}" : ""
     failures << "##{number} (#{pr["state"].downcase})#{by} is in no entry: #{pr["title"]}"
     next
+  end
+  author = pr.dig("author", "login")
+  if source_tags && owed.call(pr) && !source_tags.fetch(author, Set.new).include?(number)
+    unlogged[author] << number
+    failures << "##{number} by #{author} is tagged only in somebody else's entry; tag it in #{options[:dir]}/#{author}.md"
   end
   next unless yours.call(pr)
 

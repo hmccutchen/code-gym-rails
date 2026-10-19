@@ -9,10 +9,12 @@ require_relative "transcript"
 
 Prompt = Struct.new(:at, :source, :text)
 
-# Every Claude Code project dir for this repo, worktrees included.
+# Every Claude Code project dir for this checkout and its worktrees, by exact
+# name: a prefix would also take in code-gym-rails-api beside code-gym-rails.
 def project_dirs(repo)
-  encoded = File.expand_path(repo).tr("/", "-")
-  Dir.glob(File.expand_path("~/.claude/projects/#{encoded}*")).select { File.directory?(_1) }.sort
+  worktrees = `git -C "#{repo}" worktree list --porcelain 2>/dev/null`.scan(/^worktree (.+)$/).flatten
+  names = [File.expand_path(repo), *worktrees].flat_map { [_1.tr("/", "-"), _1.gsub(/[^A-Za-z0-9]/, "-")] }.uniq
+  names.map { File.expand_path("~/.claude/projects/#{_1}") }.select { File.directory?(_1) }.sort
 end
 
 def prompts_in(file, source)

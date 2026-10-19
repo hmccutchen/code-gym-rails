@@ -9,9 +9,11 @@ require "set"
 require "time"
 
 module Transcript
-  # Claude Code marks injected content (skill bodies, image placeholders,
-  # caveats) with isMeta, which covers far more than a list of prefixes ever did.
-  NOISE_PREFIXES = ["<", "[Request", "This session is being continued"].freeze
+  # Claude Code marks most injected content with isMeta. These tags arrive as
+  # user turns without it; any other leading markup is the person's, a paste or
+  # a snippet of HTML they typed.
+  HARNESS_TAG = /\A<(?:task-notification|command-|local-command-|bash-|system-reminder)/
+  NOISE_PREFIXES = ["[Request", "This session is being continued"].freeze
 
   NOISE_EXACT = [
     "continue", "continue from where you left off.", "/compact", "/clear",
@@ -44,6 +46,18 @@ module Transcript
     end
   end
 
+  # A queued prompt the turn did not absorb is delivered again as a user turn,
+  # and only a delivery after it can be that: the same words asked earlier, or
+  # asked again later, are separate requests. Each delivery settles one queue.
+  def redelivered_queues(turns)
+    waiting = Hash.new { |h, k| h[k] = [] }
+    turns.each_with_index.with_object(Set.new) do |((_, text, queued), index), settled|
+      if queued then waiting[text] << index
+      elsif waiting[text].any? then settled << waiting[text].pop
+      end
+    end
+  end
+
   # Each prompt the person typed, as [local time, text]. The transcript is UTC;
   # local time is what the person lived.
   def prompts(file)
@@ -52,15 +66,13 @@ module Transcript
     rescue JSON::ParserError
       nil
     end
-    turns = records.filter_map { human_turn(_1) }
-    # A queued prompt the turn did not absorb is delivered again as a user turn.
-    delivered = turns.filter_map { |_, text, queued| text&.strip unless queued }.to_set
+    turns = records.filter_map { human_turn(_1) }.map { |at, text, queued| [at, text&.strip, queued] }
+    redelivered = redelivered_queues(turns)
 
-    turns.filter_map do |at, text, queued|
-      text = text&.strip
+    turns.each_with_index.filter_map do |(at, text, _), index|
       next if text.nil? || text.length < 4 || at.nil?
-      next if queued && delivered.include?(text)
-      next if NOISE_PREFIXES.any? { text.start_with?(_1) } || NOISE_EXACT.include?(text.downcase)
+      next if redelivered.include?(index)
+      next if text.match?(HARNESS_TAG) || NOISE_PREFIXES.any? { text.start_with?(_1) } || NOISE_EXACT.include?(text.downcase)
 
       [Time.parse(at).localtime, text]
     end
