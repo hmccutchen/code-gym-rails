@@ -3,8 +3,7 @@
 One row per saved swap, written in the same user-row lock as the pair.
 Nothing reads the table yet; it exists to answer how often an in-place swap
 would have replaced something (`today_section` of `unanswered`) and whether
-people swap while on two sections (`planned_size`, `size_setting`). Design:
-`docs/superpowers/specs/2026-10-16-daily-kind-swap-design.md`, section 8.
+people swap while on two sections (`planned_size`, `size_setting`).
 
 ## The name
 

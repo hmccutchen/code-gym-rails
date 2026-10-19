@@ -27,15 +27,34 @@ A daily card's swap sheet lists all ten kinds, so each row needs one line,
 not the two-sentence summary. Cutting the summary short would end sentences
 mid-thought, so each kind has its own `short` line, written to fit the 304 px
 a row's second line has at a 390 px viewport. A line that runs over wraps
-rather than being cut. The wording of each line was decided in
-`docs/superpowers/specs/2026-10-16-daily-kind-swap-design.md` ("One-line
-summaries"), which says why each word was chosen: code review says
-"problem" because the code is sometimes a test or a migration, design
-comparison says both pieces work, plan review says "flaws", pseudocode to
-code says "see the code" because Code Gym writes the code, and Parsons says
-"pieces" because a block can hold more than one line. The ambiguity hunt
-line names no gap, like its example. The spec requires one sentence with no
-semicolon, and `.learn_text` offers the lines to the plain-language checks.
+rather than being cut.
+
+Several words in these lines are deliberate. Keep them when editing:
+
+- **Code Review says "problem", not "bug".** The day's code is sometimes a
+  test file or a database migration, where the issue isn't a bug.
+- **Design Comparison says both pieces work, and "suits the system".** That
+  both work separates it from Code Review, and the choice is about which
+  design fits the system described, not which is better in general. The
+  line is 2 px over the row at 390 px and wraps there on purpose. Dropping
+  "work" to make it fit would lose the distinction.
+- **Plan Review says "flaws".** Every plan carries 2-3 planted flaws (an
+  anti-pattern, scope creep, an unflagged behaviour change), most of them
+  things the plan does rather than omits, so "misses" would be wrong.
+  "Flaws" also keeps it apart from Code Review's "problem", and avoids
+  "push back on", which presumes the plan is wrong before it is read.
+- **Pseudocode to Code says "see the code".** The engineer writes only the
+  steps, and Code Gym turns them into code at review. "Then in code" would
+  say the engineer writes the code too.
+- **Parsons Problem says "pieces", not "lines".** A block can hold more
+  than one line.
+- **Pattern of the Month says "a named pattern".** The kind's name already
+  supplies "design".
+- **The Ambiguity Hunt line names no gap,** like its example.
+- **No line uses a semicolon.**
+
+The spec requires one sentence with no semicolon, and `.learn_text` offers
+the lines to the plain-language checks.
 
 ## Domains
 

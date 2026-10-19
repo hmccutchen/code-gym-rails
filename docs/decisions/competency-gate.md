@@ -125,9 +125,8 @@ rerunning the script would bake it in.
 
 **Two sections can hold.** On a two-section day the daily kinds' results are
 the only growth input, so a daily kind that is never favourable keeps the day
-at two. This is today's behaviour, pinned by the same spec and recorded as an
-open product question in
-`docs/superpowers/specs/2026-10-16-two-section-gate-hold-note.md`.
+at two. This is today's behaviour, pinned by the same spec. Whether it should
+hold is an open product question.
 
 **Eased sections reach the brake only.** An eased section answered an
 easier question than its rung, so its AI rating stays out of the growth

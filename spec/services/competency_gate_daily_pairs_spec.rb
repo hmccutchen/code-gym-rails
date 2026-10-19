@@ -90,7 +90,7 @@ RSpec.describe CompetencyGate, "with each day's own pair" do
     end
   end
 
-  # Pins today's behaviour for docs/superpowers/specs/2026-10-16-two-section-gate-hold-note.md; a change here is a product decision.
+  # Pins today's two-section hold, an open product question (docs/decisions/competency-gate.md); a change here is a product decision.
   describe "a two-section day where one daily kind is never favourable" do
     let(:held) { Array.new(10) { day(good("code_review"), poor("design_comparison")) } }
 

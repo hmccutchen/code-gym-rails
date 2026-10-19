@@ -5,8 +5,7 @@ user gets in every set. Before it, "every day holds code review and design
 comparison" was a facet on two kinds (`fixed?`) that a dozen readers asked
 the registry about. Now the pair is a per-user value, and every reader that
 needs it takes it as an argument. A user changes their pair from a daily card's
-swap control ("The swap" and "The card's control" below; the design is
-`docs/superpowers/specs/2026-10-16-daily-kind-swap-design.md`). An account
+swap control ("The swap" and "The card's control" below). An account
 that never swaps plans and prompts exactly as before.
 
 ## What `DailyKinds` owns
