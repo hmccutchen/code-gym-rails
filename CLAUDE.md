@@ -8,6 +8,16 @@ A team Rails app for daily personalized coding exercises. Each engineer logs in 
 
 All changes are made on a feature/dev branch, never directly on `main`. Create (or switch to) a branch before touching any files, and open a PR into `main` when the work is ready for review.
 
+**Every PR gets an intent log entry before it merges.** Use the `intent-log`
+skill (`.claude/skills/intent-log/SKILL.md`): once the PR is open, append the
+day's entry to your own `docs/intent/<github-login>.md`, tag it with the PR
+number, run the skill's `compose.rb` and `check.rb`, and commit the result to
+the PR's branch. The entry records what you asked for and why, read from your
+own prompts, so a reviewer can tell your decisions from the agent's. Never edit
+`docs/intent-log.md` by hand, since `compose.rb` generates it. The skill's
+scripts are kept as the skill ships them, and the comment rules below don't
+apply to them; RuboCop doesn't scan `.claude/`.
+
 ## Code Style
 
 ### Comment rules — never ignored
