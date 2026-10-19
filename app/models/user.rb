@@ -427,6 +427,18 @@ class User < ApplicationRecord
     attrs
   end
 
+  def held_exercise
+    return nil unless paused_generation_at?
+
+    paused_on = paused_generation_at.in_time_zone(Time.zone).to_date
+    daily_exercises
+      .left_joins(:daily_response)
+      .where(date: paused_on...Date.current)
+      .where(daily_responses: { submitted_at: nil })
+      .order(date: :desc)
+      .first
+  end
+
   private
 
   def clean_name
@@ -457,18 +469,6 @@ class User < ApplicationRecord
     return nil if held.nil? || daily_exercises.for_date.exists?
 
     carry_forward(held)
-  end
-
-  def held_exercise
-    return nil unless paused_generation_at?
-
-    paused_on = paused_generation_at.in_time_zone(Time.zone).to_date
-    daily_exercises
-      .left_joins(:daily_response)
-      .where(date: paused_on...Date.current)
-      .where(daily_responses: { submitted_at: nil })
-      .order(date: :desc)
-      .first
   end
 
   def still_in_vocabulary?(concept, bucket)
