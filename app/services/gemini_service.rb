@@ -13,7 +13,6 @@ class GeminiService < AiService
   def self.key_pattern = /\A(AIza|AQ\.)/
 
   DEFAULT_ROUTE = { model: "gemini-3.5-flash" }.freeze
-  FINISHED_STATUSES = %w[completed incomplete].freeze
   MODEL_FOR_PURPOSE = {
     "generate_exercise" => DEFAULT_ROUTE,
     "retry_section"     => DEFAULT_ROUTE
@@ -53,15 +52,14 @@ class GeminiService < AiService
   end
 
   def read_result(parsed, request)
-    usage = read_usage(parsed["usage"] || {}, request.purpose)
-    return usage.merge(error: "Gemini did not complete its response. Try again.") if unfinished?(parsed["status"])
+    usage  = read_usage(parsed["usage"] || {}, request.purpose)
+    status = parsed["status"]
+    return unfinished_reply(usage, status) if status && FINISHED_STATUSES.exclude?(status)
 
     model_output = Array(parsed["steps"]).find { |s| s["type"] == "model_output" }
     text_parts   = Array(model_output && model_output["content"]).select { |c| c["type"] == "text" }.map { |c| c["text"] }
     usage.merge(text: text_parts.join, truncated: parsed["status"] == "incomplete")
   end
-
-  def unfinished?(status) = !status.nil? && FINISHED_STATUSES.exclude?(status)
 
   def read_usage(usage, purpose)
     cached_tokens = usage["total_cached_tokens"].to_i

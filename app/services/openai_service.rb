@@ -91,9 +91,7 @@ class OpenaiService < AiService
 
   def read_result(parsed, request)
     usage = read_usage(parsed["usage"] || {}, route_for(request.purpose))
-    unless %w[completed incomplete].include?(parsed["status"])
-      return usage.merge(error: "OpenAI did not complete its response. Try again.")
-    end
+    return unfinished_reply(usage, parsed["status"]) unless FINISHED_STATUSES.include?(parsed["status"])
 
     content = Array(parsed["output"]).select { |item| item["type"] == "message" }.flat_map { |item| Array(item["content"]) }
     usage.merge(

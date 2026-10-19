@@ -51,6 +51,14 @@ RSpec.describe "Gemini truncation through AiService" do
       end
     end
 
+    it "names the provider on the error and logs the status it got" do
+      reply_with(status: "cancelled", text: "")
+      allow(Rails.logger).to receive(:warn)
+
+      expect { logged_call }.to raise_error(AiService::Error) { |error| expect(error.provider).to eq("gemini") }
+      expect(Rails.logger).to have_received(:warn).with('Gemini reply did not finish (status="cancelled")')
+    end
+
     it "accepts a reply with no status, as before" do
       reply_with(status: nil, text: "A reply")
 
