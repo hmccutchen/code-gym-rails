@@ -65,17 +65,22 @@ class DailyKindSwap
     from = current[@place].key
     @user.update!(daily_section_kinds: DailyKinds.stored(proposed.map(&:key)))
     @user.daily_kind_swap_events.create!(place: @place, from_kind: from, to_kind: @kind.key,
-                                         today_section: today_section(from), planned_size: exercise&.planned_size,
+                                         today_section: today_section(from), planned_size: swapped_on&.planned_size,
                                          size_setting: @user.daily_section_count)
   end
 
   def today_section(from)
-    return DailyKindSwapEvent::NO_SET if exercise.nil?
-    return "not_in_set" if exercise.active_section_keys.exclude?(from)
-    return "submitted" if response&.submitted?
+    return DailyKindSwapEvent::NO_SET if swapped_on.nil?
+    return "not_in_set" if swapped_on.active_section_keys.exclude?(from)
 
-    response&.answered?(from) ? "answered" : "unanswered"
+    set_response = swapped_on.daily_response
+    return "submitted" if set_response&.submitted?
+
+    set_response&.answered?(from) ? "answered" : "unanswered"
   end
+
+  # A held set moves to today only on a dashboard load, so a page left open past midnight can swap before it has.
+  def swapped_on = @swapped_on ||= exercise || @user.held_exercise
 
   def exercise = @exercise ||= @user.daily_exercises.for_date.first
 

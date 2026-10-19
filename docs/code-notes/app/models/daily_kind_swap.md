@@ -28,8 +28,17 @@ refused as stale, the same as an old one.
 
 `want_it_today` and `today_section` read the set for today in the user's
 zone when the request is handled, never the set the page was showing. A page
-left open across midnight therefore records `no_set` and offers no
-regeneration, which is right: that set is no longer today's.
+left open across midnight therefore offers no regeneration, which is right:
+that set is no longer today's.
+
+`today_section` and `planned_size` have one exception. When today has no
+set and the user is paused, they read the held set (`User#held_exercise`).
+A held set moves to today only when a dashboard loads
+(`carry_held_set_forward!`), so a swap from a page left open past midnight
+would otherwise record `no_set` while a set is held. That would under-count
+the swaps that column exists to find: people who wanted the set they were
+on changed. `want_it_today` still reads today's row only, since regeneration
+acts on today's set.
 
 ## `.refusal` is for the picker
 

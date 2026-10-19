@@ -112,6 +112,20 @@ RSpec.describe DailyKindSwap do
 
       expect(recorded).to have_attributes(today_section: "unanswered", planned_size: nil)
     end
+
+    it "reads a held set that hasn't moved to today yet, as the paused user's set" do
+      user.update!(paused_generation_at: 3.days.ago)
+      held = todays_set(plan_notes: { "size" => 3 }).tap { |set| set.update!(date: Date.yesterday) }
+      response_for(held, answers: { "code_review" => "x" * 20 })
+
+      expect(recorded(place: 0, kind: "architecture")).to have_attributes(today_section: "answered", planned_size: 3)
+    end
+
+    it "still records no set for an unsubmitted earlier set when generation isn't paused" do
+      todays_set.update!(date: Date.yesterday)
+
+      expect(recorded).to have_attributes(today_section: "no_set", planned_size: nil)
+    end
   end
 
   describe "a refused swap" do

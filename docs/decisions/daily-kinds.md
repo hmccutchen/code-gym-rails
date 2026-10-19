@@ -229,9 +229,11 @@ reviewed, not already regenerated, trial not ended); the button reads it too.
 version, for the card's picker to mark the options it can't offer.
 
 The event's `today_section` is checked in this order: `no_set` (no set
-today), `not_in_set` (today's set does not hold the outgoing kind, as after
+today and, for a paused user, no held set waiting to move to today),
+`not_in_set` (today's set does not hold the outgoing kind, as after
 an earlier swap or a judge drop), `submitted`, then `answered` or
-`unanswered` through `DailyResponse#answered?`. `planned_size` copies today's
+`unanswered` through `DailyResponse#answered?`. A held set that a dashboard
+load hasn't yet moved to today counts as the paused user's set. `planned_size` copies that set's
 `plan_notes["size"]` and stays null for `no_set`, and also for a held set
 planned before `plan_notes` recorded a size. The model is
 `DailyKindSwapEvent` on the `daily_kind_swaps` table, since `DailyKindSwap`
