@@ -276,9 +276,10 @@ These each produced a wrong log before the scripts existed:
 `check.rb` asserts every PR you opened since the date in `docs/intent/_since`
 appears exactly once with the right state marker, entries run oldest first,
 every day is a list, no bullet runs to a paragraph, and no day runs long.
-`--all` checks everybody's PRs instead of yours, and a bot's PR is never owed.
-Run it after every write; it catches dropped PRs that reading cannot. `--fix` rewraps the file, keeping
-bullets hanging-indented.
+A teammate's PRs and tags are theirs to fix, so only `--all` checks them, and a
+bot's PR is never owed. Run it after every write; it catches dropped PRs that
+reading cannot. `--fix` rewraps each file under `docs/intent/`, keeping bullets
+hanging-indented, and composes the log again.
 
 ## Capturing as you go
 

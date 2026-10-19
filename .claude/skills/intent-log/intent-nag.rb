@@ -60,8 +60,8 @@ def author(root)
 end
 
 begin
-  root = JSON.parse($stdin.read)["cwd"] rescue nil
-  root ||= Dir.pwd
+  # a session started in app/ has that as its cwd; the project dir is the repo
+  root = ENV["CLAUDE_PROJECT_DIR"] || (JSON.parse($stdin.read)["cwd"] rescue nil) || Dir.pwd
 
   staged = Dir.glob(File.join(root, ".intent", "staging", "*.jsonl"))
     .filter_map { Date.parse(File.basename(_1, ".jsonl")) rescue nil }
@@ -74,7 +74,9 @@ begin
   # a repo that keeps no log is not one to nag about
   exit 0 unless team || File.exist?(composed)
 
-  through = logged_through(own) || logged_through(composed)
+  # on a team only your own file answers for you, and a missing one is no days
+  exit 0 if team && mine.nil?
+  through = logged_through(team ? own : composed)
   behind = staged.select { (through.nil? || _1 > through) && _1 < Date.today }
   exit 0 if behind.size < BEHIND
 

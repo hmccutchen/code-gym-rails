@@ -10,7 +10,7 @@ require "optparse"
 require "time"
 
 options = {log: "docs/intent-log.md", year: Date.today.year, max_words: 400,
-           max_bullet: 20, width: 79, fix: false, repo: nil, dir: "docs/intent", all: false}
+           max_bullet: 20, width: 79, fix: false, repo: nil, dir: "docs/intent", all: false, limit: 10_000}
 parser = OptionParser.new do |opts|
   opts.banner = "usage: check.rb [docs/intent-log.md] [options]"
   opts.on("--year YEAR", Integer, "year the headings belong to") { options[:year] = _1 }
@@ -21,6 +21,7 @@ parser = OptionParser.new do |opts|
   opts.on("--dir PATH", "per-person sources, if any (default: docs/intent)") { options[:dir] = _1 }
   opts.on("--fix", "rewrap the file rather than report on it") { options[:fix] = true }
   opts.on("--all", "answer for every author's PRs, not only yours") { options[:all] = true }
+  opts.on("--limit N", Integer, "most PRs to read (default: 10000)") { options[:limit] = _1 }
 end
 parser.parse!
 options[:log] = ARGV.shift if ARGV.any?
@@ -73,12 +74,16 @@ def rewrap(source, width)
   end.join("\n\n") + "\n"
 end
 
-def pull_requests(repo)
+# A tag is checked against every PR the repo has, so a listing cut short would
+# read an old tag as a PR that does not exist. Refuse rather than guess.
+def pull_requests(repo, limit)
   target = repo ? "--repo #{repo}" : ""
   fields = "number,state,title,author,headRefName,createdAt"
-  raw = `gh pr list #{target} --state all --limit 500 --json #{fields}`
+  raw = `gh pr list #{target} --state all --limit #{limit} --json #{fields}`
   abort "gh pr list failed" unless $?.success?
-  JSON.parse(raw).to_h { [_1["number"], _1] }
+  list = JSON.parse(raw)
+  abort "gh pr list returned #{list.size} PRs, the --limit; raise it" if list.size >= limit
+  list.to_h { [_1["number"], _1] }
 end
 
 def entries(body)
@@ -127,15 +132,23 @@ end
 
 source = File.read(options[:log])
 
+# The composed log is generated, so a rewrap goes to the per-person files it is
+# built from, and the log is composed again from them.
 if options[:fix]
-  File.write(options[:log], rewrap(source, options[:width]))
-  puts "rewrapped #{options[:log]} at #{options[:width]}"
+  team = Dir.exist?(options[:dir])
+  targets = team ? Dir.glob(File.join(options[:dir], "*.md")).reject { File.basename(_1).start_with?("_") }.sort : [options[:log]]
+  targets.each { File.write(_1, rewrap(File.read(_1), options[:width])) }
+  if team
+    compose = File.join(__dir__, "compose.rb")
+    system("ruby", compose, "--dir", options[:dir], "--out", options[:log], "--year", options[:year].to_s, exception: true)
+  end
+  puts "rewrapped #{targets.join(", ")} at #{options[:width]}"
   exit
 end
 
 # the header may show example tags; only entries count
 body = source.include?("\n## ") ? source[source.index("\n## ")..] : source
-known = pull_requests(options[:repo])
+known = pull_requests(options[:repo], options[:limit])
 failures = []
 
 unlogged = Hash.new { |h, k| h[k] = [] }
@@ -160,11 +173,12 @@ first_day ||= heading_date(logged.first, carry_years(logged, options[:year]).fir
 # opened and the one checked out; --all audits everybody's.
 me = options[:all] ? nil : `gh api user -q .login 2>/dev/null`.strip
 abort "gh api user failed; is gh signed in?" if me&.empty?
+yours = ->(pr) { options[:all] || pr.dig("author", "login") == me || pr["headRefName"] == branch }
 owed = lambda do |pr|
   next false if pr.dig("author", "is_bot")
   next false if first_day && Time.parse(pr["createdAt"]).localtime.to_date < first_day
 
-  options[:all] || pr.dig("author", "login") == me || pr["headRefName"] == branch
+  yours.call(pr)
 end
 
 known.sort.each do |number, pr|
@@ -178,6 +192,7 @@ known.sort.each do |number, pr|
     failures << "##{number} (#{pr["state"].downcase})#{by} is in no entry: #{pr["title"]}"
     next
   end
+  next unless yours.call(pr)
 
   want = expected.fetch(pr["state"])
   allowed = [want]
@@ -275,4 +290,5 @@ if failures.any?
   exit 1
 end
 
-puts "ok: #{known.values.count(&owed)} PR(s) owed an entry, all accounted for, across #{dated.size} entries"
+checked = known.values.count { owed.call(_1) || (tagged[_1["number"]].any? && yours.call(_1)) }
+puts "ok: #{checked} PR(s) checked across #{dated.size} entries"

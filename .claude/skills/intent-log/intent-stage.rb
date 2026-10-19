@@ -70,7 +70,7 @@ end
 begin
   event = JSON.parse($stdin.read)
   transcript = event["transcript_path"]
-  root = event["cwd"] || Dir.pwd
+  root = ENV["CLAUDE_PROJECT_DIR"] || event["cwd"] || Dir.pwd
   exit 0 unless transcript && File.file?(transcript)
 
   staging = File.join(root, ".intent", "staging")

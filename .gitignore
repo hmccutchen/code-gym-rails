@@ -45,4 +45,4 @@
 /spec/examples*.txt
 
 # intent-log staging: raw prompts, which can hold pasted secrets
-/.intent/
+.intent/
