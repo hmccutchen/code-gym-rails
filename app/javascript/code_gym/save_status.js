@@ -14,6 +14,7 @@ let counter = 0;
 let requests = 0;
 const probes = [];
 const held = [];
+const carriedKeys = new Set();
 
 function generic() {
   return document.body?.dataset?.saveFailedText ?? "";
@@ -44,7 +45,7 @@ function waitToSettle(ignored, resolve, waited) {
 }
 
 function clean(ignored) {
-  return !pending() && ![...failures.keys()].some((key) => !ignored.includes(key));
+  return !pending() && ![...failures.keys()].some((key) => !ignored.includes(key) && !carriedKeys.has(key));
 }
 
 export function leaveWhenSaved(leave, stranded, ...ignored) {
@@ -91,6 +92,7 @@ function render() {
 }
 
 export function report(key, message) {
+  carriedKeys.delete(key);
   failures.delete(key);
   failures.set(key, message);
   render();
@@ -190,7 +192,9 @@ function reportCarried() {
     if (!carried) return;
     sessionStorage.removeItem(CARRIED);
     const parsed = JSON.parse(carried);
-    if (parsed && parsed.message && parsed.path === location.pathname) report(parsed.key || "carried", parsed.message);
+    if (!parsed || !parsed.message || parsed.path !== location.pathname) return;
+    report(parsed.key || "carried", parsed.message);
+    carriedKeys.add(parsed.key || "carried");
   } catch (_) {
     try { sessionStorage.removeItem(CARRIED); } catch (_) { /* storage is unavailable; the page shows no carried message */ }
   }

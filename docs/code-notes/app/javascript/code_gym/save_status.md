@@ -96,6 +96,14 @@ These deliberately don't:
 - the push-reminder and write-up reloads, which run on pages without these
   saves.
 
+A carried notice (`carry`, shown once on the next load) never blocks the
+gate. It describes the page that reloaded, not a save on this one, and this
+page may have no control that owns its key: the submitted dashboard has no
+answer form to clear an `answers` notice, so a review poll held on it would
+never reload. `reportCarried` marks its key as carried, and `clean` skips a
+carried key. A real failure reported later under the same key unmarks it and
+blocks as usual.
+
 The answer form ignores `answers` and `submit` because the submit carries
 every answer. The level card and the exercise mix ignore their own conflict
 key because the refusal that started the wait reports under it. A save that hangs or fails must never

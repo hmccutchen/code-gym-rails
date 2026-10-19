@@ -401,6 +401,25 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page).to have_css("#daily-kind-1-picker", visible: :hidden)
   end
 
+  it "reloads a finished review even after a stale autosave carried its notice onto the running review" do
+    exercise = user.daily_exercises.sole
+    exercise.update!(generated_at: Time.current + 1.minute, regenerated_at: Time.current)
+    response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                                     reviewing_since: Time.current, answers: { "code_review" => "Submitted with enough detail to count." },
+                                     section_ratings: { "code_review" => "right_level" })
+    page.execute_script("window.firstPage = true")
+    fill_in_answer("code_review", "An edit on the old set that the server refuses as stale.")
+
+    wait_for_js_condition("window.firstPage === undefined", timeout: 8)
+    expect(page).to have_css("[data-controller='generating']")
+    expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.stale_reloaded"))
+    page.execute_script("window.reviewPage = true")
+    response.update!(reviewing_since: nil)
+
+    wait_for_js_condition("window.reviewPage === undefined", timeout: 10)
+    expect(page).to have_no_css("[data-controller='generating']")
+  end
+
   it "holds the review poll's reload while a swap has failed, and reloads once it saves" do
     response = DailyResponse.create!(user: user, daily_exercise: user.daily_exercises.sole, date: Date.current, submitted_at: Time.current,
                                      reviewing_since: Time.current, answers: { "code_review" => "Submitted with enough detail to count." },
