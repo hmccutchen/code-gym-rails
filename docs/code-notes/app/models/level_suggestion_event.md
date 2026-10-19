@@ -4,8 +4,7 @@ One row per answer to a level suggestion: an applied target change, a Not now
 (`dismissed`), or a kind set aside from a card after Apply (`removed`). Nothing reads the
 table yet. It exists so a later question, such as whether a dismissed kind
 stayed stuck, can be answered by joining a row to the kind's level and
-results afterwards. Design: `docs/superpowers/specs/2026-10-14-level-suggestions.md`,
-report (d).
+results afterwards.
 
 ## Counts come from the server
 

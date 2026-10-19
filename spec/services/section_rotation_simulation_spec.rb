@@ -1,6 +1,6 @@
 require "rails_helper"
 
-# The run behind docs/superpowers/specs/2026-10-16-daily-kind-swap-design.md section 6, on the real rotation.
+# Every optional kind must appear within 11 days at sizes 3 and 4; a break is a decision to make, not a bound to raise.
 RSpec.describe SectionRotation, "over every reachable pair" do
   let(:days) { 160 }
   let(:warmup) { 30 }

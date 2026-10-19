@@ -3,8 +3,7 @@
 Each section's duck thread is stored on the server in `duck_threads`, so it
 survives a reload and follows the engineer to another device. The duck itself
 is unchanged: the same instructions, the same request, the same markup and
-controls. The design and its review are in
-`docs/superpowers/specs/2026-10-16-duck-thread-persistence-design.md`.
+controls.
 
 **One row per exercise, not a column on the response.** The duck usually runs
 before any answer is saved, so the response row often doesn't exist yet.
