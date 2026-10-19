@@ -4,19 +4,8 @@
 # Pull a person's own prompts out of Claude Code transcripts, grouped into work
 # blocks. The log records what the human wanted, so only user turns are read.
 
-require "json"
-require "set"
-require "time"
 require "optparse"
-
-# Claude Code marks injected content (skill bodies, image placeholders, caveats)
-# with isMeta, which covers far more than a list of prefixes ever did.
-NOISE_PREFIXES = ["<", "[Request", "This session is being continued"].freeze
-
-NOISE_EXACT = [
-  "continue", "continue from where you left off.", "/compact", "/clear",
-  "go", "ok", "yes", "yep", "thanks", "thank you", "push", "merge"
-].to_set
+require_relative "transcript"
 
 Prompt = Struct.new(:at, :source, :text)
 
@@ -26,56 +15,15 @@ def project_dirs(repo)
   Dir.glob(File.expand_path("~/.claude/projects/#{encoded}*")).select { File.directory?(_1) }.sort
 end
 
-def message_text(content)
-  case content
-  when String then content
-  when Array then content.filter_map { _1["text"] if _1.is_a?(Hash) && _1["type"] == "text" }.join(" ")
-  end
-end
-
-# A prompt typed while the model is working is not a user turn. It lands as a
-# queued_command attachment, and only the ones the turn did not absorb come
-# back later as a turn of their own; see SKILL.md.
-def human_turn(record)
-  case record["type"]
-  when "user"
-    return if record["isMeta"] || record["timestamp"].nil?
-
-    [record["timestamp"], message_text(record.dig("message", "content")), false]
-  when "attachment"
-    queued = record["attachment"] || {}
-    return unless queued["type"] == "queued_command" && queued.dig("origin", "kind") == "human"
-
-    [queued["timestamp"], message_text(queued["prompt"]), true]
-  end
-end
-
 def prompts_in(file, source)
-  records = File.foreach(file).filter_map do |line|
-    JSON.parse(line)
-  rescue JSON::ParserError
-    nil
-  end
-  turns = records.filter_map { human_turn(_1) }
-  # A queued prompt the turn did not absorb is delivered again as a user turn.
-  delivered = turns.filter_map { |_, text, queued| text&.strip unless queued }.to_set
-
-  turns.filter_map do |at, text, queued|
-    text = text&.strip
-    next if text.nil? || text.length < 4 || at.nil?
-    next if queued && delivered.include?(text)
-    next if NOISE_PREFIXES.any? { text.start_with?(_1) } || NOISE_EXACT.include?(text.downcase)
-
-    # the transcript is UTC; local time is what the person lived
-    Prompt.new(Time.parse(at).localtime, source, text)
-  end
+  Transcript.prompts(file).map { |at, text| Prompt.new(at, source, text) }
 end
 
 # Parallel sessions on one day repeat each other's prompts.
 def dedupe(prompts)
   seen = {}
   prompts.reject do |prompt|
-    key = prompt.text[0, 120]
+    key = prompt.text
     repeat = seen[key] && prompt.at - seen[key] < 120
     seen[key] = prompt.at
     repeat

@@ -34,7 +34,10 @@ def logged_through(path)
   year = nil
   File.read(path).scan(/^## +(.+)$/).flatten.filter_map do |heading|
     year = heading[/\b(20\d{2})\b/, 1]&.to_i || year || Date.today.year
-    heading.scan(/[A-Z][a-z]{2} +\d{1,2}/).filter_map { heading_date(_1, year) }.max
+    # "Oct 15-18" ends on the 18th, so the day after the dash counts too
+    heading.scan(/([A-Z][a-z]{2}) +(\d{1,2})(?:-(\d{1,2}))?/).filter_map do |month, first, last|
+      heading_date("#{month} #{last || first}", year)
+    end.max
   end.max
 end
 

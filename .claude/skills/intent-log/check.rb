@@ -7,6 +7,7 @@
 require "json"
 require "date"
 require "optparse"
+require "open3"
 require "time"
 
 options = {log: "docs/intent-log.md", year: Date.today.year, max_words: 400,
@@ -265,11 +266,12 @@ end
 if Dir.exist?(options[:dir])
   compose = File.join(__dir__, "compose.rb")
   if File.exist?(compose)
-    said = `ruby #{compose} --dir #{options[:dir]} --out #{options[:log]} --year #{options[:year]} --check 2>&1`
+    said, status = Open3.capture2e("ruby", compose, "--dir", options[:dir], "--out", options[:log],
+                                   "--year", options[:year].to_s, "--check")
     # compose refuses an ambiguous heading with its own reason, and the entry
     # it names is one this file cannot see: it reads the composed log, which
     # a stale one does not carry yet.
-    unless $?.success?
+    unless status.success?
       failures << "#{options[:log]} is out of date with #{options[:dir]}; run compose.rb"
       refusal = said.lines.map(&:strip).reject(&:empty?).last
       failures << refusal if refusal && !refusal.start_with?(options[:log])

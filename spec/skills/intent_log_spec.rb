@@ -5,9 +5,11 @@ require "open3"
 require "tmpdir"
 
 RSpec.describe "The intent-log skill's scripts" do
-  let(:skill) { File.expand_path("../../.claude/skills/intent-log", __dir__) }
   let(:repo) { Dir.mktmpdir }
   let(:prs) { [] }
+  let(:skill) do
+    File.join(repo, "skill copy").tap { FileUtils.cp_r(File.expand_path("../../.claude/skills/intent-log", __dir__), _1) }
+  end
 
   before do
     system("git", "init", "-q", "-b", "mine", repo, exception: true)
@@ -118,6 +120,30 @@ RSpec.describe "The intent-log skill's scripts" do
       expect(status.exitstatus).to eq(2)
       expect(output).to include("3 days behind", "docs/intent/me.md")
     end
+
+    it "reads a range heading through its last day" do
+      %w[2026-10-16 2026-10-17 2026-10-18].each { write(".intent/staging/#{_1}.jsonl", "{}\n") }
+      entry("me", "a long weekend", heading: "Thu Oct 15-18, 2026")
+
+      output, status = run("intent-nag.rb", env: { "INTENT_AUTHOR" => "me", "CLAUDE_PROJECT_DIR" => repo }, stdin: "{}")
+      expect(status.exitstatus).to eq(0), output
+    end
+  end
+
+  describe "extract.rb" do
+    it "keeps two quick prompts that share a long opening but differ after it" do
+      shared = "Here is the stack trace from the failing job, pasted in full so you can see it: #{"x" * 80}"
+      turns = [ [ "15:00:00", "#{shared} fix the retry" ], [ "15:01:00", "#{shared} actually, revert it instead" ] ]
+      encoded = File.expand_path(repo).tr("/", "-")
+      write("home/.claude/projects/#{encoded}/s.jsonl", turns.map do |time, text|
+        JSON.generate("type" => "user", "timestamp" => "2026-10-20T#{time}Z", "message" => { "content" => text })
+      end.join("\n") + "\n")
+
+      output, status = run("extract.rb", "dump", "2026-10-20", "--repo", repo, "--cap", "1000",
+                           env: { "HOME" => File.join(repo, "home"), "TZ" => "UTC" })
+      expect(status).to be_success, output
+      expect(output).to include("fix the retry", "actually, revert it instead")
+    end
   end
 
   describe "intent-stage.rb" do
@@ -126,7 +152,7 @@ RSpec.describe "The intent-log skill's scripts" do
                                               "message" => { "content" => "add the swap sheet" }) + "\n")
       event = { "transcript_path" => File.join(repo, "transcript.jsonl"), "cwd" => File.join(repo, "app"), "session_id" => "s" }
 
-      run("intent-stage.rb", env: { "CLAUDE_PROJECT_DIR" => repo }, stdin: JSON.generate(event))
+      run("intent-stage.rb", env: { "CLAUDE_PROJECT_DIR" => repo, "TZ" => "UTC" }, stdin: JSON.generate(event))
       expect(File.read(File.join(repo, ".intent/staging/2026-10-20.jsonl"))).to include("add the swap sheet")
       expect(Dir.exist?(File.join(repo, "app/.intent"))).to be(false)
     end
