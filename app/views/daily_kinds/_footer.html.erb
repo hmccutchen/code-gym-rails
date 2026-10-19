@@ -1,0 +1,24 @@
+<%# Locals: picker (DailyKindSwap::Picker), prefix. The checked kind's block is the last thing read before the primary button. %>
+<div class="daily-kind-sheet-footer">
+  <% picker.options.select(&:available?).each do |option| %>
+    <%= tag.div id: "#{prefix}-#{option.kind.key}-consequences", class: "daily-kind-consequences", hidden: true,
+                data: { daily_kind_swap_target: "consequences", kind: option.kind.key } do %>
+      <% option.consequences.warning.each do |paragraph| %>
+        <p class="daily-kind-warning"><%= paragraph %></p>
+      <% end %>
+      <% option.consequences.sentences.each do |sentence| %>
+        <p><%= sentence %></p>
+      <% end %>
+    <% end %>
+  <% end %>
+  <p class="daily-kind-error" id="<%= prefix %>-error" role="status" data-daily-kind-swap-target="error"></p>
+  <div class="daily-kind-actions">
+    <button type="button" class="btn btn-primary" disabled data-label="<%= t("daily_kinds.picker.confirm") %>"
+            data-daily-kind-swap-target="confirm" data-action="daily-kind-swap#confirm"><%= t("daily_kinds.picker.confirm") %></button>
+    <button type="button" class="btn btn-primary" hidden aria-describedby="<%= prefix %>-saved-message <%= prefix %>-saved-offer"
+            data-daily-kind-swap-target="done" data-action="daily-kind-swap#dismiss"><%= t("daily_kinds.picker.done") %></button>
+    <button type="button" class="btn btn-ghost" data-daily-kind-swap-target="cancel"
+            data-action="daily-kind-swap#dismiss"><%= t("daily_kinds.picker.cancel") %></button>
+  </div>
+  <p class="daily-kind-note daily-kind-saving" aria-live="polite" data-daily-kind-swap-target="status"></p>
+</div>

@@ -242,36 +242,78 @@ is the swap itself.
 ## The card's control
 
 Each delivered daily card, in the answer form and on the submitted
-dashboard, gets a swap row directly after its `kind_about` disclosure
-(`daily_kinds/_swap`). History never shows it. Cards are matched to places
-by membership in the day's recorded pair, so a judge-dropped daily section
-has no control and no control moves onto a rotating card.
-`DailyKindSwap::Picker` builds what each card shows, and
+dashboard, gets an icon button at the right end of its title row that opens
+a bottom sheet (`daily_kinds/_swap`). History never shows it. Cards are
+matched to places by membership in the day's recorded pair, so a
+judge-dropped daily section has no control and no control moves onto a
+rotating card. `DailyKindSwap::Picker` builds what each card shows, and
 `DailyKindSwap::Consequences` the sentences for each available option; both
 are pure reads of server state, and the `daily-kind-swap` Stimulus
-controller only reveals what they rendered.
+controller only shows and hides what they rendered. #421 first shipped an
+inline picker under the card's heading; the sheet replaced it in PR 3b
+without changing the endpoint, its reply, `DailyKindSwap`, `Picker`'s rules
+or `Consequences`.
 
-- The trigger names the card's own kind ("Swap Code Review"). After a swap
-  the card still shows today's kind, so a line under the trigger says what
-  the next set uses there, and the options mark that kind "In your next set"
-  and the card's kind "In today's set". The picker is a fieldset with one
-  radio per kind; each radio's `aria-describedby` names the kind's
-  `SectionKindGuide` text (the `responses/_kind_guide` partial, which
-  `_kind_about` renders too), its disabled reason and its consequences.
+- The trigger is the first element after the card's `<summary>`, since a
+  control inside the summary would be a control inside a control. It sits
+  absolutely over the title row (a card holding `.daily-kind-swap` is
+  positioned through `:has()`, so the card's own markup is unchanged, and its
+  summary reserves the button's width), so a folded card shows no
+  trigger. Its `aria-label` names the card's own kind ("Swap Code Review for
+  another kind"), and `aria-haspopup="dialog"` says it opens one; it has no
+  `aria-expanded`, because a modal hides the page that would report it.
+- The sheet is a native `<dialog>` opened with `showModal()`. That puts it in
+  the top layer, out of reach of the transform pull-to-refresh puts on the
+  page content and above the tab bar and save-status banner, and makes the
+  rest of the page inert, so focus stays in the sheet. It has a header with
+  the title and a Close button, the next-set line, the scrolling list, and a
+  footer with the chosen kind's consequence block, an error line and the
+  buttons. The page behind doesn't scroll (`html:has(...)` sets
+  `overflow: hidden`), and pull-to-refresh ignores a touch while a modal
+  dialog is open.
+- Close, Cancel, Escape (the dialog's `cancel` event) and a click on the
+  backdrop each dismiss the sheet, reset the choice to the current kind and
+  return focus to the trigger. A click counts as a backdrop click only when
+  both its `pointerdown` and its `click` landed on the dialog element itself,
+  since a drag from inside the sheet out onto the backdrop also ends with a
+  click on the dialog. There is no drag handle or swipe: a handle that
+  doesn't drag would be a false affordance, and a gesture would be more touch
+  code beside pull-to-refresh. `closedby="any"` would handle the backdrop
+  natively, but Safari doesn't support it yet.
+- After a swap the card still shows today's kind, so a line under the title
+  row says what the next set uses there, and the rows badge that kind "In
+  your next set" and the card's kind "In today's set". A row can carry two
+  badges: when the card's own kind is now the other place's stored kind, it
+  is both "In today's set" and "Already daily", and both show.
+- Each kind is one row: a `<label>` around its radio, with the name and its
+  state badges on the first line and the kind's `SectionKindGuide` `short`
+  line under it. The checked row also shows the kind's example; the others
+  render it `hidden`. Each radio is named by `aria-labelledby` (its name and
+  badges only), and its `aria-describedby` names its line, its example and,
+  for an available kind, its consequence block in the footer. A disabled
+  row dims only its radio and name, so the reason and badge keep their
+  contrast.
 - An option's state is `DailyKindSwap.refusal` for that kind: `unchanged` is
-  "Now", any other reason disables it with that reason's sentence ("Already a
-  daily section" for the other daily kind), and no reason makes it
-  available. A refusal of the place's own kind (an ended trial) closes the
-  picker: no options, only the reason.
-- A line above the options says the current set keeps its sections and the
-  swap starts with the next set, with the paused wording while generation is
+  "Now", the other daily kind is disabled under an "Already daily" badge, any
+  other reason disables it with that reason's sentence in place of its
+  `short` line, and no reason makes it available. Disabled radios use
+  `disabled`, so the arrow keys skip them. A refusal of the place's own kind
+  (an ended trial) closes the picker: the reason replaces the next-set line,
+  no list follows, and opening the sheet focuses Close.
+- The next-set line says the current set keeps its sections and the swap
+  starts with the next set, with the paused wording while generation is
   paused.
+- The primary button reads "Swap" until a different, available kind is
+  checked, then "Swap to Architecture Decision". The server renders each
+  kind's label onto its radio (`data-confirm-label`), and the controller
+  copies the checked one across.
 - Sentences on the incoming kind: a fourth's siblings stop appearing; the
   daily sections can no longer share a concept (shown when the current pair
   can share one through `DayHosts` and the new pair can't); a stored weight
   or exclusion does nothing while the kind is daily.
-- The warning on the outgoing kind sits above Confirm, and Confirm points at
-  it. Suppression comes first, at any size: a fourth swapped for a fourth
+- The warning on the outgoing kind opens the chosen kind's consequence
+  block, directly above the buttons, and the primary button points at the
+  block. Suppression comes first, at any size: a fourth swapped for a fourth
   won't appear at all, and neither will an excluded kind whose group still
   has a kind turned on. Then, only on a two-section day: a fixed setting of 2
   means the kind won't appear at all; on Automatic, an excluded kind won't
@@ -287,20 +329,47 @@ controller only reveals what they rendered.
   (`draft_scope`) the page shows, so the reply's panels are for that set
   even past midnight. When another tab has regenerated it, the reply sends
   no panels, the cards stay as they are, and the card says to reload.
+- While a swap saves, the buttons and Close are disabled, the list is
+  `inert`, the footer says "Saving…", and Escape and backdrop clicks are
+  ignored. Chrome still closes a sheet on a second Escape after refusing the
+  first, so a swap can be left saving while another card's sheet is used;
+  that is why the one-at-a-time queue still matters.
 - A save replaces every card's panel from the reply (`panels`), so both
-  pickers carry the new version and the new pair's disabled options, and a
-  second swap works without a reload. The reply sentence is announced in a
-  polite live region; the want-it-today line, when sent, links to the
-  existing "Generate new set" button. A failure shows in the save-status
-  banner. Any other failure reopens the picker, keeps the submitted kind
-  when it is still offered, and focuses an enabled control; a 409 also
-  carries fresh panels, and the card's picker reopens on the stored pair
-  and version, so the next try saves.
+  sheets carry the new version and the new pair's disabled options, and a
+  second swap works without a reload. When the reply carries `want_it_today`,
+  the sheet stays open in a saved state: the reply's sentence, the "Want it
+  in today's set?" line with its cost and a link to the existing "Generate
+  new set" button, and one "Done" button. The saved state survives another
+  card's reply replacing the panel. Otherwise the sheet closes, the
+  sentence is announced in the card's polite live region, focus returns to
+  the trigger, and the stored-kind line under the title row shows the
+  change. The offer comes only after a save, so regeneration never sits
+  next to the swap's own button as a second choice.
+- A reply shows in the sheet only while the sheet is still wanted, focus is
+  the card's, and no ancestor is inert. Otherwise the sheet stays closed: it
+  never comes back after the reader left it during the save, and a submit
+  that holds the form inert never gets a modal over it. In that case the
+  sentence and the want-it-today offer, with its link, show visibly on the
+  card instead.
+- A failure shows in a line in the sheet's footer and in the save-status
+  banner, which the leave gate reads but which sits behind the scrim. Under
+  the rule above, the sheet stays open, keeps the submitted kind when it is
+  still offered, and focuses an enabled control; a 409 also carries fresh
+  panels, and the sheet stays open on the stored pair and version, so the
+  next try saves. When focus has moved elsewhere, or the reader left the
+  sheet during the save, the sheet stays closed, and opening it by hand
+  shows the kept choice (or the stored pair, after a 409) and the error.
+- When the answer form's leave gate locks the form (`relockAndLeave`), any
+  open sheet closes first, since a modal dialog inside a subtree that turns
+  inert would stay on screen with nothing reachable.
 - Discoverability: the welcome page names the default pair and says either
   can be swapped from its card. The first delivered daily card of an
-  unsubmitted set carries "New: you can swap this daily section for another
-  kind." while the account has no swap events and fewer than
-  `Picker::HINT_UNTIL_SUBMITTED_DAYS` submitted days.
+  unsubmitted set carries "New: the button at the top of this card swaps
+  this daily section for another kind." under its title row while the
+  account has no swap events and fewer than
+  `Picker::HINT_UNTIL_SUBMITTED_DAYS` submitted days. It names no glyph,
+  since an arrow character renders differently across fonts and reads badly
+  in VoiceOver.
 
 ## The competency gate
 

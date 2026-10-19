@@ -289,6 +289,42 @@ The rule is scoped to `.section` rather than zeroing `.container`'s padding,
 which would drag the nav and every page heading flush against the screen
 edge. The `-1.5rem` tracks `.container`'s padding and must change with it.
 
+## `.daily-kind-trigger`
+
+The swap trigger sits `position: absolute` over the title row, so its `top`
+and `right` restate where that row is: `.section`'s padding (1.5rem, and
+1.25rem by 1rem in the 600px rule, which repeats the offsets) minus the
+summary's 12.5px `padding-block`, which makes the row 44px tall. A change to
+either moves the row out from under the button, so the rule's comment names
+them. The card is positioned with
+`details.section:has(> .daily-kind-swap)` rather than a class, so a card's
+own markup is the same with or without a swap control.
+
+## `.daily-kind-sheet::backdrop`
+
+Older iOS doesn't let `::backdrop` inherit custom properties. Two fallbacks
+cover the two ways that can go:
+
+- **A browser without `color-mix()`** drops the second declaration while
+  parsing and keeps the first, a literal `rgba(15, 15, 26, .7)`, which is
+  `--bg` (`#0f0f1a`) at 70%.
+- **A browser with `color-mix()` but no inherited `--bg`** keeps the second
+  declaration, so the first can't help: an unresolved `var()` makes the
+  declaration invalid at computed-value time, and the background becomes
+  transparent rather than the earlier value. The `var()` therefore carries
+  its own fallback, `var(--bg, #0f0f1a)`.
+
+`pwa_spec` reads `--bg` from the layout and fails if either literal drifts
+from it. Both literals are the dark palette's. Where `::backdrop` does see
+custom properties, the light palette gets its own `--bg`.
+
+## Swap sheet live regions
+
+The sheet's error line and its "Saving…" line are live regions, so they stay
+rendered while empty: a region that appears in the same frame its text is
+set may not be announced. An empty one takes a negative top margin equal to
+the footer's gap instead of `display: none`.
+
 ## `.mermaid-diagram:empty`
 
 This hides only the diagram box while it is still empty, before render fills

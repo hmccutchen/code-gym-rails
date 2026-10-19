@@ -1,19 +1,23 @@
-<%# Locals: option (DailyKindSwap::Picker::Option), prefix (this place's id prefix), place. %>
+<%# Locals: option (DailyKindSwap::Picker::Option), picker, prefix (this place's id prefix). A label takes only phrasing content, hence spans. %>
 <% key = option.kind.key %>
 <% id = "#{prefix}-#{key}" %>
-<% described = [ "#{id}-guide", ("#{id}-note" if option.note), ("#{id}-consequences" if option.consequences&.sentences&.any?) ].compact %>
-<div class="daily-kind-option" data-kind="<%= key %>">
-  <%= tag.input type: "radio", form: "daily-kind-swap", name: "daily_kind_#{place}", id: id, value: key,
-                checked: option.now?, disabled: !(option.available? || option.now?), aria: { describedby: described.join(" ") },
-                data: { daily_kind_swap_target: "option", state: option.state } %>
-  <label for="<%= id %>"><%= t("sections.#{key}.name") %><% if option.mark %> <span class="daily-kind-now"><%= option.mark %></span><% end %></label>
-  <% if option.note %>
-    <p class="hint" id="<%= id %>-note"><%= option.note %></p>
-  <% end %>
-  <%= render "responses/kind_guide", key: key, id: "#{id}-guide" %>
-  <% if option.consequences&.sentences&.any? %>
-    <ul class="daily-kind-consequences" id="<%= id %>-consequences">
-      <% option.consequences.sentences.each do |sentence| %><li><%= sentence %></li><% end %>
-    </ul>
-  <% end %>
-</div>
+<% name = t("sections.#{key}.name") %>
+<% line_id = option.note ? "#{id}-note" : "#{id}-short" %>
+<% badge_ids = option.marks.each_index.map { |index| "#{id}-badge-#{index}" } %>
+<% described = [ line_id, "#{id}-guide", ("#{id}-consequences" if option.available?) ].compact %>
+<label class="daily-kind-option" for="<%= id %>" data-kind="<%= key %>">
+  <span class="daily-kind-option-name">
+    <%= tag.input type: "radio", form: "daily-kind-swap", name: "daily_kind_#{picker.place}", id: id, value: key,
+                  checked: option.now?, disabled: !(option.available? || option.now?),
+                  aria: { labelledby: [ "#{id}-name", *badge_ids ].join(" "), describedby: described.join(" ") },
+                  data: { daily_kind_swap_target: "option", state: option.state,
+                          confirm_label: (t("daily_kinds.picker.confirm_kind", kind: name) if option.available?) } %>
+    <span class="daily-kind-name" id="<%= id %>-name"><%= name %></span>
+    <% option.marks.zip(badge_ids).each do |mark, badge_id| %>
+      <span class="daily-kind-badge<%= " daily-kind-badge-now" if picker.accent_mark?(option) %>" id="<%= badge_id %>"><%= mark %></span>
+    <% end %>
+  </span>
+  <span class="daily-kind-line" id="<%= line_id %>"><%= option.note || SectionKindGuide.for(key)[:short] %></span>
+  <%= tag.span id: "#{id}-guide", class: "daily-kind-example", hidden: !option.now?,
+               data: { daily_kind_swap_target: "example", kind: key } do %><strong><%= t("responses.kind_about.example_label") %></strong> <%= SectionKindGuide.for(key)[:example] %><% end %>
+</label>

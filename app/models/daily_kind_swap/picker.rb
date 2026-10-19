@@ -2,7 +2,7 @@
 class DailyKindSwap::Picker
   HINT_UNTIL_SUBMITTED_DAYS = 5
 
-  Option = Data.define(:kind, :state, :note, :consequences, :mark) do
+  Option = Data.define(:kind, :state, :note, :consequences, :marks) do
     def now? = state == :now
     def available? = state == :available
   end
@@ -53,8 +53,12 @@ class DailyKindSwap::Picker
   end
 
   def next_kind_line
-    I18n.t("daily_kinds.picker.next_kind", kind: I18n.t("sections.#{@current.key}.name")) unless @current == @card_kind
+    I18n.t("daily_kinds.picker.next_kind", kind: I18n.t("sections.#{@current.key}.name")) unless card_shows_current?
   end
+
+  def card_shows_current? = @current == @card_kind
+
+  def accent_mark?(option) = option.now? && card_shows_current?
 
   private
 
@@ -68,23 +72,22 @@ class DailyKindSwap::Picker
   def option(kind)
     swap    = DailyKindSwap.new(@user, place: @place, kind: kind.key, version: nil)
     refusal = swap.refusal
-    mark    = mark_for(kind)
-    return Option.new(kind: kind, state: :now, note: nil, consequences: nil, mark: mark) if refusal == :unchanged
-    return Option.new(kind: kind, state: :disabled, note: note(swap, refusal), consequences: nil, mark: mark) if refusal
+    marks   = marks_for(kind, refusal)
+    return Option.new(kind: kind, state: :now, note: nil, consequences: nil, marks: marks) if refusal == :unchanged
+    return Option.new(kind: kind, state: :disabled, note: note(swap, refusal), consequences: nil, marks: marks) if refusal
 
-    Option.new(kind: kind, state: :available, note: nil, consequences: consequences(kind), mark: mark)
+    Option.new(kind: kind, state: :available, note: nil, consequences: consequences(kind), marks: marks)
   end
 
-  def mark_for(kind)
-    if kind == @current
-      I18n.t(@current == @card_kind ? "daily_kinds.picker.now" : "daily_kinds.picker.next_set_mark")
-    elsif kind == @card_kind
-      I18n.t("daily_kinds.picker.today_mark")
-    end
+  def marks_for(kind, refusal)
+    return [ I18n.t(card_shows_current? ? "daily_kinds.picker.now" : "daily_kinds.picker.next_set_mark") ] if kind == @current
+
+    [ (I18n.t("daily_kinds.picker.today_mark") if kind == @card_kind),
+      (I18n.t("daily_kinds.picker.already_daily") if refusal == :already_daily) ].compact
   end
 
   def note(swap, refusal)
-    refusal == :already_daily ? I18n.t("daily_kinds.picker.already_daily") : swap.refusal_message(refusal)
+    swap.refusal_message(refusal) unless refusal == :already_daily
   end
 
   def consequences(kind)

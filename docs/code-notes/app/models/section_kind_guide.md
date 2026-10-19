@@ -21,6 +21,22 @@ generator plants are listed only inline in the prompt
 (`ExerciseSection::AmbiguityHunt.generation_guidance`), not as a constant a
 spec could read, so a reviewer checks this one by eye.
 
+## The one-line `short`
+
+A daily card's swap sheet lists all ten kinds, so each row needs one line,
+not the two-sentence summary. Cutting the summary short would end sentences
+mid-thought, so each kind has its own `short` line, written to fit the 304 px
+a row's second line has at a 390 px viewport. A line that runs over wraps
+rather than being cut. The wording of each line was decided in
+`docs/superpowers/specs/2026-10-16-daily-kind-swap-design.md` ("One-line
+summaries"), which says why each word was chosen: code review says
+"problem" because the code is sometimes a test or a migration, design
+comparison says both pieces work, plan review says "flaws", pseudocode to
+code says "see the code" because Code Gym writes the code, and Parsons says
+"pieces" because a block can hold more than one line. The ambiguity hunt
+line names no gap, like its example. The spec requires one sentence with no
+semicolon, and `.learn_text` offers the lines to the plain-language checks.
+
 ## Domains
 
 Examples spread across gym, grocery and library settings, plus one Code Gym

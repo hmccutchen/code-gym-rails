@@ -71,7 +71,9 @@ RSpec.describe DailyKindSwap::Picker do
       picker = pickers["code_review"]
 
       expect(option(picker, "code_review")).to have_attributes(state: :now, consequences: nil)
-      expect(option(picker, "design_comparison")).to have_attributes(state: :disabled, note: "Already a daily section")
+      expect(option(picker, "design_comparison")).to have_attributes(state: :disabled, note: nil, marks: [ "Already daily" ])
+      expect(picker.accent_mark?(option(picker, "code_review"))).to be(true)
+      expect(picker.accent_mark?(option(picker, "design_comparison"))).to be(false)
       expect(option(picker, "challenge").state).to eq(:available)
       expect(option(picker, "challenge").consequences).to be_a(DailyKindSwap::Consequences::Result)
       expect(picker.options.map { |option| option.kind.key }).to eq(ExerciseSection.keys)
@@ -112,16 +114,27 @@ RSpec.describe DailyKindSwap::Picker do
 
       expect(picker.card_kind).to eq(ExerciseSection::CodeReview)
       expect(picker.next_kind_line).to eq("Your next set uses Coding Challenge here.")
-      expect(option(picker, "challenge")).to have_attributes(state: :now, mark: "In your next set")
-      expect(option(picker, "code_review")).to have_attributes(state: :available, mark: "In today's set")
+      expect(option(picker, "challenge")).to have_attributes(state: :now, marks: [ "In your next set" ])
+      expect(option(picker, "code_review")).to have_attributes(state: :available, marks: [ "In today's set" ])
+      expect(option(picker, "design_comparison")).to have_attributes(state: :disabled, marks: [ "Already daily" ])
+      expect(picker.options.select { |option| picker.accent_mark?(option) }).to eq([])
     end
 
-    it "marks only Now and adds no line when the card and the stored pair agree" do
+    it "keeps both badges when the card's own kind is now the other place's stored kind" do
+      user.update!(daily_section_kinds: %w[challenge code_review])
+      picker = pickers["code_review"]
+
+      expect(option(picker, "code_review")).to have_attributes(state: :disabled, note: nil,
+                                                               marks: [ "In today's set", "Already daily" ])
+    end
+
+    it "marks only Now and the other daily kind, and adds no line, when the card and the stored pair agree" do
       picker = pickers["design_comparison"]
 
       expect(picker.next_kind_line).to be_nil
-      expect(option(picker, "design_comparison").mark).to eq("Now")
-      expect(picker.options.filter_map(&:mark)).to eq([ "Now" ])
+      expect(option(picker, "design_comparison").marks).to eq([ "Now" ])
+      expect(picker.options.flat_map(&:marks)).to eq([ "Now", "Already daily" ])
+      expect(picker.options.select { |option| picker.accent_mark?(option) }.map { |option| option.kind.key }).to eq([ "design_comparison" ])
     end
   end
 

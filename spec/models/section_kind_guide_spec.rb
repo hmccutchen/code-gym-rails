@@ -16,12 +16,20 @@ RSpec.describe SectionKindGuide do
     end
   end
 
+  it "gives every kind a one-sentence short line for the swap sheet, with no semicolon" do
+    described_class::GUIDES.each do |key, guide|
+      expect(guide[:short]).to be_present, "#{key} short"
+      expect(sentences(guide[:short]).size).to eq(1), "#{key} short"
+      expect(guide[:short]).not_to include(";"), "#{key} short"
+    end
+  end
+
   it "reads a guide by string or symbol key" do
     expect(described_class.for(:parsons_problem)).to eq(described_class::GUIDES["parsons_problem"])
   end
 
   it "offers its text to the plain-language checks" do
-    expect(HandWrittenLearnText.learn_text).to include("kind:code_review:summary", "kind:pseudocode_to_code:example")
+    expect(HandWrittenLearnText.learn_text).to include("kind:code_review:summary", "kind:pseudocode_to_code:example", "kind:design_comparison:short")
   end
 
   # Static copy must never reach a prompt, so nothing on the generation or review path may read it.

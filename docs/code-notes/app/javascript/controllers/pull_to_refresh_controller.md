@@ -20,6 +20,17 @@ so Stimulus cannot remove them. `disconnect()` removes all four and clears the
 two pending timers, which is what keeps a reload-in-progress gesture from
 outliving the page that started it.
 
+## It stops under a modal dialog
+
+A touch that starts while a modal dialog is open, such as a daily card's
+swap sheet, starts no pull, since dragging the sheet's list down at the top
+of the page would otherwise refresh behind it. `modalOpen` checks each open
+`<dialog>` with `matches(":modal")` rather than querying `dialog:modal`.
+Safari 15.4 and 15.5 support `:has` but not `:modal`, and a selector it
+can't parse throws, which would break every touch there. When `:modal`
+throws, an open dialog counts as modal, which is true of every dialog this
+app opens. An open dialog that isn't modal doesn't stop a pull.
+
 ## It imports the save status module
 
 `reloadWhenSaved` asks `code_gym/save_status` whether anything is still on the

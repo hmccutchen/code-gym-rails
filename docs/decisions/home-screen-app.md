@@ -74,7 +74,9 @@ importmap's modules load, so anything running at parse time finds them.
 A save still pending after ten seconds cancels the pull rather than
 reloading over it. The gesture also refuses to start while a text field has
 focus, while any form is `inert` (the dashboard's submission and review
-handoff), or inside an inner area scrolled away from its top. On release the
+handoff), while a modal dialog is open (a daily card's swap sheet, whose
+list would otherwise start a refresh behind it when dragged down at the top
+of the page), or inside an inner area scrolled away from its top. On release the
 content settles to a held gap and the spinner turns for at least half a
 second, and a sessionStorage note lets the reloaded page open still held
 with the spinner turning, and settle once loaded, since the page it was drawn on is gone by then.

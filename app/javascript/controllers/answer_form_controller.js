@@ -194,6 +194,7 @@ export default class extends Controller {
   }
 
   relockAndLeave(leave) {
+    this.formTarget.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close())
     this.formTarget.inert = true
     leave()
   }
