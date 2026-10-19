@@ -189,6 +189,7 @@ export default class extends Controller {
     this.submitHeld = true
     clearTimeout(this.saveTimer)
     this.saveTimer = null
+    if (!this.formTarget.inert) this.freezeAnswers()
     return saveStatus.leaveWhenSaved(leave, () => this.holdForOtherSaves(), "answers", ...ignored)
   }
 
@@ -329,12 +330,16 @@ export default class extends Controller {
   }
 
   // Answers stay read-only, since the server would drop any edit now; the swap rows stay usable so the held save can land.
-  holdForOtherSaves() {
+  freezeAnswers() {
     this.formTarget.inert = false
     this.formTarget.querySelectorAll(":scope > *, details.section > *").forEach((element) => {
       if (!element.matches("details.section, summary, .daily-kind-swap")) element.inert = true
     })
     this.submitButtonTarget.disabled = true
+  }
+
+  holdForOtherSaves() {
+    this.freezeAnswers()
     this.submitButtonTarget.classList.remove("btn-loading")
     this.submitButtonTarget.textContent = this.submitLabelValue
     this.showHeldNotice()

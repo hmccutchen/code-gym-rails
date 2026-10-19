@@ -334,6 +334,29 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
   end
 
+  it "freezes the answers as soon as an autosave waits on a swap, and reloads once the swap lands" do
+    hold_swap_replies
+    confirm_swap(1, "pattern")
+    page.execute_script("window.swapPage = true")
+    DailyResponse.create!(user: user, daily_exercise: user.daily_exercises.sole, date: Date.current, submitted_at: Time.current,
+                          answers: { "code_review" => "Submitted from another tab with enough detail." },
+                          section_ratings: { "code_review" => "right_level" })
+    type_an_answer
+
+    area = find(%(textarea[data-field="code_review"]))
+    before = area.value
+    page.execute_script(%(document.querySelector('textarea[data-field="code_review"]').focus()))
+    page.driver.with_playwright_page { |pw| pw.keyboard.type(" more") }
+    expect(area.value).to eq(before)
+    expect(page.evaluate_script(%(Boolean(document.querySelector('button[data-rating-for="code_review"]').closest("[inert]"))))).to be(true)
+    expect(page.evaluate_script("Boolean(document.querySelector('.daily-kind-swap').closest('[inert]'))")).to be(false)
+    expect(page.evaluate_script("window.swapPage")).to be(true)
+
+    release_swap
+    wait_for_js_condition("window.swapPage === undefined", timeout: 8)
+    expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
+  end
+
   it "holds the review poll's reload while a swap has failed, and reloads once it saves" do
     response = DailyResponse.create!(user: user, daily_exercise: user.daily_exercises.sole, date: Date.current, submitted_at: Time.current,
                                      reviewing_since: Time.current, answers: { "code_review" => "Submitted with enough detail to count." },
