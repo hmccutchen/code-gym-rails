@@ -58,14 +58,16 @@ read it before changing that area.
   answers `.learn_text`, which a spec holds to the plain-language standard's
   checkable rules.
 - **What each section kind is**: `SectionKindGuide` holds a hand-written
-  summary and a short example for every registered kind, shown in an "About"
+  summary, a short example and a one-line `short` summary for every
+  registered kind. The summary and example are shown in an "About"
   disclosure. Setup's Exercise mix shows one for every kind, always. The
   answer form shows one under a section's summary only until the user has
   answered that kind on a submitted day (`DailyResponse.answered_kinds_for`,
   read from submitted `section_ratings` keys, with no column of its own); the
-  submitted dashboard and History never show it as a disclosure. The
-  daily cards' swap picker shows each option's guide text
-  (`responses/_kind_guide`, the one copy both render). Like `ConceptBookSources` it
+  submitted dashboard and History never show it as a disclosure. Each row of
+  a daily card's swap sheet shows the kind's `short` line, and the checked
+  row also shows its example, both read from `SectionKindGuide`; a spec
+  requires a one-sentence `short` for every kind. Like `ConceptBookSources` it
   is never sent to a provider, and a spec fails if anything under
   `app/services` or `app/jobs` names it. Each example says what the engineer
   sees and is asked, never an answer, and the ambiguity hunt's names no gap
