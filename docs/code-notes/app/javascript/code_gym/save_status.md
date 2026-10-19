@@ -58,11 +58,14 @@ These count work the page shows but the server has not stored yet: a request on
 the wire, or a delayed save a page registered through `watch()`.
 Pull-to-refresh waits on `pending()` so a reload cannot drop an edit mid-save.
 
-## `reloadWhenSaved()`
+## `settled()` and `reloadWhenSaved()`
 
-A page that answers a refusal by reloading must not reload over a save that
-has not landed. `reloadWhenSaved(conflict, stranded)` polls `pending()` every
-200 ms and reloads once nothing is left. A save that hangs or fails must never
+A page that leaves itself must not leave over a save that has not landed.
+`settled(...ignored)` polls `pending()` every 200 ms and resolves `true` once
+nothing is left and no key outside `ignored` has a failure, or `false` after
+the wait limit or on such a failure. The answer form awaits it before a
+submit navigates. `reloadWhenSaved(conflict, stranded)` is `settled(conflict)`
+followed by a reload or by `stranded`. It reloads once nothing is left. A save that hangs or fails must never
 cost an edit to a forced reload. So after ten seconds, or while any key but
 `conflict` still has a failure in `failures`, it calls `stranded` instead,
 which hands the reload to the user and leaves the failed selection on the page

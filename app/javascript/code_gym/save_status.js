@@ -30,13 +30,20 @@ export function pending() {
   return requests > 0 || [...queues.values()].some((line) => line.busy || line.waiting.length > 0) || probes.some((probe) => probe());
 }
 
-export function reloadWhenSaved(conflict, stranded, waited = 0) {
+export function settled(...ignored) {
+  return new Promise((resolve) => waitToSettle(ignored, resolve, 0));
+}
+
+function waitToSettle(ignored, resolve, waited) {
   if (pending() && waited < SETTLE_WAIT_LIMIT_MS) {
-    setTimeout(() => reloadWhenSaved(conflict, stranded, waited + SETTLE_POLL_MS), SETTLE_POLL_MS);
+    setTimeout(() => waitToSettle(ignored, resolve, waited + SETTLE_POLL_MS), SETTLE_POLL_MS);
     return;
   }
-  if (pending() || [...failures.keys()].some((key) => key !== conflict)) return stranded();
-  window.location.reload();
+  resolve(!pending() && ![...failures.keys()].some((key) => !ignored.includes(key)));
+}
+
+export function reloadWhenSaved(conflict, stranded) {
+  settled(conflict).then((clean) => (clean ? window.location.reload() : stranded()));
 }
 
 function render() {
@@ -164,4 +171,4 @@ function reportCarried() {
 
 reportCarried();
 
-export default { save, queue, queued, watch, pending, reloadWhenSaved, carry, report, clear };
+export default { save, queue, queued, watch, pending, settled, reloadWhenSaved, carry, report, clear };

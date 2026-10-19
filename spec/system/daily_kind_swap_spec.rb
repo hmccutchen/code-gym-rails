@@ -207,6 +207,53 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page).to have_no_css("#save-status", visible: :visible)
   end
 
+  def submit_one_answer
+    page.execute_script("window.swapPage = true")
+    fill_in_answer("code_review", "The answer that is submitted while both swaps are still queued.")
+    rate_section("code_review")
+    click_button "Submit answers"
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Capybara.default_max_wait_time
+    sleep 0.05 until user.daily_responses.reload.first&.submitted? || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+    expect(user.daily_responses.sole).to be_submitted
+  end
+
+  it "waits for queued swaps to save before a submit leaves the page" do
+    hold_swap_replies
+    confirm_swap(0, "challenge")
+    confirm_swap(1, "pattern")
+    submit_one_answer
+
+    expect(page.evaluate_script("window.swapPage")).to be(true)
+    release_swap
+    wait_for_js_condition("window.heldSwaps.length === 2")
+    release_swap
+
+    expect(page).to have_content("✓ Submitted", wait: 10)
+    expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
+  end
+
+  it "stays on the page with the failure showing when a queued swap fails during a submit" do
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.swapCalls = 0;
+      window.fetch = (url, options) => {
+        if (!url.includes("/daily_kinds/")) return originalFetch(url, options);
+        window.swapCalls += 1;
+        if (window.swapCalls === 2) return Promise.resolve(new Response("unavailable", { status: 503 }));
+        return new Promise((resolve) => { window.releaseSwap = () => resolve(originalFetch(url, options)); });
+      };
+    JS
+    confirm_swap(0, "challenge")
+    confirm_swap(1, "pattern")
+    submit_one_answer
+    release_swap
+
+    expect(page).to have_css("#save-status", visible: :visible)
+    expect(page).to have_button("Submit answers", disabled: false)
+    expect(page.evaluate_script("window.swapPage")).to be(true)
+    expect(user.reload.daily_section_kinds).to eq(%w[challenge design_comparison])
+  end
+
   it "keeps Confirm disabled while a swap is on its way, whatever radio is chosen" do
     hold_swap_replies
     confirm_swap(0, "challenge")

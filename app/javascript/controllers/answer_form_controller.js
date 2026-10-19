@@ -248,7 +248,9 @@ export default class extends Controller {
     const result = await request.send("POST", this.formTarget.action, this.payload({ submit: "1" }), { fallback: this.submitFailedValue })
     if (result.ok) saveStatus.clear("submit")
     if (result.ok) draftStore.clear()
-    if (this.startReview(result) || this.reloadAfterSubmit(result)) return
+    const stale = result.status === 409
+    if ((result.ok || stale) && !(await saveStatus.settled("answers", "submit"))) return this.unlock()
+    if (this.startReview(result) || this.reloadAfterSubmit(result, stale)) return
 
     const refused = result.status === 422 && Boolean(result.data?.submit_blocker)
     if (refused) {
@@ -302,8 +304,7 @@ export default class extends Controller {
   }
 
   // Stays inert behind the reload: restoring the form would queue an autosave of the refused payload.
-  reloadAfterSubmit(result) {
-    const stale = result.status === 409
+  reloadAfterSubmit(result, stale) {
     if (!result.ok && !stale) return false
     this.clearOwnDraft()
     saveStatus.carry("answers", result.ok ? this.reviewStartFailedValue : this.staleReloadedValue)

@@ -87,6 +87,19 @@ the module has connected. `spec/system/deferred_module_spec.rb` answers the
 missing comparison module with a 404 and expects the stale pick to stay
 unsubmitted.
 
+## Leaving the page waits for other saves
+
+A submit that would leave the page, to start the review or to reload after a
+409, first awaits `saveStatus.settled("answers", "submit")`. Another control
+may still have a save queued, such as a daily card's swap waiting behind the
+other card's, and navigating would drop it. When nothing is pending and no
+other key has a failure, `settled` resolves at once, so a normal submit
+leaves as before. When another save fails or does not land within the wait,
+the form unlocks and stays on the page with that failure in the banner;
+pressing Submit again is safe, because a repeated submit returns the
+existing review URL. The two keys are ignored because the submit itself
+carries every answer, so an earlier autosave failure is already superseded.
+
 ## The copy on the device
 
 Every edit writes the answers and ratings to `code_gym/draft_store` with the
