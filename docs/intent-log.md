@@ -45,8 +45,9 @@ this one.
   **I decided:** `ProviderError` as the home, no aliases, field lists in a
   second PR, `LANGUAGE_PROMPTS` left alone
 - setup problems recorded as their own kind, not as provider failures `#444`
-  **I decided:** changed my mind from letting them fail unrescued once that
-  left pages spinning; record and word them as setup, batch skips any error
+  **I decided:** changed my mind: record them as setup, since failing
+  unrescued left pages spinning
 - the rest of `AiService`'s domain data moved onto the models `#445`
 - generation logging moved into `GenerationDiagnostics` `#448`
   **I decided:** diagnostics before prompts
+- pseudocode prompts into `PseudocodePrompt`, the model for the rest `#450`
