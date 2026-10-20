@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="public/icon-512.png" alt="Code Gym icon: a kettlebell between curly braces" width="128" height="128">
+  <img src="public/icon-512.png" alt="Coding Gym icon: a kettlebell between curly braces" width="128" height="128">
 </p>
 
-# Code Gym
+# Coding Gym
 
 **[coding-gym.pro](https://coding-gym.pro)**
 
-Code Gym gives you a short set of coding exercises every weekday morning,
+Coding Gym gives you a short set of coding exercises every weekday morning,
 written by an AI model from your own history. You answer, rate how hard each
 one felt, and get a graded review, and the next day's set goes back to what you
 missed. Most exercises train the judgment the job runs on, like reviewing code,

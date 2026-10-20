@@ -11,7 +11,7 @@ function notificationFor(event) {
   const payload = readPayload(event)
   const options = payload.options || {}
 
-  return self.registration.showNotification(payload.title || "Code Gym", {
+  return self.registration.showNotification(payload.title || "Coding Gym", {
     body: options.body || "Today's set is ready.",
     icon: "<%= versioned_public_path("icon-192.png") %>",
     badge: "<%= versioned_public_path("icon-192.png") %>",

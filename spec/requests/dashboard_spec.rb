@@ -533,7 +533,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to match(%r{<a class="brand" href="/"><img alt="Code Gym" class="brand-mark"[^>]*src="/assets/brand-mark-[0-9a-f]+\.png" />})
+      expect(response.body).to match(%r{<a class="brand" href="/"><img alt="Coding Gym" class="brand-mark"[^>]*src="/assets/brand-mark-[0-9a-f]+\.png" />})
     end
 
     it "keeps the brand's logo separately addressable from the wordmark, so CSS can hide either" do
@@ -541,7 +541,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to match(%r{<a class="brand" href="/"><img alt="Code Gym" class="brand-mark"[^>]*/><span aria-hidden="true">Code Gym</span></a>})
+      expect(response.body).to match(%r{<a class="brand" href="/"><img alt="Coding Gym" class="brand-mark"[^>]*/><span aria-hidden="true">Coding Gym</span></a>})
     end
   end
 

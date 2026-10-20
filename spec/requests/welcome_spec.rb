@@ -30,7 +30,7 @@ RSpec.describe "Welcome", type: :request do
 
     expect(response).to have_http_status(:ok)
     document = Nokogiri::HTML(response.body)
-    expect(document.at_css("title").text).to eq("Code Gym")
+    expect(document.at_css("title").text).to eq("Coding Gym")
     expect(document.at_css("h1").text).to eq("Before you start")
     buttons = document.css("[data-level]")
     expect(buttons.map { |button| button["data-level"] }).to eq(LevelSuggestion::LADDER)
