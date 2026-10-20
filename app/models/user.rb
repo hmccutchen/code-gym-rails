@@ -128,18 +128,18 @@ class User < ApplicationRecord
                             last_generation_failed_at: nil, last_generation_retry_after: nil }.freeze
 
   def record_generation_failure!(error)
-    update!(last_generation_error_date: Date.current, last_generation_error: nil,
-            last_generation_failure: ProviderFailure.classify(error),
-            last_generation_failure_provider: error.try(:provider) || provider,
-            last_generation_failed_at: Time.current, last_generation_retry_after: error.try(:retry_after))
+    write_generation_status!(last_generation_error_date: Date.current, last_generation_error: nil,
+                             last_generation_failure: ProviderFailure.classify(error),
+                             last_generation_failure_provider: error.try(:provider) || provider,
+                             last_generation_failed_at: Time.current, last_generation_retry_after: error.try(:retry_after))
   end
 
   def record_generation_message!(message)
-    update!(last_generation_error_date: Date.current, last_generation_error: message, **NO_GENERATION_FAILURE)
+    write_generation_status!(last_generation_error_date: Date.current, last_generation_error: message, **NO_GENERATION_FAILURE)
   end
 
   def clear_generation_failure!
-    update!(last_generation_error_date: nil, last_generation_error: nil, **NO_GENERATION_FAILURE)
+    write_generation_status!(last_generation_error_date: nil, last_generation_error: nil, **NO_GENERATION_FAILURE)
   end
 
   def generation_failure_message(surface:, now: Time.current)
@@ -440,6 +440,10 @@ class User < ApplicationRecord
   end
 
   private
+
+  def write_generation_status!(columns)
+    update_columns(columns.merge(updated_at: Time.current))
+  end
 
   def clean_name
     self.name = UserText.clean(name, limit: UserText::MAX_NAME_LENGTH).strip

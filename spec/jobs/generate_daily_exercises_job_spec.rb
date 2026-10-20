@@ -98,6 +98,15 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(Rails.logger).to have_received(:error).with(/user #{user.id}.*no recognized AI provider/)
   end
 
+  it "records a setup failure for a user whose stored language is invalid, with no stubbed provider" do
+    user.update_columns(language: "cobol")
+    allow(Rails.logger).to receive(:error)
+
+    expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
+    expect(user.reload).to have_attributes(last_generation_failure: "setup", last_generation_error_date: Date.current)
+    expect(DailyExercise.exists?(user: user, date: Date.current)).to be false
+  end
+
   it "records a rejected key as bad_key and renders a Setup-pointing sentence" do
     stub_provider_failure(ProviderError::AuthenticationError, "invalid x-api-key")
 

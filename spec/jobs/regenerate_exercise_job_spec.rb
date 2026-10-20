@@ -332,6 +332,15 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(user.reload.last_generation_failure).to eq("setup")
   end
 
+  it "records a setup failure for a user whose stored provider is unknown, with no stubbed provider" do
+    exercise = claimed_exercise
+    user.update_columns(provider: "nonsense")
+
+    expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
+    expect(exercise.reload.regenerating_since).to be_nil
+    expect(user.reload.last_generation_failure).to eq("setup")
+  end
+
   it "does not raise when the provider fails" do
     claimed_exercise
     stub_provider(ProviderError.new("boom"))
