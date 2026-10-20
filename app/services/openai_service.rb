@@ -67,7 +67,7 @@ class OpenaiService < AiService
 
     if resp.status == 429
       raise ProviderError::RateLimitError.new("OpenAI API error 429", http_status: 429,
-                                          quota_id: quota_id_from(resp, error), retry_after: retry_after_seconds(resp))
+                                              quota_id: quota_id_from(resp, error), retry_after: retry_after_seconds(resp))
     end
 
     log_raw_snippet("OpenAI API error #{resp.status} body", resp.body)

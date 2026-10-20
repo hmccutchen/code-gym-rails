@@ -700,7 +700,7 @@ class AiService
     when ProviderError::TrialEndedError      then "trial_ended"
     when ProviderError::TrialAllowanceError  then "trial_allowance_used"
     when ProviderError::InvalidResponseError then "invalid_response"
-    else                           "other"
+    else                                          "other"
     end
   end
 
@@ -714,19 +714,19 @@ class AiService
     when ProviderError::TruncatedResponseError then "truncated"
     when ProviderError::InvalidResponseError   then "invalid_response"
     when ProviderError::RefusalError           then "refusal"
-    else                             "provider_error"
+    else                                            "provider_error"
     end
   end
 
   def self.judge_fallback_reason(error)
     case error
     when JudgeVerdict::Invalid, ReviewProseVerdict::Invalid then "invalid_output"
-    when ProviderError::TruncatedResponseError                              then "truncated"
-    when ProviderError::InvalidResponseError                                then "invalid_json"
-    when ProviderError::RefusalError                                        then "refusal"
-    when ProviderError::DeadlineError                                       then ProviderError::DeadlineError::FALLBACK_REASON
-    when ProviderError::TimeoutError, Timeout::Error                        then "timeout"
-    else                                                          http_status_code_for(error) || error_code_for(error)
+    when ProviderError::TruncatedResponseError              then "truncated"
+    when ProviderError::InvalidResponseError                then "invalid_json"
+    when ProviderError::RefusalError                        then "refusal"
+    when ProviderError::DeadlineError                       then ProviderError::DeadlineError::FALLBACK_REASON
+    when ProviderError::TimeoutError, Timeout::Error        then "timeout"
+    else                                                         http_status_code_for(error) || error_code_for(error)
     end
   end
 
@@ -1505,7 +1505,7 @@ class AiService
 
     Rails.logger.error("#{company} authentication failed (HTTP #{status})")
     raise ProviderError::AuthenticationError.new("#{company} rejected your API key or its permissions. Check it in Settings.",
-                                  http_status: status)
+                                                 http_status: status)
   end
 
   def log_raw_snippet(label, content)
@@ -1576,7 +1576,7 @@ class AiService
     return unless result[:truncated] && !allow_truncated
 
     raise tagged(ProviderError::TruncatedResponseError.new("Provider did not finish its reply " \
-                                            "(#{result[:output_tokens].to_i} output tokens, thinking included)"))
+                                                           "(#{result[:output_tokens].to_i} output tokens, thinking included)"))
   end
 
   def tagged(error) = error.tap { |e| e.provider = self.class.provider_key }

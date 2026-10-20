@@ -87,7 +87,7 @@ class ClaudeService < AiService
     case resp.status
     when 429
       raise ProviderError::RateLimitError.new("Claude API error 429", http_status: 429,
-                                          quota_id: quota_id_from(resp, error), retry_after: retry_after_seconds(resp))
+                                              quota_id: quota_id_from(resp, error), retry_after: retry_after_seconds(resp))
     when 529
       raise ProviderError::RateLimitError.new("Claude API error 529", http_status: 529, quota_id: "overloaded_error")
     end
@@ -105,7 +105,7 @@ class ClaudeService < AiService
 
     Rails.logger.warn("Anthropic reports the account is out of credit or over its spend limit (HTTP #{status})")
     raise ProviderError::BillingError.new("Anthropic reports the account is out of credit or over its spend limit",
-                                      http_status: status)
+                                          http_status: status)
   end
 
   def quota_id_from(resp, error)

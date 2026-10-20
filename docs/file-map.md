@@ -48,7 +48,7 @@ What each listed file does.
 - `script/mint_invite_code.rb` — mints one invite code and prints it once
 - `script/record_competency_gate_fixture.rb` — rebuilds `spec/fixtures/competency_gate/default_pair_histories.json` from the gate as it stands; run only for a deliberate gate change
 - `app/models/provider_failure.rb` — `ProviderFailure`: the kind of failure a page can explain, from the error the boundary rescued; pure
-- `app/models/provider_error.rb` — `ProviderError` and its subclasses: every failure a provider call can raise, carrying the HTTP status, quota id, retry wait and provider; `ProviderFailure` and `AiService.error_code_for` classify them
+- `app/models/provider_error.rb` — `ProviderError` and its subclasses: the failures a provider call raises, carrying the HTTP status, quota id, retry wait and provider; `AiService.for` and `.config_for` also raise the base class for a user with no usable provider or an unsupported language; `ProviderFailure` and `AiService.error_code_for` classify them
 - `app/models/reset_clock.rb` — `ResetClock`: when a failed call's limit lifts, for the sentence's reset time; pure
 - `app/models/provider_failure_text.rb` — `ProviderFailureText`: one failure as a sentence for a person, from the `provider_failures` locale table, in the reader's zone and against the clock; `#full` for a page, `#brief` for a status line
 - `app/models/concept_reference_failures.rb` — `ConceptReferenceFailures`: the per-user, cache-held note of why a write-up stopped, read by Learn's status endpoint
