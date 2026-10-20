@@ -17,7 +17,7 @@ class GenerateConceptReferenceJob < ApplicationJob
     return unless user
 
     reference = AiService.for(user).generate_concept_reference(user, concept, language)
-    attributes = (AiService::CONCEPT_REFERENCE_FIELDS + AiService::CONCEPT_GUIDE_FIELDS + AiService::CONCEPT_LADDER_FIELDS + [ "lesson" ])
+    attributes = (AiService::CONCEPT_REFERENCE_FIELDS + ConceptReference::GUIDE_FIELDS + ConceptReference::LADDER_FIELDS + [ "lesson" ])
                    .index_with { |field| reference[field] }
 
     if existing

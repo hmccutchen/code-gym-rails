@@ -385,10 +385,7 @@ class AiService
 
   WORKED_EXAMPLE_BOUND = "At most the two fragments plus four sentences of prose.".freeze
 
-  CONCEPT_GUIDE_FIELDS = %w[guide_plain_language guide_worked_example guide_pitfalls].freeze
 
-  LADDER_FIELD_FOR      = KindDifficulty::LEVELS.index_with { |level| "ladder_#{level}" }.freeze
-  CONCEPT_LADDER_FIELDS = LADDER_FIELD_FOR.values.freeze
 
   MAX_LADDER_RUNG_LENGTH = 300
 
@@ -401,7 +398,6 @@ class AiService
     not tied to any single problem.
   SCOPE
 
-  RECOGNITION_GUIDE_FIELDS = %w[questions contrast misfires].freeze
 
   RECOGNITION_GUIDE_SCOPE = <<~SCOPE.chomp
     This teaches a PROCESS for recognizing the category, never an ANSWER.
@@ -517,12 +513,12 @@ class AiService
     ))
 
     guide = parse_json_object(result[:text], subject: "recognition guide")
-    RECOGNITION_GUIDE_FIELDS.each { |field| guide[field] = usable_optional_text(guide[field], MAX_CONCEPT_GUIDE_LENGTH) }
+    RecognitionGuide::FIELDS.each { |field| guide[field] = usable_optional_text(guide[field], MAX_CONCEPT_GUIDE_LENGTH) }
 
-    missing = RECOGNITION_GUIDE_FIELDS.select { |field| guide[field].nil? }
+    missing = RecognitionGuide::FIELDS.select { |field| guide[field].nil? }
     raise ProviderError::InvalidResponseError, "Recognition guide missing usable field(s): #{missing.join(', ')}" if missing.any?
 
-    guide.slice(*RECOGNITION_GUIDE_FIELDS)
+    guide.slice(*RecognitionGuide::FIELDS)
   end
 
   def explain_concept_differently(user, reference, prior_alternates: [])
@@ -853,8 +849,8 @@ class AiService
   end
 
   def normalize_optional_reference_fields!(reference)
-    CONCEPT_GUIDE_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_CONCEPT_GUIDE_LENGTH) }
-    CONCEPT_LADDER_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_LADDER_RUNG_LENGTH) }
+    ConceptReference::GUIDE_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_CONCEPT_GUIDE_LENGTH) }
+    ConceptReference::LADDER_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_LADDER_RUNG_LENGTH) }
     reference["lesson"] = ConceptLesson.from_provider(reference["lesson"])
   end
 
@@ -1166,7 +1162,7 @@ class AiService
                                  .index_by { |reference| [ reference.language, reference.concept ] }
 
     requests.each_with_object({}) do |request, ladders|
-      field = LADDER_FIELD_FOR.fetch(request[:level])
+      field = ConceptReference::LADDER_FIELD_FOR.fetch(request[:level])
       rungs = request[:concepts].filter_map do |concept|
         reference = references[[ request[:bucket], concept ]]
         [ concept, reference.public_send(field).truncate(MAX_LADDER_RUNG_LENGTH) ] if reference
@@ -1365,7 +1361,7 @@ class AiService
         "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term",
         "guide_worked_example": "#{worked_example_description(concept, medium)}",
         "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing",
-      #{LADDER_FIELD_FOR.map { |level, field| %(  "#{field}": "string — a #{level}-level problem about this concept",) }.join("\n")}
+      #{ConceptReference::LADDER_FIELD_FOR.map { |level, field| %(  "#{field}": "string — a #{level}-level problem about this concept",) }.join("\n")}
         "lesson": #{JSON.generate(ConceptLesson.schema)}
       }
     PROMPT

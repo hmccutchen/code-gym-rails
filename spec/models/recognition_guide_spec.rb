@@ -60,7 +60,7 @@ RSpec.describe RecognitionGuide do
     expect(guide).to be_valid
   end
 
-  AiService::RECOGNITION_GUIDE_FIELDS.each do |field|
+  RecognitionGuide::FIELDS.each do |field|
     it "refuses a guide with no #{field}" do
       expect(guide(field => " ")).not_to be_valid
     end

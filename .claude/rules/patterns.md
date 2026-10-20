@@ -114,7 +114,12 @@ says what a deviation from one requires.
 - **Domain data stays off provider classes** — lists and tables the domain
   owns live in a module of their own (`ConceptVocabulary`), and `AiService`
   and `GenerationPrompt` read them; `AiService` keeps only what is about
-  talking to a provider. Two exceptions still sit on `AiService`, and
-  `GenerationPrompt` reads them there: `SCENARIO_POOLS` and the per-language
-  prompt wording behind `.config_for`. Moving them to a domain module is a
-  follow-up; the exception is recorded here so it is not read as the rule.
+  talking to a provider. A field list a model validates or checks lives on
+  that model (`ConceptReference::GUIDE_FIELDS`, `RecognitionGuide::FIELDS`),
+  and `AiService` reads it there. Two exceptions still sit on `AiService`:
+  `SCENARIO_POOLS`, which `GenerationPrompt` reads, and the per-language
+  prompt wording behind `.config_for` (`LANGUAGE_PROMPTS`), which
+  `GenerationPrompt` and `RecognitionGuide` read. Moving them to a domain
+  module is a follow-up; the exception is recorded here so it is not read as
+  the rule. A model that needs provider timing asks `AiProvider`, and
+  `app_source_spec` fails on any other model naming a provider class.

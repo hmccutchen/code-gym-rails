@@ -47,4 +47,35 @@ RSpec.describe "Conventions held over app/ source" do
 
     expect(offenders).to be_empty, "send(:...) in app/: #{offenders.join(', ')}"
   end
+
+  PROVIDER_CLASS_ALLOWED_IN_MODELS = {
+    "app/models/ai_provider.rb" => :any,
+    "app/models/recognition_guide.rb" => [ "AiService::LANGUAGE_PROMPTS" ]
+  }.freeze
+
+  def provider_class_references(path)
+    names = ([ AiService ] + AiProvider.all).map { |klass| klass.name.to_sym }
+    found = []
+    visit = lambda do |node|
+      if node.is_a?(Prism::ConstantPathNode) && node.parent.is_a?(Prism::ConstantReadNode) && names.include?(node.parent.name)
+        found << "#{node.parent.name}::#{node.name}"
+        next
+      end
+      found << node.name.to_s if node.is_a?(Prism::ConstantReadNode) && names.include?(node.name)
+      node.compact_child_nodes.each(&visit)
+    end
+    visit.call(Prism.parse_file(path).value)
+    found
+  end
+
+  it "keeps models off the provider classes, apart from the registry and one recorded exception" do
+    offenders = Dir[Rails.root.join("app/models/**/*.rb")].sort.flat_map do |path|
+      allowed = PROVIDER_CLASS_ALLOWED_IN_MODELS.fetch(relative(path), [])
+      next [] if allowed == :any
+
+      (provider_class_references(path) - allowed).map { |reference| "#{relative(path)}: #{reference}" }
+    end
+
+    expect(offenders).to be_empty, "Models naming a provider class: #{offenders.join(', ')}"
+  end
 end

@@ -11,6 +11,6 @@ class ResetClock
   end
 
   def self.daily_boundary(provider, failed_at)
-    (AiProvider.find(provider.to_s) || AiService).daily_quota_reset_at(failed_at)
+    AiProvider.daily_quota_reset_at(provider, failed_at)
   end
 end
