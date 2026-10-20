@@ -805,55 +805,11 @@ class AiService
 
   def assess_difficulty(user, exercise, sections:)
     result = call_and_log(user, AiService.request_for("assess_difficulty",
-      system: build_difficulty_system_prompt(config_for(exercise.language)[:coach]),
-      prompt: build_difficulty_prompt(exercise, sections)
-    ))
+      **DifficultyPrompt.generate(coach: config_for(exercise.language)[:coach],
+                                  sections: sections.to_h { |section| [ section, exercise.problem_set[section.to_s] ] })))
 
     assessed = parse_json_object(result[:text], subject: "difficulty assessment")
     sections.to_h { |section| [ section, DailyResponse.usable_difficulty(assessed[section]) ] }.compact
-  end
-
-  def build_difficulty_system_prompt(coach)
-    "You are a senior #{coach} engineer rating how hard each of several practice problems is. " \
-    "You are not grading anyone, and you will not be shown anyone's answer. Return JSON."
-  end
-
-  def build_difficulty_prompt(exercise, sections)
-    material = sections.map { |section| "## #{section}\n#{SectionContext.render(exercise.problem_set[section.to_s])}" }
-
-    <<~PROMPT
-      Rate the objective difficulty of each problem below, on this scale:
-      #{difficulty_scale}
-
-      Judge only the material shown. Weigh how subtle the issue is, how many
-      reasoning steps a complete answer takes, and how much the scenario leaves
-      unstated. You know nothing about who is answering it, how they have done
-      before, or why this problem was chosen for them — none of that is here,
-      and none of it belongs in the rating. Two problems about the same idea can
-      differ; "#{DailyResponse::DIFFICULTY_LEVELS.first}" is a perfectly good answer.
-
-      Return a single JSON object keyed by the section names below:
-      {
-        "<section name>": {
-          "level": #{DailyResponse::DIFFICULTY_LEVELS.map(&:inspect).join(' | ')},
-          "reason": "string — one sentence of at most #{DailyResponse::MAX_DIFFICULTY_REASON_LENGTH} characters naming what makes it that, written for the engineer to read after their review"
-        }
-      }
-
-      #{material.join("\n\n")}
-    PROMPT
-  end
-
-  DIFFICULTY_GUIDANCE = {
-    "straightforward" => "one thing to notice; a competent engineer finds it on a first read.",
-    "moderate"        => "a couple of reasoning steps, or one detail that is easy to skim past.",
-    "demanding"       => "the issue is subtle, several steps chain together, or the scenario leaves something material unstated."
-  }.freeze
-
-  def difficulty_scale
-    DailyResponse::DIFFICULTY_LEVELS
-      .map { |level| "- \"#{level}\" — #{DIFFICULTY_GUIDANCE.fetch(level)}" }
-      .join("\n")
   end
 
   def recognition_subject(group_key)

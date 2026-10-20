@@ -1,0 +1,37 @@
+Rate the objective difficulty of each problem below, on this scale:
+- "straightforward" — one thing to notice; a competent engineer finds it on a first read.
+- "moderate" — a couple of reasoning steps, or one detail that is easy to skim past.
+- "demanding" — the issue is subtle, several steps chain together, or the scenario leaves something material unstated.
+
+Judge only the material shown. Weigh how subtle the issue is, how many
+reasoning steps a complete answer takes, and how much the scenario leaves
+unstated. You know nothing about who is answering it, how they have done
+before, or why this problem was chosen for them — none of that is here,
+and none of it belongs in the rating. Two problems about the same idea can
+differ; "straightforward" is a perfectly good answer.
+
+Return a single JSON object keyed by the section names below:
+{
+  "<section name>": {
+    "level": "straightforward" | "moderate" | "demanding",
+    "reason": "string — one sentence of at most 200 characters naming what makes it that, written for the engineer to read after their review"
+  }
+}
+
+## code_review
+Question: What is wrong here?
+Code snippet:
+Order.all.each { |o| o.user.name }
+
+## pattern
+Title: Memoize
+Question: When would you cache this?
+
+## ambiguity_hunt
+Title: Leaderboard
+Question: What needs clarifying?
+Feature request:
+Add a leaderboard.
+
+## challenge
+

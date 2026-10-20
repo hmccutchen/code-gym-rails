@@ -4317,7 +4317,7 @@ RSpec.describe AiService do
     end
 
     def difficulty_prompt(exercise, sections = %w[code_review pattern ambiguity_hunt])
-      service.send(:build_difficulty_prompt, exercise, sections)
+      DifficultyPrompt.generate(coach: "Rails", sections: sections.to_h { |section| [ section, exercise.problem_set[section] ] })[:prompt]
     end
 
     it "shows the assessor the problem exactly as the engineer sees it" do
@@ -4436,8 +4436,22 @@ RSpec.describe AiService do
       expect(prompt).to include("#{DailyResponse::MAX_DIFFICULTY_REASON_LENGTH} characters")
     end
 
-    it "has guidance for exactly the levels it can offer" do
-      expect(AiService::DIFFICULTY_GUIDANCE.keys).to eq(DailyResponse::DIFFICULTY_LEVELS)
+    it "sends the recorded system prompt and prompt for the sections it is handed" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review"    => { "question" => "What is wrong here?", "snippet" => "Order.all.each { |o| o.user.name }" },
+        "pattern"        => { "title" => "Memoize", "question" => "When would you cache this?" },
+        "ambiguity_hunt" => { "title" => "Leaderboard", "request" => "Add a leaderboard.", "question" => "What needs clarifying?",
+                              "planted_ambiguities" => [ "AH-SECRET-ONE", "AH-SECRET-TWO" ] }
+      })
+      svc = Class.new(double_class) do
+        attr_reader :sent
+        def call(request) = (@sent = request) && super
+      end.new(canned_text: "{}")
+
+      svc.send(:assess_difficulty, user, exercise, sections: %w[code_review pattern ambiguity_hunt challenge])
+
+      expect_prompt_snapshot("difficulty__system", svc.sent.system)
+      expect_prompt_snapshot("difficulty__prompt", svc.sent.prompt)
     end
 
     it "orders the vocabulary easiest first, which is what lets the prompt call .first easy" do
