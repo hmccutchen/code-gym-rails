@@ -371,7 +371,7 @@ end
         .and include("was[1]: Each row runs its own query.")
         .and include("issues: verbosity: \"Each row runs its own query.\"")
         .and include("ProviderError::InvalidResponseError")
-        .and include("ProviderError")
+        .and include("ProviderError: ")
       expect(out.string).to match(%r{edits: 1/2 \(plain_language_violation 0/2, verbosity 1/2\) · merges: 1 · invalid: 1/4 · provider errors: 1/4 · \d+ms})
       expect(out.string).to match(%r{edits: 0/4 \(plain_language_violation 0/4, verbosity 0/4\) · merges: 0 · invalid: 0/4 · provider errors: 0/4})
       expect(out.string).to include("$")
