@@ -1,5 +1,9 @@
 # app/services/generation_prompt.rb
 
+## `.system_prompt`
+
+A class method, because the system prompt needs only the language's coach and focus, and the draft and the single-section retry send the same text. `AiService#build_system_prompt` reads those from `LANGUAGE_PROMPTS` and calls it.
+
 ## `#initialize`
 
 The plan, history, difficulty and ladders arrive as whole values, so a new
