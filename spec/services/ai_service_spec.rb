@@ -6161,14 +6161,14 @@ RSpec.describe AiService, "review prompt call sites" do
     DailyExercise.new(language: "ruby_rails", plan_notes: { "daily_kinds" => %w[code_review design_comparison] }, problem_set: {
       "code_review" => { "question" => "What is wrong here?", "snippet" => "Order.all.each { |o| o.user.name }", "concept" => "n_plus_one", "pitched_at" => "senior" },
       "design_comparison" => { "title" => "Rates", "scenario" => "A rates file read nightly.", "question" => "Which would you ship?",
-                               "piece_a" => "a", "piece_b" => "b", "concept" => "information_hiding", "answer_key" => "b, because the format is hidden" },
+                               "piece_a" => "a", "piece_b" => "b", "concept" => "information_hiding", "answer_key" => { "better" => "b", "deciding_fact" => "The rates file format changes every quarter.", "principle" => "information_hiding", "why_other_fails" => "A spreads the format across every caller." } },
       "pattern" => { "title" => "Memoize", "question" => "When would you cache this?", "concept" => "memoization" },
       "parsons_problem" => { "title" => "Order", "question" => "Put these in order.", "blocks" => %w[a b c], "concept" => "guard_clauses", "pitched_at" => "junior" }
     })
   end
   let(:response) do
     DailyResponse.new(daily_exercise: exercise,
-      answers: { "code_review" => long, "design_comparison" => "choice:b\nThe rates file format changes, and B hides it behind one reader.",
+      answers: { "code_review" => long, "design_comparison" => ExerciseSection::DesignComparison.encode_answer("b", "The rates file format changes, and B hides it behind one reader."),
                  "pattern" => long, "parsons_problem" => "order:0,2,1" },
       section_ratings: { "code_review" => "right_level", "pattern" => "too_easy", "parsons_problem" => "too_hard" })
   end

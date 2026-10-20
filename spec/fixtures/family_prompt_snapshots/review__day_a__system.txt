@@ -44,8 +44,11 @@ Piece A:
 a
 Piece B:
 b
-Answer key (hidden from the engineer, known here for grading): the better piece is . Deciding fact:  Principle:  Why the other piece fails: 
-Their answer: (skipped)
+Answer key (hidden from the engineer, known here for grading): the better piece is B. Deciding fact: The rates file format changes every quarter. Principle: information_hiding Why the other piece fails: A spreads the format across every caller.
+Picked: B. Reason:
+<engineer_text>
+The rates file format changes, and B hides it behind one reader.
+</engineer_text>
 Their self-rating: (none given)
 
 Pattern question (Memoize): When would you cache this?
