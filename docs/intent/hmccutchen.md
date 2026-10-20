@@ -51,3 +51,4 @@
 
 - concept reference and its reframe into `ConceptReferencePrompt` `#453`
 - recognition guide into `RecognitionGuidePrompt` `#454`
+- section explain-differently into `ExplainDifferentlyPrompt` `#455`
