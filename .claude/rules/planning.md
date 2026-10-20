@@ -1,13 +1,13 @@
 ---
 paths:
-  - "app/services/{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,reviewed_section_results,weighted_roll}.rb"
+  - "app/services/{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,reviewed_section_results,weighted_roll,generation_ladders}.rb"
   - "app/services/{competency_gate,coverage_exception}/**"
   - "app/models/{concept_mastery,kind_preferences,kind_difficulty,concept_drills,concept_hosts,ladder_coverage,exercise_history_entry,user,daily_exercise}.rb"
   - "app/controllers/{concept_drills,accounts,profile,api_keys}_controller.rb"
   - "app/controllers/concerns/exercise_mix_ladders.rb"
   - "app/views/api_keys/**"
   - "app/javascript/controllers/exercise_mix_controller.js"
-  - "spec/**/*{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,concept_mastery,kind_preferences,kind_difficulty,concept_drills,accounts,user_spec,exercise_mix}*"
+  - "spec/**/*{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,concept_mastery,kind_preferences,kind_difficulty,concept_drills,accounts,user_spec,exercise_mix,generation_ladders}*"
   - "app/controllers/dashboard_controller.rb"
   - "app/views/dashboard/**"
   - "app/jobs/{generate_daily_exercises_job,regenerate_exercise_job}.rb"

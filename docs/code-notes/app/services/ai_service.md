@@ -284,11 +284,6 @@ and the source-history identity keyed on its path and name.
 Uses the day's language, not `cm.language`: `ConceptVocabulary::LANGUAGES`'
 "architecture" entry would report false hosts.
 
-## `#ladders_for`
-
-Merging by concept name is safe because a day's buckets never share a concept
-(`concept_reference_spec` holds that).
-
 ## Review day context (`sections = keys.map`)
 
 "rounds" goes to every key so the assembler needn't branch on which kind reads

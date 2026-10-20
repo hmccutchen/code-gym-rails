@@ -35,7 +35,7 @@ class ForcedConceptDrafts
   def draft(service, user, rung:)
     language = user.language_for_today
     service.singleton_class.prepend(@prompt_override) unless service.singleton_class.include?(@prompt_override)
-    service.send(:retry_section, user, language, prompt_draft(service, user, language, rung), KIND, @concept)
+    service.send(:retry_section, user, language, prompt_draft(user, language, rung), KIND, @concept)
   end
 
   private
@@ -58,12 +58,12 @@ class ForcedConceptDrafts
   end
 
   # Today's plan for this user, with this one kind targeted and locked so the prompt pitches it exactly at the rung asked for.
-  def prompt_draft(service, user, language, rung)
+  def prompt_draft(user, language, rung)
     plan       = DailyPlan.for(user, language: language)
     difficulty = KindDifficulty.new(levels: { KIND.key => rung }, locked: [ KIND.key ])
     kinds      = plan.kinds
-    ladders    = service.send(:ladders_for, difficulty.rungs_for(kinds, skill_level: user.skill_level), language,
-                              plan.code_review_mode)
+    ladders    = GenerationLadders.for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language,
+                                       plan.code_review_mode)
     history    = user.recent_performance
 
     AiService.const_get(:Draft).new(problem_set: {}, plan: plan, kinds: kinds, difficulty: difficulty, ladders: ladders,
