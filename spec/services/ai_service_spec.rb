@@ -3522,16 +3522,6 @@ RSpec.describe AiService do
         expect(svc.last_prompt).to include("sort then walk", "Ruby/Rails")
         expect(svc.last_prompt).to include("never for filling gaps")
       end
-
-      it "forbids every form of silent correction in its system prompt" do
-        system_prompt = AiService::PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT
-
-        expect(system_prompt).to match(/omits an edge case, the code omits it too/i)
-        expect(system_prompt).to match(/implement the wrong thing/i)
-        expect(system_prompt).to match(/do not add error handling/i)
-        expect(system_prompt).to match(/do not add comments/i)
-        expect(system_prompt).to match(/syntactically valid/i)
-      end
     end
 
     it "budgets enough tokens for the largest critique its own schema permits" do

@@ -14,9 +14,8 @@ These are settled decisions, not defaults that drifted into place. CLAUDE.md
 says what a deviation from one requires.
 
 - **Template method for providers** — `AiService` owns provider orchestration,
-  parsing and usage logging, and every prompt but the generation prompt, whose
-  text it delegates to `GenerationPrompt` through its private
-  `#generation_prompt` factory. `AiService#call(request)` is the template: it
+  parsing and usage logging, and the prompts not yet moved to a prompt class.
+  `AiService#call(request)` is the template: it
   posts the body with the request's timeout and retry context, raises on a
   failed status, parses the reply and maps a Faraday error the same way for
   every provider. Subclasses implement `request_body`, `read_result`,
@@ -28,6 +27,21 @@ says what a deviation from one requires.
   the closed registry used by dispatch, key detection and user validation.
   Each subclass owns its `provider_key`, `key_pattern` and any environment
   restriction.
+- **One class per prompt family** — prompt text moves out of `AiService` one
+  family at a time (#431), into a class at `app/services/*_prompt.rb`; those
+  files are the list of moved families, so no doc repeats it. A prompt class
+  is pure: it takes values, never a record, a user or a database read, and
+  returns the per-call keywords `AiService.request_for` takes (`system:` and
+  `prompt:`, plus `history:` or `response_schema:` when the family has them).
+  It holds its family's text and nothing else: settings stay in
+  `CALL_PROFILES`, and the call, the reply checks and the logging stay in
+  `AiService`. A family built in two stages gets one method per stage, such
+  as the review's day-level system prompt and its per-section prompt. Text
+  several families share is read from where it lives, never copied. Each
+  moved family's rendered text is pinned by `expect_prompt_snapshot`,
+  recorded against the code before the move. `PseudocodePrompt` is the model;
+  `GenerationPrompt` predates it, rendering from an instance, and its system
+  prompt is still `AiService#build_system_prompt`.
 - **One request value per provider call** — every provider call carries one
   `AiService::Request`: the purpose, the per-call values (system, prompt,
   history, response schema) and the settings (token cap, read timeout,
@@ -74,8 +88,8 @@ says what a deviation from one requires.
   takes them as a `Provider` struct of callables, with a `providers:` factory
   that returns a fresh one for each thread (`JudgedGeneration::Provider`,
   `ReviewGrading::Provider`, built by `AiService#judged_generation_provider`
-  and `#review_grading_provider`). `AiService` keeps the calls and builds the prompts, the
-  generation prompt through `GenerationPrompt`;
+  and `#review_grading_provider`). `AiService` keeps the calls and builds the prompts, or
+  takes them from a prompt class;
   the module keeps the orchestration and the policy, and its specs drive it
   with lambdas. Threads start through `CallerZoneThread.start`, and
   `spec/conventions/app_source_spec.rb` fails on any other `Thread.new` and on
