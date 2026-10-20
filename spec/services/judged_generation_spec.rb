@@ -110,7 +110,7 @@ RSpec.describe JudgedGeneration do
     kinds.each { |kind| verdicts[kind.key] = [ reject ] }
     allow(Rails.logger).to receive(:warn)
 
-    expect { run }.to raise_error(AiService::AllSectionsRejectedError)
+    expect { run }.to raise_error(ProviderError::AllSectionsRejectedError)
     expect(finished).to be_empty
     expect(Rails.logger).to have_received(:warn).with(/\[judge_all_rejected\] user=42/)
   end
@@ -162,7 +162,7 @@ RSpec.describe JudgedGeneration do
 
   it "drops a section whose retry the deadline stopped and lands the kept ones" do
     verdicts["pattern"] = [ reject, { "status" => "keep" } ]
-    retried_sections["pattern"] = AiService::DeadlineError.new("retry_section")
+    retried_sections["pattern"] = ProviderError::DeadlineError.new("retry_section")
 
     judged = run
 
@@ -183,7 +183,7 @@ RSpec.describe JudgedGeneration do
 
   it "drops a section whose retry fails, logging it instead of raising" do
     verdicts["challenge"] = [ reject ]
-    retried_sections["challenge"] = AiService::RateLimitError.new("slow down")
+    retried_sections["challenge"] = ProviderError::RateLimitError.new("slow down")
     allow(Rails.logger).to receive(:warn)
 
     judged = run
@@ -194,9 +194,9 @@ RSpec.describe JudgedGeneration do
   end
 
   it "keeps the draft and records the reason when the judge cannot answer" do
-    verdicts["code_review"] = [ AiService::TimeoutError.new("slow") ]
+    verdicts["code_review"] = [ ProviderError::TimeoutError.new("slow") ]
     verdicts["pattern"]     = [ JudgeVerdict::Invalid.new("bad") ]
-    verdicts["challenge"]   = [ AiService::RateLimitError.new("busy") ]
+    verdicts["challenge"]   = [ ProviderError::RateLimitError.new("busy") ]
     allow(Rails.logger).to receive(:warn)
 
     judged = run
@@ -208,7 +208,7 @@ RSpec.describe JudgedGeneration do
   end
 
   it "records a truncated judge reply under the reason the review judge uses" do
-    verdicts["code_review"] = [ AiService::TruncatedResponseError.new("cut off") ]
+    verdicts["code_review"] = [ ProviderError::TruncatedResponseError.new("cut off") ]
     allow(Rails.logger).to receive(:warn)
 
     expect(run.outcomes["code_review"][:fallback]).to eq("truncated")
@@ -290,7 +290,7 @@ RSpec.describe JudgedGeneration do
 
     it "lists a re-judge fallback's fields in the same order" do
       allow(Rails.logger).to receive(:warn)
-      outcome = outcome_for(reject, AiService::TimeoutError.new("slow"))
+      outcome = outcome_for(reject, ProviderError::TimeoutError.new("slow"))
 
       expect(outcome.keys).to eq(%i[status issues principle retries dropped fallback latency_ms evidence reason
                                     retry_principle retry_issues retry_evidence retry_reason])
@@ -303,7 +303,7 @@ RSpec.describe JudgedGeneration do
 
     it "drops a retry whose re-judge the deadline stopped, and starts no further retry" do
       allow(Rails.logger).to receive(:warn)
-      outcome = outcome_for(reject, AiService::DeadlineError.new("judge_section"))
+      outcome = outcome_for(reject, ProviderError::DeadlineError.new("judge_section"))
 
       expect(retry_calls.size).to eq(1)
       expect(outcome.keys).to eq(%i[status issues principle retries dropped fallback latency_ms evidence reason
@@ -317,7 +317,7 @@ RSpec.describe JudgedGeneration do
 
     it "lists a failed retry's fields in the same order" do
       allow(Rails.logger).to receive(:warn)
-      retried_sections["pattern"] = AiService::RateLimitError.new("slow down")
+      retried_sections["pattern"] = ProviderError::RateLimitError.new("slow down")
       outcome = outcome_for(reject)
 
       expect(outcome.keys).to eq(%i[status issues principle retries dropped fallback latency_ms evidence reason
@@ -446,7 +446,7 @@ RSpec.describe JudgedGeneration do
       end
 
       it "ships the unedited draft when the second judgment cannot answer" do
-        verdicts["design_comparison"] = [ edit_verdict, AiService::TimeoutError.new("slow") ]
+        verdicts["design_comparison"] = [ edit_verdict, ProviderError::TimeoutError.new("slow") ]
 
         judged = run
 

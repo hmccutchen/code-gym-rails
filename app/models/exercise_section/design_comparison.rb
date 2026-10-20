@@ -117,7 +117,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
       unusable = PROVIDER_KEY_FIELDS.reject { |field| key.is_a?(Hash) && usable_text?(key[field]) }
       return if unusable.empty?
 
-      raise AiService::InvalidResponseError, "Design comparison answer key has no usable #{unusable.join(', ')}"
+      raise ProviderError::InvalidResponseError, "Design comparison answer key has no usable #{unusable.join(', ')}"
     end
 
     def arrange!(section)
@@ -206,10 +206,10 @@ class ExerciseSection::DesignComparison < ExerciseSection
     private
 
     def reject_unusable_piece!(field, piece)
-      raise AiService::InvalidResponseError, "Design comparison returned no usable #{field}" unless usable_text?(piece)
+      raise ProviderError::InvalidResponseError, "Design comparison returned no usable #{field}" unless usable_text?(piece)
       return if piece.lines.count { |line| line.strip.present? } <= MAX_PIECE_LINES
 
-      raise AiService::InvalidResponseError, "Design comparison #{field} runs past #{MAX_PIECE_LINES} lines"
+      raise ProviderError::InvalidResponseError, "Design comparison #{field} runs past #{MAX_PIECE_LINES} lines"
     end
 
     def usable_text?(value)

@@ -168,7 +168,7 @@ class ModelComparison
     FileUtils.mkdir_p(path.dirname)
     path.write(JSON.pretty_generate(section))
     { name: path.relative_path_from(Rails.root).to_s, rung: rung, section: section }
-  rescue AiService::Error => e
+  rescue ProviderError => e
     { name: path.relative_path_from(Rails.root).to_s, rung: rung, error: "#{e.class}: #{e.message}" }
   end
 
@@ -194,7 +194,7 @@ class ModelComparison
               matched: verdict.solve && kind.solve_matches_key?(draft[:section], verdict.solve))
   rescue JudgeVerdict::Invalid => e
     row.merge(status: :invalid, detail: "#{e.class}: #{e.message}", matched: nil)
-  rescue AiService::Error => e
+  rescue ProviderError => e
     row.merge(status: :error, detail: "#{e.class}: #{e.message}", matched: nil)
   end
 
@@ -229,7 +229,7 @@ class ModelComparison
     )
     fields = VERDICT_FIELDS.index_with { |field| verdict.public_send(field) }
     verdict.solve ? fields.merge("solve" => kind.solve_matches_key?(section, verdict.solve) ? "match" : "mismatch") : fields
-  rescue JudgeVerdict::Invalid, AiService::Error => e
+  rescue JudgeVerdict::Invalid, ProviderError => e
     "#{e.class}: #{e.message}"
   end
 
@@ -248,7 +248,7 @@ class ModelComparison
   def drafted_solve_outcome(result)
     return { status: result["status"], matched: result.key?("solve") ? result["solve"] == "match" : nil } if result.is_a?(Hash)
 
-    invalid = result.start_with?(JudgeVerdict::Invalid.name, AiService::InvalidResponseError.name)
+    invalid = result.start_with?(JudgeVerdict::Invalid.name, ProviderError::InvalidResponseError.name)
     { status: invalid ? :invalid : :error, matched: nil }
   end
 
@@ -332,7 +332,7 @@ class ModelComparison
                                                     rung: fixture["rung"], locked: fixture["locked"]))
     rescue JudgeVerdict::Invalid => e
       fixture_failure(fixture, :invalid, e)
-    rescue AiService::Error => e
+    rescue ProviderError => e
       fixture_failure(fixture, :error, e)
     end
 
@@ -381,7 +381,7 @@ class ModelComparison
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     output  = begin
       yield service
-    rescue AiService::Error, JSON::ParserError => e
+    rescue ProviderError, JSON::ParserError => e
       "#{e.class}: #{e.message}"
     end
 
@@ -455,9 +455,9 @@ class ModelComparison
   def prose_outcome
     verdict = yield
     [ verdict.status, verdict, nil ]
-  rescue ReviewProseVerdict::Invalid, AiService::InvalidResponseError => e
+  rescue ReviewProseVerdict::Invalid, ProviderError::InvalidResponseError => e
     [ :invalid, nil, "#{e.class}: #{e.message}" ]
-  rescue AiService::Error => e
+  rescue ProviderError => e
     [ :error, nil, "#{e.class}: #{e.message}" ]
   end
 

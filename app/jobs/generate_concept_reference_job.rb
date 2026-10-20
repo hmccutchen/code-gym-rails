@@ -38,7 +38,7 @@ class GenerateConceptReferenceJob < ApplicationJob
     raise if e.is_a?(ActiveRecord::RecordInvalid) && e.record.errors[:concept].blank?
 
     Rails.logger.info("Skipped duplicate concept reference for #{concept}/#{language}")
-  rescue AiService::Error => e
+  rescue ProviderError => e
     # Noted per user because the row is shared; an error raised after the call has no provider stamp of its own.
     e.provider ||= user&.provider
     ConceptReferenceFailures.record(user_id: user_id, concept: concept, language: language, error: e)

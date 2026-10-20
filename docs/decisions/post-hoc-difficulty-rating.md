@@ -34,7 +34,7 @@ without it — so the note can add at most that grace period to a request,
 never the provider's whole retry budget; a thread abandoned that way still
 records its `ApiUsage` row, which is honest accounting for a call the
 provider already billed. Any failure in it is swallowed — `StandardError`
-wide, not just `AiService::Error`, because `Thread#value` re-raises past
+wide, not just `ProviderError`, because `Thread#value` re-raises past
 `ResponseReview#call`'s rescues, and a note must never cost the
 engineer the review itself. Stored at
 `ai_review[section]["difficulty"]` — no migration, and no pre-answer surface

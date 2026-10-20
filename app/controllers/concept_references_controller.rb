@@ -31,7 +31,7 @@ class ConceptReferencesController < ApplicationController
   rescue ActiveRecord::RecordNotFound
     # A JSON body because the client calls res.json() before checking res.ok.
     render_json_error(t("errors.concept_references.reference_missing"), status: :not_found)
-  rescue AiService::Error => e
+  rescue ProviderError => e
     render_provider_failure(e, :alternate)
   end
 

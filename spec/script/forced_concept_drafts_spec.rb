@@ -185,14 +185,14 @@ RSpec.describe ForcedConceptDrafts do
     calls = 0
     allow_any_instance_of(AiService).to receive(:retry_section).and_wrap_original do |original, *args|
       calls += 1
-      raise AiService::RateLimitError, "slow down" if calls == 1
+      raise ProviderError::RateLimitError, "slow down" if calls == 1
 
       original.call(*args)
     end
 
     ModelComparison.new(api_key: "sk-ant-runner", out: out).judge_concept(user.id, concept, per_rung: 1)
 
-    expect(out.string.scan(/status=error AiService::RateLimitError: slow down/).size)
+    expect(out.string.scan(/status=error ProviderError::RateLimitError: slow down/).size)
       .to eq(ModelComparison::CANDIDATES.fetch("judge").size)
     expect(out.string.scan(/status=keep/).size).to eq((KindDifficulty::LEVELS.size - 1) * ModelComparison::CANDIDATES.fetch("judge").size)
   end

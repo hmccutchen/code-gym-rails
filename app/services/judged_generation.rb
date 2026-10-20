@@ -54,7 +54,7 @@ class JudgedGeneration
     return if ExerciseSection.resolved_keys(set, daily: @draft.plan.daily_kinds).any?
 
     Rails.logger.warn("[judge_all_rejected] user=#{@user.id} dropped=#{dropped.join(',')}")
-    raise AiService::AllSectionsRejectedError
+    raise ProviderError::AllSectionsRejectedError
   end
 
   def finish(set, dropped, outcomes)
@@ -156,7 +156,7 @@ class JudgedGeneration
   end
 
   def unjudged_retry(retried, outcome)
-    return [ *drop(outcome), true ] if outcome[:fallback] == AiService::DeadlineError::FALLBACK_REASON
+    return [ *drop(outcome), true ] if outcome[:fallback] == ProviderError::DeadlineError::FALLBACK_REASON
 
     [ retried, outcome.merge(status: :keep), true ]
   end
@@ -200,7 +200,7 @@ class JudgedGeneration
       @user, kind, section, rung: rung_for(kind), locked: @draft.difficulty.locked?(kind)
     )
     [ verdict, elapsed_ms(started) ]
-  rescue JudgeVerdict::Invalid, AiService::Error, *AiService::INFRASTRUCTURE_ERRORS => e
+  rescue JudgeVerdict::Invalid, ProviderError, *AiService::INFRASTRUCTURE_ERRORS => e
     reason = AiService.judge_fallback_reason(e)
     Rails.logger.warn("[judge_fallback] user=#{@user.id} section=#{kind.key} reason=#{reason}#{fallback_detail(kind, e)}")
     [ reason, elapsed_ms(started) ]
@@ -212,7 +212,7 @@ class JudgedGeneration
 
   def retry_section(kind, concept)
     @providers.call.retry_section.call(@user, @language, @draft, kind, concept)
-  rescue AiService::Error, *AiService::INFRASTRUCTURE_ERRORS => e
+  rescue ProviderError, *AiService::INFRASTRUCTURE_ERRORS => e
     Rails.logger.warn("[judge_retry_failed] user=#{@user.id} section=#{kind.key}: #{e.message}")
     nil
   end

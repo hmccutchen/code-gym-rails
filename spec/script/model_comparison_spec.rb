@@ -150,12 +150,12 @@ end
   end
 
   it "prints a provider failure in place of that model's output rather than stopping" do
-    allow_any_instance_of(ClaudeService).to receive(:call).and_raise(AiService::RateLimitError, "slow down")
+    allow_any_instance_of(ClaudeService).to receive(:call).and_raise(ProviderError::RateLimitError, "slow down")
     exercise = create_exercise
 
     comparison.duck(exercise.id, section: "code_review")
 
-    expect(out.string.scan("AiService::RateLimitError: slow down").size).to eq(2)
+    expect(out.string.scan("ProviderError::RateLimitError: slow down").size).to eq(2)
   end
 
   it "drafts once, judges every section with each candidate, and prints a verdict block per section" do
@@ -198,7 +198,7 @@ end
   it "judge_fixtures prints a provider failure as that fixture's row and finishes every table" do
     failing = JSON.parse(File.read(Rails.root.join("spec/fixtures/judge/thread_prerequisite.json")))["section"]
     allow_any_instance_of(ClaudeService).to receive(:judge_section) do |_service, _user, _kind, section, **|
-      raise AiService::RateLimitError, "slow down" if section == failing
+      raise ProviderError::RateLimitError, "slow down" if section == failing
 
       JudgeVerdict.new(status: :keep)
     end
@@ -206,7 +206,7 @@ end
     comparison.judge_fixtures
 
     ModelComparison::CANDIDATES.fetch("judge").each { |route| expect(out.string).to include("=== judge_fixtures: #{route[:model]} ===") }
-    expect(out.string.scan(/^thread_prerequisite: .*got=error .*AiService::RateLimitError: slow down/).size)
+    expect(out.string.scan(/^thread_prerequisite: .*got=error .*ProviderError::RateLimitError: slow down/).size)
       .to eq(ModelComparison::CANDIDATES.fetch("judge").size)
     fixture_count = Dir[Rails.root.join("spec/fixtures/judge/*.json")].size
     expect(out.string).to include("valid: #{fixture_count - 1}/#{fixture_count}")
@@ -370,8 +370,8 @@ end
         .and include("[0, 1] now: One query per row.")
         .and include("was[1]: Each row runs its own query.")
         .and include("issues: verbosity: \"Each row runs its own query.\"")
-        .and include("AiService::InvalidResponseError")
-        .and include("AiService::Error")
+        .and include("ProviderError::InvalidResponseError")
+        .and include("ProviderError: ")
       expect(out.string).to match(%r{edits: 1/2 \(plain_language_violation 0/2, verbosity 1/2\) · merges: 1 · invalid: 1/4 · provider errors: 1/4 · \d+ms})
       expect(out.string).to match(%r{edits: 0/4 \(plain_language_violation 0/4, verbosity 0/4\) · merges: 0 · invalid: 0/4 · provider errors: 0/4})
       expect(out.string).to include("$")

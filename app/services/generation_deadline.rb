@@ -10,7 +10,7 @@ class GenerationDeadline
   def ensure_fits!(request)
     return if @ends_at.nil? || @clock.call + request.worst_case_seconds <= @ends_at
 
-    raise AiService::DeadlineError, request.purpose
+    raise ProviderError::DeadlineError, request.purpose
   end
 
   def leaving(seconds)

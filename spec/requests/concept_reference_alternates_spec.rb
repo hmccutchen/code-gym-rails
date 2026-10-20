@@ -123,7 +123,7 @@ RSpec.describe "Concept reference alternate framings", type: :request do
     fake = instance_double(ClaudeService)
     allow(AiService).to receive(:for).and_return(fake)
     allow(fake).to receive(:explain_concept_differently)
-      .and_raise(AiService::RateLimitError, "slow down")
+      .and_raise(ProviderError::RateLimitError, "slow down")
     login_as(user)
 
     post_alternate

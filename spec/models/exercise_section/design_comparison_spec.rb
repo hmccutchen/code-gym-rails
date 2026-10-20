@@ -39,7 +39,7 @@ RSpec.describe ExerciseSection::DesignComparison do
     it "refuses a missing, blank or non-string piece" do
       [ nil, "  ", 42 ].each do |value|
         expect { described_class.reject_unusable!(provider_section("other_piece" => value)) }
-          .to raise_error(AiService::InvalidResponseError, /other_piece/)
+          .to raise_error(ProviderError::InvalidResponseError, /other_piece/)
       end
     end
 
@@ -49,7 +49,7 @@ RSpec.describe ExerciseSection::DesignComparison do
 
       expect { described_class.reject_unusable!(provider_section("better_piece" => at_bound)) }.not_to raise_error
       expect { described_class.reject_unusable!(provider_section("better_piece" => past)) }
-        .to raise_error(AiService::InvalidResponseError, /#{described_class::MAX_PIECE_LINES} lines/)
+        .to raise_error(ProviderError::InvalidResponseError, /#{described_class::MAX_PIECE_LINES} lines/)
     end
 
     it "refuses an answer key with any field missing, blank or not a string" do
@@ -58,14 +58,14 @@ RSpec.describe ExerciseSection::DesignComparison do
           section = provider_section
           section["answer_key"] = section["answer_key"].merge(field => value)
 
-          expect { described_class.reject_unusable!(section) }.to raise_error(AiService::InvalidResponseError, /#{field}/)
+          expect { described_class.reject_unusable!(section) }.to raise_error(ProviderError::InvalidResponseError, /#{field}/)
         end
       end
     end
 
     it "refuses an answer key that is not an object" do
       expect { described_class.reject_unusable!(provider_section("answer_key" => "b")) }
-        .to raise_error(AiService::InvalidResponseError)
+        .to raise_error(ProviderError::InvalidResponseError)
     end
   end
 

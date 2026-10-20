@@ -135,7 +135,7 @@ class ExerciseSection
     def arrange!(section)
     end
 
-    # Raises AiService::InvalidResponseError for an unusable section; ingest then leaves out only that section.
+    # Raises ProviderError::InvalidResponseError for an unusable section; ingest then leaves out only that section.
     def reject_unusable!(section)
     end
 

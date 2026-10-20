@@ -27,7 +27,7 @@ RSpec.describe "Gemini truncation through AiService" do
     expect {
       expect {
         service.send(:call_and_log, user, AiService::Request.build(purpose: "explain_differently", system: "s", prompt: "p", max_tokens: 60))
-      }.to raise_error(AiService::TruncatedResponseError, /did not finish its reply/)
+      }.to raise_error(ProviderError::TruncatedResponseError, /did not finish its reply/)
     }.to change { ApiUsage.where(purpose: "explain_differently", model: GeminiService::DEFAULT_ROUTE[:model]).count }.by(1)
 
     expect(ApiUsage.last).to have_attributes(tokens_in: 21, tokens_out: 56)
@@ -44,7 +44,7 @@ RSpec.describe "Gemini truncation through AiService" do
 
         expect {
           expect { logged_call(allow_truncated: true) }
-            .to raise_error(AiService::Error, "Gemini did not complete its response. Try again.")
+            .to raise_error(ProviderError, "Gemini did not complete its response. Try again.")
         }.to change { ApiUsage.where(purpose: "duck_thread", failure: "provider_error").count }.by(1)
 
         expect(ApiUsage.last).to have_attributes(tokens_in: 21, tokens_out: 56)
@@ -55,7 +55,7 @@ RSpec.describe "Gemini truncation through AiService" do
       reply_with(status: "cancelled", text: "")
       allow(Rails.logger).to receive(:warn)
 
-      expect { logged_call }.to raise_error(AiService::Error) { |error| expect(error.provider).to eq("gemini") }
+      expect { logged_call }.to raise_error(ProviderError) { |error| expect(error.provider).to eq("gemini") }
       expect(Rails.logger).to have_received(:warn).with('Gemini reply did not finish (status="cancelled")')
     end
 
@@ -83,7 +83,7 @@ RSpec.describe "Gemini truncation through AiService" do
       reply_with(status: "incomplete", text: "", output_tokens: 0)
 
       expect { service.duck_response(user, exercise, section: "code_review", message: "Where do I start?") }
-        .to raise_error(AiService::InvalidResponseError, /empty duck response/)
+        .to raise_error(ProviderError::InvalidResponseError, /empty duck response/)
     end
 
     it "returns a completed reply unchanged" do

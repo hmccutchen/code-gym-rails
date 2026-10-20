@@ -29,7 +29,7 @@ class ResponseReview
     review(missing_sections)
   rescue ActiveRecord::RecordNotFound
     Outcome.of(:set_cleared)
-  rescue AiService::Error => e
+  rescue ProviderError => e
     release_and(Outcome.of(:provider_error, error: e))
   rescue StandardError
     @response.release_reviewing!(@claim) if @claim

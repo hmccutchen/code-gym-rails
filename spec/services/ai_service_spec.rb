@@ -135,7 +135,7 @@ RSpec.describe AiService do
       def call(request)
         text =
           if request.system.include?("rating how hard")
-            raise AiService::RateLimitError, "rate limited" if @difficulty == :raise
+            raise ProviderError::RateLimitError, "rate limited" if @difficulty == :raise
 
             @difficulty.to_json
           else
@@ -281,7 +281,7 @@ RSpec.describe AiService do
 
     it "writes one zero-token row for a failed call and re-raises the same error" do
       svc = double_class.new
-      error = AiService::RateLimitError.new("Gemini API error 429", http_status: 429, quota_id: "GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+      error = ProviderError::RateLimitError.new("Gemini API error 429", http_status: 429, quota_id: "GenerateRequestsPerDayPerProjectPerModel-FreeTier")
       allow(svc).to receive(:call).and_raise(error)
 
       expect {
@@ -295,12 +295,12 @@ RSpec.describe AiService do
       expect(error.provider).to eq(double_class.provider_key)
     end
 
-    { AiService::AuthenticationError.new("x", http_status: 401) => "authentication",
-      AiService::BillingError.new("x", http_status: 402)        => "out_of_credit",
-      AiService::TimeoutError.new("x")                          => "timeout",
-      AiService::NetworkError.new("x")                          => "network",
-      AiService::InvalidResponseError.new("x")                  => "invalid_response",
-      AiService::Error.new("x", http_status: 503)               => "provider_error" }.each do |error, code|
+    { ProviderError::AuthenticationError.new("x", http_status: 401) => "authentication",
+      ProviderError::BillingError.new("x", http_status: 402)        => "out_of_credit",
+      ProviderError::TimeoutError.new("x")                          => "timeout",
+      ProviderError::NetworkError.new("x")                          => "network",
+      ProviderError::InvalidResponseError.new("x")                  => "invalid_response",
+      ProviderError.new("x", http_status: 503)               => "provider_error" }.each do |error, code|
       it "records #{error.class.name.demodulize} as #{code}" do
         svc = double_class.new
         allow(svc).to receive(:call).and_raise(error)
@@ -314,21 +314,21 @@ RSpec.describe AiService do
       allow(double_class).to receive(:provider_key).and_return("claude")
       svc = double_class.new
       allow(svc).to receive(:call).and_return(text: nil, input_tokens: 700, output_tokens: 0, truncated: false, refusal: "cyber")
-      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(AiService::RefusalError) { |e| expect(e.provider).to eq("claude") }
+      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(ProviderError::RefusalError) { |e| expect(e.provider).to eq("claude") }
       expect(ApiUsage.last).to have_attributes(failure: "refusal", tokens_in: 700)
 
       allow(svc).to receive(:call).and_return(text: "{", input_tokens: 10, output_tokens: 400, truncated: true)
-      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(AiService::TruncatedResponseError) { |e| expect(e.provider).to eq("claude") }
+      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(ProviderError::TruncatedResponseError) { |e| expect(e.provider).to eq("claude") }
       expect(ApiUsage.last).to have_attributes(failure: "truncated", tokens_out: 400)
     end
 
     it "lets a failed usage write change nothing about the error the caller sees" do
       svc = double_class.new
-      allow(svc).to receive(:call).and_raise(AiService::TimeoutError, "slow")
+      allow(svc).to receive(:call).and_raise(ProviderError::TimeoutError, "slow")
       allow(ApiUsage).to receive(:create!).and_raise(ActiveRecord::StatementInvalid, "table gone")
       allow(Rails.logger).to receive(:warn)
 
-      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(AiService::TimeoutError, "slow")
+      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(ProviderError::TimeoutError, "slow")
     end
   end
 
@@ -337,7 +337,7 @@ RSpec.describe AiService do
       svc = double_class.new(input_tokens: 900, output_tokens: 8_000, truncated: true)
 
       expect {
-        expect { svc.generate_exercise(user) }.to raise_error(AiService::TruncatedResponseError)
+        expect { svc.generate_exercise(user) }.to raise_error(ProviderError::TruncatedResponseError)
       }.to change { ApiUsage.where(purpose: "generate_exercise").count }.by(1)
 
       usage = ApiUsage.last
@@ -350,7 +350,7 @@ RSpec.describe AiService do
       allow(svc).to receive(:call).and_return(text: nil, input_tokens: 700, output_tokens: 0, truncated: false, refusal: "cyber")
 
       expect {
-        expect { svc.generate_exercise(user) }.to raise_error(AiService::RefusalError, /cyber/)
+        expect { svc.generate_exercise(user) }.to raise_error(ProviderError::RefusalError, /cyber/)
       }.to change { ApiUsage.where(purpose: "generate_exercise").count }.by(1)
 
       expect(ApiUsage.last.tokens_in).to eq(700)
@@ -361,7 +361,7 @@ RSpec.describe AiService do
 
       expect {
         svc.generate_exercise(user)
-      }.to raise_error(AiService::TruncatedResponseError, /did not finish its reply \(\d+ output tokens, thinking included\)/i)
+      }.to raise_error(ProviderError::TruncatedResponseError, /did not finish its reply \(\d+ output tokens, thinking included\)/i)
     end
 
     it "records usage before raising on a prose entry point too" do
@@ -372,7 +372,7 @@ RSpec.describe AiService do
       expect {
         expect {
           svc.explain_differently(user, exercise, resp, section: "code_review", prior_alternates: [])
-        }.to raise_error(AiService::TruncatedResponseError)
+        }.to raise_error(ProviderError::TruncatedResponseError)
       }.to change { ApiUsage.where(purpose: "explain_differently").count }.by(1)
     end
 
@@ -406,7 +406,7 @@ RSpec.describe AiService do
 
       expect {
         svc.explain_differently(user, exercise, resp, section: "code_review", prior_alternates: [])
-      }.to raise_error(AiService::TruncatedResponseError)
+      }.to raise_error(ProviderError::TruncatedResponseError)
     end
 
     it "lets an error that is not a database failure escape usage logging" do
@@ -495,7 +495,7 @@ RSpec.describe AiService do
 
     it "raises instead of silently falling back on an unsupported language" do
       expect { service.send(:build_system_prompt, "mixed") }
-        .to raise_error(AiService::Error, /Unsupported generation language/)
+        .to raise_error(ProviderError, /Unsupported generation language/)
     end
   end
 
@@ -1961,7 +1961,7 @@ RSpec.describe AiService do
         "ambiguity_hunt" => { "request" => "vague", "planted_ambiguities" => [] }
       }.to_json)
 
-      expect { svc.generate_exercise(user) }.to raise_error(AiService::InvalidResponseError)
+      expect { svc.generate_exercise(user) }.to raise_error(ProviderError::InvalidResponseError)
     end
 
     it "keeps an unparseable draft out of the log and the error message" do
@@ -1969,7 +1969,7 @@ RSpec.describe AiService do
       expect(Rails.logger).not_to receive(:error).with(/Invalid JSON from provider/)
 
       expect { svc.generate_exercise(user) }
-        .to raise_error(AiService::InvalidResponseError, "Provider returned invalid JSON for the problem set")
+        .to raise_error(ProviderError::InvalidResponseError, "Provider returned invalid JSON for the problem set")
     end
 
     it "writes no suggestion when ingest rejects the set" do
@@ -1988,29 +1988,29 @@ RSpec.describe AiService do
       expect(service.send(:parse_json_response, fenced)).to eq("a" => 1)
     end
 
-    it "raises AiService::Error for invalid JSON" do
+    it "raises ProviderError for invalid JSON" do
       expect {
         service.send(:parse_json_response, "not json")
-      }.to raise_error(AiService::Error, /invalid JSON/)
+      }.to raise_error(ProviderError, /invalid JSON/)
     end
 
     it "raises the more specific InvalidResponseError subclass for invalid JSON" do
       expect {
         service.send(:parse_json_response, "not json")
-      }.to raise_error(AiService::InvalidResponseError)
+      }.to raise_error(ProviderError::InvalidResponseError)
     end
 
     it "rejects a reply that repeats a key rather than keeping the last value" do
       expect {
         service.send(:parse_json_response, '{"concept":"n_plus_one","concept":"other"}')
-      }.to raise_error(AiService::InvalidResponseError, /duplicate key/)
+      }.to raise_error(ProviderError::InvalidResponseError, /duplicate key/)
     end
 
     it "does not leak the raw provider text into the exception message" do
       huge_text = "garbage " * 200
       expect {
         service.send(:parse_json_response, huge_text)
-      }.to raise_error(AiService::Error) { |e| expect(e.message).not_to include(huge_text) }
+      }.to raise_error(ProviderError) { |e| expect(e.message).not_to include(huge_text) }
     end
 
     it "logs a truncated snippet of the raw provider text server-side" do
@@ -2021,7 +2021,7 @@ RSpec.describe AiService do
         expect(msg.length).to be < huge_text.length
       end
 
-      expect { service.send(:parse_json_response, huge_text) }.to raise_error(AiService::Error)
+      expect { service.send(:parse_json_response, huge_text) }.to raise_error(ProviderError)
     end
 
     it "scrubs an invalid byte sequence left by truncating mid-character, instead of raising" do
@@ -2032,7 +2032,7 @@ RSpec.describe AiService do
         expect(msg.valid_encoding?).to be true
       end
 
-      expect { service.send(:parse_json_response, text) }.to raise_error(AiService::Error)
+      expect { service.send(:parse_json_response, text) }.to raise_error(ProviderError)
     end
   end
 
@@ -2080,12 +2080,12 @@ RSpec.describe AiService do
   describe "#generate_exercise" do
     before { user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS) }
 
-    it "refuses an unsupported language with AiService::Error before planning, so the jobs record the failure" do
+    it "refuses an unsupported language with ProviderError before planning, so the jobs record the failure" do
       allow(DailyPlan).to receive(:for).and_call_original
       svc = double_class.new(canned_text: "{}")
 
       expect { svc.generate_exercise(user, language: "mixed") }
-        .to raise_error(AiService::Error, /Unsupported generation language/)
+        .to raise_error(ProviderError, /Unsupported generation language/)
       expect(DailyPlan).not_to have_received(:for)
     end
 
@@ -2119,7 +2119,7 @@ RSpec.describe AiService do
 
       expect {
         svc.generate_exercise(user)
-      }.to raise_error(AiService::InvalidResponseError, /Array instead of a JSON object/)
+      }.to raise_error(ProviderError::InvalidResponseError, /Array instead of a JSON object/)
     end
 
     it "logs usage and normalizes concepts from the provider's response using the resolved language" do
@@ -3202,7 +3202,7 @@ RSpec.describe AiService do
 
       expect {
         svc.explain_concept_differently(user, reference)
-      }.to raise_error(AiService::InvalidResponseError)
+      }.to raise_error(ProviderError::InvalidResponseError)
     end
   end
 
@@ -3295,7 +3295,7 @@ RSpec.describe AiService do
 
       expect {
         svc.explain_differently(user, exercise, resp, section: "code_review", prior_alternates: [])
-      }.to raise_error(AiService::InvalidResponseError)
+      }.to raise_error(ProviderError::InvalidResponseError)
     end
   end
 
@@ -3373,7 +3373,7 @@ RSpec.describe AiService do
 
       expect {
         svc.answer_follow_up(user, exercise, resp, section: "code_review", question: "Why?", thread: [])
-      }.to raise_error(AiService::InvalidResponseError)
+      }.to raise_error(ProviderError::InvalidResponseError)
     end
   end
 
@@ -3424,14 +3424,14 @@ RSpec.describe AiService do
 
       it "raises when it claims gaps and delivers none usable" do
         expect { critique_with({ gaps_found: true, gaps: [ "", "   ", 7 ] }.to_json) }
-          .to raise_error(AiService::InvalidResponseError, /claimed gaps/i)
+          .to raise_error(ProviderError::InvalidResponseError, /claimed gaps/i)
       end
 
       it "raises when gaps_found is missing or not a boolean" do
         expect { critique_with({ gaps: [ "something" ] }.to_json) }
-          .to raise_error(AiService::InvalidResponseError, /gaps_found/)
+          .to raise_error(ProviderError::InvalidResponseError, /gaps_found/)
         expect { critique_with({ gaps_found: "yes", gaps: [ "something" ] }.to_json) }
-          .to raise_error(AiService::InvalidResponseError, /gaps_found/)
+          .to raise_error(ProviderError::InvalidResponseError, /gaps_found/)
       end
 
       it "caps the points at the kind's bound" do
@@ -3457,7 +3457,7 @@ RSpec.describe AiService do
         allow(Rails.logger).to receive(:error)
 
         expect { critique_with("SENTINEL-CRITIQUE is not json") }
-          .to raise_error(AiService::InvalidResponseError) { |error| expect(error.message).not_to include("SENTINEL") }
+          .to raise_error(ProviderError::InvalidResponseError) { |error| expect(error.message).not_to include("SENTINEL") }
         expect(Rails.logger).not_to have_received(:error).with(/SENTINEL/)
       end
 
@@ -3490,12 +3490,12 @@ RSpec.describe AiService do
       end
 
       it "rejects a blank translation rather than storing it" do
-        expect { translate_with("   ") }.to raise_error(AiService::InvalidResponseError)
+        expect { translate_with("   ") }.to raise_error(ProviderError::InvalidResponseError)
       end
 
       it "rejects a runaway translation rather than cutting it into something else" do
         expect { translate_with("x" * 20_000) }
-          .to raise_error(AiService::InvalidResponseError, /too long/i)
+          .to raise_error(ProviderError::InvalidResponseError, /too long/i)
       end
 
       it "accepts a translation right at the limit" do
@@ -3506,7 +3506,7 @@ RSpec.describe AiService do
 
       it "rejects a translation that only crosses the limit once normalized" do
         expect { translate_with("\u0958" * 6_500) }
-          .to raise_error(AiService::InvalidResponseError, /too long/i)
+          .to raise_error(ProviderError::InvalidResponseError, /too long/i)
       end
 
       it "returns the same representation the grading fence will quote" do
@@ -3721,7 +3721,7 @@ RSpec.describe AiService do
 
       expect {
         svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
-      }.to raise_error(AiService::InvalidResponseError)
+      }.to raise_error(ProviderError::InvalidResponseError)
     end
 
     context "for a parsons_problem section" do
@@ -4013,8 +4013,8 @@ RSpec.describe AiService do
       expect(AiService.for(user)).to be_a(OpenaiService)
     end
 
-    it "raises AiService::Error when the user has no recognized provider" do
-      expect { AiService.for(user) }.to raise_error(AiService::Error, /no recognized AI provider/)
+    it "raises ProviderError when the user has no recognized provider" do
+      expect { AiService.for(user) }.to raise_error(ProviderError, /no recognized AI provider/)
     end
   end
 
@@ -4215,7 +4215,7 @@ RSpec.describe AiService do
           end
         end)
 
-        expect { service.generate_concept_reference(user, "n_plus_one", "ruby_rails") }.to raise_error(AiService::TimeoutError)
+        expect { service.generate_concept_reference(user, "n_plus_one", "ruby_rails") }.to raise_error(ProviderError::TimeoutError)
         expect(attempts).to eq([ [ AiService::CONCEPT_REFERENCE_READ_TIMEOUT, true ] ])
       end
     end
@@ -4231,7 +4231,7 @@ RSpec.describe AiService do
       service = double_class.new(canned_text: "[1,2,3]")
       expect {
         service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
-      }.to raise_error(AiService::InvalidResponseError)
+      }.to raise_error(ProviderError::InvalidResponseError)
     end
 
     it "raises InvalidResponseError when a required field is missing" do
@@ -4239,7 +4239,7 @@ RSpec.describe AiService do
       service = double_class.new(canned_text: partial)
       expect {
         service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
-      }.to raise_error(AiService::InvalidResponseError, /senior_lens/)
+      }.to raise_error(ProviderError::InvalidResponseError, /senior_lens/)
     end
 
     it "raises InvalidResponseError when a required field is blank" do
@@ -4247,7 +4247,7 @@ RSpec.describe AiService do
       service = double_class.new(canned_text: blank)
       expect {
         service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
-      }.to raise_error(AiService::InvalidResponseError, /senior_lens/)
+      }.to raise_error(ProviderError::InvalidResponseError, /senior_lens/)
     end
 
     AiService::CONCEPT_REFERENCE_FIELDS.each do |field|
@@ -4258,7 +4258,7 @@ RSpec.describe AiService do
 
           expect {
             service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
-          }.to raise_error(AiService::InvalidResponseError, /#{field}/)
+          }.to raise_error(ProviderError::InvalidResponseError, /#{field}/)
         end
       end
 
@@ -4283,7 +4283,7 @@ RSpec.describe AiService do
       service = double_class.new(canned_text: valid_json)
       expect {
         service.generate_concept_reference(user, "n_plus_one", "mixed")
-      }.to raise_error(AiService::Error, /Unsupported generation language/)
+      }.to raise_error(ProviderError, /Unsupported generation language/)
     end
   end
 
@@ -4321,7 +4321,7 @@ RSpec.describe AiService do
 
           expect {
             double_class.new(canned_text: payload.to_json).generate_recognition_guide(user, "code_smell")
-          }.to raise_error(AiService::InvalidResponseError, /#{field}/)
+          }.to raise_error(ProviderError::InvalidResponseError, /#{field}/)
         end
       end
     end
@@ -4646,7 +4646,7 @@ RSpec.describe AiService do
       expect {
         double_class.new(canned_text: missing_lens.to_json)
                     .generate_concept_reference(user, "n_plus_one", "ruby_rails")
-      }.to raise_error(AiService::InvalidResponseError, /senior_lens/)
+      }.to raise_error(ProviderError::InvalidResponseError, /senior_lens/)
     end
 
     it "normalizes a non-String guide value to nil" do
@@ -4897,7 +4897,7 @@ RSpec.describe AiService, "#judge_section" do
 
     expect {
       svc.judge_section(user, ExerciseSection::DesignComparison, { "concept" => "open_closed" }, rung: "senior", locked: false)
-    }.to raise_error(AiService::InvalidResponseError) { |error| expect(error.message).not_to include("better") }
+    }.to raise_error(ProviderError::InvalidResponseError) { |error| expect(error.message).not_to include("better") }
     expect(Rails.logger).not_to have_received(:error)
   end
 
@@ -4974,7 +4974,7 @@ RSpec.describe AiService, "#judge_section given a prose reply" do
 
   it "raises InvalidResponseError rather than returning a verdict" do
     expect { service.judge_section(user, ExerciseSection::CodeReview, section, rung: "senior", locked: false) }
-      .to raise_error(AiService::InvalidResponseError)
+      .to raise_error(ProviderError::InvalidResponseError)
   end
 
   it "keeps the draft and records the fallback" do
@@ -5070,9 +5070,9 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       expired = GenerationDeadline.new(start - 1)
 
       expect { FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails", deadline: expired) }
-        .to raise_error(AiService::DeadlineError)
+        .to raise_error(ProviderError::DeadlineError)
       expect { FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails", deadline: expired) }
-        .to raise_error(AiService::DeadlineError)
+        .to raise_error(ProviderError::DeadlineError)
       expect(purposes).to be_empty
     end
 
@@ -5085,7 +5085,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
         end
 
         expect { FakeService.new("fake-key").public_send(method, user, language: "ruby_rails", deadline: deadline) }
-          .to raise_error(AiService::DeadlineError)
+          .to raise_error(ProviderError::DeadlineError)
         expect(DailyPlan).to have_received(:for)
         expect(purposes).to be_empty
       end
@@ -5113,7 +5113,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       end
 
       expect { service.send(:retry_section, user, "ruby_rails", draft, ExerciseSection::Pattern, "service_objects", deadline: deadline) }
-        .to raise_error(AiService::DeadlineError)
+        .to raise_error(ProviderError::DeadlineError)
       expect(service).to have_received(:retry_ladders)
       expect(purposes).not_to include("retry_section")
     end
@@ -5124,7 +5124,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       retry_alone = GenerationDeadline.new(Time.current + AiService.worst_case_seconds_for("retry_section"))
 
       expect { service.send(:retry_section, user, "ruby_rails", draft, ExerciseSection::Pattern, "service_objects", deadline: retry_alone) }
-        .to raise_error(AiService::DeadlineError)
+        .to raise_error(ProviderError::DeadlineError)
       expect(purposes).not_to include("retry_section")
     end
 
@@ -5604,7 +5604,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     allow(Rails.logger).to receive(:warn)
 
     expect { FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails") }
-      .to raise_error(AiService::AllSectionsRejectedError)
+      .to raise_error(ProviderError::AllSectionsRejectedError)
   end
 
   it "drops a code_review when its retry generation fails" do
@@ -5614,7 +5614,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     svc = FakeService.new("fake-key")
     drafted = false
     allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **options|
-      raise AiService::RateLimitError, "slow down" if drafted
+      raise ProviderError::RateLimitError, "slow down" if drafted
 
       drafted = true
       m.call(*args, **options)
@@ -5653,7 +5653,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     svc = FakeService.new("fake-key")
     drafted = false
     allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **options|
-      raise AiService::RateLimitError, "slow down" if drafted
+      raise ProviderError::RateLimitError, "slow down" if drafted
       drafted = true
       m.call(*args, **options)
     end
@@ -5667,7 +5667,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
   end
 
   it "keeps the draft unedited and logs a fallback when the judge fails or answers invalidly" do
-    allow_any_instance_of(FakeService).to receive(:judge_section).and_raise(AiService::TimeoutError, "slow")
+    allow_any_instance_of(FakeService).to receive(:judge_section).and_raise(ProviderError::TimeoutError, "slow")
     allow(Rails.logger).to receive(:warn)
     expect(Rails.logger).to receive(:warn).with(/judge_fallback/).at_least(:once)
 
@@ -5800,13 +5800,13 @@ RSpec.describe AiService, "quiet JSON parsing" do
 
   it "raises without logging the reply or quoting it" do
     expect { service.send(:parse_json_object, "SENTINEL-7 is not JSON", subject: "verdict", log_raw: false) }
-      .to raise_error(AiService::InvalidResponseError, "Provider returned invalid JSON for the verdict")
+      .to raise_error(ProviderError::InvalidResponseError, "Provider returned invalid JSON for the verdict")
     expect(logged.string).not_to include("SENTINEL-7")
   end
 
   it "still logs a malformed reply by default" do
     expect { service.send(:parse_json_object, "SENTINEL-8 is not JSON", subject: "review") }
-      .to raise_error(AiService::InvalidResponseError)
+      .to raise_error(ProviderError::InvalidResponseError)
     expect(logged.string).to include("SENTINEL-8")
   end
 end
@@ -5887,18 +5887,18 @@ RSpec.describe AiService, ".judge_fallback_reason" do
   {
     JudgeVerdict::Invalid.new("x")                     => "invalid_output",
     ReviewProseVerdict::Invalid.new("x")               => "invalid_output",
-    AiService::TruncatedResponseError.new("x")         => "truncated",
-    AiService::InvalidResponseError.new("x")           => "invalid_json",
-    AiService::RefusalError.new("x")                   => "refusal",
-    AiService::TimeoutError.new("x")                   => "timeout",
-    AiService::DeadlineError.new("judge_section")      => "deadline",
+    ProviderError::TruncatedResponseError.new("x")         => "truncated",
+    ProviderError::InvalidResponseError.new("x")           => "invalid_json",
+    ProviderError::RefusalError.new("x")                   => "refusal",
+    ProviderError::TimeoutError.new("x")                   => "timeout",
+    ProviderError::DeadlineError.new("judge_section")      => "deadline",
     Timeout::Error.new("x")                            => "timeout",
-    AiService::RateLimitError.new("x")                 => "rate_limit",
-    AiService::AuthenticationError.new("x")            => "authentication",
-    AiService::Error.new("x")                          => "other",
-    AiService::Error.new("x", http_status: 400)        => "http_400",
-    AiService::RateLimitError.new("x", http_status: 429) => "rate_limit",
-    AiService::AuthenticationError.new("x", http_status: 401) => "authentication"
+    ProviderError::RateLimitError.new("x")                 => "rate_limit",
+    ProviderError::AuthenticationError.new("x")            => "authentication",
+    ProviderError.new("x")                          => "other",
+    ProviderError.new("x", http_status: 400)        => "http_400",
+    ProviderError::RateLimitError.new("x", http_status: 429) => "rate_limit",
+    ProviderError::AuthenticationError.new("x", http_status: 401) => "authentication"
   }.each do |error, reason|
     it "names #{error.class} #{reason}" do
       expect(AiService.judge_fallback_reason(error)).to eq(reason)
@@ -6161,9 +6161,9 @@ RSpec.describe AiService, "the day's size" do
   end
 
   it "logs the decision and the gate's evidence before the provider is contacted" do
-    failing = Class.new(FakeService) { def call(_request) = raise(AiService::Error, "provider down") }.new("fake-key")
+    failing = Class.new(FakeService) { def call(_request) = raise(ProviderError, "provider down") }.new("fake-key")
     lines = lines_from("[set_size]") do
-      expect { failing.generate_exercise(user, language: "ruby_rails") }.to raise_error(AiService::Error, "provider down")
+      expect { failing.generate_exercise(user, language: "ruby_rails") }.to raise_error(ProviderError, "provider down")
     end
 
     decision = decision_from(lines)
@@ -6244,7 +6244,7 @@ RSpec.describe AiService, "engineer text fenced under the stated rule" do
     end
     begin
       yield
-    rescue AiService::Error
+    rescue ProviderError
       # Only the request matters here; a canned reply the parser refuses does not.
     end
     captured

@@ -66,20 +66,20 @@ class OpenaiService < AiService
     raise_if_out_of_credit(error, resp.status)
 
     if resp.status == 429
-      raise AiService::RateLimitError.new("OpenAI API error 429", http_status: 429,
-                                          quota_id: quota_id_from(resp, error), retry_after: retry_after_seconds(resp))
+      raise ProviderError::RateLimitError.new("OpenAI API error 429", http_status: 429,
+                                              quota_id: quota_id_from(resp, error), retry_after: retry_after_seconds(resp))
     end
 
     log_raw_snippet("OpenAI API error #{resp.status} body", resp.body)
     message = extract_provider_message(resp.body, fallback: "OpenAI API error #{resp.status}")
-    raise AiService::Error.new(message, http_status: resp.status)
+    raise ProviderError.new(message, http_status: resp.status)
   end
 
   def raise_if_out_of_credit(error, status)
     return unless status == 402 || (status == 429 && error["code"] == INSUFFICIENT_QUOTA)
 
     Rails.logger.warn("OpenAI reports the account is out of credit (HTTP #{status}, #{error['code']})")
-    raise AiService::BillingError.new("OpenAI reports the account is out of credit", http_status: status)
+    raise ProviderError::BillingError.new("OpenAI reports the account is out of credit", http_status: status)
   end
 
   def quota_id_from(resp, error)
@@ -127,7 +127,7 @@ class OpenaiService < AiService
   end
 
   def reasoning_off_for(model)
-    REASONING_OFF.fetch(model) { raise AiService::UnsupportedRouteError, "#{model} cannot turn reasoning off, so it cannot take a capped call" }
+    REASONING_OFF.fetch(model) { raise ProviderError::UnsupportedRouteError, "#{model} cannot turn reasoning off, so it cannot take a capped call" }
   end
 
   # A content filter also reports "incomplete", so it is told apart from truncation here.

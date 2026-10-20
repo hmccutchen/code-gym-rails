@@ -57,7 +57,7 @@ RSpec.describe GenerateRecognitionGuideJob do
 
   it "swallows a provider error and writes nothing" do
     service = instance_double(ClaudeService)
-    allow(service).to receive(:generate_recognition_guide).and_raise(AiService::InvalidResponseError, "missing")
+    allow(service).to receive(:generate_recognition_guide).and_raise(ProviderError::InvalidResponseError, "missing")
     allow(AiService).to receive(:for).with(user).and_return(service)
 
     expect { described_class.perform_now(group_key: "code_smell", user_id: user.id) }.not_to change(RecognitionGuide, :count)

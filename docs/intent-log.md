@@ -42,3 +42,10 @@ this one.
   in their own PR straight after, because rewriting the prompt snapshots is a
   generation change, and nothing that freezes a day for public viewing lands
   before it
+- provider error classes moved off `AiService` into a `ProviderError` family
+  `#441`
+  **why:** models raising `AiService` errors made the domain depend on the
+  provider client, found in the layered review
+  **I decided:** `ProviderError` as the home, renamed everywhere with no
+  aliases, and the field lists in a second PR with `LANGUAGE_PROMPTS` left
+  where it is

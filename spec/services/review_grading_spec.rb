@@ -150,7 +150,7 @@ RSpec.describe ReviewGrading do
 
         def call(request)
           @calls += 1
-          raise AiService::RateLimitError, "rate limited" if request.prompt.include?('"pattern"')
+          raise ProviderError::RateLimitError, "rate limited" if request.prompt.include?('"pattern"')
           { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
         end
 
@@ -173,13 +173,13 @@ RSpec.describe ReviewGrading do
       exercise, response = exercise_and_response
 
       results = review(%w[code_review], exercise: exercise, response: response,
-                       grade: ->(*) { raise AiService::AuthenticationError, "bad key" })
+                       grade: ->(*) { raise ProviderError::AuthenticationError, "bad key" })
       expect(results["code_review"][:error_code]).to eq("authentication")
     end
 
     it "names the provider the error carries, since a fan-out can outlive a key switch" do
       exercise, response = exercise_and_response
-      error = AiService::RateLimitError.new("busy").tap { |e| e.provider = "gemini" }
+      error = ProviderError::RateLimitError.new("busy").tap { |e| e.provider = "gemini" }
 
       results = review(%w[code_review], exercise: exercise, response: response,
                        grade: ->(*) { raise error }, provider_key: "claude")
@@ -191,7 +191,7 @@ RSpec.describe ReviewGrading do
       exercise, response = exercise_and_response
 
       results = review(%w[code_review], exercise: exercise, response: response,
-                       grade: ->(*) { raise AiService::RateLimitError, "busy" }, provider_key: "claude")
+                       grade: ->(*) { raise ProviderError::RateLimitError, "busy" }, provider_key: "claude")
 
       expect(results["code_review"][:provider]).to eq("claude")
     end
@@ -240,7 +240,7 @@ RSpec.describe ReviewGrading do
       exercise, response = exercise_and_response
 
       results = review(%w[code_review pattern], exercise: exercise, response: response,
-                       assess_difficulty: ->(*, **) { raise AiService::RateLimitError, "rate limited" })
+                       assess_difficulty: ->(*, **) { raise ProviderError::RateLimitError, "rate limited" })
 
       expect(results["code_review"][:ok]).to be(true)
       expect(results["code_review"][:review]).not_to have_key("difficulty")
@@ -398,10 +398,10 @@ RSpec.describe ReviewGrading do
         "a JSON string" => [ "\"ok\"", "invalid_json" ],
         "an unexpected error" => [ ArgumentError.new("SENTINEL-G boom"), "other" ],
         "a verdict the boundary refuses" => [ { "status" => "edit", "issues" => [], "fields" => {} }.to_json, "invalid_output" ],
-        "a timeout" => [ AiService::TimeoutError.new("SENTINEL-G slow"), "timeout" ],
-        "a refusal" => [ AiService::RefusalError.new("SENTINEL-G declined"), "refusal" ],
-        "a truncated reply" => [ AiService::TruncatedResponseError.new("SENTINEL-G cut off"), "truncated" ],
-        "a rate limit" => [ AiService::RateLimitError.new("SENTINEL-G busy"), "rate_limit" ]
+        "a timeout" => [ ProviderError::TimeoutError.new("SENTINEL-G slow"), "timeout" ],
+        "a refusal" => [ ProviderError::RefusalError.new("SENTINEL-G declined"), "refusal" ],
+        "a truncated reply" => [ ProviderError::TruncatedResponseError.new("SENTINEL-G cut off"), "truncated" ],
+        "a rate limit" => [ ProviderError::RateLimitError.new("SENTINEL-G busy"), "rate_limit" ]
       }.each do |name, (reply, reason)|
         it "falls back to the sanitized grade on #{name}, logging a code and no review text" do
           result, = graded(judge_reply: reply, grader: grade.merge("graded_prose" => "forged"))

@@ -68,7 +68,7 @@ class ProblemSetIngest
     missing = @expected_keys.reject { |key| ExerciseSection.present?(@problem_set, key) }
     return if missing.empty?
 
-    raise AiService::InvalidResponseError,
+    raise ProviderError::InvalidResponseError,
           "Provider omitted intended section(s): #{missing.join(', ')}"
   end
 
@@ -110,13 +110,13 @@ class ProblemSetIngest
     end
     return if resolved_keys.any?
 
-    raise AiService::InvalidResponseError, "No usable section left: #{@unusable_sections.map(&:reason).join('; ')}"
+    raise ProviderError::InvalidResponseError, "No usable section left: #{@unusable_sections.map(&:reason).join('; ')}"
   end
 
   def reject_if_unusable(key)
     ExerciseSection.for(key).reject_unusable!(@problem_set[key])
     nil
-  rescue AiService::InvalidResponseError => e
+  rescue ProviderError::InvalidResponseError => e
     @unusable_sections << Unusable.new(key: key, concept: usable_concept(key), reason: e.message)
     @problem_set = @problem_set.except(key)
     ExerciseSection.resolved_key(@problem_set, slot_kinds_for(key))
@@ -141,7 +141,7 @@ class ProblemSetIngest
       actual = @problem_set.dig(key, "concept")
       next if actual == concept
 
-      raise AiService::InvalidResponseError,
+      raise ProviderError::InvalidResponseError,
             "Retry for #{key} returned concept #{actual.inspect}, not #{concept.inspect}"
     end
   end

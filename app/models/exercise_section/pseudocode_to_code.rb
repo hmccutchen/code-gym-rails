@@ -16,7 +16,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
   def self.reject_unusable!(section)
     statement = section["problem_statement"].is_a?(String) ? section["problem_statement"].strip : ""
     if statement.empty?
-      raise AiService::InvalidResponseError,
+      raise ProviderError::InvalidResponseError,
             "Pseudocode section returned no usable problem_statement to plan against"
     end
 

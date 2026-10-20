@@ -5,7 +5,7 @@ RSpec.describe ProblemSetIngest do
   # The steps are ordered and none undoes another, so one field after a full run tests that step.
   def step(problem_set, language: "ruby_rails")
     described_class.call(problem_set, language: language, daily: DailyKinds::DEFAULT, expected_keys: problem_set.keys).problem_set
-  rescue AiService::InvalidResponseError
+  rescue ProviderError::InvalidResponseError
     raise
   end
 
@@ -105,7 +105,7 @@ RSpec.describe ProblemSetIngest do
     it "reports nothing at all when the set is rejected" do
       set = { "ambiguity_hunt" => { "concept" => "invented_concept", "planted_ambiguities" => [] } }
 
-      expect { ingest(set) }.to raise_error(AiService::InvalidResponseError, /No usable section left/)
+      expect { ingest(set) }.to raise_error(ProviderError::InvalidResponseError, /No usable section left/)
     end
 
     describe "a section its kind refuses" do
@@ -150,7 +150,7 @@ RSpec.describe ProblemSetIngest do
 
       it "still refuses a set missing a requested key entirely" do
         expect { described_class.call({ "code_review" => {} }, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern]) }
-          .to raise_error(AiService::InvalidResponseError, /omitted/)
+          .to raise_error(ProviderError::InvalidResponseError, /omitted/)
       end
 
       it "reports nothing for a set with nothing to refuse" do
@@ -548,20 +548,20 @@ RSpec.describe ProblemSetIngest do
       expect {
         described_class.call(full_set.except("pattern"), language: "ruby_rails",
                              daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern])
-      }.to raise_error(AiService::InvalidResponseError, /pattern/)
+      }.to raise_error(ProviderError::InvalidResponseError, /pattern/)
     end
 
     it "names every missing section, not just the first" do
       expect {
         described_class.call({}, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern])
-      }.to raise_error(AiService::InvalidResponseError, /code_review.*pattern/)
+      }.to raise_error(ProviderError::InvalidResponseError, /code_review.*pattern/)
     end
 
     it "treats a non-Hash value as missing" do
       expect {
         described_class.call(full_set.merge("pattern" => "oops"), language: "ruby_rails",
                              daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern])
-      }.to raise_error(AiService::InvalidResponseError, /pattern/)
+      }.to raise_error(ProviderError::InvalidResponseError, /pattern/)
     end
 
     it "accepts extra sections the day did not intend" do
@@ -609,7 +609,7 @@ RSpec.describe ProblemSetIngest do
       expect {
         described_class.call(full_set, language: "ruby_rails",
                              daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pattern ambiguity_hunt])
-      }.to raise_error(AiService::InvalidResponseError, /ambiguity_hunt/)
+      }.to raise_error(ProviderError::InvalidResponseError, /ambiguity_hunt/)
     end
   end
 end
@@ -748,13 +748,13 @@ RSpec.describe ProblemSetIngest, "fixed concepts on a retry" do
   let(:set) { { "challenge" => { "question" => "q", "starter_code" => "s", "concept" => "n_plus_one" } } }
   it "raises when the returned concept is not the fixed one, before normalization can hide it" do
     expect { described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "memoization" }) }
-      .to raise_error(AiService::InvalidResponseError, /memoization/)
+      .to raise_error(ProviderError::InvalidResponseError, /memoization/)
   end
   it "rejects a retry tagged with any different concept when n_plus_one was fixed" do
     mismatch = { "challenge" => set.fetch("challenge").merge("concept" => "memoization") }
 
     expect { described_class.call(mismatch, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "n_plus_one" }) }
-      .to raise_error(AiService::InvalidResponseError, /n_plus_one/)
+      .to raise_error(ProviderError::InvalidResponseError, /n_plus_one/)
   end
   it "drops sections the retry did not ask for instead of keeping them" do
     extra = set.merge("pattern" => { "question" => "q", "concept" => "memoization" })

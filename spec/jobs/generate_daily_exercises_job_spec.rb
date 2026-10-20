@@ -36,7 +36,7 @@ RSpec.describe GenerateDailyExercisesJob do
       expect_logged_by_id
     end
 
-    [ AiService::Error, AiService::AuthenticationError, AiService::RateLimitError, AiService::TimeoutError ].each do |error|
+    [ ProviderError, ProviderError::AuthenticationError, ProviderError::RateLimitError, ProviderError::TimeoutError ].each do |error|
       it "names the user by id on #{error.name.demodulize}" do
         stub_provider_failure(error, "boom")
         described_class.new.perform(user_id: user.id)
@@ -80,8 +80,8 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(user.last_generation_error).to be_nil
   end
 
-  it "logs and continues when AiService::Error is raised" do
-    stub_provider_failure(AiService::Error, "boom")
+  it "logs and continues when ProviderError is raised" do
+    stub_provider_failure(ProviderError, "boom")
 
     expect(Rails.logger).to receive(:error).with(/Failed to generate exercise.*boom/)
     expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
@@ -89,7 +89,7 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "records a rejected key as bad_key and renders a Setup-pointing sentence" do
-    stub_provider_failure(AiService::AuthenticationError, "invalid x-api-key")
+    stub_provider_failure(ProviderError::AuthenticationError, "invalid x-api-key")
 
     expect(Rails.logger).to receive(:error).with(/Failed to generate exercise.*\(bad_key\).*invalid x-api-key/)
     described_class.new.perform(user_id: user.id)
@@ -104,7 +104,7 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "records a 429 as a short rate limit" do
-    stub_provider_failure(AiService::RateLimitError, "rate limited")
+    stub_provider_failure(ProviderError::RateLimitError, "rate limited")
     allow(Rails.logger).to receive(:error)
 
     described_class.new.perform(user_id: user.id)
@@ -115,7 +115,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
   # A key switch before the dashboard reads the failure must not relabel it.
   it "stores the provider tried and its wait, and keeps naming that provider after a switch" do
-    error = AiService::RateLimitError.new("rate limited", retry_after: 300).tap { |e| e.provider = "anthropic" }
+    error = ProviderError::RateLimitError.new("rate limited", retry_after: 300).tap { |e| e.provider = "anthropic" }
     stub_provider_failure(error, nil)
     allow(Rails.logger).to receive(:error)
 
@@ -129,8 +129,8 @@ RSpec.describe GenerateDailyExercisesJob do
       .to eq("Claude is limiting requests right now, so nothing was generated. Try again in about 5 minutes.")
   end
 
-  it "records a generic AiService::Error as other and never stores its message" do
-    stub_provider_failure(AiService::Error, "boom")
+  it "records a generic ProviderError as other and never stores its message" do
+    stub_provider_failure(ProviderError, "boom")
     allow(Rails.logger).to receive(:error)
 
     described_class.new.perform(user_id: user.id)
@@ -143,20 +143,20 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "persists a failure and writes no day when the judge rejects every section" do
-    allow_any_instance_of(ClaudeService).to receive(:generate_judged_exercise).and_raise(AiService::AllSectionsRejectedError)
-    allow_any_instance_of(ClaudeService).to receive(:generate_unjudged_exercise).and_raise(AiService::AllSectionsRejectedError)
+    allow_any_instance_of(ClaudeService).to receive(:generate_judged_exercise).and_raise(ProviderError::AllSectionsRejectedError)
+    allow_any_instance_of(ClaudeService).to receive(:generate_unjudged_exercise).and_raise(ProviderError::AllSectionsRejectedError)
     allow(Rails.logger).to receive(:error)
 
     described_class.new.perform(user_id: user.id)
 
     user.reload
     expect(DailyExercise.exists?(user: user, date: Date.current)).to be false
-    expect(user.last_generation_error).to eq(AiService::AllSectionsRejectedError.new.message)
+    expect(user.last_generation_error).to eq(ProviderError::AllSectionsRejectedError.new.message)
   end
 
   it "persists the failure date in the user's own time zone" do
     pac = User.create!(email: "pac2@example.com", name: "Pac", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles")
-    stub_provider_failure(AiService::Error, "boom", pac)
+    stub_provider_failure(ProviderError, "boom", pac)
     allow(Rails.logger).to receive(:error)
 
     # 2026-07-13 06:00 UTC == 2026-07-12 23:00 PDT — still July 12th in LA.
@@ -189,7 +189,7 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "records a timeout without the socket internals it came from" do
-    stub_provider_failure(AiService::TimeoutError, "Network error calling Claude: Net::ReadTimeout with #<TCPSocket:(closed)>")
+    stub_provider_failure(ProviderError::TimeoutError, "Network error calling Claude: Net::ReadTimeout with #<TCPSocket:(closed)>")
     allow(Rails.logger).to receive(:error)
 
     described_class.new.perform(user_id: user.id)
@@ -205,7 +205,7 @@ RSpec.describe GenerateDailyExercisesJob do
   it "does not persist a failure when today's exercise already exists" do
     DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} },
                           generated_at: Time.current, language: "ruby_rails")
-    stub_provider_failure(AiService::Error, "boom")
+    stub_provider_failure(ProviderError, "boom")
     allow(Rails.logger).to receive(:error)
 
     described_class.new.send(:generate_for, user)
@@ -218,7 +218,7 @@ RSpec.describe GenerateDailyExercisesJob do
     user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
     DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} },
                           generated_at: Time.current, language: "ruby_rails")
-    stub_provider_failure(AiService::Error, "boom")
+    stub_provider_failure(ProviderError, "boom")
     allow(Rails.logger).to receive(:error)
 
     described_class.new.send(:generate_for, user)
@@ -423,7 +423,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
     it "does not enqueue when the provider failed and no set exists" do
       svc = instance_double(ClaudeService)
-      allow(svc).to receive(:generate_judged_exercise).and_raise(AiService::Error, "boom")
+      allow(svc).to receive(:generate_judged_exercise).and_raise(ProviderError, "boom")
       allow(AiService).to receive(:for).with(pac).and_return(svc)
 
       travel_to(Time.utc(2026, 7, 13, 15, 0)) do

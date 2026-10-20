@@ -47,18 +47,18 @@ it opens the dashboard.
 
 **The house key changes the credential and nothing in the request.**
 `ProviderCredential.for(user)` hands `AiService.for` the user's own key, no
-key, or the house key, and raises `AiService::TrialEndedError` for an
+key, or the house key, and raises `ProviderError::TrialEndedError` for an
 ended trial. The service's `house_key?` reaches the per-section threads
 through `fresh_service`, is written to every usage row, and is what runs
 `TrialAllowance.check!` ahead of the call in `call_and_log`: a trial still
 active, since a service built during the trial keeps its house key through
-a fan-out or a long job (`AiService::TrialEndedError` otherwise), the invite's
+a fan-out or a long job (`ProviderError::TrialEndedError` otherwise), the invite's
 `daily_request_cap` on the user's own day (`ApiUsage.requests_on`, counted
 by when each row was written in the user's zone, since a job outside that
 zone stamps `date` with the server's day) and `HOUSE_<PROVIDER>_DAILY_GUARD`
 over the provider's quota day (`AiService.quota_day`: Pacific for Gemini,
 UTC otherwise), attempts included, each raising
-`AiService::TrialAllowanceError` with the seconds until the count resets
+`ProviderError::TrialAllowanceError` with the seconds until the count resets
 and writing no row. The gate counts before its own row exists, so
 concurrent calls can overshoot by the fan-out width per account, times
 the accounts calling at once; the provider's spend limit is the hard

@@ -25,7 +25,7 @@ RSpec.describe "provider transport" do
         service = failing_service(service_class, attempts)
 
         expect { call_provider(service, system: "sys", prompt: "p") }
-          .to raise_error(AiService::TimeoutError, "Network error calling #{name}: boom")
+          .to raise_error(ProviderError::TimeoutError, "Network error calling #{name}: boom")
         expect(attempts.size).to eq(service_class::RETRY_OPTIONS[:max] + 1)
         expect(attempts.uniq).to eq([ { timeout: AiService::READ_TIMEOUT, long_running: false, single_attempt: false } ])
       end
@@ -36,7 +36,7 @@ RSpec.describe "provider transport" do
         timeout = AiService::READ_TIMEOUT + 1
 
         expect { call_provider(service, system: "sys", prompt: "p", read_timeout: timeout) }
-          .to raise_error(AiService::TimeoutError, "Network error calling #{name}: boom")
+          .to raise_error(ProviderError::TimeoutError, "Network error calling #{name}: boom")
         expect(attempts).to eq([ { timeout: timeout, long_running: true, single_attempt: false } ])
       end
 
@@ -45,7 +45,7 @@ RSpec.describe "provider transport" do
         service = failing_service(service_class, attempts)
 
         expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }
-          .to raise_error(AiService::TimeoutError, "Network error calling #{name}: boom")
+          .to raise_error(ProviderError::TimeoutError, "Network error calling #{name}: boom")
         expect(attempts).to eq([ { timeout: AiService::READ_TIMEOUT, long_running: false, single_attempt: true } ])
       end
 
@@ -54,7 +54,7 @@ RSpec.describe "provider transport" do
         service = failing_service(service_class, attempts, error: Faraday::ConnectionFailed)
 
         expect { call_provider(service, system: "sys", prompt: "p") }
-          .to raise_error(AiService::NetworkError, "Network error calling #{name}: boom")
+          .to raise_error(ProviderError::NetworkError, "Network error calling #{name}: boom")
       end
     end
   end
@@ -65,7 +65,7 @@ RSpec.describe "provider transport" do
 
     expect {
       call_provider(service, system: "sys", prompt: "p", purpose: "judge_section", max_tokens: AiService::JUDGE_MAX_TOKENS)
-    }.to raise_error(AiService::TimeoutError)
+    }.to raise_error(ProviderError::TimeoutError)
     expect(attempts).to eq([ { timeout: AiService::READ_TIMEOUT, long_running: true, single_attempt: false } ])
   end
 end

@@ -862,7 +862,7 @@ RSpec.describe "Responses", type: :request do
     it "explains a provider error raised before any section came back, without its message" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_raise(AiService::Error, "boom")
+      allow(fake_service).to receive(:review_sections).and_raise(ProviderError, "boom")
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(daily_response)
@@ -1208,7 +1208,7 @@ RSpec.describe "Responses", type: :request do
       r = reviewed_response_for(user)
       fake = instance_double(ClaudeService)
       allow(AiService).to receive(:for).and_return(fake)
-      allow(fake).to receive(:explain_differently).and_raise(AiService::RateLimitError, "slow down")
+      allow(fake).to receive(:explain_differently).and_raise(ProviderError::RateLimitError, "slow down")
       login_as(user)
 
       post explain_differently_response_path(r), params: { section: "code_review" }
@@ -1329,7 +1329,7 @@ RSpec.describe "Responses", type: :request do
       r = reviewed_response_for(user)
       fake = instance_double(ClaudeService)
       allow(AiService).to receive(:for).and_return(fake)
-      allow(fake).to receive(:answer_follow_up).and_raise(AiService::RateLimitError, "slow down")
+      allow(fake).to receive(:answer_follow_up).and_raise(ProviderError::RateLimitError, "slow down")
       login_as(user)
 
       post follow_ups_response_path(r), params: { section: "code_review", question: "Why?" }

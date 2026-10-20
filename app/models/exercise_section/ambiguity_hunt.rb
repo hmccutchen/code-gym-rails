@@ -21,7 +21,7 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
     raw     = section[PLANTED_FIELD]
     planted = raw.is_a?(Array) ? raw.grep(String).filter_map { |entry| entry.strip.presence } : []
     if planted.empty?
-      raise AiService::InvalidResponseError,
+      raise ProviderError::InvalidResponseError,
             "Ambiguity hunt returned no usable #{PLANTED_FIELD} to grade coverage against"
     end
 

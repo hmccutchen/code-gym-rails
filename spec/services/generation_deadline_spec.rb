@@ -18,7 +18,7 @@ RSpec.describe GenerationDeadline do
 
     it "refuses a call whose worst case would run past the deadline, even with time left" do
       expect { deadline_in(worst("judge_section") - 1).ensure_fits!(request("judge_section")) }
-        .to raise_error(AiService::DeadlineError)
+        .to raise_error(ProviderError::DeadlineError)
     end
 
     it "reserves what the request itself can take, so a blocking draft needs its shorter read, not the full one" do
@@ -29,8 +29,8 @@ RSpec.describe GenerationDeadline do
     end
 
     it "is a timeout to everything that classifies provider failures" do
-      expect(AiService::DeadlineError.new("judge_section")).to be_a(AiService::TimeoutError)
-      expect(ProviderFailure.classify(AiService::DeadlineError.new("judge_section"))).to eq("timeout")
+      expect(ProviderError::DeadlineError.new("judge_section")).to be_a(ProviderError::TimeoutError)
+      expect(ProviderFailure.classify(ProviderError::DeadlineError.new("judge_section"))).to eq("timeout")
     end
 
     it "never refuses anything when it has no end" do
@@ -44,7 +44,7 @@ RSpec.describe GenerationDeadline do
 
       expect { deadline.leaving(worst("judge_section")).ensure_fits!(request("retry_section")) }.not_to raise_error
       expect { deadline.leaving(worst("judge_section") + 1).ensure_fits!(request("retry_section")) }
-        .to raise_error(AiService::DeadlineError)
+        .to raise_error(ProviderError::DeadlineError)
     end
 
     it "keeps no end when there was none" do
@@ -57,6 +57,6 @@ RSpec.describe GenerationDeadline do
     deadline.ensure_fits!(request("judge_section"))
     now[0] = start + 1
 
-    expect { deadline.ensure_fits!(request("judge_section")) }.to raise_error(AiService::DeadlineError)
+    expect { deadline.ensure_fits!(request("judge_section")) }.to raise_error(ProviderError::DeadlineError)
   end
 end

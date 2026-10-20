@@ -27,7 +27,7 @@ RSpec.describe GeminiService do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "<html>Bad gateway</html>" ] ]))
 
     expect { call_provider(service, system: "sys", prompt: "p") }
-      .to raise_error(AiService::InvalidResponseError, /Gemini returned an unreadable response/)
+      .to raise_error(ProviderError::InvalidResponseError, /Gemini returned an unreadable response/)
   end
 
   # A cut-off JSON body can carry an answer (a judge's blind solve), so only its size is logged.
@@ -36,11 +36,11 @@ RSpec.describe GeminiService do
     allow(Rails.logger).to receive(:error) { |message| logged << message }
 
     expect { service.send(:unreadable_envelope!, '{"text":"{\\"better\\":\\"b\\"', "Gemini") }
-      .to raise_error(AiService::InvalidResponseError)
+      .to raise_error(ProviderError::InvalidResponseError)
     expect { service.send(:unreadable_envelope!, '"{\\"better\\":\\"b\\"', "Gemini") }
-      .to raise_error(AiService::InvalidResponseError)
+      .to raise_error(ProviderError::InvalidResponseError)
     expect { service.send(:unreadable_envelope!, "<html>Bad gateway</html>", "Gemini") }
-      .to raise_error(AiService::InvalidResponseError)
+      .to raise_error(ProviderError::InvalidResponseError)
 
     expect(logged.first(2)).to all(include("withheld").and(satisfy { |line| !line.include?("better") }))
     expect(logged.last).to include("Bad gateway")
@@ -50,7 +50,7 @@ RSpec.describe GeminiService do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "[]" ] ]))
 
     expect { call_provider(service, system: "sys", prompt: "p") }
-      .to raise_error(AiService::InvalidResponseError, /Gemini returned an unreadable response/)
+      .to raise_error(ProviderError::InvalidResponseError, /Gemini returned an unreadable response/)
   end
 
   describe "#build_connection" do
@@ -98,7 +98,7 @@ RSpec.describe GeminiService do
 
       expect {
         call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
-      }.to raise_error(AiService::TimeoutError, /Network error calling Gemini/)
+      }.to raise_error(ProviderError::TimeoutError, /Network error calling Gemini/)
 
       expect(attempts.size).to eq(1)
     end
@@ -110,7 +110,7 @@ RSpec.describe GeminiService do
 
       expect {
         call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::REVIEW_READ_TIMEOUT)
-      }.to raise_error(AiService::TimeoutError, /Network error calling Gemini/)
+      }.to raise_error(ProviderError::TimeoutError, /Network error calling Gemini/)
 
       expect(attempts).to eq([ AiService::REVIEW_READ_TIMEOUT ])
     end
@@ -121,7 +121,7 @@ RSpec.describe GeminiService do
 
       expect {
         call_provider(service, system: "sys", prompt: "p")
-      }.to raise_error(AiService::TimeoutError, /Network error calling Gemini/)
+      }.to raise_error(ProviderError::TimeoutError, /Network error calling Gemini/)
 
       expect(attempts.size).to eq(GeminiService::RETRY_OPTIONS[:max] + 1)
     end
@@ -141,7 +141,7 @@ RSpec.describe GeminiService do
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::TimeoutError, /Network error calling Gemini/)
+      }.to raise_error(ProviderError::TimeoutError, /Network error calling Gemini/)
     end
 
     it "raises a plain error for a non-timeout network failure" do
@@ -155,12 +155,12 @@ RSpec.describe GeminiService do
       error = nil
       begin
         call_provider(service, system: "sys", prompt: "prompt")
-      rescue AiService::Error => e
+      rescue ProviderError => e
         error = e
       end
 
-      expect(error).to be_a(AiService::Error)
-      expect(error).not_to be_a(AiService::TimeoutError)
+      expect(error).to be_a(ProviderError)
+      expect(error).not_to be_a(ProviderError::TimeoutError)
       expect(error.message).to match(/Network error calling Gemini/)
     end
 
@@ -180,7 +180,7 @@ RSpec.describe GeminiService do
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::RateLimitError)
+      }.to raise_error(ProviderError::RateLimitError)
       expect(responses.size).to eq(1)
     end
 
@@ -190,7 +190,7 @@ RSpec.describe GeminiService do
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::AuthenticationError, "Google rejected your API key or its permissions. Check it in Settings.")
+      }.to raise_error(ProviderError::AuthenticationError, "Google rejected your API key or its permissions. Check it in Settings.")
       expect(responses.size).to eq(1)
     end
 
@@ -201,7 +201,7 @@ RSpec.describe GeminiService do
         allow(Rails.logger).to receive(:error)
 
         expect { call_provider(service, system: "sys", prompt: "prompt") }
-          .to raise_error(AiService::AuthenticationError, /\AGoogle rejected your API key/) { |error|
+          .to raise_error(ProviderError::AuthenticationError, /\AGoogle rejected your API key/) { |error|
             expect(error.http_status).to eq(status)
             expect(error.message).not_to include("AIza")
           }
@@ -217,7 +217,7 @@ RSpec.describe GeminiService do
       responses = [ [ 429, "" ], [ 429, "" ], [ 429, "" ] ]
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
-      expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::RateLimitError)
+      expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(ProviderError::RateLimitError)
       expect(responses.size).to eq(2)
     end
 
@@ -229,7 +229,7 @@ RSpec.describe GeminiService do
       end
       service.instance_variable_set(:@conn, conn)
 
-      expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::TimeoutError)
+      expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(ProviderError::TimeoutError)
       expect(attempts).to eq(1)
     end
 
@@ -237,7 +237,7 @@ RSpec.describe GeminiService do
       responses = [ [ 429, "" ], [ 429, "" ], [ 429, "" ], [ 429, "" ] ]
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
-      expect { call_provider(service, system: "sys", prompt: "p") }.to raise_error(AiService::RateLimitError)
+      expect { call_provider(service, system: "sys", prompt: "p") }.to raise_error(ProviderError::RateLimitError)
       expect(responses.size).to eq(1)
     end
   end
@@ -386,14 +386,14 @@ RSpec.describe GeminiService do
       expect(truncated_for(status: nil, output_tokens: 60, max_tokens: 60)).to be(false)
     end
 
-    it "raises AiService::Error on a non-success response" do
+    it "raises ProviderError on a non-success response" do
       fake_response = instance_double(Faraday::Response, success?: false, status: 503, body: "overloaded")
       fake_conn = instance_double(Faraday::Connection, post: fake_response)
       service.instance_variable_set(:@conn, fake_conn)
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::Error, /Gemini API error 503/) { |error| expect(error.http_status).to eq(503) }
+      }.to raise_error(ProviderError, /Gemini API error 503/) { |error| expect(error.http_status).to eq(503) }
     end
 
     it "surfaces the provider's own error message when the body includes one" do
@@ -404,7 +404,7 @@ RSpec.describe GeminiService do
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::Error, "Invalid JSON payload received.")
+      }.to raise_error(ProviderError, "Invalid JSON payload received.")
     end
 
     def quota_fixture(name) = Rails.root.join("spec/fixtures/provider_errors", name).read
@@ -413,7 +413,7 @@ RSpec.describe GeminiService do
       service.instance_variable_set(:@conn, stubbed_connection([ [ 429, quota_fixture("gemini_429_daily.json") ] ]))
 
       expect { call_provider(service, system: "sys", prompt: "prompt", single_attempt: true) }
-        .to raise_error(AiService::RateLimitError) { |e|
+        .to raise_error(ProviderError::RateLimitError) { |e|
           expect(e.quota_id).to eq("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
           expect(e.retry_after).to eq(39)
           expect(e.message).not_to include("quota")
@@ -428,18 +428,18 @@ RSpec.describe GeminiService do
       service.instance_variable_set(:@conn, stubbed_connection([ [ 429, body.to_json ] ]))
 
       expect { call_provider(service, system: "sys", prompt: "prompt", single_attempt: true) }
-        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("GenerateRequestsPerDayPerProjectPerModel-FreeTier") }
+        .to raise_error(ProviderError::RateLimitError) { |e| expect(e.quota_id).to eq("GenerateRequestsPerDayPerProjectPerModel-FreeTier") }
     end
 
     it "falls back to the status when the error envelope is null" do
       allow(Rails.logger).to receive(:error)
       service.instance_variable_set(:@conn, stubbed_connection([ [ 429, { "error" => nil }.to_json ] ]))
       expect { call_provider(service, system: "sys", prompt: "prompt", single_attempt: true) }
-        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to be_nil }
+        .to raise_error(ProviderError::RateLimitError) { |e| expect(e.quota_id).to be_nil }
 
       service.instance_variable_set(:@conn, stubbed_connection([ [ 400, { "error" => nil }.to_json ] ]))
       expect { call_provider(service, system: "sys", prompt: "prompt") }
-        .to raise_error(AiService::Error, /Gemini API error 400/) { |e| expect(e).not_to be_a(AiService::AuthenticationError) }
+        .to raise_error(ProviderError, /Gemini API error 400/) { |e| expect(e).not_to be_a(ProviderError::AuthenticationError) }
     end
 
     it "reads a 400 API_KEY_INVALID as a rejected key without logging the body" do
@@ -447,7 +447,7 @@ RSpec.describe GeminiService do
       service.instance_variable_set(:@conn, stubbed_connection([ [ 400, quota_fixture("gemini_400_api_key_invalid.json") ] ]))
 
       expect { call_provider(service, system: "sys", prompt: "prompt") }
-        .to raise_error(AiService::AuthenticationError, /\AGoogle rejected your API key/) { |e| expect(e.http_status).to eq(400) }
+        .to raise_error(ProviderError::AuthenticationError, /\AGoogle rejected your API key/) { |e| expect(e.http_status).to eq(400) }
       expect(Rails.logger).not_to have_received(:error).with(/API key not valid/)
     end
 
@@ -459,7 +459,7 @@ RSpec.describe GeminiService do
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::Error) { |e| expect(e.message).not_to include(huge_body) }
+      }.to raise_error(ProviderError) { |e| expect(e.message).not_to include(huge_body) }
     end
 
     it "logs a truncated snippet of the raw response body server-side" do
@@ -473,7 +473,7 @@ RSpec.describe GeminiService do
         expect(msg).to include("truncated, #{huge_body.bytesize} bytes total")
       end
 
-      expect { call_provider(service, system: "sys", prompt: "prompt") }.to raise_error(AiService::Error)
+      expect { call_provider(service, system: "sys", prompt: "prompt") }.to raise_error(ProviderError)
     end
   end
 

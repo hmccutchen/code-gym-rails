@@ -52,7 +52,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
 
     it "names the user by id on failure" do
       claimed_exercise
-      stub_provider(AiService::Error.new("boom"))
+      stub_provider(ProviderError.new("boom"))
       described_class.new.perform(user_id: user.id)
       expect_logged_by_id
     end
@@ -177,7 +177,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
     allow(fake_service).to receive(:generate_judged_exercise) do
       exercise.update_columns(regenerating_since: newer_claim)
-      raise AiService::TimeoutError, "slow"
+      raise ProviderError::TimeoutError, "slow"
     end
 
     described_class.new.perform(user_id: user.id)
@@ -309,7 +309,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
 
   it "preserves the existing set and the daily allowance when the provider fails" do
     exercise = claimed_exercise
-    stub_provider(AiService::Error.new("boom"))
+    stub_provider(ProviderError.new("boom"))
 
     described_class.new.perform(user_id: user.id)
 
@@ -324,14 +324,14 @@ RSpec.describe RegenerateExerciseJob, type: :job do
 
   it "does not raise when the provider fails" do
     claimed_exercise
-    stub_provider(AiService::Error.new("boom"))
+    stub_provider(ProviderError.new("boom"))
 
     expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
   end
 
   it "records a rejected key as bad_key and renders it in the user's words, not the provider's" do
     claimed_exercise
-    stub_provider(AiService::AuthenticationError.new("401 invalid x-api-key"))
+    stub_provider(ProviderError::AuthenticationError.new("401 invalid x-api-key"))
 
     described_class.new.perform(user_id: user.id)
 
@@ -342,7 +342,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
 
   it "records rate limiting as a short limit, not a configuration problem" do
     claimed_exercise
-    stub_provider(AiService::RateLimitError.new("rate limited"))
+    stub_provider(ProviderError::RateLimitError.new("rate limited"))
 
     described_class.new.perform(user_id: user.id)
 
@@ -351,7 +351,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
 
   it "stores the provider tried and its wait, so the line survives a key switch" do
     claimed_exercise
-    stub_provider(AiService::RateLimitError.new("rate limited", retry_after: 120).tap { |e| e.provider = "anthropic" })
+    stub_provider(ProviderError::RateLimitError.new("rate limited", retry_after: 120).tap { |e| e.provider = "anthropic" })
 
     described_class.new.perform(user_id: user.id)
 
@@ -365,7 +365,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
 
   it "records a timeout without leaking the socket internals it came from" do
     claimed_exercise
-    stub_provider(AiService::TimeoutError.new("Network error calling Claude: Net::ReadTimeout with #<TCPSocket:(closed)>"))
+    stub_provider(ProviderError::TimeoutError.new("Network error calling Claude: Net::ReadTimeout with #<TCPSocket:(closed)>"))
 
     described_class.new.perform(user_id: user.id)
 
@@ -377,7 +377,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     exercise = claimed_exercise
     daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                                            answers: { "code_review" => "important work" })
-    stub_provider(AiService::Error.new("timeout"))
+    stub_provider(ProviderError.new("timeout"))
 
     described_class.new.perform(user_id: user.id)
 
@@ -479,7 +479,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
 
   it "keeps today's set and the day's regeneration when the deadline leaves no time to draft" do
     exercise = claimed_exercise
-    stub_provider(AiService::DeadlineError.new("generate_exercise"))
+    stub_provider(ProviderError::DeadlineError.new("generate_exercise"))
 
     described_class.new.perform(user_id: user.id)
 
@@ -492,7 +492,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
 
   it "keeps today's set when the judge rejected every section of the new one, and says so" do
     exercise = claimed_exercise
-    stub_provider(AiService::AllSectionsRejectedError.new)
+    stub_provider(ProviderError::AllSectionsRejectedError.new)
 
     described_class.new.perform(user_id: user.id)
 

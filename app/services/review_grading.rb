@@ -38,7 +38,7 @@ class ReviewGrading
     review   = provider.grade.call(@user, @exercise, @response, section, context)
     review   = gaps_beside_their_prose(judged_review(provider, section, rated(section, review)))
     [ section, { ok: true, review: review } ]
-  rescue AiService::Error, *AiService::INFRASTRUCTURE_ERRORS => e
+  rescue ProviderError, *AiService::INFRASTRUCTURE_ERRORS => e
     [ section, { ok: false, error_code: AiService.error_code_for(e), failure: ProviderFailure.classify(e),
                  provider: e.try(:provider) || provider&.provider_key,
                  quota_id: e.try(:quota_id), retry_after: e.try(:retry_after), failed_at: Time.current } ]

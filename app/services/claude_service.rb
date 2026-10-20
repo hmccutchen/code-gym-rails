@@ -86,15 +86,15 @@ class ClaudeService < AiService
 
     case resp.status
     when 429
-      raise AiService::RateLimitError.new("Claude API error 429", http_status: 429,
-                                          quota_id: quota_id_from(resp, error), retry_after: retry_after_seconds(resp))
+      raise ProviderError::RateLimitError.new("Claude API error 429", http_status: 429,
+                                              quota_id: quota_id_from(resp, error), retry_after: retry_after_seconds(resp))
     when 529
-      raise AiService::RateLimitError.new("Claude API error 529", http_status: 529, quota_id: "overloaded_error")
+      raise ProviderError::RateLimitError.new("Claude API error 529", http_status: 529, quota_id: "overloaded_error")
     end
 
     log_raw_snippet("Claude API error #{resp.status} body", resp.body)
     message = extract_provider_message(resp.body, fallback: "Claude API error #{resp.status}")
-    raise AiService::Error.new(message, http_status: resp.status)
+    raise ProviderError.new(message, http_status: resp.status)
   end
 
   def raise_if_out_of_credit(error, status)
@@ -104,8 +104,8 @@ class ClaudeService < AiService
     return unless out_of_credit
 
     Rails.logger.warn("Anthropic reports the account is out of credit or over its spend limit (HTTP #{status})")
-    raise AiService::BillingError.new("Anthropic reports the account is out of credit or over its spend limit",
-                                      http_status: status)
+    raise ProviderError::BillingError.new("Anthropic reports the account is out of credit or over its spend limit",
+                                          http_status: status)
   end
 
   def quota_id_from(resp, error)
@@ -124,7 +124,7 @@ class ClaudeService < AiService
   end
 
   def thinking_off_for(model)
-    THINKING_OFF.fetch(model) { raise AiService::UnsupportedRouteError, "#{model} has no thinking-off setting, so it cannot take a capped call" }
+    THINKING_OFF.fetch(model) { raise ProviderError::UnsupportedRouteError, "#{model} has no thinking-off setting, so it cannot take a capped call" }
   end
 
   def refusal_category(parsed)

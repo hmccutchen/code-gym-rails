@@ -33,7 +33,7 @@ below for the bar that was set.
 
 **Placement and failure.** `ReviewGrading#judged_review` runs inside each
 section's grading thread, after grading and the Parsons rating override, and
-has its own rescue. It rescues `StandardError`, not just `AiService::Error`,
+has its own rescue. It rescues `StandardError`, not just `ProviderError`,
 because `Thread#value` re-raises whatever `ReviewGrading#grade_section`'s narrower rescue
 misses, and no judge failure may cost the engineer the review. A failure
 returns the grade unchanged and logs `[review_judge_fallback]` with a fixed

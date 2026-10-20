@@ -24,7 +24,7 @@ class GenerateRecognitionGuideJob < ApplicationJob
     raise if e.is_a?(ActiveRecord::RecordInvalid) && e.record.errors[:group_key].blank?
 
     Rails.logger.info("Skipped duplicate recognition guide for #{group_key}")
-  rescue AiService::Error => e
+  rescue ProviderError => e
     Rails.logger.warn("Failed to generate recognition guide for #{group_key}: #{e.message}")
   end
 end

@@ -124,11 +124,11 @@ class ConceptReferenceCalibration
   def call_outcome
     yield
     [ :ok, true ]
-  rescue AiService::TimeoutError
+  rescue ProviderError::TimeoutError
     [ :timeout, true ]
-  rescue AiService::InvalidResponseError => e
+  rescue ProviderError::InvalidResponseError => e
     [ e.class.name, true ]
-  rescue AiService::Error => e
+  rescue ProviderError => e
     [ e.class.name, false ]
   end
 
