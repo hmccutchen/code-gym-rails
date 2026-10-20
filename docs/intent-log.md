@@ -79,3 +79,7 @@ this one.
   issue 431's orchestration step `#470`
   **why:** I kept drafting out of `JudgedGeneration`, since unjudged days
   draft too; each step is its own PR from main, as the issue says
+- drafting into `ExerciseDraft`, the second PR for issue 431's
+  orchestration step `#471`
+  **why:** I had the draft carry its user and language so the retry takes
+  only the draft, kind and concept
