@@ -1531,6 +1531,17 @@ RSpec.describe AiService do
       expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review)
     end
 
+    it "loads a retry's ladders for the retry's language and the draft's code_review mode" do
+      draft = AiService.const_get(:Draft).new(problem_set: {}, plan: Struct.new(:code_review_mode).new(:schema_review),
+                                              kinds: [], difficulty: KindDifficulty.none, ladders: {}, history: [],
+                                              suggested_concepts: [], unusable_sections: [])
+      allow(GenerationLadders).to receive(:for).and_call_original
+
+      service.send(:retry_ladders, user, "javascript", draft, ExerciseSection::CodeReview)
+
+      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review)
+    end
+
     describe "MAX_LADDER_GUIDANCE_CHARS" do
       # Renders every level assignment at maximum rung length, since headings and overhead vary; a proxy misses the max.
       def largest_block_for(language, mode, kinds)
