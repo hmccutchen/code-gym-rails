@@ -58,6 +58,7 @@
 - difficulty assessment into `DifficultyPrompt` `#459`
 - section judge into `SectionJudgePrompt` `#460`
 - review prose judge into `ReviewProseJudgePrompt` `#461`
-- the two-stage review into `ReviewPrompt` `#463`
+- the two-stage review into `ReviewPrompt` `#463 open`
 - load each area rule with its prompt classes `#464`
-  **why:** builds were stuck on Railway, so I asked for it stacked on the review PR to merge in order later
+  **why:** Railway builds were having problems, so I asked for it stacked on
+  the review PR, to merge in order once they recover
