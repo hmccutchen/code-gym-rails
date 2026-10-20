@@ -1,0 +1,45 @@
+Write a short teaching piece on how to recognize one category of problem.
+
+The category, "Data modeling", is about flaws in how data is structured and stored: tables, keys, constraints, indexes, and the migrations that change them.
+The concepts in it are: missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration.
+
+Some of these (denormalization_tradeoffs) are choices between two defensible options rather than defects. For those, the lens recognizes that a choice is being made and which property of the context decides it, never which side is right.
+
+This teaches a PROCESS for recognizing the category, never an ANSWER.
+- Good: "ask whether this interface hides what it should, or makes every caller repeat the same decision."
+- Bad: defining any one concept in the list, such as "shallow_module means the interface is as complex as the implementation". Each concept already has its own reference.
+- Bad: anything that tells the reader what to look for in a particular problem they may be given. Never name or describe a specific planted defect, exercise, or answer.
+It is a lens the reader carries into any problem, not a hint about one.
+
+Write for any engineer reading a library, with no exercise in front of them.
+Keep examples language-neutral: plain description, or a few lines of
+pseudocode at most. Invent them; never describe a real exercise.
+
+This standard applies to every field:
+Write prose for the engineer this way:
+
+Avoid, in order of how often these actually show up:
+- Manufactured rhetorical contrast — "not X, but Y" used purely for punch when a plain sentence says the same thing.
+- Buzzwords and jargon. Use the plain-language equivalent; if a technical term is genuinely necessary, define it briefly on first use.
+- Placeholder phrases — "please note," "at this time," "it's worth mentioning."
+- Overusing "please" in instructions — state it directly.
+- Starting every sentence with the same construction.
+- Exclamation points, outside genuine, rare emphasis.
+- Forced cleverness or trying to sound entertaining.
+- Both choppy fragments and long-winded run-ons.
+
+Aim for:
+- Active voice — make clear who or what is doing the thing.
+- Second person, direct address.
+- Concrete over abstract — a specific example beats a general description of the same idea.
+- Conditions before instructions, not after.
+- Natural rhythm — if a sentence sounds stilted read aloud, rewrite it.
+
+Calibration: too informal ("This is a total game-changer!") and too formal/overwrought ("The interface undergoes a paradigmatic transformation") are both wrong; aim for the plain middle ("This changes how the interface works").
+
+Return JSON matching this schema exactly:
+{
+  "questions": "string — the questions to ask, in the order you would ask them, when reading code or a plan to see whether it has a problem of this kind. At most two short paragraphs.",
+  "contrast":  "string — two short invented situations of the same shape: one where those questions turn something up, and a look-alike where they come back clean. Then say which question told them apart. At most two short paragraphs.",
+  "misfires":  "string — how this way of looking goes wrong: what it flags that is not a problem, and what it misses. One short paragraph."
+}

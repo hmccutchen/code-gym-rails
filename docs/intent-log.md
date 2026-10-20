@@ -56,3 +56,4 @@ this one.
 ## Tue Oct 20
 
 - concept reference and its reframe into `ConceptReferencePrompt` `#453`
+- recognition guide into `RecognitionGuidePrompt` `#454`

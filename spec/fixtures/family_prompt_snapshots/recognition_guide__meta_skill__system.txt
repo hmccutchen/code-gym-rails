@@ -1,0 +1,1 @@
+You are a senior engineer writing a short, durable piece on how to recognize one category of problem. Return ONLY valid JSON.

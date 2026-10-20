@@ -8,7 +8,7 @@ of the group's block, above its concept list. A recognition group is a named
 one group; a language bucket's `core` group has no shared identity and gets
 none. The guide teaches a process, never an answer: it never defines one
 concept, which is `ConceptReference`'s job, and never hints at a planted
-defect. `AiService::RECOGNITION_GUIDE_SCOPE` states that in the prompt, and
+defect. `RecognitionGuidePrompt::SCOPE` states that in the prompt, and
 `#generate_recognition_guide(user, group_key)`'s signature holds it, since
 it is handed no exercise, response or history. It is therefore shown with no
 exposure gating. One row per group, shared across languages and the team,
