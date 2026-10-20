@@ -428,7 +428,7 @@ class ModelComparison
       review: fixture["review"], expected: fixture["expected"], must_survive: fixture["must_survive"] }
   end
 
-  def coach_for(language) = AiService::LANGUAGE_PROMPTS.fetch(language)[:coach]
+  def coach_for(language) = LanguagePrompts::ALL.fetch(language)[:coach]
 
   def run_prose_judge(heading, route, inputs, user)
     usage   = []
@@ -572,7 +572,7 @@ class ModelComparison
 
   def graded_review(service, response, exercise, section)
     provider = service.review_grading_provider
-    coach    = AiService.config_for(exercise.language)[:coach]
+    coach    = LanguagePrompts.for(exercise.language)[:coach]
     _, result = ReviewGrading.grade_section(section, context: provider.day_context.call(coach, exercise, response), user: response.user,
                                             exercise: exercise, response: response, coach: coach, provider: provider)
 

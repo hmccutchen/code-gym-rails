@@ -673,7 +673,7 @@ RSpec.describe AiService do
 
       language = "ruby_rails"
       ConceptVocabulary::DOMAIN_MODELING_CONCEPTS.each do |concept|
-        prompt = ConceptReferencePrompt.generate(concept: concept, language: language, **AiService.config_for(language).slice(:coach, :label))[:prompt]
+        prompt = ConceptReferencePrompt.generate(concept: concept, language: language, **LanguagePrompts.for(language).slice(:coach, :label))[:prompt]
 
         expect(prompt).to include("corrected version"), "#{concept} got the tradeoff contrast"
       end
@@ -735,24 +735,6 @@ RSpec.describe AiService do
     end
   end
 
-  it "has prompt wording for exactly the languages ConceptVocabulary has lists for" do
-    expect(AiService::LANGUAGE_PROMPTS.keys).to match_array(ConceptVocabulary.languages)
-  end
-
-  describe "schema_artifact in LANGUAGE_PROMPTS" do
-    it "names a per-language artifact for the two real languages" do
-      expect(AiService::LANGUAGE_PROMPTS["ruby_rails"][:schema_artifact]).to eq("a Rails migration")
-      expect(AiService::LANGUAGE_PROMPTS["javascript"][:schema_artifact])
-        .to eq("a Prisma schema change, with the migration it generates")
-    end
-
-    it "is absent for the pseudo-language buckets" do
-      %w[architecture plan_review ambiguity_hunt].each do |bucket|
-        expect(AiService::LANGUAGE_PROMPTS[bucket][:schema_artifact]).to be_nil
-      end
-    end
-  end
-
   describe "ARCHITECTURE_CONCEPTS" do
     it "is a frozen 15-entry language-independent vocabulary" do
       expect(ConceptVocabulary::ARCHITECTURE_CONCEPTS.size).to eq(15)
@@ -772,57 +754,10 @@ RSpec.describe AiService do
     end
   end
 
-  describe "SCENARIO_DOMAINS" do
-    it "is a frozen list of exactly these 9 scenario flavors, including a rare legacy-GraphQL entry" do
-      expect(AiService::SCENARIO_DOMAINS).to be_frozen
-      expect(AiService::SCENARIO_DOMAINS.size).to eq(9)
-      expect(AiService::SCENARIO_DOMAINS).to contain_exactly(
-        "background_job_processing", "api_versioning_and_deprecation",
-        "activerecord_query_construction", "component_state_management",
-        "data_export_and_reporting", "webhook_delivery", "rate_limiting",
-        "multi_tenant_data_isolation", "legacy_graphql_maintenance"
-      )
-    end
-
-    it "is never mixed into any tracked concept vocabulary" do
-      expect(AiService::SCENARIO_DOMAINS & ConceptVocabulary::RAILS_CONCEPTS).to be_empty
-      expect(AiService::SCENARIO_DOMAINS & ConceptVocabulary::JS_CONCEPTS).to be_empty
-      expect(AiService::SCENARIO_DOMAINS & ConceptVocabulary::ARCHITECTURE_CONCEPTS).to be_empty
-    end
-  end
-
-  describe "EVERYDAY_SCENARIO_DOMAINS" do
-    it "is a frozen, non-empty pool disjoint from the other pools and every concept vocabulary" do
-      pool = AiService::EVERYDAY_SCENARIO_DOMAINS
-
-      expect(pool).to be_frozen
-      expect(pool).not_to be_empty
-      expect(pool & AiService::SCENARIO_DOMAINS).to be_empty
-      [ ConceptVocabulary::RAILS_CONCEPTS, ConceptVocabulary::JS_CONCEPTS, ConceptVocabulary::ARCHITECTURE_CONCEPTS,
-        ConceptVocabulary::PLAN_REVIEW_CONCEPTS, ConceptVocabulary::AMBIGUITY_HUNT_CONCEPTS ].each do |vocabulary|
-        expect(pool & vocabulary).to be_empty
-      end
-    end
-
-    it "names nothing from a company's back office" do
-      back_office = %w[invoice invoicing ledger tenant csv webhook payroll billing export graphql api]
-
-      AiService::EVERYDAY_SCENARIO_DOMAINS.each do |domain|
-        expect(domain.split("_") & back_office).to be_empty, "#{domain} names back-office context"
-      end
-    end
-
-    it "is rolled under exactly the flavors DailyPlan weights" do
-      expect(AiService::SCENARIO_POOLS.keys).to match_array(DailyPlan::SCENARIO_FLAVOR_WEIGHTS.keys)
-      expect(AiService::SCENARIO_POOLS.dig(:general, :domains)).to equal(AiService::SCENARIO_DOMAINS)
-      expect(AiService::SCENARIO_POOLS.dig(:everyday, :domains)).to equal(AiService::EVERYDAY_SCENARIO_DOMAINS)
-    end
-  end
-
   describe "the fourth-slot pseudo-language buckets" do
     it "frames code_example as language-agnostic pseudocode for both fourth-slot configs" do
-      plan_review_prompt = ConceptReferencePrompt.generate(concept: "scope_creep", language: "plan_review", **AiService.config_for("plan_review").slice(:coach, :label))[:prompt]
-      ambiguity_prompt    = ConceptReferencePrompt.generate(concept: "missing_success_criteria", language: "ambiguity_hunt", **AiService.config_for("ambiguity_hunt").slice(:coach, :label))[:prompt]
+      plan_review_prompt = ConceptReferencePrompt.generate(concept: "scope_creep", language: "plan_review", **LanguagePrompts.for("plan_review").slice(:coach, :label))[:prompt]
+      ambiguity_prompt    = ConceptReferencePrompt.generate(concept: "missing_success_criteria", language: "ambiguity_hunt", **LanguagePrompts.for("ambiguity_hunt").slice(:coach, :label))[:prompt]
 
       expect(plan_review_prompt.downcase).to include("pseudocode")
       expect(ambiguity_prompt.downcase).to include("pseudocode")
@@ -937,7 +872,7 @@ RSpec.describe AiService do
       end
 
       { application_code: "memoization", schema_review: "missing_index" }.each do |mode, concept|
-        AiService::SCENARIO_POOLS.each_key do |flavor|
+        ScenarioPools::ALL.each_key do |flavor|
           context "#{mode} with #{flavor} flavor" do
             let(:excerpt) { RealSource.pool(mode).first }
 
@@ -1153,7 +1088,7 @@ RSpec.describe AiService do
       expect(prompt).not_to include("TypeScript syntax")
     end
 
-    it "prefers drawing scenarios from SCENARIO_DOMAINS, with legacy GraphQL framed as rare and concept-free" do
+    it "prefers drawing scenarios from ScenarioPools::GENERAL_DOMAINS, with legacy GraphQL framed as rare and concept-free" do
       prompt = render_generation_prompt(user)
       expect(prompt).to include("background job processing")
       expect(prompt).to include("activerecord query construction")
@@ -1197,7 +1132,7 @@ RSpec.describe AiService do
       it "offers the everyday pool, with the plain-words rule and no legacy GraphQL clause, on an everyday day" do
         prompt = render_generation_prompt(user, "ruby_rails", scenario_flavor: :everyday)
 
-        AiService::EVERYDAY_SCENARIO_DOMAINS.each do |domain|
+        ScenarioPools::EVERYDAY_DOMAINS.each do |domain|
           expect(prompt).to include(domain.tr("_", " "))
         end
         expect(prompt).to include("everyday settings people already know from daily life like:")
@@ -4179,7 +4114,7 @@ RSpec.describe AiService do
         expect(prompt_for(key)).to match(/The category, "#{Regexp.escape(key.humanize)}", is about \S/), key
       end
       language_key = (RecognitionGuide::GROUP_KEYS & ConceptBucket::LANGUAGE_INDEPENDENT).first
-      expect(prompt_for(language_key)).to include(AiService::LANGUAGE_PROMPTS.fetch(language_key).fetch(:focus))
+      expect(prompt_for(language_key)).to include(LanguagePrompts::ALL.fetch(language_key).fetch(:focus))
     end
 
     it "sends the recorded system prompt and prompt, with a language-independent bucket's focus as its subject" do
@@ -4234,7 +4169,7 @@ RSpec.describe AiService do
     it "reads a language-independent bucket's concepts and focus" do
       prompt = prompt_for("plan_review")
 
-      expect(prompt).to include(AiService::LANGUAGE_PROMPTS["plan_review"][:focus])
+      expect(prompt).to include(LanguagePrompts::ALL["plan_review"][:focus])
       ConceptVocabulary::PLAN_REVIEW_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
     end
 

@@ -14,7 +14,7 @@ RSpec.describe PseudocodePrompt do
 
   it "renders the translation's system prompt and prompt exactly as recorded" do
     request = described_class.translate(problem_statement: problem_statement, pseudocode: pseudocode,
-                                        language_label: AiService.config_for("javascript")[:label])
+                                        language_label: LanguagePrompts.for("javascript")[:label])
 
     expect(request.keys).to eq(%i[system prompt])
     expect_prompt_snapshot("pseudocode_translate__system", request[:system])

@@ -83,7 +83,7 @@ the write-up again clears the note, and so does a write-up landing.
 A setup problem is not a provider failure, and it is not worded as one
 (#443). `AiService.for` raises `SetupError` for a user with no recognized
 provider, or with the test-only fake provider outside a local environment;
-`.config_for` raises it for an unsupported generation language, and
+`LanguagePrompts.for` raises it for an unsupported generation language, and
 `ConceptVocabulary::UnknownLanguage` is one too. No provider was called in
 any of these cases, and none is reachable through the app:
 `require_provider` sends anyone without a usable key to Setup, and `User`

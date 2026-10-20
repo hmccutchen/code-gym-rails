@@ -81,9 +81,9 @@ RSpec.describe "Conventions held over app/ source" do
 
   it "finds a provider class however the reference is written, and not in a comment or a string" do
     expect(provider_class_references("AiService.for(user)")).to eq([ "AiService" ])
-    expect(provider_class_references("::AiService::LANGUAGE_PROMPTS")).to eq([ "AiService::LANGUAGE_PROMPTS" ])
+    expect(provider_class_references("::AiService::CALL_PROFILES")).to eq([ "AiService::CALL_PROFILES" ])
     expect(provider_class_references("X = GeminiService.daily_quota_reset_at(at)")).to eq([ "GeminiService" ])
     expect(provider_class_references("class Probe < ClaudeService; end")).to eq([ "ClaudeService" ])
-    expect(provider_class_references("# AiService::LANGUAGE_PROMPTS\nlabel = \"AiService\"")).to be_empty
+    expect(provider_class_references("# AiService::CALL_PROFILES\nlabel = \"AiService\"")).to be_empty
   end
 end

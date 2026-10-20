@@ -2,8 +2,8 @@
 
 the business setting every section's `scenario` is dressed
 in comes from one prompt line, and that line offers one pool from
-`AiService::SCENARIO_POOLS`: the job-adjacent `SCENARIO_DOMAINS` (webhook
-delivery, rate limiting, data export) or `EVERYDAY_SCENARIO_DOMAINS` (a
+`ScenarioPools::ALL`: the job-adjacent `GENERAL_DOMAINS` (webhook
+delivery, rate limiting, data export) or `EVERYDAY_DOMAINS` (a
 shared grocery list, a gym workout log, a library checkout). `DailyPlan`
 rolls which pool once per day (`SCENARIO_FLAVOR_WEIGHTS`, an even split)
 and carries it on `Result#scenario_flavor`; the prompt renders the chosen

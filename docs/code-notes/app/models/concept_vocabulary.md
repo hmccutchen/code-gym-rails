@@ -2,8 +2,8 @@
 
 The closed concept lists a section can be tagged with, and the two questions
 asked of them. They are domain data rather than provider data, so this module
-never reads `AiService`; `AiService` keeps each language's prompt wording in
-`LANGUAGE_PROMPTS`, and a spec holds its keys equal to `LANGUAGES`.
+never reads `AiService`. Each language's prompt wording is in
+`LanguagePrompts::ALL`, and a spec holds its keys equal to `LANGUAGES`.
 
 ## `DATA_MODELING_CONCEPTS`
 
