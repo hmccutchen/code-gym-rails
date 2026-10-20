@@ -65,15 +65,6 @@ class AiService
 
   MAX_GENERATED_CODE_LENGTH = 8_000
 
-  RATING_RUBRIC = <<~RUBRIC.chomp.freeze
-    How to choose "rating": rate the answer against the level its section was pitched at, which the grading instruction states on its "Pitched at" line, so a rating means the same thing at every level. Base it on the gaps you list in "missed". A gap is essential when, left as the engineer wrote it, the code or decision would behave wrongly or a requirement the problem states would go unmet. Missing syntax, polish or wording, or a step any engineer at this level would take for granted, is not essential and does not lower the rating. Judge what is essential against the problem as written: a problem simpler than its level's description is graded on what it actually asks. Each section's grading note says what its main point and its essential pieces are.
-    - "beginner": missed the main point of the section.
-    - "developing": found the main point, but missed or misexplained at least one essential piece.
-    - "solid": no essential misses.
-    - "strong": solid, plus something the question did not ask for that matters here, such as a tradeoff or a consequence.
-    The rating must agree with "missed": when "missed" names an essential gap, the rating is not "solid" or "strong". When a section's grading note says its rating is already fixed, that note wins.
-  RUBRIC
-
   RUBRIC_VERSION = 1
 
   JUDGE_MAX_TOKENS = 1_200
@@ -668,82 +659,28 @@ class AiService
   end
 
   def build_review_day_context(coach, exercise, daily_response)
-    keys    = exercise.active_section_keys
-    ratings = daily_response.section_ratings
-
-    sections = keys.map do |key|
-      ExerciseSection.for(key).review_context(
-        section: (exercise.problem_set[key] || {}).merge("rounds" => daily_response.pseudocode_round(key)),
-        answer: daily_response.answer_for(key), rating: ratings[key]
-      )
+    ratings  = daily_response.section_ratings
+    sections = exercise.active_section_keys.map do |key|
+      { key: key, section: (exercise.problem_set[key] || {}).merge("rounds" => daily_response.pseudocode_round(key)),
+        answer: daily_response.answer_for(key), rating: ratings[key] }
     end
 
-    others = keys.size - 1
-    others_clause =
-      case others
-      when 0 then "no other sections today"
-      when 1 then "the other section is"
-      else "the other #{others} sections are"
-      end
-
-    <<~CONTEXT
-      You are a senior #{coach} engineer giving direct, specific feedback on an engineer's Code Gym answers. You will grade exactly one of the day's #{keys.size} sections in a follow-up instruction — #{others_clause} given here only as context, since each section is rated against its own pitched level. Be honest and constructive. Return JSON.
-
-      #{UserText::PROMPT_RULE}
-
-      #{RATING_RUBRIC}
-
-      #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
-
-      #{sections.join("\n\n")}
-    CONTEXT
+    ReviewPrompt.day_system(coach: coach, sections: sections)
   end
 
   def build_review_section_prompt(exercise, daily_response, section)
-    <<~PROMPT
-      Grade ONLY the "#{section}" section from the day's context above.
-      Pitched at: #{pitch_line(exercise, daily_response, section)}
-
-      #{section_grading_note(exercise, daily_response, section)}
-
-      Return a single JSON object (NOT wrapped in a "#{section}" key) with:
-      - "rating": "beginner" | "developing" | "solid" | "strong"
-      - "correct": array of strings — each entry one distinct thing they got right
-      - "missed": array of strings — each entry one distinct thing they missed or got wrong
-      - "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
-      - "better_questions": array of strings — each entry one question they should have asked themselves
-      - "next_step": string — one specific thing to study
-      - "improved_code": string — #{improved_code_instruction(section)}
-
-      Each array entry must be ONE self-contained idea in one or two sentences. Never pack
-      several points into one entry, and never number points inside an entry ("1) ... 2) ...")
-      — separate ideas belong in separate entries. Use an empty array when there is nothing to
-      say for that field.
-    PROMPT
+    ReviewPrompt.section_prompt(key: section, section: exercise.problem_set[section] || {},
+                                answer: daily_response.answer_for(section), rung: review_rung(exercise, daily_response, section))
   end
 
-  def pitch_line(exercise, daily_response, section)
+  def review_rung(exercise, daily_response, section)
     stamped = exercise.problem_set.dig(section, "pitched_at")
-    rung = KindDifficulty::LEVELS.include?(stamped) ? stamped : current_rung(daily_response.user, section)
-    "#{rung} — #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}"
+    KindDifficulty::LEVELS.include?(stamped) ? stamped : current_rung(daily_response.user, section)
   end
 
   def current_rung(user, section)
     difficulty = user ? KindDifficulty.for(user) : KindDifficulty.none
     difficulty.rung_for(ExerciseSection.for(section), skill_level: user&.skill_level)
-  end
-
-  def improved_code_instruction(section)
-    kind = ExerciseSection.for(section)
-    kind.improved_code? ?
-      "the #{kind.improved_code_label.downcase} for this section" :
-      "must be an empty string for this section"
-  end
-
-  def section_grading_note(exercise, daily_response, section)
-    ExerciseSection.for(section).grading_note(
-      section: exercise.problem_set[section] || {}, answer: daily_response.answer_for(section)
-    )
   end
 
   INFRASTRUCTURE_ERRORS = [
