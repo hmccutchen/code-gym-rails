@@ -52,20 +52,23 @@ class GeminiService < AiService
   end
 
   def read_result(parsed, request)
+    usage  = read_usage(parsed["usage"] || {}, request.purpose)
+    status = parsed["status"]
+    return unfinished_reply(usage, status) if status && FINISHED_STATUSES.exclude?(status)
+
     model_output = Array(parsed["steps"]).find { |s| s["type"] == "model_output" }
     text_parts   = Array(model_output && model_output["content"]).select { |c| c["type"] == "text" }.map { |c| c["text"] }
-    usage        = parsed["usage"] || {}
-    output_tokens = usage["total_output_tokens"]
-    cached_tokens = usage["total_cached_tokens"].to_i
+    usage.merge(text: text_parts.join, truncated: parsed["status"] == "incomplete")
+  end
 
+  def read_usage(usage, purpose)
+    cached_tokens = usage["total_cached_tokens"].to_i
     {
-      text:          text_parts.join,
-      input_tokens:  usage["total_input_tokens"].to_i - cached_tokens,
-      output_tokens: output_tokens.to_i + usage["total_thought_tokens"].to_i,
-      model:         routed_model(request.purpose),
+      input_tokens:       usage["total_input_tokens"].to_i - cached_tokens,
+      output_tokens:      usage["total_output_tokens"].to_i + usage["total_thought_tokens"].to_i,
+      model:              routed_model(purpose),
       cache_read_tokens:  cached_tokens,
-      cache_write_tokens: 0,
-      truncated: parsed["status"] == "incomplete"
+      cache_write_tokens: 0
     }
   end
 

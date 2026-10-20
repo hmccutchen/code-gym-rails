@@ -310,14 +310,15 @@ RSpec.describe AiService do
       end
     end
 
-    it "marks a refused or truncated reply on the row that carries its tokens" do
+    it "marks a refused or truncated reply on the row that carries its tokens, and names the provider on the error" do
+      allow(double_class).to receive(:provider_key).and_return("claude")
       svc = double_class.new
       allow(svc).to receive(:call).and_return(text: nil, input_tokens: 700, output_tokens: 0, truncated: false, refusal: "cyber")
-      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(AiService::RefusalError)
+      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(AiService::RefusalError) { |e| expect(e.provider).to eq("claude") }
       expect(ApiUsage.last).to have_attributes(failure: "refusal", tokens_in: 700)
 
       allow(svc).to receive(:call).and_return(text: "{", input_tokens: 10, output_tokens: 400, truncated: true)
-      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(AiService::TruncatedResponseError)
+      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }.to raise_error(AiService::TruncatedResponseError) { |e| expect(e.provider).to eq("claude") }
       expect(ApiUsage.last).to have_attributes(failure: "truncated", tokens_out: 400)
     end
 

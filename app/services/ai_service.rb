@@ -50,6 +50,7 @@ class AiService
     end
   end
 
+  FINISHED_STATUSES = %w[completed incomplete].freeze
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 45
 
@@ -1613,17 +1614,24 @@ class AiService
       raise
     end
     log_usage(user, result.merge(failure: reply_failure_code(result, request.allow_truncated)), purpose: request.purpose)
-
-    raise Error, result[:error] if result[:error]
-    raise RefusalError, "The provider declined this request (#{result[:refusal]})" if result[:refusal]
-
-    if result[:truncated] && !request.allow_truncated
-      raise TruncatedResponseError,
-            "Provider did not finish its reply " \
-            "(#{result[:output_tokens].to_i} output tokens, thinking included)"
-    end
-
+    raise_for_reply!(result, request.allow_truncated)
     result
+  end
+
+  def raise_for_reply!(result, allow_truncated)
+    raise tagged(Error.new(result[:error])) if result[:error]
+    raise tagged(RefusalError.new("The provider declined this request (#{result[:refusal]})")) if result[:refusal]
+    return unless result[:truncated] && !allow_truncated
+
+    raise tagged(TruncatedResponseError.new("Provider did not finish its reply " \
+                                            "(#{result[:output_tokens].to_i} output tokens, thinking included)"))
+  end
+
+  def tagged(error) = error.tap { |e| e.provider = self.class.provider_key }
+
+  def unfinished_reply(usage, status)
+    Rails.logger.warn("#{provider_name} reply did not finish (status=#{status.inspect})")
+    usage.merge(error: "#{provider_name} did not complete its response. Try again.")
   end
 
   def failed_call_result(error, purpose)
