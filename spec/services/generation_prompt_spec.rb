@@ -4,7 +4,7 @@ RSpec.describe GenerationPrompt do
   describe ".system_prompt" do
     DailyExercise::LANGUAGES.each do |language|
       it "renders the #{language} system prompt exactly as recorded" do
-        config = AiService.config_for(language)
+        config = LanguagePrompts.for(language)
 
         expect_prompt_snapshot("generation_system__#{language}", described_class.system_prompt(coach: config[:coach], focus: config[:focus]))
       end
@@ -126,7 +126,7 @@ RSpec.describe GenerationPrompt do
 
   describe "forwarding the code-review mode to every kind" do
     def guidance_for(kind, language, mode, rung)
-      config = AiService.config_for(language)
+      config = LanguagePrompts.for(language)
       kind.generation_guidance(
         vocabulary: ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: rung),
         label: config[:label], mode: mode, artifact: config[:schema_artifact],

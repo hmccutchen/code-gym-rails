@@ -123,80 +123,6 @@ class AiService
     Request.build(purpose: purpose, system: system, prompt: prompt, history: history, response_schema: response_schema, **settings)
   end
 
-  SCENARIO_DOMAINS = %w[
-    background_job_processing api_versioning_and_deprecation
-    activerecord_query_construction component_state_management
-    data_export_and_reporting webhook_delivery rate_limiting
-    multi_tenant_data_isolation legacy_graphql_maintenance
-  ].freeze
-
-  EVERYDAY_SCENARIO_DOMAINS = %w[
-    shared_grocery_list recipe_box_and_meal_planner gym_workout_log
-    library_book_checkout pet_adoption_listings household_chore_rota
-    book_club_reading_list plant_watering_reminders event_rsvp_list
-    personal_savings_goals
-  ].freeze
-
-  LEGACY_GRAPHQL_SCENARIO_GUIDANCE =
-    "Use a legacy GraphQL maintenance scenario (e.g. \"a legacy GraphQL layer needs a fix\") only rarely — " \
-    "at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.".freeze
-
-  SCENARIO_POOLS = {
-    general: {
-      domains:    SCENARIO_DOMAINS,
-      intro:      "real, job-adjacent flavors",
-      adaptation: "a Rails day's \"component state management\" becomes a service/controller state concern instead",
-      rule:       nil,
-      legacy:     LEGACY_GRAPHQL_SCENARIO_GUIDANCE
-    },
-    everyday: {
-      domains:    EVERYDAY_SCENARIO_DOMAINS,
-      intro:      "everyday settings people already know from daily life",
-      adaptation: "a Rails day's \"shared grocery list\" is the model and controller that store and update the list",
-      rule:       "Keep the setting's own words plain and familiar: no business back-office terms such as invoices, " \
-                  "ledgers, tenants, CSV exports or webhooks, and solving a section must never require knowing how " \
-                  "a company's internal systems work.",
-      legacy:     nil
-    }
-  }.freeze
-
-  LANGUAGE_PROMPTS = {
-    "ruby_rails" => {
-      label:             "Ruby/Rails",
-      coach:             "Rails",
-      test_framework:    "an RSpec-style",
-      schema_artifact:   "a Rails migration",
-      focus:             "real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects."
-    },
-    "javascript" => {
-      label:             "JavaScript/React",
-      coach:             "JavaScript/React",
-      test_framework:    "a Jest/Vitest-style",
-      schema_artifact:   "a Prisma schema change, with the migration it generates",
-      focus:             "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
-    },
-    "architecture" => {
-      label:    "language-agnostic",
-      coach:    "software architecture",
-      focus:    "system-design tradeoffs: service boundaries, consistency, failure modes, scale, coupling."
-    },
-    "plan_review" => {
-      label:    "language-agnostic",
-      coach:    "engineering plan review",
-      focus:    "spotting flaws in a written implementation plan before it's built: unjustified complexity, scope creep, and unflagged behavior changes."
-    },
-    "ambiguity_hunt" => {
-      label:    "language-agnostic",
-      coach:    "requirements analysis",
-      focus:    "interrogating an underspecified feature request: missing scope boundaries, unhandled edge cases, and unstated success criteria."
-    },
-    "pseudocode_to_code" => {
-      label:    "language-agnostic",
-      coach:    "algorithm design",
-      focus:    "turning an informal plan into something that actually works: base cases, empty input, boundaries, ordering, and the failure paths a plan leaves undefined."
-    }
-  }.freeze
-
   MAX_LADDER_GUIDANCE_CHARS = 54_000
 
   MAX_CONCEPT_GUIDE_LENGTH = 4_000
@@ -268,7 +194,7 @@ class AiService
   def review_sections(user, exercise, daily_response, sections:)
     ReviewGrading.call(
       user: user, exercise: exercise, response: daily_response, sections: sections,
-      coach: config_for(exercise.language)[:coach], providers: -> { fresh_service.review_grading_provider }
+      coach: LanguagePrompts.for(exercise.language)[:coach], providers: -> { fresh_service.review_grading_provider }
     )
   end
 
@@ -281,7 +207,7 @@ class AiService
   end
 
   def generate_concept_reference(user, concept, language)
-    config = config_for(language)
+    config = LanguagePrompts.for(language)
 
     result = call_and_log(user, AiService.request_for("generate_concept_reference",
       **ConceptReferencePrompt.generate(concept: concept, language: language, coach: config[:coach], label: config[:label])))
@@ -315,7 +241,7 @@ class AiService
     already_read = ConceptReference::REFERENCE_FIELDS.index_with { |field| reference.public_send(field) }
 
     result = call_and_log(user, AiService.request_for("explain_concept_differently",
-      **ConceptReferencePrompt.reframe(concept: reference.concept, coach: config_for(reference.language)[:coach],
+      **ConceptReferencePrompt.reframe(concept: reference.concept, coach: LanguagePrompts.for(reference.language)[:coach],
                                        already_read: already_read, prior_alternates: prior_alternates)))
 
     text_or_raise(result, subject: "alternate concept explanation")
@@ -326,7 +252,7 @@ class AiService
 
     result = call_and_log(user, AiService.request_for("explain_differently",
       **ExplainDifferentlyPrompt.generate(
-        coach: config_for(exercise.language)[:coach], question: exercise.problem_set.dig(section, "question"),
+        coach: LanguagePrompts.for(exercise.language)[:coach], question: exercise.problem_set.dig(section, "question"),
         answer: daily_response.answer_for(section), missed: DailyResponse.review_points(review["missed"]),
         prior_alternates: prior_alternates
       )))
@@ -337,7 +263,7 @@ class AiService
   def answer_follow_up(user, exercise, daily_response, section:, question:, thread: [])
     result = call_and_log(user, AiService.request_for("review_follow_up",
       **FollowUpPrompt.generate(
-        coach: config_for(exercise.language)[:coach], exercise_question: exercise.problem_set.dig(section, "question"),
+        coach: LanguagePrompts.for(exercise.language)[:coach], exercise_question: exercise.problem_set.dig(section, "question"),
         review: daily_response.ai_review&.dig(section) || {}, answer: daily_response.answer_for(section),
         question: question, thread: thread
       )))
@@ -372,7 +298,7 @@ class AiService
 
   def translate_pseudocode(user, exercise, section:, pseudocode:)
     prompt = PseudocodePrompt.translate(problem_statement: problem_statement(exercise, section), pseudocode: pseudocode,
-                                        language_label: config_for(exercise.language)[:label])
+                                        language_label: LanguagePrompts.for(exercise.language)[:label])
     result = call_and_log(user, AiService.request_for("pseudocode_translate", **prompt))
 
     code = UserText.normalize(text_or_raise(result, subject: "pseudocode translation"))
@@ -397,12 +323,6 @@ class AiService
       **ReviewProseJudgePrompt.generate(kind: kind, coach: coach, projection: projection)))
     raw = parse_json_object(result[:text], subject: "review prose verdict", log_raw: false)
     ReviewProseVerdict.parse(raw, projection: projection)
-  end
-
-  def self.config_for(language)
-    LANGUAGE_PROMPTS.fetch(language) do
-      raise SetupError, "Unsupported generation language: #{language.inspect}"
-    end
   end
 
   def self.error_code_for(error)
@@ -553,9 +473,8 @@ class AiService
 
   def error_code_for(error) = self.class.error_code_for(error)
 
-  def require_supported_language!(language) = config_for(language)
+  def require_supported_language!(language) = LanguagePrompts.for(language)
 
-  def config_for(language) = self.class.config_for(language)
 
   def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs)
     hosts = kinds.filter_map do |kind|
@@ -624,7 +543,7 @@ class AiService
     raise NotImplementedError, "#{self.class} must implement #build_connection"
   end
 
-  def build_system_prompt(language = "ruby_rails") = GenerationPrompt.system_prompt(**config_for(language).slice(:coach, :focus))
+  def build_system_prompt(language = "ruby_rails") = GenerationPrompt.system_prompt(**LanguagePrompts.for(language).slice(:coach, :focus))
 
   def ladders_for(rungs, language, code_review_mode)
     requests = rungs.map do |kind, rung|
@@ -688,7 +607,7 @@ class AiService
 
   def assess_difficulty(user, exercise, sections:)
     result = call_and_log(user, AiService.request_for("assess_difficulty",
-      **DifficultyPrompt.generate(coach: config_for(exercise.language)[:coach],
+      **DifficultyPrompt.generate(coach: LanguagePrompts.for(exercise.language)[:coach],
                                   sections: sections.to_h { |section| [ section, exercise.problem_set[section.to_s] ] })))
 
     assessed = parse_json_object(result[:text], subject: "difficulty assessment")
@@ -696,7 +615,7 @@ class AiService
   end
 
   def recognition_subject(group_key)
-    RecognitionGuide::NAMED_GROUP_SUBJECTS.fetch(group_key) { LANGUAGE_PROMPTS.fetch(group_key).fetch(:focus) }
+    RecognitionGuide::NAMED_GROUP_SUBJECTS.fetch(group_key) { LanguagePrompts::ALL.fetch(group_key).fetch(:focus) }
   end
 
   # A non-Hash must fail here: an array saved to ai_review is truthy, flips #reviewed? and strands an empty review.

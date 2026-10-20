@@ -3,7 +3,7 @@ paths:
   - "app/services/{ai_service,generation_prompt,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt,problem_set_ingest,fake_service,judged_generation,caller_zone_thread}.rb"
   - "app/services/generation_prompt/**"
   - "app/services/judged_generation/**"
-  - "app/models/{exercise_section,concept_vocabulary,concept_bucket,real_source,judge_verdict,verdict_schema,code_format,daily_exercise,suggested_concept,mermaid_source}.rb"
+  - "app/models/{exercise_section,concept_vocabulary,language_prompts,scenario_pools,concept_bucket,real_source,judge_verdict,verdict_schema,code_format,daily_exercise,suggested_concept,mermaid_source}.rb"
   - "app/models/exercise_section/**"
   - "app/models/code_format/**"
   - "app/jobs/{generate_daily_exercises_job,regenerate_exercise_job}.rb"
@@ -72,7 +72,7 @@ read it before changing that area.
   holds at most `ExerciseSection::MAX_SECTIONS`, daily kinds first.
 - **Scenario flavor** (`docs/decisions/scenario-flavor.md`): Each day's
   scenario setting comes from one prompt line offering a pool from
-  `AiService::SCENARIO_POOLS`, rolled once a day by `DailyPlan`
+  `ScenarioPools::ALL`, rolled once a day by `DailyPlan`
   (`SCENARIO_FLAVOR_WEIGHTS`). Flavor is setting only: concepts come from each
   section's vocabulary, and solving must never need domain or company-internal
   knowledge. `ambiguity_hunt` keeps its own scenario, and a `RealSource`
