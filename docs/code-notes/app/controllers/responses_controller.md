@@ -22,13 +22,12 @@ Synchronous: the caller posts through `fetch` and appends the reply in place.
 
 ## `#explain_differently` and `#follow_ups`
 
-The count check before the provider call is advisory. The re-check under the
-row lock is what keeps concurrent requests under the cap.
+The check before the provider call only saves a paid call that would be
+refused anyway. `DailyResponse#append_alternate!` and `#append_follow_up!`
+check the cap again under the row lock, and the action only maps what they
+return (`#capped_outcome`).
 
 ## `#follow_ups`
-
-Both turns, the question and the answer, are written under the same lock, so
-no question is stored without its answer.
 
 The reply returns the cleaned question, so the transcript never claims an
 answer to text the provider never saw.

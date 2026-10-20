@@ -70,33 +70,15 @@ class ResponsesController < ApplicationController
 
   # POST /responses/:id/explain_differently
   def explain_differently
-    existing = Array(@response.review_alternates[@section])
-    if existing.size >= DailyResponse::MAX_ALTERNATES_PER_SECTION
-      return render_section_error(t("errors.responses.alternates_used", count: DailyResponse::MAX_ALTERNATES_PER_SECTION))
-    end
+    return render_section_error(alternates_used_message) unless @response.alternates_left(@section).positive?
 
     alternate = AiService.for(current_user).explain_differently(
       current_user, @response.daily_exercise, @response,
-      section: @section, prior_alternates: existing
+      section: @section, prior_alternates: Array(@response.review_alternates[@section])
     )
 
-    capped = false
-    remaining = nil
-    @response.with_lock do
-      current = Array(@response.review_alternates[@section])
-      if current.size >= DailyResponse::MAX_ALTERNATES_PER_SECTION
-        capped = true
-      else
-        @response.review_alternates = @response.review_alternates.merge(@section => current + [ alternate ])
-        @response.save!
-        remaining = DailyResponse::MAX_ALTERNATES_PER_SECTION - current.size - 1
-      end
-    end
-
-    if capped
-      render_section_error(t("errors.responses.alternates_used", count: DailyResponse::MAX_ALTERNATES_PER_SECTION))
-    else
-      render json: { status: "ok", alternate: alternate, remaining: remaining }
+    capped_outcome(@response.append_alternate!(@section, alternate), alternates_used_message) do |remaining|
+      { alternate: alternate, remaining: remaining }
     end
   rescue ProviderError, SetupError => e
     render_provider_failure(e, :alternate)
@@ -107,10 +89,7 @@ class ResponsesController < ApplicationController
     question = UserText.clean(params[:question], limit: UserText::MAX_QUESTION_LENGTH).strip
     return render_section_error(t("errors.responses.question_blank")) if question.blank?
 
-    asked = @response.review_follow_ups.where(section: @section, role: :user).count
-    if asked >= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION
-      return render_section_error(t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
-    end
+    return render_section_error(follow_ups_used_message) unless @response.follow_ups_left(@section).positive?
 
     thread = @response.review_follow_ups.for_section(@section).map { |t| { role: t.role, content: t.content } }
 
@@ -119,23 +98,9 @@ class ResponsesController < ApplicationController
       section: @section, question: question, thread: thread
     )
 
-    capped = false
-    remaining = nil
-    @response.with_lock do
-      current_count = @response.review_follow_ups.where(section: @section, role: :user).count
-      if current_count >= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION
-        capped = true
-      else
-        @response.review_follow_ups.create!(section: @section, role: :user, content: question)
-        @response.review_follow_ups.create!(section: @section, role: :assistant, content: answer)
-        remaining = DailyResponse::MAX_FOLLOW_UPS_PER_SECTION - current_count - 1
-      end
-    end
-
-    if capped
-      render_section_error(t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
-    else
-      render json: { status: "ok", question: question, answer: answer, remaining: remaining }
+    outcome = @response.append_follow_up!(@section, question: question, answer: answer)
+    capped_outcome(outcome, follow_ups_used_message) do |remaining|
+      { question: question, answer: answer, remaining: remaining }
     end
   rescue ProviderError, SetupError => e
     render_provider_failure(e, :follow_up)
@@ -315,6 +280,22 @@ class ResponsesController < ApplicationController
     elsif store.user_turn_count(section) >= MAX_DUCK_TURNS_PER_SECTION
       t("duck.turns_used", count: MAX_DUCK_TURNS_PER_SECTION)
     end
+  end
+
+  def capped_outcome(outcome, capped_message)
+    case outcome
+    when Integer then render json: { status: "ok", **yield(outcome) }
+    when :capped then render_section_error(capped_message)
+    else raise ArgumentError, "unhandled append outcome: #{outcome.inspect}"
+    end
+  end
+
+  def alternates_used_message
+    t("errors.responses.alternates_used", count: DailyResponse::MAX_ALTERNATES_PER_SECTION)
+  end
+
+  def follow_ups_used_message
+    t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION)
   end
 
   def stale_duck_page?(exercise) = params[:draft_scope].to_s != exercise.draft_scope

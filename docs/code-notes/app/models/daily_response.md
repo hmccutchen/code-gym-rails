@@ -4,6 +4,16 @@
 
 The cap is enforced on the server as well as in the view. Hiding the button does not stop a crafted request.
 
+## `#append_alternate!` and `#append_follow_up!`
+
+Each takes the row lock, reads what is left in the section again and either
+appends or writes nothing. It returns how many are left after the append, or
+`:capped` when another request filled the cap while the provider call ran.
+The caller's own count before the call is read outside the lock, so it can be
+stale, and only this check keeps concurrent requests under the cap.
+`#append_follow_up!` writes the question and the answer under the same lock,
+so no question is stored without its answer.
+
 ## `AI_REVIEW_FIELDS`
 
 `shared/_ai_review` and `ReviewMailer` both read this list. `next_step` is not a list field because it is meant to name one thing to study.
