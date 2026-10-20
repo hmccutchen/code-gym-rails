@@ -49,3 +49,5 @@ this one.
   **I decided:** `ProviderError` as the home, renamed everywhere with no
   aliases, and the field lists in a second PR with `LANGUAGE_PROMPTS` left
   where it is
+- the rest of `AiService`'s domain data moved onto the models, closing out the
+  layered review's first issue `#445`
