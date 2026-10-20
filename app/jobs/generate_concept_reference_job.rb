@@ -43,5 +43,8 @@ class GenerateConceptReferenceJob < ApplicationJob
     e.provider ||= user&.provider
     ConceptReferenceFailures.record(user_id: user_id, concept: concept, language: language, error: e)
     Rails.logger.warn("Failed to generate concept reference for #{concept}/#{language} (#{ProviderFailure.classify(e)}): #{e.message}")
+  rescue SetupError => e
+    ConceptReferenceFailures.record(user_id: user_id, concept: concept, language: language, error: e)
+    Rails.logger.error("Setup error generating concept reference #{concept}/#{language} for user #{user_id}: #{e.message}")
   end
 end

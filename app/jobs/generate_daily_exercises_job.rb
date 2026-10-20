@@ -15,8 +15,8 @@ class GenerateDailyExercisesJob < ApplicationJob
     else
       User.active.where.not(api_keys: nil).where(paused_generation_at: nil).find_each do |user|
         Time.use_zone(user.effective_time_zone) { generate_if_due(user) }
-      rescue AiService::SetupError => e
-        Rails.logger.error("Setup error for user #{user.id}: #{e.message}")
+      rescue StandardError => e
+        Rails.logger.error("Generation batch skipped user #{user.id}: #{e.class}: #{e.message}")
       end
     end
   end
@@ -84,7 +84,7 @@ class GenerateDailyExercisesJob < ApplicationJob
   rescue ProviderError::AllSectionsRejectedError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id}: #{e.message}")
     persist_failure(user) { user.record_generation_message!(e.message) }
-  rescue ProviderError => e
+  rescue ProviderError, SetupError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id} (#{ProviderFailure.classify(e)}): #{e.message}")
     persist_failure(user) { user.record_generation_failure!(e) }
     # Don't re-raise — one failure shouldn't block other users in the batch

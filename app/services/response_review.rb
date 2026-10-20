@@ -29,7 +29,7 @@ class ResponseReview
     review(missing_sections)
   rescue ActiveRecord::RecordNotFound
     Outcome.of(:set_cleared)
-  rescue ProviderError => e
+  rescue ProviderError, SetupError => e
     release_and(Outcome.of(:provider_error, error: e))
   rescue StandardError
     @response.release_reviewing!(@claim) if @claim

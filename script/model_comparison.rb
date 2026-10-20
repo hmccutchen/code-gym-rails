@@ -168,7 +168,7 @@ class ModelComparison
     FileUtils.mkdir_p(path.dirname)
     path.write(JSON.pretty_generate(section))
     { name: path.relative_path_from(Rails.root).to_s, rung: rung, section: section }
-  rescue ProviderError => e
+  rescue ProviderError, SetupError => e
     { name: path.relative_path_from(Rails.root).to_s, rung: rung, error: "#{e.class}: #{e.message}" }
   end
 
@@ -194,7 +194,7 @@ class ModelComparison
               matched: verdict.solve && kind.solve_matches_key?(draft[:section], verdict.solve))
   rescue JudgeVerdict::Invalid => e
     row.merge(status: :invalid, detail: "#{e.class}: #{e.message}", matched: nil)
-  rescue ProviderError => e
+  rescue ProviderError, SetupError => e
     row.merge(status: :error, detail: "#{e.class}: #{e.message}", matched: nil)
   end
 
@@ -332,7 +332,7 @@ class ModelComparison
                                                     rung: fixture["rung"], locked: fixture["locked"]))
     rescue JudgeVerdict::Invalid => e
       fixture_failure(fixture, :invalid, e)
-    rescue ProviderError => e
+    rescue ProviderError, SetupError => e
       fixture_failure(fixture, :error, e)
     end
 
@@ -381,7 +381,7 @@ class ModelComparison
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     output  = begin
       yield service
-    rescue ProviderError, JSON::ParserError => e
+    rescue ProviderError, SetupError, JSON::ParserError => e
       "#{e.class}: #{e.message}"
     end
 
@@ -457,7 +457,7 @@ class ModelComparison
     [ verdict.status, verdict, nil ]
   rescue ReviewProseVerdict::Invalid, ProviderError::InvalidResponseError => e
     [ :invalid, nil, "#{e.class}: #{e.message}" ]
-  rescue ProviderError => e
+  rescue ProviderError, SetupError => e
     [ :error, nil, "#{e.class}: #{e.message}" ]
   end
 

@@ -322,14 +322,14 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(user.last_generation_error_date).to eq(Date.current)
   end
 
-  it "releases the claim before letting a setup error fail the job" do
+  it "releases the claim and records a setup failure, keeping the old set" do
     exercise = claimed_exercise
-    allow(AiService).to receive(:for).with(user).and_raise(AiService::SetupError, "User #{user.id} has no recognized AI provider configured")
+    allow(AiService).to receive(:for).with(user).and_raise(SetupError, "User #{user.id} has no recognized AI provider configured")
 
-    expect { described_class.new.perform(user_id: user.id) }.to raise_error(AiService::SetupError)
+    expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
     expect(exercise.reload.regenerating_since).to be_nil
     expect(exercise.problem_set).to eq("code_review" => { "question" => "old" })
-    expect(user.reload.last_generation_failure).to be_nil
+    expect(user.reload.last_generation_failure).to eq("setup")
   end
 
   it "does not raise when the provider fails" do

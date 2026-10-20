@@ -495,7 +495,7 @@ RSpec.describe AiService do
 
     it "raises instead of silently falling back on an unsupported language" do
       expect { service.send(:build_system_prompt, "mixed") }
-        .to raise_error(AiService::SetupError, /Unsupported generation language/)
+        .to raise_error(SetupError, /Unsupported generation language/)
     end
   end
 
@@ -2085,7 +2085,7 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: "{}")
 
       expect { svc.generate_exercise(user, language: "mixed") }
-        .to raise_error(AiService::SetupError, /Unsupported generation language/)
+        .to raise_error(SetupError, /Unsupported generation language/)
       expect(DailyPlan).not_to have_received(:for)
     end
 
@@ -4014,7 +4014,7 @@ RSpec.describe AiService do
     end
 
     it "raises a setup error, outside the provider family, when the user has no recognized provider" do
-      expect { AiService.for(user) }.to raise_error(AiService::SetupError, /no recognized AI provider/) { |error|
+      expect { AiService.for(user) }.to raise_error(SetupError, /no recognized AI provider/) { |error|
         expect(error).not_to be_a(ProviderError)
       }
     end
@@ -4285,7 +4285,7 @@ RSpec.describe AiService do
       service = double_class.new(canned_text: valid_json)
       expect {
         service.generate_concept_reference(user, "n_plus_one", "mixed")
-      }.to raise_error(AiService::SetupError, /Unsupported generation language/)
+      }.to raise_error(SetupError, /Unsupported generation language/)
     end
   end
 

@@ -81,16 +81,24 @@ is per process, where the jobs run in the web process anyway. Asking for
 the write-up again clears the note, and so does a write-up landing.
 
 A setup problem is not a provider failure, and it is not worded as one
-(#443). `AiService.for` raises `AiService::SetupError` for a user with no
-recognized provider, or with the test-only fake provider outside a local
-environment, and `.config_for` raises it for an unsupported generation
-language. No provider was called in any of these cases, and none is
-reachable through the app: `require_provider` sends anyone without a usable
-key to Setup, and `User` validates `provider` and `language`. So each one
-means an account in a state the app shouldn't allow, or a bug, and it
-should be seen rather than explained away. A controller lets it surface as
-a server error and a job lets it fail in Solid Queue. Each first releases
-what it holds: the regenerate job its regeneration claim, and the
-pseudocode critique its round's claim. The hourly batch is the exception:
-it logs the error with the user's id and continues, so one broken account
-can't stop generation for everyone after it.
+(#443). `AiService.for` raises `SetupError` for a user with no recognized
+provider, or with the test-only fake provider outside a local environment;
+`.config_for` raises it for an unsupported generation language, and
+`ConceptVocabulary::UnknownLanguage` is one too. No provider was called in
+any of these cases, and none is reachable through the app:
+`require_provider` sends anyone without a usable key to Setup, and `User`
+validates `provider` and `language`.
+
+`SetupError` sits outside the `ProviderError` family, but every boundary
+rescues it next to `ProviderError` and records or renders it the same way.
+That's deliberate: a page waiting on a job only stops waiting when a
+failure is recorded, and the dashboard re-enqueues generation on every
+load until one is. An earlier version let these errors fail unrescued,
+which left the dashboard and Learn polling with no end. `ProviderFailure`
+classifies it as `setup`, whose wording points at Setup and never names the
+provider. Each boundary logs it at error level with the user's id, which is
+the only place it shows up, since the app reports to no error tracker.
+
+The hourly batch rescues any error per user, logs it with the user's id and
+moves on, so one broken account can't stop generation for the users after
+it.

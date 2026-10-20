@@ -336,9 +336,9 @@ give the user a raw 500.
 
 Planning reads `ConceptVocabulary`, which raises its own unknown-language
 error. Checking first makes an unsupported language fail as
-`AiService::SetupError` before any planning work, the same error
-`.config_for` raises, so every setup problem reaches the boundaries as one
-class.
+`SetupError` before any planning work, the same error `.config_for` raises.
+`ConceptVocabulary::UnknownLanguage` is a `SetupError` too, so the check
+changes when the failure happens, not how it's classified.
 
 ## `.config_for` and `#config_for`
 

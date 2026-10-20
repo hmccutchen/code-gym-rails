@@ -153,10 +153,14 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(user.daily_responses.where(date: Date.current).count).to eq(1)
     end
 
-    it "releases the claim before letting a setup error surface" do
-      allow_any_instance_of(FakeService).to receive(:critique_pseudocode).and_raise(AiService::SetupError, "Unsupported generation language: \"cobol\"")
+    it "releases the claim and words a setup error as setup, not as a provider failure" do
+      allow_any_instance_of(FakeService).to receive(:critique_pseudocode).and_raise(SetupError, "Unsupported generation language: \"cobol\"")
 
-      expect { critique }.to raise_error(AiService::SetupError)
+      critique
+
+      expect(response).to have_http_status(:service_unavailable)
+      expect(response.parsed_body).to include("failure" => "setup")
+      expect(response.parsed_body["error"]).to include("setup has a problem").and(satisfy { |text| text.exclude?("cobol") })
       expect(round["critique_claimed_at"]).to be_nil
       expect(round).not_to have_key("critiqued_at")
     end

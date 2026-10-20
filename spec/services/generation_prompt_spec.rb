@@ -103,8 +103,8 @@ RSpec.describe GenerationPrompt do
     end
 
     it "raises for an unsupported language on render and on schema" do
-      expect { build("mixed").render }.to raise_error(AiService::SetupError, /Unsupported generation language/)
-      expect { build("mixed").schema }.to raise_error(AiService::SetupError, /Unsupported generation language/)
+      expect { build("mixed").render }.to raise_error(SetupError, /Unsupported generation language/)
+      expect { build("mixed").schema }.to raise_error(SetupError, /Unsupported generation language/)
     end
   end
 

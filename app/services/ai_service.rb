@@ -2,8 +2,6 @@ require "json"
 
 # Design notes: docs/code-notes/app/services/ai_service.md
 class AiService
-  class SetupError < StandardError; end
-
   FINISHED_STATUSES = %w[completed incomplete].freeze
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 45

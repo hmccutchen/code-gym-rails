@@ -88,11 +88,14 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(DailyExercise.exists?(user: user, date: Date.current)).to be false
   end
 
-  it "lets a setup error fail a one-user job, without recording it as a provider failure" do
-    allow(AiService).to receive(:for).with(user).and_raise(AiService::SetupError, "User #{user.id} has no recognized AI provider configured")
+  it "records a setup error as a setup failure, so the dashboard stops waiting and words it as setup" do
+    allow(AiService).to receive(:for).with(user).and_raise(SetupError, "User #{user.id} has no recognized AI provider configured")
+    allow(Rails.logger).to receive(:error)
 
-    expect { described_class.new.perform(user_id: user.id) }.to raise_error(AiService::SetupError)
-    expect(user.reload.last_generation_failure).to be_nil
+    expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
+    expect(user.reload).to have_attributes(last_generation_failure: "setup", last_generation_error_date: Date.current)
+    expect(user.generation_failure_message(surface: :generation)).to include("setup has a problem").and include("Check your provider")
+    expect(Rails.logger).to have_received(:error).with(/user #{user.id}.*no recognized AI provider/)
   end
 
   it "records a rejected key as bad_key and renders a Setup-pointing sentence" do
@@ -368,10 +371,10 @@ RSpec.describe GenerateDailyExercisesJob do
       end
     end
 
-    it "logs a broken account's setup error and still generates for the users after it" do
+    it "logs any error one account raises and still generates for the users after it" do
       broken = User.create!(email: "broken@example.com", name: "Broken", provider: "anthropic",
                             api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles")
-      allow(AiService).to receive(:for).with(broken).and_raise(AiService::SetupError, "User #{broken.id} has no recognized AI provider configured")
+      allow(AiService).to receive(:for).with(broken).and_raise(RuntimeError, "unexpected")
       stub_generation_for(pac)
       allow(Rails.logger).to receive(:error)
 
@@ -380,8 +383,7 @@ RSpec.describe GenerateDailyExercisesJob do
         local_today = Time.use_zone("America/Los_Angeles") { Date.current }
         expect(DailyExercise.exists?(user: pac, date: local_today)).to be true
       end
-      expect(Rails.logger).to have_received(:error).with(/Setup error for user #{broken.id}: .*no recognized AI provider/)
-      expect(broken.reload.last_generation_failure).to be_nil
+      expect(Rails.logger).to have_received(:error).with("Generation batch skipped user #{broken.id}: RuntimeError: unexpected")
     end
 
     it "skips a user who has paused automatic generation" do
