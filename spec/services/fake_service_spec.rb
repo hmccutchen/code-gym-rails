@@ -185,10 +185,10 @@ RSpec.describe FakeService do
   end
 
   describe "#generate_concept_reference" do
-    it "returns every required CONCEPT_REFERENCE_FIELDS field non-blank" do
+    it "returns every required ConceptReference::REFERENCE_FIELDS field non-blank" do
       reference = described_class.new(user.api_key).generate_concept_reference(user, "n_plus_one", "ruby_rails")
 
-      AiService::CONCEPT_REFERENCE_FIELDS.each do |field|
+      ConceptReference::REFERENCE_FIELDS.each do |field|
         expect(reference[field].to_s.strip).to be_present
       end
     end

@@ -16,7 +16,7 @@ dropdown, the duck's explain mode, or anywhere else that logic runs.
 The guide (`ConceptReference::GUIDE_FIELDS`) is produced by the *same*
 `#generate_concept_reference` call that writes the inline reference, in one
 request — so the two cannot drift apart by construction rather than by
-hope. `CONCEPT_REFERENCE_FIELDS` is deliberately not extended (it is read by
+hope. `ConceptReference::REFERENCE_FIELDS` is deliberately not extended (it is read by
 `#explain_concept_differently` to build "the reference they've already
 read," and widening it would silently change that prompt), and the guide
 fields are deliberately outside the required-field check

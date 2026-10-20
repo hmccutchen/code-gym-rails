@@ -381,11 +381,7 @@ class AiService
     }
   }.freeze
 
-  CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
-
   WORKED_EXAMPLE_BOUND = "At most the two fragments plus four sentences of prose.".freeze
-
-
 
   MAX_LADDER_RUNG_LENGTH = 300
 
@@ -397,7 +393,6 @@ class AiService
     This is a stable explanation an engineer returns to across repeat exposure —
     not tied to any single problem.
   SCOPE
-
 
   RECOGNITION_GUIDE_SCOPE = <<~SCOPE.chomp
     This teaches a PROCESS for recognizing the category, never an ANSWER.
@@ -496,7 +491,7 @@ class AiService
 
     reference = parse_json_object(result[:text], subject: "concept reference")
 
-    missing = CONCEPT_REFERENCE_FIELDS.reject { |field| reference[field].is_a?(String) && reference[field].strip.present? }
+    missing = ConceptReference::REFERENCE_FIELDS.reject { |field| reference[field].is_a?(String) && reference[field].strip.present? }
     if missing.any?
       raise ProviderError::InvalidResponseError, "Concept reference missing required field(s): #{missing.join(', ')}"
     end
@@ -524,7 +519,7 @@ class AiService
   def explain_concept_differently(user, reference, prior_alternates: [])
     coach = config_for(reference.language)[:coach]
 
-    already_read = CONCEPT_REFERENCE_FIELDS
+    already_read = ConceptReference::REFERENCE_FIELDS
       .map { |field| "#{field}: #{reference.public_send(field)}" }
       .join("\n")
 
@@ -1263,7 +1258,6 @@ class AiService
     parse_json_object(result[:text], subject: "#{section} review", log_raw: false)
       .except(ReviewProseVerdict::ORIGINAL_KEY, "rubric").merge("rubric" => RUBRIC_VERSION)
   end
-
 
   def assess_difficulty(user, exercise, sections:)
     result = call_and_log(user, AiService.request_for("assess_difficulty",

@@ -3136,7 +3136,7 @@ RSpec.describe AiService do
 
       expect(result).to eq("Picture a library courier.")
       expect(svc.last_prompt).to include("n_plus_one")
-      AiService::CONCEPT_REFERENCE_FIELDS.each do |field|
+      ConceptReference::REFERENCE_FIELDS.each do |field|
         expect(svc.last_prompt).to include(reference.public_send(field))
       end
       expect(svc.last_prompt).to include("A restaurant-orders analogy")
@@ -4250,7 +4250,7 @@ RSpec.describe AiService do
       }.to raise_error(ProviderError::InvalidResponseError, /senior_lens/)
     end
 
-    AiService::CONCEPT_REFERENCE_FIELDS.each do |field|
+    ConceptReference::REFERENCE_FIELDS.each do |field|
       [ nil, false, true, 0, 1.5, [], [ "prose" ], {}, { "text" => "prose" }, "", " \n\t " ].each do |invalid|
         it "rejects #{invalid.inspect} in required reference field #{field}" do
           payload = JSON.parse(valid_json).merge(field => invalid)
@@ -4713,9 +4713,9 @@ RSpec.describe AiService do
 
   describe "concept field constants" do
     it "keeps the guide out of the reference field list" do
-      expect(AiService::CONCEPT_REFERENCE_FIELDS)
+      expect(ConceptReference::REFERENCE_FIELDS)
         .to eq(%w[tagline explanation code_example senior_lens])
-      expect(AiService::CONCEPT_REFERENCE_FIELDS & ConceptReference::GUIDE_FIELDS).to be_empty
+      expect(ConceptReference::REFERENCE_FIELDS & ConceptReference::GUIDE_FIELDS).to be_empty
     end
 
     it "does not send the guide to the alternate-framing prompt" do

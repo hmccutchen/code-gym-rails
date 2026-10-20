@@ -53,15 +53,21 @@ RSpec.describe "Conventions held over app/ source" do
     "app/models/recognition_guide.rb" => [ "AiService::LANGUAGE_PROMPTS" ]
   }.freeze
 
+  def provider_class_names = @provider_class_names ||= ([ AiService ] + AiProvider.all).map { |klass| klass.name.to_sym }
+
+  def provider_class_name?(node)
+    (node.is_a?(Prism::ConstantReadNode) || (node.is_a?(Prism::ConstantPathNode) && node.parent.nil?)) &&
+      provider_class_names.include?(node.name)
+  end
+
   def provider_class_references(path)
-    names = ([ AiService ] + AiProvider.all).map { |klass| klass.name.to_sym }
     found = []
     visit = lambda do |node|
-      if node.is_a?(Prism::ConstantPathNode) && node.parent.is_a?(Prism::ConstantReadNode) && names.include?(node.parent.name)
+      if node.is_a?(Prism::ConstantPathNode) && provider_class_name?(node.parent)
         found << "#{node.parent.name}::#{node.name}"
         next
       end
-      found << node.name.to_s if node.is_a?(Prism::ConstantReadNode) && names.include?(node.name)
+      found << node.name.to_s if provider_class_name?(node)
       node.compact_child_nodes.each(&visit)
     end
     visit.call(Prism.parse_file(path).value)

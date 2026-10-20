@@ -4,7 +4,7 @@ RSpec.describe "Learn ladder generation", type: :system, with_csrf: true do
   it "offers another attempt when generation finishes with unchanged prose and an incomplete ladder" do
     user = create_fake_provider_user
     user.update!(language: "ruby_rails", section_kind_levels: { "challenge" => "senior" })
-    prose = (AiService::CONCEPT_REFERENCE_FIELDS + ConceptReference::GUIDE_FIELDS)
+    prose = (ConceptReference::REFERENCE_FIELDS + ConceptReference::GUIDE_FIELDS)
               .index_with { |field| "Existing #{field.humanize.downcase}." }
     reference = ConceptReference.create!(prose.merge(concept: "n_plus_one", language: "ruby_rails"))
     allow_any_instance_of(FakeService).to receive(:generate_concept_reference)
