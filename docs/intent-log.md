@@ -51,3 +51,8 @@ this one.
   **I decided:** changed my mind from letting them fail unrescued once that
   left pages spinning; record and word them as setup, batch skips any error
 - the rest of `AiService`'s domain data moved onto the models `#445`
+
+## Tue Oct 20
+
+- the follow-up and alternate caps moved into `DailyResponse`, from the
+  layered review's issue `#449`
