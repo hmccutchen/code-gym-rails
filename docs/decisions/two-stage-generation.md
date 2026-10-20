@@ -189,7 +189,7 @@ the least stated in the generation prompt.
 
 **Planned concepts a drop left unhosted are recorded and nothing is
 rescheduled.** The plan attributes a concept to a section only in the fourth
-slot, so `unhosted_concepts` decides after the fact the way `log_retention`
+slot, so `unhosted_concepts` decides after the fact the way `GenerationDiagnostics`' retention log
 already decides honored: the dropped section's own concept, matched against
 what the plan offered as a due check or as reinforcement. It can therefore
 never name a concept the plan did not offer. The `[retention]` line gains

@@ -54,8 +54,8 @@ class ModelComparison
 
     compare("generate", heading: "user #{user.id}, #{language}") do |service|
       problem_set = with_fixed_plan(plan) { service.generate_exercise(user, language: language) }
-      # Printed output gets pasted around, which is the storage without_answer_key keeps the key out of.
-      service.send(:without_answer_key, problem_set)
+      # Printed output gets pasted around, which is the storage ExerciseSection.without_answer_keys keeps the key out of.
+      ExerciseSection.without_answer_keys(problem_set)
     end
   end
 

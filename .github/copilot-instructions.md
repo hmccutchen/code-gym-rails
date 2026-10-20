@@ -200,7 +200,7 @@ explicit, visible authorization check.
 
 **Does a hidden answer key stay hidden?** BLOCKING. `planted_ambiguities` is
 grading data and must never reach a rendered page, a pre-submission AI context,
-or log storage. `AiService#without_answer_key` strips it from the one place a
+or log storage. `ExerciseSection.without_answer_keys` strips it from the one place a
 whole `problem_set` is serialized.
 
 ## Performance

@@ -779,7 +779,7 @@ class AiService
   def draft_exercise(user, language:, blocking:, deadline: GenerationDeadline::NONE)
     require_supported_language!(language)
     plan       = DailyPlan.for(user, language: language)
-    log_set_size(user, plan.size)
+    GenerationDiagnostics.new(user).set_size(plan.size)
     history    = user.recent_performance
     difficulty = KindDifficulty.for(user)
     kinds      = plan.kinds
@@ -796,7 +796,7 @@ class AiService
       pitched_at: difficulty.rungs(skill_level: user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
     )
 
-    log_unusable_sections(user, ingested.unusable_sections)
+    GenerationDiagnostics.new(user).unusable_sections(ingested.unusable_sections)
     Draft.new(problem_set: ingested.problem_set, plan: plan, kinds: kinds, difficulty: difficulty,
               ladders: ladders, history: history,
               suggested_concepts: ingested.suggested_concepts, unusable_sections: ingested.unusable_sections)
@@ -807,29 +807,9 @@ class AiService
                          retention_annotation: method(:annotate_retention_concept))
   end
 
-  def log_unusable_sections(user, unusable)
-    unusable.each do |section|
-      Rails.logger.warn("[unusable_section] user=#{user.id} section=#{section.key} reason=#{section.reason}")
-    end
-  end
-
   def finish_generation(user, language, draft, set, dropped_concepts: {}, judge: nil, unhosted: [])
-    plan = draft.plan
     record_suggested_concepts(draft.suggested_concepts)
-
-    fourth_dropped, language_dropped = dropped_concepts
-      .partition { |key, _| ExerciseSection.fourths.include?(ExerciseSection.find(key)) }.map(&:to_h)
-    log_retention(user, language, plan.due_checks, set, plan.code_review_mode, dropped: language_dropped)
-    if plan.fourth
-      log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks,
-                    set, plan.code_review_mode, dropped: fourth_dropped)
-    end
-    log_waiting_retention(user, plan.waiting_checks)
-    log_shared_concept(user, plan, set)
-    log_coverage(user, plan.coverage)
-    log_difficulty_diagnostics(user, language, plan, set, draft.history,
-                               kinds: draft.kinds, difficulty: draft.difficulty, ladders: draft.ladders,
-                               judge: judge, unhosted: unhosted)
+    GenerationDiagnostics.new(user).finished(language, draft, set, dropped_concepts: dropped_concepts, judge: judge, unhosted: unhosted)
   end
 
   def retry_section(user, language, draft, kind, concept, deadline: GenerationDeadline::NONE)
@@ -983,92 +963,6 @@ class AiService
     ConceptVocabulary.selectable_for_section(section_key, language, mode: mode, rung: rung).include?(cm.concept)
   end
 
-  def log_retention(user, bucket, due_checks, problem_set, code_review_mode, dropped: {})
-    return if due_checks.empty?
-
-    offered = due_checks.map(&:concept)
-    tagged  = problem_set.values.filter_map { |s| s["concept"] if s.is_a?(Hash) }
-    honored = offered & tagged
-
-    Rails.logger.info(
-      "[retention] user=#{user.id} date=#{Date.current} bucket=#{bucket} " \
-      "code_review_mode=#{code_review_mode} " \
-      "offered=#{offered.join(',').presence || '-'} " \
-      "honored=#{honored.join(',').presence || '-'} " \
-      "tagged=#{tagged.join(',').presence || '-'} " \
-      "dropped=#{dropped.map { |key, concept| "#{key}:#{concept}" }.join(',').presence || '-'}"
-    )
-  end
-
-  def log_set_size(user, size)
-    Rails.logger.info("[set_size] user=#{user.id} date=#{Date.current} #{size.diagnostics.to_json}")
-
-    previous = user.daily_exercises.planned_size_before(Date.current)
-    return if previous.nil? || previous == size.count
-
-    Rails.logger.info("[set_size] user=#{user.id} from=#{previous} to=#{size.count} reason=#{size.reason}")
-  end
-
-  def log_coverage(user, coverage)
-    return if coverage.nil?
-
-    Rails.logger.info("[coverage] user=#{user.id} kind=#{coverage.kind.key} reason=#{coverage.reason}")
-  end
-
-  def log_shared_concept(user, plan, problem_set)
-    concept = plan.shared_concept
-    return if concept.nil?
-
-    Rails.logger.info(
-      "[shared_concept] user=#{user.id} concept=#{concept} reason=reduced_tier " \
-      "honored=#{ExerciseSection.daily_sections_share?(problem_set, concept, daily: plan.daily_kinds)}"
-    )
-  end
-
-  def log_waiting_retention(user, waiting)
-    return if waiting.empty?
-
-    entries = waiting.map { |check| "#{check[:bucket]}:#{check[:concept]}(#{check[:reason]})" }
-    Rails.logger.info("[retention] user=#{user.id} date=#{Date.current} waiting=#{entries.join(',')}")
-  end
-
-  def log_difficulty_diagnostics(user, language, plan, problem_set, history, kinds:, difficulty:, ladders:,
-                                 judge: nil, unhosted: [])
-    requested = {
-      skill_level: user.skill_level,
-      code_review_mode: plan.code_review_mode,
-      code_review_source: plan.code_review_source&.id,
-      scenario_flavor: plan.scenario_flavor,
-      daily_kinds: plan.daily_kinds.map(&:key),
-      pattern: plan.rotation[:pattern],
-      third: plan.rotation[:third],
-      fourth: plan.fourth,
-      section_count: kinds.size,
-      reinforcement: plan.reinforcement,
-      due_checks: plan.due_checks.map(&:concept),
-      established: plan.established.map(&:concept),
-      shared_concept: plan.shared_concept,
-      coverage: plan.coverage && { kind: plan.coverage.kind.key, reason: plan.coverage.reason },
-      size: plan.size.diagnostics,
-      recent_performance: history
-    }
-    rungs = difficulty.rungs_for(kinds, skill_level: user.skill_level)
-    requested.merge!(kind_difficulty_diagnostics(rungs, difficulty, ladders, language, plan.code_review_mode, problem_set))
-
-    payload = {
-      event: "generation",
-      user_id: user.id,
-      date: Date.current.to_s,
-      language: language,
-      requested: requested,
-      delivered: without_answer_key(problem_set),
-      judge: judge,
-      unhosted: unhosted
-    }
-
-    Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
-  end
-
   def eased_concepts_for(plan, difficulty)
     reduced_main   = reduced_concepts(plan.reinforcement)
     reduced_fourth = reduced_concepts(plan.fourth_reinforcement)
@@ -1080,26 +974,6 @@ class AiService
 
   def reduced_concepts(entries)
     entries.select { |h| h[:tier] == "reduced" }.map { |h| h[:concept] }
-  end
-
-  def kind_difficulty_diagnostics(rungs, difficulty, ladders, language, mode, problem_set)
-    per_kind = rungs.to_h do |kind, rung|
-      vocabulary = ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: rung)
-      grounded   = vocabulary & ladders.fetch(rung, {}).keys
-      chosen     = problem_set.dig(kind.key, "concept")
-      [ kind.key, { level: rung, targeted: difficulty.targeted?(kind), locked: difficulty.locked?(kind),
-                    ladder_coverage: "#{grounded.size}/#{vocabulary.size}",
-                    chosen_concept: chosen, chosen_grounded: grounded.include?(chosen) } ]
-    end
-
-    { kind_difficulty: per_kind,
-      kind_difficulty_chars: GenerationPrompt::DifficultyGuidance.render(rungs: rungs, difficulty: difficulty, ladders: ladders).length }
-  end
-
-  def without_answer_key(problem_set)
-    problem_set.transform_values do |section|
-      section.is_a?(Hash) ? section.except(*ExerciseSection.all_answer_key_fields) : section
-    end
   end
 
   def call(request)
@@ -1267,7 +1141,6 @@ class AiService
     parse_json_object(result[:text], subject: "#{section} review", log_raw: false)
       .except(ReviewProseVerdict::ORIGINAL_KEY, "rubric").merge("rubric" => RUBRIC_VERSION)
   end
-
 
   def assess_difficulty(user, exercise, sections:)
     result = call_and_log(user, AiService.request_for("assess_difficulty",
