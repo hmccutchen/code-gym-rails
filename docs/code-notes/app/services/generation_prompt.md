@@ -9,7 +9,7 @@ A class method, because the system prompt needs only the language's coach and fo
 The plan, history, difficulty and ladders arrive as whole values, so a new
 plan field is read here and nowhere else. No default queries the database:
 `DailyPlan.for`, `User#recent_performance`, `KindDifficulty.for` and
-`AiService#ladders_for` own those reads, and `generation_prompt_spec` holds
+`GenerationLadders.for` own those reads, and `generation_prompt_spec` holds
 that constructing, rendering and building the schema issue no SQL and mutate
 no input.
 

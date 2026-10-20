@@ -385,7 +385,7 @@ class AiService
     history    = user.recent_performance
     difficulty = KindDifficulty.for(user)
     kinds      = plan.kinds
-    ladders    = ladders_for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode)
+    ladders    = GenerationLadders.for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode)
     prompt     = generation_prompt(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders)
 
     request = AiService.request_for("generate_exercise", blocking: blocking, system: build_system_prompt(language),
@@ -431,7 +431,7 @@ class AiService
   end
 
   def retry_ladders(user, language, draft, kind)
-    ladders_for(draft.difficulty.rungs_for([ kind ], skill_level: user.skill_level), language, draft.plan.code_review_mode)
+    GenerationLadders.for(draft.difficulty.rungs_for([ kind ], skill_level: user.skill_level), language, draft.plan.code_review_mode)
   end
 
   def normalize_optional_reference_fields!(reference)
@@ -543,27 +543,6 @@ class AiService
   end
 
   def build_system_prompt(language = "ruby_rails") = GenerationPrompt.system_prompt(**LanguagePrompts.for(language).slice(:coach, :focus))
-
-  def ladders_for(rungs, language, code_review_mode)
-    requests = rungs.map do |kind, rung|
-      { level: rung, bucket: ConceptBucket.for(kind.key, language),
-        concepts: ConceptVocabulary.selectable_for_section(kind.key, language, mode: code_review_mode, rung: rung) }
-    end
-    pairs = requests.flat_map { |request| request[:concepts].map { |concept| [ request[:bucket], concept ] } }.uniq
-
-    references = ConceptReference.where(language: pairs.map(&:first).uniq, concept: pairs.map(&:last).uniq)
-                                 .select(&:ladder?)
-                                 .index_by { |reference| [ reference.language, reference.concept ] }
-
-    requests.each_with_object({}) do |request, ladders|
-      field = ConceptReference::LADDER_FIELD_FOR.fetch(request[:level])
-      rungs = request[:concepts].filter_map do |concept|
-        reference = references[[ request[:bucket], concept ]]
-        [ concept, reference.public_send(field).truncate(ConceptReference::MAX_LADDER_RUNG_LENGTH) ] if reference
-      end.to_h
-      (ladders[request[:level]] ||= {}).merge!(rungs)
-    end
-  end
 
   def build_review_day_context(coach, exercise, daily_response)
     ratings  = daily_response.section_ratings

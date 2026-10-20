@@ -1522,31 +1522,24 @@ RSpec.describe AiService do
         .to eq("junior" => { "scope_creep" => "j" })
     end
 
-    describe "#ladders_for" do
-      it "loads each kind's rungs at its level for the day's mode and merges them by level" do
-        ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
-                                 ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
-        schema_concept = ConceptVocabulary::DATA_MODELING_CONCEPTS.first
-        ConceptReference.create!(concept: schema_concept, language: "ruby_rails",
-                                 ladder_junior: "j2", ladder_mid_level: "m", ladder_senior: "s2", ladder_principal_engineer: "p2")
-        rungs = { ExerciseSection::CodeReview => "senior", ExerciseSection::Challenge => "senior" }
+    it "loads the draft's ladders for the day's language and code_review mode" do
+      pin_code_review_mode(:schema_review)
+      allow(GenerationLadders).to receive(:for).and_call_original
 
-        ladders = service.send(:ladders_for, rungs, "ruby_rails", :schema_review)
+      FakeService.new("fake-key").send(:draft_exercise, user, language: "javascript", blocking: false)
 
-        expect(ladders.keys).to eq([ "senior" ])
-        expect(ladders["senior"]).to include("n_plus_one" => "s", schema_concept => "s2")
-      end
+      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review)
+    end
 
-      it "skips a row with no ladder and truncates a rung on read" do
-        ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
-                                 ladder_junior: "x" * 500, ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
-        ConceptReference.create!(concept: "caching", language: "ruby_rails", ladder_junior: "j")
-        rungs = service.send(:ladders_for, { ExerciseSection::CodeReview => "junior" }, "ruby_rails",
-                             :application_code)["junior"]
+    it "loads a retry's ladders for the retry's language and the draft's code_review mode" do
+      draft = AiService.const_get(:Draft).new(problem_set: {}, plan: Struct.new(:code_review_mode).new(:schema_review),
+                                              kinds: [], difficulty: KindDifficulty.none, ladders: {}, history: [],
+                                              suggested_concepts: [], unusable_sections: [])
+      allow(GenerationLadders).to receive(:for).and_call_original
 
-        expect(rungs.fetch("n_plus_one").length).to eq(ConceptReference::MAX_LADDER_RUNG_LENGTH)
-        expect(rungs).not_to have_key("caching")
-      end
+      service.send(:retry_ladders, user, "javascript", draft, ExerciseSection::CodeReview)
+
+      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review)
     end
 
     describe "MAX_LADDER_GUIDANCE_CHARS" do
