@@ -40,8 +40,8 @@ says what a deviation from one requires.
   `AiService`. That text includes a fixed message a page sends into the
   family's prompt, which the page reads from the class
   (`DuckPrompt::EXPLAIN_REQUEST`). A family built in two stages gets one
-  method per stage, such as the review's day-level system prompt and its
-  per-section prompt. Text
+  method per stage, each returning that stage's string, such as the review's
+  day-level system prompt and its per-section prompt. Text
   two or more families share lives in `PromptStandards`, and a section described
   for a prompt comes from `SectionContext.render`; a prompt class reads them
   there and never copies them. Each

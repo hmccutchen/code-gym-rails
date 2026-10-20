@@ -18,7 +18,7 @@ RSpec.describe ReviewPrompt do
         answer: "order:0,2,1", rating: "too_hard" } ]
   end
 
-  def day_sections(entries) = entries.map { |entry| entry.slice(:key, :section, :answer, :rating).merge(section: entry[:section].merge("rounds" => nil)) }
+  def day_sections(entries) = entries.map { |entry| entry.slice(:key, :section, :answer, :rating).merge(section: entry[:section].merge("rounds" => {})) }
 
   it "renders a four-section day's system prompt exactly as recorded" do
     expect_prompt_snapshot("review__day_a__system", described_class.day_system(coach: "Rails", sections: day_sections(day_a)))
@@ -37,7 +37,7 @@ RSpec.describe ReviewPrompt do
 
     expect_prompt_snapshot("review__day_b__system",
                            described_class.day_system(coach: "JavaScript/React",
-                                                      sections: [ { key: "code_review", section: section.merge("rounds" => nil), answer: nil, rating: nil } ]))
+                                                      sections: [ { key: "code_review", section: section.merge("rounds" => {}), answer: nil, rating: nil } ]))
     expect_prompt_snapshot("review__day_b__code_review__prompt",
                            described_class.section_prompt(key: "code_review", section: section, answer: nil, rung: "mid_level"))
   end

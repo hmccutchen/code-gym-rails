@@ -1,4 +1,5 @@
 class ReviewPrompt
+  # A change to what a rating means must decide whether to raise AiService::RUBRIC_VERSION, which restarts the evidence it stamps.
   RATING_RUBRIC = <<~RUBRIC.chomp.freeze
     How to choose "rating": rate the answer against the level its section was pitched at, which the grading instruction states on its "Pitched at" line, so a rating means the same thing at every level. Base it on the gaps you list in "missed". A gap is essential when, left as the engineer wrote it, the code or decision would behave wrongly or a requirement the problem states would go unmet. Missing syntax, polish or wording, or a step any engineer at this level would take for granted, is not essential and does not lower the rating. Judge what is essential against the problem as written: a problem simpler than its level's description is graded on what it actually asks. Each section's grading note says what its main point and its essential pieces are.
     - "beginner": missed the main point of the section.
