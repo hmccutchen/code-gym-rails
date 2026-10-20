@@ -4720,6 +4720,20 @@ RSpec.describe AiService, "#judge_section" do
     expect(captured.history).to eq([])
   end
 
+  it "sends the recorded request, with the answer key and server stamps stripped" do
+    svc = FakeService.new("fake-key")
+    captured = nil
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **options| captured = args.last; m.call(*args, **options) }
+    stamped = { "question" => "What is wrong?", "snippet" => "Order.all.each { |o| o.user.name }", "concept" => "n_plus_one",
+                "teaching_note" => "hint", "pitched_at" => "senior", "eased" => true, "source" => "SENTINEL-SOURCE" }
+
+    svc.judge_section(user, ExerciseSection::CodeReview, stamped, rung: "senior", locked: true)
+
+    expect_prompt_snapshot("judge__code_review_locked__system", captured.system)
+    expect_prompt_snapshot("judge__code_review_locked__prompt", captured.prompt)
+    expect_prompt_snapshot("judge__code_review_locked__schema", JSON.pretty_generate(captured.response_schema))
+  end
+
   it "asks the provider for a reply shaped by the kind's verdict schema" do
     svc = FakeService.new("fake-key")
     captured = nil
@@ -4852,24 +4866,6 @@ RSpec.describe AiService, "#judge_section given a prose reply" do
     expect(judged.problem_set["code_review"]).to eq(section)
     expect(judged.outcomes["code_review"]).to include(fallback: "invalid_json", dropped: false)
     expect(Rails.logger).to have_received(:warn).with(/\[judge_fallback\] user=#{user.id} section=code_review reason=invalid_json/)
-  end
-end
-
-RSpec.describe AiService, "JUDGE_SYSTEM_PROMPT" do
-  it "asks for the checks to be worked through internally and the reply to be only the JSON verdict" do
-    expect(AiService::JUDGE_SYSTEM_PROMPT)
-      .to include("Work through these checks internally")
-      .and include("Reply with only the JSON verdict, with no text before or after it.")
-  end
-
-  it "enumerates the rejection principles and issue types from JudgeVerdict's own constants" do
-    expect(AiService::JUDGE_PRINCIPLE_GUIDANCE.keys).to eq(JudgeVerdict::PRINCIPLES)
-    expect(AiService::JUDGE_SYSTEM_PROMPT).to include("Rejection principles, the only #{JudgeVerdict::PRINCIPLES.size}:")
-    JudgeVerdict::PRINCIPLES.each do |principle|
-      expect(AiService::JUDGE_SYSTEM_PROMPT).to include("- #{principle}: #{AiService::JUDGE_PRINCIPLE_GUIDANCE.fetch(principle)}")
-    end
-    expect(AiService::JUDGE_SYSTEM_PROMPT)
-      .to include("Issues, the only #{JudgeVerdict::ISSUE_TYPES.size}: #{JudgeVerdict::ISSUE_TYPES.join(', ')}.")
   end
 end
 

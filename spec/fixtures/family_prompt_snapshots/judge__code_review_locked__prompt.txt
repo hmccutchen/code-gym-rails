@@ -1,0 +1,16 @@
+Section kind: code_review
+The learner's task for this kind: Find the one planted issue in the snippet and say how to fix it.
+This is a discovery task: wording that names where the issue is defeats it.
+Tagged concept: n_plus_one
+Pitched at: senior (locked: this level was asked for unconditionally)
+Level meaning: the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
+Prose fields you may rewrite: scenario, question, teaching_note
+Every other field is the artifact and must not change.
+
+The section as delivered:
+{
+  "question": "What is wrong?",
+  "snippet": "Order.all.each { |o| o.user.name }",
+  "concept": "n_plus_one",
+  "teaching_note": "hint"
+}

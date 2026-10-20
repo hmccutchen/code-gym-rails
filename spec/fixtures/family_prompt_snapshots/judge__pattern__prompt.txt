@@ -1,0 +1,18 @@
+Section kind: pattern
+The learner's task for this kind: Design an approach to the stated problem, explaining the tradeoffs the scaffold names; naming the pattern is the point.
+Naming the concept is expected for this kind.
+Tagged concept: memoization
+Pitched at: mid_level
+Level meaning: one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.
+Prose fields you may rewrite: title, why, scenario, question, teaching_note
+Every other field is the artifact and must not change.
+
+The section as delivered:
+{
+  "title": "Memoize",
+  "why": "Repeat work",
+  "scenario": "s",
+  "question": "When would you cache this?",
+  "concept": "memoization",
+  "teaching_note": "hint"
+}

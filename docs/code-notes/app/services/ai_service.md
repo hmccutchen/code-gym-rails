@@ -90,11 +90,6 @@ Provider output is rendered into the page, so it is bounded at the boundary.
 Sized for five prose fields, Pattern's count. The headroom bounds a model that
 overruns, and passing the cap turns thinking off.
 
-## `JUDGE_PRINCIPLE_GUIDANCE`
-
-Fetched by name in `JudgeVerdict::PRINCIPLES`' order, so a new principle fails
-loudly here instead of reaching the judge without guidance.
-
 ## `REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS`
 
 The largest prose-judge reply measured, in output tokens. `ai_service_spec`
@@ -248,11 +243,6 @@ passes it to `#call_and_log`, which checks it after the request is built, since
 a retry's ladders and prompt can spend the time the check would have allowed.
 The retry passes the deadline less a judge's worst case, so its re-judge still
 has room.
-
-## `#judge_guidance_block`
-
-Stands in for the blank line above the section, so a kind with no judge
-guidance renders its usual prompt.
 
 ## `#draft_exercise` and `#generation_prompt`
 
