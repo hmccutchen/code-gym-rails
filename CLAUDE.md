@@ -129,7 +129,7 @@ spec behind it if the two ever disagree.
 
 - **DRY** — every piece of knowledge has one authoritative home. When a rule
   starts appearing in a second place, move it to one place both call (see
-  `DailyResponse.answered?`, `AiService`'s prompt/schema ownership).
+  `DailyResponse.answered?`, one class per prompt family).
 - **Orthogonal** — a change in one area shouldn't ripple into unrelated ones.
   Provider specifics live in the `AiService` subclass, per-kind facts live in
   `ExerciseSection`, so adding a provider or a section kind means adding a
@@ -171,9 +171,9 @@ why in the PR description rather than quietly diverging.
 
 **Patterns this codebase has deliberately adopted.** These are settled
 decisions, not defaults that drifted into place: template method for
-providers, one request value per provider call, the section-kind registry,
-pure decision objects, single authority per fact, one prompt line per
-vocabulary group, provider calls as callables,
+providers, one class per prompt family, one request value per provider call,
+the section-kind registry, pure decision objects, single authority per fact,
+one prompt line per vocabulary group, provider calls as callables,
 outcomes at the HTTP edge, claims and lock order, the server decides and the
 page shows its answer, page behavior as Stimulus controllers, one way to send
 a request, and domain data kept off provider classes.

@@ -583,7 +583,8 @@ class AiService
   end
 
   def critique_pseudocode(user, exercise, section:, pseudocode:)
-    result = call_and_log(user, AiService.request_for("pseudocode_critique", **PseudocodePrompt.critique(exercise, section, pseudocode)))
+    prompt = PseudocodePrompt.critique(problem_statement: problem_statement(exercise, section), pseudocode: pseudocode)
+    result = call_and_log(user, AiService.request_for("pseudocode_critique", **prompt))
 
     parsed     = parse_json_object(result[:text], subject: "pseudocode critique", log_raw: false)
     gaps_found = parsed["gaps_found"]
@@ -599,7 +600,9 @@ class AiService
   end
 
   def translate_pseudocode(user, exercise, section:, pseudocode:)
-    result = call_and_log(user, AiService.request_for("pseudocode_translate", **PseudocodePrompt.translate(exercise, section, pseudocode)))
+    prompt = PseudocodePrompt.translate(problem_statement: problem_statement(exercise, section), pseudocode: pseudocode,
+                                        language_label: config_for(exercise.language)[:label])
+    result = call_and_log(user, AiService.request_for("pseudocode_translate", **prompt))
 
     code = UserText.normalize(text_or_raise(result, subject: "pseudocode translation"))
     if code.length > MAX_GENERATED_CODE_LENGTH
@@ -836,6 +839,8 @@ class AiService
 
     order
   end
+
+  def problem_statement(exercise, section) = exercise.problem_set.dig(section.to_s, "problem_statement")
 
   def log_pseudocode_critique(user, gaps_found, gaps)
     Rails.logger.info(

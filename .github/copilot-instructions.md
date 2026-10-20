@@ -218,9 +218,9 @@ are the standing exceptions).
 
 ## Architecture — this project's conventions, not generic advice
 
-**Does AI-calling code bypass `AiService.for`?** BLOCKING. Shared logic
-(prompt-building, schema, error types) lives in `ai_service.rb`; subclasses own
-only provider-specific HTTP and auth. A controller building its own Faraday
+**Does AI-calling code bypass `AiService.for`?** BLOCKING. Shared logic lives
+in `ai_service.rb`, the prompt classes it calls (`app/services/*_prompt.rb`)
+and `ProviderError`; subclasses own only provider-specific HTTP and auth. A controller building its own Faraday
 request is a violation.
 
 **Can a concept tag bypass normalization against the closed vocabulary?**

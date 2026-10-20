@@ -1,0 +1,9 @@
+Target language: JavaScript/React.
+
+The problem they were planning, for naming only — never for filling gaps:
+Merge overlapping ranges.
+
+Their pseudocode, to transcribe literally:
+<engineer_text>
+sort ranges, then walk them
+</engineer_text>

@@ -40,20 +40,10 @@ class PseudocodePrompt
     Return the code and nothing else — no prose, no explanation, no fences.
   PROMPT
 
-  def self.critique(exercise, section, pseudocode)
-    { system: "#{CRITIQUE_SYSTEM}\n\n#{UserText::PROMPT_RULE}", prompt: critique_prompt(exercise, section, pseudocode) }
-  end
-
-  def self.translate(exercise, section, pseudocode)
-    { system: "#{TRANSLATE_SYSTEM}\n\n#{UserText::PROMPT_RULE}", prompt: translate_prompt(exercise, section, pseudocode) }
-  end
-
-  def self.critique_prompt(exercise, section, pseudocode)
-    data = exercise.problem_set[section.to_s] || {}
-
-    <<~PROMPT
+  def self.critique(problem_statement:, pseudocode:)
+    { system: "#{CRITIQUE_SYSTEM}\n\n#{UserText::PROMPT_RULE}", prompt: <<~PROMPT }
       The problem they are planning:
-      #{data["problem_statement"]}
+      #{problem_statement}
 
       Their pseudocode:
       #{UserText.tagged(pseudocode)}
@@ -63,19 +53,15 @@ class PseudocodePrompt
     PROMPT
   end
 
-  def self.translate_prompt(exercise, section, pseudocode)
-    data = exercise.problem_set[section.to_s] || {}
-
-    <<~PROMPT
-      Target language: #{AiService.config_for(exercise.language)[:label]}.
+  def self.translate(problem_statement:, pseudocode:, language_label:)
+    { system: "#{TRANSLATE_SYSTEM}\n\n#{UserText::PROMPT_RULE}", prompt: <<~PROMPT }
+      Target language: #{language_label}.
 
       The problem they were planning, for naming only — never for filling gaps:
-      #{data["problem_statement"]}
+      #{problem_statement}
 
       Their pseudocode, to transcribe literally:
       #{UserText.tagged(pseudocode)}
     PROMPT
   end
-
-  private_class_method :critique_prompt, :translate_prompt
 end
