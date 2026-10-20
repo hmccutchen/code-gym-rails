@@ -27,4 +27,11 @@ module PromptStandards
       "different analogy, a different level of abstraction, or a concrete worked\n" \
       "scenario instead of a principle. Do not repeat the original wording."
   end
+
+  def self.prior_framings(prior_alternates)
+    return "No alternate framing has been given yet." if prior_alternates.empty?
+
+    "Framings already given (do NOT reprise these angles or analogies):\n" +
+      prior_alternates.map.with_index(1) { |a, i| "#{i}. #{UserText.tagged(a, blank: '')}" }.join("\n")
+  end
 end

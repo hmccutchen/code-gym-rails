@@ -46,7 +46,7 @@ grading one instance and explaining the concept are different jobs. The
 inline `code_example` is untouched — it stays terse and single-snippet,
 because it serves first exposure. This is the one guide field past the
 two-paragraph cap, and it carries a stated bound of its own
-(`WORKED_EXAMPLE_BOUND`) rather than none, since an unbounded field drifts
+(`ConceptReferencePrompt::WORKED_EXAMPLE_BOUND`) rather than none, since an unbounded field drifts
 into the essay the guide exists not to be. Three triggers, not one: a
 user-initiated backfill for
 concepts with no row at all, on-demand regeneration — only when someone
