@@ -14,7 +14,7 @@ These are settled decisions, not defaults that drifted into place. CLAUDE.md
 says what a deviation from one requires.
 
 - **Template method for providers** — `AiService` owns provider orchestration,
-  parsing and usage logging, and the prompts not yet moved to a prompt class.
+  parsing and usage logging, and calls each prompt class for its text.
   `AiService#call(request)` is the template: it
   posts the body with the request's timeout and retry context, raises on a
   failed status, parses the reply and maps a Faraday error the same way for
@@ -51,8 +51,8 @@ says what a deviation from one requires.
   class names it. Each
   moved family's rendered text is pinned by `expect_prompt_snapshot`,
   recorded against the code before the move. `PseudocodePrompt` is the model;
-  `GenerationPrompt` predates it, rendering from an instance, and its system
-  prompt is still `AiService#build_system_prompt`.
+  `GenerationPrompt` predates it, rendering the user prompt from an
+  instance; its system prompt is the class method `GenerationPrompt.system`.
 - **One request value per provider call** — every provider call carries one
   `AiService::Request`: the purpose, the per-call values (system, prompt,
   history, response schema) and the settings (token cap, read timeout,
