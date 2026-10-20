@@ -165,11 +165,6 @@ The JavaScript artifact is a Prisma schema change together with its migration,
 because `unsafe_migration` cannot be planted in a `schema.prisma`, which has no
 migration semantics.
 
-## `MAX_LADDER_RUNG_LENGTH`
-
-Many rungs share one generation prompt, so this is tighter than
-`MAX_CONCEPT_GUIDE_LENGTH`.
-
 ## `MAX_LADDER_GUIDANCE_CHARS`
 
 Adding mid-level raises the tested ceiling from 48,000 to 54,000 characters.
@@ -297,11 +292,6 @@ bounded String becomes nil instead of raising.
 Logs counts and flags only, and pairs with
 `ResponseReview#log_pseudocode_diagnostics` by user id and date.
 
-## `#prior_framings`
-
-Each framing is fenced because the page sends them back, so a forged framing is
-one request away.
-
 ## `#text_or_raise`
 
 A blank response would fail a validation outside `rescue ProviderError` and
@@ -356,16 +346,6 @@ include `StandardError`, which would hide real bugs behind a retry.
 
 Keyed by level from `DailyResponse` so the labels can't shift. A spec, not the
 `KeyError`, catches a missing level.
-
-## Senior lens in the concept reference prompt
-
-Shapes to find are never techniques to choose, so they skip the remedy lens;
-design principles keep it.
-
-## `#code_example_description`
-
-`medium` is nil for a concept with no code of its own (see
-`ConceptVocabulary.language_agnostic?`).
 
 ## `#call`
 

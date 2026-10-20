@@ -3,6 +3,7 @@ class ConceptReference < ApplicationRecord
   GUIDE_FIELDS     = %w[guide_plain_language guide_worked_example guide_pitfalls].freeze
   LADDER_FIELD_FOR = KindDifficulty::LEVELS.index_with { |level| "ladder_#{level}" }.freeze
   LADDER_FIELDS    = LADDER_FIELD_FOR.values.freeze
+  MAX_LADDER_RUNG_LENGTH = 300
 
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: :language }

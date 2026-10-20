@@ -68,18 +68,14 @@ RSpec.describe ConceptBookSources do
   end
 
   it "never reaches a provider prompt" do
-    double_class = Class.new(AiService) do
-      private def build_connection = nil
-    end
-    service = double_class.new("key")
-    titles  = described_class::SOURCES.values.flatten.map { |source| source[:title] }.uniq
+    titles = described_class::SOURCES.values.flatten.map { |source| source[:title] }.uniq
 
     # Derived from ConceptVocabulary::LANGUAGES so a new bucket is covered without editing this.
     ConceptVocabulary.languages.each do |language|
       described_class::SOURCES.each_key do |concept|
         next unless ConceptVocabulary.for_language(language).include?(concept)
 
-        prompt = service.send(:build_concept_reference_prompt, concept, language)
+        prompt = ConceptReferencePrompt.generate(concept: concept, language: language, **AiService.config_for(language).slice(:coach, :label))[:prompt]
 
         titles.each do |title|
           expect(prompt).not_to include(title),
