@@ -44,3 +44,4 @@
 - setup problems recorded as their own kind, not as provider failures `#444`
   **I decided:** changed my mind from letting them fail unrescued once that
   left pages spinning; record and word them as setup, batch skips any error
+- the rest of `AiService`'s domain data moved onto the models `#445`

@@ -1,5 +1,7 @@
 # Teaches a process, never an answer, so it shows with no exposure gating (see AiService::RECOGNITION_GUIDE_SCOPE).
 class RecognitionGuide < ApplicationRecord
+  FIELDS = %w[questions contrast misfires].freeze
+
   GROUP_KEYS = (ConceptGroup::NAMED.map(&:first) + ConceptBucket::LANGUAGE_INDEPENDENT).freeze
 
   # Language-independent buckets state their subject as their AiService::LANGUAGE_PROMPTS focus, so they aren't repeated here.
@@ -22,7 +24,7 @@ class RecognitionGuide < ApplicationRecord
 
   validates :group_key, presence: true, uniqueness: true, inclusion: { in: GROUP_KEYS }
   # A row's existence stops the backfill retrying, so a partial one would stay blank forever.
-  validates(*AiService::RECOGNITION_GUIDE_FIELDS, presence: true)
+  validates(*FIELDS, presence: true)
 
   # Nil for a block with no guide.
   def self.key_for(bucket, group)
@@ -34,10 +36,6 @@ class RecognitionGuide < ApplicationRecord
     return ConceptBucket.vocabulary_for(group_key) if ConceptBucket::LANGUAGE_INDEPENDENT.include?(group_key)
 
     ConceptGroup.concepts(group_key)
-  end
-
-  def self.subject_for(group_key)
-    NAMED_GROUP_SUBJECTS.fetch(group_key) { AiService::LANGUAGE_PROMPTS.fetch(group_key).fetch(:focus) }
   end
 
   def self.framing_for(group_key)

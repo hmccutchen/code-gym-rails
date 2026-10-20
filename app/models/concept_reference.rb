@@ -1,14 +1,19 @@
 class ConceptReference < ApplicationRecord
+  REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
+  GUIDE_FIELDS     = %w[guide_plain_language guide_worked_example guide_pitfalls].freeze
+  LADDER_FIELD_FOR = KindDifficulty::LEVELS.index_with { |level| "ladder_#{level}" }.freeze
+  LADDER_FIELDS    = LADDER_FIELD_FOR.values.freeze
+
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: :language }
 
   # Derived from the field list; a partly blank guide answers false so the row is regenerated whole.
   def guide?
-    AiService::CONCEPT_GUIDE_FIELDS.all? { |field| public_send(field).present? }
+    GUIDE_FIELDS.all? { |field| public_send(field).present? }
   end
 
   def ladder?
-    AiService::CONCEPT_LADDER_FIELDS.all? { |field| public_send(field).present? }
+    LADDER_FIELDS.all? { |field| public_send(field).present? }
   end
 
   def complete?

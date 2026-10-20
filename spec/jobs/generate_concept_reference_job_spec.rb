@@ -134,7 +134,7 @@ RSpec.describe GenerateConceptReferenceJob do
     end
 
     it "leaves the guide null when the provider omits it, without failing" do
-      stub_service(returning: reference_hash.except(*AiService::CONCEPT_GUIDE_FIELDS))
+      stub_service(returning: reference_hash.except(*ConceptReference::GUIDE_FIELDS))
       described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
 
       ref = ConceptReference.last
@@ -185,7 +185,7 @@ RSpec.describe GenerateConceptReferenceJob do
     end
 
     it "advances the completion counter on every successful refresh even when nothing else changes" do
-      attributes = reference_hash.except(*AiService::CONCEPT_LADDER_FIELDS)
+      attributes = reference_hash.except(*ConceptReference::LADDER_FIELDS)
       row = ConceptReference.create!(attributes.merge(concept: "n_plus_one", language: "ruby_rails"))
       stub_service(returning: attributes)
 
@@ -205,7 +205,7 @@ RSpec.describe GenerateConceptReferenceJob do
       service = stub_service
       allow(service).to receive(:generate_concept_reference) do
         row.update!(generation_version: 1, ladder_junior: "another attempt")
-        reference_hash.except(*AiService::CONCEPT_LADDER_FIELDS)
+        reference_hash.except(*ConceptReference::LADDER_FIELDS)
       end
 
       described_class.perform_now(concept: row.concept, language: row.language, user_id: user.id, refresh: true)
@@ -227,7 +227,7 @@ RSpec.describe GenerateConceptReferenceJob do
 
     it "keeps a valid shared reference when a ladder refresh returns malformed required prose" do
       row = ConceptReference.create!(
-        reference_hash.except(*AiService::CONCEPT_LADDER_FIELDS).merge(concept: "n_plus_one", language: "ruby_rails")
+        reference_hash.except(*ConceptReference::LADDER_FIELDS).merge(concept: "n_plus_one", language: "ruby_rails")
       )
       before = row.attributes
       service = ClaudeService.new(user.api_key)

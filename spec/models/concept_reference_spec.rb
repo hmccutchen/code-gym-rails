@@ -74,8 +74,8 @@ RSpec.describe ConceptReference do
     let(:full_ladder) { { ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p" } }
 
     it "names one migrated column per level" do
-      expect(AiService::CONCEPT_LADDER_FIELDS).to eq(KindDifficulty::LEVELS.map { |level| "ladder_#{level}" })
-      expect(ConceptReference.column_names).to include(*AiService::CONCEPT_LADDER_FIELDS)
+      expect(ConceptReference::LADDER_FIELDS).to eq(KindDifficulty::LEVELS.map { |level| "ladder_#{level}" })
+      expect(ConceptReference.column_names).to include(*ConceptReference::LADDER_FIELDS)
     end
 
     it "carries a ladder only when every rung is present" do

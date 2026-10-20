@@ -519,7 +519,7 @@ RSpec.describe "Learn", type: :request do
       it "reports a completed rewrite with unchanged prose and #{partial_ladder.size} ladder rungs" do
         row = reference(**guide)
         version = row.generation_version
-        fields = AiService::CONCEPT_REFERENCE_FIELDS + AiService::CONCEPT_GUIDE_FIELDS
+        fields = ConceptReference::REFERENCE_FIELDS + ConceptReference::GUIDE_FIELDS
         generated = row.attributes.slice(*fields).merge(partial_ladder.stringify_keys)
         service = ClaudeService.new(user.api_key)
         allow(AiService).to receive(:for).with(user).and_return(service)

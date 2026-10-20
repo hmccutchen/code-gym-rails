@@ -3136,7 +3136,7 @@ RSpec.describe AiService do
 
       expect(result).to eq("Picture a library courier.")
       expect(svc.last_prompt).to include("n_plus_one")
-      AiService::CONCEPT_REFERENCE_FIELDS.each do |field|
+      ConceptReference::REFERENCE_FIELDS.each do |field|
         expect(svc.last_prompt).to include(reference.public_send(field))
       end
       expect(svc.last_prompt).to include("A restaurant-orders analogy")
@@ -4177,8 +4177,8 @@ RSpec.describe AiService do
       expect(prompt).to start_with("Write a durable reference")
       expect(prompt).to include("\nThen write a difficulty ladder:", "\nReturn JSON matching this schema exactly:\n{\n")
       schema = prompt.split("Return JSON matching this schema exactly:\n").last
-      expect(JSON.parse(schema).keys).to include(*AiService::CONCEPT_LADDER_FIELDS, "lesson")
-      AiService::CONCEPT_LADDER_FIELDS.each do |field|
+      expect(JSON.parse(schema).keys).to include(*ConceptReference::LADDER_FIELDS, "lesson")
+      ConceptReference::LADDER_FIELDS.each do |field|
         expect(schema).to match(/^  "#{field}":/)
       end
       expect(schema).to match(/^  "lesson":/)
@@ -4252,7 +4252,7 @@ RSpec.describe AiService do
       }.to raise_error(ProviderError::InvalidResponseError, /senior_lens/)
     end
 
-    AiService::CONCEPT_REFERENCE_FIELDS.each do |field|
+    ConceptReference::REFERENCE_FIELDS.each do |field|
       [ nil, false, true, 0, 1.5, [], [ "prose" ], {}, { "text" => "prose" }, "", " \n\t " ].each do |invalid|
         it "rejects #{invalid.inspect} in required reference field #{field}" do
           payload = JSON.parse(valid_json).merge(field => invalid)
@@ -4309,14 +4309,22 @@ RSpec.describe AiService do
       svc.last_prompt
     end
 
+    it "states a subject for every group, a language-independent one by its language focus" do
+      RecognitionGuide::GROUP_KEYS.each do |key|
+        expect(prompt_for(key)).to match(/The category, "#{Regexp.escape(key.humanize)}", is about \S/), key
+      end
+      language_key = (RecognitionGuide::GROUP_KEYS & ConceptBucket::LANGUAGE_INDEPENDENT).first
+      expect(prompt_for(language_key)).to include(AiService::LANGUAGE_PROMPTS.fetch(language_key).fetch(:focus))
+    end
+
     it "returns exactly the three guide fields" do
       result = double_class.new(canned_text: valid_json.sub("{", '{"extra":"x",')).generate_recognition_guide(user, "code_smell")
 
-      expect(result.keys).to contain_exactly(*AiService::RECOGNITION_GUIDE_FIELDS)
+      expect(result.keys).to contain_exactly(*RecognitionGuide::FIELDS)
       expect(result["questions"]).to eq(FakeService::RECOGNITION_GUIDE["questions"])
     end
 
-    AiService::RECOGNITION_GUIDE_FIELDS.each do |field|
+    RecognitionGuide::FIELDS.each do |field|
       [ nil, 1, [ "prose" ], "", "  ", "x" * (AiService::MAX_CONCEPT_GUIDE_LENGTH + 1) ].each do |invalid|
         it "rejects #{invalid.inspect.truncate(20)} in #{field}" do
           payload = FakeService::RECOGNITION_GUIDE.merge(field => invalid)
@@ -4346,7 +4354,7 @@ RSpec.describe AiService do
       prompt = prompt_for("module_design")
 
       expect(prompt).to include(AiService::RECOGNITION_GUIDE_SCOPE)
-      expect(prompt).to include(RecognitionGuide.subject_for("module_design"))
+      expect(prompt).to include(RecognitionGuide::NAMED_GROUP_SUBJECTS.fetch("module_design"))
       ConceptVocabulary::MODULE_DESIGN_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
     end
 
@@ -4613,7 +4621,7 @@ RSpec.describe AiService do
       service = double_class.new(canned_text: full_reference.to_json)
       service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
 
-      AiService::CONCEPT_GUIDE_FIELDS.each do |field|
+      ConceptReference::GUIDE_FIELDS.each do |field|
         expect(service.last_prompt).to include(field)
       end
     end
@@ -4630,7 +4638,7 @@ RSpec.describe AiService do
       result = double_class.new(canned_text: full_reference.to_json)
                            .generate_concept_reference(user, "n_plus_one", "ruby_rails")
 
-      expect(result).to include(*AiService::CONCEPT_GUIDE_FIELDS)
+      expect(result).to include(*ConceptReference::GUIDE_FIELDS)
     end
 
     it "still succeeds when the provider omits the guide entirely" do
@@ -4691,15 +4699,15 @@ RSpec.describe AiService do
       service = double_class.new(canned_text: full_reference.to_json)
       service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
 
-      AiService::CONCEPT_LADDER_FIELDS.each { |field| expect(service.last_prompt).to include(field) }
+      ConceptReference::LADDER_FIELDS.each { |field| expect(service.last_prompt).to include(field) }
       expect(service.last_prompt).to include("composite index column order")
     end
 
     it "still succeeds when the provider omits the ladder" do
-      result = double_class.new(canned_text: full_reference.except(*AiService::CONCEPT_LADDER_FIELDS).to_json)
+      result = double_class.new(canned_text: full_reference.except(*ConceptReference::LADDER_FIELDS).to_json)
                            .generate_concept_reference(user, "n_plus_one", "ruby_rails")
 
-      expect(result.values_at(*AiService::CONCEPT_LADDER_FIELDS)).to all(be_nil)
+      expect(result.values_at(*ConceptReference::LADDER_FIELDS)).to all(be_nil)
     end
 
     it "normalizes an unusable rung to nil" do
@@ -4715,9 +4723,9 @@ RSpec.describe AiService do
 
   describe "concept field constants" do
     it "keeps the guide out of the reference field list" do
-      expect(AiService::CONCEPT_REFERENCE_FIELDS)
+      expect(ConceptReference::REFERENCE_FIELDS)
         .to eq(%w[tagline explanation code_example senior_lens])
-      expect(AiService::CONCEPT_REFERENCE_FIELDS & AiService::CONCEPT_GUIDE_FIELDS).to be_empty
+      expect(ConceptReference::REFERENCE_FIELDS & ConceptReference::GUIDE_FIELDS).to be_empty
     end
 
     it "does not send the guide to the alternate-framing prompt" do
