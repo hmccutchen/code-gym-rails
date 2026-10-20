@@ -13,10 +13,16 @@ limit. Uncapped Gemini calls are flagged too, as uncapped Claude calls
 already were. The thinking partner's `duck_thread` profile in
 `AiService::CALL_PROFILES` sets `allow_truncated: true`, so a
 partial reply is shown with an ellipsis, and an empty one still fails
-`text_or_raise`. A `failed` or `cancelled` Gemini interaction is not handled
-here. OpenAI accepts only `completed` or `incomplete` responses; any other
-status is an error, raised after usage recording even when partial prose
-is allowed. Its `incomplete` status is truncation unless the reason is
+`text_or_raise`. Gemini and OpenAI both accept only `completed` or
+`incomplete`, through `AiService::FINISHED_STATUSES`. Any other status is an
+error, raised after usage recording even when partial prose is allowed,
+because a failed interaction can still bill tokens (#245). That covers
+`failed` and `cancelled`, and also `queued`, `in_progress` and
+`requires_action`, which this app's synchronous `store: false` calls are not
+expected to receive. The status is logged so a recurring failure can be told
+apart. OpenAI rejects a reply with no status. Gemini still accepts one, as it
+did before #245, because nothing yet shows the API always sends a status.
+OpenAI's `incomplete` status is truncation unless the reason is
 `content_filter`, which is a refusal, as is a refusal content block.
 An authentication error (401 or 403) from any provider gets fixed guidance
 naming the company and logs only the HTTP status, through
