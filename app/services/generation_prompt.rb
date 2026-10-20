@@ -95,7 +95,7 @@ class GenerationPrompt
     SCHEMA
   end
 
-  def config = AiService.config_for(@language)
+  def config = LanguagePrompts.for(@language)
 
   def kinds_for(only)
     only ? [ only ] : @plan.kinds
@@ -223,7 +223,7 @@ class GenerationPrompt
   end
 
   def scenario_flavor_guidance(flavor)
-    pool    = AiService::SCENARIO_POOLS.fetch(flavor)
+    pool    = ScenarioPools::ALL.fetch(flavor)
     flavors = (pool[:domains] - %w[legacy_graphql_maintenance]).map { |d| d.tr("_", " ") }.join(", ")
 
     [

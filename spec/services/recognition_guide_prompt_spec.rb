@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe RecognitionGuidePrompt do
   def generate(group_key)
-    subject_line = RecognitionGuide::NAMED_GROUP_SUBJECTS.fetch(group_key) { AiService.config_for(group_key).fetch(:focus) }
+    subject_line = RecognitionGuide::NAMED_GROUP_SUBJECTS.fetch(group_key) { LanguagePrompts.for(group_key).fetch(:focus) }
     described_class.generate(group_key: group_key, subject: subject_line)
   end
 

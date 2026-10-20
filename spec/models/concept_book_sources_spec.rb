@@ -75,7 +75,7 @@ RSpec.describe ConceptBookSources do
       described_class::SOURCES.each_key do |concept|
         next unless ConceptVocabulary.for_language(language).include?(concept)
 
-        config = AiService.config_for(language)
+        config = LanguagePrompts.for(language)
         sent = ConceptReferencePrompt.generate(concept: concept, language: language, **config.slice(:coach, :label)).values +
                ConceptReferencePrompt.reframe(concept: concept, coach: config[:coach], already_read: {}, prior_alternates: []).values
 

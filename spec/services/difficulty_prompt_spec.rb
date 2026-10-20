@@ -10,7 +10,7 @@ RSpec.describe DifficultyPrompt do
   end
 
   it "renders the assessment exactly as recorded, with no answer key and an empty heading for a missing section" do
-    request = described_class.generate(coach: AiService.config_for("ruby_rails")[:coach], sections: sections)
+    request = described_class.generate(coach: LanguagePrompts.for("ruby_rails")[:coach], sections: sections)
 
     expect(request.keys).to eq(%i[system prompt])
     expect_prompt_snapshot("difficulty__system", request[:system])
