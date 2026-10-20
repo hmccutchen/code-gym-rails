@@ -624,7 +624,7 @@ class AiService
     raise NotImplementedError, "#{self.class} must implement #build_connection"
   end
 
-  def build_system_prompt(language = "ruby_rails") = GenerationPrompt.system(**config_for(language).slice(:coach, :focus))
+  def build_system_prompt(language = "ruby_rails") = GenerationPrompt.system_prompt(**config_for(language).slice(:coach, :focus))
 
   def ladders_for(rungs, language, code_review_mode)
     requests = rungs.map do |kind, rung|

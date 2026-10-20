@@ -1,4 +1,4 @@
-# generate_exercise and retry_section share AiService#build_system_prompt, so the first match, generate_exercise, wins.
+# generate_exercise and retry_section share GenerationPrompt.system_prompt, so the first match, generate_exercise, wins.
 module FakeReplies
   SYSTEM_PROMPT_MARKERS = {
     "generate_exercise"           => "generating personalized daily exercise sets",

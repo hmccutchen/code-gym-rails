@@ -52,7 +52,7 @@ says what a deviation from one requires.
   moved family's rendered text is pinned by `expect_prompt_snapshot`,
   recorded against the code before the move. `PseudocodePrompt` is the model;
   `GenerationPrompt` predates it, rendering the user prompt from an
-  instance; its system prompt is the class method `GenerationPrompt.system`.
+  instance; its system prompt is the class method `GenerationPrompt.system_prompt`.
 - **One request value per provider call** — every provider call carries one
   `AiService::Request`: the purpose, the per-call values (system, prompt,
   history, response schema) and the settings (token cap, read timeout,

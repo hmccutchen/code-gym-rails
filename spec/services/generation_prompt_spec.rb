@@ -1,17 +1,17 @@
 require "rails_helper"
 
 RSpec.describe GenerationPrompt do
-  describe ".system" do
+  describe ".system_prompt" do
     DailyExercise::LANGUAGES.each do |language|
       it "renders the #{language} system prompt exactly as recorded" do
         config = AiService.config_for(language)
 
-        expect_prompt_snapshot("generation_system__#{language}", described_class.system(coach: config[:coach], focus: config[:focus]))
+        expect_prompt_snapshot("generation_system__#{language}", described_class.system_prompt(coach: config[:coach], focus: config[:focus]))
       end
     end
 
     it "takes only the coach and the focus, so it sees nothing about the engineer or the day" do
-      expect(described_class.method(:system).parameters).to eq([ [ :keyreq, :coach ], [ :keyreq, :focus ] ])
+      expect(described_class.method(:system_prompt).parameters).to eq([ [ :keyreq, :coach ], [ :keyreq, :focus ] ])
     end
   end
 
@@ -30,7 +30,7 @@ RSpec.describe GenerationPrompt do
              established: [ ConceptMastery.new(concept: "caching", language: "ruby_rails") ],
              fourth_reinforcement: [ { concept: "scope_creep", bucket: "plan_review", tier: "standard" } ],
              fourth_established: [ ConceptMastery.new(concept: "scope_creep", language: "plan_review") ],
-             code_review_source: RealSource::APPLICATION_CODE.first)
+             code_review_source: RealSource::APPLICATION_CODE.first.dup)
   end
 
   let(:difficulty) do
