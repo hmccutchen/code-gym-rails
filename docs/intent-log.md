@@ -32,6 +32,16 @@ this one.
   what saved state now has to carry
 - a failed or cancelled Gemini call raises a provider error and still records
   its usage `#437`
+- the app's visible name from Code Gym to Coding Gym, to match coding-gym.pro
+  `#438`
+  **why:** the name people see should match the domain I'm about to show
+  developers
+  **I decided:** the session cookie, storage keys and code names keep the old
+  name, since renaming the cookie signs everyone out; the README and
+  CONTEXT.md get renamed because the repo is public; the generation prompts go
+  in their own PR straight after, because rewriting the prompt snapshots is a
+  generation change, and nothing that freezes a day for public viewing lands
+  before it
 - provider error classes moved off `AiService` into a `ProviderError` family
   `#441`
   **why:** models raising `AiService` errors made the domain depend on the

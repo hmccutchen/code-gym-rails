@@ -8,7 +8,7 @@ RSpec.describe "Page titles", type: :request do
   it "names the login page" do
     get login_path
 
-    expect(title).to eq("Log in – Code Gym")
+    expect(title).to eq("Log in – Coding Gym")
   end
 
   context "when signed in" do
@@ -27,7 +27,7 @@ RSpec.describe "Page titles", type: :request do
       it "titles #{expected}" do
         travel_to(Date.new(2026, 7, 18)) { get instance_exec(&path) }
 
-        expect(title).to eq("#{expected} – Code Gym")
+        expect(title).to eq("#{expected} – Coding Gym")
       end
     end
 
@@ -35,7 +35,7 @@ RSpec.describe "Page titles", type: :request do
       ENV["ADMIN_EMAILS"] = user.email
       get admin_suggested_concepts_path
 
-      expect(title).to eq("Suggested concepts – Code Gym")
+      expect(title).to eq("Suggested concepts – Coding Gym")
     ensure
       ENV.delete("ADMIN_EMAILS")
     end
@@ -43,7 +43,7 @@ RSpec.describe "Page titles", type: :request do
     it "titles a Learn concept page with the concept" do
       get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
 
-      expect(title).to eq("N plus one – Learn – Code Gym")
+      expect(title).to eq("N plus one – Learn – Coding Gym")
     end
   end
 end

@@ -7,7 +7,7 @@ RSpec.describe UserMailer, type: :mailer do
 
     it "addresses the email correctly" do
       expect(mail.to).to eq([ "dev@example.com" ])
-      expect(mail.subject).to eq("Your Code Gym login code")
+      expect(mail.subject).to eq("Your Coding Gym login code")
     end
 
     it "contains the raw code" do

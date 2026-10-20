@@ -1,6 +1,6 @@
 en:
   level_suggestion:
-    setup_suggested: "Code Gym suggested moving %{kinds} to %{level}. Change their difficulty below."
+    setup_suggested: "Coding Gym suggested moving %{kinds} to %{level}. Change their difficulty below."
     card:
       own: "%{favourable} of your last %{window} %{kind} sections were reviewed solid or better. Try %{kind} at %{level}?"
       own_heading: "These sections can move up to %{level}:"
@@ -31,14 +31,14 @@ en:
       junior: "One clearly visible problem in a small scenario. A good start if you're early in your career, changing careers, or new to this stack."
       mid_level: "Problems that don't point at themselves, so you find them by reading closely."
       senior: "A problem alongside a real constraint or a second issue, where the right answer depends on context."
-    note: "You can change this any time in Setup, and set a level for each kind of section. Senior is the highest level Code Gym suggests; choose Principal engineer in Setup if you want it."
+    note: "You can change this any time in Setup, and set a level for each kind of section. Senior is the highest level Coding Gym suggests; choose Principal engineer in Setup if you want it."
     daily_sections: "Every set starts with two daily sections, %{sections}. You can swap either one for another kind from its card."
   tracks:
     stale_page: "This page is out of date. Reload it to continue."
     kept_own_level: "These sections kept their own level: %{sections}. Choose Your track for any of them in the Exercise mix to have it follow the track."
     kept_section: "%{name} (%{level})"
     kept_locked_section: "%{name} (%{level}, locked)"
-  app_name: "Code Gym"
+  app_name: "Coding Gym"
   sessions:
     new:
       page_title: "Log in"
@@ -65,9 +65,9 @@ en:
   trials:
     page_title: "Trial"
     heading: "Trial"
-    intro: "Enter the invite code you were given and choose a provider to try Code Gym on a shared key."
-    start_intro: "Try Code Gym on a shared key with the invite code you were given. We'll email you a code to confirm your address, and the trial starts when you enter it."
-    unavailable: "Trials aren't available right now. You can still use Code Gym with an API key of your own."
+    intro: "Enter the invite code you were given and choose a provider to try Coding Gym on a shared key."
+    start_intro: "Try Coding Gym on a shared key with the invite code you were given. We'll email you a code to confirm your address, and the trial starts when you enter it."
+    unavailable: "Trials aren't available right now. You can still use Coding Gym with an API key of your own."
     log_in_instead: "Have an account, or using your own key? Log in."
     code_label: "Invite code"
     provider_label: "Provider"
@@ -86,21 +86,21 @@ en:
     has_own_key: "You already have an API key, so you don't need a trial."
     rate_limited: "Too many attempts. Try again in an hour."
     data_notice:
-      shared: "On a trial, Code Gym sends your exercises, answers and messages to %{provider} using a key that belongs to the person who runs Code Gym, not to you. Usage counts against that key."
+      shared: "On a trial, Coding Gym sends your exercises, answers and messages to %{provider} using a key that belongs to the person who runs Coding Gym, not to you. Usage counts against that key."
       gemini: "Google's free tier lets Google use what is sent, including your answers, to improve its products, and people at Google may read it. Don't paste anything confidential."
       anthropic: "Anthropic keeps API data for up to 30 days and does not train on it by default."
       openai: "OpenAI keeps API data for up to 30 days to watch for abuse and does not train on it by default."
       fake: "The test provider sends nothing anywhere."
   user_mailer:
     login_code:
-      subject: "Your Code Gym login code"
+      subject: "Your Coding Gym login code"
       greeting: "Hi %{name},"
-      intro: "Your Code Gym login code is:"
+      intro: "Your Coding Gym login code is:"
       where_and_when: |-
         Enter it in the browser where you requested it — the code will not work
         anywhere else. It expires in %{expiry}. If you
         didn't request this, you can ignore it.
-      sign_off: "— Code Gym"
+      sign_off: "— Coding Gym"
   flash:
     application:
       session_expired: "Your session expired — please try again."
@@ -197,14 +197,14 @@ en:
         next: "Check the key in Setup."
       trial:
         title: "%{provider} didn't accept the trial's key, so %{outcome}."
-        next: "Tell the person who runs Code Gym."
+        next: "Tell the person who runs Coding Gym."
     out_of_credit:
       own_key:
         title: "%{provider} reports that your account is out of credit or over its spend limit, so %{outcome}."
         next: "Add credit or raise the limit with %{provider}, then try again."
       trial:
         title: "The trial's %{provider} key is out of credit or over its spend limit, so %{outcome}."
-        next: "Tell the person who runs Code Gym."
+        next: "Tell the person who runs Coding Gym."
     outage:
       own_key:
         title: "%{provider} isn't answering right now, so %{outcome}."
@@ -215,8 +215,8 @@ en:
         next: "Try again."
     other:
       own_key:
-        title: "%{provider} sent back something Code Gym couldn't use, so %{outcome}."
-        next: "Try again. If it keeps happening, tell the person who runs Code Gym."
+        title: "%{provider} sent back something Coding Gym couldn't use, so %{outcome}."
+        next: "Try again. If it keeps happening, tell the person who runs Coding Gym."
   errors:
     no_exercise_today: "No exercise set for today."
     provider_calls_limited: "You've reached the limit on AI requests for now. Try again later."
@@ -756,7 +756,7 @@ en:
       delete_confirm: "Delete your account? This permanently removes your name and email and logs you out. It cannot be undone."
     api_usage:
       heading: "API usage this month"
-      intro: "Requests Code Gym sent with your API key since %{since}. Your provider's console shows the exact bill."
+      intro: "Requests Coding Gym sent with your API key since %{since}. Your provider's console shows the exact bill."
       empty: "No requests sent with your API key since %{since}."
       provider: "Provider"
       requests: "Requests"
@@ -781,7 +781,7 @@ en:
   api_keys:
     key_guide:
       title: "Getting an API key"
-      intro: "Code Gym uses your own AI key to write your exercises and review your answers. You pay the provider directly, or use Gemini's free tier."
+      intro: "Coding Gym uses your own AI key to write your exercises and review your answers. You pay the provider directly, or use Gemini's free tier."
       anthropic: "Anthropic (Claude)"
       anthropic_guide_html: "Follow Anthropic's guide, %{link}."
       anthropic_guide_link: "Get your Claude API key"
@@ -837,7 +837,7 @@ en:
         hawaii: "Hawaii"
       time_zone_hint: 'Sets when your day rolls over and when your 8am exercise set is generated. Leave on "detect automatically" to use your browser''s zone.'
       skill_level_label: "Track"
-      skill_level_hint: "The level every section uses unless you set one for it in the Exercise mix below. Your ratings nudge each day's set around it. Changing your track also moves any section set to your old or new level, unless it is locked. When your reviewed answers show a section is ready to move, Code Gym suggests a level for that section, and you decide. Principal engineer is set only here; Code Gym never suggests it."
+      skill_level_hint: "The level every section uses unless you set one for it in the Exercise mix below. Your ratings nudge each day's set around it. Changing your track also moves any section set to your old or new level, unless it is locked. When your reviewed answers show a section is ready to move, Coding Gym suggests a level for that section, and you decide. Principal engineer is set only here; Coding Gym never suggests it."
   history:
     index:
       title: "History"

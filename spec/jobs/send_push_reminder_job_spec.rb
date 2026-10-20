@@ -141,7 +141,7 @@ RSpec.describe SendPushReminderJob do
       user.update!(reminder_level: :ready)
 
       expect(PushDelivery).to receive(:deliver).with(
-        anything, hash_including(title: "Today's Code Gym is ready")
+        anything, hash_including(title: "Today's Coding Gym is ready")
       ).and_return(true)
 
       described_class.new.perform(user_id: user.id)

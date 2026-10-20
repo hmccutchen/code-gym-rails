@@ -73,7 +73,7 @@ RSpec.describe ProviderFailureText, type: :model do
       "The limit resets at 3:00 am your time, Wednesday. Try again after that."
     )
     expect(text("bad_key", surface: :duck, variant: "trial").full)
-      .to eq("Gemini didn't accept the trial's key, so the thinking partner didn't answer. Your message is still in the box. Tell the person who runs Code Gym.")
+      .to eq("Gemini didn't accept the trial's key, so the thinking partner didn't answer. Your message is still in the box. Tell the person who runs Coding Gym.")
     expect(text("timeout", surface: :duck, variant: "trial").full).to eq(text("timeout", surface: :duck).full)
   end
 
@@ -87,7 +87,7 @@ RSpec.describe ProviderFailureText, type: :model do
 
   it "reads an unknown kind as other and an unknown variant as own_key" do
     sentence = text("nonsense", surface: :critique, variant: "nonsense").full
-    expect(sentence).to start_with("Gemini sent back something Code Gym couldn't use, so the critique didn't run.")
+    expect(sentence).to start_with("Gemini sent back something Coding Gym couldn't use, so the critique didn't run.")
   end
 
   it "never shows provider text, a status code or a key, on any surface for any kind" do

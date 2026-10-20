@@ -20,8 +20,8 @@ RSpec.describe "PWA", type: :request do
 
     it "declares a standalone app rooted at the dashboard" do
       expect(manifest).to include(
-        "name" => "Code Gym",
-        "short_name" => "Code Gym",
+        "name" => "Coding Gym",
+        "short_name" => "Coding Gym",
         "description" => "Daily personalized coding exercises.",
         "display" => "standalone",
         "start_url" => "/",
@@ -81,7 +81,7 @@ RSpec.describe "PWA", type: :request do
     end
 
     it "names and illustrates the home screen entry" do
-      expect(response.body).to include(%(<meta name="apple-mobile-web-app-title" content="Code Gym">))
+      expect(response.body).to include(%(<meta name="apple-mobile-web-app-title" content="Coding Gym">))
       expect(response.body).to include(%(<link rel="apple-touch-icon" href="#{Object.new.extend(PublicFileHelper).versioned_public_path("apple-touch-icon.png")}">))
       expect(Rails.public_path.join("apple-touch-icon.png")).to exist
     end
