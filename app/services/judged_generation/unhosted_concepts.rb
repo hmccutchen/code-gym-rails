@@ -1,4 +1,4 @@
-# Decided after the fact, like AiService#log_retention, since the plan ties a concept to a section only in slot four.
+# Decided after the fact, like GenerationDiagnostics' retention log, since the plan ties a concept to a section only in slot four.
 module JudgedGeneration::UnhostedConcepts
   def self.for(plan, dropped_concepts)
     retention     = (plan.due_checks + plan.fourth_due_checks).map(&:concept)

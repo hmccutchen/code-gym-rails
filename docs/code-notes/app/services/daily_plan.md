@@ -6,7 +6,7 @@ No `code_review`, pattern or third section can host a fourth bucket's concepts, 
 
 ## `.for`
 
-The plan chooses the day's concepts so the caller can compare what was offered with what the provider used (`AiService#log_retention`).
+The plan chooses the day's concepts so the caller can compare what was offered with what the provider used (`GenerationDiagnostics`' retention log).
 
 ## `.concept_tracks`
 
