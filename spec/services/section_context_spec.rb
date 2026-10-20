@@ -24,6 +24,10 @@ RSpec.describe SectionContext do
     expect_prompt_snapshot("section_context__parsons_solved_order", described_class.render("blocks" => blocks, "display_order" => [ 0, 1, 2 ]))
   end
 
+  it "lists unscrambled blocks the provider returned as mixed types without raising" do
+    expect(described_class.render("blocks" => [ 2, "a", 1 ])).to eq("Blocks (order withheld):\n- 1\n- 2\n- a")
+  end
+
   it "describes a missing or empty section as nothing" do
     expect(described_class.render(nil)).to eq("")
     expect(described_class.render({})).to eq("")

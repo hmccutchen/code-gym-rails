@@ -90,15 +90,6 @@ tight loses the note silently.
 
 Provider output is rendered into the page, so it is bounded at the boundary.
 
-## `.explain_differently_standard`
-
-One rule shared by two prompts, so it cannot be edited in one without the
-other.
-
-## `PLAIN_LANGUAGE_STANDARD`
-
-Defined above `DUCK_SYSTEM_PROMPT` because that prompt interpolates it.
-
 ## `JUDGE_MAX_TOKENS`
 
 Sized for five prose fields, Pattern's count. The headroom bounds a model that
