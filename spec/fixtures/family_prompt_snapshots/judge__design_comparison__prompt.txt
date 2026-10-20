@@ -1,0 +1,21 @@
+Section kind: design_comparison
+The learner's task for this kind: Pick the better-designed of two working pieces of code for the stated system, and say which stated fact decides it.
+This is a discovery task: wording that names where the issue is defeats it.
+Tagged concept: information_hiding
+Pitched at: junior
+Level meaning: one clearly visible instance of the concept in a small scenario.
+Prose fields you may rewrite: title, scenario, question
+Every other field is the artifact and must not change.
+
+This section shows two pieces of code, A and B. They must behave the same and differ on one design principle. Solve it before judging: decide which piece is better for the stated system, and quote the sentence that decides it. Reject as underdetermined if no stated fact decides it, or if, at the junior rung, both pieces are defensible. Reject as reasoning_failure if a piece can be picked without reasoning about the system: cleaner names, more or better comments, clearly shorter code, or behavior that differs under any condition the scenario states, such as concurrent writers, retries, bulk writes or a failure. Reject as scope_mismatch if the principle the pieces differ on is not the tagged concept. At principal_engineer both pieces may be defensible and each may carry a real cost; keep it only if the stated facts still settle which cost this system should pay. Reject as scope_mismatch if the section restates a defect to find rather than offering a choice between two working designs. When you edit, you may reword the title, scenario and question; never change either piece of code, which piece is better, or what the deciding fact says.
+Put your solve in "better" ("a" or "b") and nowhere else: evidence, reason and issues must not say which piece is better.
+
+The section as delivered:
+{
+  "title": "Rates",
+  "scenario": "A rates file.",
+  "question": "Which would you ship?",
+  "piece_a": "a",
+  "piece_b": "b",
+  "concept": "information_hiding"
+}

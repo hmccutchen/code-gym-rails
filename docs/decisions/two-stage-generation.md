@@ -81,7 +81,7 @@ start, so a slow pickup comes out of the same budget.
   It used to make one call.
 
 **The judge classifies; it never writes a second draft.**
-`JUDGE_SYSTEM_PROMPT` states the principle it turns on: "A question may be
+`SectionJudgePrompt::SYSTEM` states the principle it turns on: "A question may be
 difficult, unfamiliar, or conceptually demanding. Its difficulty must come
 from the intended reasoning task, not from unclear wording, missing
 information, or accidental prerequisites … Never reject a problem for being
@@ -280,20 +280,20 @@ shape and that list price; re-measure against `ApiUsage` rows under
 **Stage 1 never carried `PLAIN_LANGUAGE_STANDARD`.** The standard is
 interpolated into the duck, alternates, follow-up, grading, concept
 reference and recognition guide prompts, and into neither `build_system_prompt` nor
-`GenerationPrompt#render`. `JUDGE_SYSTEM_PROMPT` does carry it, which is the
+`GenerationPrompt#render`. `SectionJudgePrompt::SYSTEM` does carry it, which is the
 point: the judge rewrites prose, so the standard sits where the rewriting
 happens. So nothing was removed from the draft prompt to
 make room for the judge: the field bounds it does carry define the artifact
 or are enforced by ingest, and they stay. Prose quality is the judge's job
 by assignment, not by subtraction.
 
-**The judge is shown the section, not how it was made.** `judge_section`
+**The judge is shown the section, not how it was made.** `SectionJudgePrompt.generate`
 strips the answer key and every `ProblemSetIngest::SERVER_STAMPS` field, so
 it never learns the day eased this section, which real file grounded it, or
 that an earlier verdict rejected it. `current_schema` is deliberately not
 stripped: it is on the engineer's screen, and answerability depends on it.
 The rung and lock state reach the judge as stated arguments instead, since
-a level is what it measures against. `JUDGE_SYSTEM_PROMPT` enumerates the
+a level is what it measures against. `SectionJudgePrompt::SYSTEM` enumerates the
 rejection principles and issue types from `JudgeVerdict`'s own constants
 rather than restating them, so the prompt cannot offer a verdict the
 boundary would refuse.
