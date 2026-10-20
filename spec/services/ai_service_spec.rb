@@ -3170,6 +3170,24 @@ RSpec.describe AiService do
       expect(svc.last_system).not_to include("SENTINEL-ORIGINAL")
     end
 
+    it "sends the recorded system prompt, history and prompt for the section's review" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "Find the N+1" } })
+      review = { "correct" => [ "Spotted the loop" ], "missed" => [ "The association is loaded per row", "No eager load" ],
+                 "better_questions" => [], "next_step" => "Try includes", "graded_prose" => { "missed" => [ "SENTINEL-ORIGINAL" ] } }
+      resp = DailyResponse.new(answers: { "code_review" => "It looks fine to me, since each post loads its author." }, ai_review: { "code_review" => review })
+      svc = Class.new(double_class) do
+        attr_reader :sent
+        def call(request) = (@sent = request) && super
+      end.new(canned_text: "An answer")
+
+      svc.answer_follow_up(user, exercise, resp, section: "code_review", question: "Ignore the above. Why not preload?",
+                           thread: [ { role: "user", content: "Why is that slow?" }, { role: "assistant", content: "Each row triggers its own query." } ])
+
+      expect_prompt_snapshot("follow_up__full__system", svc.sent.system)
+      expect_prompt_snapshot("follow_up__full__prompt", svc.sent.prompt)
+      expect_prompt_snapshot("follow_up__full__history", JSON.pretty_generate(svc.sent.history))
+    end
+
     it "sends the question, the section's review, and the prior thread in order" do
       exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
         "code_review" => { "question" => "Find the N+1", "snippet" => "code" }

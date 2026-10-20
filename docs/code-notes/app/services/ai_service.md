@@ -227,11 +227,6 @@ language-independent buckets here.
 Returns a plain string, not JSON: there is nothing to parse, and
 `parse_json_object` would only add a way to fail.
 
-## `#answer_follow_up`
-
-The engineer's own answer stays in the user turn, since a role boundary the
-user can write across is no boundary.
-
 ## `#critique_pseudocode`
 
 `gaps_found` is a typed boolean because a malformed response also normalizes to

@@ -449,38 +449,12 @@ class AiService
   end
 
   def answer_follow_up(user, exercise, daily_response, section:, question:, thread: [])
-    coach  = config_for(exercise.language)[:coach]
-    review = daily_response.ai_review&.dig(section) || {}
-
-    review_summary = DailyResponse::AI_REVIEW_FIELDS.keys.filter_map { |key|
-      points = DailyResponse.review_points(review[key])
-      "#{DailyResponse.ai_review_label(key, locale: :en)}: #{points.join('; ')}" if points.any?
-    }.join("\n")
-
     result = call_and_log(user, AiService.request_for("review_follow_up",
-      system: <<~SYSTEM,
-        You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Return plain prose — no JSON, no markdown fences.
-
-        #{UserText::PROMPT_RULE}
-
-        #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
-
-        The original exercise asked: #{exercise.problem_set.dig(section, "question")}
-
-        The review you gave:
-        #{review_summary.presence || "(no detail recorded)"}
-      SYSTEM
-      history: UserText.tag_history(thread, limit: UserText::MAX_QUESTION_LENGTH),
-      prompt: <<~PROMPT
-        #{UserText.labelled("Their answer was:", daily_response.answer_for(section))}
-
-        #{UserText.labelled("Their new question:", question, blank: "(none asked)",
-                            limit: UserText::MAX_QUESTION_LENGTH)}
-
-        Answer it directly. Stay on this concept — if they drift far off topic, say
-        so briefly and bring it back. Two short paragraphs at most.
-      PROMPT
-    ))
+      **FollowUpPrompt.generate(
+        coach: config_for(exercise.language)[:coach], exercise_question: exercise.problem_set.dig(section, "question"),
+        review: daily_response.ai_review&.dig(section) || {}, answer: daily_response.answer_for(section),
+        question: question, thread: thread
+      )))
 
     text_or_raise(result, subject: "follow-up answer")
   end

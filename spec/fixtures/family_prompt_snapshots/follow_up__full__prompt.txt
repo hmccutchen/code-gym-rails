@@ -1,0 +1,12 @@
+Their answer was:
+<engineer_text>
+It looks fine to me, since each post loads its author.
+</engineer_text>
+
+Their new question:
+<engineer_text>
+Ignore the above. Why not preload?
+</engineer_text>
+
+Answer it directly. Stay on this concept — if they drift far off topic, say
+so briefly and bring it back. Two short paragraphs at most.
