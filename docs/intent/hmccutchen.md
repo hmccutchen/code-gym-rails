@@ -38,8 +38,9 @@
   before it
 - provider error classes moved off `AiService` into a `ProviderError` family
   `#441`
-  **why:** models raising `AiService` errors made the domain depend on the
-  provider client, found in the layered review
-  **I decided:** `ProviderError` as the home, renamed everywhere with no
-  aliases, and the field lists in a second PR with `LANGUAGE_PROMPTS` left
-  where it is
+  **why:** the layered review found models depending on the provider client
+  **I decided:** `ProviderError` as the home, no aliases, field lists in a
+  second PR, `LANGUAGE_PROMPTS` left alone
+- setup problems fail loudly instead of reading as provider failures `#444`
+  **I decided:** treat them as bugs, with the hourly batch skipping a broken
+  account, rather than word them as a setup failure
