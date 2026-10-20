@@ -166,8 +166,8 @@ RSpec.describe FakeService do
   end
 
   describe FakeReplies do
-    it "names the system-prompt marker of every purpose, each a phrase AiService's prompts carry" do
-      source = Rails.root.join("app/services/ai_service.rb").read
+    it "names the system-prompt marker of every purpose, each a phrase AiService's or a *Prompt class's prompts carry" do
+      source = ([ "app/services/ai_service.rb" ] + Dir[Rails.root.join("app/services/*_prompt.rb")]).map { |path| Rails.root.join(path).read }.join
 
       expect(FakeReplies::SYSTEM_PROMPT_MARKERS.keys.sort).to eq(ApiUsage::PURPOSES.sort)
       FakeReplies::SYSTEM_PROMPT_MARKERS.each_value { |marker| expect(source).to include(marker) }

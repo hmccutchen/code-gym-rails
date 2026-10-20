@@ -3524,7 +3524,7 @@ RSpec.describe AiService do
       end
 
       it "forbids every form of silent correction in its system prompt" do
-        system_prompt = AiService::PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT
+        system_prompt = PseudocodePrompt::TRANSLATE_SYSTEM
 
         expect(system_prompt).to match(/omits an edge case, the code omits it too/i)
         expect(system_prompt).to match(/implement the wrong thing/i)

@@ -14,9 +14,13 @@ These are settled decisions, not defaults that drifted into place. CLAUDE.md
 says what a deviation from one requires.
 
 - **Template method for providers** — `AiService` owns provider orchestration,
-  parsing and usage logging, and every prompt but the generation prompt, whose
-  text it delegates to `GenerationPrompt` through its private
-  `#generation_prompt` factory. `AiService#call(request)` is the template: it
+  parsing and usage logging, and the prompts not yet moved to a prompt class.
+  Prompt text is moving into one class per prompt family (#431), and each
+  moved family keeps its system prompt and its prompt builder together:
+  `GenerationPrompt`, which `AiService` reaches through its private
+  `#generation_prompt` factory, and `PseudocodePrompt`, whose `.critique` and
+  `.translate` return the `system:` and `prompt:` a request needs. A moved
+  family's text lives only in its class. `AiService#call(request)` is the template: it
   posts the body with the request's timeout and retry context, raises on a
   failed status, parses the reply and maps a Faraday error the same way for
   every provider. Subclasses implement `request_body`, `read_result`,
@@ -74,8 +78,8 @@ says what a deviation from one requires.
   takes them as a `Provider` struct of callables, with a `providers:` factory
   that returns a fresh one for each thread (`JudgedGeneration::Provider`,
   `ReviewGrading::Provider`, built by `AiService#judged_generation_provider`
-  and `#review_grading_provider`). `AiService` keeps the calls and builds the prompts, the
-  generation prompt through `GenerationPrompt`;
+  and `#review_grading_provider`). `AiService` keeps the calls and builds the prompts, or
+  takes them from a prompt class (`GenerationPrompt`, `PseudocodePrompt`);
   the module keeps the orchestration and the policy, and its specs drive it
   with lambdas. Threads start through `CallerZoneThread.start`, and
   `spec/conventions/app_source_spec.rb` fails on any other `Thread.new` and on
