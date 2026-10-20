@@ -59,3 +59,5 @@
 - section judge into `SectionJudgePrompt` `#460`
 - review prose judge into `ReviewProseJudgePrompt` `#461`
 - the two-stage review into `ReviewPrompt` `#463`
+- load each area rule with its prompt classes `#464`
+  **why:** builds were stuck on Railway, so I asked for it stacked on the review PR to merge in order later
