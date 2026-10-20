@@ -75,3 +75,7 @@ this one.
   `ScenarioPools` `#468`
 - landed the domain modules move on main, since it merged into its
   stacked base too `#469`
+- ladder loading into `GenerationLadders`, the first of two PRs for
+  issue 431's orchestration step `#470`
+  **why:** I kept drafting out of `JudgedGeneration`, since unjudged days
+  draft too; each step is its own PR from main, as the issue says
