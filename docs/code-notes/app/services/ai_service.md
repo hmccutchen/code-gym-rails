@@ -334,9 +334,11 @@ give the user a raw 500.
 
 ## `#require_supported_language!`
 
-Planning reads `ConceptVocabulary`, whose unknown-language error is not an
-`ProviderError`. Checking first keeps an unsupported language failing the
-way the generation jobs rescue and record.
+Planning reads `ConceptVocabulary`, which raises its own unknown-language
+error. Checking first makes an unsupported language fail as
+`AiService::SetupError` before any planning work, the same error
+`.config_for` raises, so every setup problem reaches the boundaries as one
+class.
 
 ## `.config_for` and `#config_for`
 

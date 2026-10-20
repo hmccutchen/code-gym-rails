@@ -191,6 +191,9 @@ class ResponsesController < ApplicationController
   rescue ProviderError => e
     release_pseudocode_claim!(row, section, "critique")
     render_provider_failure(e, :critique)
+  rescue AiService::SetupError
+    release_pseudocode_claim!(row, section, "critique")
+    raise
   end
 
   private

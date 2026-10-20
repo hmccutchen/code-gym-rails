@@ -47,6 +47,9 @@ class RegenerateExerciseJob < ApplicationJob
     release(user, exercise, claim, e) { user.record_generation_message!(KEPT_SET_MESSAGES.fetch(:all_rejected)) }
   rescue ProviderError => e
     release(user, exercise, claim, e) { user.record_generation_failure!(e) }
+  rescue AiService::SetupError
+    exercise&.release_regenerating!(claim)
+    raise
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
     release(user, exercise, claim, e) { user.record_generation_message!("Generation returned an unusable set — try again.") }
   end

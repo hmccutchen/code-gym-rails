@@ -95,7 +95,11 @@ read it before changing that area.
   status code or key reaches a user. Page scripts show only
   `CodeGymRequest.send`'s `message`, JSON errors go through
   `render_json_error`, and `ProviderError::BillingError` is never treated as a
-  rate limit.
+  rate limit. A setup problem (no usable provider, the fake provider outside
+  a local environment, an unsupported language) raises
+  `AiService::SetupError`, which is not a `ProviderError`, so no surface
+  words it as a provider failure: it fails loudly, after releasing any claim
+  it holds, and the daily batch logs it and moves on to the next user.
 - **What stays out of the logs**: `config/initializers/filter_parameter_logging.rb`
   filters what engineers write (`answers`, `message`, `question`,
   `pseudocode`, `prior_alternates`, the duck's `thread`), the login `code`

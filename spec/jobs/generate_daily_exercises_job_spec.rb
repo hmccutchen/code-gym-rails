@@ -88,6 +88,13 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(DailyExercise.exists?(user: user, date: Date.current)).to be false
   end
 
+  it "lets a setup error fail a one-user job, without recording it as a provider failure" do
+    allow(AiService).to receive(:for).with(user).and_raise(AiService::SetupError, "User #{user.id} has no recognized AI provider configured")
+
+    expect { described_class.new.perform(user_id: user.id) }.to raise_error(AiService::SetupError)
+    expect(user.reload.last_generation_failure).to be_nil
+  end
+
   it "records a rejected key as bad_key and renders a Setup-pointing sentence" do
     stub_provider_failure(ProviderError::AuthenticationError, "invalid x-api-key")
 
@@ -359,6 +366,22 @@ RSpec.describe GenerateDailyExercisesJob do
 
         expect(DailyExercise.where(user: alaska).count).to eq(0)
       end
+    end
+
+    it "logs a broken account's setup error and still generates for the users after it" do
+      broken = User.create!(email: "broken@example.com", name: "Broken", provider: "anthropic",
+                            api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles")
+      allow(AiService).to receive(:for).with(broken).and_raise(AiService::SetupError, "User #{broken.id} has no recognized AI provider configured")
+      stub_generation_for(pac)
+      allow(Rails.logger).to receive(:error)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        expect { described_class.new.perform }.not_to raise_error
+        local_today = Time.use_zone("America/Los_Angeles") { Date.current }
+        expect(DailyExercise.exists?(user: pac, date: local_today)).to be true
+      end
+      expect(Rails.logger).to have_received(:error).with(/Setup error for user #{broken.id}: .*no recognized AI provider/)
+      expect(broken.reload.last_generation_failure).to be_nil
     end
 
     it "skips a user who has paused automatic generation" do

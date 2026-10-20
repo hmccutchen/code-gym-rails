@@ -495,7 +495,7 @@ RSpec.describe AiService do
 
     it "raises instead of silently falling back on an unsupported language" do
       expect { service.send(:build_system_prompt, "mixed") }
-        .to raise_error(ProviderError, /Unsupported generation language/)
+        .to raise_error(AiService::SetupError, /Unsupported generation language/)
     end
   end
 
@@ -2080,12 +2080,12 @@ RSpec.describe AiService do
   describe "#generate_exercise" do
     before { user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS) }
 
-    it "refuses an unsupported language with ProviderError before planning, so the jobs record the failure" do
+    it "refuses an unsupported language with a setup error before planning" do
       allow(DailyPlan).to receive(:for).and_call_original
       svc = double_class.new(canned_text: "{}")
 
       expect { svc.generate_exercise(user, language: "mixed") }
-        .to raise_error(ProviderError, /Unsupported generation language/)
+        .to raise_error(AiService::SetupError, /Unsupported generation language/)
       expect(DailyPlan).not_to have_received(:for)
     end
 
@@ -4013,8 +4013,10 @@ RSpec.describe AiService do
       expect(AiService.for(user)).to be_a(OpenaiService)
     end
 
-    it "raises ProviderError when the user has no recognized provider" do
-      expect { AiService.for(user) }.to raise_error(ProviderError, /no recognized AI provider/)
+    it "raises a setup error, outside the provider family, when the user has no recognized provider" do
+      expect { AiService.for(user) }.to raise_error(AiService::SetupError, /no recognized AI provider/) { |error|
+        expect(error).not_to be_a(ProviderError)
+      }
     end
   end
 
@@ -4283,7 +4285,7 @@ RSpec.describe AiService do
       service = double_class.new(canned_text: valid_json)
       expect {
         service.generate_concept_reference(user, "n_plus_one", "mixed")
-      }.to raise_error(ProviderError, /Unsupported generation language/)
+      }.to raise_error(AiService::SetupError, /Unsupported generation language/)
     end
   end
 

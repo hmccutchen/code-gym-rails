@@ -79,3 +79,18 @@ Cache in the one Postgres database, shared by web and worker, which is what
 lets the worker's job write what the web reads; development's memory store
 is per process, where the jobs run in the web process anyway. Asking for
 the write-up again clears the note, and so does a write-up landing.
+
+A setup problem is not a provider failure, and it is not worded as one
+(#443). `AiService.for` raises `AiService::SetupError` for a user with no
+recognized provider, or with the test-only fake provider outside a local
+environment, and `.config_for` raises it for an unsupported generation
+language. No provider was called in any of these cases, and none is
+reachable through the app: `require_provider` sends anyone without a usable
+key to Setup, and `User` validates `provider` and `language`. So each one
+means an account in a state the app shouldn't allow, or a bug, and it
+should be seen rather than explained away. A controller lets it surface as
+a server error and a job lets it fail in Solid Queue. Each first releases
+what it holds: the regenerate job its regeneration claim, and the
+pseudocode critique its round's claim. The hourly batch is the exception:
+it logs the error with the user's id and continues, so one broken account
+can't stop generation for everyone after it.

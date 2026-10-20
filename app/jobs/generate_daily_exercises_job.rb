@@ -15,6 +15,8 @@ class GenerateDailyExercisesJob < ApplicationJob
     else
       User.active.where.not(api_keys: nil).where(paused_generation_at: nil).find_each do |user|
         Time.use_zone(user.effective_time_zone) { generate_if_due(user) }
+      rescue AiService::SetupError => e
+        Rails.logger.error("Setup error for user #{user.id}: #{e.message}")
       end
     end
   end

@@ -153,6 +153,14 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(user.daily_responses.where(date: Date.current).count).to eq(1)
     end
 
+    it "releases the claim before letting a setup error surface" do
+      allow_any_instance_of(FakeService).to receive(:critique_pseudocode).and_raise(AiService::SetupError, "Unsupported generation language: \"cobol\"")
+
+      expect { critique }.to raise_error(AiService::SetupError)
+      expect(round["critique_claimed_at"]).to be_nil
+      expect(round).not_to have_key("critiqued_at")
+    end
+
     it "rejects a section this exercise does not present" do
       allow_any_instance_of(DailyExercise).to receive(:active_section_keys).and_return(%w[code_review pattern])
 
