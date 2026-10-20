@@ -65,6 +65,7 @@ this one.
 - section judge into `SectionJudgePrompt` `#460`
 - review prose judge into `ReviewProseJudgePrompt` `#461`
 - the two-stage review into `ReviewPrompt` `#463`
-- load each area rule with its prompt classes `#464`
+- load each area rule with its prompt classes `#464 open`
   **why:** Railway builds were having problems, so I asked for it stacked on
   the review PR, to merge in order once they recover
+- the generation system prompt into `GenerationPrompt.system_prompt` `#466`

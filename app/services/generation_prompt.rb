@@ -2,6 +2,17 @@
 class GenerationPrompt
   include GenerationPrompt::ConceptGuidance
 
+  def self.system_prompt(coach:, focus:)
+    <<~PROMPT
+      You are a senior #{coach} engineering coach generating personalized daily exercise sets.
+      Your goal is to push engineers toward senior-level thinking: not just "what" but "why" and "when not to."
+      Focus on #{focus}
+      Return ONLY valid JSON — no markdown fences, no explanation outside the JSON.
+
+      #{UserText::PROMPT_RULE}
+    PROMPT
+  end
+
   def initialize(user, language, plan:, history:, difficulty:, ladders:, retention_annotation:)
     @user                 = user
     @language             = language

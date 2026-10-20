@@ -423,6 +423,12 @@ RSpec.describe AiService do
   end
 
   describe "the generation schema" do
+    it "sends the recorded system prompt for each generation language" do
+      DailyExercise::LANGUAGES.each do |language|
+        expect_prompt_snapshot("generation_system__#{language}", service.send(:build_system_prompt, language))
+      end
+    end
+
     it "defaults to ruby_rails when no language is given" do
       expect(generation_schema(user)).to eq(generation_schema(user, "ruby_rails"))
     end

@@ -624,18 +624,7 @@ class AiService
     raise NotImplementedError, "#{self.class} must implement #build_connection"
   end
 
-  def build_system_prompt(language = "ruby_rails")
-    config = config_for(language)
-
-    <<~PROMPT
-      You are a senior #{config[:coach]} engineering coach generating personalized daily exercise sets.
-      Your goal is to push engineers toward senior-level thinking: not just "what" but "why" and "when not to."
-      Focus on #{config[:focus]}
-      Return ONLY valid JSON — no markdown fences, no explanation outside the JSON.
-
-      #{UserText::PROMPT_RULE}
-    PROMPT
-  end
+  def build_system_prompt(language = "ruby_rails") = GenerationPrompt.system_prompt(**config_for(language).slice(:coach, :focus))
 
   def ladders_for(rungs, language, code_review_mode)
     requests = rungs.map do |kind, rung|
