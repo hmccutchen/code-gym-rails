@@ -24,3 +24,13 @@ this one.
   **why:** I wanted it to say what the product is and who it's for
   **I decided:** it's a private product at coding-gym.pro, not an open-source
   project, so the setup and contributing sections went
+- the app's visible name from Code Gym to Coding Gym, to match coding-gym.pro
+  `#438`
+  **why:** the name people see should match the domain I'm about to show
+  developers
+  **I decided:** the session cookie, storage keys and code names keep the old
+  name, since renaming the cookie signs everyone out; the README and
+  CONTEXT.md get renamed because the repo is public; the generation prompts go
+  in their own PR straight after, because rewriting the prompt snapshots is a
+  generation change, and nothing that freezes a day for public viewing lands
+  before it
