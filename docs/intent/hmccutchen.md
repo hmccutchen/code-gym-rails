@@ -54,3 +54,4 @@
 - section explain-differently into `ExplainDifferentlyPrompt` `#455`
 - follow-ups into `FollowUpPrompt` `#457`
 - an issue for the browser specs that fail on slow runs
+- duck into `DuckPrompt` `#458`
