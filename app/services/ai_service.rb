@@ -67,35 +67,6 @@ class AiService
 
   MAX_GENERATED_CODE_LENGTH = 8_000
 
-  def self.explain_differently_standard(subject)
-    "Explain the SAME #{subject} again using a genuinely different approach — a\n" \
-      "different analogy, a different level of abstraction, or a concrete worked\n" \
-      "scenario instead of a principle. Do not repeat the original wording."
-  end
-
-  PLAIN_LANGUAGE_STANDARD = <<~STANDARD.chomp.freeze
-    Write prose for the engineer this way:
-
-    Avoid, in order of how often these actually show up:
-    - Manufactured rhetorical contrast — "not X, but Y" used purely for punch when a plain sentence says the same thing.
-    - Buzzwords and jargon. Use the plain-language equivalent; if a technical term is genuinely necessary, define it briefly on first use.
-    - Placeholder phrases — "please note," "at this time," "it's worth mentioning."
-    - Overusing "please" in instructions — state it directly.
-    - Starting every sentence with the same construction.
-    - Exclamation points, outside genuine, rare emphasis.
-    - Forced cleverness or trying to sound entertaining.
-    - Both choppy fragments and long-winded run-ons.
-
-    Aim for:
-    - Active voice — make clear who or what is doing the thing.
-    - Second person, direct address.
-    - Concrete over abstract — a specific example beats a general description of the same idea.
-    - Conditions before instructions, not after.
-    - Natural rhythm — if a sentence sounds stilted read aloud, rewrite it.
-
-    Calibration: too informal ("This is a total game-changer!") and too formal/overwrought ("The interface undergoes a paradigmatic transformation") are both wrong; aim for the plain middle ("This changes how the interface works").
-  STANDARD
-
   RATING_RUBRIC = <<~RUBRIC.chomp.freeze
     How to choose "rating": rate the answer against the level its section was pitched at, which the grading instruction states on its "Pitched at" line, so a rating means the same thing at every level. Base it on the gaps you list in "missed". A gap is essential when, left as the engineer wrote it, the code or decision would behave wrongly or a requirement the problem states would go unmet. Missing syntax, polish or wording, or a step any engineer at this level would take for granted, is not essential and does not lower the rating. Judge what is essential against the problem as written: a problem simpler than its level's description is graded on what it actually asks. Each section's grading note says what its main point and its essential pieces are.
     - "beginner": missed the main point of the section.
@@ -137,7 +108,7 @@ class AiService
     Keep it short: 1-3 sentences for a guiding question, up to 4 for an
     explanation. No preamble.
 
-    #{PLAIN_LANGUAGE_STANDARD}
+    #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
   PROMPT
 
   JUDGE_MAX_TOKENS = 1_200
@@ -175,7 +146,7 @@ class AiService
     When you edit: never modify code or schema content, the tagged concept, the kind, or any field that carries the planted defect. Never change the task or the difficulty; never make a subtle flaw more obvious or an obvious one more obscure. Never add a technical claim the draft does not make or imply. Never add information only to make the answer easier to find, and never solve the exercise. Never remove or genericize the scenario setting; trim filler inside a statement, never the setting. Return exactly the fields you were asked to rewrite, nothing else.
 
     For any prose you rewrite:
-    #{PLAIN_LANGUAGE_STANDARD}
+    #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
 
     Return only JSON, one of:
     {"status":"keep"}
@@ -202,7 +173,7 @@ class AiService
     Check for these problems, the only #{ReviewProseVerdict::ISSUE_TYPES.size}:
     #{REVIEW_PROSE_ISSUE_LINES}
 
-    #{PLAIN_LANGUAGE_STANDARD}
+    #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
 
     Rules for any rewrite:
     - Keep what every entry claims. Keep each negation ("does not", "never"), each condition ("only when", "unless"), and every identifier (a method, column, constant or file name) exactly as written.
@@ -340,26 +311,9 @@ class AiService
     }
   }.freeze
 
-  WORKED_EXAMPLE_BOUND = "At most the two fragments plus four sentences of prose.".freeze
-
-  MAX_LADDER_RUNG_LENGTH = 300
-
   MAX_LADDER_GUIDANCE_CHARS = 54_000
 
   MAX_CONCEPT_GUIDE_LENGTH = 4_000
-
-  CONCEPT_REFERENCE_SCOPE = <<~SCOPE.chomp
-    This is a stable explanation an engineer returns to across repeat exposure —
-    not tied to any single problem.
-  SCOPE
-
-  RECOGNITION_GUIDE_SCOPE = <<~SCOPE.chomp
-    This teaches a PROCESS for recognizing the category, never an ANSWER.
-    - Good: "ask whether this interface hides what it should, or makes every caller repeat the same decision."
-    - Bad: defining any one concept in the list, such as "shallow_module means the interface is as complex as the implementation". Each concept already has its own reference.
-    - Bad: anything that tells the reader what to look for in a particular problem they may be given. Never name or describe a specific planted defect, exercise, or answer.
-    It is a lens the reader carries into any problem, not a hint about one.
-  SCOPE
 
   RAW_SNIPPET_LIMIT = 500
 
@@ -444,9 +398,7 @@ class AiService
     config = config_for(language)
 
     result = call_and_log(user, AiService.request_for("generate_concept_reference",
-      system: "You are a senior #{config[:coach]} engineer writing a concise, durable reference for one concept. Return ONLY valid JSON.",
-      prompt: build_concept_reference_prompt(concept, language)
-    ))
+      **ConceptReferencePrompt.generate(concept: concept, language: language, coach: config[:coach], label: config[:label])))
 
     reference = parse_json_object(result[:text], subject: "concept reference")
 
@@ -462,9 +414,7 @@ class AiService
 
   def generate_recognition_guide(user, group_key)
     result = call_and_log(user, AiService.request_for("generate_recognition_guide",
-      system: "You are a senior engineer writing a short, durable piece on how to recognize one category of problem. Return ONLY valid JSON.",
-      prompt: build_recognition_guide_prompt(group_key)
-    ))
+      **RecognitionGuidePrompt.generate(group_key: group_key, subject: recognition_subject(group_key))))
 
     guide = parse_json_object(result[:text], subject: "recognition guide")
     RecognitionGuide::FIELDS.each { |field| guide[field] = usable_optional_text(guide[field], MAX_CONCEPT_GUIDE_LENGTH) }
@@ -476,55 +426,24 @@ class AiService
   end
 
   def explain_concept_differently(user, reference, prior_alternates: [])
-    coach = config_for(reference.language)[:coach]
-
-    already_read = ConceptReference::REFERENCE_FIELDS
-      .map { |field| "#{field}: #{reference.public_send(field)}" }
-      .join("\n")
+    already_read = ConceptReference::REFERENCE_FIELDS.index_with { |field| reference.public_send(field) }
 
     result = call_and_log(user, AiService.request_for("explain_concept_differently",
-      system: "You are a senior #{coach} engineer re-teaching one concept to an engineer for whom the standard reference did not land. Return plain prose — no JSON, no markdown fences.\n\n#{UserText::PROMPT_RULE}",
-      prompt: <<~PROMPT
-        The concept: "#{reference.concept}"
-
-        The reference they have already read:
-        #{already_read}
-
-        #{prior_framings(prior_alternates)}
-
-        #{self.class.explain_differently_standard("concept")}
-        #{CONCEPT_REFERENCE_SCOPE} Teach the concept itself; never solve, hint at,
-        or refer to any particular exercise. Two short paragraphs at most.
-
-        #{PLAIN_LANGUAGE_STANDARD}
-      PROMPT
-    ))
+      **ConceptReferencePrompt.reframe(concept: reference.concept, coach: config_for(reference.language)[:coach],
+                                       already_read: already_read, prior_alternates: prior_alternates)))
 
     text_or_raise(result, subject: "alternate concept explanation")
   end
 
   def explain_differently(user, exercise, daily_response, section:, prior_alternates: [])
-    coach   = config_for(exercise.language)[:coach]
-    review  = daily_response.ai_review&.dig(section) || {}
-    missed  = DailyResponse.review_points(review["missed"])
+    review = daily_response.ai_review&.dig(section) || {}
 
     result = call_and_log(user, AiService.request_for("explain_differently",
-      system: "You are a senior #{coach} engineer re-explaining one point to an engineer who did not follow the first explanation. Return plain prose — no JSON, no markdown fences.\n\n#{UserText::PROMPT_RULE}",
-      prompt: <<~PROMPT
-        The engineer was asked: #{exercise.problem_set.dig(section, "question")}
-        #{UserText.labelled("Their answer:", daily_response.answer_for(section))}
-
-        What they missed:
-        #{missed.any? ? missed.map { |m| "- #{m}" }.join("\n") : "- (nothing recorded)"}
-
-        #{prior_framings(prior_alternates)}
-
-        #{self.class.explain_differently_standard("point")}
-        Two short paragraphs at most.
-
-        #{PLAIN_LANGUAGE_STANDARD}
-      PROMPT
-    ))
+      **ExplainDifferentlyPrompt.generate(
+        coach: config_for(exercise.language)[:coach], question: exercise.problem_set.dig(section, "question"),
+        answer: daily_response.answer_for(section), missed: DailyResponse.review_points(review["missed"]),
+        prior_alternates: prior_alternates
+      )))
 
     text_or_raise(result, subject: "alternate explanation")
   end
@@ -544,7 +463,7 @@ class AiService
 
         #{UserText::PROMPT_RULE}
 
-        #{PLAIN_LANGUAGE_STANDARD}
+        #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
 
         The original exercise asked: #{exercise.problem_set.dig(section, "question")}
 
@@ -568,7 +487,7 @@ class AiService
 
   def duck_response(user, exercise, section:, message:, thread: [])
     result = call_and_log(user, AiService.request_for("duck_thread",
-      system: "#{DUCK_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
+      system: "#{DUCK_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}\n\nThe exercise section:\n#{SectionContext.render(exercise.problem_set[section.to_s])}",
       history: UserText.tag_history(thread),
       prompt: <<~PROMPT
         Their new message:
@@ -781,7 +700,7 @@ class AiService
 
   def normalize_optional_reference_fields!(reference)
     ConceptReference::GUIDE_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_CONCEPT_GUIDE_LENGTH) }
-    ConceptReference::LADDER_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_LADDER_RUNG_LENGTH) }
+    ConceptReference::LADDER_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], ConceptReference::MAX_LADDER_RUNG_LENGTH) }
     reference["lesson"] = ConceptLesson.from_provider(reference["lesson"])
   end
 
@@ -801,45 +720,6 @@ class AiService
     thread.map { |turn| "#{turn[:role] == "assistant" ? "You" : "Them"}: #{turn[:content]}" }.join("\n")
   end
 
-  def duck_section_context(exercise, section)
-    data = exercise.problem_set.dig(section.to_s) || {}
-
-    [
-      ("Title: #{data["title"]}" if data["title"].present?),
-      ("Scenario: #{data["scenario"]}" if data["scenario"].present?),
-      ("Why it exists: #{data["why"]}" if data["why"].present?),
-      ("Question: #{data["question"]}" if data["question"].present?),
-      ("Options: #{Array(data["options"]).join(" / ")}" if data["options"].present?),
-      ("Code snippet:\n#{data["snippet"]}" if data["snippet"].present?),
-      ("Current schema, as the table stands today:\n#{data["current_schema"]}" if data["current_schema"].present?),
-      ("Starter code:\n#{data["starter_code"]}" if data["starter_code"].present?),
-      ("Plan excerpt:\n#{data["plan_excerpt"]}" if data["plan_excerpt"].present?),
-      ("The problem to plan:\n#{data["problem_statement"]}" if data["problem_statement"].present?),
-      ("Feature request:\n#{data["request"]}" if data["request"].present?),
-      ("Piece A:\n#{data["piece_a"]}" if data["piece_a"].present?),
-      ("Piece B:\n#{data["piece_b"]}" if data["piece_b"].present?),
-      duck_parsons_blocks(data)
-    ].compact.join("\n")
-  end
-
-  def duck_parsons_blocks(data)
-    blocks = data["blocks"]
-    return unless blocks.is_a?(Array) && blocks.any?
-
-    order = scrambled_display_order(data["display_order"], blocks.size)
-    return "Blocks (order withheld):\n#{blocks.map(&:to_s).sort.map { |b| "- #{b}" }.join("\n")}" unless order
-
-    lines = order.map.with_index { |block_index, position| "#{position + 1}. #{blocks[block_index]}" }
-    "Blocks, in the learner's current on-screen order (NOT the correct order):\n#{lines.join("\n")}"
-  end
-
-  def scrambled_display_order(display_order, block_count)
-    order = ExerciseSection::ParsonsProblem.normalize_order(Array(display_order), block_count)
-    return if order.empty? || order == (0...block_count).to_a
-
-    order
-  end
-
   def problem_statement(exercise, section) = exercise.problem_set.dig(section.to_s, "problem_statement")
 
   def log_pseudocode_critique(user, gaps_found, gaps)
@@ -847,13 +727,6 @@ class AiService
       "[pseudocode] user=#{user.id} date=#{Date.current} phase=critique " \
       "gaps_found=#{gaps_found} gaps=#{gaps.size}"
     )
-  end
-
-  def prior_framings(prior_alternates)
-    return "No alternate framing has been given yet." if prior_alternates.empty?
-
-    "Framings already given (do NOT reprise these angles or analogies):\n" +
-      prior_alternates.map.with_index(1) { |a, i| "#{i}. #{UserText.tagged(a, blank: '')}" }.join("\n")
   end
 
   def text_or_raise(result, subject:)
@@ -963,7 +836,7 @@ class AiService
       field = ConceptReference::LADDER_FIELD_FOR.fetch(request[:level])
       rungs = request[:concepts].filter_map do |concept|
         reference = references[[ request[:bucket], concept ]]
-        [ concept, reference.public_send(field).truncate(MAX_LADDER_RUNG_LENGTH) ] if reference
+        [ concept, reference.public_send(field).truncate(ConceptReference::MAX_LADDER_RUNG_LENGTH) ] if reference
       end.to_h
       (ladders[request[:level]] ||= {}).merge!(rungs)
     end
@@ -995,7 +868,7 @@ class AiService
 
       #{RATING_RUBRIC}
 
-      #{PLAIN_LANGUAGE_STANDARD}
+      #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
 
       #{sections.join("\n\n")}
     CONTEXT
@@ -1078,7 +951,7 @@ class AiService
   end
 
   def build_difficulty_prompt(exercise, sections)
-    material = sections.map { |section| "## #{section}\n#{duck_section_context(exercise, section)}" }
+    material = sections.map { |section| "## #{section}\n#{SectionContext.render(exercise.problem_set[section.to_s])}" }
 
     <<~PROMPT
       Rate the objective difficulty of each problem below, on this scale:
@@ -1115,141 +988,8 @@ class AiService
       .join("\n")
   end
 
-  def build_concept_reference_prompt(concept, language)
-    config = config_for(language)
-    medium = ConceptVocabulary.language_agnostic?(language) ? nil : config[:label]
-
-    senior_lens_desc =
-      if ConceptVocabulary::ANTI_SHAPE_CONCEPTS.include?(concept)
-        "how to catch it early, what it costs to leave in place, and when the cheaper-looking shape is still worth refusing"
-      else
-        "when to reach for it / tradeoffs"
-      end
-
-    <<~PROMPT
-      Write a durable reference for the #{config[:coach]} concept: "#{concept}".
-      #{CONCEPT_REFERENCE_SCOPE} Be precise and senior-level.
-
-      Then write a longer, plainer-language guide for someone meeting this
-      concept in a library rather than in a problem — no exercise in front of
-      them, no answer to reach. Thorough but not an essay: each guide field is
-      at most two short paragraphs, except guide_worked_example, which carries
-      its own bound below.
-
-      This standard applies to the guide fields and the lesson:
-      #{PLAIN_LANGUAGE_STANDARD}
-
-      Then write a difficulty ladder: for each of #{KindDifficulty::LEVELS.join(', ')}, what a
-      problem about THIS concept looks like at that level. Name its concrete form, never a
-      description of the level in general. For missing_index, for example: junior is an
-      unindexed foreign key, mid_level is an index the query can't use because it wraps the
-      column in a function, senior is composite index column order, principal_engineer is
-      the write-cost tradeoff of adding an index. Each rung is one or two sentences, under
-      #{MAX_LADDER_RUNG_LENGTH} characters.
-
-      #{concept_lesson_instruction(concept)}
-
-      Return JSON matching this schema exactly:
-      {
-        "tagline":      "string — bold one-liner",
-        "explanation":  "string — 2-3 sentences",
-        "code_example": "string — #{code_example_description(medium)}",
-        "senior_lens":  "string — #{senior_lens_desc}",
-        "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term",
-        "guide_worked_example": "#{worked_example_description(concept, medium)}",
-        "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing",
-      #{ConceptReference::LADDER_FIELD_FOR.map { |level, field| %(  "#{field}": "string — a #{level}-level problem about this concept",) }.join("\n")}
-        "lesson": #{JSON.generate(ConceptLesson.schema)}
-      }
-    PROMPT
-  end
-
-  def concept_lesson_instruction(concept)
-    habits =
-      if ConceptVocabulary::TRADEOFF_CONCEPTS.include?(concept)
-        "habits: one to #{ConceptLesson::MAX_HABITS} options a team can choose between. Each carries \"catch\": what that option costs."
-      else
-        "habits: one to #{ConceptLesson::MAX_HABITS} small habits or fixes. Each carries \"catch\": the real limit or cost of that habit, which the reader sees directly after it."
-      end
-
-    <<~TEXT.chomp
-      Then write a short lesson for someone reading this concept on a phone, under
-      "lesson". Every key in it is optional: leave a key out when it does not fit
-      this concept, and never pad one to fill it.
-      Keep the whole lesson under about #{ConceptLesson::WORD_TARGET} words, in plain prose with no code;
-      the code example and the worked example already show the code.
-      - definition: one sentence saying what the concept is.
-      - comparison: an everyday comparison that maps onto the concept exactly.
-      - comparison_limit: one sentence saying where that comparison stops working. Give it with comparison or leave both out; one without the other is dropped.
-      - misunderstanding: the most common wrong idea about this concept, and what is true instead.
-      - situations: two to #{ConceptLesson::MAX_SITUATIONS} concrete situations where an engineer runs into it, each one short.
-      - #{habits}
-      - carry_question: one question the reader can ask about their own work.
-      - quick_test: a quick way to check their own code or plan for it.
-    TEXT
-  end
-
-  def build_recognition_guide_prompt(group_key)
-    concepts = RecognitionGuide.concepts_for(group_key)
-
-    <<~PROMPT
-      Write a short teaching piece on how to recognize one category of problem.
-
-      The category, "#{group_key.humanize}", is about #{recognition_subject(group_key)}
-      The concepts in it are: #{concepts.join(', ')}.
-      #{RecognitionGuide.framing_for(group_key)}
-      #{recognition_tradeoff_line(concepts)}
-
-      #{RECOGNITION_GUIDE_SCOPE}
-
-      Write for any engineer reading a library, with no exercise in front of them.
-      Keep examples language-neutral: plain description, or a few lines of
-      pseudocode at most. Invent them; never describe a real exercise.
-
-      This standard applies to every field:
-      #{PLAIN_LANGUAGE_STANDARD}
-
-      Return JSON matching this schema exactly:
-      {
-        "questions": "string — the questions to ask, in the order you would ask them, when reading code or a plan to see whether it has a problem of this kind. At most two short paragraphs.",
-        "contrast":  "string — two short invented situations of the same shape: one where those questions turn something up, and a look-alike where they come back clean. Then say which question told them apart. At most two short paragraphs.",
-        "misfires":  "string — how this way of looking goes wrong: what it flags that is not a problem, and what it misses. One short paragraph."
-      }
-    PROMPT
-  end
-
   def recognition_subject(group_key)
     RecognitionGuide::NAMED_GROUP_SUBJECTS.fetch(group_key) { LANGUAGE_PROMPTS.fetch(group_key).fetch(:focus) }
-  end
-
-  def recognition_tradeoff_line(concepts)
-    choices = concepts & ConceptVocabulary::TRADEOFF_CONCEPTS
-    return if choices.empty?
-
-    "Some of these (#{choices.join(', ')}) are choices between two defensible options rather than defects. " \
-      "For those, the lens recognizes that a choice is being made and which property of the context decides it, never which side is right."
-  end
-
-  def code_example_description(medium)
-    return "illustrative pseudocode or a short language-agnostic snippet, ~15 lines" if medium.nil?
-
-    "annotated #{medium} code, ~15 lines"
-  end
-
-  def worked_example_description(concept, medium)
-    opening = "two short #{medium || 'pseudocode'} fragments of the SAME scenario, " \
-              "keeping the same names and shape so the difference reads structurally"
-
-    if ConceptVocabulary::TRADEOFF_CONCEPTS.include?(concept)
-      "string — #{opening}: option A, then option B. NEITHER is the corrected version — both are " \
-        "legitimate and the choice is context-dependent. Then say in prose what each option buys, what it " \
-        "costs, and which property of the context decides between them. #{WORKED_EXAMPLE_BOUND}"
-    else
-      "string — #{opening}: first the version exhibiting the concept's failure mode, then the " \
-        "corrected version of that same scenario. Then say in prose WHY the two relate as a mechanism " \
-        "('X causes Y', 'Y is what happens when X breaks down') — never merely that they are " \
-        "associated or related. #{WORKED_EXAMPLE_BOUND}"
-    end
   end
 
   # A non-Hash must fail here: an array saved to ai_review is truthy, flips #reviewed? and strands an empty review.

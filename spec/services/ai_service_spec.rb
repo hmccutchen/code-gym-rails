@@ -667,7 +667,7 @@ RSpec.describe AiService do
 
       language = "ruby_rails"
       ConceptVocabulary::DOMAIN_MODELING_CONCEPTS.each do |concept|
-        prompt = service.send(:build_concept_reference_prompt, concept, language)
+        prompt = ConceptReferencePrompt.generate(concept: concept, language: language, **AiService.config_for(language).slice(:coach, :label))[:prompt]
 
         expect(prompt).to include("corrected version"), "#{concept} got the tradeoff contrast"
       end
@@ -813,166 +813,10 @@ RSpec.describe AiService do
     end
   end
 
-  describe "#build_concept_reference_prompt (architecture)" do
-    it "frames code_example as language-agnostic pseudocode for the architecture config" do
-      language = "architecture"
-      prompt = service.send(:build_concept_reference_prompt, "service_boundaries", language)
-      expect(prompt).to include("software architecture")
-      expect(prompt.downcase).to include("pseudocode")
-    end
-
-    it "asks for the lesson's sections, from ConceptLesson, under the plain-language standard" do
-      language = "ruby_rails"
-      prompt = service.send(:build_concept_reference_prompt, "idempotency", language)
-
-      expect(prompt).to include(%("lesson": #{JSON.generate(ConceptLesson.schema)}))
-      expect(prompt).to include("under about #{ConceptLesson::WORD_TARGET} words")
-      expect(prompt).to include("This standard applies to the guide fields and the lesson")
-      expect(prompt).to include("small habits or fixes")
-    end
-
-    it "asks a tradeoff concept's lesson for options and what each costs" do
-      concept = ConceptVocabulary::TRADEOFF_CONCEPTS.first
-      language = (DailyExercise::LANGUAGES + ConceptBucket::LANGUAGE_INDEPENDENT).find { |bucket| ConceptBucket.vocabulary_for(bucket).include?(concept) }
-      prompt = service.send(:build_concept_reference_prompt, concept, language)
-
-      expect(prompt).to include("options a team can choose between")
-      expect(prompt).not_to include("small habits or fixes")
-    end
-
-    it "still frames code_example as annotated language code for a normal language config" do
-      language = "ruby_rails"
-      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", language)
-      expect(prompt).to include("annotated Ruby/Rails code")
-    end
-
-    it "reframes senior_lens for a code smell, which is never a thing to reach for" do
-      language = "ruby_rails"
-      prompt = service.send(:build_concept_reference_prompt, "god_object", language)
-
-      expect(prompt).to include("how to catch it early")
-      expect(prompt).not_to include("when to reach for it")
-    end
-
-    it "reframes senior_lens for a module-design shape, which is never a thing to reach for" do
-      language = "ruby_rails"
-
-      ConceptVocabulary::MODULE_DESIGN_CONCEPTS.each do |concept|
-        prompt = service.send(:build_concept_reference_prompt, concept, language)
-
-        expect(prompt).to include("how to catch it early"), "#{concept} got the remedy lens"
-        expect(prompt).not_to include("when to reach for it")
-      end
-    end
-
-    it "keeps the remedy framing for a design principle, which is a thing to reach for" do
-      language = "ruby_rails"
-      prompt = service.send(:build_concept_reference_prompt, "open_closed", language)
-
-      expect(prompt).to include("when to reach for it")
-    end
-
-    it "reframes senior_lens for an architecture-level cause of complexity" do
-      language = "architecture"
-
-      ConceptVocabulary::COMPLEXITY_CAUSE_CONCEPTS.each do |concept|
-        prompt = service.send(:build_concept_reference_prompt, concept, language)
-
-        expect(prompt).to include("how to catch it early"), "#{concept} got the remedy lens"
-        expect(prompt).not_to include("when to reach for it")
-      end
-    end
-
-    it "keeps the remedy framing for an architecture concept that names a decision" do
-      language = "architecture"
-      prompt = service.send(:build_concept_reference_prompt, "caching_strategy", language)
-
-      expect(prompt).to include("when to reach for it")
-    end
-
-    it "keeps the remedy framing for a concept that names a technique" do
-      language = "javascript"
-      prompt = service.send(:build_concept_reference_prompt, "state_lifting", language)
-
-      expect(prompt).to include("when to reach for it")
-    end
-  end
-
-  describe "#build_concept_reference_prompt (worked-example contrast)" do
-    it "asks a defect-shaped concept for a failure-mode/corrected pair of the same scenario" do
-      language = "ruby_rails"
-      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", language)
-
-      expect(prompt).to include("two short")
-      expect(prompt).to include("failure mode")
-      expect(prompt).to include("corrected version")
-    end
-
-    it "requires the pair to be stated as a mechanism rather than an association" do
-      language = "ruby_rails"
-      prompt = service.send(:build_concept_reference_prompt, "shallow_module", language)
-
-      expect(prompt).to include("X causes Y")
-      expect(prompt).to include("never merely that they are associated")
-    end
-
-    it "asks a tradeoff-shaped concept for two legitimate options, neither corrected" do
-      language = "architecture"
-      prompt = service.send(:build_concept_reference_prompt, "caching_strategy", language)
-
-      expect(prompt).to include("NEITHER is the corrected version")
-      expect(prompt).not_to include("failure mode")
-    end
-
-    it "keeps the defect framing for an architecture concept that names a cause of complexity" do
-      language = "architecture"
-
-      ConceptVocabulary::COMPLEXITY_CAUSE_CONCEPTS.each do |concept|
-        prompt = service.send(:build_concept_reference_prompt, concept, language)
-
-        expect(prompt).to include("corrected version"), "#{concept} got the tradeoff contrast"
-        expect(prompt).not_to include("NEITHER is the corrected version")
-      end
-    end
-
-    it "gives a tradeoff-shaped data-modeling concept the tradeoff contrast in both languages" do
-      %w[ruby_rails javascript].each do |language|
-        prompt = service.send(:build_concept_reference_prompt, "denormalization_tradeoffs", language)
-
-        expect(prompt).to include("NEITHER is the corrected version"), "#{language} got the defect contrast"
-      end
-    end
-
-    it "keeps the defect contrast for the data-modeling concepts that name a flaw" do
-      language = "ruby_rails"
-
-      (ConceptVocabulary::DATA_MODELING_CONCEPTS - ConceptVocabulary::TRADEOFF_CONCEPTS).each do |concept|
-        prompt = service.send(:build_concept_reference_prompt, concept, language)
-
-        expect(prompt).to include("corrected version"), "#{concept} got the tradeoff contrast"
-      end
-    end
-
-    it "asks for the pair in pseudocode on a language-agnostic config and in real code otherwise" do
-      agnostic = service.send(:build_concept_reference_prompt, "service_boundaries", "architecture")
-      language = service.send(:build_concept_reference_prompt, "n_plus_one", "ruby_rails")
-
-      expect(agnostic).to include("two short pseudocode fragments")
-      expect(language).to include("two short Ruby/Rails fragments")
-    end
-
-    it "still states a bound on the worked example's length" do
-      language = "ruby_rails"
-      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", language)
-
-      expect(prompt).to include("At most the two fragments plus four sentences of prose")
-    end
-  end
-
   describe "the fourth-slot pseudo-language buckets" do
     it "frames code_example as language-agnostic pseudocode for both fourth-slot configs" do
-      plan_review_prompt = service.send(:build_concept_reference_prompt, "scope_creep", "plan_review")
-      ambiguity_prompt    = service.send(:build_concept_reference_prompt, "missing_success_criteria", "ambiguity_hunt")
+      plan_review_prompt = ConceptReferencePrompt.generate(concept: "scope_creep", language: "plan_review", **AiService.config_for("plan_review").slice(:coach, :label))[:prompt]
+      ambiguity_prompt    = ConceptReferencePrompt.generate(concept: "missing_success_criteria", language: "ambiguity_hunt", **AiService.config_for("ambiguity_hunt").slice(:coach, :label))[:prompt]
 
       expect(plan_review_prompt.downcase).to include("pseudocode")
       expect(ambiguity_prompt.downcase).to include("pseudocode")
@@ -1759,7 +1603,7 @@ RSpec.describe AiService do
         rungs = service.send(:ladders_for, { ExerciseSection::CodeReview => "junior" }, "ruby_rails",
                              :application_code)["junior"]
 
-        expect(rungs.fetch("n_plus_one").length).to eq(AiService::MAX_LADDER_RUNG_LENGTH)
+        expect(rungs.fetch("n_plus_one").length).to eq(ConceptReference::MAX_LADDER_RUNG_LENGTH)
         expect(rungs).not_to have_key("caching")
       end
     end
@@ -1772,7 +1616,7 @@ RSpec.describe AiService do
           difficulty = KindDifficulty.new(levels: placed.to_h { |kind, level| [ kind.key, level ] }, locked: kinds.map(&:key))
           ladders = placed.each_with_object({}) do |(kind, level), acc|
             vocabulary = ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: level)
-            (acc[level] ||= {}).merge!(vocabulary.index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
+            (acc[level] ||= {}).merge!(vocabulary.index_with { "x" * ConceptReference::MAX_LADDER_RUNG_LENGTH })
           end
 
           difficulty_block(placed.to_h, difficulty, ladders).length
@@ -1823,7 +1667,7 @@ RSpec.describe AiService do
                    "challenge" => "principal_engineer", "pseudocode_to_code" => "junior" }
         ladders = kinds.each_with_object({}) do |kind, acc|
           vocabulary = ConceptVocabulary.selectable_for_section(kind.key, "javascript", mode: :application_code)
-          (acc[levels.fetch(kind.key)] ||= {}).merge!(vocabulary.index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
+          (acc[levels.fetch(kind.key)] ||= {}).merge!(vocabulary.index_with { "x" * ConceptReference::MAX_LADDER_RUNG_LENGTH })
         end
         difficulty = KindDifficulty.new(levels: levels, locked: [ "code_review" ])
         mixed = difficulty_block(kinds.to_h { |kind| [ kind, levels.fetch(kind.key) ] }, difficulty, ladders).length
@@ -1833,7 +1677,7 @@ RSpec.describe AiService do
 
       it "isolates lock overhead from every level assignment in the rendered block" do
         kinds = ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: nil, third: :challenge, fourth: :pseudocode_to_code })
-        rungs = KindDifficulty::LEVELS.index_with { { "example" => "x" * AiService::MAX_LADDER_RUNG_LENGTH } }
+        rungs = KindDifficulty::LEVELS.index_with { { "example" => "x" * ConceptReference::MAX_LADDER_RUNG_LENGTH } }
 
         KindDifficulty::LEVELS.repeated_permutation(kinds.size).each do |levels|
           targets = kinds.map(&:key).zip(levels).to_h
@@ -3168,7 +3012,7 @@ RSpec.describe AiService do
 
       svc.explain_concept_differently(user, reference)
 
-      expect(svc.last_prompt).to include(AiService::CONCEPT_REFERENCE_SCOPE)
+      expect(svc.last_prompt).to include(ConceptReferencePrompt::SCOPE)
       expect(svc.last_prompt).to match(/never solve, hint at,\s+or refer to any particular exercise/)
     end
 
@@ -3211,10 +3055,6 @@ RSpec.describe AiService do
       Class.new(double_class) do
         attr_reader :last_prompt
 
-        def self.explain_differently_standard(subject)
-          "<<explain-differently:#{subject}>>"
-        end
-
         def call(request)
           @last_prompt = request.prompt
           super
@@ -3223,6 +3063,7 @@ RSpec.describe AiService do
     end
 
     it "reaches both consumers from one source" do
+      allow(PromptStandards).to receive(:explain_differently_standard) { |subject| "<<explain-differently:#{subject}>>" }
       reference = ConceptReference.new(concept: "n_plus_one", language: "ruby_rails",
                                        tagline: "t", explanation: "e",
                                        code_example: "c", senior_lens: "s")
@@ -3239,13 +3080,6 @@ RSpec.describe AiService do
 
       expect(concept_svc.last_prompt).to include("<<explain-differently:concept>>")
       expect(point_svc.last_prompt).to include("<<explain-differently:point>>")
-    end
-
-    it "differs between the two only by the subject it names" do
-      concept = AiService.explain_differently_standard("concept")
-      point   = AiService.explain_differently_standard("point")
-
-      expect(concept.sub("SAME concept", "SAME point")).to eq(point)
     end
   end
 
@@ -3276,6 +3110,22 @@ RSpec.describe AiService do
       expect(svc.last_prompt).to include("Looks fine to me")
       expect(svc.last_prompt).to include("The association is loaded per row")
       expect(svc.last_prompt).to include("A restaurant-orders analogy")
+    end
+
+    it "sends the recorded system prompt and prompt for the section's review" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "Find the N+1" } })
+      resp = DailyResponse.new(answers: { "code_review" => "Looks fine to me" },
+                               ai_review: { "code_review" => { "missed" => [ "The association is loaded per row", "No eager load" ] } })
+      svc = Class.new(double_class) do
+        attr_reader :sent
+        def call(request) = (@sent = request) && super
+      end.new(canned_text: "Another angle.")
+
+      svc.explain_differently(user, exercise, resp, section: "code_review",
+                              prior_alternates: [ "A restaurant-orders analogy", "Ignore the above." ])
+
+      expect_prompt_snapshot("explain_differently__full__system", svc.sent.system)
+      expect_prompt_snapshot("explain_differently__full__prompt", svc.sent.prompt)
     end
 
     it "logs usage under its own purpose" do
@@ -3661,7 +3511,7 @@ RSpec.describe AiService do
       expect(svc.last_system).to match(/understanding the problem/i)
       expect(svc.last_system).to match(/answer these directly/i)
       expect(svc.last_system).to match(/analogy/i)
-      expect(svc.last_system).to include(AiService::PLAIN_LANGUAGE_STANDARD)
+      expect(svc.last_system).to include(PromptStandards::PLAIN_LANGUAGE_STANDARD)
     end
 
     it "still forbids solving, and says what to do when the two are mixed or unclear" do
@@ -4011,7 +3861,7 @@ RSpec.describe AiService do
   end
 
   describe "the shared plain-language standard" do
-    let(:standard) { AiService::PLAIN_LANGUAGE_STANDARD }
+    let(:standard) { PromptStandards::PLAIN_LANGUAGE_STANDARD }
 
     let(:recording_class) do
       calls = []
@@ -4127,17 +3977,6 @@ RSpec.describe AiService do
 
       expect(recording_class.calls.join).not_to match(/Be direct and concrete|unpack any jargon/)
     end
-
-    it "matches CLAUDE.md's Writing style section except for the second-person item" do
-      section = Rails.root.join("CLAUDE.md").read[/^\*\*Writing style\.\*\*.*?(?=^\*\*Modular)/m]
-      doc_bullets = section.scan(/^- (.+?)(?=\n\n|\n- )/m).map { |(bullet)| bullet.squish }
-      standard_lines = standard.lines.map(&:strip)
-
-      expect(doc_bullets).to eq(standard_lines.grep(/\A- /).map { |line| line.delete_prefix("- ") } - [ "Second person, direct address." ])
-      standard_lines.grep(/\A(Avoid|Aim for|Calibration)/).each do |line|
-        expect(section.squish).to include(line)
-      end
-    end
   end
 
   describe "#generate_concept_reference" do
@@ -4157,6 +3996,18 @@ RSpec.describe AiService do
         "tagline", "explanation", "code_example", "senior_lens"
       )
       expect(result["tagline"]).to eq("Avoid N+1 by eager loading.")
+    end
+
+    it "sends the system prompt and prompt recorded for this concept and language" do
+      service = Class.new(double_class) do
+        attr_reader :sent
+        def call(request) = (@sent = request) && super
+      end.new(canned_text: valid_json)
+
+      service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect_prompt_snapshot("concept_reference__n_plus_one__ruby_rails__system", service.sent.system)
+      expect_prompt_snapshot("concept_reference__n_plus_one__ruby_rails__prompt", service.sent.prompt)
     end
 
     it "dedents reference instructions and aligns every generated ladder field with the JSON schema" do
@@ -4307,6 +4158,14 @@ RSpec.describe AiService do
       expect(prompt_for(language_key)).to include(AiService::LANGUAGE_PROMPTS.fetch(language_key).fetch(:focus))
     end
 
+    it "sends the recorded system prompt and prompt, with a language-independent bucket's focus as its subject" do
+      svc = capturing_class.new(canned_text: valid_json)
+      svc.generate_recognition_guide(user, "architecture")
+
+      expect_prompt_snapshot("recognition_guide__architecture__system", svc.last_system)
+      expect_prompt_snapshot("recognition_guide__architecture__prompt", svc.last_prompt)
+    end
+
     it "returns exactly the three guide fields" do
       result = double_class.new(canned_text: valid_json.sub("{", '{"extra":"x",')).generate_recognition_guide(user, "code_smell")
 
@@ -4343,7 +4202,7 @@ RSpec.describe AiService do
     it "states the process-not-answer scope and names the group's concepts" do
       prompt = prompt_for("module_design")
 
-      expect(prompt).to include(AiService::RECOGNITION_GUIDE_SCOPE)
+      expect(prompt).to include(RecognitionGuidePrompt::SCOPE)
       expect(prompt).to include(RecognitionGuide::NAMED_GROUP_SUBJECTS.fetch("module_design"))
       ConceptVocabulary::MODULE_DESIGN_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
     end
@@ -4353,22 +4212,6 @@ RSpec.describe AiService do
 
       expect(prompt).to include(AiService::LANGUAGE_PROMPTS["plan_review"][:focus])
       ConceptVocabulary::PLAN_REVIEW_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
-    end
-
-    it "frames the tradeoff concepts a group holds as choices, and no others" do
-      architecture = prompt_for("architecture")
-      data_modeling = prompt_for("data_modeling")
-
-      expect(architecture).to include("choices between two defensible options")
-      expect(architecture[/Some of these \((.*?)\)/, 1].split(", "))
-        .to match_array(ConceptVocabulary::ARCHITECTURE_CONCEPTS & ConceptVocabulary::TRADEOFF_CONCEPTS)
-      expect(data_modeling[/Some of these \((.*?)\)/, 1]).to eq("denormalization_tradeoffs")
-      expect(prompt_for("code_smell")).not_to include("choices between two defensible options")
-    end
-
-    it "frames meta skill as the habit its tracked concepts exercise, and only meta skill" do
-      expect(prompt_for("meta_skill")).to include(RecognitionGuide::FRAMINGS.fetch("meta_skill"))
-      expect(prompt_for("code_smell")).not_to include(RecognitionGuide::FRAMINGS.fetch("meta_skill"))
     end
 
     it "is answered by FakeService" do
@@ -4701,7 +4544,7 @@ RSpec.describe AiService do
     end
 
     it "normalizes an unusable rung to nil" do
-      [ [ "a list" ], "   ", "x" * (AiService::MAX_LADDER_RUNG_LENGTH + 1) ].each do |junk|
+      [ [ "a list" ], "   ", "x" * (ConceptReference::MAX_LADDER_RUNG_LENGTH + 1) ].each do |junk|
         result = double_class.new(canned_text: full_reference.merge("ladder_senior" => junk).to_json)
                              .generate_concept_reference(user, "n_plus_one", "ruby_rails")
 
@@ -5864,7 +5707,7 @@ end
 RSpec.describe AiService, "REVIEW_PROSE_JUDGE_SYSTEM_PROMPT" do
   it "lists issue types from ReviewProseVerdict and carries the plain-language standard" do
     ReviewProseVerdict::ISSUE_TYPES.each { |type| expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include("- #{type}:") }
-    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include(AiService::PLAIN_LANGUAGE_STANDARD.strip)
+    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include(PromptStandards::PLAIN_LANGUAGE_STANDARD.strip)
       .and include("reply with only the JSON verdict")
   end
 

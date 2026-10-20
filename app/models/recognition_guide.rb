@@ -1,4 +1,4 @@
-# Teaches a process, never an answer, so it shows with no exposure gating (see AiService::RECOGNITION_GUIDE_SCOPE).
+# Teaches a process, never an answer, so it shows with no exposure gating (see RecognitionGuidePrompt::SCOPE).
 class RecognitionGuide < ApplicationRecord
   FIELDS = %w[questions contrast misfires].freeze
 

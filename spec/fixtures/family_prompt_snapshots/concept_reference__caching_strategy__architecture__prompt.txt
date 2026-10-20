@@ -1,0 +1,69 @@
+Write a durable reference for the software architecture concept: "caching_strategy".
+This is a stable explanation an engineer returns to across repeat exposure —
+not tied to any single problem. Be precise and senior-level.
+
+Then write a longer, plainer-language guide for someone meeting this
+concept in a library rather than in a problem — no exercise in front of
+them, no answer to reach. Thorough but not an essay: each guide field is
+at most two short paragraphs, except guide_worked_example, which carries
+its own bound below.
+
+This standard applies to the guide fields and the lesson:
+Write prose for the engineer this way:
+
+Avoid, in order of how often these actually show up:
+- Manufactured rhetorical contrast — "not X, but Y" used purely for punch when a plain sentence says the same thing.
+- Buzzwords and jargon. Use the plain-language equivalent; if a technical term is genuinely necessary, define it briefly on first use.
+- Placeholder phrases — "please note," "at this time," "it's worth mentioning."
+- Overusing "please" in instructions — state it directly.
+- Starting every sentence with the same construction.
+- Exclamation points, outside genuine, rare emphasis.
+- Forced cleverness or trying to sound entertaining.
+- Both choppy fragments and long-winded run-ons.
+
+Aim for:
+- Active voice — make clear who or what is doing the thing.
+- Second person, direct address.
+- Concrete over abstract — a specific example beats a general description of the same idea.
+- Conditions before instructions, not after.
+- Natural rhythm — if a sentence sounds stilted read aloud, rewrite it.
+
+Calibration: too informal ("This is a total game-changer!") and too formal/overwrought ("The interface undergoes a paradigmatic transformation") are both wrong; aim for the plain middle ("This changes how the interface works").
+
+Then write a difficulty ladder: for each of junior, mid_level, senior, principal_engineer, what a
+problem about THIS concept looks like at that level. Name its concrete form, never a
+description of the level in general. For missing_index, for example: junior is an
+unindexed foreign key, mid_level is an index the query can't use because it wraps the
+column in a function, senior is composite index column order, principal_engineer is
+the write-cost tradeoff of adding an index. Each rung is one or two sentences, under
+300 characters.
+
+Then write a short lesson for someone reading this concept on a phone, under
+"lesson". Every key in it is optional: leave a key out when it does not fit
+this concept, and never pad one to fill it.
+Keep the whole lesson under about 350 words, in plain prose with no code;
+the code example and the worked example already show the code.
+- definition: one sentence saying what the concept is.
+- comparison: an everyday comparison that maps onto the concept exactly.
+- comparison_limit: one sentence saying where that comparison stops working. Give it with comparison or leave both out; one without the other is dropped.
+- misunderstanding: the most common wrong idea about this concept, and what is true instead.
+- situations: two to 4 concrete situations where an engineer runs into it, each one short.
+- habits: one to 4 options a team can choose between. Each carries "catch": what that option costs.
+- carry_question: one question the reader can ask about their own work.
+- quick_test: a quick way to check their own code or plan for it.
+
+Return JSON matching this schema exactly:
+{
+  "tagline":      "string — bold one-liner",
+  "explanation":  "string — 2-3 sentences",
+  "code_example": "string — illustrative pseudocode or a short language-agnostic snippet, ~15 lines",
+  "senior_lens":  "string — when to reach for it / tradeoffs",
+  "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term",
+  "guide_worked_example": "string — two short pseudocode fragments of the SAME scenario, keeping the same names and shape so the difference reads structurally: option A, then option B. NEITHER is the corrected version — both are legitimate and the choice is context-dependent. Then say in prose what each option buys, what it costs, and which property of the context decides between them. At most the two fragments plus four sentences of prose.",
+  "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing",
+  "ladder_junior": "string — a junior-level problem about this concept",
+  "ladder_mid_level": "string — a mid_level-level problem about this concept",
+  "ladder_senior": "string — a senior-level problem about this concept",
+  "ladder_principal_engineer": "string — a principal_engineer-level problem about this concept",
+  "lesson": {"definition":"string","comparison":"string","comparison_limit":"string","misunderstanding":"string","situations":["string"],"habits":[{"habit":"string","catch":"string"}],"carry_question":"string","quick_test":"string"}
+}

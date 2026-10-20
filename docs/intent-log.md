@@ -25,7 +25,7 @@ this one.
   **I decided:** it's a private product at coding-gym.pro, not an open-source
   project, so the setup and contributing sections went
 - layered-architecture review of `app/`, larger findings filed as issues
-- checked whether the three older open issues were still worth keeping
+- checked the three older open issues
   **I decided:** keep all three; the gate one stays deferred with a note on
   what saved state now has to carry
 - an unfinished Gemini call raises and still records its usage `#437`
@@ -50,9 +50,13 @@ this one.
 - the rest of `AiService`'s domain data moved onto the models `#445`
 - generation logging moved into `GenerationDiagnostics` `#448`
   **I decided:** diagnostics before prompts
-- pseudocode prompts into `PseudocodePrompt`, the model for the rest `#450`
+- pseudocode prompts into `PseudocodePrompt` `#450`
+- shared prompt text into `PromptStandards` `#452`
 
 ## Tue Oct 20
 
 - the follow-up and alternate caps moved into `DailyResponse`, from the
   layered review's issue `#449`
+- concept reference and its reframe into `ConceptReferencePrompt` `#453`
+- recognition guide into `RecognitionGuidePrompt` `#454`
+- section explain-differently into `ExplainDifferentlyPrompt` `#455`
