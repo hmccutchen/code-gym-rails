@@ -8,6 +8,7 @@ class ReviewProseJudgePrompt
     .map { |type| "- #{type}: #{ISSUE_GUIDANCE.fetch(type)}" }
     .join("\n").freeze
 
+  # Changing this text must re-pass the activation gate in docs/decisions/review-prose-judge.md.
   SYSTEM = <<~PROMPT.freeze
     You are editing the prose of one section's code review so the engineer who submitted the work can read it easily. The grade is final: you change how the review says things, never what it says.
 
