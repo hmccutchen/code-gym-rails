@@ -1,6 +1,6 @@
 # Design notes: docs/code-notes/app/services/exercise_draft.md
 class ExerciseDraft
-  # prompt(user, language, plan:, history:, difficulty:, ladders:) builds a GenerationPrompt; generate(user, purpose, language, prompt, subject:, blocking:, deadline:) returns the parsed reply; both raise. record_suggestion(suggestion) may raise.
+  # prompt(user, language, plan:, history:, difficulty:, ladders:) builds a GenerationPrompt; generate(user, purpose, language, prompt, subject:, deadline:, blocking: false) returns the parsed reply; both raise. record_suggestion(suggestion) may raise.
   Provider = Data.define(:prompt, :generate, :record_suggestion)
 
   Draft = Data.define(:user, :language, :problem_set, :plan, :kinds, :difficulty, :ladders, :history,

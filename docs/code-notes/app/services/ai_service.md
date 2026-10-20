@@ -257,7 +257,6 @@ Logs counts and flags only, and pairs with
 A blank response would fail a validation outside `rescue ProviderError` and
 give the user a raw 500.
 
-
 ## `#annotate_retention_concept`
 
 Names the sections that can host the concept today; otherwise the model
