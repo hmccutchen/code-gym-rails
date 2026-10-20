@@ -46,3 +46,7 @@
   **I decided:** diagnostics before prompts
 - pseudocode prompts into `PseudocodePrompt` `#450`
 - shared prompt text into `PromptStandards` `#452`
+
+## Tue Oct 20
+
+- concept reference and its reframe into `ConceptReferencePrompt` `#453`
