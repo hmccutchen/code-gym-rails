@@ -70,6 +70,8 @@ this one.
   the review PR, to merge in order once they recover
 - the generation system prompt into `GenerationPrompt.system_prompt` `#466`
 - landed the generation system prompt move on main, since it merged into
-  its stacked base `#467 open`
+  its stacked base `#467`
 - language wording and scenario pools into `LanguagePrompts` and
   `ScenarioPools` `#468`
+- landed the domain modules move on main, since it merged into its
+  stacked base too `#469`
