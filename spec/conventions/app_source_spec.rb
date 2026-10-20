@@ -47,4 +47,43 @@ RSpec.describe "Conventions held over app/ source" do
 
     expect(offenders).to be_empty, "send(:...) in app/: #{offenders.join(', ')}"
   end
+
+  PROVIDER_REGISTRY = "app/models/ai_provider.rb".freeze
+
+  def provider_class_names = @provider_class_names ||= ([ AiService ] + AiProvider.all).map { |klass| klass.name.to_sym }
+
+  def provider_class_name?(node)
+    (node.is_a?(Prism::ConstantReadNode) || (node.is_a?(Prism::ConstantPathNode) && node.parent.nil?)) &&
+      provider_class_names.include?(node.name)
+  end
+
+  def provider_class_references(source)
+    found = []
+    visit = lambda do |node|
+      if node.is_a?(Prism::ConstantPathNode) && provider_class_name?(node.parent)
+        found << "#{node.parent.name}::#{node.name}"
+        next
+      end
+      found << node.name.to_s if provider_class_name?(node)
+      node.compact_child_nodes.each(&visit)
+    end
+    visit.call(Prism.parse(source).value)
+    found
+  end
+
+  it "keeps models off the provider classes, apart from the registry" do
+    offenders = Dir[Rails.root.join("app/models/**/*.rb")].sort.reject { |path| relative(path) == PROVIDER_REGISTRY }.flat_map do |path|
+      provider_class_references(File.read(path)).map { |reference| "#{relative(path)}: #{reference}" }
+    end
+
+    expect(offenders).to be_empty, "Models naming a provider class: #{offenders.join(', ')}"
+  end
+
+  it "finds a provider class however the reference is written, and not in a comment or a string" do
+    expect(provider_class_references("AiService.for(user)")).to eq([ "AiService" ])
+    expect(provider_class_references("::AiService::LANGUAGE_PROMPTS")).to eq([ "AiService::LANGUAGE_PROMPTS" ])
+    expect(provider_class_references("X = GeminiService.daily_quota_reset_at(at)")).to eq([ "GeminiService" ])
+    expect(provider_class_references("class Probe < ClaudeService; end")).to eq([ "ClaudeService" ])
+    expect(provider_class_references("# AiService::LANGUAGE_PROMPTS\nlabel = \"AiService\"")).to be_empty
+  end
 end

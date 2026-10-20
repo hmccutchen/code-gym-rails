@@ -35,7 +35,7 @@ read it before changing that area.
   `ConceptReference` is a team-wide cache keyed on `(concept, language)` with
   no `user_id`. Guide, ladder and `lesson` come from the same
   `#generate_concept_reference` call, outside its required fields;
-  `CONCEPT_REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
+  `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
   out, and "seen" reads `concept_exposure_count`, never `ConceptMastery`.
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
   `ConceptGroup` or language-independent bucket gets one shared
@@ -48,7 +48,7 @@ read it before changing that area.
   `ConceptBookSources` maps a concept to an array of hand-curated reading
   pointers (title, author, coined term), shown only on `LearnController#show`.
   It must never reach a provider prompt (a spec pins this), and
-  `CONCEPT_REFERENCE_FIELDS` and `CONCEPT_GUIDE_FIELDS` stay untouched by it.
+  `ConceptReference::REFERENCE_FIELDS` and `ConceptReference::GUIDE_FIELDS` stay untouched by it.
   A pointer names a term the book coined, never a chapter or page number.
 - **Hand-written lessons** (`docs/decisions/hand-written-lessons.md`):
   `LearnLessons` holds static lessons for Learn-only concepts in no

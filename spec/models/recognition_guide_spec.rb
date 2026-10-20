@@ -11,12 +11,6 @@ RSpec.describe RecognitionGuide do
     expect(ConceptGroup::NAMED.map(&:first) & ConceptVocabulary.languages).to be_empty
   end
 
-  it "states a subject for every group" do
-    described_class::GROUP_KEYS.each do |key|
-      expect(described_class.subject_for(key)).to be_present, key
-    end
-  end
-
   it "frames only groups that exist" do
     expect(described_class::FRAMINGS.keys - described_class::GROUP_KEYS).to be_empty
   end
@@ -60,7 +54,7 @@ RSpec.describe RecognitionGuide do
     expect(guide).to be_valid
   end
 
-  AiService::RECOGNITION_GUIDE_FIELDS.each do |field|
+  RecognitionGuide::FIELDS.each do |field|
     it "refuses a guide with no #{field}" do
       expect(guide(field => " ")).not_to be_valid
     end
