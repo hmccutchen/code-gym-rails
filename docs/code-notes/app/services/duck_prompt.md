@@ -4,7 +4,7 @@ The duck's prompt, moved out of `AiService` (#431). `AiService#duck_response` st
 
 ## `.generate`
 
-It takes one section's data and renders it only through `SectionContext.render`, so no answer key reaches the duck before submission, and it never sees the response, the review or another section.
+It takes one section's data and renders it only through `SectionContext.render`, so no answer key reaches the duck before submission, and it never sees the response, the review or another section. The engineer's new message and their earlier turns are fenced (`UserText.tagged`, `UserText.tag_history`), since the page sends the thread back and a forged turn is one request away.
 
 ## `EXPLAIN_REQUEST`
 
