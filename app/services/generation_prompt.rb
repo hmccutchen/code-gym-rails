@@ -2,7 +2,7 @@
 class GenerationPrompt
   include GenerationPrompt::ConceptGuidance
 
-  def self.system(coach:, focus:)
+  def self.system_prompt(coach:, focus:)
     <<~PROMPT
       You are a senior #{coach} engineering coach generating personalized daily exercise sets.
       Your goal is to push engineers toward senior-level thinking: not just "what" but "why" and "when not to."

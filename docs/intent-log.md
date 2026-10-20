@@ -68,4 +68,4 @@ this one.
 - load each area rule with its prompt classes `#464 open`
   **why:** Railway builds were having problems, so I asked for it stacked on
   the review PR, to merge in order once they recover
-- the generation system prompt into `GenerationPrompt.system` `#466`
+- the generation system prompt into `GenerationPrompt.system_prompt` `#466`
