@@ -1,6 +1,6 @@
 ---
 paths:
-  - "app/services/{ai_service,generation_prompt,section_judge_prompt,problem_set_ingest,fake_service,judged_generation,caller_zone_thread}.rb"
+  - "app/services/{ai_service,generation_prompt,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt,problem_set_ingest,fake_service,judged_generation,caller_zone_thread}.rb"
   - "app/services/generation_prompt/**"
   - "app/services/judged_generation/**"
   - "app/models/{exercise_section,concept_vocabulary,concept_bucket,real_source,judge_verdict,verdict_schema,code_format,daily_exercise,suggested_concept,mermaid_source}.rb"
@@ -10,7 +10,7 @@ paths:
   - "app/views/responses/bodies/**"
   - "script/{compare_models,model_comparison,forced_concept_drafts,solve_agreement,report_answer_positions,answer_position_balance}.rb"
   - "spec/fixtures/judge/**"
-  - "spec/**/*{ai_service,judged_generation,section_judge_prompt,problem_set_ingest,exercise_section,real_source,judge_verdict,code_format,concept_vocabulary,generate_daily_exercises,regenerate_exercise}*"
+  - "spec/**/*{ai_service,judged_generation,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt,problem_set_ingest,exercise_section,real_source,judge_verdict,code_format,concept_vocabulary,generate_daily_exercises,regenerate_exercise}*"
   - "app/services/{daily_plan,section_rotation,section_count,day_hosts}.rb"
   - "app/models/exercise_history_entry.rb"
   - "app/views/responses/answers/_design_comparison.html.erb"

@@ -44,7 +44,9 @@ says what a deviation from one requires.
   day-level system prompt and its per-section prompt. Text
   two or more families share lives in `PromptStandards`, and a section described
   for a prompt comes from `SectionContext.render`; a prompt class reads them
-  there and never copies them. Each
+  there and never copies them. A prompt class is in the `paths:` of the area
+  rule that states its isolation, so editing it loads that rule
+  (`claude_rules_spec` holds this). Each
   moved family's rendered text is pinned by `expect_prompt_snapshot`,
   recorded against the code before the move. `PseudocodePrompt` is the model;
   `GenerationPrompt` predates it, rendering from an instance, and its system
