@@ -3,14 +3,14 @@ paths:
   - "app/controllers/{learn,learn_lessons,concept_references,concept_drills,progress}_controller.rb"
   - "app/controllers/concerns/learn_scope.rb"
   - "app/models/{concept_reference,concept_lesson,concept_group,concept_book_sources,learn_lessons,glossary,hand_written_learn_text,section_kind_guide,recognition_guide,featured_concept,rung_ledger,concept_hosts,worked_example,ladder_coverage}.rb"
-  - "app/services/{featured_concept_pick,concept_reference_prompt,recognition_guide_prompt}.rb"
+  - "app/services/{featured_concept_pick,concept_reference_prompt,recognition_guide_prompt,explain_differently_prompt}.rb"
   - "app/jobs/{generate_concept_reference_job,generate_recognition_guide_job}.rb"
   - "app/helpers/{featured_concept,concept_references,concept_drills,progress,section_kind_guide,glossary}_helper.rb"
   - "app/views/{learn,learn_lessons,progress}/**"
   - "app/views/shared/{_concept_reference,_featured_concept}.html.erb"
   - "app/views/responses/{_featured_marker,_kind_about,_kind_guide}.html.erb"
   - "app/javascript/controllers/{concept_alternates,learn_filter,write_up_control,glossary}_controller.js"
-  - "spec/**/*{learn,concept_reference,featured,progress,rung_ledger,recognition,lesson,book_source,kind_guide,glossary,hand_written}*"
+  - "spec/**/*{learn,concept_reference,explain_differently_prompt,featured,progress,rung_ledger,recognition,lesson,book_source,kind_guide,glossary,hand_written}*"
   - "app/models/concept_vocabulary.rb"
 ---
 

@@ -45,8 +45,10 @@ says what a deviation from one requires.
   two or more families share lives in `PromptStandards`, and a section described
   for a prompt comes from `SectionContext.render`; a prompt class reads them
   there and never copies them. A prompt class is in the `paths:` of the area
-  rule that states its isolation, so editing it loads that rule
-  (`claude_rules_spec` holds this). Each
+  rule that states its isolation, so editing it loads that rule.
+  `claude_rules_spec` fails on a prompt class that loads no area rule, but
+  it cannot tell whether the rule is the right one, so the PR that moves a
+  class names it. Each
   moved family's rendered text is pinned by `expect_prompt_snapshot`,
   recorded against the code before the move. `PseudocodePrompt` is the model;
   `GenerationPrompt` predates it, rendering from an instance, and its system
