@@ -332,11 +332,6 @@ it.
 Read by `ReviewGrading` and `JudgedGeneration`. Tagged like provider errors so the other sections still save. It does not
 include `StandardError`, which would hide real bugs behind a retry.
 
-## `DIFFICULTY_GUIDANCE`
-
-Keyed by level from `DailyResponse` so the labels can't shift. A spec, not the
-`KeyError`, catches a missing level.
-
 ## `#call`
 
 The template every real provider runs: post the body the subclass's
