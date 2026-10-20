@@ -35,14 +35,14 @@ RSpec.describe ReviewMailer, type: :mailer do
 
     it "addresses the user with a dated subject" do
       expect(mail.to).to eq([ "dev@example.com" ])
-      expect(mail.subject).to eq("Your Code Gym review — Friday, July 10")
+      expect(mail.subject).to eq("Your Coding Gym review — Friday, July 10")
     end
 
     it "greets the user by name and signs off" do
       body = mail.body.encoded
       expect(body).to include("Hi Dev,")
-      expect(body).to include("Here's your Code Gym review from Friday, July 10, 2026.")
-      expect(body).to include("— Code Gym")
+      expect(body).to include("Here's your Coding Gym review from Friday, July 10, 2026.")
+      expect(body).to include("— Coding Gym")
     end
 
     it "shows the rewritten prose and never the grader's original kept for audit" do

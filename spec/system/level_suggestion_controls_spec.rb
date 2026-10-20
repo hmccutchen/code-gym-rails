@@ -69,7 +69,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     within("#level-suggestion") { click_link "Change it in Setup" }
 
     expect(page).to have_css("#exercise-mix[open]")
-    expect(page).to have_text("Code Gym suggested moving Code Review to mid-level.")
+    expect(page).to have_text("Coding Gym suggested moving Code Review to mid-level.")
     within('.mix-difficulty.mix-suggested[data-kind="code_review"]') { choose "Mid-level" }
     wait_for_saves
     expect(user.reload.section_kind_levels["code_review"]).to eq("mid_level")

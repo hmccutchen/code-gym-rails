@@ -5,7 +5,7 @@
 Junior and newer engineers on the team ramp faster with deliberate, repeated
 practice — but there's no natural forcing function for that in day-to-day
 work, where tickets favor whatever's urgent over whatever builds skill.
-Code Gym is that forcing function: a short, personalized set of exercises
+Coding Gym is that forcing function: a short, personalized set of exercises
 every weekday morning, tuned to each person's actual performance history
 rather than a generic curriculum.
 

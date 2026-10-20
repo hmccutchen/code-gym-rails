@@ -39,8 +39,8 @@ RSpec.describe "Setup track control", type: :request do
     expect(page_html.text).to include("The level every section uses unless you set one for it in the Exercise mix below.",
                                      "Your ratings nudge each day's set around it.",
                                      "Changing your track also moves any section set to your old or new level, unless it is locked.",
-                                     "Code Gym suggests a level for that section, and you decide.",
-                                     "Principal engineer is set only here; Code Gym never suggests it.")
+                                     "Coding Gym suggests a level for that section, and you decide.",
+                                     "Principal engineer is set only here; Coding Gym never suggests it.")
   end
 
   it "sits above the Exercise mix, whose default options name it" do

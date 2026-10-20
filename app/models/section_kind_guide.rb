@@ -71,7 +71,7 @@ module SectionKindGuide
     "pseudocode_to_code" => {
       short: "Write steps in plain words, then see the code.",
       summary: "Write the steps to solve a problem in plain words, without worrying about syntax. " \
-               "When your answer is reviewed, Code Gym turns your steps into code exactly as written, " \
+               "When your answer is reviewed, Coding Gym turns your steps into code exactly as written, " \
                "so you can see what a missing step would do.",
       example: "The problem is merging overlapping bookings in a meeting room's calendar. " \
                "You write your steps, and “Check my plan” can point out gaps before you submit."

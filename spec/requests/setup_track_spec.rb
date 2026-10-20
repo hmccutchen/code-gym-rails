@@ -61,7 +61,7 @@ RSpec.describe "Setup's track control", type: :request do
   end
 
   it "says in its hint that Code Gym never suggests principal engineer" do
-    expect(I18n.t("api_keys.edit.skill_level_hint")).to include("Principal engineer is set only here; Code Gym never suggests it.")
-    expect(I18n.t("welcome.note")).to include("Senior is the highest level Code Gym suggests")
+    expect(I18n.t("api_keys.edit.skill_level_hint")).to include("Principal engineer is set only here; Coding Gym never suggests it.")
+    expect(I18n.t("welcome.note")).to include("Senior is the highest level Coding Gym suggests")
   end
 end

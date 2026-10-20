@@ -193,7 +193,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       get setup_path(suggested: %w[code_review pattern], suggested_level: "junior")
 
       expect(page_html.at_css("#exercise-mix")["open"]).not_to be_nil
-      expect(page_html.at_css("#mix-suggested-note").text).to eq("Code Gym suggested moving Code Review and Pattern of the Month to junior. Change their difficulty below.")
+      expect(page_html.at_css("#mix-suggested-note").text).to eq("Coding Gym suggested moving Code Review and Pattern of the Month to junior. Change their difficulty below.")
       marked = page_html.css(".mix-difficulty.mix-suggested")
       expect(marked.map { |field| field["data-kind"] }).to match_array(%w[code_review pattern])
       expect(marked.map { |field| field["aria-describedby"] }.uniq).to eq([ "mix-suggested-note" ])
@@ -205,7 +205,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       get setup_path(suggested: %w[code_review pattern], suggested_level: "mid_level")
 
       expect(page_html.at_css("#exercise-mix")["open"]).not_to be_nil
-      expect(page_html.at_css("#mix-suggested-note").text).to eq("Code Gym suggested moving Code Review and Pattern of the Month to mid-level. Change their difficulty below.")
+      expect(page_html.at_css("#mix-suggested-note").text).to eq("Coding Gym suggested moving Code Review and Pattern of the Month to mid-level. Change their difficulty below.")
       expect(page_html.css(".mix-difficulty.mix-suggested").map { |field| field["data-kind"] }).to match_array(%w[code_review pattern])
     end
 

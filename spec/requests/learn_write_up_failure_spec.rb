@@ -58,7 +58,7 @@ RSpec.describe "Learn write-up failures", type: :request do
     user.update!(provider: "anthropic", api_keys: user.api_keys.merge("anthropic" => "sk-ant-test"))
 
     expect(status_body["failed"]).to eq("other")
-    expect(status_body["message"]).to start_with("Gemini sent back something Code Gym couldn't use")
+    expect(status_body["message"]).to start_with("Gemini sent back something Coding Gym couldn't use")
   end
 
   it "forgets the note after its expiry, so the page can ask again" do
