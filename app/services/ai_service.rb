@@ -1392,7 +1392,7 @@ class AiService
     <<~PROMPT
       Write a short teaching piece on how to recognize one category of problem.
 
-      The category, "#{group_key.humanize}", is about #{RecognitionGuide.subject_for(group_key)}
+      The category, "#{group_key.humanize}", is about #{recognition_subject(group_key)}
       The concepts in it are: #{concepts.join(', ')}.
       #{RecognitionGuide.framing_for(group_key)}
       #{recognition_tradeoff_line(concepts)}
@@ -1413,6 +1413,10 @@ class AiService
         "misfires":  "string — how this way of looking goes wrong: what it flags that is not a problem, and what it misses. One short paragraph."
       }
     PROMPT
+  end
+
+  def recognition_subject(group_key)
+    RecognitionGuide::NAMED_GROUP_SUBJECTS.fetch(group_key) { LANGUAGE_PROMPTS.fetch(group_key).fetch(:focus) }
   end
 
   def recognition_tradeoff_line(concepts)

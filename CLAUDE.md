@@ -216,9 +216,9 @@ rather than only catching it afterward:
   - Answer-key fields (`ExerciseSection.all_answer_key_fields`) never reach
     the page, a pre-submission AI context or a log before review.
   - No page shows or implies `ConceptMastery` tier.
-  - No model names `AiService` or a provider class, with two exceptions:
-    `AiProvider`, the provider registry, and `RecognitionGuide`'s read of
-    `AiService::LANGUAGE_PROMPTS` (`app_source_spec`).
+  - No model names `AiService` or a provider class; `.claude/rules/patterns.md`
+    ("Domain data stays off provider classes") says which one may
+    (`app_source_spec`).
 - New methods stay under 25 lines (excluding heredoc bodies), new `app/` files
   under 300 — or the PR says why not. Nothing enforces this mechanically;
   `Metrics` is disabled.

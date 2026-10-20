@@ -4307,6 +4307,14 @@ RSpec.describe AiService do
       svc.last_prompt
     end
 
+    it "states a subject for every group, a language-independent one by its language focus" do
+      RecognitionGuide::GROUP_KEYS.each do |key|
+        expect(prompt_for(key)).to match(/The category, "#{Regexp.escape(key.humanize)}", is about \S/), key
+      end
+      language_key = (RecognitionGuide::GROUP_KEYS & ConceptBucket::LANGUAGE_INDEPENDENT).first
+      expect(prompt_for(language_key)).to include(AiService::LANGUAGE_PROMPTS.fetch(language_key).fetch(:focus))
+    end
+
     it "returns exactly the three guide fields" do
       result = double_class.new(canned_text: valid_json.sub("{", '{"extra":"x",')).generate_recognition_guide(user, "code_smell")
 
@@ -4344,7 +4352,7 @@ RSpec.describe AiService do
       prompt = prompt_for("module_design")
 
       expect(prompt).to include(AiService::RECOGNITION_GUIDE_SCOPE)
-      expect(prompt).to include(RecognitionGuide.subject_for("module_design"))
+      expect(prompt).to include(RecognitionGuide::NAMED_GROUP_SUBJECTS.fetch("module_design"))
       ConceptVocabulary::MODULE_DESIGN_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
     end
 

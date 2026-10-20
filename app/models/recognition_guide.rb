@@ -38,10 +38,6 @@ class RecognitionGuide < ApplicationRecord
     ConceptGroup.concepts(group_key)
   end
 
-  def self.subject_for(group_key)
-    NAMED_GROUP_SUBJECTS.fetch(group_key) { AiService::LANGUAGE_PROMPTS.fetch(group_key).fetch(:focus) }
-  end
-
   def self.framing_for(group_key)
     FRAMINGS[group_key]
   end

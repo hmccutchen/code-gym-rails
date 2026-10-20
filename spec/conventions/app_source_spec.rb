@@ -48,10 +48,7 @@ RSpec.describe "Conventions held over app/ source" do
     expect(offenders).to be_empty, "send(:...) in app/: #{offenders.join(', ')}"
   end
 
-  PROVIDER_CLASS_ALLOWED_IN_MODELS = {
-    "app/models/ai_provider.rb" => :any,
-    "app/models/recognition_guide.rb" => [ "AiService::LANGUAGE_PROMPTS" ]
-  }.freeze
+  PROVIDER_REGISTRY = "app/models/ai_provider.rb".freeze
 
   def provider_class_names = @provider_class_names ||= ([ AiService ] + AiProvider.all).map { |klass| klass.name.to_sym }
 
@@ -60,7 +57,7 @@ RSpec.describe "Conventions held over app/ source" do
       provider_class_names.include?(node.name)
   end
 
-  def provider_class_references(path)
+  def provider_class_references(source)
     found = []
     visit = lambda do |node|
       if node.is_a?(Prism::ConstantPathNode) && provider_class_name?(node.parent)
@@ -70,18 +67,23 @@ RSpec.describe "Conventions held over app/ source" do
       found << node.name.to_s if provider_class_name?(node)
       node.compact_child_nodes.each(&visit)
     end
-    visit.call(Prism.parse_file(path).value)
+    visit.call(Prism.parse(source).value)
     found
   end
 
-  it "keeps models off the provider classes, apart from the registry and one recorded exception" do
-    offenders = Dir[Rails.root.join("app/models/**/*.rb")].sort.flat_map do |path|
-      allowed = PROVIDER_CLASS_ALLOWED_IN_MODELS.fetch(relative(path), [])
-      next [] if allowed == :any
-
-      (provider_class_references(path) - allowed).map { |reference| "#{relative(path)}: #{reference}" }
+  it "keeps models off the provider classes, apart from the registry" do
+    offenders = Dir[Rails.root.join("app/models/**/*.rb")].sort.reject { |path| relative(path) == PROVIDER_REGISTRY }.flat_map do |path|
+      provider_class_references(File.read(path)).map { |reference| "#{relative(path)}: #{reference}" }
     end
 
     expect(offenders).to be_empty, "Models naming a provider class: #{offenders.join(', ')}"
+  end
+
+  it "finds a provider class however the reference is written, and not in a comment or a string" do
+    expect(provider_class_references("AiService.for(user)")).to eq([ "AiService" ])
+    expect(provider_class_references("::AiService::LANGUAGE_PROMPTS")).to eq([ "AiService::LANGUAGE_PROMPTS" ])
+    expect(provider_class_references("X = GeminiService.daily_quota_reset_at(at)")).to eq([ "GeminiService" ])
+    expect(provider_class_references("class Probe < ClaudeService; end")).to eq([ "ClaudeService" ])
+    expect(provider_class_references("# AiService::LANGUAGE_PROMPTS\nlabel = \"AiService\"")).to be_empty
   end
 end
