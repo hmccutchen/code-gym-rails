@@ -60,6 +60,6 @@ group :test do
   gem "capybara-playwright-driver", "~> 0.5.13"
 end
 
-gem "faraday", "~> 2.14"
+gem "faraday", "~> 2.15"
 gem "faraday-retry"
 gem "letter_opener", group: :development
