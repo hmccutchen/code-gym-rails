@@ -287,7 +287,7 @@ make room for the judge: the field bounds it does carry define the artifact
 or are enforced by ingest, and they stay. Prose quality is the judge's job
 by assignment, not by subtraction.
 
-**The judge is shown the section, not how it was made.** `judge_section`
+**The judge is shown the section, not how it was made.** `SectionJudgePrompt.generate`
 strips the answer key and every `ProblemSetIngest::SERVER_STAMPS` field, so
 it never learns the day eased this section, which real file grounded it, or
 that an earlier verdict rejected it. `current_schema` is deliberately not
