@@ -63,6 +63,8 @@ RSpec.describe GenerationPrompt do
   end
 
   def deep_freeze(value)
+    return value if value.is_a?(Module)
+
     case value
     when Hash  then value.each { |key, nested| deep_freeze(key); deep_freeze(nested) }
     when Array then value.each { |nested| deep_freeze(nested) }
