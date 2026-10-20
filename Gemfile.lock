@@ -319,7 +319,7 @@ GEM
     regexp_parser (2.13.1)
     reline (0.7.0)
       io-console (~> 0.5)
-    resend (1.17.0)
+    resend (1.18.0)
       base64
       httparty (>= 0.22.0)
     rouge (5.1.0)
