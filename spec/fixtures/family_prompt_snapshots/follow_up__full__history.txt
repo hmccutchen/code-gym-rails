@@ -1,0 +1,10 @@
+[
+  {
+    "role": "user",
+    "content": "<engineer_text>\nWhy is that slow?\n</engineer_text>"
+  },
+  {
+    "role": "assistant",
+    "content": "Each row triggers its own query."
+  }
+]
