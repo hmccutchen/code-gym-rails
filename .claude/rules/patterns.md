@@ -37,8 +37,11 @@ says what a deviation from one requires.
   purposes (the concept reference and its reframe are one family). The class
   holds its family's text and nothing else: settings stay in
   `CALL_PROFILES`, and the call, the reply checks and the logging stay in
-  `AiService`. A family built in two stages gets one method per stage, such
-  as the review's day-level system prompt and its per-section prompt. Text
+  `AiService`. That text includes a fixed message a page sends into the
+  family's prompt, which the page reads from the class
+  (`DuckPrompt::EXPLAIN_REQUEST`). A family built in two stages gets one
+  method per stage, such as the review's day-level system prompt and its
+  per-section prompt. Text
   two or more families share lives in `PromptStandards`, and a section described
   for a prompt comes from `SectionContext.render`; a prompt class reads them
   there and never copies them. Each

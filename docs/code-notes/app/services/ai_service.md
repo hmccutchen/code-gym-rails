@@ -71,11 +71,6 @@ since a reply type the client declares can't be trusted.
 Free prose has no largest valid reply to derive a cap from. Passing any
 `max_tokens` also turns extended thinking off.
 
-## `DUCK_EXPLAIN_REQUEST`
-
-Owned by the server so its wording sits beside the prompt it is tuned against.
-It counts against the turn cap like any other message.
-
 ## `PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS`
 
 The critique cap is derived from the largest valid critique, because a flat cap
