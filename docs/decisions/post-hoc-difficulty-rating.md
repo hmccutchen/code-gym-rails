@@ -20,7 +20,7 @@ the instruction it was given; folding it into the grading call was rejected
 because that call's shared context carries every answer and self-rating, and
 a rating drawn from those launders performance (and so, indirectly, tier)
 into "difficulty". Its per-section material comes from
-`AiService#duck_section_context`, already the single authority for "the
+`SectionContext.render`, already the single authority for "the
 section as the engineer sees it", so it inherits that method's answer-key
 exclusion rather than restating it. Cost is one extra provider call per
 review *attempt* (not per section), billed as `assess_difficulty` and capped

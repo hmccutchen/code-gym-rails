@@ -37,7 +37,9 @@ says what a deviation from one requires.
   `CALL_PROFILES`, and the call, the reply checks and the logging stay in
   `AiService`. A family built in two stages gets one method per stage, such
   as the review's day-level system prompt and its per-section prompt. Text
-  several families share is read from where it lives, never copied. Each
+  several families share lives in `PromptStandards`, and a section described
+  for a prompt comes from `SectionContext.render`; a prompt class reads them
+  there and never copies them. Each
   moved family's rendered text is pinned by `expect_prompt_snapshot`,
   recorded against the code before the move. `PseudocodePrompt` is the model;
   `GenerationPrompt` predates it, rendering from an instance, and its system

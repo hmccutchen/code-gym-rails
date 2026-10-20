@@ -1,0 +1,31 @@
+require "rails_helper"
+
+RSpec.describe SectionContext do
+  let(:full) do
+    { "title" => "T", "scenario" => "S", "why" => "W", "question" => "Q", "options" => %w[a b], "snippet" => "code",
+      "current_schema" => "schema", "starter_code" => "start", "plan_excerpt" => "plan", "problem_statement" => "P",
+      "request" => "R", "piece_a" => "A", "piece_b" => "B" }
+  end
+
+  it "describes every field it knows, exactly as recorded" do
+    expect_prompt_snapshot("section_context__full", described_class.render(full))
+  end
+
+  it "never shows an answer-key field" do
+    keys = ExerciseSection.all_answer_key_fields.index_with { "ANSWER-KEY-SENTINEL" }
+
+    expect(described_class.render(full.merge(keys))).to eq(described_class.render(full))
+  end
+
+  it "lists Parsons blocks in the learner's scrambled order, or unordered when no scramble was persisted" do
+    blocks = %w[x y z]
+
+    expect_prompt_snapshot("section_context__parsons_scrambled", described_class.render("blocks" => blocks, "display_order" => [ 2, 0, 1 ]))
+    expect_prompt_snapshot("section_context__parsons_solved_order", described_class.render("blocks" => blocks, "display_order" => [ 0, 1, 2 ]))
+  end
+
+  it "describes a missing or empty section as nothing" do
+    expect(described_class.render(nil)).to eq("")
+    expect(described_class.render({})).to eq("")
+  end
+end

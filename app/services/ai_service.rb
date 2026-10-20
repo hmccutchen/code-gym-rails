@@ -67,35 +67,6 @@ class AiService
 
   MAX_GENERATED_CODE_LENGTH = 8_000
 
-  def self.explain_differently_standard(subject)
-    "Explain the SAME #{subject} again using a genuinely different approach — a\n" \
-      "different analogy, a different level of abstraction, or a concrete worked\n" \
-      "scenario instead of a principle. Do not repeat the original wording."
-  end
-
-  PLAIN_LANGUAGE_STANDARD = <<~STANDARD.chomp.freeze
-    Write prose for the engineer this way:
-
-    Avoid, in order of how often these actually show up:
-    - Manufactured rhetorical contrast — "not X, but Y" used purely for punch when a plain sentence says the same thing.
-    - Buzzwords and jargon. Use the plain-language equivalent; if a technical term is genuinely necessary, define it briefly on first use.
-    - Placeholder phrases — "please note," "at this time," "it's worth mentioning."
-    - Overusing "please" in instructions — state it directly.
-    - Starting every sentence with the same construction.
-    - Exclamation points, outside genuine, rare emphasis.
-    - Forced cleverness or trying to sound entertaining.
-    - Both choppy fragments and long-winded run-ons.
-
-    Aim for:
-    - Active voice — make clear who or what is doing the thing.
-    - Second person, direct address.
-    - Concrete over abstract — a specific example beats a general description of the same idea.
-    - Conditions before instructions, not after.
-    - Natural rhythm — if a sentence sounds stilted read aloud, rewrite it.
-
-    Calibration: too informal ("This is a total game-changer!") and too formal/overwrought ("The interface undergoes a paradigmatic transformation") are both wrong; aim for the plain middle ("This changes how the interface works").
-  STANDARD
-
   RATING_RUBRIC = <<~RUBRIC.chomp.freeze
     How to choose "rating": rate the answer against the level its section was pitched at, which the grading instruction states on its "Pitched at" line, so a rating means the same thing at every level. Base it on the gaps you list in "missed". A gap is essential when, left as the engineer wrote it, the code or decision would behave wrongly or a requirement the problem states would go unmet. Missing syntax, polish or wording, or a step any engineer at this level would take for granted, is not essential and does not lower the rating. Judge what is essential against the problem as written: a problem simpler than its level's description is graded on what it actually asks. Each section's grading note says what its main point and its essential pieces are.
     - "beginner": missed the main point of the section.
@@ -137,7 +108,7 @@ class AiService
     Keep it short: 1-3 sentences for a guiding question, up to 4 for an
     explanation. No preamble.
 
-    #{PLAIN_LANGUAGE_STANDARD}
+    #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
   PROMPT
 
   JUDGE_MAX_TOKENS = 1_200
@@ -175,7 +146,7 @@ class AiService
     When you edit: never modify code or schema content, the tagged concept, the kind, or any field that carries the planted defect. Never change the task or the difficulty; never make a subtle flaw more obvious or an obvious one more obscure. Never add a technical claim the draft does not make or imply. Never add information only to make the answer easier to find, and never solve the exercise. Never remove or genericize the scenario setting; trim filler inside a statement, never the setting. Return exactly the fields you were asked to rewrite, nothing else.
 
     For any prose you rewrite:
-    #{PLAIN_LANGUAGE_STANDARD}
+    #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
 
     Return only JSON, one of:
     {"status":"keep"}
@@ -202,7 +173,7 @@ class AiService
     Check for these problems, the only #{ReviewProseVerdict::ISSUE_TYPES.size}:
     #{REVIEW_PROSE_ISSUE_LINES}
 
-    #{PLAIN_LANGUAGE_STANDARD}
+    #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
 
     Rules for any rewrite:
     - Keep what every entry claims. Keep each negation ("does not", "never"), each condition ("only when", "unless"), and every identifier (a method, column, constant or file name) exactly as written.
@@ -492,11 +463,11 @@ class AiService
 
         #{prior_framings(prior_alternates)}
 
-        #{self.class.explain_differently_standard("concept")}
+        #{PromptStandards.explain_differently_standard("concept")}
         #{CONCEPT_REFERENCE_SCOPE} Teach the concept itself; never solve, hint at,
         or refer to any particular exercise. Two short paragraphs at most.
 
-        #{PLAIN_LANGUAGE_STANDARD}
+        #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
       PROMPT
     ))
 
@@ -519,10 +490,10 @@ class AiService
 
         #{prior_framings(prior_alternates)}
 
-        #{self.class.explain_differently_standard("point")}
+        #{PromptStandards.explain_differently_standard("point")}
         Two short paragraphs at most.
 
-        #{PLAIN_LANGUAGE_STANDARD}
+        #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
       PROMPT
     ))
 
@@ -544,7 +515,7 @@ class AiService
 
         #{UserText::PROMPT_RULE}
 
-        #{PLAIN_LANGUAGE_STANDARD}
+        #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
 
         The original exercise asked: #{exercise.problem_set.dig(section, "question")}
 
@@ -568,7 +539,7 @@ class AiService
 
   def duck_response(user, exercise, section:, message:, thread: [])
     result = call_and_log(user, AiService.request_for("duck_thread",
-      system: "#{DUCK_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
+      system: "#{DUCK_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}\n\nThe exercise section:\n#{SectionContext.render(exercise.problem_set[section.to_s])}",
       history: UserText.tag_history(thread),
       prompt: <<~PROMPT
         Their new message:
@@ -801,45 +772,6 @@ class AiService
     thread.map { |turn| "#{turn[:role] == "assistant" ? "You" : "Them"}: #{turn[:content]}" }.join("\n")
   end
 
-  def duck_section_context(exercise, section)
-    data = exercise.problem_set.dig(section.to_s) || {}
-
-    [
-      ("Title: #{data["title"]}" if data["title"].present?),
-      ("Scenario: #{data["scenario"]}" if data["scenario"].present?),
-      ("Why it exists: #{data["why"]}" if data["why"].present?),
-      ("Question: #{data["question"]}" if data["question"].present?),
-      ("Options: #{Array(data["options"]).join(" / ")}" if data["options"].present?),
-      ("Code snippet:\n#{data["snippet"]}" if data["snippet"].present?),
-      ("Current schema, as the table stands today:\n#{data["current_schema"]}" if data["current_schema"].present?),
-      ("Starter code:\n#{data["starter_code"]}" if data["starter_code"].present?),
-      ("Plan excerpt:\n#{data["plan_excerpt"]}" if data["plan_excerpt"].present?),
-      ("The problem to plan:\n#{data["problem_statement"]}" if data["problem_statement"].present?),
-      ("Feature request:\n#{data["request"]}" if data["request"].present?),
-      ("Piece A:\n#{data["piece_a"]}" if data["piece_a"].present?),
-      ("Piece B:\n#{data["piece_b"]}" if data["piece_b"].present?),
-      duck_parsons_blocks(data)
-    ].compact.join("\n")
-  end
-
-  def duck_parsons_blocks(data)
-    blocks = data["blocks"]
-    return unless blocks.is_a?(Array) && blocks.any?
-
-    order = scrambled_display_order(data["display_order"], blocks.size)
-    return "Blocks (order withheld):\n#{blocks.map(&:to_s).sort.map { |b| "- #{b}" }.join("\n")}" unless order
-
-    lines = order.map.with_index { |block_index, position| "#{position + 1}. #{blocks[block_index]}" }
-    "Blocks, in the learner's current on-screen order (NOT the correct order):\n#{lines.join("\n")}"
-  end
-
-  def scrambled_display_order(display_order, block_count)
-    order = ExerciseSection::ParsonsProblem.normalize_order(Array(display_order), block_count)
-    return if order.empty? || order == (0...block_count).to_a
-
-    order
-  end
-
   def problem_statement(exercise, section) = exercise.problem_set.dig(section.to_s, "problem_statement")
 
   def log_pseudocode_critique(user, gaps_found, gaps)
@@ -995,7 +927,7 @@ class AiService
 
       #{RATING_RUBRIC}
 
-      #{PLAIN_LANGUAGE_STANDARD}
+      #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
 
       #{sections.join("\n\n")}
     CONTEXT
@@ -1078,7 +1010,7 @@ class AiService
   end
 
   def build_difficulty_prompt(exercise, sections)
-    material = sections.map { |section| "## #{section}\n#{duck_section_context(exercise, section)}" }
+    material = sections.map { |section| "## #{section}\n#{SectionContext.render(exercise.problem_set[section.to_s])}" }
 
     <<~PROMPT
       Rate the objective difficulty of each problem below, on this scale:
@@ -1137,7 +1069,7 @@ class AiService
       its own bound below.
 
       This standard applies to the guide fields and the lesson:
-      #{PLAIN_LANGUAGE_STANDARD}
+      #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
 
       Then write a difficulty ladder: for each of #{KindDifficulty::LEVELS.join(', ')}, what a
       problem about THIS concept looks like at that level. Name its concrete form, never a
@@ -1207,7 +1139,7 @@ class AiService
       pseudocode at most. Invent them; never describe a real exercise.
 
       This standard applies to every field:
-      #{PLAIN_LANGUAGE_STANDARD}
+      #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
 
       Return JSON matching this schema exactly:
       {
