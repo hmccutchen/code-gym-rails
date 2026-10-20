@@ -1,0 +1,128 @@
+{
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "keep"
+        },
+        "better": {
+          "type": "string",
+          "enum": [
+            "a",
+            "b"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "better"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "edit"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "referential_ambiguity",
+                  "technical_ambiguity",
+                  "unstated_incidental_term",
+                  "leakage",
+                  "padding",
+                  "answer_instruction",
+                  "sequencing"
+                ]
+              },
+              "evidence": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "evidence"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "scenario": {
+              "type": "string"
+            },
+            "question": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "better": {
+          "type": "string",
+          "enum": [
+            "a",
+            "b"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "issues",
+        "fields",
+        "better"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "reject"
+        },
+        "principle": {
+          "type": "string",
+          "enum": [
+            "scope_mismatch",
+            "unstated_prerequisite",
+            "underdetermined",
+            "reasoning_failure"
+          ]
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "better": {
+          "type": "string",
+          "enum": [
+            "a",
+            "b"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "principle",
+        "evidence",
+        "reason",
+        "better"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}
