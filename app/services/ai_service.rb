@@ -436,27 +436,14 @@ class AiService
   end
 
   def explain_differently(user, exercise, daily_response, section:, prior_alternates: [])
-    coach   = config_for(exercise.language)[:coach]
-    review  = daily_response.ai_review&.dig(section) || {}
-    missed  = DailyResponse.review_points(review["missed"])
+    review = daily_response.ai_review&.dig(section) || {}
 
     result = call_and_log(user, AiService.request_for("explain_differently",
-      system: "You are a senior #{coach} engineer re-explaining one point to an engineer who did not follow the first explanation. Return plain prose — no JSON, no markdown fences.\n\n#{UserText::PROMPT_RULE}",
-      prompt: <<~PROMPT
-        The engineer was asked: #{exercise.problem_set.dig(section, "question")}
-        #{UserText.labelled("Their answer:", daily_response.answer_for(section))}
-
-        What they missed:
-        #{missed.any? ? missed.map { |m| "- #{m}" }.join("\n") : "- (nothing recorded)"}
-
-        #{PromptStandards.prior_framings(prior_alternates)}
-
-        #{PromptStandards.explain_differently_standard("point")}
-        Two short paragraphs at most.
-
-        #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
-      PROMPT
-    ))
+      **ExplainDifferentlyPrompt.generate(
+        coach: config_for(exercise.language)[:coach], question: exercise.problem_set.dig(section, "question"),
+        answer: daily_response.answer_for(section), missed: DailyResponse.review_points(review["missed"]),
+        prior_alternates: prior_alternates
+      )))
 
     text_or_raise(result, subject: "alternate explanation")
   end
