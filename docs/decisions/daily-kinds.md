@@ -124,7 +124,7 @@ slots. Every reader takes the pair:
   shares.
 - `ExerciseSection.for_plan(daily:, rotation:)` lists the day's kinds;
   `DailyPlan::Result#kinds` is the one call site the generation prompt,
-  `AiService#draft_exercise` and `script/forced_concept_drafts.rb` read.
+  `ExerciseDraft.call` and `script/forced_concept_drafts.rb` read.
   `slot_kinds` refuses a rotation that names a slot the pair leaves no room
   for.
 - `DailyPlan::Result#rotation` holds what the rotation (and any coverage

@@ -159,7 +159,7 @@ RSpec.describe AiService, "request values" do
 
     def retry_one_section
       draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false)
-      service.send(:retry_section, user, "ruby_rails", draft, ExerciseSection::Pattern, "service_objects")
+      service.send(:retry_section, draft, ExerciseSection::Pattern, "service_objects")
     end
 
     call_site_settings.each do |purpose, settings|

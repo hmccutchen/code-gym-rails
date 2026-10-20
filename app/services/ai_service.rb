@@ -164,10 +164,6 @@ class AiService
 
   JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes)
 
-  Draft = Data.define(:problem_set, :plan, :kinds, :difficulty, :ladders, :history,
-                      :suggested_concepts, :unusable_sections)
-  private_constant :Draft
-
   def generate_exercise(user, language: user.language_for_today, blocking: false)
     generate_unjudged_exercise(user, language: language, blocking: blocking).problem_set
   end
@@ -176,8 +172,8 @@ class AiService
     draft   = draft_exercise(user, language: language, blocking: blocking, deadline: deadline)
     planned = draft.kinds.map(&:key)
     dropped = draft.unusable_sections.select { |section| planned.include?(section.key) }
-    finish_generation(user, language, draft, draft.problem_set,
-                      dropped_concepts: dropped.to_h { |section| [ section.key, section.concept ] })
+    ExerciseDraft.finish(draft, draft.problem_set, provider: exercise_draft_provider,
+                                                   dropped_concepts: dropped.to_h { |section| [ section.key, section.concept ] })
     JudgedSet.new(problem_set: draft.problem_set, dropped_sections: dropped.map(&:key), outcomes: {},
                   plan_notes: draft.plan.notes)
   end
@@ -185,9 +181,9 @@ class AiService
   def generate_judged_exercise(user, language: user.language_for_today, deadline: GenerationDeadline::NONE)
     draft = draft_exercise(user, language: language, blocking: false, deadline: deadline)
     JudgedGeneration.call(
-      user: user, language: language, draft: draft,
+      user: user, draft: draft,
       providers: -> { fresh_service.judged_generation_provider(deadline) },
-      finish: ->(set, **logs) { finish_generation(user, language, draft, set, **logs) }
+      finish: ->(set, **logs) { ExerciseDraft.finish(draft, set, provider: exercise_draft_provider, **logs) }
     )
   end
 
@@ -372,66 +368,38 @@ class AiService
   def judged_generation_provider(deadline = GenerationDeadline::NONE)
     JudgedGeneration::Provider.new(
       judge_section: ->(*args, **options) { judge_section(*args, **options, deadline: deadline) },
-      retry_section: ->(*args) { retry_section(*args, deadline: deadline) }
+      retry_section: ->(draft, kind, concept) { retry_section(draft, kind, concept, deadline: deadline) }
     )
   end
 
   private
 
   def draft_exercise(user, language:, blocking:, deadline: GenerationDeadline::NONE)
-    require_supported_language!(language)
-    plan       = DailyPlan.for(user, language: language)
-    GenerationDiagnostics.new(user).set_size(plan.size)
-    history    = user.recent_performance
-    difficulty = KindDifficulty.for(user)
-    kinds      = plan.kinds
-    ladders    = GenerationLadders.for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode)
-    prompt     = generation_prompt(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders)
+    ExerciseDraft.call(user, language: language, blocking: blocking, deadline: deadline, provider: exercise_draft_provider)
+  end
 
-    request = AiService.request_for("generate_exercise", blocking: blocking, system: build_system_prompt(language),
-                                                         prompt: prompt.render)
-    result = call_and_log(user, request, deadline: deadline)
+  def retry_section(draft, kind, concept, deadline: GenerationDeadline::NONE)
+    ExerciseDraft.retry_section(draft, kind, concept, deadline: deadline, provider: exercise_draft_provider)
+  end
 
-    ingested = ProblemSetIngest.call(
-      parse_json_object(result[:text], subject: "problem set", log_raw: false),
-      language: language, expected_keys: kinds.map(&:key), daily: plan.daily_kinds, code_review_source: plan.code_review_source,
-      pitched_at: difficulty.rungs(skill_level: user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
+  def exercise_draft_provider
+    ExerciseDraft::Provider.new(
+      prompt: ->(*args, **options) { generation_prompt(*args, **options) },
+      generate: ->(*args, **options) { generate_problem_set(*args, **options) },
+      record_suggestion: ->(suggestion) { record_suggested_concept(suggestion) }
     )
+  end
 
-    GenerationDiagnostics.new(user).unusable_sections(ingested.unusable_sections)
-    Draft.new(problem_set: ingested.problem_set, plan: plan, kinds: kinds, difficulty: difficulty,
-              ladders: ladders, history: history,
-              suggested_concepts: ingested.suggested_concepts, unusable_sections: ingested.unusable_sections)
+  def record_suggested_concept(suggestion) = SuggestedConcept.record!(language: suggestion.bucket, name: suggestion.name)
+
+  def generate_problem_set(user, purpose, language, prompt, subject:, blocking: false, deadline: GenerationDeadline::NONE)
+    request = AiService.request_for(purpose, blocking: blocking, system: build_system_prompt(language), prompt: prompt)
+    parse_json_object(call_and_log(user, request, deadline: deadline)[:text], subject: subject, log_raw: false)
   end
 
   def generation_prompt(user, language, plan:, history:, difficulty:, ladders:)
     GenerationPrompt.new(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders,
                          retention_annotation: method(:annotate_retention_concept))
-  end
-
-  def finish_generation(user, language, draft, set, dropped_concepts: {}, judge: nil, unhosted: [])
-    record_suggested_concepts(draft.suggested_concepts)
-    GenerationDiagnostics.new(user).finished(language, draft, set, dropped_concepts: dropped_concepts, judge: judge, unhosted: unhosted)
-  end
-
-  def retry_section(user, language, draft, kind, concept, deadline: GenerationDeadline::NONE)
-    prompt = generation_prompt(user, language, plan: draft.plan, history: draft.history, difficulty: draft.difficulty,
-                               ladders: retry_ladders(user, language, draft, kind))
-    request = AiService.request_for("retry_section", system: build_system_prompt(language),
-                                                     prompt: prompt.render(only: kind, fixed_concept: concept))
-    result = call_and_log(user, request, deadline: deadline.leaving(AiService.worst_case_seconds_for("judge_section")))
-
-    ProblemSetIngest.call(
-      parse_json_object(result[:text], subject: "#{kind.key} retry", log_raw: false), language: language,
-      expected_keys: [ kind.key ], daily: draft.plan.daily_kinds, fixed_concepts: { kind.key => concept },
-      code_review_source: draft.plan.code_review_source,
-      pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
-      eased_for: eased_concepts_for(draft.plan, draft.difficulty).slice(kind.key)
-    ).problem_set[kind.key]
-  end
-
-  def retry_ladders(user, language, draft, kind)
-    GenerationLadders.for(draft.difficulty.rungs_for([ kind ], skill_level: user.skill_level), language, draft.plan.code_review_mode)
   end
 
   def normalize_optional_reference_fields!(reference)
@@ -473,8 +441,6 @@ class AiService
 
   def error_code_for(error) = self.class.error_code_for(error)
 
-  def require_supported_language!(language) = LanguagePrompts.for(language)
-
   def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs)
     hosts = kinds.filter_map do |kind|
       mode = code_review_mode if kind == ExerciseSection::CodeReview
@@ -488,19 +454,6 @@ class AiService
 
   def can_host?(cm, section_key, language, mode: nil, rung: nil)
     ConceptVocabulary.selectable_for_section(section_key, language, mode: mode, rung: rung).include?(cm.concept)
-  end
-
-  def eased_concepts_for(plan, difficulty)
-    reduced_main   = reduced_concepts(plan.reinforcement)
-    reduced_fourth = reduced_concepts(plan.fourth_reinforcement)
-
-    ExerciseSection.all.reject { |kind| difficulty.locked?(kind) }.to_h do |kind|
-      [ kind.key, kind.fourth? ? reduced_fourth : reduced_main ]
-    end
-  end
-
-  def reduced_concepts(entries)
-    entries.select { |h| h[:tier] == "reduced" }.map { |h| h[:concept] }
   end
 
   def call(request)
@@ -654,16 +607,6 @@ class AiService
     snippet = text.byteslice(0, RAW_SNIPPET_LIMIT).scrub
     snippet += "... (truncated, #{text.bytesize} bytes total)" if text.bytesize > RAW_SNIPPET_LIMIT
     Rails.logger.error("#{label}: #{snippet}")
-  end
-
-  def record_suggested_concepts(suggestions)
-    suggestions.each { |suggestion| record_suggested_concept(suggestion) }
-  end
-
-  def record_suggested_concept(suggestion)
-    SuggestedConcept.record!(language: suggestion.bucket, name: suggestion.name)
-  rescue => e
-    Rails.logger.warn("SuggestedConcept recording failed: #{e.message}")
   end
 
   def fresh_service

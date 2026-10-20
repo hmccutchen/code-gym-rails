@@ -100,7 +100,9 @@ says what a deviation from one requires.
   takes them as a `Provider` struct of callables, with a `providers:` factory
   that returns a fresh one for each thread (`JudgedGeneration::Provider`,
   `ReviewGrading::Provider`, built by `AiService#judged_generation_provider`
-  and `#review_grading_provider`). `AiService` keeps the calls and builds the prompts, or
+  and `#review_grading_provider`). `ExerciseDraft` takes one
+  `ExerciseDraft::Provider` (`AiService#exercise_draft_provider`), since a
+  draft makes one call and a retry runs on the thread that asked for it. `AiService` keeps the calls and builds the prompts, or
   takes them from a prompt class;
   the module keeps the orchestration and the policy, and its specs drive it
   with lambdas. Threads start through `CallerZoneThread.start`, and

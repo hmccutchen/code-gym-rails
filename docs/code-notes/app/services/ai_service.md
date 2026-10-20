@@ -225,26 +225,22 @@ Hands over callables, so neither `judge_section` nor `retry_section` has to
 join this class's public API. Each closes over the generation's deadline and
 passes it to `#call_and_log`, which checks it after the request is built, since
 a retry's ladders and prompt can spend the time the check would have allowed.
-The retry passes the deadline less a judge's worst case, so its re-judge still
-has room.
+`ExerciseDraft.retry_section` passes the deadline less a judge's worst case,
+so its re-judge still has room.
 
-## `#draft_exercise` and `#generation_prompt`
+## `#exercise_draft_provider` and `#generation_prompt`
 
-History is fetched once and handed to the prompt as a whole value, so the
-logged "requested" history can't diverge from what the prompt contained.
-`#generation_prompt` is the one place a `GenerationPrompt` is built: it binds
-`#annotate_retention_concept` as the retention callable, and both the draft and
-`#retry_section` go through it. A retry renders from the draft's own plan,
-history and difficulty with fresh ladders for the retried kind, and stores
-nothing on the draft or the service. `script/forced_concept_drafts.rb` wraps
-the factory on one service instance to add a line to that instance's prompts
-alone, so the override never reaches `GenerationPrompt` itself.
-
-## `#finish_generation`
-
-`draft` still holds every drafted section, so `GenerationDiagnostics#finished`
-can name a dropped key with its concept. The logging itself, and its notes,
-are in `docs/code-notes/app/services/generation_diagnostics.md`.
+`ExerciseDraft` does the drafting and reaches this class only through the
+provider's two callables. `#generation_prompt` is the one place a
+`GenerationPrompt` is built: it binds `#annotate_retention_concept` as the
+retention callable, which stays here because `RealSource` lists it as a
+curated excerpt. The `prompt` callable calls the method each time rather than
+capturing it, so `script/forced_concept_drafts.rb` can wrap the factory on one
+service instance to add a line to that instance's prompts alone, and the
+override never reaches `GenerationPrompt` itself. `#generate_problem_set` is
+the `generate` callable: it builds the request, calls, and parses the reply
+with `log_raw: false`. `#record_suggested_concept` is the `record_suggestion`
+callable, kept here so a script's subclass can override it.
 
 ## `#normalize_optional_reference_fields!`
 
@@ -261,13 +257,6 @@ Logs counts and flags only, and pairs with
 A blank response would fail a validation outside `rescue ProviderError` and
 give the user a raw 500.
 
-## `#require_supported_language!`
-
-Planning reads `ConceptVocabulary`, which raises its own unknown-language
-error. Checking first makes an unsupported language fail as
-`SetupError` before any planning work, the same error `LanguagePrompts.for` raises.
-`ConceptVocabulary::UnknownLanguage` is a `SetupError` too, so the check
-changes when the failure happens, not how it's classified.
 
 ## `#annotate_retention_concept`
 
@@ -322,11 +311,6 @@ else falls back to `fallback`.
 Raw output is logged instead of put in an exception message, which would reach
 flash alerts and error trackers. `.scrub` repairs a multi-byte character that
 `byteslice` cut in half.
-
-## `#record_suggested_concepts`
-
-Rescued per suggestion, so one bad name can't discard the rest, and a failure
-here never breaks generation.
 
 ## `#log_usage`
 
