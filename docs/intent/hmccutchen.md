@@ -65,4 +65,5 @@
 - the generation system prompt into `GenerationPrompt.system_prompt` `#466`
 - landed the generation system prompt move on main, since it merged into
   its stacked base `#467 open`
-- language wording and scenario pools into `LanguagePrompts` and `ScenarioPools` `#468`
+- language wording and scenario pools into `LanguagePrompts` and
+  `ScenarioPools` `#468`
