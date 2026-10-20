@@ -1,4 +1,4 @@
-# Nothing here reads the error's message, which can carry provider text.
+# A provider error's message can carry provider text, so only a SetupError's, which the app writes, is read here, to log it.
 module ProviderFailureRendering
   extend ActiveSupport::Concern
 
