@@ -21,8 +21,8 @@ RSpec.describe ModelComparison do
           body   = JSON.parse(env.body)
           system = body["system"].is_a?(Array) ? body["system"].first["text"] : body["system"]
           requests << body
-          output_tokens = system == AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT && judge_tokens.any? ? judge_tokens.shift : 30
-          if system == AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT && replies.any?
+          output_tokens = system == ReviewProseJudgePrompt::SYSTEM && judge_tokens.any? ? judge_tokens.shift : 30
+          if system == ReviewProseJudgePrompt::SYSTEM && replies.any?
             reply = replies.shift
             next [ 500, {}, "{}" ] if reply == :provider_error
 
@@ -383,7 +383,7 @@ end
         "fields" => { "missed" => [ { "from" => [ 0, 1 ], "text" => "One query per row." } ] } }
     end
 
-    def judge_requests = posted.select { |body| body["system"] == AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT }
+    def judge_requests = posted.select { |body| body["system"] == ReviewProseJudgePrompt::SYSTEM }
 
     def store_reviews(sections)
       DailyResponse.create!(user: user, daily_exercise: create_exercise, date: Date.current, submitted_at: Time.current,

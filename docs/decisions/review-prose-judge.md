@@ -112,9 +112,9 @@ box this run ticked.
 plain-language problem and "a next step that names more than one thing to
 study" a verbosity one, so the judge was following instructions when it
 firmed up a vague claim and cut four topics to one. Both items are gone
-from `REVIEW_PROSE_ISSUE_GUIDANCE`. The rules now say to keep how sure each
-claim is and every topic a next step names, and a spec holds the prompt
-to that. The grader still asks for one topic per next step; when it names
+from `ReviewProseJudgePrompt::ISSUE_GUIDANCE`. The rules now say to keep
+how sure each claim is and every topic a next step names, and a spec
+holds the prompt to that. The grader still asks for one topic per next step; when it names
 several, the judge keeps them all, because choosing which to drop changes
 what the review says.
 

@@ -57,3 +57,4 @@
 - duck into `DuckPrompt` `#458`
 - difficulty assessment into `DifficultyPrompt` `#459`
 - section judge into `SectionJudgePrompt` `#460`
+- review prose judge into `ReviewProseJudgePrompt` `#461`

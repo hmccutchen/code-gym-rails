@@ -5697,12 +5697,25 @@ RSpec.describe AiService, "#judge_review_prose" do
     captured
   end
 
+  it "sends the recorded request, showing the judge the review's prose and never its rating or code" do
+    graded = { "rating" => "partial", "correct" => [ "Spotted the loop" ], "missed" => [ "The association is loaded per row", "No eager load" ],
+               "better_questions" => [], "next_step" => "Try includes", "improved_code" => "SENTINEL-CODE" }
+    captured = nil
+    allow(service).to receive(:call_and_log).and_wrap_original { |m, *args, **options| captured = args.last; m.call(*args, **options) }
+
+    service.judge_review_prose(user, ExerciseSection::CodeReview, graded, coach: "Rails")
+
+    expect_prompt_snapshot("review_prose_judge__system", captured.system)
+    expect_prompt_snapshot("review_prose_judge__prompt", captured.prompt)
+    expect_prompt_snapshot("review_prose_judge__schema", JSON.pretty_generate(captured.response_schema))
+  end
+
   it "calls judge_review once, capped, on its own timeout, with the verdict schema" do
     request = captured_call
     expect(request).to have_attributes(purpose: "judge_review", max_tokens: AiService::REVIEW_JUDGE_MAX_TOKENS,
                                        read_timeout: AiService::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true,
                                        cache_system: false, allow_truncated: false,
-                                       response_schema: ReviewProseVerdict.schema, system: AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT)
+                                       response_schema: ReviewProseVerdict.schema, system: ReviewProseJudgePrompt::SYSTEM)
   end
 
   it "keeps the measured headroom its cap is justified by" do
@@ -5729,20 +5742,6 @@ RSpec.describe AiService, "#judge_review_prose" do
   it "says which providers judge" do
     expect([ AiService, ClaudeService, GeminiService, OpenaiService, FakeService ].map(&:judges_review_prose?))
       .to eq([ false, true, false, false, true ])
-  end
-end
-
-RSpec.describe AiService, "REVIEW_PROSE_JUDGE_SYSTEM_PROMPT" do
-  it "lists issue types from ReviewProseVerdict and carries the plain-language standard" do
-    ReviewProseVerdict::ISSUE_TYPES.each { |type| expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include("- #{type}:") }
-    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include(PromptStandards::PLAIN_LANGUAGE_STANDARD.strip)
-      .and include("reply with only the JSON verdict")
-  end
-
-  it "never asks the judge to remove a hedge or cut a next step's topics" do
-    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).not_to match(/needless hedging|names more than one thing/)
-    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include("Keep how sure each claim is")
-      .and include("Keep every topic a next step names")
   end
 end
 

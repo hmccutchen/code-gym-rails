@@ -175,7 +175,7 @@ RSpec.describe FakeService do
 
     it "finds the purpose whose marker a real system prompt carries" do
       expect(purpose_for(DuckPrompt::SYSTEM)).to eq("duck_thread")
-      expect(purpose_for(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT)).to eq("judge_review")
+      expect(purpose_for(ReviewProseJudgePrompt::SYSTEM)).to eq("judge_review")
       expect(purpose_for(FakeService.new(user.api_key).send(:build_system_prompt, "ruby_rails"))).to eq("generate_exercise")
     end
 
