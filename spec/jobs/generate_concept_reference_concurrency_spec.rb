@@ -54,7 +54,7 @@ RSpec.describe GenerateConceptReferenceJob do
   end
 
   it "releases the permit after a provider failure" do
-    allow(service).to receive(:generate_concept_reference).and_raise(AiService::RateLimitError, "slow down")
+    allow(service).to receive(:generate_concept_reference).and_raise(ProviderError::RateLimitError, "slow down")
     enqueue_reference
     perform_next
 

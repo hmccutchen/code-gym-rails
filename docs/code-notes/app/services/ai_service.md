@@ -329,13 +329,13 @@ one request away.
 
 ## `#text_or_raise`
 
-A blank response would fail a validation outside `rescue AiService::Error` and
+A blank response would fail a validation outside `rescue ProviderError` and
 give the user a raw 500.
 
 ## `#require_supported_language!`
 
 Planning reads `ConceptVocabulary`, whose unknown-language error is not an
-`AiService::Error`. Checking first keeps an unsupported language failing the
+`ProviderError`. Checking first keeps an unsupported language failing the
 way the generation jobs rescue and record.
 
 ## `.config_for` and `#config_for`
@@ -418,7 +418,7 @@ any other Faraday error `NetworkError`, both naming the provider.
 
 ## `#parse_provider_envelope`
 
-Callers rescue `AiService::Error`, so a body that is not a JSON object (an HTML
+Callers rescue `ProviderError`, so a body that is not a JSON object (an HTML
 page, a cut-off reply) must arrive as one.
 
 ## `#extract_provider_message`

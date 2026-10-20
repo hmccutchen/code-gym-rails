@@ -338,7 +338,7 @@ class FakeService < AiService
 
   private
 
-  # Raises bare RuntimeErrors because the job turns AiService::Error into a user-facing message that hides the bug.
+  # Raises bare RuntimeErrors because the job turns ProviderError into a user-facing message that hides the bug.
   def call(request)
     reply = REPLIES.fetch(request.purpose) { raise "FakeService has no reply for purpose: #{request.purpose.inspect}" }
     text  = reply.respond_to?(:call) ? reply.call(request.prompt) : reply

@@ -31,16 +31,16 @@ RSpec.describe ProviderCredential, type: :model do
     user = create_trial_user(provider: "fake")
 
     travel_to(user.trial_ends_at + 1.minute) do
-      expect { described_class.for(user) }.to raise_error(AiService::TrialEndedError)
+      expect { described_class.for(user) }.to raise_error(ProviderError::TrialEndedError)
       expect(user).to be_trial_ended
     end
 
     stub_env("TRIALS_DISABLED" => "1")
-    expect { described_class.for(user) }.to raise_error(AiService::TrialEndedError)
+    expect { described_class.for(user) }.to raise_error(ProviderError::TrialEndedError)
     expect(TrialMode.enabled?).to be(false)
 
     stub_env("TRIALS_DISABLED" => nil, "HOUSE_FAKE_API_KEY" => nil)
-    expect { described_class.for(user) }.to raise_error(AiService::TrialEndedError)
+    expect { described_class.for(user) }.to raise_error(ProviderError::TrialEndedError)
   end
 
   it "prefers a key the trial account pasted over the house key" do

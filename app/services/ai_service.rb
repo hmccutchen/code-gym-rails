@@ -2,54 +2,6 @@ require "json"
 
 # Design notes: docs/code-notes/app/services/ai_service.md
 class AiService
-  class Error < StandardError
-    attr_reader :http_status, :quota_id, :retry_after
-    attr_accessor :provider
-
-    def initialize(message = nil, http_status: nil, quota_id: nil, retry_after: nil)
-      super(message)
-      @http_status = http_status
-      @quota_id    = quota_id
-      @retry_after = retry_after
-    end
-  end
-
-  class AuthenticationError < Error; end
-
-  class RateLimitError < Error; end
-
-  class BillingError < Error; end
-
-  class TrialEndedError < Error; end
-
-  class TrialAllowanceError < Error; end
-
-  class NetworkError < Error; end
-
-  class TimeoutError < Error; end
-
-  class InvalidResponseError < Error; end
-
-  class TruncatedResponseError < InvalidResponseError; end
-
-  class RefusalError < Error; end
-
-  class UnsupportedRouteError < Error; end
-
-  class DeadlineError < TimeoutError
-    def initialize(purpose = nil)
-      super("The generation deadline left no time for a #{purpose || "further"} call.")
-    end
-
-    FALLBACK_REASON = "deadline".freeze
-  end
-
-  class AllSectionsRejectedError < Error
-    def initialize(message = "Every section of today's draft failed its quality check, so no set was saved. Try generating again.")
-      super
-    end
-  end
-
   FINISHED_STATUSES = %w[completed incomplete].freeze
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 45
@@ -472,9 +424,9 @@ class AiService
 
   def self.for(user)
     provider = AiProvider.find(user.provider)
-    raise Error, "User #{user.id} has no recognized AI provider configured" unless provider
+    raise ProviderError, "User #{user.id} has no recognized AI provider configured" unless provider
     unless provider.available?
-      raise Error, "User #{user.id} has the test-only #{provider.provider_key} provider outside a local environment"
+      raise ProviderError, "User #{user.id} has the test-only #{provider.provider_key} provider outside a local environment"
     end
 
     credential = ProviderCredential.for(user)
@@ -550,7 +502,7 @@ class AiService
 
     missing = CONCEPT_REFERENCE_FIELDS.reject { |field| reference[field].is_a?(String) && reference[field].strip.present? }
     if missing.any?
-      raise InvalidResponseError, "Concept reference missing required field(s): #{missing.join(', ')}"
+      raise ProviderError::InvalidResponseError, "Concept reference missing required field(s): #{missing.join(', ')}"
     end
 
     normalize_optional_reference_fields!(reference)
@@ -568,7 +520,7 @@ class AiService
     RECOGNITION_GUIDE_FIELDS.each { |field| guide[field] = usable_optional_text(guide[field], MAX_CONCEPT_GUIDE_LENGTH) }
 
     missing = RECOGNITION_GUIDE_FIELDS.select { |field| guide[field].nil? }
-    raise InvalidResponseError, "Recognition guide missing usable field(s): #{missing.join(', ')}" if missing.any?
+    raise ProviderError::InvalidResponseError, "Recognition guide missing usable field(s): #{missing.join(', ')}" if missing.any?
 
     guide.slice(*RECOGNITION_GUIDE_FIELDS)
   end
@@ -689,11 +641,11 @@ class AiService
     parsed     = parse_json_object(result[:text], subject: "pseudocode critique", log_raw: false)
     gaps_found = parsed["gaps_found"]
     unless [ true, false ].include?(gaps_found)
-      raise InvalidResponseError, "Pseudocode critique returned no usable \"gaps_found\" flag"
+      raise ProviderError::InvalidResponseError, "Pseudocode critique returned no usable \"gaps_found\" flag"
     end
 
     gaps = ExerciseSection::PseudocodeToCode.normalize_critique(parsed["gaps"])
-    raise InvalidResponseError, "Pseudocode critique claimed gaps but returned none usable" if gaps_found && gaps.empty?
+    raise ProviderError::InvalidResponseError, "Pseudocode critique claimed gaps but returned none usable" if gaps_found && gaps.empty?
 
     log_pseudocode_critique(user, gaps_found, gaps)
     { gaps_found: gaps_found, gaps: gaps_found ? gaps : [] }
@@ -707,7 +659,7 @@ class AiService
 
     code = UserText.normalize(text_or_raise(result, subject: "pseudocode translation"))
     if code.length > MAX_GENERATED_CODE_LENGTH
-      raise InvalidResponseError,
+      raise ProviderError::InvalidResponseError,
             "Pseudocode translation came back too long to be usable (#{code.length} characters)"
     end
 
@@ -736,32 +688,32 @@ class AiService
 
   def self.config_for(language)
     LANGUAGE_PROMPTS.fetch(language) do
-      raise Error, "Unsupported generation language: #{language.inspect}"
+      raise ProviderError, "Unsupported generation language: #{language.inspect}"
     end
   end
 
   def self.error_code_for(error)
     case error
-    when AuthenticationError  then "authentication"
-    when RateLimitError       then "rate_limit"
-    when BillingError         then "out_of_credit"
-    when TrialEndedError      then "trial_ended"
-    when TrialAllowanceError  then "trial_allowance_used"
-    when InvalidResponseError then "invalid_response"
+    when ProviderError::AuthenticationError  then "authentication"
+    when ProviderError::RateLimitError       then "rate_limit"
+    when ProviderError::BillingError         then "out_of_credit"
+    when ProviderError::TrialEndedError      then "trial_ended"
+    when ProviderError::TrialAllowanceError  then "trial_allowance_used"
+    when ProviderError::InvalidResponseError then "invalid_response"
     else                           "other"
     end
   end
 
   def self.failure_code_for(error)
     case error
-    when RateLimitError         then "rate_limit"
-    when AuthenticationError    then "authentication"
-    when BillingError           then "out_of_credit"
-    when TimeoutError           then "timeout"
-    when NetworkError           then "network"
-    when TruncatedResponseError then "truncated"
-    when InvalidResponseError   then "invalid_response"
-    when RefusalError           then "refusal"
+    when ProviderError::RateLimitError         then "rate_limit"
+    when ProviderError::AuthenticationError    then "authentication"
+    when ProviderError::BillingError           then "out_of_credit"
+    when ProviderError::TimeoutError           then "timeout"
+    when ProviderError::NetworkError           then "network"
+    when ProviderError::TruncatedResponseError then "truncated"
+    when ProviderError::InvalidResponseError   then "invalid_response"
+    when ProviderError::RefusalError           then "refusal"
     else                             "provider_error"
     end
   end
@@ -769,17 +721,17 @@ class AiService
   def self.judge_fallback_reason(error)
     case error
     when JudgeVerdict::Invalid, ReviewProseVerdict::Invalid then "invalid_output"
-    when TruncatedResponseError                              then "truncated"
-    when InvalidResponseError                                then "invalid_json"
-    when RefusalError                                        then "refusal"
-    when DeadlineError                                       then DeadlineError::FALLBACK_REASON
-    when TimeoutError, Timeout::Error                        then "timeout"
+    when ProviderError::TruncatedResponseError                              then "truncated"
+    when ProviderError::InvalidResponseError                                then "invalid_json"
+    when ProviderError::RefusalError                                        then "refusal"
+    when ProviderError::DeadlineError                                       then ProviderError::DeadlineError::FALLBACK_REASON
+    when ProviderError::TimeoutError, Timeout::Error                        then "timeout"
     else                                                          http_status_code_for(error) || error_code_for(error)
     end
   end
 
   def self.http_status_code_for(error)
-    "http_#{error.http_status}" if error.instance_of?(Error) && error.http_status
+    "http_#{error.http_status}" if error.instance_of?(ProviderError) && error.http_status
   end
 
   protected
@@ -1006,7 +958,7 @@ class AiService
 
   def text_or_raise(result, subject:)
     text = result[:text].to_s.strip
-    raise InvalidResponseError, "Provider returned an empty #{subject}" if text.blank?
+    raise ProviderError::InvalidResponseError, "Provider returned an empty #{subject}" if text.blank?
     text
   end
 
@@ -1155,7 +1107,7 @@ class AiService
     raise_for_status(resp) unless resp.success?
     read_result(parse_provider_envelope(resp.body, provider: provider_name), request).merge(http_status: resp.status)
   rescue Faraday::Error => e
-    raise (e.is_a?(Faraday::TimeoutError) ? TimeoutError : NetworkError), "Network error calling #{provider_name}: #{e.message}"
+    raise (e.is_a?(Faraday::TimeoutError) ? ProviderError::TimeoutError : ProviderError::NetworkError), "Network error calling #{provider_name}: #{e.message}"
   end
 
   def post(body, request)
@@ -1508,17 +1460,17 @@ class AiService
     parsed = parse_json_response(text, subject: subject, log_raw: log_raw)
     return parsed if parsed.is_a?(Hash)
 
-    raise InvalidResponseError, "Provider returned #{parsed.class} instead of a JSON object for the #{subject}"
+    raise ProviderError::InvalidResponseError, "Provider returned #{parsed.class} instead of a JSON object for the #{subject}"
   end
 
   def parse_json_response(text, subject: "response", log_raw: true)
     clean = text.to_s.gsub(/\A```(?:json)?\n?/, "").gsub(/\n?```\z/, "").strip
     JSON.parse(clean)
   rescue JSON::ParserError => e
-    raise InvalidResponseError, "Provider returned invalid JSON for the #{subject}" unless log_raw
+    raise ProviderError::InvalidResponseError, "Provider returned invalid JSON for the #{subject}" unless log_raw
 
     log_raw_snippet("Invalid JSON from provider", text)
-    raise InvalidResponseError, "Provider returned invalid JSON: #{e.message}"
+    raise ProviderError::InvalidResponseError, "Provider returned invalid JSON: #{e.message}"
   end
 
   def parse_provider_envelope(body, provider:)
@@ -1537,7 +1489,7 @@ class AiService
     else
       log_raw_snippet("Unreadable #{provider} response body", text)
     end
-    raise InvalidResponseError, "#{provider} returned an unreadable response"
+    raise ProviderError::InvalidResponseError, "#{provider} returned an unreadable response"
   end
 
   def extract_provider_message(body, fallback:)
@@ -1552,7 +1504,7 @@ class AiService
     return unless [ 401, 403 ].include?(status)
 
     Rails.logger.error("#{company} authentication failed (HTTP #{status})")
-    raise AuthenticationError.new("#{company} rejected your API key or its permissions. Check it in Settings.",
+    raise ProviderError::AuthenticationError.new("#{company} rejected your API key or its permissions. Check it in Settings.",
                                   http_status: status)
   end
 
@@ -1608,7 +1560,7 @@ class AiService
     TrialAllowance.check!(user, provider: self.class) if house_key?
     begin
       result = call(request)
-    rescue Error => e
+    rescue ProviderError => e
       e.provider ||= self.class.provider_key
       log_usage(user, failed_call_result(e, request.purpose), purpose: request.purpose)
       raise
@@ -1619,11 +1571,11 @@ class AiService
   end
 
   def raise_for_reply!(result, allow_truncated)
-    raise tagged(Error.new(result[:error])) if result[:error]
-    raise tagged(RefusalError.new("The provider declined this request (#{result[:refusal]})")) if result[:refusal]
+    raise tagged(ProviderError.new(result[:error])) if result[:error]
+    raise tagged(ProviderError::RefusalError.new("The provider declined this request (#{result[:refusal]})")) if result[:refusal]
     return unless result[:truncated] && !allow_truncated
 
-    raise tagged(TruncatedResponseError.new("Provider did not finish its reply " \
+    raise tagged(ProviderError::TruncatedResponseError.new("Provider did not finish its reply " \
                                             "(#{result[:output_tokens].to_i} output tokens, thinking included)"))
   end
 

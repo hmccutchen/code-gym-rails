@@ -24,7 +24,7 @@ RSpec.describe ClaudeService do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "<html>Bad gateway</html>" ] ]))
 
     expect { call_provider(service, system: "sys", prompt: "p") }
-      .to raise_error(AiService::InvalidResponseError, /Claude returned an unreadable response/)
+      .to raise_error(ProviderError::InvalidResponseError, /Claude returned an unreadable response/)
   end
 
   it "withholds a cut-off JSON body, which can carry a blind solve, from the log and still logs a non-JSON one" do
@@ -32,11 +32,11 @@ RSpec.describe ClaudeService do
     allow(Rails.logger).to receive(:error) { |message| logged << message }
 
     expect { service.send(:unreadable_envelope!, '{"text":"{\\"better\\":\\"b\\"', "Claude") }
-      .to raise_error(AiService::InvalidResponseError)
+      .to raise_error(ProviderError::InvalidResponseError)
     expect { service.send(:unreadable_envelope!, '"{\\"better\\":\\"b\\"', "Claude") }
-      .to raise_error(AiService::InvalidResponseError)
+      .to raise_error(ProviderError::InvalidResponseError)
     expect { service.send(:unreadable_envelope!, "<html>Bad gateway</html>", "Claude") }
-      .to raise_error(AiService::InvalidResponseError)
+      .to raise_error(ProviderError::InvalidResponseError)
 
     expect(logged.first(2)).to all(include("withheld").and(satisfy { |line| !line.include?("better") }))
     expect(logged.last).to include("Bad gateway")
@@ -46,7 +46,7 @@ RSpec.describe ClaudeService do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "[]" ] ]))
 
     expect { call_provider(service, system: "sys", prompt: "p") }
-      .to raise_error(AiService::InvalidResponseError, /Claude returned an unreadable response/)
+      .to raise_error(ProviderError::InvalidResponseError, /Claude returned an unreadable response/)
   end
 
   describe "#build_connection" do
@@ -93,7 +93,7 @@ RSpec.describe ClaudeService do
 
       expect {
         call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
-      }.to raise_error(AiService::TimeoutError, /Network error calling Claude/)
+      }.to raise_error(ProviderError::TimeoutError, /Network error calling Claude/)
 
       expect(attempts.size).to eq(1)
     end
@@ -104,7 +104,7 @@ RSpec.describe ClaudeService do
 
       expect {
         call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::REVIEW_READ_TIMEOUT)
-      }.to raise_error(AiService::TimeoutError, /Network error calling Claude/)
+      }.to raise_error(ProviderError::TimeoutError, /Network error calling Claude/)
 
       expect(attempts).to eq([ AiService::REVIEW_READ_TIMEOUT ])
     end
@@ -115,7 +115,7 @@ RSpec.describe ClaudeService do
 
       expect {
         call_provider(service, system: "sys", prompt: "p")
-      }.to raise_error(AiService::TimeoutError, /Network error calling Claude/)
+      }.to raise_error(ProviderError::TimeoutError, /Network error calling Claude/)
 
       expect(attempts.size).to eq(ClaudeService::RETRY_OPTIONS[:max] + 1)
     end
@@ -136,7 +136,7 @@ RSpec.describe ClaudeService do
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::TimeoutError, /Network error calling Claude/)
+      }.to raise_error(ProviderError::TimeoutError, /Network error calling Claude/)
     end
 
     it "raises a plain error for a non-timeout network failure" do
@@ -150,12 +150,12 @@ RSpec.describe ClaudeService do
       error = nil
       begin
         call_provider(service, system: "sys", prompt: "prompt")
-      rescue AiService::Error => e
+      rescue ProviderError => e
         error = e
       end
 
-      expect(error).to be_a(AiService::Error)
-      expect(error).not_to be_a(AiService::TimeoutError)
+      expect(error).to be_a(ProviderError)
+      expect(error).not_to be_a(ProviderError::TimeoutError)
       expect(error.message).to match(/Network error calling Claude/)
     end
 
@@ -175,7 +175,7 @@ RSpec.describe ClaudeService do
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::RateLimitError)
+      }.to raise_error(ProviderError::RateLimitError)
       # 3 total attempts (max: 2 retries) — one response left unused.
       expect(responses.size).to eq(1)
     end
@@ -186,7 +186,7 @@ RSpec.describe ClaudeService do
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::RateLimitError)
+      }.to raise_error(ProviderError::RateLimitError)
       expect(responses.size).to eq(1)
     end
 
@@ -196,7 +196,7 @@ RSpec.describe ClaudeService do
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::AuthenticationError, "Anthropic rejected your API key or its permissions. Check it in Settings.")
+      }.to raise_error(ProviderError::AuthenticationError, "Anthropic rejected your API key or its permissions. Check it in Settings.")
       # 401 is not in retry_statuses, so the second stubbed response is never consumed.
       expect(responses.size).to eq(1)
     end
@@ -208,7 +208,7 @@ RSpec.describe ClaudeService do
         allow(Rails.logger).to receive(:error)
 
         expect { call_provider(service, system: "sys", prompt: "prompt") }
-          .to raise_error(AiService::AuthenticationError, /\AAnthropic rejected your API key/) { |error|
+          .to raise_error(ProviderError::AuthenticationError, /\AAnthropic rejected your API key/) { |error|
             expect(error.http_status).to eq(status)
             expect(error.message).not_to include("sk-ant-")
           }
@@ -221,7 +221,7 @@ RSpec.describe ClaudeService do
         responses = [ [ 429, "" ], [ 429, "" ], [ 429, "" ] ]
         service.instance_variable_set(:@conn, stubbed_connection(responses))
 
-        expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::RateLimitError)
+        expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(ProviderError::RateLimitError)
         expect(responses.size).to eq(2)
       end
 
@@ -233,7 +233,7 @@ RSpec.describe ClaudeService do
         end
         service.instance_variable_set(:@conn, conn)
 
-        expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::TimeoutError)
+        expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(ProviderError::TimeoutError)
         expect(attempts).to eq(1)
       end
 
@@ -245,7 +245,7 @@ RSpec.describe ClaudeService do
         end
         service.instance_variable_set(:@conn, conn)
 
-        expect { call_provider(service, system: "sys", prompt: "p") }.to raise_error(AiService::TimeoutError)
+        expect { call_provider(service, system: "sys", prompt: "p") }.to raise_error(ProviderError::TimeoutError)
         expect(attempts).to eq(AiService::RETRY_MAX + 1)
       end
     end
@@ -363,9 +363,9 @@ RSpec.describe ClaudeService do
         allow(service).to receive(:route_for).and_return({ model: "claude-opus-5-5" })
 
         expect { call_provider(service, system: "sys", prompt: "p", max_tokens: 100) }
-          .to raise_error(AiService::UnsupportedRouteError, /claude-opus-5-5/)
+          .to raise_error(ProviderError::UnsupportedRouteError, /claude-opus-5-5/)
         expect(posts).to eq(0)
-        expect(AiService::UnsupportedRouteError).to be < AiService::Error
+        expect(ProviderError::UnsupportedRouteError).to be < ProviderError
       end
     end
 
@@ -411,14 +411,14 @@ RSpec.describe ClaudeService do
       expect(result[:truncated]).to be(false)
     end
 
-    it "raises AiService::Error on a non-success response" do
+    it "raises ProviderError on a non-success response" do
       fake_response = instance_double(Faraday::Response, success?: false, status: 500, body: "boom")
       fake_conn = instance_double(Faraday::Connection, post: fake_response)
       service.instance_variable_set(:@conn, fake_conn)
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::Error, /Claude API error 500/) { |error| expect(error.http_status).to eq(500) }
+      }.to raise_error(ProviderError, /Claude API error 500/) { |error| expect(error.http_status).to eq(500) }
     end
 
     it "surfaces the provider's own error message when the body includes one" do
@@ -429,7 +429,7 @@ RSpec.describe ClaudeService do
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::Error, "messages: at least one message is required")
+      }.to raise_error(ProviderError, "messages: at least one message is required")
     end
 
     # Per platform.claude.com's errors and rate-limits pages, none of these is a rate limit.
@@ -444,7 +444,7 @@ RSpec.describe ClaudeService do
         service.instance_variable_set(:@conn, stubbed_connection([ [ status, { "type" => "error", "error" => error }.to_json ] ]))
 
         expect { call_provider(service, system: "sys", prompt: "prompt", single_attempt: true) }
-          .to raise_error(AiService::BillingError) { |e|
+          .to raise_error(ProviderError::BillingError) { |e|
             expect(e.http_status).to eq(status)
             expect(e.message).not_to include("credit balance", "regain access")
           }
@@ -460,7 +460,7 @@ RSpec.describe ClaudeService do
       service.instance_variable_set(:@conn, conn)
 
       expect { call_provider(service, system: "sys", prompt: "prompt") }
-        .to raise_error(AiService::RateLimitError) { |e|
+        .to raise_error(ProviderError::RateLimitError) { |e|
           expect(e.quota_id).to eq("anthropic-ratelimit-input-tokens")
           expect(e.retry_after).to eq(17)
         }
@@ -470,11 +470,11 @@ RSpec.describe ClaudeService do
       allow(Rails.logger).to receive(:warn)
       service.instance_variable_set(:@conn, stubbed_connection([ [ 429, { "type" => "error", "error" => nil }.to_json ] ]))
       expect { call_provider(service, system: "sys", prompt: "prompt", single_attempt: true) }
-        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("rate_limit_error") }
+        .to raise_error(ProviderError::RateLimitError) { |e| expect(e.quota_id).to eq("rate_limit_error") }
 
       service.instance_variable_set(:@conn, stubbed_connection([ [ 400, { "type" => "error", "error" => nil }.to_json ] ]))
       expect { call_provider(service, system: "sys", prompt: "prompt") }
-        .to raise_error(AiService::Error) { |e| expect(e).not_to be_a(AiService::BillingError) }
+        .to raise_error(ProviderError) { |e| expect(e).not_to be_a(ProviderError::BillingError) }
     end
 
     it "falls back to the error type as the quota id when no family reads zero" do
@@ -484,7 +484,7 @@ RSpec.describe ClaudeService do
       service.instance_variable_set(:@conn, conn)
 
       expect { call_provider(service, system: "sys", prompt: "prompt") }
-        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("overloaded_error") }
+        .to raise_error(ProviderError::RateLimitError) { |e| expect(e.quota_id).to eq("overloaded_error") }
     end
 
     it "does not leak the raw response body into the exception message" do
@@ -495,7 +495,7 @@ RSpec.describe ClaudeService do
 
       expect {
         call_provider(service, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::Error) { |e| expect(e.message).not_to include(huge_body) }
+      }.to raise_error(ProviderError) { |e| expect(e.message).not_to include(huge_body) }
     end
 
     it "logs a truncated snippet of the raw response body server-side" do
@@ -509,7 +509,7 @@ RSpec.describe ClaudeService do
         expect(msg).to include("truncated, #{huge_body.bytesize} bytes total")
       end
 
-      expect { call_provider(service, system: "sys", prompt: "prompt") }.to raise_error(AiService::Error)
+      expect { call_provider(service, system: "sys", prompt: "prompt") }.to raise_error(ProviderError)
     end
 
     it "wraps system in a cache_control content block when cache_system is true" do

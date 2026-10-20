@@ -1927,7 +1927,7 @@ RSpec.describe User, "trials", type: :model do
 
     expect(trial.reload).not_to be_trial_active
     expect(trial).not_to be_provider_ready
-    expect { AiService.for(trial) }.to raise_error(AiService::TrialEndedError)
+    expect { AiService.for(trial) }.to raise_error(ProviderError::TrialEndedError)
   end
 
   it "ends the trial at the end of its last day in the user's zone, on the chosen provider" do

@@ -64,7 +64,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
 
     it "leaves the cap unconsumed when the provider response is malformed" do
       allow_any_instance_of(FakeService).to receive(:critique_pseudocode)
-        .and_raise(AiService::InvalidResponseError, "claimed gaps but returned none usable")
+        .and_raise(ProviderError::InvalidResponseError, "claimed gaps but returned none usable")
 
       critique
       expect(response).to have_http_status(:service_unavailable)
@@ -99,7 +99,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
 
     it "hands the round back when the provider fails, so a retry is immediate" do
       allow_any_instance_of(FakeService).to receive(:critique_pseudocode)
-        .and_raise(AiService::Error, "provider down")
+        .and_raise(ProviderError, "provider down")
       critique
       expect(response).to have_http_status(:service_unavailable)
       expect(round["critique_claimed_at"]).to be_nil
@@ -376,7 +376,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
 
     it "still reviews every section when the translation fails" do
       allow_any_instance_of(FakeService).to receive(:translate_pseudocode)
-        .and_raise(AiService::Error, "provider down")
+        .and_raise(ProviderError, "provider down")
 
       row = submit_and_review
 

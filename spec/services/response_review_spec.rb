@@ -137,7 +137,7 @@ RSpec.describe ResponseReview do
   end
 
   it "reports a provider error and releases the claim" do
-    error = AiService::Error.new("boom")
+    error = ProviderError.new("boom")
     allow(reviewer).to receive(:review_sections).and_raise(error)
 
     outcome = review
@@ -148,7 +148,7 @@ RSpec.describe ResponseReview do
   end
 
   it "builds the provider inside the call, so a refused credential is a provider error" do
-    allow(AiService).to receive(:for).with(user).and_raise(AiService::TrialEndedError.new("ended"))
+    allow(AiService).to receive(:for).with(user).and_raise(ProviderError::TrialEndedError.new("ended"))
 
     outcome = described_class.new(response, user: user).call
 
@@ -414,7 +414,7 @@ RSpec.describe ResponseReview do
         resp = submitted_response
         stub_reviewer do
           take_over(resp)
-          raise AiService::Error, "boom"
+          raise ProviderError, "boom"
         end
 
         expect(review_through_provider(resp).status).to eq(:provider_error)

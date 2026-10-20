@@ -58,7 +58,7 @@ RSpec.describe GenerateConceptReferenceJob do
   it "swallows provider errors without raising and creates no row" do
     service = instance_double(ClaudeService)
     allow(service).to receive(:generate_concept_reference)
-      .and_raise(AiService::RateLimitError, "slow down")
+      .and_raise(ProviderError::RateLimitError, "slow down")
     allow(AiService).to receive(:for).with(user).and_return(service)
 
     expect {

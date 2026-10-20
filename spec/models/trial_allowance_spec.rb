@@ -18,7 +18,7 @@ RSpec.describe TrialAllowance, type: :model do
 
     write_rows(1, provider: "gemini")
     expect { described_class.check!(user, provider: GeminiService, now: now) }
-      .to raise_error(AiService::TrialAllowanceError) { |e| expect(e.retry_after).to eq(30 * 60) }
+      .to raise_error(ProviderError::TrialAllowanceError) { |e| expect(e.retry_after).to eq(30 * 60) }
   end
 
   it "counts attempts on the user's own day, and only this provider's" do
@@ -37,7 +37,7 @@ RSpec.describe TrialAllowance, type: :model do
     end
 
     expect { described_class.check!(user, provider: GeminiService, now: now) }
-      .to raise_error(AiService::TrialAllowanceError) { |e| expect(e.retry_after).to eq(3.5 * 3600) }
+      .to raise_error(ProviderError::TrialAllowanceError) { |e| expect(e.retry_after).to eq(3.5 * 3600) }
   end
 
   it "ignores own-key calls and the previous quota day for the guard" do
@@ -53,11 +53,11 @@ RSpec.describe TrialAllowance, type: :model do
     expect(ApiUsage).not_to receive(:requests_on)
 
     stub_env("TRIALS_DISABLED" => "1")
-    expect { described_class.check!(user, provider: GeminiService, now: now) }.to raise_error(AiService::TrialEndedError)
+    expect { described_class.check!(user, provider: GeminiService, now: now) }.to raise_error(ProviderError::TrialEndedError)
 
     stub_env("TRIALS_DISABLED" => nil)
     travel_to(ends + 1.minute) do
-      expect { described_class.check!(user, provider: GeminiService) }.to raise_error(AiService::TrialEndedError)
+      expect { described_class.check!(user, provider: GeminiService) }.to raise_error(ProviderError::TrialEndedError)
     end
   end
 
@@ -68,7 +68,7 @@ RSpec.describe TrialAllowance, type: :model do
     stub_env("TRIALS_DISABLED" => "1")
 
     expect { service.send(:call_and_log, trial, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }
-      .to raise_error(AiService::TrialEndedError)
+      .to raise_error(ProviderError::TrialEndedError)
     expect(ApiUsage.count).to eq(0)
   end
 

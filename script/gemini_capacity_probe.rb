@@ -182,15 +182,15 @@ class GeminiCapacityProbe
     outcome = yield
     record_attempts(day, label, nil)
     outcome
-  rescue AiService::RateLimitError => e
+  rescue ProviderError::RateLimitError => e
     record_attempts(day, label, e)
     @stop_reason ||= :rate_limited
     nil
-  rescue AiService::AuthenticationError => e
+  rescue ProviderError::AuthenticationError => e
     record_attempts(day, label, e)
     @stop_reason ||= :key_refused
     nil
-  rescue AiService::Error, JudgeVerdict::Invalid => e
+  rescue ProviderError, JudgeVerdict::Invalid => e
     record_attempts(day, label, e)
     nil
   end

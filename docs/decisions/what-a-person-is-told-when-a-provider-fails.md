@@ -1,7 +1,7 @@
 # What a person is told when a provider fails
 
 every surface that
-rescues an `AiService::Error` classifies it with `ProviderFailure.classify`
+rescues a `ProviderError` classifies it with `ProviderFailure.classify`
 (pure: `daily_limit`, `short_rate_limit`, `bad_key`, `out_of_credit`,
 `outage`, `timeout`, `other`) and renders the class through
 `ProviderFailureText`, whose words live in the `provider_failures` locale
@@ -47,8 +47,8 @@ Pacific; the base class gives a day), a short limit after the wait the
 provider asked for or a minute, and once the reset has passed the sentence
 says the limit has reset rather than naming a time behind the reader.
 The provider is stored because `call_and_log` stamps every
-`AiService::Error` with the provider whose call raised
-(`AiService::Error#provider`), and a user can switch keys before reading:
+`ProviderError` with the provider whose call raised
+(`ProviderError#provider`), and a user can switch keys before reading:
 the sentence names the provider that failed, and a stored failure with no
 provider reads as the current one.
 `last_generation_error` keeps text that is not a provider failure (a
@@ -65,7 +65,7 @@ message begins "You have reached your specified ... API usage limits" or
 names the credit balance, or a 429 whose `details.error_code` is
 `enforced_spend_limit_reached` with no `retry-after`; OpenAI returns a 429
 whose `error.code` is `insufficient_quota`. Each provider raises
-`AiService::BillingError` for those before a 429 can become a
+`ProviderError::BillingError` for those before a 429 can become a
 `RateLimitError`, so waiting is never advised for an empty balance. A
 per-day quota id or a wait of an hour or more makes a 429 a daily limit;
 any other is a short one.

@@ -38,7 +38,7 @@ class GeminiStructuredOutputCheck
     Row.new(name: name, outcome: :parsed, detail: "status=#{verdict.status}", tokens_out: usage.sum)
   rescue JudgeVerdict::Invalid => e
     Row.new(name: name, outcome: :invalid, detail: e.message, tokens_out: usage.sum)
-  rescue AiService::Error => e
+  rescue ProviderError => e
     outcome = e.http_status.to_i.between?(400, 499) ? :refused : :error
     Row.new(name: name, outcome: outcome, detail: "#{e.class} #{e.http_status}: #{e.message}", tokens_out: usage.sum)
   end

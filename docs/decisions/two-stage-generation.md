@@ -46,7 +46,7 @@ start, so a slow pickup comes out of the same budget.
 - **The rule.** `AiService#call_and_log` takes the deadline and checks it
   first, before the trial allowance and before any request is sent: the
   call's own worst case (`AiService::Request#worst_case_seconds`, retries
-  included) must still end in time, or it raises `AiService::DeadlineError`,
+  included) must still end in time, or it raises `ProviderError::DeadlineError`,
   a `TimeoutError`. The worst case comes from the request itself, so a
   blocking request reserves its shorter read and not the profile's. It shares
   one formula with `AiService.worst_case_seconds_for`, which the constants
@@ -149,7 +149,7 @@ persist on `daily_exercises.dropped_sections` (jsonb), and the dashboard
 says so in one muted line (`dashboard.section_left_out`), which is the only
 user-facing change. Every kind can be dropped, both daily kinds included:
 with two of them, a day without one is still a day. A day whose sections
-are all dropped raises `AiService::AllSectionsRejectedError`, which
+are all dropped raises `ProviderError::AllSectionsRejectedError`, which
 `GenerateDailyExercisesJob` records through `persist_failure` like any
 other failed generation, so no empty day is ever written. Before both
 fixed kinds existed, a twice-rejected `code_review` shipped with
@@ -209,7 +209,7 @@ deadline left no time to start the call, the shared error code, or
 `[judge_fallback]` warns. The one exception is a retry's re-judge stopped by
 the deadline, which drops the section (see the regeneration deadline above).
 Provider errors carry the response's HTTP status
-(`AiService::Error#http_status`); authentication and rate-limit errors keep
+(`ProviderError#http_status`); authentication and rate-limit errors keep
 their own codes. The judge is never retried. The review prose
 judge reads the same table, so the two judges' fallback rates compare.
 

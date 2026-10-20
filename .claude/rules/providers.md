@@ -89,12 +89,12 @@ read it before changing that area.
   through `AiService#raise_if_key_rejected` and never log the provider body.
 - **What a person is told when a provider fails**
   (`docs/decisions/what-a-person-is-told-when-a-provider-fails.md`): Every
-  surface that rescues an `AiService::Error` classifies it with
+  surface that rescues a `ProviderError` classifies it with
   `ProviderFailure.classify` and words it through `ProviderFailureText` and
   the `provider_failures` locale table; no error message, provider text,
   status code or key reaches a user. Page scripts show only
   `CodeGymRequest.send`'s `message`, JSON errors go through
-  `render_json_error`, and `AiService::BillingError` is never treated as a
+  `render_json_error`, and `ProviderError::BillingError` is never treated as a
   rate limit.
 - **What stays out of the logs**: `config/initializers/filter_parameter_logging.rb`
   filters what engineers write (`answers`, `message`, `question`,

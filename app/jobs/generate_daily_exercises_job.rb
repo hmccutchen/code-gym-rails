@@ -79,10 +79,10 @@ class GenerateDailyExercisesJob < ApplicationJob
     user.clear_generation_failure! if user.last_generation_error_date.present?
 
     Rails.logger.info("Generated exercise for user #{user.id} on #{Date.current}")
-  rescue AiService::AllSectionsRejectedError => e
+  rescue ProviderError::AllSectionsRejectedError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id}: #{e.message}")
     persist_failure(user) { user.record_generation_message!(e.message) }
-  rescue AiService::Error => e
+  rescue ProviderError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id} (#{ProviderFailure.classify(e)}): #{e.message}")
     persist_failure(user) { user.record_generation_failure!(e) }
     # Don't re-raise — one failure shouldn't block other users in the batch

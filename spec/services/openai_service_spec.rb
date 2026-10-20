@@ -61,7 +61,7 @@ RSpec.describe OpenaiService do
 
         expect {
           expect { logged_call(body, allow_truncated: true) }
-            .to raise_error(AiService::Error, "OpenAI did not complete its response. Try again.")
+            .to raise_error(ProviderError, "OpenAI did not complete its response. Try again.")
         }.to change { ApiUsage.count }.by(1)
         expect(ApiUsage.last).to have_attributes(tokens_in: 1, tokens_out: 1)
       end
@@ -83,7 +83,7 @@ RSpec.describe OpenaiService do
       body = reply(status: "incomplete", output: [], incomplete_details: { "reason" => "content_filter" })
 
       expect {
-        expect { logged_call(body, allow_truncated: true) }.to raise_error(AiService::RefusalError)
+        expect { logged_call(body, allow_truncated: true) }.to raise_error(ProviderError::RefusalError)
       }.to change { ApiUsage.count }.by(1)
     end
 
@@ -91,7 +91,7 @@ RSpec.describe OpenaiService do
       body = hello.merge("status" => "incomplete")
 
       expect {
-        expect { logged_call(body) }.to raise_error(AiService::TruncatedResponseError)
+        expect { logged_call(body) }.to raise_error(ProviderError::TruncatedResponseError)
       }.to change { ApiUsage.count }.by(1)
     end
 
@@ -105,7 +105,7 @@ RSpec.describe OpenaiService do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "<html>Bad gateway</html>" ] ]))
 
     expect { call_provider(service, system: "sys", prompt: "p") }
-      .to raise_error(AiService::InvalidResponseError, /OpenAI returned an unreadable response/)
+      .to raise_error(ProviderError::InvalidResponseError, /OpenAI returned an unreadable response/)
   end
 
   it "withholds a cut-off JSON body, which can carry a blind solve, from the log and still logs a non-JSON one" do
@@ -113,9 +113,9 @@ RSpec.describe OpenaiService do
     allow(Rails.logger).to receive(:error) { |message| logged << message }
 
     expect { service.send(:unreadable_envelope!, '{"text":"{\\"better\\":\\"b\\"', "OpenAI") }
-      .to raise_error(AiService::InvalidResponseError)
+      .to raise_error(ProviderError::InvalidResponseError)
     expect { service.send(:unreadable_envelope!, "<html>Bad gateway</html>", "OpenAI") }
-      .to raise_error(AiService::InvalidResponseError)
+      .to raise_error(ProviderError::InvalidResponseError)
 
     expect(logged.first).to include("withheld").and(satisfy { |line| !line.include?("better") })
     expect(logged.last).to include("Bad gateway")
@@ -125,7 +125,7 @@ RSpec.describe OpenaiService do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "[]" ] ]))
 
     expect { call_provider(service, system: "sys", prompt: "p") }
-      .to raise_error(AiService::InvalidResponseError, /OpenAI returned an unreadable response/)
+      .to raise_error(ProviderError::InvalidResponseError, /OpenAI returned an unreadable response/)
   end
 
   describe "#build_connection" do
@@ -152,7 +152,7 @@ RSpec.describe OpenaiService do
 
       expect {
         call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
-      }.to raise_error(AiService::TimeoutError, /Network error calling OpenAI/)
+      }.to raise_error(ProviderError::TimeoutError, /Network error calling OpenAI/)
       expect(attempts).to eq(1)
     end
 
@@ -165,7 +165,7 @@ RSpec.describe OpenaiService do
 
       expect {
         call_provider(service, system: "sys", prompt: "p", max_tokens: AiService::JUDGE_MAX_TOKENS, purpose: "judge_section")
-      }.to raise_error(AiService::TimeoutError)
+      }.to raise_error(ProviderError::TimeoutError)
       expect(attempts).to eq(1)
     end
 
@@ -176,7 +176,7 @@ RSpec.describe OpenaiService do
         f.adapter(:test) { |stub| stub.post(OpenaiService::API_URL) { attempts += 1; raise Faraday::TimeoutError } }
       end)
 
-      expect { call_provider(service, system: "sys", prompt: "p", max_tokens: 250) }.to raise_error(AiService::TimeoutError)
+      expect { call_provider(service, system: "sys", prompt: "p", max_tokens: 250) }.to raise_error(ProviderError::TimeoutError)
       expect(attempts).to eq(OpenaiService::RETRY_OPTIONS[:max] + 1)
     end
 
@@ -192,7 +192,7 @@ RSpec.describe OpenaiService do
       responses = Array.new(4) { [ 429, "" ] }
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
-      expect { call_provider(service, system: "sys", prompt: "p") }.to raise_error(AiService::RateLimitError)
+      expect { call_provider(service, system: "sys", prompt: "p") }.to raise_error(ProviderError::RateLimitError)
       expect(responses.size).to eq(1)
     end
 
@@ -201,7 +201,7 @@ RSpec.describe OpenaiService do
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
       expect { call_provider(service, system: "sys", prompt: "p") }
-        .to raise_error(AiService::AuthenticationError, "OpenAI rejected your API key or its permissions. Check it in Settings.")
+        .to raise_error(ProviderError::AuthenticationError, "OpenAI rejected your API key or its permissions. Check it in Settings.")
       expect(responses.size).to eq(1)
     end
 
@@ -212,7 +212,7 @@ RSpec.describe OpenaiService do
         allow(Rails.logger).to receive(:error)
 
         expect { call_provider(service, system: "sys", prompt: "p") }
-          .to raise_error(AiService::AuthenticationError, "OpenAI rejected your API key or its permissions. Check it in Settings.") { |error|
+          .to raise_error(ProviderError::AuthenticationError, "OpenAI rejected your API key or its permissions. Check it in Settings.") { |error|
             expect(error.http_status).to eq(status)
           }
         expect(Rails.logger).not_to have_received(:error).with(/sk-proj-/)
@@ -223,7 +223,7 @@ RSpec.describe OpenaiService do
       responses = Array.new(3) { [ 429, "" ] }
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
-      expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::RateLimitError)
+      expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(ProviderError::RateLimitError)
       expect(responses.size).to eq(2)
     end
   end
@@ -251,7 +251,7 @@ RSpec.describe OpenaiService do
       service.instance_variable_set(:@conn, stubbed_connection([ [ 429, body ] ]))
 
       expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }
-        .to raise_error(AiService::BillingError) { |e|
+        .to raise_error(ProviderError::BillingError) { |e|
           expect(e.http_status).to eq(429)
           expect(e.message).not_to include("exceeded")
         }
@@ -261,10 +261,10 @@ RSpec.describe OpenaiService do
       allow(Rails.logger).to receive(:warn)
       service.instance_variable_set(:@conn, stubbed_connection([ [ 429, { "error" => nil }.to_json ] ]))
       expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }
-        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("rate_limit_exceeded") }
+        .to raise_error(ProviderError::RateLimitError) { |e| expect(e.quota_id).to eq("rate_limit_exceeded") }
 
       service.instance_variable_set(:@conn, stubbed_connection([ [ 402, { "error" => nil }.to_json ] ]))
-      expect { call_provider(service, system: "sys", prompt: "p") }.to raise_error(AiService::BillingError)
+      expect { call_provider(service, system: "sys", prompt: "p") }.to raise_error(ProviderError::BillingError)
     end
 
     it "names the exhausted limit and the wait on a rate-limit 429" do
@@ -275,7 +275,7 @@ RSpec.describe OpenaiService do
       service.instance_variable_set(:@conn, conn)
 
       expect { call_provider(service, system: "sys", prompt: "p") }
-        .to raise_error(AiService::RateLimitError) { |e|
+        .to raise_error(ProviderError::RateLimitError) { |e|
           expect(e.quota_id).to eq("x-ratelimit-requests")
           expect(e.retry_after).to eq(20)
         }
@@ -311,7 +311,7 @@ RSpec.describe OpenaiService do
       service.instance_variable_set(:@conn, stubbed_connection([]))
 
       expect { call_provider(service, system: "sys", prompt: "p", max_tokens: 250, purpose: "generate_exercise") }
-        .to raise_error(AiService::UnsupportedRouteError, /gpt-6.1-sol/)
+        .to raise_error(ProviderError::UnsupportedRouteError, /gpt-6.1-sol/)
     end
 
     it "asks for JSON mode when the caller holds the reply to a schema" do
@@ -381,11 +381,11 @@ RSpec.describe OpenaiService do
       expect(call_with(response).last).to include(text: "", refusal: "unspecified")
     end
 
-    it "raises AiService::Error on a non-success response without leaking the raw body" do
+    it "raises ProviderError on a non-success response without leaking the raw body" do
       service.instance_variable_set(:@conn, stubbed_connection([ [ 400, "<html>secret page</html>" ] ]))
 
       expect { call_provider(service, system: "sys", prompt: "p") }
-        .to raise_error(AiService::Error, "OpenAI API error 400") { |error| expect(error.http_status).to eq(400) }
+        .to raise_error(ProviderError, "OpenAI API error 400") { |error| expect(error.http_status).to eq(400) }
     end
   end
 end

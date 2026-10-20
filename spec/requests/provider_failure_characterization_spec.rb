@@ -154,7 +154,7 @@ RSpec.describe "Provider failures as users see them", type: :request do
 
     it "ships the unedited draft and records rate_limit when every judge call is a 429" do
       allow_any_instance_of(FakeService).to receive(:judge_section)
-        .and_raise(AiService::RateLimitError.new(GOOGLE_QUOTA_MESSAGE, http_status: 429))
+        .and_raise(ProviderError::RateLimitError.new(GOOGLE_QUOTA_MESSAGE, http_status: 429))
 
       result = AiService.for(fake_user).generate_judged_exercise(fake_user, language: "ruby_rails")
 
@@ -207,7 +207,7 @@ RSpec.describe "Provider failures as users see them", type: :request do
         Faraday.new { |f| f.adapter(:test) { |stub| stub.post(GeminiService::API_URL) { [ 200, {}, body ] } } }
       )
       allow_any_instance_of(GeminiService).to receive(:assess_difficulty)
-        .and_raise(AiService::RateLimitError.new(GOOGLE_QUOTA_MESSAGE, http_status: 429))
+        .and_raise(ProviderError::RateLimitError.new(GOOGLE_QUOTA_MESSAGE, http_status: 429))
       login_as(user)
 
       post review_response_path(daily_response)

@@ -10,7 +10,7 @@
 
 ## `.call`
 
-It raises `AiService::InvalidResponseError` when the set cannot be used. A caller that passes no rungs (`pitched_at: nil`) gets no `pitched_at` or `eased` stamps.
+It raises `ProviderError::InvalidResponseError` when the set cannot be used. A caller that passes no rungs (`pitched_at: nil`) gets no `pitched_at` or `eased` stamps.
 
 ## `.prune_to_expected_keys`
 

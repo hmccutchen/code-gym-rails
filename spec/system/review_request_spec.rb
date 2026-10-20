@@ -59,7 +59,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
     weekday = a_weekday
 
     allow_any_instance_of(FakeService).to receive(:review_sections)
-      .and_raise(AiService::RateLimitError, "slow down")
+      .and_raise(ProviderError::RateLimitError, "slow down")
 
     travel_to(weekday) do
       visit_with_todays_set(user)

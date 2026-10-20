@@ -71,7 +71,7 @@ ships the unedited draft and records `fallback: "rate_limit"` on the outcome
 ### 1.2 Review (grading, difficulty check, pseudocode translation)
 
 `ResponsesController#review` fans out one grading call per section plus one
-difficulty call. `grade_section` rescues `AiService::Error` per section and
+difficulty call. `grade_section` rescues `ProviderError` per section and
 stores `{code, message}` in `daily_responses.review_errors`, which no view
 renders. The controller flashes `zero_success_alert` when every section
 failed, or `review_partial` when some did. Answers and the submission are kept
@@ -89,7 +89,7 @@ note; pseudocode translation likewise.
 
 ### 1.3 Duck, follow-ups, explain differently (review and concept), pseudocode critique
 
-All five rescue `AiService::Error` and render `{status: "error", error:
+All five rescue `ProviderError` and render `{status: "error", error:
 e.message}` with HTTP 503; each page's script shows `e.message` in its status
 line. The duck leaves the typed message in the box and the follow-up leaves
 its question, so both can be resent without retyping; the critique releases
@@ -106,7 +106,7 @@ its round claim. Nothing is stored.
 ### 1.4 Learn references, ladders, the backfill
 
 `GenerateConceptReferenceJob` and `GenerateRecognitionGuideJob` rescue every
-`AiService::Error`, log a warning and write nothing. The concept page polls
+`ProviderError`, log a warning and write nothing. The concept page polls
 `/learn/:bucket/:concept/status` for the call budget and then says "Still
 working on it. Reload this page in a minute to check." The ladder rewrite
 leaves the shared row unchanged (`generation_version` stays). The "Write up
@@ -128,7 +128,7 @@ only orders tomorrow's reinforcement list. Nothing to classify.
   line.
 - Gemini reports an invalid key as HTTP 400 with `error.details[].reason ==
   "API_KEY_INVALID"`, not 401 or 403. `raise_if_key_rejected` checks only
-  401 and 403, so a mistyped Gemini key is a generic `AiService::Error`
+  401 and 403, so a mistyped Gemini key is a generic `ProviderError`
   whose message is Google's text. The probe should confirm the Interactions
   API does the same; the fixture encodes the `generateContent` behavior.
 
@@ -176,7 +176,7 @@ Index added: `[provider, house_key, created_at]`, for the global guard's
 count.
 
 Rows for failures carry zero tokens. `call_and_log` writes them: it rescues
-`AiService::Error` around `call`, builds a result from the error's
+`ProviderError` around `call`, builds a result from the error's
 `http_status`, `quota_id` and class (`AiService.failure_code_for`) and the
 routed model, writes it through the same `#log_usage`, which never raises,
 and re-raises the same error. The providers put `quota_id` and
@@ -338,7 +338,7 @@ arrive with trial mode.
 | `daily_limit` | `RateLimitError` whose `quota_id` contains `PerDay`, or whose `retry_after` is an hour or more |
 | `short_rate_limit` | any other `RateLimitError`, including Anthropic's 429 and 529 |
 | `bad_key` | `AuthenticationError`: 401 and 403 on every provider, and Gemini's 400 with `details[].reason == "API_KEY_INVALID"`, read from the body without logging it |
-| `out_of_credit` | the new `AiService::BillingError`. Anthropic, per platform.claude.com/docs/en/api/errors and /rate-limits (read 2026-10-06): a 402 `billing_error`; a 400 `invalid_request_error` beginning "You have reached your specified ... API usage limits" (a spend limit the account set) or naming the credit balance; a 429 `rate_limit_error` whose `details.error_code` is `enforced_spend_limit_reached` (the tier's monthly cap, sent with no `retry-after`). OpenAI: a 429 whose `error.code` is `insufficient_quota`, or a 402. OpenAI's reference (platform.openai.com/docs/guides/error-codes) could not be fetched from the build environment, so that code string is from memory of the page and should be checked against it once |
+| `out_of_credit` | the new `ProviderError::BillingError`. Anthropic, per platform.claude.com/docs/en/api/errors and /rate-limits (read 2026-10-06): a 402 `billing_error`; a 400 `invalid_request_error` beginning "You have reached your specified ... API usage limits" (a spend limit the account set) or naming the credit balance; a 429 `rate_limit_error` whose `details.error_code` is `enforced_spend_limit_reached` (the tier's monthly cap, sent with no `retry-after`). OpenAI: a 429 whose `error.code` is `insufficient_quota`, or a 402. OpenAI's reference (platform.openai.com/docs/guides/error-codes) could not be fetched from the build environment, so that code string is from memory of the page and should be checked against it once |
 | `outage` | `NetworkError` (a refused or reset connection) or an `Error` with a 5xx status |
 | `timeout` | `TimeoutError`, or a `Timeout::Error` from the review fan-out |
 | `other` | everything else: an unreadable or invalid reply, a 4xx with no narrower class, a refusal |
@@ -426,7 +426,7 @@ surface):
   `User#record_generation_failure!`, and the dashboard panel, the
   regeneration line and `/dashboard/status` render
   `User#generation_failure_message` when read. The provider is stored
-  because `AiService::Error#provider`, stamped by `call_and_log` with the
+  because `ProviderError#provider`, stamped by `call_and_log` with the
   class whose call raised, is what the sentence names: a user who switches
   keys before reading still sees which provider failed, and a row with no
   provider falls back to the current one. `last_generation_error` keeps
@@ -499,7 +499,7 @@ expiry and its clearing.
 `ProviderCredential.for(user)`, which returns the user's own key when they
 stored one, no key when they have neither key nor trial (as before trials
 existed), and the house key for `user.provider` while the trial is active.
-It raises `AiService::TrialEndedError` when the trial has ended, the kill
+It raises `ProviderError::TrialEndedError` when the trial has ended, the kill
 switch is on, or the provider has no house key set. The key is read from
 `ENV` at that moment and never stored. The service carries `house_key?`,
 which the per-section review and judge threads inherit (`fresh_service`),
@@ -609,9 +609,9 @@ key.
 
 `TrialAllowance.check!` runs in `AiService#call_and_log` ahead of `call`,
 only when the service holds a house key. It first raises
-`AiService::TrialEndedError` unless the trial is still active, since a
+`ProviderError::TrialEndedError` unless the trial is still active, since a
 service built while the trial ran keeps its house key through a fan-out or
-a long job. Then it raises `AiService::TrialAllowanceError` with `retry_after` set to the seconds until
+a long job. Then it raises `ProviderError::TrialAllowanceError` with `retry_after` set to the seconds until
 the count resets; a refused call writes no usage row and never reaches the
 provider:
 

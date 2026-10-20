@@ -26,13 +26,13 @@ RSpec.describe "AiService on a trial", type: :model do
 
     expect {
       service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p"))
-    }.to raise_error(AiService::TrialAllowanceError)
+    }.to raise_error(ProviderError::TrialAllowanceError)
     expect(ApiUsage.count).to eq(2)
   end
 
   it "raises TrialEndedError from .for once the trial has ended" do
     travel_to(user.trial_ends_at + 1.hour) do
-      expect { AiService.for(user) }.to raise_error(AiService::TrialEndedError)
+      expect { AiService.for(user) }.to raise_error(ProviderError::TrialEndedError)
     end
   end
 

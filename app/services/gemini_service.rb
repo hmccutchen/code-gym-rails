@@ -79,20 +79,20 @@ class GeminiService < AiService
     raise_if_key_invalid(error, resp.status)
 
     if resp.status == 429
-      raise AiService::RateLimitError.new("Gemini API error 429", http_status: 429,
+      raise ProviderError::RateLimitError.new("Gemini API error 429", http_status: 429,
                                           quota_id: quota_id_from(error), retry_after: retry_delay_from(resp, error))
     end
 
     log_raw_snippet("Gemini API error #{resp.status} body", resp.body)
     message = extract_provider_message(resp.body, fallback: "Gemini API error #{resp.status}")
-    raise AiService::Error.new(message, http_status: resp.status)
+    raise ProviderError.new(message, http_status: resp.status)
   end
 
   def raise_if_key_invalid(error, status)
     return unless error_reasons(error).include?("API_KEY_INVALID")
 
     Rails.logger.error("Google authentication failed (HTTP #{status}, API_KEY_INVALID)")
-    raise AiService::AuthenticationError.new("Google rejected your API key or its permissions. Check it in Settings.",
+    raise ProviderError::AuthenticationError.new("Google rejected your API key or its permissions. Check it in Settings.",
                                              http_status: status)
   end
 

@@ -122,7 +122,7 @@ RSpec.describe ConceptReferenceCalibration do
 
       records = calibration(repeats: 1, concurrency: 0).run([ [ "ruby_rails", "n_plus_one" ], [ "javascript", js_concept ] ])
 
-      expect(records.map(&:outcome)).to eq([ "AiService::InvalidResponseError", :ok ])
+      expect(records.map(&:outcome)).to eq([ "ProviderError::InvalidResponseError", :ok ])
       expect(calibration.summary(records)[:sequential]).to include(failures: 1, timeouts: 0)
     end
 
@@ -143,13 +143,13 @@ RSpec.describe ConceptReferenceCalibration do
     context "when the generated reference is malformed JSON" do
       let(:provider_reply) { claude_reply("not json at all") }
 
-      include_examples "a measured response failure", "AiService::InvalidResponseError"
+      include_examples "a measured response failure", "ProviderError::InvalidResponseError"
     end
 
     context "when the generated reference is missing required fields" do
       let(:provider_reply) { claude_reply("{}") }
 
-      include_examples "a measured response failure", "AiService::InvalidResponseError"
+      include_examples "a measured response failure", "ProviderError::InvalidResponseError"
     end
 
     context "when generation stops at the output token limit" do
@@ -158,13 +158,13 @@ RSpec.describe ConceptReferenceCalibration do
         [ status, headers, JSON.parse(body).merge("stop_reason" => "max_tokens").to_json ]
       end
 
-      include_examples "a measured response failure", "AiService::TruncatedResponseError"
+      include_examples "a measured response failure", "ProviderError::TruncatedResponseError"
     end
 
     context "when the provider envelope is malformed JSON" do
       let(:provider_reply) { [ 200, {}, "not json at all" ] }
 
-      include_examples "a measured response failure", "AiService::InvalidResponseError"
+      include_examples "a measured response failure", "ProviderError::InvalidResponseError"
     end
 
     it "excludes refused and transport-failed calls from the latency spread" do
@@ -173,7 +173,7 @@ RSpec.describe ConceptReferenceCalibration do
 
       records = calibration(repeats: 1, concurrency: 0).run([ [ "ruby_rails", "n_plus_one" ], [ "javascript", js_concept ] ])
 
-      expect(records.map(&:outcome)).to eq([ "AiService::AuthenticationError", "AiService::NetworkError" ])
+      expect(records.map(&:outcome)).to eq([ "ProviderError::AuthenticationError", "ProviderError::NetworkError" ])
       expect(calibration.summary(records)[:sequential]).to eq(
         n: 2, measured: 0, min: nil, median: nil, p90: nil, max: nil,
         timeouts: 0, failures: 2, over_deployed: 0
@@ -254,7 +254,7 @@ RSpec.describe ConceptReferenceCalibration do
     it "reports the spread over the calls the provider worked on, and counts failures beside it" do
       over = AiService::CONCEPT_REFERENCE_READ_TIMEOUT + 1
       records = [ record(10, :ok), record(20, :ok), record(over, :ok), record(40, :timeout), record(50, :ok),
-                  record(0.3, "AiService::RateLimitError") ]
+                  record(0.3, "ProviderError::RateLimitError") ]
 
       expect(calibration.summary(records)).to eq(
         sequential: { n: 6, measured: 5, min: 10, median: 40, p90: over, max: over, timeouts: 1, failures: 1, over_deployed: 1 }
@@ -262,7 +262,7 @@ RSpec.describe ConceptReferenceCalibration do
     end
 
     it "reports no spread for a mode in which every call failed" do
-      records = [ record(0.3, "AiService::RateLimitError", mode: :concurrent) ]
+      records = [ record(0.3, "ProviderError::RateLimitError", mode: :concurrent) ]
 
       expect(calibration.summary(records)).to eq(
         concurrent: { n: 1, measured: 0, min: nil, median: nil, p90: nil, max: nil, timeouts: 0, failures: 1, over_deployed: 0 }

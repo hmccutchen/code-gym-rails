@@ -7,14 +7,14 @@ class ProviderFailure
 
   def self.classify(error)
     case error
-    when AiService::TrialAllowanceError then "trial_allowance_used"
-    when AiService::TrialEndedError     then "trial_ended"
-    when AiService::BillingError        then "out_of_credit"
-    when AiService::AuthenticationError then "bad_key"
-    when AiService::RateLimitError      then rate_limit_kind(error)
-    when AiService::TimeoutError, Timeout::Error then "timeout"
-    when AiService::NetworkError        then "outage"
-    when AiService::Error               then error.http_status.to_i >= 500 ? "outage" : "other"
+    when ProviderError::TrialAllowanceError then "trial_allowance_used"
+    when ProviderError::TrialEndedError     then "trial_ended"
+    when ProviderError::BillingError        then "out_of_credit"
+    when ProviderError::AuthenticationError then "bad_key"
+    when ProviderError::RateLimitError      then rate_limit_kind(error)
+    when ProviderError::TimeoutError, Timeout::Error then "timeout"
+    when ProviderError::NetworkError        then "outage"
+    when ProviderError               then error.http_status.to_i >= 500 ? "outage" : "other"
     else                                     "other"
     end
   end
