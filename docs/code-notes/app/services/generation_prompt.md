@@ -2,7 +2,7 @@
 
 ## `.system_prompt`
 
-A class method, because the system prompt needs only the language's coach and focus, and the draft and the single-section retry send the same text. `AiService#build_system_prompt` reads those from `LANGUAGE_PROMPTS` and calls it.
+A class method, because the system prompt needs only the language's coach and focus, and the draft and the single-section retry send the same text. `AiService#build_system_prompt` reads those from `LanguagePrompts.for` and calls it.
 
 ## `#initialize`
 
@@ -65,7 +65,7 @@ it on a retry, which asks for one section.
 
 ## `#scenario_flavor_guidance`
 
-Uses `AiService::SCENARIO_POOLS.fetch`, so an unknown flavor fails here
+Uses `ScenarioPools::ALL.fetch`, so an unknown flavor fails here
 instead of rendering an empty list.
 
 ## `#scaffolded_kinds_clause`

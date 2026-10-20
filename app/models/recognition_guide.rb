@@ -4,7 +4,7 @@ class RecognitionGuide < ApplicationRecord
 
   GROUP_KEYS = (ConceptGroup::NAMED.map(&:first) + ConceptBucket::LANGUAGE_INDEPENDENT).freeze
 
-  # Language-independent buckets state their subject as their AiService::LANGUAGE_PROMPTS focus, so they aren't repeated here.
+  # Language-independent buckets state their subject as their LanguagePrompts::ALL focus, so they aren't repeated here.
   NAMED_GROUP_SUBJECTS = {
     "data_modeling"      => "flaws in how data is structured and stored: tables, keys, constraints, indexes, and the migrations that change them.",
     "domain_modeling"    => "whether the model's names match the words the business uses, and which things must change together behind one entry point.",

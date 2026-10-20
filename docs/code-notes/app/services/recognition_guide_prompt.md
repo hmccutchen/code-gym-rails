@@ -4,4 +4,4 @@ The recognition guide prompt, moved out of `AiService` (#431). `AiService#genera
 
 ## `.generate`
 
-It takes the group's subject as a value, because a language-independent bucket's subject is its `AiService::LANGUAGE_PROMPTS` focus, and a prompt class reads nothing from `AiService`. `AiService#recognition_subject` resolves it. The group, its subject and its concepts are all it sees, so a guide cannot hint at any exercise.
+It takes the group's subject as a value, because a language-independent bucket's subject is its `LanguagePrompts::ALL` focus, which `AiService#recognition_subject` looks up. The group, its subject and its concepts are all it sees, so a guide cannot hint at any exercise.

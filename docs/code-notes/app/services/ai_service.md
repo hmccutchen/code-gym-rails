@@ -139,22 +139,6 @@ blocking timeout, so a blocking caller of any other purpose fails at once
 instead of running on a timeout nobody chose for a waiting thread. An unknown
 purpose raises too, at the call site.
 
-## `SCENARIO_DOMAINS`
-
-Scenario dressing only, never tagged as a concept.
-`legacy_graphql_maintenance` must never appear as a concept value.
-
-## `SCENARIO_POOLS`
-
-A spec holds these keys equal to `DailyPlan::SCENARIO_FLAVOR_WEIGHTS`' keys, so
-every flavor that can be rolled has a pool.
-
-## `LANGUAGE_PROMPTS` (javascript `schema_artifact`)
-
-The JavaScript artifact is a Prisma schema change together with its migration,
-because `unsafe_migration` cannot be planted in a `schema.prisma`, which has no
-migration semantics.
-
 ## `MAX_LADDER_GUIDANCE_CHARS`
 
 Adding mid-level raises the tested ceiling from 48,000 to 54,000 characters.
@@ -209,7 +193,7 @@ field rejects the reply and keeps any existing reference for a later retry.
 
 ## `#explain_concept_differently`
 
-`reference.language` is a `ConceptBucket`, so `config_for` also resolves the
+`reference.language` is a `ConceptBucket`, so `LanguagePrompts.for` also resolves the
 language-independent buckets here.
 
 ## `#explain_differently`
@@ -281,16 +265,9 @@ give the user a raw 500.
 
 Planning reads `ConceptVocabulary`, which raises its own unknown-language
 error. Checking first makes an unsupported language fail as
-`SetupError` before any planning work, the same error `.config_for` raises.
+`SetupError` before any planning work, the same error `LanguagePrompts.for` raises.
 `ConceptVocabulary::UnknownLanguage` is a `SetupError` too, so the check
 changes when the failure happens, not how it's classified.
-
-## `.config_for` and `#config_for`
-
-Fails loudly on "mixed" or a typo instead of silently falling back to
-Ruby/Rails. A class method, the way `.error_code_for` is, so `GenerationPrompt`
-and `script/model_comparison.rb` share the one lookup; the instance method
-delegates to it for this class's own callers.
 
 ## `#annotate_retention_concept`
 
