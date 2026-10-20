@@ -57,6 +57,9 @@ this one.
 
 - the follow-up and alternate caps moved into `DailyResponse`, from the
   layered review's issue `#449`
+  **I decided:** ran the critical review against what had merged since, and
+  took its fixes in this PR: the review page reads the caps from the model too,
+  and a spec now fails if the lock goes
 - concept reference and its reframe into `ConceptReferencePrompt` `#453`
 - recognition guide into `RecognitionGuidePrompt` `#454`
 - section explain-differently into `ExplainDifferentlyPrompt` `#455`
