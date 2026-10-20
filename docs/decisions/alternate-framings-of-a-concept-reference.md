@@ -8,7 +8,7 @@ fallback, and if it doesn't land there is nowhere to go. A low-weight control
 `ConceptReferencesController#explain_differently` for the same concept
 explained another way, capped at
 `MAX_ALTERNATES_PER_CONCEPT`. The duck is deliberately not the answer to this:
-`DUCK_SYSTEM_PROMPT`'s explain mode is scoped to "Describe only what is
+`DuckPrompt::SYSTEM`'s explain mode is scoped to "Describe only what is
 already on their screen", which is describing a problem rather than
 re-teaching a concept from zero, and that scoping is intentional.
 

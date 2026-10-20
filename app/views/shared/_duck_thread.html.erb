@@ -4,7 +4,7 @@
      data-duck-thread-section-value="<%= field %>"
      data-duck-thread-url-value="<%= duck_thread_responses_path %>"
      data-duck-thread-max-turns-value="<%= ResponsesController::MAX_DUCK_TURNS_PER_SECTION %>"
-     data-duck-thread-explain-message-value="<%= AiService::DUCK_EXPLAIN_REQUEST %>"
+     data-duck-thread-explain-message-value="<%= DuckPrompt::EXPLAIN_REQUEST %>"
      data-duck-thread-send-failed-text-value="<%= t("duck.send_failed") %>"
      data-duck-thread-thinking-text-value="<%= t("duck.thinking") %>"
      data-duck-thread-capped-text-value="<%= t("duck.turns_used", count: ResponsesController::MAX_DUCK_TURNS_PER_SECTION) %>"

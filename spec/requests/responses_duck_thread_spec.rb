@@ -247,12 +247,12 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
       fake = stub_answer("Think of it like recounting a shopping list on every trip.")
       login_as(user)
 
-      ask(section: "code_review", message: AiService::DUCK_EXPLAIN_REQUEST)
+      ask(section: "code_review", message: DuckPrompt::EXPLAIN_REQUEST)
 
       expect(response).to have_http_status(:ok)
       expect(fake).to have_received(:duck_response).with(
         user, an_instance_of(DailyExercise),
-        section: "code_review", message: AiService::DUCK_EXPLAIN_REQUEST, thread: []
+        section: "code_review", message: DuckPrompt::EXPLAIN_REQUEST, thread: []
       )
       expect(DailyResponse.count).to eq(0)
     end
@@ -263,7 +263,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
       stub_answer
       login_as(user)
 
-      ask(message: AiService::DUCK_EXPLAIN_REQUEST, version: ResponsesController::MAX_DUCK_TURNS_PER_SECTION)
+      ask(message: DuckPrompt::EXPLAIN_REQUEST, version: ResponsesController::MAX_DUCK_TURNS_PER_SECTION)
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(JSON.parse(response.body)["error"]).to match(/used all/i)
@@ -276,7 +276,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
       stub_answer
       login_as(user)
 
-      ask(section: "code_review", message: AiService::DUCK_EXPLAIN_REQUEST)
+      ask(section: "code_review", message: DuckPrompt::EXPLAIN_REQUEST)
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(JSON.parse(response.body)["error"]).to match(/before you submit/i)

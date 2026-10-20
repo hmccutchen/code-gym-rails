@@ -84,6 +84,6 @@ RSpec.describe "duck prompt characterization" do
   end
 
   it "keeps the duck's instructions as the system prompt's opening bytes" do
-    expect(recorded_request(message: "hm", thread: []).system).to start_with(AiService::DUCK_SYSTEM_PROMPT)
+    expect(recorded_request(message: "hm", thread: []).system).to start_with(DuckPrompt::SYSTEM)
   end
 end

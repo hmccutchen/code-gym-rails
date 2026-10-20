@@ -306,7 +306,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       expect(duck.find(".duck-input").value).to eq("")
       duck.find(".duck-explain").click
 
-      expect(duck).to have_selector(".duck-turn.duck-user", text: AiService::DUCK_EXPLAIN_REQUEST, wait: 10)
+      expect(duck).to have_selector(".duck-turn.duck-user", text: DuckPrompt::EXPLAIN_REQUEST, wait: 10)
       expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT, wait: 10)
       expect(DailyResponse.count).to eq(0)
     end

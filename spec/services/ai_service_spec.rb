@@ -3524,7 +3524,7 @@ RSpec.describe AiService do
       svc = duck_spy_class.new(canned_text: "Think of it like a shopping list you rewrite on every trip.")
 
       svc.duck_response(user, exercise, section: "code_review",
-                        message: AiService::DUCK_EXPLAIN_REQUEST, thread: [])
+                        message: DuckPrompt::EXPLAIN_REQUEST, thread: [])
 
       expect(svc.last_system).to match(/understanding the problem/i)
       expect(svc.last_system).to match(/answer these directly/i)
@@ -3544,12 +3544,12 @@ RSpec.describe AiService do
     end
 
     it "keeps the FakeService dispatch phrase, which every duck system spec routes on" do
-      expect(AiService::DUCK_SYSTEM_PROMPT).to include("Socratic thinking partner")
+      expect(DuckPrompt::SYSTEM).to include("Socratic thinking partner")
     end
 
     it "asks for a plain-language explanation rather than the answer" do
-      expect(AiService::DUCK_EXPLAIN_REQUEST).to match(/plain language/i)
-      expect(AiService::DUCK_EXPLAIN_REQUEST).not_to match(/answer|fix|solve/i)
+      expect(DuckPrompt::EXPLAIN_REQUEST).to match(/plain language/i)
+      expect(DuckPrompt::EXPLAIN_REQUEST).not_to match(/answer|fix|solve/i)
     end
 
     it "gives a reply room for an explanation while staying far below a review's ceiling" do
@@ -3759,7 +3759,7 @@ RSpec.describe AiService do
     it "moves the section context into system, where it is sent once" do
       request = captured_call(thread: [])
 
-      expect(request.system).to include(AiService::DUCK_SYSTEM_PROMPT)
+      expect(request.system).to include(DuckPrompt::SYSTEM)
       expect(request.system).to include(exercise.problem_set.dig("code_review", "question"))
       expect(request.prompt).not_to include(exercise.problem_set.dig("code_review", "question"))
     end
@@ -3986,7 +3986,7 @@ RSpec.describe AiService do
     end
 
     it "replaced each site's own wording rather than sitting beside it" do
-      expect(AiService::DUCK_SYSTEM_PROMPT).not_to match(/plain words|no jargon/i)
+      expect(DuckPrompt::SYSTEM).not_to match(/plain words|no jargon/i)
 
       recording_class.new(canned_text: "Because.")
         .answer_follow_up(user, exercise, reviewed_response, section: "code_review", question: "Why?", thread: [])

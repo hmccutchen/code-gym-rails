@@ -1,0 +1,6 @@
+Their new message:
+<engineer_text>
+What is this even asking?
+</engineer_text>
+
+Respond as their Socratic thinking partner, following your system instructions exactly.

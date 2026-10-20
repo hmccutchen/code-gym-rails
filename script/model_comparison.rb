@@ -70,7 +70,7 @@ class ModelComparison
     end
   end
 
-  def duck(daily_exercise_id, section:, message: AiService::DUCK_EXPLAIN_REQUEST)
+  def duck(daily_exercise_id, section:, message: DuckPrompt::EXPLAIN_REQUEST)
     exercise = DailyExercise.find(daily_exercise_id)
 
     compare("duck", heading: section) do |service|
