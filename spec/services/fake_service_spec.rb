@@ -16,7 +16,7 @@ RSpec.describe FakeService do
   it "is refused by AiService.for outside a local environment" do
     allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
 
-    expect { AiService.for(user) }.to raise_error(ProviderError, /test-only fake provider/)
+    expect { AiService.for(user) }.to raise_error(SetupError, /test-only fake provider/)
   end
 
   describe "#generate_exercise" do

@@ -34,6 +34,17 @@ the mailer wants; it is not a debug dump.
 Only an error from today is cleared. An error from an earlier day is history,
 and the dashboard reports only today's.
 
+## `#record_generation_failure!`, `#record_generation_message!` and `#clear_generation_failure!`
+
+All three write through `#write_generation_status!`, which uses
+`update_columns` and skips validation. The failure most worth recording is
+a `SetupError`, which can mean the stored `provider` or `language` is
+invalid. With `update!`, those inclusion validations would refuse the
+write, and a page waiting on the failure would keep polling. The columns
+written are bookkeeping that nothing validates, so skipping validation
+loses nothing. The specs that pin this write an invalid value with
+`update_columns` first.
+
 ## `#carry_held_set_forward!`
 
 The read of `held_exercise` before the lock only avoids taking a lock when

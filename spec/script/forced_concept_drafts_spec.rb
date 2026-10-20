@@ -196,4 +196,34 @@ RSpec.describe ForcedConceptDrafts do
       .to eq(ModelComparison::CANDIDATES.fetch("judge").size)
     expect(out.string.scan(/status=keep/).size).to eq((KindDifficulty::LEVELS.size - 1) * ModelComparison::CANDIDATES.fetch("judge").size)
   end
+
+  it "judge_concept prints a draft that hit a setup error as an error row and judges the rest" do
+    calls = 0
+    allow_any_instance_of(AiService).to receive(:retry_section).and_wrap_original do |original, *args|
+      calls += 1
+      raise SetupError, "Unsupported generation language: \"cobol\"" if calls == 1
+
+      original.call(*args)
+    end
+
+    ModelComparison.new(api_key: "sk-ant-runner", out: out).judge_concept(user.id, concept, per_rung: 1)
+
+    expect(out.string.scan(/status=error SetupError: Unsupported generation language/).size)
+      .to eq(ModelComparison::CANDIDATES.fetch("judge").size)
+  end
+
+  it "judge_concept prints a judge call that hit a setup error as an error row and judges the rest" do
+    calls = 0
+    allow_any_instance_of(AiService).to receive(:judge_section).and_wrap_original do |original, *args, **kwargs|
+      calls += 1
+      raise SetupError, "Unsupported generation language: \"cobol\"" if calls == 1
+
+      original.call(*args, **kwargs)
+    end
+
+    ModelComparison.new(api_key: "sk-ant-runner", out: out).judge_concept(user.id, concept, per_rung: 1)
+
+    expect(out.string.scan(/status=error SetupError: Unsupported generation language/).size).to eq(1)
+    expect(out.string.scan(/status=keep/).size).to eq(KindDifficulty::LEVELS.size * ModelComparison::CANDIDATES.fetch("judge").size - 1)
+  end
 end

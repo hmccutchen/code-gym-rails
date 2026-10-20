@@ -213,6 +213,13 @@ en:
       own_key:
         title: "%{provider} took too long to answer, so %{outcome}."
         next: "Try again."
+    setup:
+      own_key:
+        title: "Your account's setup has a problem Coding Gym can't work around, so %{outcome}."
+        next: "Check your provider, API key and language in Setup. If they look right, tell the person who runs Coding Gym."
+      trial:
+        title: "Your account's setup has a problem Coding Gym can't work around, so %{outcome}."
+        next: "Tell the person who runs Coding Gym."
     other:
       own_key:
         title: "%{provider} sent back something Coding Gym couldn't use, so %{outcome}."

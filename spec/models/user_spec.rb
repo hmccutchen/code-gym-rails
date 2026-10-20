@@ -1976,3 +1976,26 @@ RSpec.describe User, "trials", type: :model do
     expect(trial).to be_valid
   end
 end
+
+RSpec.describe User, "generation status", type: :model do
+  let(:user) { User.create!(email: "status@example.com", name: "Status") }
+
+  it "records a failure, then a message, then clears them, even when the stored provider and language are invalid" do
+    user.update_columns(provider: "nonsense", language: "cobol")
+
+    user.record_generation_failure!(SetupError.new("User has no recognized AI provider configured"))
+    expect(user.reload).to have_attributes(last_generation_failure: "setup", last_generation_error_date: Date.current)
+
+    user.record_generation_message!("every section failed its check")
+    expect(user.reload).to have_attributes(last_generation_error: "every section failed its check", last_generation_failure: nil)
+
+    user.clear_generation_failure!
+    expect(user.reload).to have_attributes(last_generation_error_date: nil, last_generation_error: nil)
+  end
+
+  it "touches updated_at when it writes" do
+    user.update_columns(updated_at: 1.day.ago)
+
+    expect { user.record_generation_message!("x") }.to change { user.reload.updated_at }
+  end
+end

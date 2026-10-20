@@ -1,7 +1,7 @@
 # Billing failures never reach here as limits: providers raise BillingError before a 429 is classified.
 class ProviderFailure
   TRIAL_KINDS = %w[trial_allowance_used trial_ended].freeze
-  KINDS = (%w[daily_limit short_rate_limit bad_key out_of_credit outage timeout other] + TRIAL_KINDS).freeze
+  KINDS = (%w[daily_limit short_rate_limit bad_key out_of_credit outage timeout setup other] + TRIAL_KINDS).freeze
   DAILY_WAIT = 1.hour
   DAILY_QUOTA_PATTERN = /PerDay/i
 
@@ -15,6 +15,7 @@ class ProviderFailure
     when ProviderError::TimeoutError, Timeout::Error then "timeout"
     when ProviderError::NetworkError                 then "outage"
     when ProviderError                               then error.http_status.to_i >= 500 ? "outage" : "other"
+    when SetupError                                  then "setup"
     else                                                  "other"
     end
   end

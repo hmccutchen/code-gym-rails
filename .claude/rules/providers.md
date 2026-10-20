@@ -95,7 +95,13 @@ read it before changing that area.
   status code or key reaches a user. Page scripts show only
   `CodeGymRequest.send`'s `message`, JSON errors go through
   `render_json_error`, and `ProviderError::BillingError` is never treated as a
-  rate limit.
+  rate limit. A setup problem (no usable provider, the fake provider outside
+  a local environment, an unsupported language) raises `SetupError`, which
+  is not a `ProviderError`. Every boundary that rescues a `ProviderError`
+  rescues it too, and `ProviderFailure` classifies it as `setup`, worded
+  as a problem with the account's setup and never as the provider's. It is
+  logged at error level with the user's id. The hourly batch also rescues
+  any error per user, so one account can't stop it.
 - **What stays out of the logs**: `config/initializers/filter_parameter_logging.rb`
   filters what engineers write (`answers`, `message`, `question`,
   `pseudocode`, `prior_alternates`, the duck's `thread`), the login `code`

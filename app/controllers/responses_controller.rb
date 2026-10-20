@@ -98,7 +98,7 @@ class ResponsesController < ApplicationController
     else
       render json: { status: "ok", alternate: alternate, remaining: remaining }
     end
-  rescue ProviderError => e
+  rescue ProviderError, SetupError => e
     render_provider_failure(e, :alternate)
   end
 
@@ -137,7 +137,7 @@ class ResponsesController < ApplicationController
     else
       render json: { status: "ok", question: question, answer: answer, remaining: remaining }
     end
-  rescue ProviderError => e
+  rescue ProviderError, SetupError => e
     render_provider_failure(e, :follow_up)
   end
 
@@ -156,7 +156,7 @@ class ResponsesController < ApplicationController
     outcome = DuckThread.append!(exercise, section, message: message, answer: answer,
                                  expected_version: store.version_for(section), expected_scope: params[:draft_scope].to_s)
     duck_outcome(outcome) { |version| { answer: answer, version: version } }
-  rescue ProviderError => e
+  rescue ProviderError, SetupError => e
     render_provider_failure(e, :duck)
   end
 
@@ -188,7 +188,7 @@ class ResponsesController < ApplicationController
       "critiqued_at"       => Time.current.iso8601)
 
     render json: { status: "ok", gaps_found: result[:gaps_found], gaps: result[:gaps] }
-  rescue ProviderError => e
+  rescue ProviderError, SetupError => e
     release_pseudocode_claim!(row, section, "critique")
     render_provider_failure(e, :critique)
   end

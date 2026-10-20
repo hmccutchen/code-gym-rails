@@ -167,6 +167,23 @@ RSpec.describe ConceptReferenceCalibration do
       include_examples "a measured response failure", "ProviderError::InvalidResponseError"
     end
 
+    it "records a setup error as an unmeasured failure and carries on to the next sample" do
+      stub_claude
+      calls = 0
+      allow_any_instance_of(ClaudeService).to receive(:generate_concept_reference).and_wrap_original do |original, *args|
+        calls += 1
+        raise SetupError, "Unsupported generation language: \"cobol\"" if calls == 1
+
+        original.call(*args)
+      end
+
+      records = calibration(repeats: 1, concurrency: 0).run([ [ "ruby_rails", "n_plus_one" ], [ "javascript", js_concept ] ])
+
+      expect(records.map(&:outcome)).to eq([ "SetupError", :ok ])
+      expect(records.map(&:measured)).to eq([ false, true ])
+      expect(calibration.summary(records)[:sequential]).to include(n: 2, measured: 1, failures: 1, timeouts: 0)
+    end
+
     it "excludes refused and transport-failed calls from the latency spread" do
       replies = [ [ 401, {}, "{}" ] ]
       stub_provider(ClaudeService) { replies.shift or raise Faraday::ConnectionFailed, "connection failed" }
