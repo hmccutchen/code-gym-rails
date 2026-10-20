@@ -4,6 +4,18 @@
 
 The cap is enforced on the server as well as in the view. Hiding the button does not stop a crafted request.
 
+## `#alternates_left`, `#follow_ups_left` and `#follow_up_turns`
+
+These are the one statement of each per-section cap and of a section's
+follow-up thread. The review partial, `ResponsesController` and the append
+methods below all read them.
+
+`#follow_up_turns` filters and sorts the loaded `review_follow_ups` in Ruby
+and never queries, so `/history`, which preloads the association, renders
+every entry's thread and cap from one query. It sorts by `created_at`, then
+`id`, because an exchange's two turns can share a timestamp, and without the
+`id` an answer could render before its question.
+
 ## `#append_alternate!` and `#append_follow_up!`
 
 Each takes the row lock, reads what is left in the section again and either

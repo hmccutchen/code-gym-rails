@@ -91,7 +91,7 @@ class ResponsesController < ApplicationController
 
     return render_section_error(follow_ups_used_message) unless @response.follow_ups_left(@section).positive?
 
-    thread = @response.review_follow_ups.for_section(@section).map { |t| { role: t.role, content: t.content } }
+    thread = @response.follow_up_turns(@section).map { |turn| { role: turn.role, content: turn.content } }
 
     answer = AiService.for(current_user).answer_follow_up(
       current_user, @response.daily_exercise, @response,

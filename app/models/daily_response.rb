@@ -88,8 +88,12 @@ class DailyResponse < ApplicationRecord
     MAX_ALTERNATES_PER_SECTION - Array(review_alternates[section.to_s]).size
   end
 
+  def follow_up_turns(section)
+    review_follow_ups.select { |turn| turn.section == section.to_s }.sort_by { |turn| [ turn.created_at, turn.id ] }
+  end
+
   def follow_ups_left(section)
-    MAX_FOLLOW_UPS_PER_SECTION - review_follow_ups.where(section: section.to_s, role: :user).count
+    MAX_FOLLOW_UPS_PER_SECTION - follow_up_turns(section).count(&:role_user?)
   end
 
   def append_alternate!(section, alternate)

@@ -841,6 +841,13 @@ RSpec.describe DailyResponse, type: :model do
         expect(response.reload.review_alternates["code_review"]).to eq([ "first" ])
       end
 
+      it "counts what is left only after it holds the row lock" do
+        expect(response).to receive(:lock!).ordered.and_call_original
+        expect(response).to receive(:alternates_left).ordered.and_call_original
+
+        response.append_alternate!("code_review", "first")
+      end
+
       it "returns :capped without writing when another request filled the cap after this copy was read" do
         stale = DailyResponse.find(response.id)
         full = Array.new(DailyResponse::MAX_ALTERNATES_PER_SECTION) { |i| "other #{i}" }
@@ -862,17 +869,35 @@ RSpec.describe DailyResponse, type: :model do
       it "stores the question and answer in order and returns how many are left" do
         expect(response.append_follow_up!("code_review", question: "why?", answer: "because"))
           .to eq(DailyResponse::MAX_FOLLOW_UPS_PER_SECTION - 1)
-        expect(response.review_follow_ups.for_section("code_review").map { |t| [ t.role, t.content ] })
+        expect(response.reload.follow_up_turns("code_review").map { |t| [ t.role, t.content ] })
           .to eq([ [ "user", "why?" ], [ "assistant", "because" ] ])
+      end
+
+      it "counts what is left only after it holds the row lock" do
+        expect(response).to receive(:lock!).ordered.and_call_original
+        expect(response).to receive(:follow_ups_left).ordered.and_call_original
+
+        response.append_follow_up!("code_review", question: "why?", answer: "because")
       end
 
       it "returns :capped without writing when another request filled the cap after this copy was read" do
         stale = DailyResponse.find(response.id)
-        stale.follow_ups_left("code_review")
+        expect(stale.follow_ups_left("code_review")).to eq(DailyResponse::MAX_FOLLOW_UPS_PER_SECTION)
         fill_follow_ups(response, DailyResponse::MAX_FOLLOW_UPS_PER_SECTION)
 
         expect(stale.append_follow_up!("code_review", question: "late?", answer: "late")).to eq(:capped)
         expect(response.review_follow_ups.count).to eq(DailyResponse::MAX_FOLLOW_UPS_PER_SECTION * 2)
+      end
+    end
+
+    describe "#follow_up_turns" do
+      it "keeps only the section's turns, breaking a created_at tie by id so an answer never sorts before its question" do
+        same_time = Time.current
+        answer = response.review_follow_ups.create!(section: "code_review", role: :assistant, content: "a", created_at: same_time)
+        question = response.review_follow_ups.create!(section: "code_review", role: :user, content: "q", created_at: same_time)
+        response.review_follow_ups.create!(section: "pattern", role: :user, content: "other")
+
+        expect(response.reload.follow_up_turns("code_review")).to eq([ answer, question ])
       end
     end
 
