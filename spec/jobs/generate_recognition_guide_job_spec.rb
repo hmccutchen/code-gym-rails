@@ -63,6 +63,14 @@ RSpec.describe GenerateRecognitionGuideJob do
     expect { described_class.perform_now(group_key: "code_smell", user_id: user.id) }.not_to change(RecognitionGuide, :count)
   end
 
+  it "logs a setup error at error level with the user's id and writes nothing" do
+    allow(AiService).to receive(:for).with(user).and_raise(SetupError, "User #{user.id} has no recognized AI provider configured")
+    allow(Rails.logger).to receive(:error)
+
+    expect { described_class.perform_now(group_key: "code_smell", user_id: user.id) }.not_to change(RecognitionGuide, :count)
+    expect(Rails.logger).to have_received(:error).with(/user #{user.id}.*no recognized AI provider/)
+  end
+
   it "swallows a lost race on the unique index" do
     stub_service
     allow(RecognitionGuide).to receive(:create!).and_raise(ActiveRecord::RecordNotUnique, "duplicate key")

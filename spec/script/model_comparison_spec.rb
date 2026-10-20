@@ -158,6 +158,25 @@ end
     expect(out.string.scan("ProviderError::RateLimitError: slow down").size).to eq(2)
   end
 
+  it "prints a setup error in place of one model's output and still runs the next candidate" do
+    exercise = create_exercise
+    calls = 0
+    allow_any_instance_of(ClaudeService).to receive(:duck_response).and_wrap_original do |original, *args, **kwargs|
+      calls += 1
+      raise SetupError, "Unsupported generation language: \"cobol\"" if calls == 1
+
+      original.call(*args, **kwargs)
+    end
+
+    comparison.duck(exercise.id, section: "code_review")
+
+    candidates = ModelComparison::CANDIDATES.fetch("duck")
+    expect(calls).to eq(candidates.size)
+    candidates.each { |route| expect(out.string).to include("--- #{route[:model]}") }
+    expect(out.string.scan("SetupError: Unsupported generation language").size).to eq(1)
+    expect(out.string).to include(FakeService::DUCK_RESPONSE_TEXT)
+  end
+
   it "drafts once, judges every section with each candidate, and prints a verdict block per section" do
     comparison.judge(user.id)
 
@@ -210,6 +229,21 @@ end
       .to eq(ModelComparison::CANDIDATES.fetch("judge").size)
     fixture_count = Dir[Rails.root.join("spec/fixtures/judge/*.json")].size
     expect(out.string).to include("valid: #{fixture_count - 1}/#{fixture_count}")
+  end
+
+  it "judge_fixtures prints a setup error as that fixture's row and finishes every table" do
+    failing = JSON.parse(File.read(Rails.root.join("spec/fixtures/judge/thread_prerequisite.json")))["section"]
+    allow_any_instance_of(ClaudeService).to receive(:judge_section) do |_service, _user, _kind, section, **|
+      raise SetupError, "Unsupported generation language: \"cobol\"" if section == failing
+
+      JudgeVerdict.new(status: :keep)
+    end
+
+    comparison.judge_fixtures
+
+    ModelComparison::CANDIDATES.fetch("judge").each { |route| expect(out.string).to include("=== judge_fixtures: #{route[:model]} ===") }
+    expect(out.string.scan(/^thread_prerequisite: .*got=error .*SetupError: Unsupported generation language/).size)
+      .to eq(ModelComparison::CANDIDATES.fetch("judge").size)
   end
 
   def keep_verdict(kind, solve: "b")
@@ -375,6 +409,23 @@ end
       expect(out.string).to match(%r{edits: 1/2 \(plain_language_violation 0/2, verbosity 1/2\) · merges: 1 · invalid: 1/4 · provider errors: 1/4 · \d+ms})
       expect(out.string).to match(%r{edits: 0/4 \(plain_language_violation 0/4, verbosity 0/4\) · merges: 0 · invalid: 0/4 · provider errors: 0/4})
       expect(out.string).to include("$")
+    end
+
+    it "prints a setup error in place of one review's verdict and judges the rest" do
+      store_reviews(%w[code_review pattern])
+      calls = 0
+      allow_any_instance_of(ClaudeService).to receive(:judge_review_prose).and_wrap_original do |original, *args, **kwargs|
+        calls += 1
+        raise SetupError, "Unsupported generation language: \"cobol\"" if calls == 1
+
+        original.call(*args, **kwargs)
+      end
+
+      comparison.review_prose(user.id)
+
+      expect(calls).to eq(2 * ModelComparison::CANDIDATES.fetch("review_prose").size)
+      expect(out.string.scan("SetupError: Unsupported generation language").size).to eq(1)
+      expect(out.string).to match(%r{provider errors: 1/2})
     end
 
     # Run totals cannot show single replies against the cap: [100, 1400] and [750, 750] total the same.

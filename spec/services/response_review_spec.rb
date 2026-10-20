@@ -156,6 +156,17 @@ RSpec.describe ResponseReview do
     expect(response.reload.reviewing_since).to be_nil
   end
 
+  it "reports a setup error as a handled outcome and releases the claim" do
+    error = SetupError.new("Unsupported generation language: \"cobol\"")
+    allow(reviewer).to receive(:review_sections).and_raise(error)
+
+    outcome = review
+
+    expect(outcome.status).to eq(:provider_error)
+    expect(outcome.error).to be(error)
+    expect(response.reload.reviewing_since).to be_nil
+  end
+
   it "reports a set cleared while the review ran" do
     allow(reviewer).to receive(:review_sections) do
       DailyResponse.where(id: response.id).delete_all

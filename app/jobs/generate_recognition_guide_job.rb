@@ -26,5 +26,7 @@ class GenerateRecognitionGuideJob < ApplicationJob
     Rails.logger.info("Skipped duplicate recognition guide for #{group_key}")
   rescue ProviderError => e
     Rails.logger.warn("Failed to generate recognition guide for #{group_key}: #{e.message}")
+  rescue SetupError => e
+    Rails.logger.error("Setup error generating recognition guide #{group_key} for user #{user_id}: #{e.message}")
   end
 end

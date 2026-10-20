@@ -66,6 +66,18 @@ RSpec.describe GenerateConceptReferenceJob do
     }.not_to change(ConceptReference, :count)
   end
 
+  it "notes a setup error as a setup failure, so Learn stops waiting, and creates no row" do
+    allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+    allow(AiService).to receive(:for).with(user).and_raise(SetupError, "User #{user.id} has no recognized AI provider configured")
+    allow(Rails.logger).to receive(:error)
+
+    expect {
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+    }.not_to change(ConceptReference, :count)
+    expect(ConceptReferenceFailures.read(user_id: user.id, concept: "n_plus_one", language: "ruby_rails")).to include("kind" => "setup")
+    expect(Rails.logger).to have_received(:error).with(/user #{user.id}.*no recognized AI provider/)
+  end
+
   it "is a no-op for the 'other' concept (does not call the provider)" do
     expect(AiService).not_to receive(:for)
     expect {

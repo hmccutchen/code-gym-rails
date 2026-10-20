@@ -415,9 +415,9 @@ class AiService
 
   def self.for(user)
     provider = AiProvider.find(user.provider)
-    raise ProviderError, "User #{user.id} has no recognized AI provider configured" unless provider
+    raise SetupError, "User #{user.id} has no recognized AI provider configured" unless provider
     unless provider.available?
-      raise ProviderError, "User #{user.id} has the test-only #{provider.provider_key} provider outside a local environment"
+      raise SetupError, "User #{user.id} has the test-only #{provider.provider_key} provider outside a local environment"
     end
 
     credential = ProviderCredential.for(user)
@@ -679,7 +679,7 @@ class AiService
 
   def self.config_for(language)
     LANGUAGE_PROMPTS.fetch(language) do
-      raise ProviderError, "Unsupported generation language: #{language.inspect}"
+      raise SetupError, "Unsupported generation language: #{language.inspect}"
     end
   end
 

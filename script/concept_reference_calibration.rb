@@ -128,7 +128,7 @@ class ConceptReferenceCalibration
     [ :timeout, true ]
   rescue ProviderError::InvalidResponseError => e
     [ e.class.name, true ]
-  rescue ProviderError => e
+  rescue ProviderError, SetupError => e
     [ e.class.name, false ]
   end
 

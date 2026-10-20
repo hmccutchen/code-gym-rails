@@ -35,6 +35,11 @@ RSpec.describe ProviderFailure do
     expect(classify(IOError.new("x"))).to eq("other")
   end
 
+  it "reads a setup problem as setup, never as a provider failure" do
+    expect(classify(SetupError.new("User 1 has no recognized AI provider configured"))).to eq("setup")
+    expect(classify(ConceptVocabulary::UnknownLanguage.new("Unsupported generation language: \"cobol\""))).to eq("setup")
+  end
+
   it "answers only its own kinds" do
     expect(described_class::KINDS).to all(satisfy { |kind| described_class.kind?(kind) })
     expect(described_class.kind?("trial_ended")).to be(true)
