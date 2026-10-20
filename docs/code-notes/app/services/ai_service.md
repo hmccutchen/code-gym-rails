@@ -297,8 +297,9 @@ alone, so the override never reaches `GenerationPrompt` itself.
 
 ## `#finish_generation`
 
-`draft` still holds every drafted section, so a dropped key can be named with
-its concept.
+`draft` still holds every drafted section, so `GenerationDiagnostics#finished`
+can name a dropped key with its concept. The logging itself, and its notes,
+are in `docs/code-notes/app/services/generation_diagnostics.md`.
 
 ## `#normalize_optional_reference_fields!`
 
@@ -361,19 +362,6 @@ and the source-history identity keyed on its path and name.
 
 Uses the day's language, not `cm.language`: `ConceptVocabulary::LANGUAGES`'
 "architecture" entry would report false hosts.
-
-## `#log_difficulty_diagnostics`
-
-Difficulty adaptation is advisory. This line pairs what was requested with what
-was delivered to check it, alongside `ResponseReview#log_diagnostics`.
-
-## `#kind_difficulty_diagnostics`
-
-Measures whether a rung was available and chosen. Whether the problem was
-actually pitched at that rung is deliberately not measured.
-`kind_difficulty_chars` is the length of
-`GenerationPrompt::DifficultyGuidance.render`'s output, the same call the
-prompt interpolates, so the logged count is the text that was sent.
 
 ## `#ladders_for`
 

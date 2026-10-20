@@ -47,7 +47,7 @@ otherwise ask for a retry that is impossible.
 ## `#log_diagnostics`
 
 Pairs the AI and self ratings per section, to read beside
-`AiService#log_difficulty_diagnostics`. Remove it once that question is
+`GenerationDiagnostics#difficulty`. Remove it once that question is
 settled.
 
 It logs `daily_exercise.date` rather than `response.date`, because the

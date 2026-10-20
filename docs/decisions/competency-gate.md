@@ -34,7 +34,7 @@ through `create_fake_provider_user(daily_section_count:)`, the setting, or
 by stubbing the gate open (`DailyPlanGateStubs` in `daily_plan_spec`),
 rather than relying on a new account getting four.
 
-**Logs.** `AiService#draft_exercise` logs `[set_size] user=… date=… {…}`
+**Logs.** `GenerationDiagnostics`, called from `AiService#draft_exercise`, logs `[set_size] user=… date=… {…}`
 as soon as the plan is decided, before the provider is contacted, so fixed
 settings, weekends, regeneration and attempts that later fail all leave
 one. Its JSON is `DaySize::Decision#diagnostics`: count, reason, setting,

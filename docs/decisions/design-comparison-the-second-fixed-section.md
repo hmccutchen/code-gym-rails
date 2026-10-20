@@ -39,7 +39,7 @@ B (`spec/support/weighted_roll_position_default.rb`), which sorts after
 is the read-only check on A/B balance; no log line records a position.
 
 **The answer key never leaves the server before review.** `answer_key` is
-the kind's `.answer_key_fields`, so `without_answer_key` keeps it out of
+the kind's `.answer_key_fields`, so `ExerciseSection.without_answer_keys` keeps it out of
 `[difficulty_diagnostics]`, `judge_section` keeps it from the judge, and
 `duck_section_context` gains only `piece_a` and `piece_b` (scenario and
 question were already there). The page shows the key, as "What decides

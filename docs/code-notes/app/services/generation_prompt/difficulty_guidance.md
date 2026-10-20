@@ -3,7 +3,7 @@
 ## `.render`
 
 The one renderer of the difficulty block. `GenerationPrompt#render`
-interpolates it and `AiService#kind_difficulty_diagnostics` measures its
+interpolates it and `GenerationDiagnostics#kind_difficulty` measures its
 `.length`, so the logged `kind_difficulty_chars` is the length of the text
 that was sent, leading newline included.
 

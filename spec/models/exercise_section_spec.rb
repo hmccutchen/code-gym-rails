@@ -617,6 +617,25 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".without_answer_keys" do
+    it "drops every kind's answer-key fields and leaves the rest of each section and any non-section value alone" do
+      problem_set = {
+        "ambiguity_hunt"     => { "request" => "Build a leaderboard", "planted_ambiguities" => [ "ties" ] },
+        "design_comparison"  => { "question" => "Which?", "answer_key" => { "better" => "a" } },
+        "code_review"        => { "question" => "Find the bug" },
+        "notes"              => "not a section"
+      }
+
+      expect(described_class.without_answer_keys(problem_set)).to eq(
+        "ambiguity_hunt"    => { "request" => "Build a leaderboard" },
+        "design_comparison" => { "question" => "Which?" },
+        "code_review"       => { "question" => "Find the bug" },
+        "notes"             => "not a section"
+      )
+      expect(problem_set["ambiguity_hunt"]).to have_key("planted_ambiguities")
+    end
+  end
+
   describe ".narrow_vocabulary" do
     it "returns the vocabulary unchanged for every kind but design_comparison, at any rung or none" do
       vocabulary = %w[n_plus_one memoization]

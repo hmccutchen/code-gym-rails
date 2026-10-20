@@ -66,6 +66,12 @@ class ExerciseSection
     all.flat_map(&:answer_key_fields).uniq
   end
 
+  def self.without_answer_keys(problem_set)
+    problem_set.transform_values do |section|
+      section.is_a?(Hash) ? section.except(*all_answer_key_fields) : section
+    end
+  end
+
   def self.rotatable(daily:)
     optional_slots(daily: daily).values.select { |kinds| kinds.size > 1 }.flatten
   end

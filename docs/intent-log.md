@@ -24,14 +24,11 @@ this one.
   **why:** I wanted it to say what the product is and who it's for
   **I decided:** it's a private product at coding-gym.pro, not an open-source
   project, so the setup and contributing sections went
-- ran a layered-architecture review of `app/` and had its larger findings
-  filed as issues
-- checked whether the old competency-gate, Gemini status and OpenDyslexic
-  issues were still worth keeping open
+- layered-architecture review of `app/`, larger findings filed as issues
+- checked whether the three older open issues were still worth keeping
   **I decided:** keep all three; the gate one stays deferred with a note on
   what saved state now has to carry
-- a failed or cancelled Gemini call raises a provider error and still records
-  its usage `#437`
+- an unfinished Gemini call raises and still records its usage `#437`
 - the app's visible name from Code Gym to Coding Gym, to match coding-gym.pro
   `#438`
   **why:** the name people see should match the domain I'm about to show
@@ -51,3 +48,5 @@ this one.
   **I decided:** changed my mind from letting them fail unrescued once that
   left pages spinning; record and word them as setup, batch skips any error
 - the rest of `AiService`'s domain data moved onto the models `#445`
+- generation logging moved into `GenerationDiagnostics` `#448`
+  **I decided:** diagnostics before prompts
