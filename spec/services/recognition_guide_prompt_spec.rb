@@ -20,7 +20,7 @@ RSpec.describe RecognitionGuidePrompt do
   end
 
   it "cannot see an exercise, a response or history, because it takes only the group and its subject" do
-    expect(described_class.method(:generate).parameters.map(&:last)).to contain_exactly(:group_key, :subject)
+    expect(described_class.method(:generate).parameters).to eq([ [ :keyreq, :group_key ], [ :keyreq, :subject ] ])
   end
 
   it "frames the tradeoff concepts a group holds as choices, and no others" do
