@@ -41,6 +41,6 @@
   **why:** the layered review found models depending on the provider client
   **I decided:** `ProviderError` as the home, no aliases, field lists in a
   second PR, `LANGUAGE_PROMPTS` left alone
-- setup problems fail loudly instead of reading as provider failures `#444`
-  **I decided:** treat them as bugs, with the hourly batch skipping a broken
-  account, rather than word them as a setup failure
+- setup problems recorded as their own kind, not as provider failures `#444`
+  **I decided:** changed my mind from letting them fail unrescued once that
+  left pages spinning; record and word them as setup, batch skips any error
