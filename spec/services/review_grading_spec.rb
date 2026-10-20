@@ -315,7 +315,7 @@ RSpec.describe ReviewGrading do
       judge_calls = 0
       svc = provider.new("key")
       allow(svc).to receive(:call).and_wrap_original do |_m, request|
-        if request.system == AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT
+        if request.system == ReviewProseJudgePrompt::SYSTEM
           judge_calls += 1
           raise judge_reply if judge_reply.is_a?(Exception)
           { text: judge_reply, input_tokens: 1, output_tokens: 1 }

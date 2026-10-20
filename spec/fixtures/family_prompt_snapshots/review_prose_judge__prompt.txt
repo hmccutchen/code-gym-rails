@@ -1,0 +1,16 @@
+Section kind: code_review
+The review is written for an engineer working in Rails.
+Each list field is an array; an entry's index is its zero-based position.
+
+The review's prose:
+{
+  "correct": [
+    "Spotted the loop"
+  ],
+  "missed": [
+    "The association is loaded per row",
+    "No eager load"
+  ],
+  "better_questions": [],
+  "next_step": "Try includes"
+}

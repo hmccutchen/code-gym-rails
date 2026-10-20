@@ -1,0 +1,129 @@
+{
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "keep"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "edit"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "plain_language_violation",
+                  "verbosity"
+                ]
+              },
+              "evidence": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "evidence"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "correct": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "missed": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "better_questions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "next_step": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "status",
+        "issues",
+        "fields"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}
