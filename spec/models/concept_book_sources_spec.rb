@@ -75,10 +75,12 @@ RSpec.describe ConceptBookSources do
       described_class::SOURCES.each_key do |concept|
         next unless ConceptVocabulary.for_language(language).include?(concept)
 
-        prompt = ConceptReferencePrompt.generate(concept: concept, language: language, **AiService.config_for(language).slice(:coach, :label))[:prompt]
+        config = AiService.config_for(language)
+        sent = ConceptReferencePrompt.generate(concept: concept, language: language, **config.slice(:coach, :label)).values +
+               ConceptReferencePrompt.reframe(concept: concept, coach: config[:coach], already_read: {}, prior_alternates: []).values
 
         titles.each do |title|
-          expect(prompt).not_to include(title),
+          expect(sent.join("\n")).not_to include(title),
             "#{concept}'s #{language} reference prompt carries #{title}"
         end
       end

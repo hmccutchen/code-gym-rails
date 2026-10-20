@@ -25,6 +25,10 @@ RSpec.describe ConceptReferencePrompt do
         expect_prompt_snapshot("concept_reference__#{concept}__#{language}__prompt", request[:prompt])
       end
     end
+
+    it "cannot see an exercise or a response, because it takes neither" do
+      expect(described_class.method(:generate).parameters.map(&:last)).to contain_exactly(:concept, :language, :coach, :label)
+    end
   end
 
   describe ".reframe" do

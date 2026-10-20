@@ -3982,6 +3982,18 @@ RSpec.describe AiService do
       expect(result["tagline"]).to eq("Avoid N+1 by eager loading.")
     end
 
+    it "sends the system prompt and prompt recorded for this concept and language" do
+      service = Class.new(double_class) do
+        attr_reader :sent
+        def call(request) = (@sent = request) && super
+      end.new(canned_text: valid_json)
+
+      service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect_prompt_snapshot("concept_reference__n_plus_one__ruby_rails__system", service.sent.system)
+      expect_prompt_snapshot("concept_reference__n_plus_one__ruby_rails__prompt", service.sent.prompt)
+    end
+
     it "dedents reference instructions and aligns every generated ladder field with the JSON schema" do
       service = double_class.new(canned_text: valid_json)
       service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
