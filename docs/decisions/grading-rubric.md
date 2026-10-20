@@ -1,6 +1,6 @@
 # Grading rubric
 
-`AiService::RATING_RUBRIC` is the one definition of
+`ReviewPrompt::RATING_RUBRIC` is the one definition of
 the four review ratings, stated once in the review's shared day context.
 A rating describes how the answer meets the level its section was pitched
 at, so `solid` means the same at junior and senior: beginner missed the
@@ -16,9 +16,9 @@ out of place and replaces the grader's, except when the stored section has
 no blocks to compute from. The hook is the only statement of that rule;
 shared grading code calls it for every kind.
 
-**The grader is told the pitched level.** `build_review_section_prompt`
+**The grader is told the pitched level.** `ReviewPrompt.section_prompt`
 states the section's `pitched_at` rung and its
-`KindDifficulty::LEVEL_DEFINITIONS` sentence, falling back to
+`KindDifficulty::LEVEL_DEFINITIONS` sentence. `AiService#review_rung` falls back to
 `KindDifficulty#rung_for` (target included) for an unstamped section.
 `eased` is never passed; the rubric instead says a problem simpler than
 its level's description is graded on what it actually asks. The day context no

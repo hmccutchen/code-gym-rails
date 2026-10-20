@@ -2387,7 +2387,7 @@ RSpec.describe AiService do
                                                               answer: response.answer_for("parsons_problem"))
 
         expect(rating).to eq("strong")
-        expect(service.send(:section_grading_note, exercise, response, "parsons_problem"))
+        expect(ExerciseSection::ParsonsProblem.grading_note(section: exercise.problem_set["parsons_problem"], answer: response.answer_for("parsons_problem")))
           .to include("0 block(s) out of place")
       end
     end
@@ -5795,12 +5795,12 @@ RSpec.describe AiService, "the grading rubric" do
     context = service.send(:build_review_day_context, "Rails", exercise, response)
     prompt  = service.send(:build_review_section_prompt, exercise, response, "code_review")
 
-    expect(context.scan(AiService::RATING_RUBRIC).size).to eq(1)
-    expect(prompt).not_to include(AiService::RATING_RUBRIC)
+    expect(context.scan(ReviewPrompt::RATING_RUBRIC).size).to eq(1)
+    expect(prompt).not_to include(ReviewPrompt::RATING_RUBRIC)
   end
 
   it "defines every rating the review may return, in the order they rank" do
-    positions = ConceptMastery::AI_RATING_RANK.keys.map { |rating| AiService::RATING_RUBRIC.index("\"#{rating}\":") }
+    positions = ConceptMastery::AI_RATING_RANK.keys.map { |rating| ReviewPrompt::RATING_RUBRIC.index("\"#{rating}\":") }
 
     expect(positions).to all(be_an(Integer))
     expect(positions).to eq(positions.sort)
@@ -5814,7 +5814,7 @@ RSpec.describe AiService, "the grading rubric" do
     context = service.send(:build_review_day_context, "Rails", exercise, response)
 
     expect(context).not_to include("consistent across the whole day")
-    expect(AiService::RATING_RUBRIC).to include('"Pitched at" line')
+    expect(ReviewPrompt::RATING_RUBRIC).to include('"Pitched at" line')
   end
 
   it "keeps the ambiguity hunt's rating independent of how many ambiguities were planted" do
@@ -5870,7 +5870,7 @@ it "reads an unstamped section's rung the way generation would, target included"
 end
 
 it "tells the grader a problem simpler than its level is graded on what it asks" do
-  expect(AiService::RATING_RUBRIC).to include("graded on what it actually asks")
+  expect(ReviewPrompt::RATING_RUBRIC).to include("graded on what it actually asks")
 end
 end
 
@@ -6150,6 +6150,33 @@ RSpec.describe AiService, "engineer text fenced under the stated rule" do
 
       expect(request.prompt).to include(UserText.tagged(injection)), entry_point.to_s
       expect(request.system).to include(UserText::PROMPT_RULE), entry_point.to_s
+    end
+  end
+end
+
+RSpec.describe AiService, "review prompt call sites" do
+  let(:service) { Class.new(AiService) { private def build_connection = nil }.new("unused") }
+  let(:long) { "The loop loads each order's user separately, so the page runs one query per order; preload users first." }
+  let(:exercise) do
+    DailyExercise.new(language: "ruby_rails", plan_notes: { "daily_kinds" => %w[code_review design_comparison] }, problem_set: {
+      "code_review" => { "question" => "What is wrong here?", "snippet" => "Order.all.each { |o| o.user.name }", "concept" => "n_plus_one", "pitched_at" => "senior" },
+      "design_comparison" => { "title" => "Rates", "scenario" => "A rates file read nightly.", "question" => "Which would you ship?",
+                               "piece_a" => "a", "piece_b" => "b", "concept" => "information_hiding", "answer_key" => { "better" => "b", "deciding_fact" => "The rates file format changes every quarter.", "principle" => "information_hiding", "why_other_fails" => "A spreads the format across every caller." } },
+      "pattern" => { "title" => "Memoize", "question" => "When would you cache this?", "concept" => "memoization" },
+      "parsons_problem" => { "title" => "Order", "question" => "Put these in order.", "blocks" => %w[a b c], "concept" => "guard_clauses", "pitched_at" => "junior" }
+    })
+  end
+  let(:response) do
+    DailyResponse.new(daily_exercise: exercise,
+      answers: { "code_review" => long, "design_comparison" => ExerciseSection::DesignComparison.encode_answer("b", "The rates file format changes, and B hides it behind one reader."),
+                 "pattern" => long, "parsons_problem" => "order:0,2,1" },
+      section_ratings: { "code_review" => "right_level", "pattern" => "too_easy", "parsons_problem" => "too_hard" })
+  end
+
+  it "sends the recorded day system prompt and section prompts, falling back to the current rung for an unstamped section" do
+    expect_prompt_snapshot("review__day_a__system", service.send(:build_review_day_context, "Rails", exercise, response))
+    exercise.active_section_keys.each do |key|
+      expect_prompt_snapshot("review__day_a__#{key}__prompt", service.send(:build_review_section_prompt, exercise, response, key))
     end
   end
 end

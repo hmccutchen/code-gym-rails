@@ -1,0 +1,23 @@
+Grade ONLY the "parsons_problem" section from the day's context above.
+Pitched at: junior — one clearly visible instance of the concept in a small scenario.
+
+Correct blocks, in order: 1. a / 2. b / 3. c
+What they misplaced: position 2 has "c" (correct block there: "b"); position 3 has "b" (correct block there: "c")
+Verified result (already scored in Ruby — do not re-judge correctness or propose a different rating): 2 block(s) out of place.
+
+Explain WHY the misplaced blocks belong where they do — cite the actual dependency or logical reason (e.g. "this block uses a variable an earlier block declares, so it must come after it"), grounded strictly in the verified result above. Do not output a "rating" judgement of your own for this section; the rating is fixed by the verified result, not by you.
+For this section "improved_code" must be an empty string.
+
+Return a single JSON object (NOT wrapped in a "parsons_problem" key) with:
+- "rating": "beginner" | "developing" | "solid" | "strong"
+- "correct": array of strings — each entry one distinct thing they got right
+- "missed": array of strings — each entry one distinct thing they missed or got wrong
+- "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
+- "better_questions": array of strings — each entry one question they should have asked themselves
+- "next_step": string — one specific thing to study
+- "improved_code": string — must be an empty string for this section
+
+Each array entry must be ONE self-contained idea in one or two sentences. Never pack
+several points into one entry, and never number points inside an entry ("1) ... 2) ...")
+— separate ideas belong in separate entries. Use an empty array when there is nothing to
+say for that field.

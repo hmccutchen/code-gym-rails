@@ -1,0 +1,20 @@
+Grade ONLY the "design_comparison" section from the day's context above.
+Pitched at: junior — one clearly visible instance of the concept in a small scenario.
+
+Grade the reason, never the pick alone.
+Main point: a pick grounded in the stated system: the piece the answer key names, or a reason tied to a fact the section states. A pick that is neither has missed it.
+Essential pieces: picking the piece the answer key names, naming the deciding fact, and naming the principle the pieces differ on. The matching pick with a reason that does not name the deciding fact has missed an essential piece. The other pick with a sound reason tied to a stated fact has missed one too; say in "missed" what the stated facts decide. At principal_engineer, a reason that weighs both pieces' costs against the stated facts counts for more than which piece was picked. Naming the other piece's real cost, or a consequence of the choice, is the kind of addition the rubric credits beyond solid.
+
+Return a single JSON object (NOT wrapped in a "design_comparison" key) with:
+- "rating": "beginner" | "developing" | "solid" | "strong"
+- "correct": array of strings — each entry one distinct thing they got right
+- "missed": array of strings — each entry one distinct thing they missed or got wrong
+- "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
+- "better_questions": array of strings — each entry one question they should have asked themselves
+- "next_step": string — one specific thing to study
+- "improved_code": string — must be an empty string for this section
+
+Each array entry must be ONE self-contained idea in one or two sentences. Never pack
+several points into one entry, and never number points inside an entry ("1) ... 2) ...")
+— separate ideas belong in separate entries. Use an empty array when there is nothing to
+say for that field.

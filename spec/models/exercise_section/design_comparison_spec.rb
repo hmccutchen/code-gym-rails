@@ -180,7 +180,7 @@ RSpec.describe ExerciseSection::DesignComparison do
       note = described_class.grading_note(section: {}, answer: nil)
 
       expect(note).to include("Main point:", "Essential pieces:", "Grade the reason, never the pick alone")
-      levels = AiService::RATING_RUBRIC.scan(/^- "(\w+)":/).flatten
+      levels = ReviewPrompt::RATING_RUBRIC.scan(/^- "(\w+)":/).flatten
       expect(levels).to eq(%w[beginner developing solid strong])
       levels.each { |level| expect(note).not_to include("\"#{level}\":") }
     end

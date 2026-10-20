@@ -1,6 +1,6 @@
 ---
 paths:
-  - "app/services/{response_review,review_grading,review_prose_judge,review_prose_judge_prompt,ai_service}.rb"
+  - "app/services/{response_review,review_grading,review_prose_judge,review_prose_judge_prompt,review_prompt,ai_service}.rb"
   - "app/models/{review_prose_verdict,rubric_check,daily_response,review_follow_up}.rb"
   - "app/controllers/responses_controller.rb"
   - "app/views/shared/_ai_review.html.erb"
@@ -19,7 +19,7 @@ Each entry states what a change must not break. An entry that names a
 read it before changing that area.
 
 - **Grading rubric** (`docs/decisions/grading-rubric.md`):
-  `AiService::RATING_RUBRIC` is the one definition of the four review ratings,
+  `ReviewPrompt::RATING_RUBRIC` is the one definition of the four review ratings,
   graded against the section's `pitched_at` rung; `eased` is never passed to
   the grader. Per-kind grading notes name the main point and never restate the
   levels. Parsons' rating comes from its `fixed_rating` hook. `RubricCheck`
