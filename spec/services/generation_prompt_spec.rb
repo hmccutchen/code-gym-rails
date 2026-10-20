@@ -1,6 +1,20 @@
 require "rails_helper"
 
 RSpec.describe GenerationPrompt do
+  describe ".system" do
+    DailyExercise::LANGUAGES.each do |language|
+      it "renders the #{language} system prompt exactly as recorded" do
+        config = AiService.config_for(language)
+
+        expect_prompt_snapshot("generation_system__#{language}", described_class.system(coach: config[:coach], focus: config[:focus]))
+      end
+    end
+
+    it "takes only the coach and the focus, so it sees nothing about the engineer or the day" do
+      expect(described_class.method(:system).parameters).to eq([ [ :keyreq, :coach ], [ :keyreq, :focus ] ])
+    end
+  end
+
   let(:user) { User.new(email: "render@example.com", name: "Render", skill_level: "senior", focus_areas: %w[caching]) }
 
   let(:history) do
