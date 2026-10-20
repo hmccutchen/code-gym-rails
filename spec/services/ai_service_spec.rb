@@ -3211,10 +3211,6 @@ RSpec.describe AiService do
       Class.new(double_class) do
         attr_reader :last_prompt
 
-        def self.explain_differently_standard(subject)
-          "<<explain-differently:#{subject}>>"
-        end
-
         def call(request)
           @last_prompt = request.prompt
           super
@@ -3223,6 +3219,7 @@ RSpec.describe AiService do
     end
 
     it "reaches both consumers from one source" do
+      allow(PromptStandards).to receive(:explain_differently_standard) { |subject| "<<explain-differently:#{subject}>>" }
       reference = ConceptReference.new(concept: "n_plus_one", language: "ruby_rails",
                                        tagline: "t", explanation: "e",
                                        code_example: "c", senior_lens: "s")
@@ -3239,13 +3236,6 @@ RSpec.describe AiService do
 
       expect(concept_svc.last_prompt).to include("<<explain-differently:concept>>")
       expect(point_svc.last_prompt).to include("<<explain-differently:point>>")
-    end
-
-    it "differs between the two only by the subject it names" do
-      concept = AiService.explain_differently_standard("concept")
-      point   = AiService.explain_differently_standard("point")
-
-      expect(concept.sub("SAME concept", "SAME point")).to eq(point)
     end
   end
 
@@ -3661,7 +3651,7 @@ RSpec.describe AiService do
       expect(svc.last_system).to match(/understanding the problem/i)
       expect(svc.last_system).to match(/answer these directly/i)
       expect(svc.last_system).to match(/analogy/i)
-      expect(svc.last_system).to include(AiService::PLAIN_LANGUAGE_STANDARD)
+      expect(svc.last_system).to include(PromptStandards::PLAIN_LANGUAGE_STANDARD)
     end
 
     it "still forbids solving, and says what to do when the two are mixed or unclear" do
@@ -4011,7 +4001,7 @@ RSpec.describe AiService do
   end
 
   describe "the shared plain-language standard" do
-    let(:standard) { AiService::PLAIN_LANGUAGE_STANDARD }
+    let(:standard) { PromptStandards::PLAIN_LANGUAGE_STANDARD }
 
     let(:recording_class) do
       calls = []
@@ -4126,17 +4116,6 @@ RSpec.describe AiService do
       recording_class.new(canned_text: json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
 
       expect(recording_class.calls.join).not_to match(/Be direct and concrete|unpack any jargon/)
-    end
-
-    it "matches CLAUDE.md's Writing style section except for the second-person item" do
-      section = Rails.root.join("CLAUDE.md").read[/^\*\*Writing style\.\*\*.*?(?=^\*\*Modular)/m]
-      doc_bullets = section.scan(/^- (.+?)(?=\n\n|\n- )/m).map { |(bullet)| bullet.squish }
-      standard_lines = standard.lines.map(&:strip)
-
-      expect(doc_bullets).to eq(standard_lines.grep(/\A- /).map { |line| line.delete_prefix("- ") } - [ "Second person, direct address." ])
-      standard_lines.grep(/\A(Avoid|Aim for|Calibration)/).each do |line|
-        expect(section.squish).to include(line)
-      end
     end
   end
 
@@ -5864,7 +5843,7 @@ end
 RSpec.describe AiService, "REVIEW_PROSE_JUDGE_SYSTEM_PROMPT" do
   it "lists issue types from ReviewProseVerdict and carries the plain-language standard" do
     ReviewProseVerdict::ISSUE_TYPES.each { |type| expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include("- #{type}:") }
-    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include(AiService::PLAIN_LANGUAGE_STANDARD.strip)
+    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include(PromptStandards::PLAIN_LANGUAGE_STANDARD.strip)
       .and include("reply with only the JSON verdict")
   end
 

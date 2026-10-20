@@ -1,8 +1,8 @@
 require "rails_helper"
 
-# Checks the machine-checkable rules of AiService::PLAIN_LANGUAGE_STANDARD; the rest needs a reader.
+# Checks the machine-checkable rules of PromptStandards::PLAIN_LANGUAGE_STANDARD; the rest needs a reader.
 RSpec.describe HandWrittenLearnText do
-  standard = AiService::PLAIN_LANGUAGE_STANDARD
+  standard = PromptStandards::PLAIN_LANGUAGE_STANDARD
 
   # Read from the standard, so a phrase added there is checked here too.
   placeholder_phrases = standard.lines.find { |line| line.include?("Placeholder phrases") }
