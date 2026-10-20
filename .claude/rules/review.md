@@ -1,13 +1,13 @@
 ---
 paths:
-  - "app/services/{response_review,review_grading,review_prose_judge,review_prose_judge_prompt,review_prompt,ai_service}.rb"
+  - "app/services/{response_review,review_grading,review_prose_judge,review_prose_judge_prompt,review_prompt,difficulty_prompt,ai_service}.rb"
   - "app/models/{review_prose_verdict,rubric_check,daily_response,review_follow_up}.rb"
   - "app/controllers/responses_controller.rb"
   - "app/views/shared/_ai_review.html.erb"
   - "app/views/responses/{_submission,_review_in_progress,_answered_sections}.html.erb"
   - "app/views/review_mailer/**"
   - "spec/fixtures/{review_calibration,review_judge}/**"
-  - "spec/**/*{review,rubric,grading}*"
+  - "spec/**/*{review,rubric,grading,difficulty_prompt}*"
   - "app/models/exercise_section/**"
   - "app/models/{concept_mastery,rung_ledger}.rb"
 ---

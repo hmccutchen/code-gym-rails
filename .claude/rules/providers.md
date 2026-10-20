@@ -1,6 +1,6 @@
 ---
 paths:
-  - "app/services/{ai_service,claude_service,gemini_service,openai_service,fake_service,lazy_cache_store}.rb"
+  - "app/services/{ai_service,duck_prompt,follow_up_prompt,claude_service,gemini_service,openai_service,fake_service,lazy_cache_store}.rb"
   - "app/models/{ai_provider,api_usage,provider_credential,provider_failure,provider_failure_text,reset_clock,concept_reference_failures,user}.rb"
   - "app/controllers/concerns/{provider_call_limits,provider_failure_rendering,json_errors}.rb"
   - "app/controllers/{application,api_keys,responses,concept_references,daily_exercises}_controller.rb"
@@ -9,7 +9,7 @@ paths:
   - "config/initializers/filter_parameter_logging.rb"
   - "script/{probe_gemini_capacity,gemini_capacity_probe,check_gemini_structured_output,gemini_structured_output_check}.rb"
   - "spec/fixtures/provider_errors/**"
-  - "spec/**/*{_service,provider,api_usage,model_routing,request_characterization,request_module,server_message}*"
+  - "spec/**/*{_service,provider,duck_prompt,follow_up_prompt,api_usage,model_routing,request_characterization,request_module,server_message}*"
   - "app/controllers/{dashboard,learn}_controller.rb"
   - "app/jobs/{generate_daily_exercises_job,generate_concept_reference_job}.rb"
   - "app/views/dashboard/_generation_failed.html.erb"
