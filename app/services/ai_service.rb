@@ -475,7 +475,6 @@ class AiService
 
   def require_supported_language!(language) = LanguagePrompts.for(language)
 
-
   def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs)
     hosts = kinds.filter_map do |kind|
       mode = code_review_mode if kind == ExerciseSection::CodeReview
