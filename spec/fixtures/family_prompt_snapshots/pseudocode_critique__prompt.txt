@@ -1,0 +1,10 @@
+The problem they are planning:
+Merge overlapping ranges.
+
+Their pseudocode:
+<engineer_text>
+sort ranges, then walk them
+</engineer_text>
+
+Apply your standard exactly as stated in your system instructions:
+Only flag a gap if implementing the pseudocode literally as written would produce behavior that's actually wrong or that fails to handle something the problem statement requires. Do NOT flag: missing syntax or type detail, omitted mechanical/obvious steps (e.g. "return the result"), or any level of abstraction normal for pseudocode. Pseudocode is expected to be less granular than code — evaluate the REASONING, not the verbosity.

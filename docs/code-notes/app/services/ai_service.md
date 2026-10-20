@@ -99,11 +99,6 @@ other.
 
 Defined above `DUCK_SYSTEM_PROMPT` because that prompt interpolates it.
 
-## `PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT`
-
-Its rules are stated as prohibitions because a model reads the adjective
-"faithful" generously, and the translation drifts into free help.
-
 ## `JUDGE_MAX_TOKENS`
 
 Sized for five prose fields, Pattern's count. The headroom bounds a model that
