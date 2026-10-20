@@ -63,4 +63,5 @@
   **why:** Railway builds were having problems, so I asked for it stacked on
   the review PR, to merge in order once they recover
 - the generation system prompt into `GenerationPrompt.system_prompt` `#466`
-- landed the generation system prompt move on main after it merged into its stacked base `#467`
+- landed the generation system prompt move on main, since it merged into
+  its stacked base `#467`
