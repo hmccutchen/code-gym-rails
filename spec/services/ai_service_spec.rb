@@ -4142,6 +4142,14 @@ RSpec.describe AiService do
       expect(prompt_for(language_key)).to include(AiService::LANGUAGE_PROMPTS.fetch(language_key).fetch(:focus))
     end
 
+    it "sends the recorded system prompt and prompt, with a language-independent bucket's focus as its subject" do
+      svc = capturing_class.new(canned_text: valid_json)
+      svc.generate_recognition_guide(user, "architecture")
+
+      expect_prompt_snapshot("recognition_guide__architecture__system", svc.last_system)
+      expect_prompt_snapshot("recognition_guide__architecture__prompt", svc.last_prompt)
+    end
+
     it "returns exactly the three guide fields" do
       result = double_class.new(canned_text: valid_json.sub("{", '{"extra":"x",')).generate_recognition_guide(user, "code_smell")
 
@@ -4178,7 +4186,7 @@ RSpec.describe AiService do
     it "states the process-not-answer scope and names the group's concepts" do
       prompt = prompt_for("module_design")
 
-      expect(prompt).to include(AiService::RECOGNITION_GUIDE_SCOPE)
+      expect(prompt).to include(RecognitionGuidePrompt::SCOPE)
       expect(prompt).to include(RecognitionGuide::NAMED_GROUP_SUBJECTS.fetch("module_design"))
       ConceptVocabulary::MODULE_DESIGN_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
     end
@@ -4188,22 +4196,6 @@ RSpec.describe AiService do
 
       expect(prompt).to include(AiService::LANGUAGE_PROMPTS["plan_review"][:focus])
       ConceptVocabulary::PLAN_REVIEW_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
-    end
-
-    it "frames the tradeoff concepts a group holds as choices, and no others" do
-      architecture = prompt_for("architecture")
-      data_modeling = prompt_for("data_modeling")
-
-      expect(architecture).to include("choices between two defensible options")
-      expect(architecture[/Some of these \((.*?)\)/, 1].split(", "))
-        .to match_array(ConceptVocabulary::ARCHITECTURE_CONCEPTS & ConceptVocabulary::TRADEOFF_CONCEPTS)
-      expect(data_modeling[/Some of these \((.*?)\)/, 1]).to eq("denormalization_tradeoffs")
-      expect(prompt_for("code_smell")).not_to include("choices between two defensible options")
-    end
-
-    it "frames meta skill as the habit its tracked concepts exercise, and only meta skill" do
-      expect(prompt_for("meta_skill")).to include(RecognitionGuide::FRAMINGS.fetch("meta_skill"))
-      expect(prompt_for("code_smell")).not_to include(RecognitionGuide::FRAMINGS.fetch("meta_skill"))
     end
 
     it "is answered by FakeService" do
