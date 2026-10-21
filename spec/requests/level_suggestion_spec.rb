@@ -516,7 +516,8 @@ RSpec.describe "Level suggestion proposals", type: :request do
         unless changed
           changed = true
           fresh = User.find(user.id)
-          fresh.update!(section_kind_levels: fresh.section_kind_levels.merge("pattern" => "senior"))
+          levels = fresh.section_kind_levels.merge("pattern" => "senior")
+          ProfileUpdate.new(fresh, ActionController::Parameters.new(user: { section_kind_levels: levels })).save
         end
         original.call(*args)
       end

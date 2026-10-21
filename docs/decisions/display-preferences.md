@@ -7,8 +7,8 @@ OpenDyslexic is deferred to #235, pending its license's rule on renamed and
 converted copies). They live in a Display disclosure on Setup and save
 through `PATCH /profile`. `DisplayPreferences` is the one list of choices,
 defaults first. `users.display_preferences` is sparse jsonb, since a default
-stores no key, and `User` plus `ProfileController` refuse anything outside
-the lists. Saves are chained one at a time because each carries the whole
+stores no key, and `User` refuses anything outside the lists, while
+`ProfileUpdate` refuses a value that is not an object. Saves are chained one at a time because each carries the whole
 object.
 
 **The background pattern is deliberately on by default**, an exception to

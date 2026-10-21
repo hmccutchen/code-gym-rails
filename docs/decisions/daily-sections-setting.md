@@ -19,13 +19,14 @@ sentence. A
 fixed count is what the day is planned with, and the judge can still drop
 an optional section from it.
 
-**The boundary accepts only listed values.** `ProfileController` takes
+**The boundary accepts only listed values.** `ProfileUpdate` takes
 `User::AUTOMATIC_SECTION_COUNT` (`"automatic"`, stored as nil, and the value
-Setup's radio posts) or a listed count, as an Integer or its exact string.
-Anything else is a 422 that saves nothing, because Active Record's integer
-cast would turn `""` or `null` into nil, which means Automatic, `"abc"`
-into 0 and `"2.5"` into 2, and a JSON `2.0` equals 2. The model checks the
-same range only when the value changes, like the other validations that
+Setup's radio posts) or a whole number, as an Integer or a string of digits,
+and `User` refuses a number outside the range. Anything else is a 422 that
+saves nothing, because Active Record's integer cast would turn `""` or
+`null` into nil, which means Automatic, `"abc"` into 0 and `"2.5"` into 2,
+and a JSON `2.0` equals 2. The model checks the range only when the value
+changes, like the other validations that
 read moving constants, and `DaySize.for` clamps a stored count to the
 current range on read, so a row saved under a wider range plans a day the
 set can actually hold.

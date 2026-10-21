@@ -4,6 +4,7 @@ paths:
   - "app/services/{competency_gate,coverage_exception}/**"
   - "app/models/{concept_mastery,kind_preferences,kind_difficulty,concept_drills,concept_hosts,ladder_coverage,exercise_history_entry,user,daily_exercise}.rb"
   - "app/controllers/{concept_drills,accounts,profile,api_keys}_controller.rb"
+  - "app/forms/profile_update.rb"
   - "app/controllers/concerns/exercise_mix_ladders.rb"
   - "app/views/api_keys/**"
   - "app/javascript/controllers/exercise_mix_controller.js"
@@ -84,9 +85,9 @@ read it before changing that area.
   `User#daily_section_count` is Automatic (nil) or a count in
   `User::DAILY_SECTION_COUNTS`. `DaySize.for` returns a fixed count before
   completion or the gate, and a fixed count never gains a coverage section.
-  `ProfileController` accepts only `"automatic"` or a listed count and 422s
-  anything else, since Active Record's integer cast would misread it. It is
-  not part of the Exercise mix version.
+  `ProfileUpdate` accepts only `"automatic"` or a whole number, since Active
+  Record's integer cast would misread anything else, and `User` 422s a count
+  outside the range. It is not part of the Exercise mix version.
 - **What the plan did, on the row**
   (`docs/decisions/what-the-plan-did-on-the-row.md`):
   `daily_exercises.plan_notes` records the planned size and reason on every

@@ -4,7 +4,7 @@
 
 The first-run question at `/welcome`: one choice of track, one PATCH, then
 Setup. Each button posts `choose_track: true` with its level, which
-`ProfileController` checks under the user-row lock and `User#choose_track`
+`ProfileUpdate` checks under the user-row lock and `User#choose_track`
 records. The levels come from `LevelSuggestion::LADDER`, so principal
 engineer is never offered here; Setup sets it by hand.
 

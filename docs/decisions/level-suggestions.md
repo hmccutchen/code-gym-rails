@@ -46,7 +46,7 @@ Not now records each kind's current rung and the newest reviewed response
 date, falling back to the user's today, so an offer returns only on newer
 results at that rung, five of them for a step up. Any change to a kind's
 rung, for every account, records the destination rung and today's date in
-the user's zone (`User#record_level_changes`): a target set, edited or
+the user's zone (`LevelChange#record_cutoffs`): a target set, edited or
 cleared, and a skill-level change, which moves every kind without a
 target. A rung that did not move records nothing, and a move to principal
 engineer records nothing. The first-run track choice records nothing. So
@@ -57,7 +57,7 @@ day, keeping any cutoff it already had: each account starts from five new
 results, and no card appears for at least five reviewed days after deploy. Evidence through
 a cutoff's date is ignored at its rung, and results at any other rung
 never count. Every save that touches a target or the skill level runs
-under the user-row lock (`ProfileController#locked_save?`), and so does
+under the user-row lock (`ProfileUpdate#locked_save?`), and so does
 dismissal, which merges into the reloaded map and keeps a later valid
 cutoff at the current rung. Its earlier evidence read cannot undo a newer
 dismissal or level-change cutoff. A different-level or malformed entry is

@@ -3,6 +3,8 @@
 What each listed file does.
 
 - `app/models/track_change.rb` — `TrackChange`: which per-kind targets a track change clears, the one statement of the rule; pure.
+- `app/forms/profile_update.rb` — `ProfileUpdate`: `PATCH /profile`'s form. Checks the posted shape, runs the stale-page and track-choice checks under the user-row lock, saves through `LevelChange` in one transaction, and returns an `Outcome` the controller maps to JSON; which values a field allows stays with `User`'s validators.
+- `app/models/level_change.rb` — `LevelChange`: one profile save's level bookkeeping, in the order `ProfileUpdate` calls it: clear the targets a track change covers, record cutoffs for kinds whose rung moved, then write the applied event rows.
 - `app/services/level_suggestion.rb` — pure proposal rules: one-rung moves up and back along junior, mid-level and senior, each kind judged on its own results, and the evidence counts a card and an event row show.
 - `app/services/level_suggestion/evidence.rb` — bounded, preloaded reviewed-response history projected into stamped, answered, rubric-graded results.
 - `app/services/reviewed_section_results.rb` — `ReviewedSectionResults`: which sections of one submitted, reviewed response count as evidence of work at a rung, optionally only under the current rubric. Pure over the response it is given; shared by `LevelSuggestion::Evidence` and `CompetencyGate::Evidence`.
@@ -10,10 +12,10 @@ What each listed file does.
 - `app/services/day_size.rb` — `DaySize`: the day's planned count and its reason, from the Daily sections setting, the completion count and the gate's `Plan`. Pure; its `Decision` also answers whether the brake is on, for the coverage exception, and what the `[set_size]` line logs.
 - `app/services/size_forecast.rb` — `SizeForecast`: whether tomorrow's Automatic set will be larger, or smaller because of the brake, than today's planned one, for the submitted dashboard's size lines.
 - `app/services/competency_gate/evidence.rb` — the gate's only query: every rubric-stamped reviewed day, oldest first, in batches, as `CompetencyGate::Day` values, each carrying the pair its row was planned with.
-- `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileController`.
+- `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileUpdate`.
 - `app/controllers/level_suggestion_dismissals_controller.rb` — records Not now and removed-kind cutoffs for the current user under the user-row lock, refusing a stale shown step with a 409, with a `dismissed` or `removed` event row for each kind whose cutoff moves forward.
 - `app/models/level_suggestion_step.rb` — `LevelSuggestionStep`: one move a card or Setup showed, and the boundary check on the steps they post.
-- `app/models/level_suggestion_event.rb` — `LevelSuggestionEvent`: one row per answer to a level suggestion (`applied`, `dismissed`, `removed`) with the evidence counts behind it; builds applied rows by rung, with `skill_level_edit` for a kind the skill level moved, from the state `User` passes in from before the save.
+- `app/models/level_suggestion_event.rb` — `LevelSuggestionEvent`: one row per answer to a level suggestion (`applied`, `dismissed`, `removed`) with the evidence counts behind it; builds applied rows by rung, with `skill_level_edit` for a kind the skill level moved, from the state `LevelChange` passes in from before the save.
 - `app/controllers/daily_kinds_controller.rb` — `PATCH /daily_kinds/:place`: maps a `DailyKindSwap` outcome to JSON, the reply, new pair and every daily card's re-rendered panel on a save, a 409 with the current pair and those panels for a stale page (panels only for the generation the page posts as `draft_scope`, else a `set_changed` sentence), and a 422 naming the reason for every other refusal
 - `app/controllers/level_suggestion_answers_controller.rb` — counts an answered proposal, which decides whether the next one applies in place or links to Setup.
 - `app/views/dashboard/_level_suggestion.html.erb` — submitted-day proposal with counts from the evidence, a removable list when several kinds share a destination, and in-place Apply/Not now saves.

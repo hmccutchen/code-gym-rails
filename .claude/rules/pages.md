@@ -51,8 +51,8 @@ read it before changing that area.
 - **Display preferences** (`docs/decisions/display-preferences.md`): Theme,
   background pattern, text size, line spacing and reading font, saved through
   `PATCH /profile`. `DisplayPreferences` is the one list of choices, defaults
-  first; storage is sparse jsonb, and `User` and `ProfileController` refuse
-  values outside the lists. The background pattern is on by default on
+  first; storage is sparse jsonb, and `User` refuses values outside the
+  lists. The background pattern is on by default on
   purpose, the one display change that needs no opt-in, so only an explicit
   `"off"` is stored. Every other default renders no `<html>` attribute or
   extra stylesheet. `#light_palette_media` drives the palette, logo and

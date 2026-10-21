@@ -57,10 +57,10 @@ for accounts that chose a track; a first-run spec passes
 `TrackChange` is the one statement of the rule: an unlocked target equal to
 the old or the new level is cleared, so that kind follows the track again;
 every other target stays, including a locked one and, on a two-rung move,
-one between the two levels. `User#apply_track_change` runs before every save
-and holds the change for a save that moves the track after the first
-choice. It is declared ahead of `bump_section_kind_preferences_version`, so
-a skill-level-only save that clears targets also bumps the version and an
+one between the two levels. `LevelChange#clear_track_targets` applies it in
+`ProfileUpdate`'s save, for a save that moves the track after the first
+choice, before the record is saved. So a skill-level-only save that clears
+targets also bumps the version, through `User`'s `before_save`, and an
 Exercise mix open in another tab gets the usual 409. A cleared kind whose rung
 moves gets a cutoff and a `skill_level_edit` event row, like any kind the
 skill level moved. Setup's track select saves through the same endpoint; the
