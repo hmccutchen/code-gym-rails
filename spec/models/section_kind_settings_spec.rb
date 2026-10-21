@@ -23,6 +23,10 @@ RSpec.describe SectionKindSettings do
     expect(settings(**retired, stored: {}).problems.map(&:first)).to include(:section_kind_levels, :locked_section_kinds)
   end
 
+  it "refuses a field it doesn't know, so a misspelt column fails instead of going unchecked" do
+    expect { described_class.new(section_kind_weight: {}) }.to raise_error(ArgumentError)
+  end
+
   it "says which fields changed" do
     edited = settings(locked_section_kinds: [ "pattern" ], section_kind_levels: { "pattern" => "senior" })
 
