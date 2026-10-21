@@ -147,11 +147,37 @@ class DailyResponse < ApplicationRecord
     end
   end
 
-  def pseudocode_claimed?(section, phase)
-    claimed_at = pseudocode_round(section)["#{phase}_claimed_at"]
+  def pseudocode_critique_claimed?(section)
+    claimed_at = pseudocode_round(section)["critique_claimed_at"]
     return false if claimed_at.blank?
 
     Time.zone.parse(claimed_at) > REVIEW_CLAIM_STALE_AFTER.ago
+  end
+
+  def claim_pseudocode_critique!(section)
+    token = Time.current.iso8601(6)
+    with_lock do
+      next if critiqued?(section) || pseudocode_critique_claimed?(section)
+
+      merge_pseudocode_round!(section, "critique_claimed_at" => token)
+      token
+    end
+  end
+
+  def record_pseudocode_critique!(section, token, pseudocode:, gaps_found:, gaps:)
+    with_lock do
+      next false unless holds_pseudocode_critique?(section, token)
+
+      merge_pseudocode_round!(section, "initial_pseudocode" => pseudocode, "gaps_found" => gaps_found, "critique" => gaps,
+                                       "critiqued_at" => Time.current.iso8601, "critique_claimed_at" => nil)
+      true
+    end
+  end
+
+  def release_pseudocode_critique!(section, token)
+    with_lock do
+      merge_pseudocode_round!(section, "critique_claimed_at" => nil) if holds_pseudocode_critique?(section, token)
+    end
   end
 
   def self_rating_for(section) = section_ratings[section.to_s]
@@ -256,4 +282,8 @@ class DailyResponse < ApplicationRecord
     bucket = ConceptBucket.for(section, daily_exercise.language)
     user.concept_exposure_count(concept, bucket, on_or_before: date) >= 2
   end
+
+  private
+
+  def holds_pseudocode_critique?(section, token) = token.present? && pseudocode_round(section)["critique_claimed_at"] == token
 end

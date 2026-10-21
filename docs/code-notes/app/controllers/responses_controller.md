@@ -78,7 +78,13 @@ truthy value and would let the action carry on.
 
 ## `#pseudocode_critique`
 
-Round 1: one text-only critique of the engineer's plan.
+Round 1: one text-only critique of the engineer's plan. The claim, the write
+and the release are `DailyResponse`'s (`#claim_pseudocode_critique!`), and
+the action keeps only the token. A critique whose claim went stale and was
+taken over is still shown to the engineer, since it was paid for, but it is
+not stored: the newer call's result is the one the round keeps, so a reload
+can show a different critique from the one first shown. If the newer call
+fails instead, its release leaves the round open and a new check is allowed.
 
 ## `#stale_answer_sections`
 
@@ -118,20 +124,6 @@ only after the request has passed validation.
 Rescues both `RecordInvalid` and `RecordNotUnique`, since the model validation
 and the unique index both guard uniqueness. The create runs inside a
 SAVEPOINT because `#create` already wraps it in a transaction.
-
-## `#claim_pseudocode_round!`
-
-Claims the round before the provider call, so a cap on a paid call also bounds
-the spend. The claim expires the way `#review`'s claim does.
-
-## `#write_pseudocode_round!`
-
-Writing the result also releases the claim, so the two can never disagree.
-
-## `#release_pseudocode_claim!`
-
-After a handled provider failure, the round is handed back so the engineer can
-retry without waiting out the stale window.
 
 ## `#pseudocode_error`
 

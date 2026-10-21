@@ -117,8 +117,11 @@ says what a deviation from one requires.
   call is declared with `Claimable` (`claim :name, column:, stale_after:`),
   released only with the token `#claim_<name>!` returned, and checked again
   under the row lock before anything is written, since a claim that went
-  stale may now belong to another caller. Anything that locks an exercise and
-  its response goes through `DailyExercise#with_response_locked`.
+  stale may now belong to another caller. The pseudocode critique claim is a
+  key inside a JSON column, so it lives on `DailyResponse`
+  (`#claim_pseudocode_critique!`) and keeps the same token rule under the row
+  lock. Anything that locks an exercise and its response goes through
+  `DailyExercise#with_response_locked`.
 - **The server decides; the page shows its answer** — when a page needs a
   rule the server owns, the browser holds no copy of it. The server renders its
   answer onto the page and sends it again in every reply, and the script only

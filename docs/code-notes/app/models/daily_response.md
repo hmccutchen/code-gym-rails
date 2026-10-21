@@ -76,9 +76,30 @@ the claim gone and writes nothing (`ResponsesController#store_review`).
 
 Nil values are dropped from the merged round. That lets a caller clear a claim in the same merge that records its result.
 
-## `#pseudocode_claimed?`
+## `#pseudocode_critique_claimed?`
 
 It reuses `REVIEW_CLAIM_STALE_AFTER` on purpose: both checks ask whether a paid provider call may still be running.
+
+## `#claim_pseudocode_critique!`
+
+Claims the round before the provider call, so the once-per-section cap on a
+paid call also bounds the spend. It returns the token it wrote, or nil when
+the round is critiqued or a fresh claim is in flight.
+
+This claim doesn't use `Claimable`, because it is a key inside the
+`pseudocode_rounds` JSON column, one per section, and `Claimable` takes a
+claim with one conditional `UPDATE` on a column. It keeps the same rules
+under the row lock instead: the token is the timestamp written, at
+microsecond precision, and only the caller holding it may write or release.
+
+## `#record_pseudocode_critique!` and `#release_pseudocode_critique!`
+
+Both check the token under the row lock first. A call that outran the stale
+window may find its claim taken over. Writing or clearing then would wipe the
+newer call's claim and let a third paid call start while the second is still
+running. Recording the result also releases the claim, so the two can never
+disagree. A release after a handled provider failure hands the round back, so
+the engineer can retry without waiting out the stale window.
 
 ## `#completeness`
 

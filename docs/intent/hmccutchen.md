@@ -82,3 +82,7 @@
   orchestration step `#471`
   **why:** I had the draft carry its user and language so the retry takes
   only the draft, kind and concept
+
+## Wed Oct 21
+- the pseudocode critique claim onto `DailyResponse`, with a token so a
+  stale caller can't clear a newer claim `#474`
