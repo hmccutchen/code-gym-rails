@@ -131,6 +131,8 @@ RSpec.describe "Pseudocode rounds", type: :request do
     end
 
     describe "a claim that goes stale while its call is still running" do
+      before { travel_to Time.current.change(hour: 12) }
+
       let!(:newer_claim) { (Time.current + DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).iso8601(6) }
 
       def take_over_mid_call
