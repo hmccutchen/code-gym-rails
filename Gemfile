@@ -13,7 +13,7 @@ gem "bcrypt", "~> 3.1.7"
 
 gem "resend"
 
-gem "pagy", "~> 43.7"
+gem "pagy", "~> 43.8"
 
 gem "rouge", "~> 5.1"
 
