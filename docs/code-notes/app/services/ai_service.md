@@ -86,9 +86,9 @@ no provider.
 
 ## `#generate_exercise`
 
-`blocking:` means a request thread is waiting on the call. The timeout policy
-for that case stays in this class, as the `generate_exercise` profile's
-`blocking_read_timeout` (`SYNC_GENERATION_READ_TIMEOUT`).
+`blocking:` means a request thread is waiting on the call. The timeout for
+that case is the `generate_exercise` profile's `blocking_read_timeout` in
+`CallProfiles::BY_PURPOSE` (`SYNC_GENERATION_READ_TIMEOUT`).
 
 ## `#review_grading_provider`
 
