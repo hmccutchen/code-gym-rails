@@ -77,7 +77,7 @@ RSpec.describe "Focusable controls are large enough not to trigger iOS zoom", ty
     travel_to(weekday) do
       seed_challenge_exercise
       visit_as(user)
-      expect(page).to have_css("textarea.answer", wait: 10)
+      expect(page).to have_css("textarea.answer")
 
       expect_no_undersized_controls(minimum_controls: 7)
     end
@@ -85,7 +85,7 @@ RSpec.describe "Focusable controls are large enough not to trigger iOS zoom", ty
 
   it "renders no undersized control on the login form" do
     visit login_path
-    expect(page).to have_css(".form-field input", wait: 10)
+    expect(page).to have_css(".form-field input")
 
     expect_no_undersized_controls(minimum_controls: 1)
   end
@@ -95,7 +95,7 @@ RSpec.describe "Focusable controls are large enough not to trigger iOS zoom", ty
       seed_reviewed_session
       visit_as(user)
       visit history_path
-      expect(page).to have_css(".follow-up-input", wait: 10)
+      expect(page).to have_css(".follow-up-input")
 
       expect_no_undersized_controls(minimum_controls: 1)
     end
@@ -106,7 +106,7 @@ RSpec.describe "Focusable controls are large enough not to trigger iOS zoom", ty
                               track_chosen_at: Time.current)
     visit_as(setup_user)
     visit setup_path
-    expect(page).to have_css("#tz-select", wait: 10)
+    expect(page).to have_css("#tz-select")
 
     expect_no_undersized_controls(minimum_controls: 1)
   end

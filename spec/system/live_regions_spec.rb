@@ -31,7 +31,7 @@ RSpec.describe "Live regions", type: :system, with_csrf: true do
     visit history_path
     click_button "Explain this differently", match: :first
 
-    expect(page).to have_css(".alternate-status", text: "A different explanation was added above", wait: 10)
+    expect(page).to have_css(".alternate-status", text: "A different explanation was added above")
     expect(page).to have_css(".alternate-item", text: FakeService::EXPLAIN_DIFFERENTLY_TEXT.first(30))
   end
 
@@ -42,7 +42,7 @@ RSpec.describe "Live regions", type: :system, with_csrf: true do
     find(".follow-up-input", match: :first).fill_in(with: "Why eager loading?")
     click_button "Ask", match: :first
 
-    expect(page).to have_css(".follow-up-thread[aria-live='polite'] .follow-up-turn", text: FakeService::FOLLOW_UP_ANSWER_TEXT.first(30), wait: 10)
+    expect(page).to have_css(".follow-up-thread[aria-live='polite'] .follow-up-turn", text: FakeService::FOLLOW_UP_ANSWER_TEXT.first(30))
   end
 
   it "announces a failed save assertively" do
@@ -50,7 +50,7 @@ RSpec.describe "Live regions", type: :system, with_csrf: true do
     visit learn_path
     page.execute_script(%(window.CodeGymSaveStatus.save("PATCH", "/no-such-endpoint", {}, "probe")))
 
-    expect(page).to have_css("#save-status", text: /couldn't save/i, wait: 5)
+    expect(page).to have_css("#save-status", text: /couldn't save/i)
     expect(page.find("#save-status-announcer", visible: :all)[:role]).to eq("alert")
     expect(live_text("#save-status-announcer")).to match(/couldn't save/i)
   end

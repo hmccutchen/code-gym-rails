@@ -12,7 +12,7 @@ RSpec.describe "Dashboard on-demand generation", type: :system do
       end
 
       # Waits on the page's own poll to reload; regex since CSS uppercases `.section-label` in the rendered text.
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
 
       # The judged path keeps only the kinds the plan chose, so which third and fourth render depends on the plan.
       exercise = DailyExercise.find_by!(user: user, date: Date.current)

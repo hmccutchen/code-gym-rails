@@ -86,3 +86,7 @@
 ## Wed Oct 21
 - the pseudocode critique claim onto `DailyResponse`, with a token so a
   stale caller can't clear a newer claim `#474`
+- one raising `wait_for` and one 20-second wait limit for the system specs
+  `#475`
+  **why:** I chose that a Submit clicked while a controller is still loading
+  should wait for it; the app already does, and the spec was fixed instead

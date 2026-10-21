@@ -24,7 +24,7 @@ RSpec.describe "Failed requests on the page", type: :system, with_csrf: true do
 
   def open_duck(user)
     visit_with_todays_set(user)
-    expect(page).to have_content(/Code Review/i, wait: 10)
+    expect(page).to have_content(/Code Review/i)
     duck = first(".duck-thread[data-duck-thread-section-value='code_review']")
     duck.find(".duck-toggle").click
     duck
@@ -40,7 +40,7 @@ RSpec.describe "Failed requests on the page", type: :system, with_csrf: true do
         duck.find(".duck-input").fill_in(with: "Why does this loop twice?")
         duck.find(".duck-send").click
 
-        expect(duck).to have_content(I18n.t("duck.send_failed"), wait: 10)
+        expect(duck).to have_content(I18n.t("duck.send_failed"))
         expect(duck.find(".duck-status").text).not_to match(RAW_TEXT)
         expect(duck.find(".duck-send")).not_to be_disabled
       end
@@ -61,7 +61,7 @@ RSpec.describe "Failed requests on the page", type: :system, with_csrf: true do
       duck.find(".duck-input").fill_in(with: "Why does this loop twice?")
       duck.find(".duck-send").click
 
-      expect(duck).to have_content("Gemini's daily limit is used up, so the thinking partner didn't answer.", wait: 10)
+      expect(duck).to have_content("Gemini's daily limit is used up, so the thinking partner didn't answer.")
     end
   end
 
@@ -79,7 +79,7 @@ RSpec.describe "Failed requests on the page", type: :system, with_csrf: true do
       duck.find(".duck-input").fill_in(with: "Why does this loop twice?")
       duck.find(".duck-send").click
 
-      expect(duck).to have_content(I18n.t("request.signed_out"), wait: 10)
+      expect(duck).to have_content(I18n.t("request.signed_out"))
     end
   end
 end

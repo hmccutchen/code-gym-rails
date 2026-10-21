@@ -7,7 +7,7 @@ RSpec.describe "Section folding", type: :system do
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
 
       first_field = rating_row_fields.first
       section = find(%(details.section[data-section-fold="#{first_field}"]))

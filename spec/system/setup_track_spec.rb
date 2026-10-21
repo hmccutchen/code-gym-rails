@@ -11,11 +11,6 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     end
   end
 
-  def wait_for(timeout)
-    deadline = Time.current + timeout
-    sleep 0.1 until yield || Time.current > deadline
-  end
-
   def checked_level(kind)
     find(".mix-difficulty[data-kind='#{kind}'] input[type=radio]:checked", visible: :all).value
   end
@@ -39,7 +34,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
 
     expect(page).to have_no_css("#save-status", text: /changed in another tab/i, wait: 2)
     expect(page).to have_css(".mix-difficulty[data-kind='code_review'] input[value='senior']:checked", visible: :all)
-    wait_for(5) { user.reload.section_kind_levels["code_review"] == "senior" }
+    wait_for { user.reload.section_kind_levels["code_review"] == "senior" }
     expect(user.reload.section_kind_levels).to include("code_review" => "senior")
     expect(page.evaluate_script("window.sameDocument")).to be(true)
   end
@@ -53,7 +48,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     find("#skill-level").select("Mid-level")
 
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
-    wait_for(5) { user.reload.section_kind_levels["code_review"] == "senior" }
+    wait_for { user.reload.section_kind_levels["code_review"] == "senior" }
     expect(user.reload.section_kind_levels).to eq("code_review" => "senior", "pattern" => "senior", "challenge" => "junior")
     expect(checked_level("code_review")).to eq("senior")
     expect(checked_level("design_comparison")).to eq("")
@@ -69,7 +64,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     find("#skill-level").select("Mid-level")
 
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Security")
-    wait_for(5) { user.reload.locked_section_kinds.include?("security_review") }
+    wait_for { user.reload.locked_section_kinds.include?("security_review") }
     expect(user.reload).to have_attributes(locked_section_kinds: match_array(%w[challenge security_review]))
     expect(user.section_kind_levels).to include("security_review" => "junior")
     expect(checked_level("security_review")).to eq("junior")
@@ -88,7 +83,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     find("#skill-level").select("Mid-level")
 
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
-    wait_for(5) { user.reload.section_kind_weights == { "security_review" => 0.25 } }
+    wait_for { user.reload.section_kind_weights == { "security_review" => 0.25 } }
     expect(user.reload.section_kind_weights).to eq("security_review" => 0.25)
     expect(user.section_kind_levels).to eq("pattern" => "senior", "challenge" => "junior")
     expect(checked_level("security_review")).to eq("")
@@ -103,7 +98,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Challenge")
     find(".mix-difficulty[data-kind='code_review'] input[value='mid_level']").click
 
-    wait_for(5) { user.reload.section_kind_levels["code_review"] == "mid_level" }
+    wait_for { user.reload.section_kind_levels["code_review"] == "mid_level" }
     expect(user.reload.section_kind_levels).to include("code_review" => "mid_level")
     expect(page).to have_no_css("#save-status", text: /changed in another tab/i)
     expect(user.level_suggestion_events.where(kind: "code_review").last.source).to eq("setup_edit")
@@ -131,7 +126,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     sleep 0.6
     find("#skill-level").select("Mid-level")
 
-    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 5)
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
     expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all)
   end
 
@@ -156,8 +151,8 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     sleep 0.6
     find("#skill-level").select("Mid-level")
 
-    expect(page).to have_css("#save-status", text: /couldn't save/i, wait: 5)
-    wait_for(5) { user.reload.section_kind_levels["code_review"] == "senior" }
+    expect(page).to have_css("#save-status", text: /couldn't save/i)
+    wait_for { user.reload.section_kind_levels["code_review"] == "senior" }
     expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all)
     expect(user.reload.skill_level).to eq("junior")
   end
@@ -181,7 +176,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     find("#skill-level").select("Mid-level")
 
     expect(page).to have_css("#mix-ladder-preparation button[disabled]", visible: :all)
-    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 5)
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
     expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all)
   end
 
@@ -204,8 +199,8 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     sleep 0.3
     find(".mix-difficulty[data-kind='security_review'] .mix-lock-box").click
 
-    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 5)
-    wait_for(5) { user.reload.locked_section_kinds.include?("security_review") }
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
+    wait_for { user.reload.locked_section_kinds.include?("security_review") }
     expect(user.reload).to have_attributes(locked_section_kinds: match_array(%w[challenge security_review]))
     expect(user.section_kind_levels).to include("security_review" => "junior")
     expect(user.section_kind_levels).not_to include("code_review")
@@ -240,8 +235,8 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     find("#skill-level").select("Mid-level")
     find(".mix-difficulty[data-kind='design_comparison'] input[value='mid_level']").click
 
-    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 5)
-    wait_for(8) { user.reload.section_kind_levels["design_comparison"] == "mid_level" }
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
+    wait_for { user.reload.section_kind_levels["design_comparison"] == "mid_level" }
     expect(user.reload).to have_attributes(
       skill_level: "mid_level", section_kind_weights: { "security_review" => 0.25 },
       section_kind_levels: { "code_review" => "senior", "design_comparison" => "mid_level", "pattern" => "senior", "challenge" => "junior" }
@@ -277,8 +272,8 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     find("#skill-level").select("Mid-level")
     find(".mix-difficulty[data-kind='design_comparison'] input[value='mid_level']").click
 
-    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 6)
-    wait_for(8) { user.reload.section_kind_levels["design_comparison"] == "mid_level" }
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
+    wait_for { user.reload.section_kind_levels["design_comparison"] == "mid_level" }
     expect(user.reload).to have_attributes(
       skill_level: "mid_level", section_kind_weights: { "security_review" => 0.25 },
       section_kind_levels: { "code_review" => "senior", "design_comparison" => "mid_level", "pattern" => "senior", "challenge" => "junior" }
@@ -308,10 +303,10 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       slider.value = 0;
       slider.dispatchEvent(new Event("input", { bubbles: true }));
     JS
-    expect(page).to have_css("#skill-level:not([disabled])", wait: 5)
+    expect(page).to have_css("#skill-level:not([disabled])")
     find("#skill-level").select("Senior")
 
-    wait_for(10) { user.reload.skill_level == "senior" && user.section_kind_weights.present? }
+    wait_for { user.reload.skill_level == "senior" && user.section_kind_weights.present? }
     sleep 1
     expect(user.reload).to have_attributes(
       skill_level: "senior", section_kind_weights: { "security_review" => 0.25 },
@@ -348,8 +343,8 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     page.execute_script(%(moveSlider("default")))
     find("#skill-level").select("Mid-level")
 
-    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 6)
-    wait_for(8) { user.reload.skill_level == "mid_level" }
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
+    wait_for { user.reload.skill_level == "mid_level" }
     sleep 1
     expect(user.reload.section_kind_weights).to eq({})
     expect(page.evaluate_script(%(document.querySelector("#weight-security_review").value))).to eq(
@@ -384,8 +379,8 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     sleep 0.6
     find("#skill-level").select("Mid-level")
 
-    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 6)
-    wait_for(8) { user.reload.skill_level == "mid_level" }
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
+    wait_for { user.reload.skill_level == "mid_level" }
     sleep 1
     expect(user.reload.section_kind_weights).to eq("security_review" => 0.25)
     expect(user.section_kind_levels).to include("design_comparison" => "senior")
@@ -418,10 +413,10 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     page.execute_script(%(moveSlider("1")))
     find("#skill-level").select("Mid-level")
     page.execute_script(%(moveSlider("0")))
-    expect(page).to have_css("#skill-level:not([disabled])", wait: 5)
+    expect(page).to have_css("#skill-level:not([disabled])")
     find("#skill-level").select("Senior")
 
-    wait_for(10) { user.reload.skill_level == "senior" }
+    wait_for { user.reload.skill_level == "senior" }
     sleep 1.5
     expect(user.reload.section_kind_weights).to eq("security_review" => 0.25)
     expect(page.evaluate_script(%(document.querySelector("#weight-security_review").value))).to eq("0")
@@ -449,7 +444,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     JS
 
     expect(page).to have_css("#skill-level[disabled]")
-    expect(page).to have_css("#skill-level:not([disabled])", wait: 5)
+    expect(page).to have_css("#skill-level:not([disabled])")
     expect(page.evaluate_script(%(document.activeElement.id))).to eq("skill-level")
     expect(user.reload.skill_level).to eq("mid_level")
   end
@@ -474,7 +469,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       document.getElementById("weight-security_review").focus();
     JS
 
-    expect(page).to have_css("#skill-level:not([disabled])", wait: 5)
+    expect(page).to have_css("#skill-level:not([disabled])")
     expect(page.evaluate_script(%(document.activeElement.id))).to eq("weight-security_review")
   end
 
@@ -492,7 +487,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
 
     find("#skill-level").select("Mid-level")
 
-    expect(page).to have_css("#save-status", text: /couldn't save/i, wait: 5)
+    expect(page).to have_css("#save-status", text: /couldn't save/i)
     expect(page).to have_css("#skill-level:not([disabled])")
     expect(user.reload.skill_level).to eq("junior")
   end
@@ -516,8 +511,8 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     find(".mix-difficulty[data-kind='security_review'] input[value='senior']").click
     find(".mix-difficulty[data-kind='security_review'] input[value='junior']").click
 
-    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern", wait: 6)
-    wait_for(5) { user.reload.section_kind_levels["security_review"] == "junior" }
+    expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
+    wait_for { user.reload.section_kind_levels["security_review"] == "junior" }
     expect(user.reload.section_kind_levels).to include("security_review" => "junior")
     expect(user.section_kind_levels).not_to include("code_review")
     expect(checked_level("security_review")).to eq("junior")

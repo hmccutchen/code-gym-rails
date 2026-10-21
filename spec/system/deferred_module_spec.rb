@@ -3,7 +3,7 @@ require "rails_helper"
 # with_csrf: the submit action reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 RSpec.describe "Interaction before the deferred modules run", type: :system, with_csrf: true do
   let(:user) { create_fake_provider_user }
-  let(:stalled) { { modules: false, controller: nil, missing: nil } }
+  let(:stalled) { { modules: false, controller: nil, missing: nil, held: nil } }
   let(:errors) { [] }
 
   before do
@@ -12,6 +12,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       next [ 404, { "cache-control" => "no-store" }, [] ] if stalled[:missing] && path.include?(stalled[:missing])
       module_asset = path.include?("code_gym/") || path.include?("_controller")
       sleep 3 if (stalled[:modules] && path.include?("code_gym/")) || (stalled[:controller] && path.include?(stalled[:controller]))
+      wait_for { stalled[:held].nil? } if stalled[:held] && path.include?(stalled[:held])
       status, headers, body = original.call(env)
       headers["cache-control"] = "no-store" if module_asset
       [ status, headers, body ]
@@ -33,17 +34,11 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     end
   end
 
-  # Monotonic, not Time.current: these examples run inside travel_to, where a frozen clock never passes a deadline.
-  def wait_for(timeout = 10)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
-    sleep 0.1 until yield || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
-  end
-
   it "drops a Submit click made while the modules are still loading rather than posting the day" do
     travel_to(a_weekday) do
       watch_page_errors
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       fields = rating_row_fields
       fields.each { |field| fill_in_answer(field, "A substantive answer for #{field} that clears the length floor.") }
       fields.each { |field| rate_section(field) }
@@ -57,21 +52,23 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       expect(user.daily_responses.sole).not_to be_submitted
 
       stalled[:modules] = false
-      Timeout.timeout(20) { sleep 0.1 until answer_form_connected? }
+      wait_for { answer_form_connected? }
       click_button "Submit answers"
 
-      expect(page).to have_content("Review ready!", wait: 20)
+      expect(page).to have_content("Review ready!")
       expect(user.daily_responses.sole.reload).to be_submitted
       expect(errors).to be_empty
     end
   end
 
-  def answer_form_connected?
-    page.evaluate_script(<<~JS)
+  def connected_js(identifier)
+    <<~JS
       !!(window.Stimulus && window.Stimulus.getControllerForElementAndIdentifier(
-        document.querySelector('[data-controller~="answer-form"]'), "answer-form"))
+        document.querySelector('[data-controller~="#{identifier}"]'), "#{identifier}"))
     JS
   end
+
+  def answer_form_connected? = page.evaluate_script(connected_js("answer-form"))
 
   # Pull-to-refresh reloads once pending() is false, so a typed answer must count before the modules arrive.
   it "counts an answer typed while the modules are still loading as pending, then saves it" do
@@ -80,7 +77,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     travel_to(a_weekday) do
       watch_page_errors
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
 
       reload_with_modules_stalled do |pw|
         pending = pw.evaluate(<<~JS)
@@ -106,13 +103,13 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     travel_to(a_weekday) do
       watch_page_errors
       visit_with_todays_set(user)
-      expect(page).to have_css(%([data-comparison-answer="design_comparison"]), wait: 10)
+      expect(page).to have_css(%([data-comparison-answer="design_comparison"]))
       fill_in_answer("design_comparison", reason)
       rate_section("design_comparison")
       wait_for { user.daily_responses.reload.first&.answers&.dig("design_comparison").to_s.start_with?("pick:a") }
 
       url = page.current_url
-      stalled[:controller] = "comparison_answer_controller"
+      stalled[:held] = "comparison_answer_controller"
 
       page.driver.with_playwright_page do |pw|
         pw.goto(url, waitUntil: "commit")
@@ -122,10 +119,13 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
             box.querySelectorAll('input[type="radio"]')[1].click();
           })()
         JS
+        wait_for { pw.evaluate(connected_js("answer-form")) }
+        expect(pw.evaluate(connected_js("comparison-answer"))).to be(false)
         pw.evaluate("[...document.querySelectorAll('button')].find((b) => /Submit answers/i.test(b.textContent)).click()")
       end
+      stalled[:held] = nil
 
-      wait_for(20) { user.daily_responses.reload.first&.submitted? }
+      wait_for { user.daily_responses.reload.first&.submitted? }
       expect(user.daily_responses.sole.answers["design_comparison"]).to eq("pick:b\n#{reason}")
       expect(errors).to be_empty
     end
@@ -136,18 +136,18 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_css(%([data-comparison-answer="design_comparison"]), wait: 10)
+      expect(page).to have_css(%([data-comparison-answer="design_comparison"]))
       fill_in_answer("design_comparison", reason)
       rate_section("design_comparison")
       wait_for { user.daily_responses.reload.first&.answers&.dig("design_comparison").to_s.start_with?("pick:a") }
 
       stalled[:missing] = "comparison_answer_controller"
       visit current_path
-      Timeout.timeout(20) { sleep 0.1 until answer_form_connected? }
+      wait_for { answer_form_connected? }
       within(%([data-comparison-answer="design_comparison"])) { all('input[type="radio"]')[1].click }
       click_button "Submit answers"
 
-      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.controls_not_ready"), wait: 20)
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.controls_not_ready"))
       expect(page).to have_button("Submit answers", disabled: false)
       expect(user.daily_responses.sole.reload).not_to be_submitted
       expect(user.daily_responses.sole.answers["design_comparison"]).to eq("pick:a\n#{reason}")
@@ -160,7 +160,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     travel_to(a_weekday) do
       watch_page_errors
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
 
       url = page.current_url
       stalled[:controller] = "answer_form_controller"
@@ -263,7 +263,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(user.reload.section_kind_levels).to eq("pattern" => "senior")
 
     find("#exercise-mix summary").click
-    expect(page).to have_css(".mix-difficulty[data-kind='challenge'] input[type=radio][value='']:checked", visible: :all, wait: 10)
+    expect(page).to have_css(".mix-difficulty[data-kind='challenge'] input[type=radio][value='']:checked", visible: :all)
     find(".mix-difficulty[data-kind='challenge'] input[value='senior']").click
 
     wait_for { user.reload.section_kind_levels["challenge"] == "senior" }
@@ -301,8 +301,8 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(user.reload.skill_level).to eq("junior")
     expect(page).to have_css("#mix-ladder-preparation button[disabled]", visible: :all)
 
-    wait_for(15) { user.reload.skill_level == "mid_level" }
-    expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all, wait: 5)
+    wait_for { user.reload.skill_level == "mid_level" }
+    expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all)
     expect(errors).to be_empty
   end
 
@@ -344,7 +344,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
 
     sleep 1
     expect(user.reload.anonymized_at).to be_nil
-    wait_for(20) { !page.driver.with_playwright_page { |pw| pw.evaluate(%(document.querySelector("#delete-account-form button").disabled)) } }
+    wait_for { !page.driver.with_playwright_page { |pw| pw.evaluate(%(document.querySelector("#delete-account-form button").disabled)) } }
     expect(errors).to be_empty
   end
 
@@ -364,7 +364,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       expect(pw.evaluate(%(document.querySelector("#push-enable").disabled))).to be(true)
     end
 
-    wait_for(20) { !page.driver.with_playwright_page { |pw| pw.evaluate(%(document.querySelector("#push-enable").disabled)) } }
+    wait_for { !page.driver.with_playwright_page { |pw| pw.evaluate(%(document.querySelector("#push-enable").disabled)) } }
     expect(page).to have_button("Turn on daily reminders", disabled: false)
     expect(errors).to be_empty
   ensure
@@ -390,7 +390,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       JS
     end
 
-    wait_for(20) { user.reload.name == "Typed Early" }
+    wait_for { user.reload.name == "Typed Early" }
     expect(user.reload.name).to eq("Typed Early")
     expect(errors).to be_empty
   end
@@ -402,7 +402,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     travel_to(a_weekday) do
       watch_page_errors
       visit_with_todays_set(user)
-      expect(page).to have_css(%([data-comparison-answer="design_comparison"]), wait: 10)
+      expect(page).to have_css(%([data-comparison-answer="design_comparison"]))
 
       reload_with_modules_stalled do |pw|
         pw.evaluate(<<~JS)
@@ -414,7 +414,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
         JS
       end
 
-      wait_for(20) { user.daily_responses.reload.first&.answers&.dig("design_comparison").to_s.include?(reason) }
+      wait_for { user.daily_responses.reload.first&.answers&.dig("design_comparison").to_s.include?(reason) }
       expect(user.daily_responses.sole.answers["design_comparison"]).to eq("pick:a\n#{reason}")
       expect(errors).to be_empty
     end
@@ -445,7 +445,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       expect(connected).to be(false)
     end
 
-    expect(page).to have_css("#learn-empty", visible: :visible, wait: 20)
+    expect(page).to have_css("#learn-empty", visible: :visible)
     expect(page).to have_no_css(".learn-entry", visible: :visible)
     expect(errors).to be_empty
   end

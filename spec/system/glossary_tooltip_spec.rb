@@ -12,7 +12,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
     DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails",
                           generated_at: Time.current, problem_set: problem_set)
     visit_as(user)
-    expect(page).to have_content(/Code Review/i, wait: 10)
+    expect(page).to have_content(/Code Review/i)
   end
 
   # The page already overflows slightly from the snippet, so assert opening a panel adds nothing, not a zero total.

@@ -30,9 +30,8 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     expect(values.last).to eq(tint)
   end
 
-  def stored(timeout: 5)
-    deadline = Time.current + timeout
-    sleep 0.1 until yield(user.reload.display_preferences) || Time.current > deadline
+  def stored
+    wait_for { yield(user.reload.display_preferences) }
     user.reload.display_preferences
   end
 
@@ -148,11 +147,11 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     expect(page).to have_css("nav .brand-mark")
     # currentSrc reads empty while the new source loads, so wait for the light mark itself.
     light_mark = %r{/brand-mark-light-[0-9a-f]+\.png}
-    Timeout.timeout(5) { sleep 0.05 until logo.call.match?(light_mark) }
+    wait_for { logo.call.match?(light_mark) }
     expect(logo.call).to match(light_mark)
 
     choose_display("theme", "dark")
-    Timeout.timeout(5) { sleep 0.05 until logo.call.match?(dark_mark) }
+    wait_for { logo.call.match?(dark_mark) }
   end
 
   it "stores the later of two quick choices even when the first save is slow to leave" do
@@ -182,7 +181,7 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_css("pre.snippet", wait: 10)
+      expect(page).to have_css("pre.snippet")
 
       family = ->(selector) { page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).fontFamily") }
       expect(family.call(".question")).to include("Atkinson Hyperlegible")
@@ -198,7 +197,7 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_css(".progress-sticky", wait: 10)
+      expect(page).to have_css(".progress-sticky")
 
       sticky = page.evaluate_script("(() => { const s = document.querySelector('.progress-sticky'); return [s.scrollHeight, s.clientHeight]; })()")
       expect(sticky.first).to be <= sticky.last

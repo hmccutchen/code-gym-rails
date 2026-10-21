@@ -18,13 +18,13 @@ RSpec.describe "Save status", type: :system do
   it "reports a dropped connection while answers are auto-saving" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
 
       break_the_network
       find(%(textarea[data-field="code_review"]))
         .fill_in(with: "An answer the server is never going to receive.")
 
-      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"), wait: 5)
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"))
       expect(user.daily_responses).to be_empty
     end
   end
@@ -32,14 +32,14 @@ RSpec.describe "Save status", type: :system do
   it "replaces a stale answer form when another tab has submitted the day" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       exercise = user.daily_exercises.sole
       saved = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
         submitted_at: Time.current, answers: { "code_review" => "The answer already submitted" })
 
       find(%(textarea[data-field="code_review"])).fill_in(with: "This late edit must not replace the submission")
 
-      expect(page).to have_no_css("#gym-form", wait: 10)
+      expect(page).to have_no_css("#gym-form")
       expect(page).to have_content("The answer already submitted")
       expect(saved.reload.answers["code_review"]).to eq("The answer already submitted")
     end
@@ -48,12 +48,12 @@ RSpec.describe "Save status", type: :system do
   it "reloads a form left open across a regeneration instead of saving into the new set" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       user.daily_exercises.sole.update!(generated_at: 1.minute.from_now)
 
       find(%(textarea[data-field="code_review"])).fill_in(with: "Text written for the set before it was replaced")
 
-      expect(page).to have_css("#save-status", text: /the set changed/i, wait: 10)
+      expect(page).to have_css("#save-status", text: /the set changed/i)
       expect(user.daily_responses).to be_empty
     end
   end
@@ -61,26 +61,26 @@ RSpec.describe "Save status", type: :system do
   it "shows a carried explanation on the page the reload lands on" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       page.execute_script("window.CodeGymSaveStatus.carry('answers', 'That last change wasn\\'t saved')")
 
       page.refresh
 
-      expect(page).to have_css("#save-status", text: /that last change wasn't saved/i, wait: 10)
+      expect(page).to have_css("#save-status", text: /that last change wasn't saved/i)
     end
   end
 
   it "shows a carried explanation only once" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       page.execute_script("window.CodeGymSaveStatus.carry('answers', 'That last change wasn\\'t saved')")
 
       page.refresh
-      expect(page).to have_css("#save-status", text: /that last change wasn't saved/i, wait: 10)
+      expect(page).to have_css("#save-status", text: /that last change wasn't saved/i)
       page.refresh
 
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       expect(page).to have_no_css("#save-status", visible: true)
     end
   end
@@ -88,12 +88,12 @@ RSpec.describe "Save status", type: :system do
   it "keeps a carried explanation off a page it was not about" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       page.execute_script("window.CodeGymSaveStatus.carry('answers', 'A message about the dashboard')")
 
       visit history_path
 
-      expect(page).to have_css("h1", wait: 10)
+      expect(page).to have_css("h1")
       expect(page).to have_no_css("#save-status", visible: true)
     end
   end
@@ -101,7 +101,7 @@ RSpec.describe "Save status", type: :system do
   it "reloads a stale rated form without restoring a skipped section's discarded rating" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       exercise = user.daily_exercises.sole
       saved = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
         submitted_at: Time.current,
@@ -111,7 +111,7 @@ RSpec.describe "Save status", type: :system do
       find('textarea[data-field="pattern"]').fill_in(with: "An answer from the stale tab")
       rate_section("pattern", value: "too_hard")
 
-      expect(page).to have_no_css("#gym-form", wait: 10)
+      expect(page).to have_no_css("#gym-form")
       expect(page).to have_content("The final submitted answer")
       expect(page).not_to have_selector(".history-pill", text: "Pattern: too hard")
       expect(saved.reload.answers["pattern"]).to eq("")
@@ -126,7 +126,7 @@ RSpec.describe "Save status", type: :system do
 
     exclude_every_fourth_kind
 
-    expect(page).to have_css("#save-status", text: /at least one fourth section/i, wait: 5)
+    expect(page).to have_css("#save-status", text: /at least one fourth section/i)
     expect(user.reload.excluded_section_kinds).not_to match_array(ExerciseSection.fourths.map(&:key))
   end
 
@@ -139,7 +139,7 @@ RSpec.describe "Save status", type: :system do
     user.anonymize!
     find("#weight-challenge").set(0)
 
-    expect(page).to have_css("#save-status", exact_text: I18n.t("request.signed_out"), wait: 5)
+    expect(page).to have_css("#save-status", exact_text: I18n.t("request.signed_out"))
   end
 
   # These three controls PATCH the same path, so an unkeyed status would let one control's success hide another's warning.
@@ -149,13 +149,12 @@ RSpec.describe "Save status", type: :system do
     find("#exercise-mix summary").click
 
     exclude_every_fourth_kind
-    expect(page).to have_css("#save-status", wait: 5)
+    expect(page).to have_css("#save-status")
 
     find("#tz-select").select("Pacific")
 
     # Waits on the write, not the DOM: the fetch resolves independently of Capybara.
-    deadline = Time.current + 5
-    sleep 0.1 until user.reload.time_zone == "America/Los_Angeles" || Time.current > deadline
+    wait_for { user.reload.time_zone == "America/Los_Angeles" }
 
     expect(user.reload.time_zone).to eq("America/Los_Angeles")
     expect(page).to have_css("#save-status", text: /at least one fourth section/i)
@@ -167,12 +166,12 @@ RSpec.describe "Save status", type: :system do
     find("#exercise-mix summary").click
 
     exclude_every_fourth_kind
-    expect(page).to have_css("#save-status", wait: 5)
+    expect(page).to have_css("#save-status")
 
     # Un-excluding one leaves a kind in the group, so this payload is accepted.
     find("#exclude-#{ExerciseSection.fourths.first.key}").click
 
-    expect(page).to have_no_css("#save-status", visible: true, wait: 5)
+    expect(page).to have_no_css("#save-status", visible: true)
     expect(user.reload.excluded_section_kinds)
       .to match_array(ExerciseSection.fourths.drop(1).map(&:key))
   end
