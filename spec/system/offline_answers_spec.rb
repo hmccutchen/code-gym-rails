@@ -21,7 +21,6 @@ RSpec.describe "Answers through a lost connection", type: :system do
   def open_dashboard
     visit_with_todays_set(user)
     expect(page).to have_content(/Code Review/i)
-    wait_for_js
   end
 
   def keep_an_unsent_answer

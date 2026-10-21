@@ -55,14 +55,18 @@ only the posted body, so it gets the purpose from the system prompt with
 purpose to a phrase its system prompt carries. Provider specs send a request
 through `call_provider` (`spec/support/provider_call_helpers.rb`), which
 builds it with `AiService::Request.build` and its defaults.
+
 A system spec waits through Capybara's matchers or `wait_for`
 (`spec/support/system_test_helper.rb`), never a hand-written `sleep ... until`
 loop or `Timeout.timeout`, and passes no `wait:` beyond a deliberately short
 negative check: every wait follows `Capybara.default_max_wait_time`, and
 `wait_for` raises on timeout instead of returning silently (#456).
+`spec/conventions/system_spec_waits_spec.rb` fails on either.
+
 A system spec that needs today's set calls `visit_with_todays_set(user)`,
-which generates it before the first page load; visiting first would wait out
-the dashboard's 3-second "generating" poll. `dashboard_generation_spec.rb` is
+which generates it before the first page load, since visiting first would wait
+out the dashboard's 3-second "generating" poll, and returns only once every
+controller on the page has connected (`wait_for_js`). `dashboard_generation_spec.rb` is
 the one spec that goes through that poll on purpose.
 Running them locally requires a one-time install of the pinned Playwright CLI
 and a Chromium build, the same commands CI runs:

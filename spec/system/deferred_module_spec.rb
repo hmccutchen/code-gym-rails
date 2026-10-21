@@ -3,7 +3,7 @@ require "rails_helper"
 # with_csrf: the submit action reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 RSpec.describe "Interaction before the deferred modules run", type: :system, with_csrf: true do
   let(:user) { create_fake_provider_user }
-  let(:stalled) { { modules: false, controller: nil, missing: nil } }
+  let(:stalled) { { modules: false, controller: nil, missing: nil, held: nil } }
   let(:errors) { [] }
 
   before do
@@ -12,6 +12,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       next [ 404, { "cache-control" => "no-store" }, [] ] if stalled[:missing] && path.include?(stalled[:missing])
       module_asset = path.include?("code_gym/") || path.include?("_controller")
       sleep 3 if (stalled[:modules] && path.include?("code_gym/")) || (stalled[:controller] && path.include?(stalled[:controller]))
+      wait_for { stalled[:held].nil? } if stalled[:held] && path.include?(stalled[:held])
       status, headers, body = original.call(env)
       headers["cache-control"] = "no-store" if module_asset
       [ status, headers, body ]
@@ -108,7 +109,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       wait_for { user.daily_responses.reload.first&.answers&.dig("design_comparison").to_s.start_with?("pick:a") }
 
       url = page.current_url
-      stalled[:controller] = "comparison_answer_controller"
+      stalled[:held] = "comparison_answer_controller"
 
       page.driver.with_playwright_page do |pw|
         pw.goto(url, waitUntil: "commit")
@@ -122,6 +123,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
         expect(pw.evaluate(connected_js("comparison-answer"))).to be(false)
         pw.evaluate("[...document.querySelectorAll('button')].find((b) => /Submit answers/i.test(b.textContent)).click()")
       end
+      stalled[:held] = nil
 
       wait_for { user.daily_responses.reload.first&.submitted? }
       expect(user.daily_responses.sole.answers["design_comparison"]).to eq("pick:b\n#{reason}")

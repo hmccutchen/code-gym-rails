@@ -7,7 +7,6 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
   before do
     visit_with_todays_set(user)
-    wait_for_js
   end
 
   def panel(place) = find("#daily-kind-swap-panel-#{place}")
@@ -20,15 +19,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
   def focused(script) = page.evaluate_script("document.activeElement.#{script}")
 
-  def trigger_focused?
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Capybara.default_max_wait_time
-    loop do
-      return true if page.evaluate_script("document.activeElement.classList.contains('daily-kind-trigger')")
-      return false if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
-
-      sleep 0.05
-    end
-  end
+  def trigger_focused? = wait_for { page.evaluate_script("document.activeElement.classList.contains('daily-kind-trigger')") }
 
   def open_sheet(place)
     within(panel(place)) { find("button.daily-kind-trigger").click }
@@ -427,7 +418,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
   def retry_swap_and_expect_reload
     confirm_swap(1, "pattern")
-    wait_for_js_condition("window.swapPage === undefined", timeout: 8)
+    wait_for_js_condition("window.swapPage === undefined")
     expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
   end
 
@@ -451,7 +442,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page.evaluate_script("window.swapPage")).to be(true)
 
     release_swap
-    wait_for_js_condition("window.swapPage === undefined", timeout: 8)
+    wait_for_js_condition("window.swapPage === undefined")
     expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
   end
 
@@ -513,13 +504,13 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     page.execute_script("window.firstPage = true")
     fill_in_answer("code_review", "An edit on the old set that the server refuses as stale.")
 
-    wait_for_js_condition("window.firstPage === undefined", timeout: 8)
+    wait_for_js_condition("window.firstPage === undefined")
     expect(page).to have_css("[data-controller='generating']")
     expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.stale_reloaded"))
     page.execute_script("window.reviewPage = true")
     response.update!(reviewing_since: nil)
 
-    wait_for_js_condition("window.reviewPage === undefined", timeout: 10)
+    wait_for_js_condition("window.reviewPage === undefined")
     expect(page).to have_no_css("[data-controller='generating']")
   end
 

@@ -179,8 +179,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
       duck.find(".duck-clear").click
       cleared = -> { DuckThread.first.reload.stored_turns("code_review").empty? }
-      50.times { cleared.call ? break : sleep(0.2) }
-      expect(cleared.call).to be(true)
+      wait_for { cleared.call }
 
       duck = reopen_duck
       expect(duck).to have_no_css(".duck-turn")

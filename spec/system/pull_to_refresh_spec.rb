@@ -80,12 +80,7 @@ RSpec.describe "Pull to refresh", type: :system do
     page.execute_script("window.__beforePull = true")
   end
 
-  def reloaded?
-    wait_for { page.evaluate_script("window.__beforePull === undefined") }
-    true
-  rescue Timeout::Error
-    false
-  end
+  def reloaded? = wait_for { page.evaluate_script("window.__beforePull === undefined") }
 
   def still_the_same_page?
     sleep 0.5

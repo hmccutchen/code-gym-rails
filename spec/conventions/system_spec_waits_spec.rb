@@ -5,8 +5,8 @@ RSpec.describe "Conventions held over system spec waits" do
 
   def relative(path) = Pathname(path).relative_path_from(Rails.root).to_s
 
-  def offending_lines(pattern)
-    system_files.flat_map do |path|
+  def offending_lines(pattern, except: [])
+    (system_files - except.map { |path| Rails.root.join(path).to_s }).flat_map do |path|
       File.readlines(path).filter_map.with_index(1) do |line, number|
         "#{relative(path)}:#{number}" if line.match?(pattern)
       end
@@ -14,7 +14,9 @@ RSpec.describe "Conventions held over system spec waits" do
   end
 
   it "waits through Capybara or wait_for, never a hand-written poll loop" do
-    offenders = offending_lines(/\bTimeout\.timeout\b|\bsleep\b[^#\n]*\b(?:until|while)\b|\bdef wait_(?:for|until)\b/)
+    loop_shapes = [ /\bTimeout\.timeout\b/, /^[^#]*\bsleep\b[^#]*\b(?:until|while)\b/, /\.times\s*\{[^}]*\bsleep\b/,
+                    /\bdef wait_(?:for|until)\b/, /\bCLOCK_MONOTONIC\b/ ]
+    offenders = offending_lines(Regexp.union(loop_shapes))
 
     expect(offenders).to be_empty, <<~MESSAGE
       Hand-written wait in a system spec: #{offenders.join(', ')}.
@@ -23,8 +25,9 @@ RSpec.describe "Conventions held over system spec waits" do
     MESSAGE
   end
 
-  it "passes no wait: longer than a deliberate short negative check" do
-    offenders = offending_lines(/\bwait: (?:[3-9]|\d{2,})\b/)
+  it "passes no wait: or timeout: longer than a deliberate short negative check" do
+    limits = [ /\bwait: (?:[3-9]|\d{2,})\b/, /\bsynchronize\(\d/, /\bwait_for_js_condition\b.*\btimeout:/ ]
+    offenders = offending_lines(Regexp.union(limits), except: [ "spec/system/wait_for_js_condition_spec.rb" ])
 
     expect(offenders).to be_empty, <<~MESSAGE
       Explicit Capybara wait in a system spec: #{offenders.join(', ')}.

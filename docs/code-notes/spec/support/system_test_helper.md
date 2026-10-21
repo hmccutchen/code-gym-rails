@@ -15,7 +15,7 @@ fails fast instead of timing out.
 
 `Target closed` is not one of them. It means the page, context or browser
 is gone, and asking the same page again cannot bring it back, so swallowing
-it would turn a crash into an unrelated timeout ten seconds later.
+it would turn a crash into an unrelated timeout at the end of the wait limit.
 
 ## `PollingHelper#wait_for`
 
@@ -37,3 +37,10 @@ so the longer limit costs a passing run nothing; it only makes a real
 failure take longer to report. `wait_for` and `wait_for_js_condition` use the
 same value, so the suite has one wait to tune.
 
+## `visit_with_todays_set` ends with `wait_for_js`
+
+Text on the dashboard is rendered by the server, so seeing it says nothing
+about `answer_form_controller` having connected. An example that typed or
+clicked straight away raced the modules, and on a loaded run it lost. Waiting
+for `html[data-js-ready]` holds until every controller on the page has
+connected, or `application.js` has given up after ten seconds.

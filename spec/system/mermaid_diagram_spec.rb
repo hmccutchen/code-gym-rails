@@ -17,7 +17,6 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
     end
   end
 
-
   def count(js) = page.evaluate_script(js)
 
   STRUCTURE_SUMMARIES = %q{Array.from(document.querySelectorAll("summary")).filter((s) => /Structure diagram/.test(s.textContent)).length}
