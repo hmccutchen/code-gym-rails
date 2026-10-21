@@ -76,7 +76,10 @@ read it before changing that area.
   tokens, from the rescue in `call_and_log(user, request)`). `model` is the
   routed model; `tokens_in` is uncached input, with cache reads and writes in their own
   columns, so each provider subclass subtracts what its API counts inside
-  input. `failure` comes from `AiService.failure_code_for`.
+  input. `failure` comes from `AiService.failure_code_for`. `cost_usd` is
+  priced at call time from the subclass's `PRICE_PER_MILLION`; null means
+  unknown, and older rows stay null (no backfill). `model_routing_spec`
+  fails on a routed model with no price.
 - **How a cut-off reply is recognized**
   (`docs/decisions/how-a-cut-off-reply-is-recognized.md`): Providers report
   truncation as data and `AiService#call_and_log` decides it is fatal after

@@ -162,6 +162,21 @@ class AiService
 
   def self.judges_review_prose? = false
 
+  Price = Data.define(:input, :output, :cache_write, :cache_read, :checked_on)
+  PRICE_PER_MILLION = {}.freeze
+  PRICED_TOKENS = { input: :input_tokens, output: :output_tokens,
+                    cache_write: :cache_write_tokens, cache_read: :cache_read_tokens }.freeze
+
+  def self.price_for(model) = self::PRICE_PER_MILLION[model]
+
+  def self.cost_usd(result)
+    counts = PRICED_TOKENS.transform_values { |key| result[key].to_i }
+    return BigDecimal(0) if counts.values.all?(&:zero?)
+
+    price = price_for(result[:model]) or return
+    counts.sum { |rate, count| count * BigDecimal(price.public_send(rate).to_s) } / 1_000_000
+  end
+
   JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes)
 
   Draft = Data.define(:problem_set, :plan, :kinds, :difficulty, :ladders, :history,
@@ -684,6 +699,7 @@ class AiService
         http_status: result[:http_status],
         failure:     result[:failure],
         quota_id:    result[:quota_id],
+        cost_usd:    usage_cost(result),
         purpose:    purpose,
         date:       Date.current
       )
@@ -694,6 +710,12 @@ class AiService
       "tokens_in=#{result[:input_tokens].to_i} tokens_out=#{result[:output_tokens].to_i}: " \
       "#{e.class}: #{e.message}"
     )
+  end
+
+  def usage_cost(result)
+    self.class.cost_usd(result).tap do |cost|
+      Rails.logger.warn("[usage] #{self.class} has no price for model=#{result[:model].inspect}; cost_usd left null") if cost.nil?
+    end
   end
 
   def call_and_log(user, request, deadline: GenerationDeadline::NONE)

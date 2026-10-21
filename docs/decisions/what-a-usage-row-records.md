@@ -41,3 +41,20 @@ per call, whatever faraday-retry did inside it, and the write never changes
 the error the caller sees. A refusal or truncation is marked on the row its
 tokens were billed to. `AiService.failure_code_for` is the one map from an
 error class to a code.
+
+**A row also records what it cost.** `cost_usd` is priced in `#log_usage`,
+at call time, from the provider subclass's `PRICE_PER_MILLION`: one
+`AiService::Price` per model, holding US-dollar list rates per million tokens
+for input, output, cache writes and cache reads, plus the date someone
+checked them. Pricing at call time means a later price change never
+rewrites history, as a lookup at read time would. Null means unknown, never
+zero: a model with no price writes null and a warning, and every row from
+before the column existed stays null. A backfill of the rows that already
+named a model was considered and declined, since it needed three providers'
+price changelogs for about three weeks of rows that only the operator would
+see, and the gap closes on its own when October ends
+(`docs/superpowers/specs/2026-10-20-api-usage-cost-design.md`). A call with
+no tokens of any kind costs zero. `model_routing_spec` fails when a routed
+model has no price, so routing to a new model means pricing it first. The
+figure is a list-price estimate: a free tier, credits or a discount on the
+key is invisible to the app.

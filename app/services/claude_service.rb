@@ -17,6 +17,12 @@ class ClaudeService < AiService
     "judge_review"      => { model: "claude-sonnet-5-5", effort: "high" }
   }.then { |routes| routes.merge("retry_section" => routes.fetch("generate_exercise")) }.freeze
 
+  PRICE_PER_MILLION = {
+    "claude-opus-5-5"   => Price.new(input: 4, output: 20, cache_write: 5, cache_read: 0.2, checked_on: Date.new(2026, 10, 6)),
+    "claude-sonnet-5-5" => Price.new(input: 2, output: 10, cache_write: 2.5, cache_read: 0.2, checked_on: Date.new(2026, 10, 6)),
+    "claude-haiku-4-5"  => Price.new(input: 1, output: 5, cache_write: 1.25, cache_read: 0.1, checked_on: Date.new(2026, 10, 6))
+  }.freeze
+
   # Sonnet 5.5 rejects "disabled" with a 400; Opus 5.5 has no off setting, so a capped call routed to it raises.
   THINKING_OFF = {
     "claude-sonnet-5-5" => { type: "between_tools" },

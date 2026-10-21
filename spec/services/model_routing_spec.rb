@@ -15,6 +15,19 @@ RSpec.describe "per-purpose model routing" do
     end
   end
 
+  [ ClaudeService, GeminiService, OpenaiService ].each do |service_class|
+    it "prices every model #{service_class} routes a purpose to" do
+      routed = (service_class::MODEL_FOR_PURPOSE.values + [ service_class::DEFAULT_ROUTE ]).map { |route| route[:model] }.uniq
+
+      routed.each do |model|
+        price = service_class.price_for(model)
+        expect(price).to be_a(AiService::Price), "#{model} has no entry in #{service_class}::PRICE_PER_MILLION"
+        expect(price.to_h.except(:checked_on).values).to all(be_a(Numeric).and(be >= 0)), "#{model} has a missing rate"
+        expect(price.checked_on).to be_a(Date)
+      end
+    end
+  end
+
   def result_for(service_class, **kwargs)
     service = service_class.new("test-key")
     conn = Faraday.new do |f|

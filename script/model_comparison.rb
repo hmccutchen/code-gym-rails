@@ -29,15 +29,6 @@ class ModelComparison
     "miss"     => %w[beginner]
   }.freeze
 
-  LIST_PRICE_PER_MILLION = {
-    "claude-opus-5-5"   => { input: 4.0, output: 20.0 },
-    "claude-sonnet-5-5" => { input: 2.0, output: 10.0 },
-    "claude-haiku-4-5"  => { input: 1.0, output: 5.0 }
-  }.freeze
-
-  CACHE_WRITE_PRICE_FACTOR = 1.25
-  CACHE_READ_PRICE_FACTOR  = 0.1
-
   Run = Data.define(:route, :output, :seconds, :tokens_in, :tokens_out, :cache_read, :cache_write)
 
   ProseResult = Data.define(:label, :outcome, :verdict, :error, :ms, :tokens_in, :tokens_out, :expected)
@@ -319,9 +310,11 @@ class ModelComparison
   end
 
   def fixture_cost(model, tokens_in, tokens_out, cache_read: 0, cache_write: 0)
-    price = LIST_PRICE_PER_MILLION.fetch(model)
-    input = tokens_in + cache_write * CACHE_WRITE_PRICE_FACTOR + cache_read * CACHE_READ_PRICE_FACTOR
-    (input * price[:input] + tokens_out * price[:output]) / 1_000_000.0
+    cost = ClaudeService.cost_usd(model: model, input_tokens: tokens_in, output_tokens: tokens_out,
+                                  cache_read_tokens: cache_read, cache_write_tokens: cache_write)
+    raise KeyError, "ClaudeService::PRICE_PER_MILLION has no #{model}" unless cost
+
+    cost.to_f
   end
 
   def fixture_row(service, user, fixture)

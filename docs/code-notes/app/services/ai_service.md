@@ -332,3 +332,14 @@ here never breaks generation.
 
 Rescues database errors only. Swallowing anything else would silently empty the
 table that cost questions rely on.
+
+The row's `cost_usd` is priced here, at call time, from the subclass's
+`PRICE_PER_MILLION`, so a later price change never rewrites an old row. A model
+with no price writes a null cost and a warning instead of raising, because the
+call the row records has already happened.
+
+## `.cost_usd`
+
+A result with no tokens of any kind costs zero whatever its model, so a call
+that failed before a reply is never left unknown. Rates go through `to_s` into
+`BigDecimal`, so `0.2` stays two tenths rather than a float's nearest value.

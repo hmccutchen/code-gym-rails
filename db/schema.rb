@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_17_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_20_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -30,6 +30,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_17_090000) do
     t.string "failure"
     t.string "quota_id"
     t.boolean "house_key", default: false, null: false
+    t.decimal "cost_usd", precision: 14, scale: 8
     t.index ["provider", "house_key", "created_at"], name: "index_api_usages_on_provider_and_house_key_and_created_at"
     t.index ["user_id", "date"], name: "index_api_usages_on_user_id_and_date"
     t.index ["user_id"], name: "index_api_usages_on_user_id"

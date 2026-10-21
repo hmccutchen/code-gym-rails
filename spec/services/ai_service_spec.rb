@@ -266,6 +266,47 @@ RSpec.describe AiService do
       )
     end
 
+    it "records the cost of every token kind at the routed model's rates" do
+      svc = ClaudeService.new("test-key")
+      allow(svc).to receive(:call).and_return(
+        text: "{}", input_tokens: 1_000, output_tokens: 2_000, truncated: false,
+        model: "claude-opus-5-5", cache_read_tokens: 10_000, cache_write_tokens: 3_000
+      )
+
+      svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p"))
+
+      expect(ApiUsage.last.cost_usd).to eq(BigDecimal("0.061"))
+    end
+
+    it "records the cost of a refused reply, since its tokens were billed" do
+      svc = ClaudeService.new("test-key")
+      allow(svc).to receive(:call).and_return(text: nil, input_tokens: 700, output_tokens: 0, truncated: false,
+                                              refusal: "cyber", model: "claude-sonnet-5-5")
+
+      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }
+        .to raise_error(ProviderError::RefusalError)
+      expect(ApiUsage.last.cost_usd).to eq(BigDecimal("0.0014"))
+    end
+
+    it "records zero cost for a call that failed before any tokens" do
+      svc = ClaudeService.new("test-key")
+      allow(svc).to receive(:call).and_raise(ProviderError::TimeoutError, "slow")
+
+      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }
+        .to raise_error(ProviderError::TimeoutError)
+      expect(ApiUsage.last.cost_usd).to eq(0)
+    end
+
+    it "leaves the cost unknown and warns when the model has no price, without failing the call" do
+      svc = ClaudeService.new("test-key")
+      allow(svc).to receive(:call).and_return(text: "{}", input_tokens: 5, output_tokens: 5, truncated: false, model: "claude-unpriced")
+      allow(Rails.logger).to receive(:warn)
+
+      expect(svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p"))).to include(text: "{}")
+      expect(ApiUsage.last.cost_usd).to be_nil
+      expect(Rails.logger).to have_received(:warn).with(/no price for model="claude-unpriced"/)
+    end
+
     it "accepts a row with no model or cache counts, which reads as unknown rather than zero" do
       expect(ApiUsage.new(user: user, purpose: "duck_thread", date: Date.current, tokens_in: 1, tokens_out: 1)).to be_valid
     end

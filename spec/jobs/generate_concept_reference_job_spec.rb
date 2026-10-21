@@ -233,7 +233,8 @@ RSpec.describe GenerateConceptReferenceJob do
       service = ClaudeService.new(user.api_key)
       allow(AiService).to receive(:for).with(user).and_return(service)
       allow(service).to receive(:call).and_return(
-        text: reference_hash.merge("explanation" => false).to_json, input_tokens: 10, output_tokens: 20
+        text: reference_hash.merge("explanation" => false).to_json, input_tokens: 10, output_tokens: 20,
+        model: "claude-sonnet-5-5"
       )
       expect(Rails.logger).to receive(:warn).with(/Failed to generate concept reference/)
 

@@ -8,9 +8,9 @@ The script writes no `ApiUsage` rows. A row would charge a teammate's usage hist
 
 The `review_calibration` candidate is the production grading route, so a run measures the rubric as deployed.
 
-## `LIST_PRICE_PER_MILLION`
+## `#fixture_cost`
 
-These are list prices for comparing candidates. Nothing that bills reads them.
+Costs come from `ClaudeService::PRICE_PER_MILLION`, the same rates each usage row is priced from, so the script and the app can't disagree on a price. A candidate model with no price there raises rather than printing $0.
 
 ## `ProseResult`
 
