@@ -60,12 +60,14 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     end
   end
 
-  def answer_form_connected?
-    page.evaluate_script(<<~JS)
+  def connected_js(identifier)
+    <<~JS
       !!(window.Stimulus && window.Stimulus.getControllerForElementAndIdentifier(
-        document.querySelector('[data-controller~="answer-form"]'), "answer-form"))
+        document.querySelector('[data-controller~="#{identifier}"]'), "#{identifier}"))
     JS
   end
+
+  def answer_form_connected? = page.evaluate_script(connected_js("answer-form"))
 
   # Pull-to-refresh reloads once pending() is false, so a typed answer must count before the modules arrive.
   it "counts an answer typed while the modules are still loading as pending, then saves it" do
@@ -116,6 +118,8 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
             box.querySelectorAll('input[type="radio"]')[1].click();
           })()
         JS
+        wait_for { pw.evaluate(connected_js("answer-form")) }
+        expect(pw.evaluate(connected_js("comparison-answer"))).to be(false)
         pw.evaluate("[...document.querySelectorAll('button')].find((b) => /Submit answers/i.test(b.textContent)).click()")
       end
 
