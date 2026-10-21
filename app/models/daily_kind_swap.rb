@@ -45,7 +45,7 @@ class DailyKindSwap
     conflict = DailyKinds.conflict(@kind, current.reject.with_index { |_kind, index| index == @place })
     return CONFLICT_REASONS.fetch(conflict) if conflict
 
-    :empties_a_slot if @user.emptied_slots(daily: proposed).any?
+    :empties_a_slot if @user.section_kind_settings.emptied_slots(daily: proposed).any?
   end
 
   def shape_refusal
@@ -100,7 +100,7 @@ class DailyKindSwap
   def refusal_details(reason)
     case reason
     when :second_fourth  then { kinds: names(ExerciseSection.fourths) }
-    when :empties_a_slot then { kinds: names(@user.emptied_slots(daily: proposed).values.flatten) }
+    when :empties_a_slot then { kinds: names(@user.section_kind_settings.emptied_slots(daily: proposed).values.flatten) }
     else {}
     end
   end
