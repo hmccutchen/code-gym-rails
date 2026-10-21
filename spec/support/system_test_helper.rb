@@ -72,8 +72,15 @@ module TodaysSetHelper
 end
 
 module JavascriptReadyHelper
+  EVERY_CONTROLLER_CONNECTED = <<~JS.squish.freeze
+    [...document.querySelectorAll("[data-controller]")].every((element) =>
+      element.dataset.controller.split(/\s+/).filter(Boolean).every((identifier) =>
+        window.Stimulus.getControllerForElementAndIdentifier(element, identifier)))
+  JS
+
   def wait_for_js
     expect(page).to have_css("html[data-js-ready]", visible: :all)
+    wait_for_js_condition(EVERY_CONTROLLER_CONNECTED)
   end
 
   NAVIGATED_AWAY = /Execution context was destroyed|Cannot find context/

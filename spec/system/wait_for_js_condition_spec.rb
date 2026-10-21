@@ -41,4 +41,14 @@ RSpec.describe "wait_for_js_condition", type: :system do
 
     expect { wait_for_js_condition("true", timeout: 5) }.to raise_error(Playwright::Error, /Target closed/)
   end
+
+  it "has wait_for_js hold for a controller that has not connected, even once the page reports ready" do
+    visit_as(user)
+    wait_for_js
+    page.execute_script(%(document.body.insertAdjacentHTML("beforeend", '<div data-controller="never-registered"></div>')))
+
+    Capybara.using_wait_time(1) do
+      expect { wait_for_js }.to raise_error(RuntimeError, /timed out waiting for/)
+    end
+  end
 end

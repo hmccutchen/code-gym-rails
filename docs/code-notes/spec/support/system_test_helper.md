@@ -41,6 +41,10 @@ same value, so the suite has one wait to tune.
 
 Text on the dashboard is rendered by the server, so seeing it says nothing
 about `answer_form_controller` having connected. An example that typed or
-clicked straight away raced the modules, and on a loaded run it lost. Waiting
-for `html[data-js-ready]` holds until every controller on the page has
-connected, or `application.js` has given up after ten seconds.
+clicked straight away raced the modules, and on a loaded run it lost.
+
+`wait_for_js` waits for `html[data-js-ready]` and then for every
+`[data-controller]` element to have its controller connected.
+`application.js` also sets the marker when it gives up after ten seconds with
+a controller still missing, so the marker alone would let an example run
+against a page whose controller never arrived.
