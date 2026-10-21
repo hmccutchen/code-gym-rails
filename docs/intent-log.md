@@ -97,3 +97,5 @@ this one.
   `#475`
   **why:** I chose that a Submit clicked while a controller is still loading
   should wait for it; the app already does, and the spec was fixed instead
+- `ProfileController`'s checks and `User`'s level callbacks into a
+  `ProfileUpdate` form `#476 open`
