@@ -239,7 +239,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       JS
 
       fill_in_answer("code_review", "An answer that reaches the server once the field is left.")
-      find("body").click
+      leave_field
       wait_for_saved_answer(user, "code_review", "An answer that reaches the server once the field is left.")
 
       rate_section("code_review")
@@ -269,9 +269,10 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       JS
 
       fill_in_answer("code_review", "The first answer, still on the wire.")
-      find("body").click
+      leave_field
       fill_in_answer("code_review", "The newer answer, written while the first save waits.")
-      find("body").click
+      leave_field
+      wait_for { page.evaluate_script("window.saveRequests").positive? }
       expect(page.evaluate_script("window.saveRequests")).to eq(1)
 
       page.execute_script("window.releaseFirstSave()")
@@ -288,7 +289,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i)
       fill_in_answer("code_review", "An answer long enough for the server to count it.")
-      find("body").click
+      leave_field
       wait_for_saved_answer(user, "code_review", "An answer long enough for the server to count it.")
       status = find('.section-status[data-status-for="code_review"]')
       expect(status).to have_text(I18n.t("responses.section_status.in_progress"))
@@ -364,6 +365,8 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       };
     JS
   end
+
+  def leave_field = page.execute_script("document.activeElement.blur()")
 
   def wait_for_saved_answer(user, field, text)
     wait_for do

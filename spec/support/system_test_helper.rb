@@ -67,6 +67,7 @@ module TodaysSetHelper
       GenerateDailyExercisesJob.perform_now(user_id: user.id)
       visit_as(user)
     end
+    wait_for_js
   end
 end
 
