@@ -1,27 +1,27 @@
 require "rails_helper"
 
 RSpec.describe AiService, "request values" do
-  defaults = { read_timeout: AiService::READ_TIMEOUT, max_tokens: nil,
+  defaults = { read_timeout: CallProfiles::READ_TIMEOUT, max_tokens: nil,
                cache_system: false, single_attempt: false, allow_truncated: false }
 
-  # Written from the constants, apart from CALL_PROFILES, so a profile row that drifts fails here.
+  # Written from the constants, apart from CallProfiles::BY_PURPOSE, so a profile row that drifts fails here.
   call_site_settings = {
-    "generate_exercise"           => defaults.merge(read_timeout: AiService::GENERATION_READ_TIMEOUT),
-    "retry_section"               => defaults.merge(read_timeout: AiService::RETRY_READ_TIMEOUT),
-    "review_response"             => defaults.merge(cache_system: true, read_timeout: AiService::REVIEW_READ_TIMEOUT),
-    "assess_difficulty"           => defaults.merge(max_tokens: AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS),
-    "generate_concept_reference"  => defaults.merge(read_timeout: AiService::CONCEPT_REFERENCE_READ_TIMEOUT),
-    "generate_recognition_guide"  => defaults.merge(read_timeout: AiService::CONCEPT_REFERENCE_READ_TIMEOUT),
-    "explain_concept_differently" => defaults.merge(max_tokens: AiService::CONCEPT_ALTERNATE_MAX_TOKENS),
+    "generate_exercise"           => defaults.merge(read_timeout: CallProfiles::GENERATION_READ_TIMEOUT),
+    "retry_section"               => defaults.merge(read_timeout: CallProfiles::RETRY_READ_TIMEOUT),
+    "review_response"             => defaults.merge(cache_system: true, read_timeout: CallProfiles::REVIEW_READ_TIMEOUT),
+    "assess_difficulty"           => defaults.merge(max_tokens: CallProfiles::DIFFICULTY_ASSESSMENT_MAX_TOKENS),
+    "generate_concept_reference"  => defaults.merge(read_timeout: CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT),
+    "generate_recognition_guide"  => defaults.merge(read_timeout: CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT),
+    "explain_concept_differently" => defaults.merge(max_tokens: CallProfiles::CONCEPT_ALTERNATE_MAX_TOKENS),
     "explain_differently"         => defaults,
     "review_follow_up"            => defaults,
-    "duck_thread"                 => defaults.merge(max_tokens: AiService::DUCK_RESPONSE_MAX_TOKENS,
+    "duck_thread"                 => defaults.merge(max_tokens: CallProfiles::DUCK_RESPONSE_MAX_TOKENS,
                                                    cache_system: true, allow_truncated: true),
-    "pseudocode_critique"         => defaults.merge(max_tokens: AiService::PSEUDOCODE_CRITIQUE_MAX_TOKENS),
+    "pseudocode_critique"         => defaults.merge(max_tokens: CallProfiles::PSEUDOCODE_CRITIQUE_MAX_TOKENS),
     "pseudocode_translate"        => defaults,
-    "judge_section"               => defaults.merge(max_tokens: AiService::JUDGE_MAX_TOKENS),
-    "judge_review"                => defaults.merge(max_tokens: AiService::REVIEW_JUDGE_MAX_TOKENS,
-                                                   read_timeout: AiService::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true)
+    "judge_section"               => defaults.merge(max_tokens: CallProfiles::JUDGE_MAX_TOKENS),
+    "judge_review"                => defaults.merge(max_tokens: CallProfiles::REVIEW_JUDGE_MAX_TOKENS,
+                                                   read_timeout: CallProfiles::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true)
   }.freeze
 
   def settings_of(request)
@@ -29,9 +29,9 @@ RSpec.describe AiService, "request values" do
       single_attempt: request.single_attempt, allow_truncated: request.allow_truncated }
   end
 
-  describe "CALL_PROFILES" do
+  describe "CallProfiles::BY_PURPOSE" do
     it "profiles exactly the purposes a usage row may record" do
-      expect(AiService::CALL_PROFILES.keys.sort).to eq(ApiUsage::PURPOSES.sort)
+      expect(CallProfiles::BY_PURPOSE.keys.sort).to eq(ApiUsage::PURPOSES.sort)
     end
 
     it "is checked here against every purpose" do
@@ -53,8 +53,8 @@ RSpec.describe AiService, "request values" do
     it "picks the synchronous timeout for a blocking generation" do
       request = AiService.request_for("generate_exercise", system: "s", prompt: "p", blocking: true)
 
-      expect(settings_of(request)).to eq(call_site_settings["generate_exercise"].merge(read_timeout: AiService::SYNC_GENERATION_READ_TIMEOUT))
-      expect(request.read_timeout).to eq(AiService::SYNC_GENERATION_READ_TIMEOUT)
+      expect(settings_of(request)).to eq(call_site_settings["generate_exercise"].merge(read_timeout: CallProfiles::SYNC_GENERATION_READ_TIMEOUT))
+      expect(request.read_timeout).to eq(CallProfiles::SYNC_GENERATION_READ_TIMEOUT)
     end
 
     it "carries the per-call values through unchanged" do
@@ -83,7 +83,7 @@ RSpec.describe AiService, "request values" do
     it "applies the defaults #call_and_log applied before" do
       expect(AiService::Request.build(system: "s", prompt: "p")).to have_attributes(
         purpose: nil, system: "s", prompt: "p", history: [], response_schema: nil, max_tokens: nil,
-        read_timeout: AiService::READ_TIMEOUT, cache_system: false, single_attempt: false, allow_truncated: false
+        read_timeout: CallProfiles::READ_TIMEOUT, cache_system: false, single_attempt: false, allow_truncated: false
       )
     end
 
@@ -180,7 +180,7 @@ RSpec.describe AiService, "request values" do
     it "sends a blocking generation on the synchronous timeout" do
       request = request_sent_for("generate_exercise") { service.generate_exercise(user, blocking: true) }
 
-      expect(settings_of(request)).to eq(call_site_settings["generate_exercise"].merge(read_timeout: AiService::SYNC_GENERATION_READ_TIMEOUT))
+      expect(settings_of(request)).to eq(call_site_settings["generate_exercise"].merge(read_timeout: CallProfiles::SYNC_GENERATION_READ_TIMEOUT))
     end
 
     it "sends prior turns from the two conversational callers" do

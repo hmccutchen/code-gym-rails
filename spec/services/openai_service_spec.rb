@@ -135,8 +135,8 @@ RSpec.describe OpenaiService do
 
     it "bounds the request so a hung provider cannot block a thread forever" do
       conn = service.send(:build_connection)
-      expect(conn.options.open_timeout).to eq(AiService::OPEN_TIMEOUT)
-      expect(conn.options.timeout).to eq(AiService::READ_TIMEOUT)
+      expect(conn.options.open_timeout).to eq(CallProfiles::OPEN_TIMEOUT)
+      expect(conn.options.timeout).to eq(CallProfiles::READ_TIMEOUT)
     end
   end
 
@@ -151,7 +151,7 @@ RSpec.describe OpenaiService do
       end)
 
       expect {
-        call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
+        call_provider(service, system: "sys", prompt: "p", read_timeout: CallProfiles::GENERATION_READ_TIMEOUT)
       }.to raise_error(ProviderError::TimeoutError, /Network error calling OpenAI/)
       expect(attempts).to eq(1)
     end
@@ -164,7 +164,7 @@ RSpec.describe OpenaiService do
       end)
 
       expect {
-        call_provider(service, system: "sys", prompt: "p", max_tokens: AiService::JUDGE_MAX_TOKENS, purpose: "judge_section")
+        call_provider(service, system: "sys", prompt: "p", max_tokens: CallProfiles::JUDGE_MAX_TOKENS, purpose: "judge_section")
       }.to raise_error(ProviderError::TimeoutError)
       expect(attempts).to eq(1)
     end

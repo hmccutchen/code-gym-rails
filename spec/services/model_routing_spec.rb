@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "per-purpose model routing" do
-  let(:purposes_in_use) { AiService::CALL_PROFILES.keys }
+  let(:purposes_in_use) { CallProfiles::BY_PURPOSE.keys }
 
   # A usage row must name the model whose prices apply to it.
   [ ClaudeService, GeminiService, OpenaiService ].each do |service_class|
@@ -154,11 +154,11 @@ RSpec.describe "per-purpose model routing" do
     end
 
     it "sends the section judge to Astra at low effort, with its cap raised by the reasoning allowance" do
-      body = posted_body(OpenaiService, purpose: "judge_section", max_tokens: AiService::JUDGE_MAX_TOKENS)
+      body = posted_body(OpenaiService, purpose: "judge_section", max_tokens: CallProfiles::JUDGE_MAX_TOKENS)
 
       expect(body["model"]).to eq("gpt-6-astra")
       expect(body["reasoning"]).to eq("effort" => "low")
-      expect(body["max_output_tokens"]).to eq(AiService::JUDGE_MAX_TOKENS + 25_000)
+      expect(body["max_output_tokens"]).to eq(CallProfiles::JUDGE_MAX_TOKENS + 25_000)
     end
 
     it "lets every capped purpose either turn reasoning off or reason within an allowance" do

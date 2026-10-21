@@ -90,7 +90,7 @@ RSpec.describe GeminiCapacityProbe, type: :model do
   end
 
   it "waits out a whole connect and read before giving up on a straggler" do
-    expect(described_class::DRAIN_SECONDS).to eq(AiService::OPEN_TIMEOUT + AiService::READ_TIMEOUT)
+    expect(described_class::DRAIN_SECONDS).to eq(CallProfiles::OPEN_TIMEOUT + CallProfiles::READ_TIMEOUT)
 
     probe = described_class.new(user: create_user_with_key, api_key: "probe-key", out: StringIO.new, sleeper: ->(_) { })
     log = probe.instance_variable_get(:@attempts)

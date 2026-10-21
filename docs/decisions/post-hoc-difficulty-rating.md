@@ -24,7 +24,7 @@ into "difficulty". Its per-section material comes from
 section as the engineer sees it", so it inherits that method's answer-key
 exclusion rather than restating it. Cost is one extra provider call per
 review *attempt* (not per section), billed as `assess_difficulty` and capped
-by `AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS` — which is sized from the
+by `CallProfiles::DIFFICULTY_ASSESSMENT_MAX_TOKENS` — which is sized from the
 largest valid reply plus an allowance for the model overrunning the
 requested length, and, by being passed at all, is what turns off the
 extended thinking `ClaudeService` would otherwise leave on. It runs as one

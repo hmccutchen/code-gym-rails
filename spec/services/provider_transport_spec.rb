@@ -27,13 +27,13 @@ RSpec.describe "provider transport" do
         expect { call_provider(service, system: "sys", prompt: "p") }
           .to raise_error(ProviderError::TimeoutError, "Network error calling #{name}: boom")
         expect(attempts.size).to eq(service_class::RETRY_OPTIONS[:max] + 1)
-        expect(attempts.uniq).to eq([ { timeout: AiService::READ_TIMEOUT, long_running: false, single_attempt: false } ])
+        expect(attempts.uniq).to eq([ { timeout: CallProfiles::READ_TIMEOUT, long_running: false, single_attempt: false } ])
       end
 
       it "marks a read timeout above READ_TIMEOUT as long running and makes one attempt" do
         attempts = []
         service = failing_service(service_class, attempts)
-        timeout = AiService::READ_TIMEOUT + 1
+        timeout = CallProfiles::READ_TIMEOUT + 1
 
         expect { call_provider(service, system: "sys", prompt: "p", read_timeout: timeout) }
           .to raise_error(ProviderError::TimeoutError, "Network error calling #{name}: boom")
@@ -46,7 +46,7 @@ RSpec.describe "provider transport" do
 
         expect { call_provider(service, system: "sys", prompt: "p", single_attempt: true) }
           .to raise_error(ProviderError::TimeoutError, "Network error calling #{name}: boom")
-        expect(attempts).to eq([ { timeout: AiService::READ_TIMEOUT, long_running: false, single_attempt: true } ])
+        expect(attempts).to eq([ { timeout: CallProfiles::READ_TIMEOUT, long_running: false, single_attempt: true } ])
       end
 
       it "maps a Faraday error other than a timeout to NetworkError" do
@@ -64,8 +64,8 @@ RSpec.describe "provider transport" do
     service = failing_service(OpenaiService, attempts)
 
     expect {
-      call_provider(service, system: "sys", prompt: "p", purpose: "judge_section", max_tokens: AiService::JUDGE_MAX_TOKENS)
+      call_provider(service, system: "sys", prompt: "p", purpose: "judge_section", max_tokens: CallProfiles::JUDGE_MAX_TOKENS)
     }.to raise_error(ProviderError::TimeoutError)
-    expect(attempts).to eq([ { timeout: AiService::READ_TIMEOUT, long_running: true, single_attempt: false } ])
+    expect(attempts).to eq([ { timeout: CallProfiles::READ_TIMEOUT, long_running: true, single_attempt: false } ])
   end
 end

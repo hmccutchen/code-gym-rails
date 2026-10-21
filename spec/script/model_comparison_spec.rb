@@ -439,12 +439,12 @@ end
       # ai_review is jsonb, which does not keep key order, so labels are read back from the output.
       calls = sonnet_block.scan(/^(\S+ \w+): keep \d+ms · (\d+) out$/)
       expect(calls.map(&:last)).to eq(%w[100 1400])
-      expect(sonnet_block).to include("largest reply: 1400 out (#{calls.last.first}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap")
+      expect(sonnet_block).to include("largest reply: 1400 out (#{calls.last.first}) of the #{CallProfiles::REVIEW_JUDGE_MAX_TOKENS} cap")
 
       first_haiku_label = haiku_block[/^(\S+ \w+): keep \d+ms · 750 out$/, 1]
-      expect(haiku_block).to include("largest reply: 750 out (#{first_haiku_label}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap")
+      expect(haiku_block).to include("largest reply: 750 out (#{first_haiku_label}) of the #{CallProfiles::REVIEW_JUDGE_MAX_TOKENS} cap")
       [ sonnet_block, haiku_block ].each do |block|
-        expect(block).to match(/slowest: \d+ms \(\S+ \w+\) of the #{AiService::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout/)
+        expect(block).to match(/slowest: \d+ms \(\S+ \w+\) of the #{CallProfiles::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout/)
       end
     end
 

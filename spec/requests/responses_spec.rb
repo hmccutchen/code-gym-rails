@@ -1688,7 +1688,7 @@ RSpec.describe ResponsesController, "duck thread byte allowance" do
   it "gives a full-length reply room whatever the cap is" do
     allowance = described_class::DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE
 
-    expect(allowance).to be >= AiService::DUCK_RESPONSE_MAX_TOKENS * described_class::DUCK_REPLY_BYTES_PER_TOKEN
+    expect(allowance).to be >= CallProfiles::DUCK_RESPONSE_MAX_TOKENS * described_class::DUCK_REPLY_BYTES_PER_TOKEN
     expect(described_class::MAX_DUCK_THREAD_BYTES).to be > allowance * described_class::MAX_DUCK_TURNS_PER_SECTION
   end
 end

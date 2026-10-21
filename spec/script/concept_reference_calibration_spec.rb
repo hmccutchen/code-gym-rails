@@ -92,7 +92,7 @@ RSpec.describe ConceptReferenceCalibration do
         .and include(" · ok · 1 attempt · 70 in / 30 out")
         .and include("architecture/sync_vs_async · concurrent · ")
         .and match(/^sequential: n=1 /).and match(/^concurrent: n=1 /)
-        .and include("over #{AiService::CONCEPT_REFERENCE_READ_TIMEOUT}s (CONCEPT_REFERENCE_READ_TIMEOUT)")
+        .and include("over #{CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT}s (CONCEPT_REFERENCE_READ_TIMEOUT)")
         .and include("retries").and include("Queue wait")
     end
 
@@ -129,7 +129,7 @@ RSpec.describe ConceptReferenceCalibration do
     shared_examples "a measured response failure" do |outcome|
       it "includes the failed generation in the latency spread and over-budget count" do
         stub_provider(ClaudeService) { provider_reply }
-        elapsed = AiService::CONCEPT_REFERENCE_READ_TIMEOUT + 1
+        elapsed = CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT + 1
         record = calibration(repeats: 1, concurrency: 0).run([ [ "ruby_rails", "n_plus_one" ] ]).sole.with(seconds: elapsed)
 
         expect(record.outcome).to eq(outcome)
@@ -200,7 +200,7 @@ RSpec.describe ConceptReferenceCalibration do
     it "sends the deployed read timeout unless told otherwise, and keeps an override long-running" do
       stub_claude
       calibration(repeats: 1, concurrency: 0).run([ [ "ruby_rails", "n_plus_one" ] ])
-      expect(seen.last).to include(timeout: AiService::CONCEPT_REFERENCE_READ_TIMEOUT, long_running: true)
+      expect(seen.last).to include(timeout: CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT, long_running: true)
 
       calibration(repeats: 1, concurrency: 0, timeout: 240).run([ [ "ruby_rails", "n_plus_one" ] ])
       expect(seen.last).to include(timeout: 240, long_running: true)
@@ -249,8 +249,8 @@ RSpec.describe ConceptReferenceCalibration do
 
     # At or under READ_TIMEOUT a timeout would retry into billed attempts the deployed call never makes.
     it "refuses a timeout the retry guard would not treat as final" do
-      expect { calibration(timeout: AiService::READ_TIMEOUT) }.to raise_error(ArgumentError, /READ_TIMEOUT.*final/)
-      expect { calibration(timeout: AiService::READ_TIMEOUT + 1) }.not_to raise_error
+      expect { calibration(timeout: CallProfiles::READ_TIMEOUT) }.to raise_error(ArgumentError, /READ_TIMEOUT.*final/)
+      expect { calibration(timeout: CallProfiles::READ_TIMEOUT + 1) }.not_to raise_error
     end
 
     it "refuses a negative repeat or concurrency count" do
@@ -269,7 +269,7 @@ RSpec.describe ConceptReferenceCalibration do
 
     # A refused call returns almost at once, so counting it would pull the minimum and median toward zero.
     it "reports the spread over the calls the provider worked on, and counts failures beside it" do
-      over = AiService::CONCEPT_REFERENCE_READ_TIMEOUT + 1
+      over = CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT + 1
       records = [ record(10, :ok), record(20, :ok), record(over, :ok), record(40, :timeout), record(50, :ok),
                   record(0.3, "ProviderError::RateLimitError") ]
 
