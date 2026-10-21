@@ -98,7 +98,7 @@ this one.
   **why:** I chose that a Submit clicked while a controller is still loading
   should wait for it; the app already does, and the spec was fixed instead
 - `ProfileController`'s checks and `User`'s level callbacks into a
-  `ProfileUpdate` form `#476 open`
+  `ProfileUpdate` form `#476`
 - call profiles and call timing off `AiService` into `CallProfiles` `#477 open`
   **why:** Railway builds were down, so I asked to work through the open
   enhancements without merging and merge them in order once it's back
