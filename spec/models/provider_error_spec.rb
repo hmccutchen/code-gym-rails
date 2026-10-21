@@ -8,7 +8,7 @@ RSpec.describe ProviderError do
     expect(error).to have_attributes(message: "slow down", http_status: 429, quota_id: "PerDay", retry_after: 30, provider: "gemini")
   end
 
-  it "keeps the subclass order the classifiers depend on" do
+  it "keeps the subclass tree the inherited codes follow" do
     expect(ProviderError::TruncatedResponseError.superclass).to eq(ProviderError::InvalidResponseError)
     expect(ProviderError::DeadlineError.superclass).to eq(ProviderError::TimeoutError)
     %w[AuthenticationError RateLimitError BillingError TrialEndedError TrialAllowanceError NetworkError TimeoutError
@@ -24,7 +24,7 @@ RSpec.describe ProviderError do
   end
 
   # error code, ApiUsage failure code, judge fallback reason (nil: the status or error code), person-facing kind (nil: by status).
-  CODES = {
+  codes = {
     "ProviderError"                           => [ "other", "provider_error", nil, nil ],
     "ProviderError::AuthenticationError"      => [ "authentication", "authentication", nil, "bad_key" ],
     "ProviderError::RateLimitError"           => [ "rate_limit", "rate_limit", nil, nil ],
@@ -39,15 +39,20 @@ RSpec.describe ProviderError do
     "ProviderError::RefusalError"             => [ "other", "refusal", "refusal", nil ],
     "ProviderError::UnsupportedRouteError"    => [ "other", "provider_error", nil, nil ],
     "ProviderError::AllSectionsRejectedError" => [ "other", "provider_error", nil, nil ]
-  }.freeze
+  }
 
   it "has every error class state its codes here, so a new subclass is a decision rather than a silent fall-through" do
     Rails.application.eager_load!
 
-    expect(([ described_class ] + described_class.descendants).map(&:name)).to match_array(CODES.keys)
+    expect(([ described_class ] + described_class.descendants).filter_map(&:name)).to match_array(codes.keys)
   end
 
-  CODES.each do |name, (error_code, failure_code, judge_reason, failure_kind)|
+  it "uses only codes the usage row and the person-facing wording accept" do
+    expect(codes.values.map { |row| row[1] }).to all(be_in(ApiUsage::FAILURES))
+    expect(codes.values.filter_map { |row| row[3] }).to all(be_in(ProviderFailure::KINDS))
+  end
+
+  codes.each do |name, (error_code, failure_code, judge_reason, failure_kind)|
     it "gives #{name} its codes, inherited unless it states its own" do
       expect(name.constantize).to have_attributes(error_code: error_code, failure_code: failure_code,
                                                   judge_fallback_reason: judge_reason, failure_kind: failure_kind)
