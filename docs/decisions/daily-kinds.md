@@ -37,7 +37,7 @@ that never swaps plans and prompts exactly as before.
 the default pair, so an untouched account stores nothing. Order is the
 place: index 0 is the first daily section and index 1 the second. A
 non-empty list must name exactly `COUNT` distinct known kinds, holding at
-most one fourth-slot kind (`User#daily_section_kinds_name_a_full_set`).
+most one fourth-slot kind (`SectionKindSettings#daily_kind_problems`).
 
 ## Normalized on read
 

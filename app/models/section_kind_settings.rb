@@ -8,6 +8,7 @@ class SectionKindSettings
   end
 
   def initialize(stored: {}, **values)
+    values.assert_valid_keys(*FIELDS)
     @values = values
     @stored = stored
   end

@@ -17,27 +17,28 @@ did, so a person sees the same refusal.
 
 `#problems` checks `section_kind_weights`, `excluded_section_kinds`,
 `section_kind_levels`, `locked_section_kinds` and `daily_section_kinds` only
-when that column differs from its stored value (`#changed?`), which is how
-the separate `User` validators were guarded before (#435). If they ran on every save, a kind retired from the
-registry would make every user who names it unsavable, logins included.
+when that column differs from its stored value (`#changed?`). If the rules
+ran on every save, a kind retired from the registry would make every user who
+names it unsavable, logins included.
 
 ## `#locks_without_levels`
 
-This runs as a model validation because a CHECK constraint cannot run subqueries.
-A lock that slips past it anyway is inert, because `KindDifficulty#locked?`
-ignores a lock on a kind with no target.
+This runs as a model validation because a CHECK constraint cannot run
+subqueries. A lock that slips past it anyway is inert, because
+`KindDifficulty#locked?` ignores a lock on a kind with no target.
 
 ## `#emptied_slot_problems` and `#emptied_slots`
 
 `#emptied_slots` reads the slot roster from `ExerciseSection.optional_slots`
-for the user's own pair (`#daily`) or the pair a caller passes, so a future slot that holds several
-kinds needs no edit here. `#emptied_slot_problems` runs when the exclusions or the pair change.
-`DailyKindSwap` asks `#emptied_slots` too, with the proposed pair, to name the
-kinds in its refusal. It it tests each slot with `KindPreferences#all_excluded?`, the
-predicate rotation's whole-slot fallback reads. A pair that leaves an optional slot holding only excluded kinds
-is refused, the same as an exclusion that would: rotation would otherwise
-fall back to the excluded kinds (`KindPreferences#eligible`), quietly undoing
-"never show me this". Single-kind slots are skipped.
+for the user's own pair (`#daily`) or the pair a caller passes, so a future
+slot that holds several kinds needs no edit here. It tests each slot with
+`KindPreferences#all_excluded?`, the predicate rotation's whole-slot fallback
+reads, and skips single-kind slots. `#emptied_slot_problems` runs when the
+exclusions or the pair change, and `DailyKindSwap` asks `#emptied_slots`
+with the proposed pair to name the kinds in its refusal. A pair that leaves
+an optional slot holding only excluded kinds is refused, the same as an
+exclusion that would: rotation would otherwise fall back to the excluded
+kinds (`KindPreferences#eligible`), quietly undoing "never show me this".
 
 ## `#keep_unrendered` and the rotatable-kind rules
 
