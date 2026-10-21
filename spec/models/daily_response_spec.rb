@@ -100,6 +100,61 @@ RSpec.describe DailyResponse, type: :model do
       expect(response.translated?("pseudocode_to_code")).to be(true)
       expect(response.critiqued?("pseudocode_to_code")).to be(false)
     end
+
+    describe "the critique claim" do
+      let(:section) { "pseudocode_to_code" }
+      let(:response) { response_for({}) }
+
+      def record(token)
+        response.record_pseudocode_critique!(section, token, pseudocode: "sort then walk", gaps_found: false, gaps: [])
+      end
+
+      it "returns a token, then refuses a second claim while the first is fresh" do
+        token = response.claim_pseudocode_critique!(section)
+
+        expect(token).to be_present
+        expect(response.reload.pseudocode_round(section)["critique_claimed_at"]).to eq(token)
+        expect(response.claim_pseudocode_critique!(section)).to be_nil
+      end
+
+      it "refuses a claim once the round has been critiqued" do
+        record(response.claim_pseudocode_critique!(section))
+
+        expect(response.claim_pseudocode_critique!(section)).to be_nil
+      end
+
+      it "records the critique and releases the claim with the token that took it" do
+        token = response.claim_pseudocode_critique!(section)
+
+        expect(record(token)).to be(true)
+        round = response.reload.pseudocode_round(section)
+        expect(round).to include("initial_pseudocode" => "sort then walk", "gaps_found" => false, "critique" => [])
+        expect(round).not_to have_key("critique_claimed_at")
+        expect(response.critiqued?(section)).to be(true)
+      end
+
+      it "lets a stale claim be taken over, and leaves the new claim alone when the old caller writes or releases" do
+        stale = response.claim_pseudocode_critique!(section)
+        travel DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute
+        fresh = response.claim_pseudocode_critique!(section)
+
+        expect(fresh).to be_present
+        expect(fresh).not_to eq(stale)
+        expect(record(stale)).to be(false)
+        response.release_pseudocode_critique!(section, stale)
+
+        expect(response.reload.pseudocode_round(section)["critique_claimed_at"]).to eq(fresh)
+        expect(response.critiqued?(section)).to be(false)
+      end
+
+      it "hands the round back on release with its own token" do
+        token = response.claim_pseudocode_critique!(section)
+        response.release_pseudocode_critique!(section, token)
+
+        expect(response.reload.pseudocode_round(section)).not_to have_key("critique_claimed_at")
+        expect(response.claim_pseudocode_critique!(section)).to be_present
+      end
+    end
   end
 
   describe ".review_points" do

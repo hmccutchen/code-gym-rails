@@ -140,21 +140,17 @@ class ResponsesController < ApplicationController
     return unless (context = load_pseudocode_context)
 
     row, section, pseudocode = context
-    return render_section_error(critique_busy_message(row, section)) unless claim_pseudocode_round!(row, section, "critique", :critiqued?)
+    token = row.claim_pseudocode_critique!(section)
+    return render_section_error(critique_busy_message(row, section)) unless token
 
     result = AiService.for(current_user).critique_pseudocode(
       current_user, row.daily_exercise, section: section, pseudocode: pseudocode
     )
-
-    write_pseudocode_round!(row, section, "critique",
-      "initial_pseudocode" => pseudocode,
-      "gaps_found"         => result[:gaps_found],
-      "critique"           => result[:gaps],
-      "critiqued_at"       => Time.current.iso8601)
+    row.record_pseudocode_critique!(section, token, pseudocode: pseudocode, gaps_found: result[:gaps_found], gaps: result[:gaps])
 
     render json: { status: "ok", gaps_found: result[:gaps_found], gaps: result[:gaps] }
   rescue ProviderError, SetupError => e
-    release_pseudocode_claim!(row, section, "critique")
+    row.release_pseudocode_critique!(section, token) if token
     render_provider_failure(e, :critique)
   end
 
@@ -353,29 +349,6 @@ class ResponsesController < ApplicationController
     end
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
     current_user.daily_responses.find_by!(date: Date.current)
-  end
-
-  def claim_pseudocode_round!(row, section, phase, done)
-    claimed = false
-
-    row.with_lock do
-      next if row.public_send(done, section) || row.pseudocode_claimed?(section, phase)
-
-      row.merge_pseudocode_round!(section, "#{phase}_claimed_at" => Time.current.iso8601)
-      claimed = true
-    end
-
-    claimed
-  end
-
-  def write_pseudocode_round!(row, section, phase, attrs)
-    row.with_lock { row.merge_pseudocode_round!(section, attrs.merge("#{phase}_claimed_at" => nil)) }
-  end
-
-  def release_pseudocode_claim!(row, section, phase)
-    return if row.nil?
-
-    row.with_lock { row.merge_pseudocode_round!(section, "#{phase}_claimed_at" => nil) }
   end
 
   def critique_busy_message(row, section)

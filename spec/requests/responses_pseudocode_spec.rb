@@ -130,6 +130,38 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(JSON.parse(response.body)["error"]).to match(/already running/i)
     end
 
+    describe "a claim that goes stale while its call is still running" do
+      let(:newer_claim) { (Time.current + DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).iso8601(6) }
+
+      def take_over_mid_call
+        travel DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute
+        user.daily_responses.find_by(date: Date.current).merge_pseudocode_round!("pseudocode_to_code", "critique_claimed_at" => newer_claim)
+      end
+
+      it "leaves the newer claim in place and writes nothing over it when the stale call finishes" do
+        allow_any_instance_of(FakeService).to receive(:critique_pseudocode) do
+          take_over_mid_call
+          { gaps_found: true, gaps: [ "No empty-input case." ] }
+        end
+
+        critique
+
+        expect(round["critique_claimed_at"]).to eq(newer_claim)
+        expect(round).not_to have_key("critiqued_at")
+      end
+
+      it "leaves the newer claim in place when the stale call fails" do
+        allow_any_instance_of(FakeService).to receive(:critique_pseudocode) do
+          take_over_mid_call
+          raise ProviderError, "provider down"
+        end
+
+        critique
+
+        expect(round["critique_claimed_at"]).to eq(newer_claim)
+      end
+    end
+
     it "reuses today's response when the autosave already created it" do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "pseudocode_to_code" => "sort then walk" })
