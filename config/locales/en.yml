@@ -744,6 +744,10 @@ en:
       sign_off: "— %{app_name}"
   pwa:
     description: "Daily personalized coding exercises."
+  activerecord:
+    attributes:
+      user:
+        daily_section_count: "Daily sections"
   profile:
     name:
       saved: "Saved ✓"

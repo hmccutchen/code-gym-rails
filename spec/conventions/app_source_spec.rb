@@ -86,4 +86,44 @@ RSpec.describe "Conventions held over app/ source" do
     expect(provider_class_references("class Probe < ClaudeService; end")).to eq([ "ClaudeService" ])
     expect(provider_class_references("# AiService::CALL_PROFILES\nlabel = \"AiService\"")).to be_empty
   end
+
+  LEVEL_FIELDS = %i[skill_level section_kind_levels].freeze
+  LEVEL_UPDATES = %i[update update! update_columns update_column update_attribute assign_attributes].freeze
+  LEVEL_WRITE_EXEMPT = {
+    "app/models/level_change.rb" => { writes: 1, reason: "the track change clearing targets inside ProfileUpdate's save" },
+    "app/models/user.rb" => { writes: 1, reason: "#choose_track, which ProfileUpdate calls under the row lock" }
+  }.freeze
+
+  def level_field?(node) = (node.is_a?(Prism::SymbolNode) || node.is_a?(Prism::StringNode)) && LEVEL_FIELDS.include?(node.unescaped.to_sym)
+
+  def level_writes(source)
+    found = []
+    visit = lambda do |node|
+      if node.is_a?(Prism::CallNode)
+        arguments = node.arguments&.arguments.to_a
+        named = arguments.any? { |arg| arg.respond_to?(:elements) && arg.elements.any? { |pair| pair.respond_to?(:key) && level_field?(pair.key) } }
+        found << node.location.start_line if LEVEL_FIELDS.any? { |field| node.name == :"#{field}=" } ||
+                                              (LEVEL_UPDATES.include?(node.name) && (named || level_field?(arguments.first)))
+      end
+      node.compact_child_nodes.each(&visit)
+    end
+    visit.call(Prism.parse(source).value)
+    found
+  end
+
+  it "changes a saved user's levels only through ProfileUpdate, which records their cutoffs and events" do
+    sources = Dir[Rails.root.join("{app,lib,script}/**/*.rb")].sort.to_h { |path| [ relative(path), File.read(path) ] }
+    counts = sources.transform_values { |source| level_writes(source).size }.reject { |_path, count| count.zero? }
+
+    expect(counts).to eq(LEVEL_WRITE_EXEMPT.transform_values { |exemption| exemption[:writes] }),
+      "Only LevelChange and User#choose_track may write a saved user's levels; ProfileUpdate records the cutoffs and events: #{counts}"
+  end
+
+  it "finds a level write however it is spelled, and not a read" do
+    expect(level_writes("user.update!(skill_level: 'senior')").size).to eq(1)
+    expect(level_writes("user.update_column(:section_kind_levels, {})").size).to eq(1)
+    expect(level_writes("self.skill_level = level").size).to eq(1)
+    expect(level_writes("user.assign_attributes('section_kind_levels' => {})").size).to eq(1)
+    expect(level_writes("rungs(skill_level: user.skill_level); User.new(skill_level: 'junior')").size).to eq(0)
+  end
 end

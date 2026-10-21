@@ -168,7 +168,7 @@ setting:
 - The Exercise mix form posts only the controls on screen. A daily kind has
   no weight row there, and while a fourth kind is daily its two siblings have
   no row at all, so neither their weights and exclusions nor their difficulty
-  targets and locks are posted. `ProfileController` passes every save through
+  targets and locks are posted. `ProfileUpdate` passes every save through
   `User#keep_unrendered_preferences`, which merges back the stored weights and
   exclusions for kinds outside `ExerciseSection.rotatable` and the stored
   targets and locks for kinds outside `ExerciseSection.pickable`, the two sets

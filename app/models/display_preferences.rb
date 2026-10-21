@@ -31,7 +31,7 @@ class DisplayPreferences
   def self.sparse(values)
     return values unless values.is_a?(Hash)
 
-    values.reject { |key, value| OPTIONS[key]&.first == value }
+    values.reject { |key, value| OPTIONS.key?(key) && OPTIONS[key].first == value }
   end
 
   def self.problems_with(values)

@@ -84,46 +84,20 @@ Each prepared ladder is a billed rewrite of a shared reference. A trial
 account's calls run on a house key, so a trial is never offered the control
 and the endpoint queues nothing for one.
 
-## `#apply_track_change`
+## `#kind_rungs`
 
-Runs before every save and holds the `TrackChange` for a save that moves the
-track, or nil, so a later save on the same object never reads a stale one. It
-is declared ahead of `bump_section_kind_preferences_version`: callbacks run in
-declaration order and each `if:` is read when its callback is reached, so a
-skill-level-only save must clear its targets before the bump checks
-`section_kind_levels_changed?`. Otherwise the version would stay put and
-another tab could write the cleared levels back. The first track choice is not
-a track change.
+Each kind's rung, its target or else the skill level, read through
+`KindDifficulty#rungs`, the same reading generation uses. Level suggestions,
+their cutoffs and their event rows all work in rungs, so an account with no
+targets is handled the same way as one with a target for every kind.
 
-## `#kind_rungs`, `#record_level_changes` and `#record_level_suggestion_events`
+## No level callbacks
 
-`#kind_rungs` is each kind's rung, its target or else the skill level, read
-through `KindDifficulty#rungs`, the same reading generation uses. Level
-suggestions, their cutoffs and their event rows all work in rungs, so an
-account with no targets is handled the same way as one with a target for
-every kind.
-
-`#record_level_changes` runs before any save that changes
-`section_kind_levels` or `skill_level`, for every account, after
-`#apply_track_change`. It compares each kind's rung before the save
-(`*_in_database`) with its rung after, and records a cutoff at the new rung
-through the user's own today for each kind that moved onto
-`LevelSuggestion::LADDER` (junior, mid_level, senior). A target set, edited or
-cleared counts, and so does a skill-level change, which moves every kind
-without a target and every kind whose target the track change cleared. Results
-from an earlier stay at that rung then never count again, even after a detour
-through principal_engineer. A rung that did not move records nothing, and a
-move to principal_engineer records nothing, because no suggestion reaches it.
-The first track choice records nothing: there are no results yet to cut off.
-
-`#record_level_suggestion_events` runs in `after_save` under the same
-conditions. It passes `LevelSuggestionEvent.applied_rows` the levels and skill
-level from before and after the save (`*_before_last_save`), the cutoffs as
-they stood before, `shown_level_suggestions`, the moves a page posted and
-`ProfileController` checked under the row lock, and the kinds the track change
-cleared, which are labelled `skill_level_edit`. The insert runs in the save's
-transaction, so a failed insert raises and rolls back the level change and
-its cutoff together.
+`User` records no cutoff and writes no event row when its levels or skill
+level change. `ProfileUpdate`, the one flow that changes them on a saved
+account, does both explicitly through `LevelChange` (see its notes). A spec
+or script that sets levels with `update!` gets the new values and nothing
+else.
 
 ## `#recent_performance`
 
@@ -223,7 +197,7 @@ difficulty controls for the daily kinds and every optional slot's kinds, which
 is `ExerciseSection.pickable`; `spec/requests/setup_unrendered_preferences_spec.rb`
 pins that the page renders exactly those. A daily kind has no weight row, and
 while a fourth kind is daily its two siblings have no row at all (D1).
-`ProfileController#profile_params` passes every save through
+`ProfileUpdate#profile_attributes` passes every save through
 `#keep_unrendered_preferences`, which merges back the stored weights and
 exclusions for kinds outside `rotatable` and the stored difficulty targets and
 locks for kinds outside `pickable`. A swap can therefore be undone without
