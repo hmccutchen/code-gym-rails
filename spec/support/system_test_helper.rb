@@ -22,7 +22,7 @@ Capybara.register_driver(:capybara_playwright_bfcache) do |app|
 end
 
 # Capybara's 2s default is too short for this app's fetch-based autosave, submit and status-poll flows.
-Capybara.default_max_wait_time = 10
+Capybara.default_max_wait_time = 20
 
 # travel_to more than two days back would hand Chromium an already-expired session cookie.
 module SystemTimeHelper
@@ -94,6 +94,18 @@ module JavascriptReadyHelper
   end
 end
 
+module PollingHelper
+  def wait_for(timeout = Capybara.default_max_wait_time)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+    until (value = yield)
+      raise "Waited #{timeout}s at #{caller_locations(1, 1).first} and the condition never held" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+
+      sleep 0.05
+    end
+    value
+  end
+end
+
 RSpec.configure do |config|
   config.before(:each, type: :system) do
     driven_by :capybara_playwright
@@ -107,4 +119,5 @@ RSpec.configure do |config|
   config.include AnswerFormHelper, type: :system
   config.include TodaysSetHelper, type: :system
   config.include JavascriptReadyHelper, type: :system
+  config.include PollingHelper, type: :system
 end

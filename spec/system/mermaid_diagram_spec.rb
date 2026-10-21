@@ -17,16 +17,6 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
     end
   end
 
-  # Mermaid loads from a CDN, so cleanup lands after an unpredictable delay; poll rather than sleep.
-  def wait_until(timeout: 15)
-    deadline = Time.current + timeout
-    loop do
-      value = yield
-      return value if value
-      raise "condition never became true within #{timeout}s" if Time.current > deadline
-      sleep 0.2
-    end
-  end
 
   def count(js) = page.evaluate_script(js)
 
@@ -38,9 +28,9 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
     ps = FakeService::EXERCISE_PROBLEM_SET.deep_dup
     ps["code_review"]["diagram"] = bad_diagram
     start_dashboard(ps)
-    expect(page).to have_content(/Code Review/i, wait: 10)
+    expect(page).to have_content(/Code Review/i)
 
-    wait_until { count(STRUCTURE_SUMMARIES).zero? }
+    wait_for { count(STRUCTURE_SUMMARIES).zero? }
     expect(count(EMPTY_DIAGRAMS)).to eq(0)
   end
 
@@ -48,9 +38,9 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
     ps = FakeService::EXERCISE_PROBLEM_SET.deep_dup
     ps["code_review"]["diagram"] = "flowchart TD\n  A[Job] --> B[(DB)]"
     start_dashboard(ps)
-    expect(page).to have_content(/Code Review/i, wait: 10)
+    expect(page).to have_content(/Code Review/i)
 
-    wait_until { count(RENDERED_DIAGRAMS) == 1 }
+    wait_for { count(RENDERED_DIAGRAMS) == 1 }
     expect(count(STRUCTURE_SUMMARIES)).to eq(1)
     expect(count(EMPTY_DIAGRAMS)).to eq(0)
   end
@@ -67,9 +57,9 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
       }
     }
     start_dashboard(ps)
-    expect(page).to have_content(/Datastore/i, wait: 10)
+    expect(page).to have_content(/Datastore/i)
 
-    wait_until { count(EMPTY_DIAGRAMS).zero? }
+    wait_for { count(EMPTY_DIAGRAMS).zero? }
     expect(page).to have_css("details.ref", text: /Reference/i)
     expect(count(%q{document.body.innerHTML.includes("Sharding complicates joins")})).to be(true)
   end

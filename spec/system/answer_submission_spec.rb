@@ -9,7 +9,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     travel_to(weekday) do
       visit_with_todays_set(user)
       # Regex: `.section-label` is uppercased by CSS and Playwright matches the rendered text.
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
 
       expect(page).to have_button("Submit answers", disabled: false)
       expect_blocked("Answer at least one section to finish up.")
@@ -32,7 +32,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       click_button "Submit answers"
 
       # review_request_spec covers the chained review; this only needs the gated click to have gone through.
-      expect(page).to have_content("Review ready!", wait: 10)
+      expect(page).to have_content("Review ready!")
       expect(user.daily_responses.sole).to be_submitted
     end
   end
@@ -42,7 +42,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       fill_in_answer("code_review", "A substantive answer that will stay.")
       rate_section("code_review")
       fill_in_answer("pattern", "A substantive answer that will be cleared.")
@@ -56,7 +56,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       expect(page).to have_selector('button[data-rating-for="pattern"][data-rating="too_hard"].active')
       click_button "Submit answers"
 
-      expect(page).to have_content("Review ready!", wait: 10)
+      expect(page).to have_content("Review ready!")
       expect(user.daily_responses.reload.sole.section_ratings).to eq("code_review" => "right_level")
       expect(page).not_to have_selector(".history-pill", text: "Pattern: too hard")
     end
@@ -68,7 +68,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
     travel_to(weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
 
       expect_blocked("Answer at least one section to finish up.")
 
@@ -85,7 +85,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       expect_ready_to_submit
       click_button "Submit answers"
 
-      expect(page).to have_content("Review ready!", wait: 10)
+      expect(page).to have_content("Review ready!")
       response = user.daily_responses.sole
       expect(response).to be_submitted
       expect(response.section_ratings.keys).to contain_exactly("code_review", "pattern")
@@ -98,7 +98,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
       travel_to(a_weekday) do
         visit_with_todays_set(user)
-        expect(page).to have_content(/Code Review/i, wait: 10)
+        expect(page).to have_content(/Code Review/i)
         original = "The earlier autosaved answer."
         final = "The final edit typed immediately before submission."
         fill_in_answer("code_review", original)
@@ -152,7 +152,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       fill_in_answer("code_review", "The answer that survives the lost submission acknowledgement.")
       rate_section("code_review")
       fill_in_answer("pattern", "The answer that will be cleared before submission.")
@@ -171,7 +171,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
       click_button "Submit answers"
 
-      expect(page).to have_content("✓ Submitted", wait: 10)
+      expect(page).to have_content("✓ Submitted")
       expect(page).to have_no_selector("#gym-form")
       expect(page).to have_selector("form.review-form")
       response = user.daily_responses.reload.sole
@@ -186,7 +186,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       fill_in_answer("code_review", "The answer that will be submitted before navigation fails.")
       rate_section("code_review")
       page.execute_script(<<~JS)
@@ -197,14 +197,14 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
       click_button "Submit answers"
 
-      expect(page).to have_content("✓ Submitted", wait: 10)
+      expect(page).to have_content("✓ Submitted")
       expect(page).to have_no_selector("#gym-form")
       expect(page).to have_selector("form.review-form")
       expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.review_start_failed"))
       expect(user.daily_responses.reload.sole).to have_attributes(submitted?: true, reviewed?: false)
       expect(user.daily_responses.sole.answers["code_review"]).to eq("The answer that will be submitted before navigation fails.")
       within("form.review-form") { find('button[type="submit"]').click }
-      expect(page).to have_content("Review ready!", wait: 10)
+      expect(page).to have_content("Review ready!")
     end
   end
 
@@ -213,7 +213,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       rate_section("code_review")
       fill_in_answer("code_review", "🦆" * DailyResponse::ANSWER_MIN_LENGTH)
       wait_for_saved_answer(user, "code_review", "🦆" * DailyResponse::ANSWER_MIN_LENGTH)
@@ -222,7 +222,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       fill_in_answer("code_review", "🦆" * (DailyResponse::ANSWER_MIN_LENGTH + 1))
       expect_ready_to_submit
       click_button "Submit answers"
-      expect(page).to have_content("Review ready!", wait: 10)
+      expect(page).to have_content("Review ready!")
       expect(user.daily_responses.reload.sole.answered_sections).to eq([ "code_review" ])
     end
   end
@@ -232,7 +232,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       page.execute_script(<<~JS)
         const originalSetTimeout = window.setTimeout;
         window.setTimeout = (callback, delay, ...rest) => delay === 800 ? 0 : originalSetTimeout(callback, delay, ...rest);
@@ -243,7 +243,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       wait_for_saved_answer(user, "code_review", "An answer that reaches the server once the field is left.")
 
       rate_section("code_review")
-      Timeout.timeout(10) { sleep 0.05 until user.daily_responses.reload.first.section_ratings["code_review"] }
+      wait_for { user.daily_responses.reload.first.section_ratings["code_review"] }
 
       find(%([data-comparison-answer="design_comparison"])).choose("Piece A")
       wait_for_saved_answer(user, "design_comparison", "pick:a\n")
@@ -256,7 +256,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       page.execute_script(<<~JS)
         const originalFetch = window.fetch;
         window.saveRequests = 0;
@@ -286,7 +286,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       fill_in_answer("code_review", "An answer long enough for the server to count it.")
       find("body").click
       wait_for_saved_answer(user, "code_review", "An answer long enough for the server to count it.")
@@ -312,7 +312,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
       hold_response_requests
       fill_in_answer("code_review", "The substantive answer to keep.")
       rate_section("code_review")
@@ -330,7 +330,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       expect(page).to have_selector("#gym-form[inert]")
 
       page.execute_script("window.releaseSubmission()")
-      expect(page).to have_content("Review ready!", wait: 10)
+      expect(page).to have_content("Review ready!")
       saved = user.daily_responses.reload.sole
       expect(saved.answers["pattern"]).to eq("")
       expect(saved.section_ratings).to eq("code_review" => "right_level")
@@ -366,8 +366,8 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
   end
 
   def wait_for_saved_answer(user, field, text)
-    Timeout.timeout(10) do
-      sleep 0.05 until user.daily_responses.reload.first&.answers&.fetch(field, nil) == text
+    wait_for do
+      user.daily_responses.reload.first&.answers&.fetch(field, nil) == text
     end
   end
 end

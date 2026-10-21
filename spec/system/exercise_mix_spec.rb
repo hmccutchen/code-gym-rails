@@ -4,19 +4,14 @@ RSpec.describe "Exercise mix", type: :system do
   let(:user) { create_fake_provider_user }
 
   # Poll until the value matches, not just until present: debounced saves can land an intermediate write first.
-  def weights_after_save(expected, timeout: 5)
-    wait_for(timeout) { user.reload.section_kind_weights == expected }
+  def weights_after_save(expected)
+    wait_for { user.reload.section_kind_weights == expected }
     user.reload.section_kind_weights
   end
 
-  def exclusions_after_save(expected, timeout: 5)
-    wait_for(timeout) { user.reload.excluded_section_kinds.sort == expected.sort }
+  def exclusions_after_save(expected)
+    wait_for { user.reload.excluded_section_kinds.sort == expected.sort }
     user.reload.excluded_section_kinds
-  end
-
-  def wait_for(timeout)
-    deadline = Time.current + timeout
-    sleep 0.1 until yield || Time.current > deadline
   end
 
   it "keeps each difficulty radio beside its text with the fieldset gap as the only spacing" do
@@ -77,7 +72,7 @@ RSpec.describe "Exercise mix", type: :system do
 
     find("#weight-challenge").set(0)
 
-    expect(page).to have_css("#save-status", text: /changed in another tab/i, wait: 5)
+    expect(page).to have_css("#save-status", text: /changed in another tab/i)
     expect(user.reload.section_kind_weights).to eq({})
     expect(find("#exclude-parsons_problem")).to be_checked
   end
@@ -91,7 +86,7 @@ RSpec.describe "Exercise mix", type: :system do
     user.update!(daily_section_kinds: %w[code_review challenge])
     find("#weight-architecture").set(0)
 
-    expect(page).to have_no_css("#weight-challenge", wait: 5)
+    expect(page).to have_no_css("#weight-challenge")
     expect(page.evaluate_script("window.renderedBeforeSwap === undefined")).to be(true)
     expect(user.reload.section_kind_weights).to eq({})
   end
@@ -112,13 +107,13 @@ RSpec.describe "Exercise mix", type: :system do
     JS
 
     find("#weight-architecture").set(0)
-    wait_for(5) { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
+    wait_for { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
     user.update!(daily_section_kinds: %w[code_review challenge])
     level = (User::SKILL_LEVELS - [ user.skill_level ]).first
     find("#skill-level").select(I18n.t("exercise_mix.levels.#{level}"))
     page.execute_script("window.releaseMixSave()")
 
-    expect(page).to have_no_css("#weight-challenge", wait: 5)
+    expect(page).to have_no_css("#weight-challenge")
     expect(page.evaluate_script("window.renderedBeforeSwap === undefined")).to be(true)
     expect(user.reload.skill_level).to eq(level)
   end
@@ -139,24 +134,24 @@ RSpec.describe "Exercise mix", type: :system do
     JS
 
     find("#weight-architecture").set(0)
-    wait_for(5) { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
+    wait_for { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
     user.update!(daily_section_kinds: %w[code_review challenge])
     stored = user.skill_level
     level = (User::SKILL_LEVELS - [ stored ]).first
     find("#skill-level").select(I18n.t("exercise_mix.levels.#{level}"))
     page.execute_script("window.releaseMixSave()")
 
-    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"), wait: 5)
+    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))
     expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
     expect(find("#skill-level").value).to eq(level)
     expect(user.reload.skill_level).to eq(stored)
 
     page.execute_script("window.releaseMixSave = null; window.CodeGymSaveStatus.clear('exercise_mix')")
     find("#weight-architecture").set(4)
-    wait_for(5) { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
+    wait_for { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
     page.execute_script("window.releaseMixSave()")
 
-    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"), wait: 5)
+    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))
     expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
     expect(find("#skill-level").value).to eq(level)
   end
@@ -176,11 +171,11 @@ RSpec.describe "Exercise mix", type: :system do
     JS
 
     find("#tz-select").select(I18n.t("api_keys.edit.time_zones.hawaii"))
-    expect(page).to have_css("#save-status:not([hidden])", wait: 5)
+    expect(page).to have_css("#save-status:not([hidden])")
     user.update!(daily_section_kinds: %w[code_review challenge])
     find("#weight-architecture").set(0)
 
-    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"), wait: 5)
+    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))
     expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
     expect(find("#tz-select").value).to eq("Pacific/Honolulu")
   end
@@ -203,12 +198,12 @@ RSpec.describe "Exercise mix", type: :system do
     JS
 
     find("#weight-architecture").set(0)
-    wait_for(5) { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
+    wait_for { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
     user.update!(daily_section_kinds: %w[code_review challenge])
     find("#skill-level").select(I18n.t("exercise_mix.levels.#{(User::SKILL_LEVELS - [ user.skill_level ]).first}"))
     page.execute_script("window.releaseMixSave()")
 
-    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"), wait: 5)
+    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))
     expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
   end
 
@@ -222,7 +217,7 @@ RSpec.describe "Exercise mix", type: :system do
     user.update!(section_kind_levels: { "pattern" => "senior" })
     find("#weight-architecture").set(0)
 
-    expect(page).to have_css("#save-status", text: /changed in another tab/i, wait: 5)
+    expect(page).to have_css("#save-status", text: /changed in another tab/i)
     expect(page).to have_no_css("fieldset.mix-difficulty[data-kind='challenge'] input[type=radio]:disabled")
     expect(user.reload.excluded_section_kinds).to eq(%w[challenge])
   end
@@ -239,7 +234,7 @@ RSpec.describe "Exercise mix", type: :system do
     sleep 0.8
     find("#weight-challenge").set(4)
 
-    expect(weights_after_save({ "challenge" => 4.0 }, timeout: 15)).to eq("challenge" => 4.0)
+    expect(weights_after_save({ "challenge" => 4.0 })).to eq("challenge" => 4.0)
   end
 
   # Delay the response handling, not the request: delaying requests would reorder arrivals and stop reproducing this.
@@ -274,8 +269,8 @@ RSpec.describe "Exercise mix", type: :system do
     expect(exclusions_after_save(excluded.map(&:key))).to contain_exactly(*excluded.map(&:key))
   end
 
-  def difficulty_after_save(levels, locked, timeout: 5)
-    wait_for(timeout) { user.reload.section_kind_levels == levels && user.locked_section_kinds.sort == locked.sort }
+  def difficulty_after_save(levels, locked)
+    wait_for { user.reload.section_kind_levels == levels && user.locked_section_kinds.sort == locked.sort }
     [ user.reload.section_kind_levels, user.locked_section_kinds ]
   end
 
@@ -386,7 +381,7 @@ RSpec.describe "Exercise mix", type: :system do
 
     find(".mix-difficulty[data-kind='code_review'] input[value='junior']").click
 
-    expect(page).to have_css("#save-status", text: /changed in another tab/i, wait: 5)
+    expect(page).to have_css("#save-status", text: /changed in another tab/i)
     expect(find(".mix-difficulty[data-kind='pattern'] input[value='senior']")).to be_checked
     expect(find("#lock-pattern")).to be_checked
     expect(find(".mix-difficulty[data-kind='code_review'] input[value='']")).to be_checked
@@ -421,7 +416,7 @@ RSpec.describe "Exercise mix", type: :system do
   end
 
   def wait_for_mix_responses(count)
-    wait_for(5) { page.evaluate_script("window.mixResponses?.length") == count }
+    wait_for { page.evaluate_script("window.mixResponses?.length") == count }
     expect(page.evaluate_script("window.mixResponses?.length")).to eq(count)
   end
 
@@ -442,7 +437,7 @@ RSpec.describe "Exercise mix", type: :system do
         #{'window.mixResponses[0]();' if phase == "pending"}
       JS
       if phase == "queued"
-        wait_for(5) { page.evaluate_script("window.mixDebounces") == 2 }
+        wait_for { page.evaluate_script("window.mixDebounces") == 2 }
         expect(page.evaluate_script("window.mixDebounces")).to eq(2)
         page.execute_script("window.mixResponses[0]()")
       end

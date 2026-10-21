@@ -8,7 +8,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
 
     travel_to(weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
 
       find(%(textarea[data-field="code_review"])).fill_in(
         with: "It re-runs the loyalty_tier query inside the loop — precompute it once outside the loop."
@@ -17,7 +17,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
       rate_all_sections
       click_button "Submit answers"
 
-      expect(page).to have_content("Review ready!", wait: 10)
+      expect(page).to have_content("Review ready!")
       expect(page).to have_current_path(root_path)
       expect(page).to have_content("What you got right")
     end
@@ -32,7 +32,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
 
     travel_to(weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
 
       find(%(textarea[data-field="code_review"])).fill_in(
         with: "It re-runs the loyalty_tier query inside the loop — precompute it once outside the loop."
@@ -40,16 +40,16 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
 
       rate_all_sections
       click_button "Submit answers"
-      expect(page).to have_content("Review ready!", wait: 10)
+      expect(page).to have_content("Review ready!")
 
       # Back changes no path now, so mark this document and wait for the mark to go before asserting.
       page.execute_script("window.__beforeBack = true")
 
       # history.back(), not go_back: a bfcache restore fires no load event, so go_back would hide the failing path.
       page.execute_script("history.back()")
-      Timeout.timeout(10) { sleep 0.1 until page.evaluate_script("window.__beforeBack === undefined") }
+      wait_for { page.evaluate_script("window.__beforeBack === undefined") }
 
-      expect(page).to have_content("✓ Submitted", wait: 10)
+      expect(page).to have_content("✓ Submitted")
       expect(page).to have_no_selector("textarea[data-field]")
     end
   end
@@ -63,7 +63,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
 
     travel_to(weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
 
       find(%(textarea[data-field="code_review"])).fill_in(
         with: "It re-runs the loyalty_tier query inside the loop — precompute it once outside the loop."
@@ -72,7 +72,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
       rate_all_sections
       click_button "Submit answers"
 
-      expect(page).to have_content("is limiting requests right now", wait: 10)
+      expect(page).to have_content("is limiting requests right now")
       expect(page).to have_content("✓ Submitted")
       expect(page).to have_selector("form.review-form button")
       expect(page).to have_button("Start over")

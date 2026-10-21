@@ -4,7 +4,7 @@ require "rails_helper"
 RSpec.describe "Duck thread", type: :system, with_csrf: true do
   def open_duck(user)
     visit_with_todays_set(user)
-    expect(page).to have_content(/Code Review/i, wait: 10)
+    expect(page).to have_content(/Code Review/i)
 
     duck = first(".duck-thread[data-duck-thread-section-value='code_review']")
     duck.find(".duck-toggle").click
@@ -26,7 +26,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
       ask(duck, "I don't see what's slow here")
 
-      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT)
       expect(duck).to have_selector(".duck-turn.duck-user", text: "I don't see what's slow here")
 
       expect(DailyResponse.count).to eq(0)
@@ -36,10 +36,10 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
       (ResponsesController::MAX_DUCK_TURNS_PER_SECTION - 1).times do |i|
         ask(duck, "still stuck #{i}")
-        expect(duck).to have_css(".duck-turn.duck-user", count: i + 2, wait: 10)
+        expect(duck).to have_css(".duck-turn.duck-user", count: i + 2)
       end
 
-      expect(duck).to have_content(/used all #{ResponsesController::MAX_DUCK_TURNS_PER_SECTION} messages/i, wait: 10)
+      expect(duck).to have_content(/used all #{ResponsesController::MAX_DUCK_TURNS_PER_SECTION} messages/i)
       expect(duck.find(".duck-send")).to be_disabled
       expect(duck.find(".duck-input")).to be_disabled
     end
@@ -53,8 +53,8 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       duck.find(".duck-input").fill_in(with: "why is this slow?")
       duck.find(".duck-input").send_keys(:enter)
 
-      expect(duck).to have_selector(".duck-turn.duck-user", text: "why is this slow?", wait: 10)
-      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(duck).to have_selector(".duck-turn.duck-user", text: "why is this slow?")
+      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT)
       expect(page).to have_current_path(root_path)
     end
   end
@@ -65,7 +65,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     travel_to(a_weekday) do
       duck = open_duck(user)
       ask(duck, "what should I look at first?")
-      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT)
 
       expect(duck.find(".duck-turn.duck-user", match: :first).text(:all)).to start_with("You:")
       expect(duck.find(".duck-turn.duck-assistant", match: :first).text(:all)).to start_with("Duck:")
@@ -78,7 +78,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     travel_to(a_weekday) do
       duck = open_duck(user)
       ask(duck, "a first question")
-      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT)
 
       duck.find(".duck-clear").click
 
@@ -105,7 +105,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       JS
 
       ask(duck, "hold this one open")
-      expect(duck).to have_content("Thinking…", wait: 10)
+      expect(duck).to have_content("Thinking…")
 
       duck.find(".duck-clear").click
       expect(duck).to have_no_css(".duck-turn")
@@ -124,7 +124,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
   def reopen_duck
     visit root_path
-    expect(page).to have_content(/Code Review/i, wait: 10)
+    expect(page).to have_content(/Code Review/i)
     duck = first(".duck-thread[data-duck-thread-section-value='code_review']")
     duck.find(".duck-toggle").click
     duck
@@ -135,14 +135,14 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
     travel_to(a_weekday) do
       ask(open_duck(user), "before the reload")
-      expect(page).to have_css(".duck-turn.duck-assistant", count: 1, wait: 10)
+      expect(page).to have_css(".duck-turn.duck-assistant", count: 1)
 
       duck = reopen_duck
       expect(duck).to have_css(".duck-turn.duck-user", text: "before the reload")
       expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT)
 
       ask(duck, "after the reload")
-      expect(duck).to have_css(".duck-turn.duck-user", count: 2, wait: 10)
+      expect(duck).to have_css(".duck-turn.duck-user", count: 2)
       expect(duck).to have_no_content(/out of date/i)
     end
   end
@@ -154,7 +154,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       duck = open_duck(user)
       ResponsesController::MAX_DUCK_TURNS_PER_SECTION.times do |i|
         ask(duck, "stuck #{i}")
-        expect(duck).to have_css(".duck-turn.duck-user", count: i + 1, wait: 10)
+        expect(duck).to have_css(".duck-turn.duck-user", count: i + 1)
       end
 
       duck = reopen_duck
@@ -164,7 +164,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       duck.find(".duck-clear").click
       expect(duck.find(".duck-send")).not_to be_disabled
       ask(duck, "a fresh start")
-      expect(duck).to have_css(".duck-turn.duck-user", count: 1, wait: 10)
+      expect(duck).to have_css(".duck-turn.duck-user", count: 1)
       expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT)
     end
   end
@@ -175,7 +175,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     travel_to(a_weekday) do
       duck = open_duck(user)
       ask(duck, "soon cleared")
-      expect(duck).to have_css(".duck-turn.duck-assistant", count: 1, wait: 10)
+      expect(duck).to have_css(".duck-turn.duck-assistant", count: 1)
 
       duck.find(".duck-clear").click
       cleared = -> { DuckThread.first.reload.stored_turns("code_review").empty? }
@@ -186,7 +186,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       expect(duck).to have_no_css(".duck-turn")
 
       ask(duck, "after clearing and reloading")
-      expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT)
       expect(duck).to have_no_content(/out of date/i)
     end
   end
@@ -197,7 +197,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     travel_to(a_weekday) do
       duck = open_duck(user)
       ask(duck, "soon cleared twice")
-      expect(duck).to have_css(".duck-turn.duck-assistant", count: 1, wait: 10)
+      expect(duck).to have_css(".duck-turn.duck-assistant", count: 1)
 
       page.execute_script(<<~JS)
         const originalFetch = window.fetch;
@@ -216,7 +216,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       page.execute_script("window.__release()")
 
       ask(duck, "after a double clear")
-      expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT)
       expect(duck).to have_no_content(/out of date/i)
       expect(page.evaluate_script("window.__deletes")).to eq(1)
     end
@@ -228,7 +228,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     travel_to(a_weekday) do
       duck = open_duck(user)
       ask(duck, "kept on a failed clear")
-      expect(duck).to have_css(".duck-turn.duck-assistant", count: 1, wait: 10)
+      expect(duck).to have_css(".duck-turn.duck-assistant", count: 1)
 
       page.execute_script(<<~JS)
         const originalFetch = window.fetch;
@@ -238,7 +238,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       JS
       duck.find(".duck-clear").click
 
-      expect(duck).to have_css(".duck-turn.duck-user", text: "kept on a failed clear", wait: 10)
+      expect(duck).to have_css(".duck-turn.duck-user", text: "kept on a failed clear")
       expect(duck).to have_content(I18n.t("duck.send_failed"))
       expect(DuckThread.first.reload.user_turn_count("code_review")).to eq(1)
     end
@@ -265,19 +265,19 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
         JS
 
         ask(duck, "sent before the clear")
-        expect(duck).to have_content("Thinking…", wait: 10)
+        expect(duck).to have_content("Thinking…")
         duck.find(".duck-clear").click
         order.each do |kind|
           page.execute_script("window.__held['#{kind}']()")
           sleep 0.5
         end
 
-        expect(duck).to have_css(".duck-turn.duck-user", text: "sent before the clear", wait: 10)
+        expect(duck).to have_css(".duck-turn.duck-user", text: "sent before the clear")
         expect(duck).to have_css(".duck-turn.duck-assistant", text: FakeService::DUCK_RESPONSE_TEXT)
 
         page.execute_script("window.fetch = window.__originalFetch")
         ask(duck, "the next message")
-        expect(duck).to have_css(".duck-turn.duck-user", count: 2, wait: 10)
+        expect(duck).to have_css(".duck-turn.duck-user", count: 2)
         expect(duck).to have_no_content(/out of date/i)
       end
     end
@@ -291,7 +291,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       # A real 422 from the endpoint: rspec-mocks stubs don't reach the server thread handling the driver's requests.
       ask(duck, "x" * (ResponsesController::MAX_DUCK_MESSAGE_LENGTH + 1))
 
-      expect(duck).to have_content(/too long/i, wait: 10)
+      expect(duck).to have_content(/too long/i)
       expect(duck.find(".duck-send")).not_to be_disabled
       expect(duck).to have_no_css(".duck-turn")
     end
@@ -306,8 +306,8 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       expect(duck.find(".duck-input").value).to eq("")
       duck.find(".duck-explain").click
 
-      expect(duck).to have_selector(".duck-turn.duck-user", text: DuckPrompt::EXPLAIN_REQUEST, wait: 10)
-      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(duck).to have_selector(".duck-turn.duck-user", text: DuckPrompt::EXPLAIN_REQUEST)
+      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT)
       expect(DailyResponse.count).to eq(0)
     end
   end
@@ -320,7 +320,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
       ResponsesController::MAX_DUCK_TURNS_PER_SECTION.times do |i|
         ask(duck, "stuck #{i}")
-        expect(duck).to have_css(".duck-turn.duck-user", count: i + 1, wait: 10)
+        expect(duck).to have_css(".duck-turn.duck-user", count: i + 1)
       end
 
       # Not clicked: Playwright would wait for a disabled button to become actionable and time out.
@@ -338,7 +338,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
-      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_content(/Code Review/i)
 
       find(%(textarea[data-field="code_review"])).fill_in(
         with: "It re-runs the loyalty_tier query inside the loop — precompute it once outside."
@@ -346,7 +346,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       rate_all_sections
       click_button "Submit answers"
 
-      expect(page).to have_content("Review ready!", wait: 10)
+      expect(page).to have_content("Review ready!")
 
       expect(page).to have_content("✓ Submitted")
       expect(page).to have_no_css(".duck-thread")

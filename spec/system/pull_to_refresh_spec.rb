@@ -81,7 +81,7 @@ RSpec.describe "Pull to refresh", type: :system do
   end
 
   def reloaded?
-    Timeout.timeout(5) { sleep 0.1 until page.evaluate_script("window.__beforePull === undefined") }
+    wait_for { page.evaluate_script("window.__beforePull === undefined") }
     true
   rescue Timeout::Error
     false
@@ -307,9 +307,9 @@ RSpec.describe "Pull to refresh", type: :system do
 
     visit learn_path
 
-    expect(page).to have_css("#pull-refresh.is-refreshing", visible: :all, wait: 10)
+    expect(page).to have_css("#pull-refresh.is-refreshing", visible: :all)
     expect(content("style.transform")).to eq("translateY(64px)")
-    expect(page).to have_no_css("#pull-refresh.is-refreshing", visible: :all, wait: 10)
+    expect(page).to have_no_css("#pull-refresh.is-refreshing", visible: :all)
     expect(indicator("style.transform")).to eq("")
     expect(content("style.transform")).to eq("")
     expect(page.evaluate_script("sessionStorage.getItem('codegym:pull-refreshed') === null")).to be(true)
@@ -325,7 +325,7 @@ RSpec.describe "Pull to refresh", type: :system do
 
     visit learn_path
 
-    expect(page).to have_css("#pull-refresh.is-refreshing", visible: :all, wait: 10)
+    expect(page).to have_css("#pull-refresh.is-refreshing", visible: :all)
     expect(page.evaluate_script("window.__firstFrameTransform")).to eq("matrix(1, 0, 0, 1, 0, 64)")
   end
 
@@ -344,7 +344,7 @@ RSpec.describe "Pull to refresh", type: :system do
     expect(page).to have_css("html.pull-resuming", visible: :all)
     expect(page.evaluate_script("getComputedStyle(document.querySelector('[data-pull-content]')).transform"))
       .to eq("matrix(1, 0, 0, 1, 0, 64)")
-    expect(page).to have_css("html:not(.pull-resuming)", visible: :all, wait: 15)
+    expect(page).to have_css("html:not(.pull-resuming)", visible: :all)
     expect(page.evaluate_script("getComputedStyle(document.querySelector('[data-pull-content]')).transform")).to eq("none")
   end
 

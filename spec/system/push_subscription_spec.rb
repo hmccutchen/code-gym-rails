@@ -42,7 +42,7 @@ RSpec.describe "Re-subscribing to push reminders on launch", type: :system do
   end
 
   def wait_until_subscribed
-    Timeout.timeout(10) { sleep 0.05 until page.evaluate_script("window.pushSubscribed") }
+    wait_for { page.evaluate_script("window.pushSubscribed") }
   end
 
   it "registers an endpoint the server does not hold yet" do
@@ -51,7 +51,7 @@ RSpec.describe "Re-subscribing to push reminders on launch", type: :system do
     wait_for_js
     wait_until_subscribed
 
-    Timeout.timeout(10) { sleep 0.1 until user.push_subscriptions.reload.any? }
+    wait_for { user.push_subscriptions.reload.any? }
     expect(page.evaluate_script("window.pushPosts")).to eq([ { "endpoint" => endpoint, "p256dh" => "p256dh-key", "auth" => "auth-key" } ])
     expect(user.push_subscriptions.reload.pluck(:endpoint, :p256dh_key, :auth_key)).to eq([ [ endpoint, "p256dh-key", "auth-key" ] ])
   end

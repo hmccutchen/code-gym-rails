@@ -297,8 +297,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     fill_in_answer("code_review", "The answer that is submitted while both swaps are still queued.")
     rate_section("code_review")
     click_button "Submit answers"
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Capybara.default_max_wait_time
-    sleep 0.05 until user.daily_responses.reload.first&.submitted? || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+    wait_for { user.daily_responses.reload.first&.submitted? }
     expect(user.daily_responses.sole).to be_submitted
   end
 
@@ -315,7 +314,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     wait_for_js_condition("window.heldSwaps.length === 2")
     release_swap
 
-    expect(page).to have_content("✓ Submitted", wait: 10)
+    expect(page).to have_content("✓ Submitted")
     expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
   end
 
@@ -349,7 +348,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page).to have_css("#{sheet(1)} .daily-kind-error", text: I18n.t("save_status.generic"))
     primary(1).click
     release_swap
-    expect(page).to have_content("✓ Submitted", wait: 10)
+    expect(page).to have_content("✓ Submitted")
     expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
   end
 
@@ -469,7 +468,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     fill_in_answer("code_review", "The answer an autosave is still carrying when the submit goes out.")
     wait_for_js_condition("window.releaseAutosave")
     submit_one_answer
-    expect(page).to have_css("#leave-held", wait: 15)
+    expect(page).to have_css("#leave-held")
 
     page.execute_script("window.releaseAutosave()")
     wait_for_js_condition("window.reviewHandoffs === 1")
@@ -578,7 +577,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
     finish_saved(1)
     submit_one_answer
-    expect(page).to have_content("✓ Submitted", wait: 10)
+    expect(page).to have_content("✓ Submitted")
     expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
   end
 
