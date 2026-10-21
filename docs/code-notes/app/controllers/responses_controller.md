@@ -82,7 +82,9 @@ Round 1: one text-only critique of the engineer's plan. The claim, the write
 and the release are `DailyResponse`'s (`#claim_pseudocode_critique!`), and
 the action keeps only the token. A critique whose claim went stale and was
 taken over is still shown to the engineer, since it was paid for, but it is
-not stored: the newer call's result is the one the round keeps.
+not stored: the newer call's result is the one the round keeps, so a reload
+can show a different critique from the one first shown. If the newer call
+fails instead, its release leaves the round open and a new check is allowed.
 
 ## `#stale_answer_sections`
 

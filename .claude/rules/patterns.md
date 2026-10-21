@@ -120,8 +120,8 @@ says what a deviation from one requires.
   stale may now belong to another caller. The pseudocode critique claim is a
   key inside a JSON column, so it lives on `DailyResponse`
   (`#claim_pseudocode_critique!`) and keeps the same token rule under the row
-  lock. Anything that locks an exercise and
-  its response goes through `DailyExercise#with_response_locked`.
+  lock. Anything that locks an exercise and its response goes through
+  `DailyExercise#with_response_locked`.
 - **The server decides; the page shows its answer** — when a page needs a
   rule the server owns, the browser holds no copy of it. The server renders its
   answer onto the page and sends it again in every reply, and the script only

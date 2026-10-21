@@ -131,7 +131,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
     end
 
     describe "a claim that goes stale while its call is still running" do
-      let(:newer_claim) { (Time.current + DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).iso8601(6) }
+      let!(:newer_claim) { (Time.current + DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).iso8601(6) }
 
       def take_over_mid_call
         travel DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute
@@ -146,6 +146,8 @@ RSpec.describe "Pseudocode rounds", type: :request do
 
         critique
 
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)).to include("gaps_found" => true, "gaps" => [ "No empty-input case." ])
         expect(round["critique_claimed_at"]).to eq(newer_claim)
         expect(round).not_to have_key("critiqued_at")
       end
