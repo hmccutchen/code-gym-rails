@@ -21,6 +21,15 @@ expected; deduplicating them would leave sections without their controls.
 `spec/requests/history_spec.rb` counts three follow-ups mounts because its
 fixture has three entries with one reviewed section each.
 
+## Caps and the follow-up thread
+
+Whether the "explain differently" button and the follow-up form still show,
+and the order of the thread, come from `DailyResponse#alternates_left`,
+`#follow_ups_left` and `#follow_up_turns`, the same methods the controller
+checks before and after the provider call. The partial keeps no count of its
+own. The "used up" message still names `MAX_FOLLOW_UPS_PER_SECTION`, since it
+states the cap's number to the reader.
+
 ## Alternate status line
 
 The status line is set after an alternate lands and never cleared, because the

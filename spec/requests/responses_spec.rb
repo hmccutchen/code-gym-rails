@@ -1289,7 +1289,7 @@ RSpec.describe "Responses", type: :request do
       post follow_ups_response_path(r), params: { section: "code_review", question: "Why is that slow?" }
       expect(response).to have_http_status(:ok)
 
-      turns = r.reload.review_follow_ups.for_section("code_review")
+      turns = r.reload.follow_up_turns("code_review")
       expect(turns.map(&:role)).to eq(%w[user assistant])
       expect(turns.first.content).to eq("Why is that slow?")
       expect(turns.last.content).to eq("Because the query runs per row.")

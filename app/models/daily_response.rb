@@ -84,6 +84,40 @@ class DailyResponse < ApplicationRecord
     ai_review&.dig(section.to_s).is_a?(Hash)
   end
 
+  def alternates_left(section)
+    MAX_ALTERNATES_PER_SECTION - Array(review_alternates[section.to_s]).size
+  end
+
+  def follow_up_turns(section)
+    review_follow_ups.select { |turn| turn.section == section.to_s }.sort_by { |turn| [ turn.created_at, turn.id ] }
+  end
+
+  def follow_ups_left(section)
+    MAX_FOLLOW_UPS_PER_SECTION - follow_up_turns(section).count(&:role_user?)
+  end
+
+  def append_alternate!(section, alternate)
+    with_lock do
+      left = alternates_left(section)
+      next :capped unless left.positive?
+
+      stored = Array(review_alternates[section.to_s])
+      update!(review_alternates: review_alternates.merge(section.to_s => stored + [ alternate ]))
+      left - 1
+    end
+  end
+
+  def append_follow_up!(section, question:, answer:)
+    with_lock do
+      left = follow_ups_left(section)
+      next :capped unless left.positive?
+
+      review_follow_ups.create!(section: section.to_s, role: :user, content: question)
+      review_follow_ups.create!(section: section.to_s, role: :assistant, content: answer)
+      left - 1
+    end
+  end
+
   def pseudocode_round(section)
     pseudocode_rounds[section.to_s] || {}
   end
