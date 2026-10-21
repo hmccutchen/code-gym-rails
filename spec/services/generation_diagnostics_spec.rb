@@ -13,8 +13,8 @@ RSpec.describe GenerationDiagnostics do
              coverage: Struct.new(:kind, :reason).new(ExerciseSection::Challenge, "gap"), size: size)
   end
   let(:draft) do
-    AiService.const_get(:Draft).new(problem_set: {}, plan: plan, kinds: kinds, difficulty: KindDifficulty.none, ladders: {},
-                                    history: [], suggested_concepts: [], unusable_sections: [])
+    ExerciseDraft::Draft.new(user: user, language: "ruby_rails", problem_set: {}, plan: plan, kinds: kinds,
+                             difficulty: KindDifficulty.none, ladders: {}, history: [], suggested_concepts: [], unusable_sections: [])
   end
 
   # Every section carries every answer-key field any kind declares, so a new kind or a new field is covered unchanged.

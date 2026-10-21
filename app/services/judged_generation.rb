@@ -1,6 +1,6 @@
 # Design notes: docs/code-notes/app/services/judged_generation.md
 class JudgedGeneration
-  # judge_section(user, kind, section, rung:, locked:), retry_section(user, language, draft, kind, concept); both raise.
+  # judge_section(user, kind, section, rung:, locked:), retry_section(draft, kind, concept); both raise.
   Provider = Data.define(:judge_section, :retry_section)
 
   REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL = false
@@ -8,13 +8,12 @@ class JudgedGeneration
 
   RETRY_FIELDS = %i[retry_principle retry_issues retry_evidence retry_reason].freeze
 
-  def self.call(user:, language:, draft:, providers:, finish:)
-    new(user, language, draft, providers, finish).call
+  def self.call(user:, draft:, providers:, finish:)
+    new(user, draft, providers, finish).call
   end
 
-  def initialize(user, language, draft, providers, finish)
+  def initialize(user, draft, providers, finish)
     @user      = user
-    @language  = language
     @draft     = draft
     @providers = providers
     @finish    = finish
@@ -211,7 +210,7 @@ class JudgedGeneration
   end
 
   def retry_section(kind, concept)
-    @providers.call.retry_section.call(@user, @language, @draft, kind, concept)
+    @providers.call.retry_section.call(@draft, kind, concept)
   rescue ProviderError, *AiService::INFRASTRUCTURE_ERRORS => e
     Rails.logger.warn("[judge_retry_failed] user=#{@user.id} section=#{kind.key}: #{e.message}")
     nil

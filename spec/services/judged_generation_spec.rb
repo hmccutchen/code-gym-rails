@@ -38,8 +38,8 @@ RSpec.describe JudgedGeneration do
 
           JudgeVerdict.parse(reply, kind: kind)
         },
-        retry_section: lambda { |retry_user, language, retry_draft, kind, concept|
-          retry_calls << [ retry_user, language, retry_draft, kind.key, concept ]
+        retry_section: lambda { |retry_draft, kind, concept|
+          retry_calls << [ retry_draft, kind.key, concept ]
           reply = retried_sections.fetch(kind.key) { drafted[kind.key].merge("question" => "Retried") }
           raise reply if reply.is_a?(Exception)
 
@@ -53,7 +53,7 @@ RSpec.describe JudgedGeneration do
     { "status" => "reject", "principle" => principle, "evidence" => "quoted", "reason" => "because" }
   end
 
-  def run = described_class.call(user: user, language: "ruby_rails", draft: draft, providers: providers, finish: finish)
+  def run = described_class.call(user: user, draft: draft, providers: providers, finish: finish)
 
   it "judges only planned sections, at each kind's rung, and returns the existing JudgedSet" do
     judged = run
@@ -72,7 +72,7 @@ RSpec.describe JudgedGeneration do
 
     judged = run
 
-    expect(retry_calls).to eq([ [ user, "ruby_rails", draft, "pattern", "service_objects" ] ])
+    expect(retry_calls).to eq([ [ draft, "pattern", "service_objects" ] ])
     expect(judged.problem_set["pattern"]["question"]).to eq("Retried")
     expect(judged.outcomes["pattern"]).to include(status: :keep, retries: 1, principle: "scope_mismatch",
                                                   retry_principle: [ nil ], retry_issues: [ [] ])
@@ -99,7 +99,7 @@ RSpec.describe JudgedGeneration do
 
     judged = run
 
-    expect(retry_calls.map { |call| call[3] }).to eq(%w[code_review code_review])
+    expect(retry_calls.map { |call| call[1] }).to eq(%w[code_review code_review])
     expect(judged.dropped_sections).to eq([ "code_review" ])
     expect(judged.problem_set).not_to have_key("code_review")
     expect(judged.outcomes["code_review"]).to include(dropped: true, fallback: nil, retries: 2,
@@ -128,7 +128,7 @@ RSpec.describe JudgedGeneration do
 
       judged = run
 
-      expect(retry_calls).to eq([ [ user, "ruby_rails", draft, "challenge", "memoization" ] ])
+      expect(retry_calls).to eq([ [ draft, "challenge", "memoization" ] ])
       expect(judged.problem_set["challenge"]).to include("question" => "Retried")
       expect(judged.outcomes["challenge"]).to include(unusable: true, status: :keep, retries: 1, dropped: false)
     end
@@ -219,7 +219,7 @@ RSpec.describe JudgedGeneration do
     built = 0
     counting = -> { built += 1; providers.call }
 
-    described_class.call(user: user, language: "ruby_rails", draft: draft, providers: counting, finish: finish)
+    described_class.call(user: user, draft: draft, providers: counting, finish: finish)
 
     expect(built).to eq(kinds.size + 2)
   end
@@ -240,7 +240,7 @@ RSpec.describe JudgedGeneration do
 
       judged = run
 
-      expect(retry_calls.map { |call| call[3] }).to eq(%w[pattern pattern])
+      expect(retry_calls.map { |call| call[1] }).to eq(%w[pattern pattern])
       expect(judged.outcomes["pattern"]).to include(status: :keep, retries: 2, dropped: false)
       # One entry per judged retry, so the rejected first attempt never describes the section that shipped.
       expect(judged.outcomes["pattern"]).to include(retry_principle: [ "underdetermined", nil ],

@@ -35,7 +35,7 @@ class ForcedConceptDrafts
   def draft(service, user, rung:)
     language = user.language_for_today
     service.singleton_class.prepend(@prompt_override) unless service.singleton_class.include?(@prompt_override)
-    service.send(:retry_section, user, language, prompt_draft(user, language, rung), KIND, @concept)
+    service.send(:retry_section, prompt_draft(user, language, rung), KIND, @concept)
   end
 
   private
@@ -66,7 +66,8 @@ class ForcedConceptDrafts
                                        plan.code_review_mode)
     history    = user.recent_performance
 
-    AiService.const_get(:Draft).new(problem_set: {}, plan: plan, kinds: kinds, difficulty: difficulty, ladders: ladders,
-                                    history: history, suggested_concepts: [], unusable_sections: [])
+    ExerciseDraft::Draft.new(user: user, language: language, problem_set: {}, plan: plan, kinds: kinds,
+                             difficulty: difficulty, ladders: ladders, history: history,
+                             suggested_concepts: [], unusable_sections: [])
   end
 end

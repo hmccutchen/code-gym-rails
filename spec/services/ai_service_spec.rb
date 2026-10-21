@@ -223,7 +223,7 @@ RSpec.describe AiService do
       retry_draft = spy_class.new(canned_text: full_problem_set.to_json)
                             .send(:draft_exercise, user, language: "ruby_rails", blocking: false)
       spy_class.new(canned_text: { "pattern" => FakeService::EXERCISE_PROBLEM_SET["pattern"].deep_dup }.to_json)
-               .send(:retry_section, user, "ruby_rails", retry_draft, ExerciseSection::Pattern, "service_objects")
+               .send(:retry_section, retry_draft, ExerciseSection::Pattern, "service_objects")
       spy_class.new(canned_text: review_json).review_sections(user, exercise, response, sections: %w[code_review])
       spy_class.new(canned_text: reference_json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
       spy_class.new(canned_text: FakeService::RECOGNITION_GUIDE.to_json).generate_recognition_guide(user, "code_smell")
@@ -1382,9 +1382,10 @@ RSpec.describe AiService do
     let(:difficulty) { KindDifficulty.new(levels: { "challenge" => "senior", "pattern" => "mid_level" }, locked: %w[challenge]) }
     let(:draft_ladders) { { "senior" => { "memoization" => "the draft's senior rung" } } }
     let(:draft) do
-      AiService.const_get(:Draft).new(problem_set: {}, plan: plan, kinds: ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review }),
-                                      difficulty: difficulty, ladders: draft_ladders, history: history,
-                                      suggested_concepts: [], unusable_sections: [])
+      ExerciseDraft::Draft.new(user: user, language: "ruby_rails", problem_set: {}, plan: plan,
+                               kinds: ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review }),
+                               difficulty: difficulty, ladders: draft_ladders, history: history,
+                               suggested_concepts: [], unusable_sections: [])
     end
     let(:svc) { double_class.new(canned_text: { "challenge" => FakeService::EXERCISE_PROBLEM_SET["challenge"] }.to_json) }
 
@@ -1397,9 +1398,10 @@ RSpec.describe AiService do
                                ladder_senior: "a fresh senior rung", ladder_principal_engineer: "p")
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_junior: "j", ladder_senior: "s",
                                ladder_mid_level: "a mid-level pattern rung", ladder_principal_engineer: "p")
-      expect(svc).to receive(:retry_ladders).with(user, "ruby_rails", draft, ExerciseSection::Challenge).and_call_original
+      expect(GenerationLadders).to receive(:for).with({ ExerciseSection::Challenge => "senior" }, "ruby_rails", plan.code_review_mode)
+                                               .and_call_original
 
-      section = svc.send(:retry_section, user, "ruby_rails", draft, ExerciseSection::Challenge, "memoization")
+      section = svc.send(:retry_section, draft, ExerciseSection::Challenge, "memoization")
       prompt  = svc.last_prompt
 
       expect(section).to include("concept" => "memoization", "pitched_at" => "senior")
@@ -1411,11 +1413,6 @@ RSpec.describe AiService do
       expect(prompt).not_to include("Sections at mid_level", "the draft's senior rung", "a mid-level pattern rung")
       expect(draft.ladders).to equal(draft_ladders)
       expect(draft_ladders).to eq("senior" => { "memoization" => "the draft's senior rung" })
-    end
-
-    it "keeps the draft to the plan, the drafted inputs and the ingest results" do
-      expect(AiService.const_get(:Draft).members)
-        .to eq(%i[problem_set plan kinds difficulty ladders history suggested_concepts unusable_sections])
     end
   end
 
@@ -1507,37 +1504,11 @@ RSpec.describe AiService do
       expect(render(difficulty: KindDifficulty.for(user.reload))).to eq(untargeted)
     end
 
-    it "gives a one-section retry only that section's ladder rungs" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
-                               ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
-      ConceptReference.create!(concept: "scope_creep", language: ConceptBucket.for("plan_review", "ruby_rails"),
-                               ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
-      draft = AiService.const_get(:Draft).new(problem_set: {}, plan: Struct.new(:code_review_mode).new(:application_code),
-                                              kinds: [], difficulty: KindDifficulty.none, ladders: {}, history: [],
-                                              suggested_concepts: [], unusable_sections: [])
-
-      expect(service.send(:retry_ladders, user, "ruby_rails", draft, ExerciseSection::Pattern))
-        .to eq("junior" => { "n_plus_one" => "j" })
-      expect(service.send(:retry_ladders, user, "ruby_rails", draft, ExerciseSection::PlanReview))
-        .to eq("junior" => { "scope_creep" => "j" })
-    end
-
     it "loads the draft's ladders for the day's language and code_review mode" do
       pin_code_review_mode(:schema_review)
       allow(GenerationLadders).to receive(:for).and_call_original
 
       FakeService.new("fake-key").send(:draft_exercise, user, language: "javascript", blocking: false)
-
-      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review)
-    end
-
-    it "loads a retry's ladders for the retry's language and the draft's code_review mode" do
-      draft = AiService.const_get(:Draft).new(problem_set: {}, plan: Struct.new(:code_review_mode).new(:schema_review),
-                                              kinds: [], difficulty: KindDifficulty.none, ladders: {}, history: [],
-                                              suggested_concepts: [], unusable_sections: [])
-      allow(GenerationLadders).to receive(:for).and_call_original
-
-      service.send(:retry_ladders, user, "javascript", draft, ExerciseSection::CodeReview)
 
       expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review)
     end
@@ -1731,6 +1702,15 @@ RSpec.describe AiService do
 
       expect { svc.generate_exercise(user) }.to change(SuggestedConcept, :count).by(1)
       expect(SuggestedConcept.last.display_name).to eq("Second Invention!!")
+    end
+
+    it "records each suggestion through #record_suggested_concept, so a script's service can keep its runs from recording" do
+      quiet = Class.new(double_class) { define_method(:record_suggested_concept) { |_suggestion| } }
+      svc = quiet.new(canned_text: full_problem_set(
+        "code_review" => { "question" => "q", "concept" => "Invented Concept!!" }
+      ).to_json)
+
+      expect { svc.generate_exercise(user) }.not_to change(SuggestedConcept, :count)
     end
 
     it "propagates an ingest rejection as a generation failure" do
@@ -4809,7 +4789,7 @@ RSpec.describe AiService, "#judge_section given a prose reply" do
     providers = -> { JudgedGeneration::Provider.new(judge_section: service.method(:judge_section), retry_section: ->(*) { raise "no retry expected" }) }
     allow(Rails.logger).to receive(:warn)
 
-    judged = JudgedGeneration.call(user: user, language: "ruby_rails", draft: draft, providers: providers, finish: ->(*, **) { })
+    judged = JudgedGeneration.call(user: user, draft: draft, providers: providers, finish: ->(*, **) { })
 
     expect(judged.problem_set["code_review"]).to eq(section)
     expect(judged.outcomes["code_review"]).to include(fallback: "invalid_json", dropped: false)
@@ -4913,13 +4893,13 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       now = [ start ]
       retry_and_judge = AiService.worst_case_seconds_for("retry_section") + AiService.worst_case_seconds_for("judge_section")
       deadline = GenerationDeadline.new(start + retry_and_judge, clock: -> { now.first })
-      allow(service).to receive(:retry_ladders).and_wrap_original do |original, *args|
+      allow(GenerationLadders).to receive(:for).and_wrap_original do |original, *args|
         original.call(*args).tap { now[0] = start + 1 }
       end
 
-      expect { service.send(:retry_section, user, "ruby_rails", draft, ExerciseSection::Pattern, "service_objects", deadline: deadline) }
+      expect { service.send(:retry_section, draft, ExerciseSection::Pattern, "service_objects", deadline: deadline) }
         .to raise_error(ProviderError::DeadlineError)
-      expect(service).to have_received(:retry_ladders)
+      expect(GenerationLadders).to have_received(:for)
       expect(purposes).not_to include("retry_section")
     end
 
@@ -4928,7 +4908,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false)
       retry_alone = GenerationDeadline.new(Time.current + AiService.worst_case_seconds_for("retry_section"))
 
-      expect { service.send(:retry_section, user, "ruby_rails", draft, ExerciseSection::Pattern, "service_objects", deadline: retry_alone) }
+      expect { service.send(:retry_section, draft, ExerciseSection::Pattern, "service_objects", deadline: retry_alone) }
         .to raise_error(ProviderError::DeadlineError)
       expect(purposes).not_to include("retry_section")
     end
@@ -5250,7 +5230,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     end
     entered = Queue.new
     release = Queue.new
-    allow_any_instance_of(FakeService).to receive(:retry_section) do |_, _user, _language, _draft, kind, _concept|
+    allow_any_instance_of(FakeService).to receive(:retry_section) do |_, _draft, kind, _concept|
       entered << kind.key
       release.pop
       FakeService::EXERCISE_PROBLEM_SET[kind.key].deep_dup
@@ -5278,7 +5258,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
     end
     retry_instances = Queue.new
-    allow_any_instance_of(FakeService).to receive(:retry_section) do |instance, _user, _language, _draft, kind, _concept|
+    allow_any_instance_of(FakeService).to receive(:retry_section) do |instance, _draft, kind, _concept|
       retry_instances << instance
       FakeService::EXERCISE_PROBLEM_SET[kind.key].deep_dup
     end
