@@ -37,7 +37,7 @@ has its own rescue. It rescues `StandardError`, not just `ProviderError`,
 because `Thread#value` re-raises whatever `ReviewGrading#grade_section`'s narrower rescue
 misses, and no judge failure may cost the engineer the review. A failure
 returns the grade unchanged and logs `[review_judge_fallback]` with a fixed
-reason code from `AiService.judge_fallback_reason`, the table the section
+reason code from `AiService.judge_fallback_reason`, which the section
 judge also reads, never the error message, which can carry provider text. The call is billed as `judge_review`, which is in
 `ApiUsage::PURPOSES`, and capped by `REVIEW_JUDGE_MAX_TOKENS` (1,500). The
 cap was re-checked against the comparison script on 2026-10-09; the run

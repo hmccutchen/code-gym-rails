@@ -237,41 +237,16 @@ class AiService
     ReviewProseVerdict.parse(raw, projection: projection)
   end
 
-  def self.error_code_for(error)
-    case error
-    when ProviderError::AuthenticationError  then "authentication"
-    when ProviderError::RateLimitError       then "rate_limit"
-    when ProviderError::BillingError         then "out_of_credit"
-    when ProviderError::TrialEndedError      then "trial_ended"
-    when ProviderError::TrialAllowanceError  then "trial_allowance_used"
-    when ProviderError::InvalidResponseError then "invalid_response"
-    else                                          "other"
-    end
-  end
+  def self.error_code_for(error) = error.is_a?(ProviderError) ? error.class.error_code : ProviderError.error_code
 
-  def self.failure_code_for(error)
-    case error
-    when ProviderError::RateLimitError         then "rate_limit"
-    when ProviderError::AuthenticationError    then "authentication"
-    when ProviderError::BillingError           then "out_of_credit"
-    when ProviderError::TimeoutError           then "timeout"
-    when ProviderError::NetworkError           then "network"
-    when ProviderError::TruncatedResponseError then "truncated"
-    when ProviderError::InvalidResponseError   then "invalid_response"
-    when ProviderError::RefusalError           then "refusal"
-    else                                            "provider_error"
-    end
-  end
+  def self.failure_code_for(error) = error.is_a?(ProviderError) ? error.class.failure_code : ProviderError.failure_code
 
   def self.judge_fallback_reason(error)
     case error
     when JudgeVerdict::Invalid, ReviewProseVerdict::Invalid then "invalid_output"
-    when ProviderError::TruncatedResponseError              then "truncated"
-    when ProviderError::InvalidResponseError                then "invalid_json"
-    when ProviderError::RefusalError                        then "refusal"
-    when ProviderError::DeadlineError                       then ProviderError::DeadlineError::FALLBACK_REASON
-    when ProviderError::TimeoutError, Timeout::Error        then "timeout"
-    else                                                         http_status_code_for(error) || error_code_for(error)
+    when Timeout::Error                                     then ProviderError::TimeoutError.judge_fallback_reason
+    when ProviderError then error.class.judge_fallback_reason || http_status_code_for(error) || error_code_for(error)
+    else                                                         error_code_for(error)
     end
   end
 

@@ -1,7 +1,7 @@
 ---
 paths:
   - "app/services/{ai_service,duck_prompt,follow_up_prompt,claude_service,gemini_service,openai_service,fake_service,lazy_cache_store}.rb"
-  - "app/models/{ai_provider,call_profiles,api_usage,provider_credential,provider_failure,provider_failure_text,reset_clock,concept_reference_failures,user}.rb"
+  - "app/models/{ai_provider,call_profiles,api_usage,provider_credential,provider_error,provider_failure,provider_failure_text,reset_clock,concept_reference_failures,user}.rb"
   - "app/controllers/concerns/{provider_call_limits,provider_failure_rendering,json_errors}.rb"
   - "app/controllers/{application,api_keys,responses,concept_references,daily_exercises}_controller.rb"
   - "app/helpers/generation_failure_helper.rb"

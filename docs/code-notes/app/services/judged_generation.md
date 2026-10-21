@@ -20,7 +20,7 @@ Returns one `[key, section_or_nil, outcome]` per rejected key. `#resolve_rejecti
 
 Returns `[section, outcome, settled]`. `settled` is false only when the judge rejected the retry.
 
-A re-judge fallback keeps the retry, except one with reason `deadline` (`ProviderError::DeadlineError::FALLBACK_REASON`), which drops the section through `#unjudged_retry`. The retry replaces a section the judge already rejected, so only a judge that answered may ship it, and a deadline stop leaves no time for another retry. A first-pass judge stopped by the deadline still keeps the draft, since that section was never rejected.
+A re-judge fallback keeps the retry, except one with reason `deadline` (`ProviderError::DeadlineError.judge_fallback_reason`), which drops the section through `#unjudged_retry`. The retry replaces a section the judge already rejected, so only a judge that answered may ship it, and a deadline stop leaves no time for another retry. A first-pass judge stopped by the deadline still keeps the draft, since that section was never rejected.
 
 ## `#record_attempt`
 
