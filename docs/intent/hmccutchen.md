@@ -92,6 +92,11 @@
   should wait for it; the app already does, and the spec was fixed instead
 - `ProfileController`'s checks and `User`'s level callbacks into a
   `ProfileUpdate` form `#476`
+- call profiles and call timing off `AiService` into `CallProfiles` `#477`
+  **why:** Railway builds were down, so I asked to work through the open
+  enhancements without merging and merge them in order once it's back
+  **I decided:** stacked branches, one per issue, each PR based on the one
+  before
 
 ## Wed Oct 21
 
