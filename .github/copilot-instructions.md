@@ -109,7 +109,7 @@ what the reasoning assumed. A comment that merely restates a fresh number is
 not a fix; it is the same defect with a later expiry date.
 
 Growing a vocabulary has one more consequence to check for: the
-`MAX_LADDER_GUIDANCE_CHARS` spec in `spec/services/ai_service_spec.rb` renders
+`MAX_LADDER_GUIDANCE_CHARS` spec in `spec/clients/ai_service_spec.rb` renders
 the largest difficulty block any day can produce. A diff that raises the
 constant to make it pass must say in the PR description what that costs per
 generation.
@@ -123,7 +123,7 @@ methods exceed 25.
 Two honest caveats. First, this is **not machine-enforced** —
 `rubocop-rails-omakase` disables the entire `Metrics` department, so no CI job
 measures it and the reviewer is the only enforcement. Second, several existing
-files exceed these numbers, most visibly `app/services/ai_service.rb`, which
+files exceed these numbers, most visibly `app/clients/ai_service.rb`, which
 was 1303 lines with a 156-line `build_exercise_prompt` when these figures were
 taken; that template is now `GenerationPrompt#render`, still mostly heredocs of
 prompt text rather than logic, which is why the threshold excludes heredoc
@@ -194,7 +194,7 @@ confirm the user is allowed to access that specific record.
 
 **Can an API key reach a log, a view, or an error message?** BLOCKING. Provider
 keys pass only through the encrypted `api_keys` column and the request headers
-built in `app/services/*_service.rb`. Never approve a change that reads or
+built in `app/clients/*_service.rb`. Never approve a change that reads or
 transmits another user's `api_keys`, email, or personal data without an
 explicit, visible authorization check.
 
@@ -219,7 +219,7 @@ are the standing exceptions).
 ## Architecture — this project's conventions, not generic advice
 
 **Does AI-calling code bypass `AiService.for`?** BLOCKING. Shared logic lives
-in `ai_service.rb`, the prompt classes it calls (`app/services/*_prompt.rb`)
+in `ai_service.rb`, the prompt classes it calls (`app/prompts/*_prompt.rb`)
 and `ProviderError`; subclasses own only provider-specific HTTP and auth. A controller building its own Faraday
 request is a violation.
 

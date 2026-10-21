@@ -3,7 +3,8 @@ paths:
   - "app/controllers/{learn,learn_lessons,concept_references,concept_drills,progress}_controller.rb"
   - "app/controllers/concerns/learn_scope.rb"
   - "app/models/{concept_reference,concept_lesson,concept_group,concept_book_sources,learn_lessons,glossary,hand_written_learn_text,section_kind_guide,recognition_guide,featured_concept,rung_ledger,concept_hosts,worked_example,ladder_coverage}.rb"
-  - "app/services/{featured_concept_pick,concept_reference_prompt,recognition_guide_prompt,explain_differently_prompt}.rb"
+  - "app/models/featured_concept_pick.rb"
+  - "app/prompts/{concept_reference_prompt,recognition_guide_prompt,explain_differently_prompt}.rb"
   - "app/jobs/{generate_concept_reference_job,generate_recognition_guide_job}.rb"
   - "app/helpers/{featured_concept,concept_references,concept_drills,progress,section_kind_guide,glossary}_helper.rb"
   - "app/views/{learn,learn_lessons,progress}/**"
@@ -68,8 +69,8 @@ read it before changing that area.
   a daily card's swap sheet shows the kind's `short` line, and the checked
   row also shows its example, both read from `SectionKindGuide`; a spec
   requires a one-sentence `short` for every kind. Like `ConceptBookSources` it
-  is never sent to a provider, and a spec fails if anything under
-  `app/services` or `app/jobs` names it. Each example says what the engineer
+  is never sent to a provider, and a spec fails if anything in
+  `IsolationScope` (`spec/support/isolation_scope.rb`) names it. Each example says what the engineer
   sees and is asked, never an answer, and the ambiguity hunt's names no gap
   and no kind of gap, since the real ones are that section's hidden answer
   key. Its keys must equal `ExerciseSection.keys`, so a new kind fails a spec

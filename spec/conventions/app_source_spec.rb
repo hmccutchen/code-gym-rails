@@ -2,8 +2,8 @@ require "rails_helper"
 
 RSpec.describe "Conventions held over app/ source" do
   THREAD_EXEMPT = {
-    "app/services/caller_zone_thread.rb" => { threads: 1, reason: "the one place a fan-out thread is started" },
-    "app/models/code_format/javascript.rb" => { threads: 2, reason: "Prettier's stdout and stderr readers, which touch neither Time.zone nor the database" }
+    "app/clients/caller_zone_thread.rb" => { threads: 1, reason: "the one place a fan-out thread is started" },
+    "app/clients/code_format/javascript.rb" => { threads: 2, reason: "Prettier's stdout and stderr readers, which touch neither Time.zone nor the database" }
   }.freeze
 
   def calls_in(path)
@@ -81,10 +81,10 @@ RSpec.describe "Conventions held over app/ source" do
 
   it "finds a provider class however the reference is written, and not in a comment or a string" do
     expect(provider_class_references("AiService.for(user)")).to eq([ "AiService" ])
-    expect(provider_class_references("::AiService::RUBRIC_VERSION")).to eq([ "AiService::RUBRIC_VERSION" ])
+    expect(provider_class_references("::AiService::MAX_GENERATED_CODE_LENGTH")).to eq([ "AiService::MAX_GENERATED_CODE_LENGTH" ])
     expect(provider_class_references("X = GeminiService.daily_quota_reset_at(at)")).to eq([ "GeminiService" ])
     expect(provider_class_references("class Probe < ClaudeService; end")).to eq([ "ClaudeService" ])
-    expect(provider_class_references("# AiService::RUBRIC_VERSION\nlabel = \"AiService\"")).to be_empty
+    expect(provider_class_references("# AiService::MAX_GENERATED_CODE_LENGTH\nlabel = \"AiService\"")).to be_empty
   end
 
   LEVEL_FIELDS = %i[skill_level section_kind_levels].freeze

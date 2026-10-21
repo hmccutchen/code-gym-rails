@@ -45,7 +45,7 @@ RSpec.describe "Trial isolation", type: :model do
   it "keeps trial state out of generation, review, judges and ConceptMastery" do
     own = %w[app/models/provider_credential.rb app/models/trial_allowance.rb app/models/house_keys.rb
              app/models/trial_mode.rb app/models/invite_code.rb]
-    files = Rails.root.glob("app/{services,jobs}/**/*.rb").map { |file| file.relative_path_from(Rails.root).to_s } +
+    files = isolation_scope +
             %w[app/models/concept_mastery.rb app/models/judge_verdict.rb
                app/models/review_prose_verdict.rb app/models/kind_difficulty.rb]
 

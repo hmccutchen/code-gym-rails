@@ -67,8 +67,8 @@ RSpec.describe "Track choice and level suggestion isolation" do
   end
 
   it "keeps track and suggestion state out of generation, review, judges, ConceptMastery, KindDifficulty and DailyKinds" do
-    own = %w[app/services/level_suggestion.rb app/services/level_suggestion/evidence.rb]
-    files = Rails.root.glob("app/{services,jobs}/**/*.rb").map { |file| file.relative_path_from(Rails.root).to_s } +
+    own = %w[app/models/level_suggestion.rb app/models/level_suggestion/evidence.rb]
+    files = isolation_scope +
             %w[app/models/concept_mastery.rb app/models/judge_verdict.rb
                app/models/review_prose_verdict.rb app/models/kind_difficulty.rb app/models/daily_kinds.rb
                app/models/daily_kind_swap.rb]

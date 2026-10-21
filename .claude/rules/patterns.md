@@ -28,7 +28,7 @@ says what a deviation from one requires.
   Each subclass owns its `provider_key`, `key_pattern` and any environment
   restriction.
 - **One class per prompt family** — prompt text moves out of `AiService` one
-  family at a time (#431), into a class at `app/services/*_prompt.rb`; those
+  family at a time (#431), into a class at `app/prompts/*_prompt.rb`; those
   files are the list of moved families, so no doc repeats it. A prompt class
   is pure: it takes values, never a record, a user or a database read, and
   returns the per-call keywords `AiService.request_for` takes (`system:` and
@@ -155,3 +155,14 @@ says what a deviation from one requires.
   provider registry, is the one model that may name `AiService` or a provider
   class, for a provider's own quota day, and `app_source_spec` fails on any
   other model that names one.
+- **Folders by layer** (`docs/decisions/folders-by-layer.md`) — a folder
+  under `app/` says which layer its classes are in. `app/services` holds only
+  classes that orchestrate side effects (a claim, a write, a provider call
+  fanned out, a push). Pure decisions are in `app/models`, prompt classes in
+  `app/prompts`, and adapters to the outside (the provider clients, push
+  credentials, the Node formatter, environment switches, thread and cache
+  helpers) in `app/clients`. Moving a file between them keeps its constant
+  name. `Archspec.rb` fails CI when a model or prompt class references a
+  service or a client; `AiProvider`, the provider registry, is the one
+  exception. A new class goes in the folder for what it does, not next to
+  the class that first calls it.

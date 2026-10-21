@@ -47,7 +47,7 @@ RSpec.describe RealSource do
   end
 
   describe RealSource::Method do
-    let(:excerpt) { described_class.new("app/services/weighted_roll.rb", "pick") }
+    let(:excerpt) { described_class.new("app/models/weighted_roll.rb", "pick") }
 
     it "slices exactly the named def, nothing around it" do
       text = excerpt.text
@@ -58,7 +58,7 @@ RSpec.describe RealSource do
     end
 
     it "does not resolve a method that is not there" do
-      expect(described_class.new("app/services/weighted_roll.rb", "not_a_method")).not_to be_resolvable
+      expect(described_class.new("app/models/weighted_roll.rb", "not_a_method")).not_to be_resolvable
     end
 
     it "does not resolve a file that is not there" do
@@ -66,13 +66,13 @@ RSpec.describe RealSource do
     end
 
     it "keys its id on the method as well as the file" do
-      expect(excerpt.id).to eq("app/services/weighted_roll.rb#pick")
+      expect(excerpt.id).to eq("app/models/weighted_roll.rb#pick")
     end
 
     it "says the copy is altered, so the exercise cannot read as a bug report" do
       expect(excerpt.scenario).to include("altered for this exercise")
       expect(excerpt.scenario).to include("The deployed method is fine")
-      expect(excerpt.scenario).to include("`app/services/weighted_roll.rb`, `#pick`")
+      expect(excerpt.scenario).to include("`app/models/weighted_roll.rb`, `#pick`")
     end
 
     it "instructs exactly one flaw in a modified copy, never unchanged" do
@@ -237,7 +237,7 @@ RSpec.describe RealSource do
     end
 
     it "skips an entry that no longer resolves and says so" do
-      stale = RealSource::Method.new("app/services/weighted_roll.rb", "renamed_away")
+      stale = RealSource::Method.new("app/models/weighted_roll.rb", "renamed_away")
       stub_const("RealSource::POOLS", { application_code: [ stale, pool.first ] })
       allow(Rails.logger).to receive(:warn)
 

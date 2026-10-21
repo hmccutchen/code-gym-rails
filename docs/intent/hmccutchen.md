@@ -100,3 +100,8 @@
 - each `ProviderError` class carries its own failure codes `#478 open`
 - section-kind preference rules off `User` into `SectionKindSettings`
   `#479 open`
+- `app/services` sorted by layer into models, prompts and clients, with
+  Archspec enforcing the direction in CI `#480 open`
+  **I decided:** the pure decisions go flat into `app/models` so no class is
+  renamed, prompt classes get `app/prompts`, and Archspec is added as a gem
+  with a CI step
