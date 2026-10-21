@@ -35,6 +35,7 @@ RSpec.describe DisplayPreferences do
   it "drops defaults and keeps anything unknown for validation to refuse" do
     expect(described_class.sparse("theme" => "dark", "font" => "atkinson", "bogus" => "1"))
       .to eq("font" => "atkinson", "bogus" => "1")
+    expect(described_class.sparse("contrast" => nil)).to eq("contrast" => nil)
   end
 
   it "names what is wrong with a malformed object" do

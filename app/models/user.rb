@@ -23,12 +23,14 @@ class User < ApplicationRecord
 
   DAILY_SECTION_COUNTS = (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
   AUTOMATIC_SECTION_COUNT = "automatic".freeze
+  SKILL_LEVEL_RULE = "must be one of #{SKILL_LEVELS.join(', ')}".freeze
+  DAILY_SECTION_COUNT_RULE = "must be #{AUTOMATIC_SECTION_COUNT} or one of #{DAILY_SECTION_COUNTS.to_a.join(', ')}".freeze
 
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :name,  presence: true
   before_validation :clean_name, if: :name_changed?
-  validates :skill_level, inclusion: { in: SKILL_LEVELS, message: "must be one of #{SKILL_LEVELS.join(', ')}" }
+  validates :skill_level, inclusion: { in: SKILL_LEVELS, message: SKILL_LEVEL_RULE }
   validates :provider, inclusion: { in: ->(_) { AiProvider.keys } }, allow_nil: true
   validate :api_keys_name_providers, if: :api_keys_changed?
   validate :provider_has_a_stored_key, if: -> { provider_changed? || api_keys_changed? }
@@ -42,10 +44,8 @@ class User < ApplicationRecord
   validate :locked_section_kinds_name_section_kinds,     if: :locked_section_kinds_changed?
   validate :locks_have_levels, if: -> { section_kind_levels_changed? || locked_section_kinds_changed? }
   validate :display_preferences_name_known_options, if: :display_preferences_changed?
-  validates :daily_section_count, numericality: { only_integer: true, in: DAILY_SECTION_COUNTS,
-                                                  message: "must be #{AUTOMATIC_SECTION_COUNT} or one of #{DAILY_SECTION_COUNTS.to_a.join(', ')}" },
-                                  allow_nil: true,
-                                  if: :daily_section_count_changed?
+  validates :daily_section_count, numericality: { only_integer: true, in: DAILY_SECTION_COUNTS, message: DAILY_SECTION_COUNT_RULE },
+                                  allow_nil: true, if: :daily_section_count_changed?
 
   normalizes :display_preferences, with: ->(values) { DisplayPreferences.sparse(values) }
   normalizes :api_keys, with: ->(keys) { keys.presence }
@@ -507,7 +507,7 @@ class User < ApplicationRecord
       next if stored.key?(key) && stored[key] == value
 
       errors.add(:section_kind_weights, "names an unknown section kind: #{key}") if rotatable_keys.exclude?(key)
-      errors.add(:section_kind_weights, "has an unsupported weight for #{key}") if KindPreferences::MULTIPLIERS.exclude?(value)
+      errors.add(:section_kind_weights, "has an unsupported weight for #{key}, which must be one of #{KindPreferences::MULTIPLIERS.join(', ')}") if KindPreferences::MULTIPLIERS.exclude?(value)
     end
   end
 

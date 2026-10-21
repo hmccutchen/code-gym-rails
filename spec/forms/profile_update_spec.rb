@@ -25,9 +25,9 @@ RSpec.describe ProfileUpdate, type: :model do
 
       [ { section_kind_weights: [] }, { excluded_section_kinds: [ { "a" => 1 } ] }, { section_kind_levels: nil },
         { locked_section_kinds: nil }, { display_preferences: "light" },
-        { skill_level: [ "senior" ] }, { level_suggestions: "yes" },
+        { skill_level: [ "senior" ] }, { level_suggestions: "yes" }, { name: [ "x" ] }, { time_zone: {} },
         { daily_section_count: "2.5" }, { daily_section_count: "" }, { daily_section_count: nil }, { daily_section_count: 2.0 } ]
-        .each { |payload| refused(payload.merge(name: "Not saved")) }
+        .each { |payload| refused({ name: "Not saved" }.merge(payload)) }
 
       expect(user.reload.attributes).to eq(original)
     end
@@ -48,6 +48,13 @@ RSpec.describe ProfileUpdate, type: :model do
       expect(refused(skill_level: "expert")).to eq("Skill level must be one of #{User::SKILL_LEVELS.join(', ')}")
       expect(refused(display_preferences: { "theme" => "neon" })).to include("unsupported theme")
       expect(refused(locked_section_kinds: [ "challenge" ])).to include("without a difficulty target")
+      expect(refused(display_preferences: { "contrast" => nil })).to include("unknown setting: contrast")
+    end
+
+    it "refuses an unknown time zone posted with a target change instead of reading it for the cutoff" do
+      expect(refused(time_zone: "Mars/Phobos", section_kind_levels: { "pattern" => "senior" })).to include("valid time zone")
+
+      expect(user.reload).to have_attributes(section_kind_levels: {}, level_suggestion_cutoffs: {})
     end
 
     it "refuses a page from before tracks per level" do

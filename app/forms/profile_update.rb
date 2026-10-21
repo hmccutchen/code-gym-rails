@@ -30,13 +30,15 @@ class ProfileUpdate
 
   def shape_error
     return I18n.t("tracks.stale_page") if posted?(:learning_track)
-    return daily_section_count_error unless daily_section_count_shaped?
+    return full_rule(:daily_section_count, User::DAILY_SECTION_COUNT_RULE) unless daily_section_count_shaped?
     return "Section weights must map each section to a weight" unless object?(:section_kind_weights)
     return "Excluded section kinds must be a list of strings" unless list_of_strings?(:excluded_section_kinds)
     return "Section difficulty must map each section to a level" unless object?(:section_kind_levels)
     return "Locked section kinds must be a list of strings" unless list_of_strings?(:locked_section_kinds)
     return "Display preferences must use the listed options" unless object?(:display_preferences)
-    return "Skill level must be one of #{User::SKILL_LEVELS.join(', ')}" unless skill_level_shaped?
+    return full_rule(:skill_level, User::SKILL_LEVEL_RULE) unless text_or_null?(:skill_level)
+    return "Name must be text" unless text_or_null?(:name)
+    return "Time zone must be text" unless text_or_null?(:time_zone)
     return "Change the track and the exercise mix in separate saves." if mixed_track_save?
     return "Level suggestions must be true or false" unless boolean?(:level_suggestions)
 
@@ -51,9 +53,7 @@ class ProfileUpdate
     value.is_a?(Integer) || value == User::AUTOMATIC_SECTION_COUNT || (value.is_a?(String) && value.match?(WHOLE_NUMBER))
   end
 
-  def daily_section_count_error
-    "Daily sections must be #{User::AUTOMATIC_SECTION_COUNT} or one of #{User::DAILY_SECTION_COUNTS.to_a.join(', ')}"
-  end
+  def full_rule(attribute, rule) = "#{User.human_attribute_name(attribute)} #{rule}"
 
   # Checked on the raw param, since strong params drop a value of the wrong shape and the save would then return 200 without it.
   def object?(key) = !posted?(key) || @user_params[key].respond_to?(:to_unsafe_h)
@@ -67,9 +67,7 @@ class ProfileUpdate
 
   def boolean?(key) = !posted?(key) || [ true, false ].include?(@user_params[key])
 
-  def skill_level_shaped?
-    !posted?(:skill_level) || @user_params[:skill_level].nil? || @user_params[:skill_level].is_a?(String)
-  end
+  def text_or_null?(key) = !posted?(key) || @user_params[key].nil? || @user_params[key].is_a?(String)
 
   def mixed_track_save?
     posted?(:skill_level) && !posted?(:choose_track) && PREFERENCE_KEYS.any? { |key| posted?(key) }
@@ -130,6 +128,8 @@ class ProfileUpdate
     saved = @user.transaction do
       level_change = LevelChange.new(@user, first_choice: track_choice?, shown: shown_moves)
       @user.assign_attributes(profile_attributes)
+      next false unless @user.valid?
+
       level_change.clear_track_targets
       level_change.record_cutoffs
       @user.save && level_change.write_events

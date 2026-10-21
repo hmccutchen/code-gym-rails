@@ -14,7 +14,8 @@ catch, and leaves which values a field allows to `User`:
   Strong params drop a value of the wrong shape, so without this check the
   request would return 200 having saved nothing for that field. A nested
   value inside an object is kept by `permit(key: {})`, so `User` refuses it.
-- `skill_level` must be a string or null, for the same reason.
+- `skill_level`, `name` and `time_zone` must each be a string or null, for
+  the same reason.
 - `daily_section_count` must be an Integer, a string of digits or
   `"automatic"`. Active Record's integer cast would read `""` as nil, which
   means Automatic, and `"2.5"` as 2. The range is `User`'s.
@@ -22,8 +23,15 @@ catch, and leaves which values a field allows to `User`:
   true.
 
 The request specs read `User`'s messages for a value outside a list, so
-`User` words them for a person (`"Skill level must be one of …"`, the
-`Daily sections` attribute name in `config/locales/en.yml`).
+`User` words them for a person, and the form builds its shape messages for
+the skill level and the daily count from the same `User::SKILL_LEVEL_RULE`
+and `User::DAILY_SECTION_COUNT_RULE` (the `Daily sections` attribute name is
+in `config/locales/en.yml`).
+
+A value outside a list is found when `User` validates, which is after the
+locked checks. So a tampered post that also carries a stale version gets the
+409, and a bad level posted with `choose_track` gets the track-choice 422.
+No page sends either.
 
 ## `TRACK_CHOICE_KEYS` and `#invalid_track_choice?`
 
@@ -93,8 +101,12 @@ A save that posts no layout, such as the track control's, is not checked.
 
 ## `#save_profile`
 
-It assigns the posted fields and calls `LevelChange` in order, all in one
-transaction (see `docs/code-notes/app/models/level_change.md`). A failed
+It assigns the posted fields, validates, and only then calls `LevelChange`
+in order, all in one transaction (see
+`docs/code-notes/app/models/level_change.md`). The validation comes first
+because `LevelChange#record_cutoffs` reads the assigned time zone: a post
+carrying an unknown zone and a target change would otherwise raise instead
+of answering 422. A failed
 validation leaves the user object holding the unsaved values; a request
 discards it, but a caller that reuses the object must reload it before the
 next save, since `with_lock` refuses a record with unsaved changes.
