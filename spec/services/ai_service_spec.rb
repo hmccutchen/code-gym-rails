@@ -4786,7 +4786,10 @@ RSpec.describe AiService, "#judge_section given a prose reply" do
       plan: plan_for(due_checks: [], fourth_due_checks: [], reinforcement: [], fourth_reinforcement: nil),
       kinds: [ ExerciseSection::CodeReview ], difficulty: KindDifficulty.none
     )
-    providers = -> { JudgedGeneration::Provider.new(judge_section: service.method(:judge_section), retry_section: ->(*) { raise "no retry expected" }) }
+    providers = lambda do
+      JudgedGeneration::Provider.new(judge_section: service.method(:judge_section), retry_section: ->(*) { raise "no retry expected" },
+                                     judge_identity: {})
+    end
     allow(Rails.logger).to receive(:warn)
 
     judged = JudgedGeneration.call(user: user, draft: draft, providers: providers, finish: ->(*, **) { })
@@ -4837,6 +4840,16 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(judged.plan_notes).to eq(notes)
     expect(single.plan_notes).to eq(notes)
     expect(single.dropped_sections).to eq([])
+  end
+
+  it "hands back the judge's solves, naming the provider and the model it routed the judge to, and none unjudged" do
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+    single = FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
+
+    expect(judged.solves.sole).to have_attributes(section: "design_comparison", judge_provider: "fake", judge_model: "fake",
+                                                  matched: true, shipped: true)
+    expect(judged.solves.sole.judged_section).to eq(judged.problem_set["design_comparison"])
+    expect(single.solves).to eq([])
   end
 
   describe "under a deadline" do

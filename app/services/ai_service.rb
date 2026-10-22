@@ -162,7 +162,11 @@ class AiService
 
   def self.judges_review_prose? = false
 
-  JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes)
+  JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes, :solves) do
+    def initialize(solves: [], **) = super
+  end
+
+  def model_for(purpose) = routed_model(purpose)
 
   def generate_exercise(user, language: user.language_for_today, blocking: false)
     generate_unjudged_exercise(user, language: language, blocking: blocking).problem_set
@@ -175,7 +179,7 @@ class AiService
     ExerciseDraft.finish(draft, draft.problem_set, provider: exercise_draft_provider,
                                                    dropped_concepts: dropped.to_h { |section| [ section.key, section.concept ] })
     JudgedSet.new(problem_set: draft.problem_set, dropped_sections: dropped.map(&:key), outcomes: {},
-                  plan_notes: draft.plan.notes)
+                  plan_notes: draft.plan.notes, solves: [])
   end
 
   def generate_judged_exercise(user, language: user.language_for_today, deadline: GenerationDeadline::NONE)
@@ -368,7 +372,8 @@ class AiService
   def judged_generation_provider(deadline = GenerationDeadline::NONE)
     JudgedGeneration::Provider.new(
       judge_section: ->(*args, **options) { judge_section(*args, **options, deadline: deadline) },
-      retry_section: ->(draft, kind, concept) { retry_section(draft, kind, concept, deadline: deadline) }
+      retry_section: ->(draft, kind, concept) { retry_section(draft, kind, concept, deadline: deadline) },
+      judge_identity: { judge_provider: self.class.provider_key, judge_model: model_for("judge_section") }
     )
   end
 

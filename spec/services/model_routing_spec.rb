@@ -15,6 +15,21 @@ RSpec.describe "per-purpose model routing" do
     end
   end
 
+  [ ClaudeService, GeminiService, OpenaiService ].each do |service_class|
+    it "answers which model #{service_class} routes each purpose to without making a call" do
+      service = service_class.new("test-key")
+
+      (service_class::MODEL_FOR_PURPOSE.keys + [ "an_unlisted_purpose" ]).each do |purpose|
+        expected = service_class::MODEL_FOR_PURPOSE.fetch(purpose, service_class::DEFAULT_ROUTE)[:model]
+        expect(service.model_for(purpose)).to eq(expected), "purpose #{purpose}"
+      end
+    end
+  end
+
+  it "names the fake provider's one model for every purpose, as its replies do" do
+    expect(FakeService.new(nil).model_for("judge_section")).to eq("fake")
+  end
+
   def result_for(service_class, **kwargs)
     service = service_class.new("test-key")
     conn = Faraday.new do |f|

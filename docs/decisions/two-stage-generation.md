@@ -206,7 +206,10 @@ section stands unedited, `fallback` records the reason from
 `invalid_json`, `refusal`, `timeout`, `deadline` when a regeneration's
 deadline left no time to start the call, the shared error code, or
 `http_<status>` when the provider refused the request itself), and
-`[judge_fallback]` warns. The one exception is a retry's re-judge stopped by
+`[judge_fallback]` warns. The warning adds the error's message only for a
+refused verdict (`JudgeVerdict::Invalid`), whose messages never quote the
+reply's content, and never for a provider error, whose body can echo the
+section. The one exception is a retry's re-judge stopped by
 the deadline, which drops the section (see the regeneration deadline above).
 Provider errors carry the response's HTTP status
 (`ProviderError#http_status`); authentication and rate-limit errors keep

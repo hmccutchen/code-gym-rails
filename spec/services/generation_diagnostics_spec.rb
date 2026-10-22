@@ -45,6 +45,18 @@ RSpec.describe GenerationDiagnostics do
     expect(lines).to all(satisfy { |line| line.exclude?(sentinel) })
   end
 
+  it "keeps the judge's pick, the answer key and the solves out of the payload a judged generation logs" do
+    judged = nil
+    lines = logged_lines { judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails") }
+
+    payload = lines.grep(/\A\[difficulty_diagnostics\]/).sole
+    key = judged.problem_set.fetch("design_comparison").fetch("answer_key")
+    expect(judged.solves).not_to be_empty
+    expect(payload).to include("solve_matched")
+    expect(payload).not_to include("answer_key", "\"better\"", "judge_pick", "judged_section", "solves", "Solve",
+                                   key.fetch("deciding_fact"), key.fetch("why_other_fails"))
+  end
+
   it "reports each dropped concept on its own track's retention line" do
     lines = logged_lines do
       described_class.new(user).finished("ruby_rails", draft, problem_set,

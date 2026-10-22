@@ -349,4 +349,6 @@ class FakeService < AiService
   def build_connection
     nil
   end
+
+  def routed_model(_purpose) = "fake"
 end
