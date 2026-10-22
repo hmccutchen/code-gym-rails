@@ -97,7 +97,7 @@
   enhancements without merging and merge them in order once it's back
   **I decided:** stacked branches, one per issue, each PR based on the one
   before
-- each `ProviderError` class carries its own failure codes `#478 open`
+- each `ProviderError` class carries its own failure codes `#478`
 
 ## Wed Oct 21
 
