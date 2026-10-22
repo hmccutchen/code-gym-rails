@@ -47,7 +47,7 @@ en:
       email_placeholder: "you@company.com"
       password_label: "Password"
       otp_label: "Authenticator or backup code"
-      otp_hint: "Leave this blank if you haven't set up an authenticator app yet."
+      otp_hint: "Haven't set up an authenticator app yet? Use the link in your confirmation email, or reset your password."
       submit: "Log in"
       sign_up: "New here? Create an account."
       forgot_password: "Forgot your password?"
@@ -107,6 +107,7 @@ en:
     code_label: "Authenticator or backup code"
     submit: "Make new backup codes"
     code_rejected: "That code didn't match, so your backup codes are unchanged."
+    rate_limited: "Too many attempts. Try again in a few minutes."
   authenticator_moves:
     intro: "Got a new phone? Enter a code from your old phone, or a backup code, to turn the authenticator off. You'll scan a new QR code straight after."
     submit: "Move to a new phone"

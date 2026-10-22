@@ -19,6 +19,6 @@ class AuthenticatorMovesController < ApplicationController
   private
 
   def attempts_limited
-    redirect_to account_path, alert: t("backup_codes.rate_limited")
+    redirect_to account_path, alert: t("authenticator_moves.rate_limited")
   end
 end

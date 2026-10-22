@@ -37,6 +37,15 @@ RSpec.describe "Making new backup codes", type: :request do
     expect(user.reload.otp_backup_codes).to eq(old_digests)
   end
 
+  it "limits attempts, with a message saying when to try again" do
+    allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+    10.times { post backup_codes_path, params: { code: "000000" } }
+
+    post backup_codes_path, params: { code: user.current_otp }
+
+    expect(flash[:alert]).to eq("Too many attempts. Try again in a few minutes.")
+  end
+
   it "offers the form on the Account page" do
     get account_path
 

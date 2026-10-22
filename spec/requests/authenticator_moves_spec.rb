@@ -23,6 +23,16 @@ RSpec.describe "Moving the authenticator to a new phone", type: :request do
     expect(user.reload).to be_two_factor_enrolled
   end
 
+  it "limits attempts, with a message saying when to try again" do
+    allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+    10.times { post authenticator_move_path, params: { code: "000000" } }
+
+    post authenticator_move_path, params: { code: user.current_otp }
+
+    expect(flash[:alert]).to eq("Too many attempts. Try again in a few minutes.")
+    expect(user.reload).to be_two_factor_enrolled
+  end
+
   it "offers the form on the Account page" do
     get account_path
 
