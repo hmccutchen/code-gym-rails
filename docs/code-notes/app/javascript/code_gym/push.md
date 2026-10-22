@@ -19,6 +19,10 @@ of them needs no write, so the function returns `null` and the caller sends
 nothing. That is what keeps the every-launch re-subscribe from being a write on
 every page load.
 
+## A subscription made with another key is dropped first
+
+A browser subscription keeps the VAPID public key it was made with, and `subscribe()` rejects a different key while that subscription exists (Chrome and Firefox throw `InvalidStateError`). After a key rotation, every device that had reminders on would fail to resubscribe, on launch and from the Account page, until its site data was cleared. `dropSubscriptionForAnotherKey` unsubscribes it when its key differs from the page's. A subscription that reports no key is left alone, because nothing says it is stale.
+
 ## failure marks a sentence meant for a person
 
 `failure(text)` stamps `readable` on the error it builds. Anything thrown

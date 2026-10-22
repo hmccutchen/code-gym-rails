@@ -18,6 +18,17 @@ function applicationServerKey(base64) {
   return Uint8Array.from(raw, (character) => character.charCodeAt(0))
 }
 
+function sameKey(buffer, key) {
+  const bytes = new Uint8Array(buffer)
+  return bytes.length === key.length && bytes.every((byte, index) => byte === key[index])
+}
+
+async function dropSubscriptionForAnotherKey(pushManager, key) {
+  const existing = await pushManager.getSubscription()
+  const existingKey = existing && existing.options && existing.options.applicationServerKey
+  if (existingKey && !sameKey(existingKey, key)) await existing.unsubscribe()
+}
+
 // A 4xx and an expired session's redirect to /login must both reject, or a failed enrolment looks saved.
 async function register(subscription, { registerPath, registerFailedText }) {
   const json = subscription.toJSON()
@@ -35,10 +46,9 @@ async function register(subscription, { registerPath, registerFailedText }) {
 export async function subscribeAndRegister({ vapidKey, registerPath, knownEndpoints, registerFailedText }) {
   await navigator.serviceWorker.register("/service-worker.js")
   const registration = await navigator.serviceWorker.ready
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: applicationServerKey(vapidKey)
-  })
+  const key = applicationServerKey(vapidKey)
+  await dropSubscriptionForAnotherKey(registration.pushManager, key)
+  const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key })
   if (knownEndpoints.indexOf(subscription.endpoint) !== -1) return null
 
   return register(subscription, { registerPath, registerFailedText })
