@@ -100,7 +100,7 @@ this one.
   **why:** I chose that a Submit clicked while a controller is still loading
   should wait for it; the app already does, and the spec was fixed instead
 - `ProfileController`'s checks and `User`'s level callbacks into a
-  `ProfileUpdate` form `#476 open`
+  `ProfileUpdate` form `#476`
 
 ### Hassan
 
@@ -112,10 +112,9 @@ this one.
 
 ## Thu Oct 22
 
-- production onto Railway's managed Postgres, copied from the old container
-  **why:** the old `postgres` service had no volume, so a restart would have
-  erased the database
-  **I decided:** a new database instead of rotating the old one's password
+- moved production onto a fresh Railway Postgres, then deleted the old
+  database and the copy job `#489`
+  **I decided:** a fresh database rather than rotating the old one's password
 - sign-in through Devise: a password plus an authenticator code, replacing
   the emailed code `#490 open`
   **why:** after the breach I wanted the security-critical parts from

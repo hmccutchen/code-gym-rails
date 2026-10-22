@@ -243,7 +243,7 @@ advisory signal; it is not evidence that anything was verified.
 - **Devise and devise-two-factor** — sign-in with a password and a TOTP code, backup codes, sign-up confirmation and password resets (`SignInCredentials`)
 - **BCrypt** — password, backup code and legacy login code digests
 - **ActiveRecord Encryption** — encrypts each user's provider API key at rest
-- **Railway** — hosting (web + worker services, postgres service)
+- **Railway** — hosting (web + worker services, and a `Database` service running Railway's Postgres 18 template)
 - **Docker** — Railway builds the image from the `Dockerfile`, as its build logs show, although `railway.toml` still names Nixpacks
 
 ## Architecture
