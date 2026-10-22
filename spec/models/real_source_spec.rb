@@ -21,6 +21,11 @@ RSpec.describe RealSource do
       expect(ids.uniq.size).to eq(ids.size)
     end
 
+    it "has a unique file name and method, which is what carries its history across a folder move" do
+      names = RealSource.all.map { |excerpt| File.basename(excerpt.id) }
+      expect(names.uniq.size).to eq(names.size)
+    end
+
     # The model writes a next migration against the table as it stands, so the table must still exist.
     it "shows every migration's tables as they stand today, and no method any schema" do
       RealSource::SCHEMA_REVIEW.each do |excerpt|
@@ -262,6 +267,15 @@ RSpec.describe RealSource do
       exercise_on(Date.current - 7,  source: "b#two")
 
       expect(RealSource.last_seen_for(user)).to eq("a#one" => Date.current - 3, "b#two" => Date.current - 7)
+    end
+
+    [ [ 2, 5 ], [ 5, 2 ] ].each do |before_move, after_move|
+      it "counts an id stamped before its file moved folders as the current id, keeping the later of #{before_move} and #{after_move} days ago" do
+        exercise_on(Date.current - before_move, source: "app/services/weighted_roll.rb#pick")
+        exercise_on(Date.current - after_move, source: "app/models/weighted_roll.rb#pick")
+
+        expect(RealSource.last_seen_for(user)).to eq("app/models/weighted_roll.rb#pick" => Date.current - 2)
+      end
     end
 
     it "ignores toy days, which carry no trace" do

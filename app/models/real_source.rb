@@ -259,7 +259,16 @@ class RealSource
         .where("problem_set -> 'code_review' ->> 'source' IS NOT NULL")
         .group("problem_set -> 'code_review' ->> 'source'")
         .maximum(:date)
+        .each_with_object({}) do |(stored_id, date), seen|
+          id = current_id(stored_id)
+          seen[id] = [ seen[id], date ].compact.max
+        end
   end
+
+  def self.current_id(stored_id)
+    all.find { |excerpt| File.basename(excerpt.id) == File.basename(stored_id) }&.id || stored_id
+  end
+  private_class_method :current_id
 
   def self.usable?(excerpt)
     return true if excerpt.resolvable?

@@ -52,10 +52,15 @@ evidence, not about the rubric's wording.
 owners each spec names: the classes that hold that state, and `User`. A new
 model is scanned unless someone names it an owner.
 
-**Excerpt rotation restarts once.** `RealSource` excerpt ids are
+**Excerpt rotation keeps its history.** `RealSource` excerpt ids are
 `"<path>#<method>"`, and each day's code review stores the id it used
 (`problem_set["code_review"]["source"]`), which `RealSource.pick` reads to
 rotate excerpts. Seven excerpts point at files this move relocated, so their
-ids changed. After the deploy, those seven read as never used and each user's
-rotation starts over, so an excerpt from the last few weeks can come back
-once. That costs one repeat and nothing else, so the old ids are not mapped.
+ids changed. Read as they were stored, those seven would count as never used,
+and `pick` would offer one ahead of excerpts a user really has not seen,
+possibly the one from the day before. `RealSource.last_seen_for` therefore
+matches each stored id to the current excerpt with the same file name and
+method, and keeps the later date when both forms are present. That carries
+history across this move and any later folder move without a table of old
+ids. A spec holds file name plus method unique across the pool, which the
+match depends on.
