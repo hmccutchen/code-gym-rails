@@ -1,10 +1,6 @@
 require "rails_helper"
 
 RSpec.describe AiProvider do
-  it "answers a purpose's worst-case call time from the call profiles" do
-    expect(described_class.worst_case_seconds_for("judge_section")).to eq(AiService.worst_case_seconds_for("judge_section"))
-  end
-
   it "uses a known provider's own quota day and falls back to the default for an unknown key" do
     failed_at = Time.utc(2026, 10, 14, 15, 0)
 

@@ -50,7 +50,7 @@ class ConceptReferenceCalibration
     PROVIDERS.dig(provider, :key)
   end
 
-  def initialize(provider:, api_key:, out: $stdout, timeout: AiService::CONCEPT_REFERENCE_READ_TIMEOUT,
+  def initialize(provider:, api_key:, out: $stdout, timeout: CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT,
                  repeats: 2, concurrency: 6)
     @provider_class = PROVIDERS.fetch(provider) { raise ArgumentError, "provider must be one of #{PROVIDERS.keys.join(', ')}" }[:service]
     validate_options!(timeout, repeats, concurrency)
@@ -80,8 +80,8 @@ class ConceptReferenceCalibration
   private
 
   def validate_options!(timeout, repeats, concurrency)
-    unless timeout > AiService::READ_TIMEOUT
-      raise ArgumentError, "timeout must exceed AiService::READ_TIMEOUT (#{AiService::READ_TIMEOUT}s), " \
+    unless timeout > CallProfiles::READ_TIMEOUT
+      raise ArgumentError, "timeout must exceed CallProfiles::READ_TIMEOUT (#{CallProfiles::READ_TIMEOUT}s), " \
                            "or the retry guard stops treating a timeout as final and retries it"
     end
     raise ArgumentError, "repeats must be 0 or more" if repeats.negative?
@@ -164,7 +164,7 @@ class ConceptReferenceCalibration
       @out.puts "#{mode}: n=#{stats[:n]} measured=#{stats[:measured]} min=#{format_seconds(stats[:min])} median=#{format_seconds(stats[:median])} " \
                 "p90=#{format_seconds(stats[:p90])} max=#{format_seconds(stats[:max])} " \
                 "timeouts=#{stats[:timeouts]} failures=#{stats[:failures]} " \
-                "over #{AiService::CONCEPT_REFERENCE_READ_TIMEOUT}s (CONCEPT_REFERENCE_READ_TIMEOUT)=#{stats[:over_deployed]}"
+                "over #{CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT}s (CONCEPT_REFERENCE_READ_TIMEOUT)=#{stats[:over_deployed]}"
     end
   end
 
@@ -181,7 +181,7 @@ class ConceptReferenceCalibration
       max:           seconds.last,
       timeouts:      records.count { |record| record.outcome == :timeout },
       failures:      records.count { |record| record.outcome.is_a?(String) },
-      over_deployed: measured.count { |record| record.seconds > AiService::CONCEPT_REFERENCE_READ_TIMEOUT } }
+      over_deployed: measured.count { |record| record.seconds > CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT } }
   end
 
   def percentile(sorted, pct)

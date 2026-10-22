@@ -72,7 +72,7 @@ RSpec.describe GenerateConceptReferenceJob do
 
   it "holds the permit for the provider budget and recovers an abandoned expired permit" do
     job = described_class.new(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
-    budget = AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT)
+    budget = CallProfiles.call_budget_seconds(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT)
     expect(described_class.concurrency_duration).to be >= budget.seconds
     expect(job.concurrency_key).to be_present
 

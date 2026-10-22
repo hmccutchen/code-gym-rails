@@ -12,7 +12,7 @@ class GeminiCapacityProbe
 
   DEFAULT_PACE_SECONDS = 15
   # No retry middleware, so one connect and one read is the longest a straggler can take.
-  DRAIN_SECONDS = AiService.single_attempt_call_seconds(AiService::READ_TIMEOUT)
+  DRAIN_SECONDS = CallProfiles.single_attempt_call_seconds(CallProfiles::READ_TIMEOUT)
   OUTPUT_DIR = "tmp/gemini_probe".freeze
   FIXTURE_CAPTURE = "gemini_429_capture.json".freeze
 
@@ -322,8 +322,8 @@ class GeminiCapacityProbe
       define_method(:log_usage) { |_user, _result, purpose:| }
       define_method(:build_connection) do
         Faraday.new do |f|
-          f.options.open_timeout      = AiService::OPEN_TIMEOUT
-          f.options.timeout           = AiService::READ_TIMEOUT
+          f.options.open_timeout      = CallProfiles::OPEN_TIMEOUT
+          f.options.timeout           = CallProfiles::READ_TIMEOUT
           f.headers["x-goog-api-key"] = @api_key
           f.headers["content-type"]   = "application/json"
           f.use Recorder, log

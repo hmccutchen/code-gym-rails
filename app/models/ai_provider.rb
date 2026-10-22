@@ -16,8 +16,6 @@ class AiProvider
     I18n.t("providers.#{key.presence || 'unknown'}", default: :"providers.unknown")
   end
 
-  def self.worst_case_seconds_for(purpose) = AiService.worst_case_seconds_for(purpose)
-
   def self.daily_quota_reset_at(key, failed_at) = (find(key.to_s) || AiService).daily_quota_reset_at(failed_at)
 
   def self.detect(api_key)

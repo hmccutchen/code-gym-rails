@@ -7,18 +7,15 @@ class ProviderFailure
 
   def self.classify(error)
     case error
-    when ProviderError::TrialAllowanceError          then "trial_allowance_used"
-    when ProviderError::TrialEndedError              then "trial_ended"
-    when ProviderError::BillingError                 then "out_of_credit"
-    when ProviderError::AuthenticationError          then "bad_key"
-    when ProviderError::RateLimitError               then rate_limit_kind(error)
-    when ProviderError::TimeoutError, Timeout::Error then "timeout"
-    when ProviderError::NetworkError                 then "outage"
-    when ProviderError                               then error.http_status.to_i >= 500 ? "outage" : "other"
-    when SetupError                                  then "setup"
-    else                                                  "other"
+    when ProviderError::RateLimitError then rate_limit_kind(error)
+    when ProviderError                 then error.class.failure_kind || status_kind(error)
+    when Timeout::Error                then ProviderError::TimeoutError.failure_kind
+    when SetupError                    then "setup"
+    else                                    "other"
     end
   end
+
+  def self.status_kind(error) = error.http_status.to_i >= 500 ? "outage" : "other"
 
   # A 5xx rate limit (Claude's 529, "overloaded") is a provider outage, not this key's limit.
   def self.rate_limit_kind(error)

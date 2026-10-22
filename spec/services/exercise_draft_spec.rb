@@ -71,7 +71,7 @@ RSpec.describe ExerciseDraft do
 
     expect(rendered).to eq([ { only: "pattern", fixed_concept: "service_objects" } ])
     expect(generated.sole).to include(user: user, purpose: "retry_section", language: "ruby_rails", subject: "pattern retry")
-    expect(generated.sole[:deadline].ends_at).to eq(ends_at - AiService.worst_case_seconds_for("judge_section"))
+    expect(generated.sole[:deadline].ends_at).to eq(ends_at - CallProfiles.worst_case_seconds_for("judge_section"))
     expect(section).to include("concept" => "service_objects", "pitched_at" => "senior")
   end
 

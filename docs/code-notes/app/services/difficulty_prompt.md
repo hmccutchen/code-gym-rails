@@ -1,6 +1,6 @@
 # `DifficultyPrompt`
 
-The post-review difficulty assessment's prompt, moved out of `AiService` (#431). `AiService#assess_difficulty` still makes the call and keeps only usable levels. Its token cap and the grace period `ReviewGrading` waits for it stay on `AiService`, since they are call settings.
+The post-review difficulty assessment's prompt, moved out of `AiService` (#431). `AiService#assess_difficulty` still makes the call and keeps only usable levels. Its token cap is a call setting, in `CallProfiles`. The grace period `ReviewGrading` waits for the call is `AiService::DIFFICULTY_ASSESSMENT_GRACE_SECONDS`.
 
 ## `.generate`
 
