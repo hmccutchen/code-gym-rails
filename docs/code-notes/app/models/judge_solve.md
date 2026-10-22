@@ -147,6 +147,13 @@ error class when neither is available. It's raised with `cause: nil` so an
 error reporter that walks the cause chain finds nothing either. The
 transaction has already rolled back when it's raised, so no row is written.
 
+`JudgeSolve.record_synthetic!(solves, draft_model:, app_revision:)` is the
+writer for `source: "synthetic"` rows, which have no exercise to take an
+owner from. It stamps no `user_id`, `daily_exercise_id` or
+`set_generated_at`, and goes through the same private `write_solves!` as
+`record!`, so it has the same one-transaction rule and the same scrubbed
+`RecordError`. The replay script's `--synthesize` is its one caller.
+
 ## The `solve` inflection
 
 Rails singularizes "solves" to "solf" by default, which would break
