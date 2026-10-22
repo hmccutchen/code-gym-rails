@@ -40,7 +40,7 @@ Alongside the verdict or reason it returns the judge's identity from the same `P
 
 ## `#fallback_detail` and `#refusal_message`
 
-Only a `JudgeVerdict::Invalid` message is logged, for every kind, and it is the message a `Solve` keeps as `unsolved_detail`. `JudgeVerdict`'s messages name a missing or unknown value and never quote the submitted `better` (`judge_verdict_spec` words every refusal path with several values of `better` and expects one message). Any other error class keeps its message out of the log, since a provider's error body can echo the section, the key included.
+Only a `JudgeVerdict::Invalid` message is logged, for every kind, and it is the message a `Solve` keeps as `unsolved_detail`, cut to `REFUSAL_DETAIL_LIMIT` characters in both places, since a message can echo a judge-written value through `inspect`. `JudgeVerdict`'s messages name a missing or unknown value and never quote the submitted `better` (`judge_verdict_spec` words every refusal path with several values of `better` and expects one message). Any other error class keeps its message out of the log, since a provider's error body can echo the section, the key included.
 
 ## Solves
 
@@ -52,6 +52,6 @@ Each judge pass on a kind with `judge_solve_options` becomes a `JudgedGeneration
 - `#rejudge` settles it at the retry's number when the retry is kept or edited, and `#unjudged_retry` does when a re-judge fallback keeps the retry. A deadline stop settles nothing.
 - `#confirmed_edit` tells the chain which version of the attempt is its candidate: the edit check when the edit was kept, the pre-edit draft when it was reverted (with `#revert_reason`, the same three tests that decide the revert).
 
-A chain never settled is a dropped section. `SolveChain#solves` turns that into the two columns: see its own note.
+`#call` tells each chain whether its kind is in `dropped`, the list that becomes `dropped_sections`, and `SolveChain#solves` turns the settled attempt and that fact into the two columns: see its own note.
 
 The chains are built per planned kind in `#initialize`, before any thread starts, so each thread only touches its own kind's chain and the hash is never written concurrently.

@@ -1,5 +1,7 @@
 # Design notes: docs/code-notes/app/services/judged_generation/solve_chain.md
 class JudgedGeneration::SolveChain
+  AlreadySettled = Class.new(StandardError)
+
   def initialize(kind, rung:, locked:)
     @kind     = kind
     @rung     = rung
@@ -24,20 +26,22 @@ class JudgedGeneration::SolveChain
   end
 
   def settle(attempt)
+    raise AlreadySettled, "#{@kind.key} settled at #{@settled}, then at #{attempt}" unless @settled.nil?
+
     @settled = attempt
   end
 
-  def solves
-    @entries.map { |solve, candidate| solve.with(**visibility(solve.attempt, candidate)) }
+  def solves(dropped:)
+    @entries.map { |solve, candidate| solve.with(**visibility(solve.attempt, candidate, dropped)) }
   end
 
   private
 
-  def visibility(attempt, candidate)
-    return { shipped: false, never_shown_reason: "section_dropped" } if @settled.nil?
-    return { shipped: false, never_shown_reason: "replaced_by_retry" } if attempt < @settled
+  def visibility(attempt, candidate, dropped)
+    return { shipped: false, never_shown_reason: "section_dropped" } if dropped
+    return { shipped: false, never_shown_reason: "replaced_by_retry" } if @settled && attempt < @settled
 
-    { shipped: candidate, never_shown_reason: nil }
+    { shipped: attempt == @settled && candidate, never_shown_reason: nil }
   end
 
   def build(section, verdict, matched, pass, attempt:, edit_check:)

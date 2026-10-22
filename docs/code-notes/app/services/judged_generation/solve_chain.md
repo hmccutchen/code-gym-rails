@@ -20,13 +20,23 @@ the edit's outcome by `#confirmed_edit`:
 ## `#settle` and `#solves`
 
 `JudgedGeneration` calls `#settle` with the attempt that shipped, at the
-point its control flow keeps a version. `#solves` then reads:
+point its control flow keeps a version. A second `#settle` raises
+`AlreadySettled`: a section ships once, and two ship points would mean one of
+them is wrong. `#solves(dropped:)` is told by `JudgedGeneration#call`
+whether the kind is in the `dropped` list that becomes `dropped_sections`,
+and then reads:
 
-- no settled attempt: the section was dropped, so every solve is
-  `shipped: false, never_shown_reason: "section_dropped"`
+- a dropped kind: every solve is `shipped: false, never_shown_reason:
+  "section_dropped"`
 - an attempt before the settled one: rejected and replaced with freshly
   generated pieces, so `replaced_by_retry`
 - the settled attempt: `shipped` is the candidate flag, with no reason
+- anything else, including every solve of a chain never settled and not
+  dropped: `shipped: false` with no reason
+
+Each reason is a positive fact from the code that decided it, so a future
+path that ships a section and forgets `#settle` leaves its rows hidden until
+review rather than labels them never shown.
 
 `replaced_by_retry` is safe because a retry never sees the rejected section:
 `judged_generation_spec` pins that the retry callable gets only the draft,

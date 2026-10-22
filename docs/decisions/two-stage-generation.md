@@ -207,9 +207,12 @@ section stands unedited, `fallback` records the reason from
 deadline left no time to start the call, the shared error code, or
 `http_<status>` when the provider refused the request itself), and
 `[judge_fallback]` warns. The warning adds the error's message only for a
-refused verdict (`JudgeVerdict::Invalid`), whose messages never quote the
-reply's content, and never for a provider error, whose body can echo the
-section. The one exception is a retry's re-judge stopped by
+refused verdict (`JudgeVerdict::Invalid`), never for a provider error, whose
+body can echo the section. An `Invalid` message never depends on the
+submitted `better`, but it can echo a short value the judge wrote (an
+unknown status, issue type, principle or field name), so it is cut to
+`JudgedGeneration::REFUSAL_DETAIL_LIMIT` characters; that echo is the
+remaining risk. The one exception is a retry's re-judge stopped by
 the deadline, which drops the section (see the regeneration deadline above).
 Provider errors carry the response's HTTP status
 (`ProviderError#http_status`); authentication and rate-limit errors keep

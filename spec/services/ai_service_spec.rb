@@ -4842,14 +4842,20 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(single.dropped_sections).to eq([])
   end
 
-  it "hands back the judge's solves, naming the provider and the model it routed the judge to, and none unjudged" do
-    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
-    single = FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
+  { "b" => true, "a" => false }.each do |better, matched|
+    it "hands back the judge's solves, naming the provider and the model it routed the judge to (key #{better})" do
+      allow(WeightedRoll).to receive(:pick).with(ExerciseSection::DesignComparison::POSITION_WEIGHTS).and_return(better)
 
-    expect(judged.solves.sole).to have_attributes(section: "design_comparison", judge_provider: "fake", judge_model: "fake",
-                                                  matched: true, shipped: true)
-    expect(judged.solves.sole.judged_section).to eq(judged.problem_set["design_comparison"])
-    expect(single.solves).to eq([])
+      judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+      expect(judged.solves.sole).to have_attributes(section: "design_comparison", judge_provider: "fake", judge_model: "fake",
+                                                    judge_pick: "b", key_better: better, matched: matched, shipped: true)
+      expect(judged.solves.sole.judged_section).to eq(judged.problem_set["design_comparison"])
+    end
+  end
+
+  it "hands back no solves from an unjudged generation" do
+    expect(FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails").solves).to eq([])
   end
 
   describe "under a deadline" do

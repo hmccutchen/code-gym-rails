@@ -8,6 +8,8 @@ class JudgedGeneration
 
   RETRY_FIELDS = %i[retry_principle retry_issues retry_evidence retry_reason].freeze
 
+  REFUSAL_DETAIL_LIMIT = 300
+
   def self.call(user:, draft:, providers:, finish:)
     new(user, draft, providers, finish).call
   end
@@ -35,7 +37,7 @@ class JudgedGeneration
     reject_empty_day!(set, dropped)
     finish(set, dropped, outcomes)
     AiService::JudgedSet.new(problem_set: set, dropped_sections: dropped, outcomes: outcomes, plan_notes: @draft.plan.notes,
-                             solves: @chains.values.flat_map(&:solves))
+                             solves: @chains.flat_map { |key, chain| chain.solves(dropped: dropped.include?(key)) })
   end
 
   private
@@ -239,7 +241,7 @@ class JudgedGeneration
   end
 
   def refusal_message(error)
-    error.message if error.is_a?(JudgeVerdict::Invalid)
+    error.message.truncate(REFUSAL_DETAIL_LIMIT) if error.is_a?(JudgeVerdict::Invalid)
   end
 
   def retry_section(kind, concept)

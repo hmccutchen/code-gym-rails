@@ -590,6 +590,19 @@ RSpec.describe JudgedGeneration do
         )
       end
 
+      it "bounds a refusal message that echoes a long judge-written value, in the solve and in the log" do
+        echoed = "x" * (described_class::REFUSAL_DETAIL_LIMIT * 3)
+        verdicts["design_comparison"] = [ JudgeVerdict::Invalid.new("unknown status #{echoed.inspect}") ]
+
+        detail = run.solves.sole.unsolved_detail
+
+        expect(detail.length).to eq(described_class::REFUSAL_DETAIL_LIMIT)
+        expect(detail).to start_with('unknown status "xxx')
+        expect(logged.grep(/judge_fallback/).sole).to eq(
+          "[judge_fallback] user=42 section=design_comparison reason=invalid_output: #{detail}"
+        )
+      end
+
       it "keeps no detail for a judge failure that is not a refused verdict" do
         verdicts["design_comparison"] = [ ProviderError::TimeoutError.new("SECRET body echo") ]
 
