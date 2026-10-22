@@ -4,7 +4,7 @@ class GenerateRecognitionGuideJob < ApplicationJob
   # The row is shared, so an overlapping job is discarded rather than billed twice.
   limits_concurrency key: ->(args) { "recognition_guide/#{args.fetch(:group_key)}" },
                      to: 1, on_conflict: :discard,
-                     duration: AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT).seconds
+                     duration: CallProfiles.call_budget_seconds(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT).seconds
 
   # Best-effort: failures are logged and the next Learn backfill retries; a written guide is never rewritten.
   def perform(group_key:, user_id:)

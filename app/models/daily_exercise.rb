@@ -9,8 +9,8 @@ class DailyExercise < ApplicationRecord
   JOB_PICKUP_MARGIN = 60.seconds
 
   # One worst-case judged pass (draft, then judge) plus pickup; GenerationDeadline stops any call that would overrun it.
-  REGENERATION_DEADLINE = (AiProvider.worst_case_seconds_for("generate_exercise") +
-                           AiProvider.worst_case_seconds_for("judge_section")).seconds + JOB_PICKUP_MARGIN
+  REGENERATION_DEADLINE = (CallProfiles.worst_case_seconds_for("generate_exercise") +
+                           CallProfiles.worst_case_seconds_for("judge_section")).seconds + JOB_PICKUP_MARGIN
 
   WRITE_MARGIN = 60.seconds
 

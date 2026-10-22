@@ -3,7 +3,7 @@ class GenerateConceptReferenceJob < ApplicationJob
 
   limits_concurrency key: ->(args) { "#{args.fetch(:language)}/#{args.fetch(:concept)}" },
                      to: 1, on_conflict: :discard,
-                     duration: AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT).seconds
+                     duration: CallProfiles.call_budget_seconds(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT).seconds
 
   # refresh rewrites the whole row so its parts come from one response; only a deliberate Learn click passes it.
   def perform(concept:, language:, user_id:, refresh: false)
