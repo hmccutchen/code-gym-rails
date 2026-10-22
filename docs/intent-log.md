@@ -100,7 +100,7 @@ this one.
   **why:** I chose that a Submit clicked while a controller is still loading
   should wait for it; the app already does, and the spec was fixed instead
 - `ProfileController`'s checks and `User`'s level callbacks into a
-  `ProfileUpdate` form `#476 open`
+  `ProfileUpdate` form `#476`
 
 ### Hassan
 
@@ -109,3 +109,9 @@ this one.
   **I decided:** clear the stored provider keys and have users add new ones,
   rather than re-encrypt keys that may already be exposed; build the PR now and
   merge it with the new variables once Railway is back
+
+## Thu Oct 22
+
+- moved production onto a fresh Railway Postgres, then deleted the old
+  database and the copy job `#489`
+  **I decided:** a fresh database rather than rotating the old one's password
