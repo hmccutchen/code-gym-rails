@@ -39,7 +39,8 @@ The confirming code is consumed (`validate_and_consume_otp!` stores its
 timestep), so the code used to turn the authenticator on cannot also sign in.
 The backup codes it returns exist only in that reply; the row keeps digests.
 Both run under the row lock and re-check enrollment there, so two submits
-cannot each write a set.
+cannot each write a set. `#prepare_two_factor_secret!` takes the lock too, so
+two setup pages opened at once show the same QR code.
 
 ## `#sign_in_credentials_cleared`
 

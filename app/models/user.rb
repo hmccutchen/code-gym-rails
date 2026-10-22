@@ -85,7 +85,7 @@ class User < ApplicationRecord
     return nil unless user
 
     user.with_lock do
-      return nil if user.login_code_digest.nil?
+      return nil if user.password_set? || user.login_code_digest.nil?
       return nil if user.login_code_sent_at.nil? || user.login_code_sent_at < LOGIN_CODE_EXPIRY.ago
 
       if BCrypt::Password.new(user.login_code_digest) == code.to_s.strip

@@ -43,6 +43,8 @@ class FirstSignInsController < ApplicationController
     session.delete(:pending_login_email)
     session.delete(:pending_login_at)
     sign_in(user)
+    return redirect_to(after_sign_in_path_for(user)) if PendingTrial.email(session)
+
     redirect_to edit_password_setup_path, notice: t("first_sign_ins.choose_password", name: user.name)
   end
 

@@ -140,6 +140,15 @@ RSpec.describe "Preview auto-login", type: :request do
       expect(signed_in_as).to be_empty
     end
 
+    it "declines on the emailed-code page too, so an older account can still use it" do
+      seeded_user
+      allow(controller).to receive(:controller_name).and_return("first_sign_ins")
+
+      controller.send(:preview_auto_login)
+
+      expect(signed_in_as).to be_empty
+    end
+
     it "declines on the login pages, so signing in as someone else still works" do
       seeded_user
       allow(controller).to receive(:controller_name).and_return("sessions")

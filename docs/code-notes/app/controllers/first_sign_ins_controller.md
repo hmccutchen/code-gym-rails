@@ -12,6 +12,13 @@ little longer, which the rate limits bound. It creates no accounts.
 
 ## `#verify_code`
 
+A trial the account asked for before signing in starts here, through
+`after_sign_in_path_for`; without one the account goes straight to choosing a
+password. `User.authenticate_login_code` checks again under the row lock that
+the account still has no password, so a password set while the code was being
+checked wins.
+
+
 A rejected code gets one of two messages. With no pending login in this browser the page renders no code field, so telling the user to retry would point at a field that isn't there; they are told to request a new code instead.
 
 ## `#rate_limited`

@@ -141,6 +141,31 @@ RSpec.describe "First sign-in for an account with no password", type: :request d
       expect(other_browser.session["warden.user.user.key"]).to be_nil
     end
 
+    it "refuses a code when a password is set between finding the account and locking it" do
+      request_code
+      code = mailed_code
+      allow_any_instance_of(User).to receive(:with_lock).and_wrap_original do |original, *args, &block|
+        User.where(id: waiting.id).update_all(encrypted_password: Devise::Encryptor.digest(User, AuthHelpers::SPEC_PASSWORD))
+        original.call(*args, &block)
+      end
+
+      post verify_first_sign_in_path, params: { code: code }
+
+      expect(signed_in?).to be(false)
+    end
+
+    it "starts a trial the account asked for before signing in" do
+      stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+      invite, invite_code = mint_trial_code
+      post start_trial_path, params: { email: waiting.email, invite_code: invite_code, provider: "fake", consent: "1" }
+      request_code
+
+      post verify_first_sign_in_path, params: { code: mailed_code }
+
+      expect(waiting.reload).to be_trial
+      expect(invite.reload.redeemed_count).to eq(1)
+    end
+
     it "refuses a code issued before the account set a password" do
       request_code
       code = mailed_code

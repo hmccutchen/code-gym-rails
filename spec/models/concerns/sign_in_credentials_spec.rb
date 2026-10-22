@@ -50,6 +50,16 @@ RSpec.describe SignInCredentials, type: :model do
   describe "enrolling an authenticator" do
     let(:user) { create_user_with_key }
 
+    it "keeps one secret when two setup pages load the account at once" do
+      first_tab = User.find(user.id)
+      second_tab = User.find(user.id)
+
+      secret = first_tab.prepare_two_factor_secret!
+
+      expect(second_tab.prepare_two_factor_secret!).to eq(secret)
+      expect(user.reload.otp_secret).to eq(secret)
+    end
+
     it "keeps one secret until enrollment, so a reload shows the same QR code" do
       secret = user.prepare_two_factor_secret!
 

@@ -59,8 +59,10 @@ module SignInCredentials
   end
 
   def prepare_two_factor_secret!
-    update!(otp_secret: self.class.generate_otp_secret) if otp_secret.blank?
-    otp_secret
+    with_lock do
+      update!(otp_secret: self.class.generate_otp_secret) if otp_secret.blank?
+      otp_secret
+    end
   end
 
   def sign_in_credentials_cleared
