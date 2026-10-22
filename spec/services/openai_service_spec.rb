@@ -322,16 +322,36 @@ RSpec.describe OpenaiService do
 
     # OpenAI refuses JSON mode unless an input message mentions JSON, and instructions do not count (#253).
     it "ends the input with a request for a JSON object when JSON mode is on" do
-      body, = call_with(hello, response_schema: JudgeVerdict.schema_for(ExerciseSection::Challenge))
+      schema = JudgeVerdict.schema_for(ExerciseSection::Challenge)
+      body, = call_with(hello, response_schema: schema)
 
-      expect(body["input"].last).to eq("role" => "user", "content" => "prompt text\n\n#{OpenaiService::JSON_MODE_REQUEST}")
+      expect(body["input"].last).to eq("role" => "user", "content" => "prompt text\n\n#{OpenaiService::JSON_MODE_REQUEST}\n#{schema.to_json}")
       expect(OpenaiService::JSON_MODE_REQUEST).to match(/json/i)
+    end
+
+    it "sends the schema it holds the reply to, as compact JSON after one plain line, with strict mode off" do
+      schema = JudgeVerdict.schema_for(ExerciseSection::DesignComparison)
+      body, = call_with(hello, response_schema: schema)
+
+      request_line, schema_line = body["input"].last["content"].split("\n").last(2)
+      expect(request_line).to eq("Reply with a JSON object matching this JSON Schema:")
+      expect(JSON.parse(schema_line)).to eq(schema.deep_stringify_keys)
+      expect(schema_line).not_to include("\n", ": ")
+      expect(body["text"]).to eq("format" => { "type" => "json_object" })
     end
 
     it "leaves the input as written when JSON mode is off" do
       body, = call_with(hello)
 
       expect(body["input"].last).to eq("role" => "user", "content" => "prompt text")
+    end
+
+    it "sends a request without a schema exactly as before the schema line existed" do
+      body, = call_with(hello, max_tokens: 250)
+
+      expect(body).to eq("model" => OpenaiService::DEFAULT_ROUTE[:model], "instructions" => "sys",
+                         "input" => [ { "role" => "user", "content" => "prompt text" } ], "store" => false,
+                         "reasoning" => { "effort" => "none" }, "max_output_tokens" => 250)
     end
 
     it "joins the message's text parts and skips reasoning items" do
