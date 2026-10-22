@@ -109,3 +109,17 @@ this one.
   **I decided:** clear the stored provider keys and have users add new ones,
   rather than re-encrypt keys that may already be exposed; build the PR now and
   merge it with the new variables once Railway is back
+
+## Thu Oct 22
+
+- production onto Railway's managed Postgres, copied from the old container
+  **why:** the old `postgres` service had no volume, so a restart would have
+  erased the database
+  **I decided:** a new database instead of rotating the old one's password
+- sign-in through Devise: a password plus an authenticator code, replacing
+  the emailed code `#490 open`
+  **why:** after the breach I wanted the security-critical parts from
+  maintained libraries rather than our own code
+  **I decided:** backup codes for a lost phone, open sign-up with email
+  confirmation, an emailed password reset, and existing accounts enrolling at
+  their next sign-in with one last emailed code
