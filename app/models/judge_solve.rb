@@ -32,7 +32,9 @@ class JudgeSolve < ApplicationRecord
 
   def self.section_review_exists
     responses = DailyResponse.arel_table
-    DailyResponse.where(responses[:daily_exercise_id].eq(arel_table[:daily_exercise_id]))
+    DailyResponse.joins(:daily_exercise)
+                 .where(responses[:daily_exercise_id].eq(arel_table[:daily_exercise_id]))
+                 .where(DailyExercise.arel_table[:generated_at].eq(arel_table[:set_generated_at]))
                  .where(DailyResponse.section_reviewed_condition(arel_table[:section]))
                  .arel.exists
   end

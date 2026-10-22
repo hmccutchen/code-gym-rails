@@ -565,6 +565,20 @@ RSpec.describe RegenerateExerciseJob, type: :job do
         .to have_attributes(matched: false, source: "live", draft_model: "claude-opus-5-5")
     end
 
+    it "lets a review of the new set show the new set's records and never the replaced set's" do
+      exercise = claimed_exercise
+      replaced = JudgeSolve.record!(exercise, [ live_solve ]).sole
+      stub_judged([ live_solve(judge_pick: "a", matched: false) ])
+
+      described_class.new.perform(user_id: user.id)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                            answers: { "design_comparison" => "a" * 20 },
+                            ai_review: { "design_comparison" => { "rating" => "solid" } })
+
+      expect(JudgeSolve.readable).to contain_exactly(have_attributes(set_generated_at: exercise.reload.generated_at))
+      expect(JudgeSolve.readable).not_to include(replaced)
+    end
+
     it "writes nothing when its claim was released under the call" do
       exercise = claimed_exercise
       stub_judged([ live_solve ]) { exercise.update_columns(regenerating_since: nil) }

@@ -345,6 +345,26 @@ RSpec.describe JudgeSolve, type: :model do
       expect(described_class.readable).not_to include(other)
     end
 
+    it "keeps a regenerated day's review of the new set from showing the replaced set's rows" do
+      replaced = described_class.record!(exercise, [ solve ]).sole
+      exercise.update!(generated_at: exercise.generated_at + 10.minutes, regenerated_at: Time.current)
+      current = described_class.record!(exercise, [ solve(judge_pick: "b", matched: false) ]).sole
+      review!(exercise)
+
+      expect(described_class.readable).to contain_exactly(current)
+      expect(described_class.where(id: replaced.id).readable).to be_empty
+    end
+
+    it "matches a recorded set to its exercise after a round trip, from a time finer than the column" do
+      precise = Time.zone.at(1_800_000_000, 123_456_789, :nsec)
+      exercise.update!(generated_at: precise)
+      record = described_class.record!(exercise, [ solve ]).sole
+      review!(exercise)
+
+      expect(record.reload.set_generated_at).to eq(exercise.reload.generated_at)
+      expect(described_class.readable).to contain_exactly(record)
+    end
+
     it "hides a row whose own section is not reviewed, even when another section of the day is" do
       create_solve
       review!(exercise, ai_review: { "code_review" => { "rating" => "solid" } })
@@ -366,7 +386,7 @@ RSpec.describe JudgeSolve, type: :model do
       states.each_with_index do |(name, attrs), offset|
         day = exercise_on(Date.current - (offset + 2).days)
         response = attrs && review!(day, **attrs)
-        record = create_solve(daily_exercise_id: day.id)
+        record = create_solve(daily_exercise_id: day.id, set_generated_at: day.generated_at)
 
         expected = response&.section_reviewed?(record.section) || false
         expect(described_class.readable.include?(record)).to eq(expected), name.to_s
