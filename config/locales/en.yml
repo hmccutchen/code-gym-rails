@@ -102,11 +102,16 @@ en:
       page_title: "Resend confirmation"
       submit: "Resend confirmation email"
   backup_codes:
-    heading: "Backup codes"
-    intro: "Lost your backup codes, or used most of them? Enter a code from your authenticator app to make ten new ones. The old ones stop working."
-    code_label: "6-digit code from your authenticator app"
+    heading: "Authenticator and backup codes"
+    intro: "Lost your backup codes, or used most of them? Enter a code from your authenticator app, or one of your backup codes, to make ten new ones. The old ones stop working."
+    code_label: "Authenticator or backup code"
     submit: "Make new backup codes"
     code_rejected: "That code didn't match, so your backup codes are unchanged."
+  authenticator_moves:
+    intro: "Got a new phone? Enter a code from your old phone, or a backup code, to turn the authenticator off. You'll scan a new QR code straight after."
+    submit: "Move to a new phone"
+    released: "Your old authenticator is off. Scan this QR code with your new phone."
+    code_rejected: "That code didn't match, so your authenticator is unchanged."
     rate_limited: "Too many attempts. Try again in a few minutes."
   password_setups:
     edit:
@@ -293,6 +298,8 @@ en:
         title: "%{provider} sent back something Coding Gym couldn't use, so %{outcome}."
         next: "Try again. If it keeps happening, tell the person who runs Coding Gym."
   errors:
+    messages:
+      already_confirmed: "was already confirmed. If you haven't set up your authenticator app yet, reset your password to finish."
     no_exercise_today: "No exercise set for today."
     provider_calls_limited: "You've reached the limit on AI requests for now. Try again later."
     section_not_in_exercise: "That section isn't part of this exercise."
@@ -952,8 +959,8 @@ en:
         dismiss: "Dismiss"
   devise:
     failure:
-      invalid: "Incorrect email, password or code. Haven't set up your authenticator app yet? Use the link in your confirmation email, or reset your password."
-      not_found_in_database: "Incorrect email, password or code. Haven't set up your authenticator app yet? Use the link in your confirmation email, or reset your password."
+      invalid: "Incorrect email, password or code. Still setting up your account? Use the newest link in your confirmation email, or reset your password if you've already confirmed it."
+      not_found_in_database: "Incorrect email, password or code. Still setting up your account? Use the newest link in your confirmation email, or reset your password if you've already confirmed it."
       unauthenticated: "Log in first."
       unconfirmed: "Confirm your email address first. The link is in the email we sent you."
       inactive: "This account can't log in."

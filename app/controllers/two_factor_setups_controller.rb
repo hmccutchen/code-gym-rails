@@ -15,13 +15,15 @@ class TwoFactorSetupsController < ApplicationController
 
   # POST /two_factor_setup — the backup codes exist only in this reply, so it renders rather than redirects.
   def create
-    @backup_codes = current_user.enroll_two_factor!(params[:code].to_s)
-    return render(:backup_codes) if @backup_codes
-    return redirect_to(account_path, notice: t("two_factor_setups.already_on")) if current_user.two_factor_enrolled?
-
-    @secret = current_user.otp_secret
-    flash.now[:alert] = t("two_factor_setups.code_rejected")
-    render :show, status: :unprocessable_content
+    outcome = current_user.enroll_two_factor!(params[:code].to_s)
+    case outcome.status
+    when :enrolled
+      @backup_codes = outcome.backup_codes
+      render :backup_codes
+    when :already_on then redirect_to account_path, notice: t("two_factor_setups.already_on")
+    when :rejected then refuse(t("two_factor_setups.code_rejected"), :unprocessable_content)
+    else raise ArgumentError, "unhandled enrollment outcome #{outcome.status}"
+    end
   end
 
   private
@@ -30,9 +32,11 @@ class TwoFactorSetupsController < ApplicationController
     redirect_to root_path if current_user.two_factor_enrolled?
   end
 
-  def attempts_limited
+  def attempts_limited = refuse(t("two_factor_setups.rate_limited"), :too_many_requests)
+
+  def refuse(message, status)
     @secret = current_user.otp_secret
-    flash.now[:alert] = t("two_factor_setups.rate_limited")
-    render :show, status: :too_many_requests
+    flash.now[:alert] = message
+    render :show, status: status
   end
 end

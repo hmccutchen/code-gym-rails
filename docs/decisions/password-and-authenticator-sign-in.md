@@ -19,7 +19,7 @@ The owner made each of these calls:
 - **Backup codes** for a lost phone (`:two_factor_backupable`), ten
   single-use codes shown once when the authenticator is turned on
   (`SignInCredentials::BACKUP_CODE_COUNT`). The Account page makes a new set
-  for anyone who enters a current authenticator code (`BackupCodesController`),
+  for anyone who enters an authenticator or backup code (`BackupCodesController`),
   so an open session alone cannot take them. A Devise emailed reset was
   turned down for the authenticator, because whoever holds the inbox could
   then take the account.
@@ -74,6 +74,24 @@ only once, since a confirmed account cannot be confirmed again. Enrollment and
 backup-code regeneration run under the user row lock, so a double-submitted
 form cannot write two sets of backup codes and show the person the losing one.
 A second enrollment submit goes to the Account page, which can make new codes.
+
+A confirmation link can be spent before the person follows it, by a mail
+scanner that opens links or by a second click. The page then says the address
+was already confirmed and to reset the password, and the login refusal points
+at both the newest confirmation link and a reset. A reset always works for a
+confirmed account without an authenticator.
+
+The model methods return a `SignInCredentials::CodeOutcome` naming what
+happened (`:enrolled`, `:already_on`, `:regenerated`, `:released`,
+`:rejected`), and each controller maps it to a page, following "Outcomes at
+the HTTP edge".
+
+## Moving to a new phone
+
+The Account page's "Move to a new phone" takes a code from the old phone or a
+backup code (`AuthenticatorMovesController`). It turns the authenticator off,
+which clears the secret and the backup codes, and the setup checks then show
+a new QR code in the same session.
 
 ## Recovering an account that lost both
 

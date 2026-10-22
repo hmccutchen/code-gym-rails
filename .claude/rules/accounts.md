@@ -1,6 +1,6 @@
 ---
 paths:
-  - "app/controllers/{first_sign_ins,password_setups,two_factor_setups,backup_codes,trials,accounts,application}_controller.rb"
+  - "app/controllers/{first_sign_ins,password_setups,two_factor_setups,backup_codes,authenticator_moves,trials,accounts,application}_controller.rb"
   - "app/controllers/concerns/posted_user_email.rb"
   - "app/controllers/users/**"
   - "app/controllers/concerns/preview_auto_login.rb"
@@ -11,7 +11,7 @@ paths:
   - "config/initializers/devise.rb"
   - "app/services/{preview_environment,preview_seed,preview_mail,lazy_cache_store}.rb"
   - "app/views/{first_sign_ins,password_setups,two_factor_setups,devise,trials,user_mailer}/**"
-  - "app/views/accounts/_backup_codes.html.erb"
+  - "app/views/accounts/_authenticator.html.erb"
   - "app/views/shared/_auth_page_styles.html.erb"
   - "app/views/dashboard/{_trial_banner,_trial_ended}.html.erb"
   - "app/views/api_keys/{_trial_note,_key_guide}.html.erb"
@@ -51,8 +51,9 @@ read it before changing that area.
   accounts created through sign-up (`#confirmation_required?`). A reset signs
   in only an account without an authenticator. `ApplicationController` sends a
   signed-in account with no password, then one with no authenticator, to set
-  them up before anything else. Enrollment and backup-code regeneration run
-  under the row lock. Never call `current_user` in `Users::SessionsController`
+  them up before anything else. Enrollment, backup-code regeneration and
+  moving to a new phone run under the row lock and return a
+  `SignInCredentials::CodeOutcome`. Never call `current_user` in `Users::SessionsController`
   before params authentication is allowed: the rate limits are prepended
   for that reason, and the stale-token handler reads
   `warden.authenticated?(:user)`.

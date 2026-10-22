@@ -109,7 +109,7 @@ RSpec.describe "Signing in with a password and an authenticator code", type: :re
       sign_in_with(email: registrant.email, code: "")
 
       expect(signed_in?).to be(false)
-      expect(flash[:alert]).to include("the link in your confirmation email")
+      expect(flash[:alert]).to include("newest link in your confirmation email")
     end
 
     it "sends the user back to the page they were bounced from" do

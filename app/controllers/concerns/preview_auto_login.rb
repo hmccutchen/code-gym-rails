@@ -9,7 +9,7 @@ module PreviewAutoLogin
     private
 
     def preview_auto_login
-      return if %w[sessions first_sign_ins].include?(controller_name)
+      return if devise_controller? || controller_name == "first_sign_ins"
       return if current_user
       return if cookies[SIGNED_OUT_COOKIE].present?
 

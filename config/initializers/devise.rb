@@ -17,7 +17,7 @@ Devise.setup do |config|
   config.reconfirmable          = false
   config.confirm_within         = 3.days
   config.reset_password_within  = 2.hours
-  # A reset must not sign in: the authenticator code would be skipped.
+  # Users::PasswordsController signs in only an account without an authenticator; any other would skip its code.
   config.sign_in_after_reset_password = false
   config.sign_out_via = :delete
 

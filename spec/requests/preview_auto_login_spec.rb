@@ -149,9 +149,9 @@ RSpec.describe "Preview auto-login", type: :request do
       expect(signed_in_as).to be_empty
     end
 
-    it "declines on the login pages, so signing in as someone else still works" do
+    it "declines on every Devise page, so signing in, signing up and resetting still work" do
       seeded_user
-      allow(controller).to receive(:controller_name).and_return("sessions")
+      allow(controller).to receive(:devise_controller?).and_return(true)
 
       controller.send(:preview_auto_login)
 

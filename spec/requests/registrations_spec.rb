@@ -30,7 +30,7 @@ RSpec.describe "Signing up", type: :request do
     expect(response).to redirect_to(two_factor_setup_path)
   end
 
-  it "signs nobody in from a confirmation link that was already used" do
+  it "signs nobody in from a confirmation link that was already used, and points at a reset instead" do
     sign_up
     token = confirmation_token
     get user_confirmation_path(confirmation_token: token)
@@ -39,6 +39,7 @@ RSpec.describe "Signing up", type: :request do
     get user_confirmation_path(confirmation_token: token)
 
     expect(session["warden.user.user.key"]).to be_nil
+    expect(response.body).to include("reset your password to finish")
   end
 
   it "never signs in an account that already has an authenticator from a confirmation link" do

@@ -66,7 +66,7 @@ customers.each { |c| puts loyalty_tier(c) }
    scan the QR code with an authenticator app such as 1Password, Google
    Authenticator or Authy, and save the backup codes it shows you. After that,
    you sign in with your password and a code from the app. Had an account
-   before passwords? Use "Sign in with an emailed code" on the login page once,
+   before passwords? Use "Had an account before passwords? Sign in with an emailed code." on the login page once,
    and it walks you through the same setup.
 2. On the Setup page, add an API key from one of these providers. The app uses
    your own key, so you pay only for your own exercises.

@@ -27,6 +27,7 @@ Rails.application.routes.draw do
   resource :password_setup,   only: [ :edit, :update ]
   resource :two_factor_setup, only: [ :show, :create ]
   resource :backup_codes, only: :create
+  resource :authenticator_move, only: :create
 
   get   "setup", to: "api_keys#edit"
   patch "setup", to: "api_keys#update"

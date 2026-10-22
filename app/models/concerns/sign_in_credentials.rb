@@ -4,6 +4,10 @@ module SignInCredentials
 
   BACKUP_CODE_COUNT = 10
 
+  CodeOutcome = Data.define(:status, :backup_codes) do
+    def self.of(status, backup_codes = nil) = new(status:, backup_codes:)
+  end
+
   # Prepended because `devise` includes its modules after this one, so they would win otherwise.
   module DeviseOverrides
     def active_for_authentication?
@@ -42,20 +46,34 @@ module SignInCredentials
   # Under the row lock, so a double-submitted form cannot write two sets and show the person the losing one.
   def enroll_two_factor!(code)
     with_lock do
-      return nil if two_factor_enrolled? || otp_secret.blank? || !validate_and_consume_otp!(code)
+      return CodeOutcome.of(:already_on) if two_factor_enrolled?
+      return CodeOutcome.of(:rejected) unless otp_secret.present? && validate_and_consume_otp!(code)
 
       backup_codes = generate_otp_backup_codes!
       update!(otp_required_for_login: true)
-      backup_codes
+      CodeOutcome.of(:enrolled, backup_codes)
     end
   end
 
   def regenerate_backup_codes!(code)
     with_lock do
-      return nil unless two_factor_enrolled? && validate_and_consume_otp!(code)
+      return CodeOutcome.of(:rejected) unless two_factor_enrolled? && second_factor_accepted?(code)
 
-      generate_otp_backup_codes!.tap { save!(validate: false) }
+      CodeOutcome.of(:regenerated, generate_otp_backup_codes!.tap { save!(validate: false) })
     end
+  end
+
+  def release_authenticator!(code)
+    with_lock do
+      return CodeOutcome.of(:rejected) unless two_factor_enrolled? && second_factor_accepted?(code)
+
+      update!(otp_required_for_login: false, otp_secret: nil, otp_backup_codes: nil)
+      CodeOutcome.of(:released)
+    end
+  end
+
+  def second_factor_accepted?(code)
+    validate_and_consume_otp!(code) || invalidate_otp_backup_code!(code)
   end
 
   def prepare_two_factor_secret!

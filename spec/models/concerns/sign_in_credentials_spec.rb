@@ -69,8 +69,10 @@ RSpec.describe SignInCredentials, type: :model do
     it "turns the authenticator on for a current code and returns ten fresh backup codes" do
       user.prepare_two_factor_secret!
 
-      codes = user.enroll_two_factor!(user.current_otp)
+      outcome = user.enroll_two_factor!(user.current_otp)
+      codes = outcome.backup_codes
 
+      expect(outcome.status).to eq(:enrolled)
       expect(codes.size).to eq(SignInCredentials::BACKUP_CODE_COUNT)
       expect(user.reload).to be_two_factor_enrolled
       expect(user.invalidate_otp_backup_code!(codes.first)).to be(true)
@@ -78,20 +80,37 @@ RSpec.describe SignInCredentials, type: :model do
 
     it "refuses a second enrollment, even with a fresh code, so the backup codes already shown stay valid" do
       user.prepare_two_factor_secret!
-      codes = user.enroll_two_factor!(user.current_otp)
+      codes = user.enroll_two_factor!(user.current_otp).backup_codes
 
       travel(31.seconds) do
-        expect(user.enroll_two_factor!(user.current_otp)).to be_nil
+        expect(user.enroll_two_factor!(user.current_otp).status).to eq(:already_on)
       end
       expect(user.reload.invalidate_otp_backup_code!(codes.first)).to be(true)
     end
 
-    it "returns nil and stays off for a wrong code or a missing secret" do
-      expect(user.enroll_two_factor!("123456")).to be_nil
+    it "is rejected and stays off for a wrong code or a missing secret" do
+      expect(user.enroll_two_factor!("123456").status).to eq(:rejected)
 
       user.prepare_two_factor_secret!
-      expect(user.enroll_two_factor!(wrong_code_for(user.current_otp))).to be_nil
+      expect(user.enroll_two_factor!(wrong_code_for(user.current_otp)).status).to eq(:rejected)
       expect(user.reload).not_to be_two_factor_enrolled
+    end
+  end
+
+  describe "moving to a new phone" do
+    let(:user) { enroll_two_factor(create_user_with_key) }
+
+    it "turns the authenticator off for a current code or a backup code, so setup shows a new secret" do
+      backup_code = user.generate_otp_backup_codes!.first
+      user.save!
+
+      expect(user.release_authenticator!(backup_code).status).to eq(:released)
+      expect(user.reload).to have_attributes(two_factor_enrolled?: false, otp_secret: nil, otp_backup_codes: nil)
+    end
+
+    it "is rejected for a wrong code, leaving the authenticator on" do
+      expect(user.release_authenticator!(wrong_code_for(user.current_otp)).status).to eq(:rejected)
+      expect(user.reload).to be_two_factor_enrolled
     end
   end
 

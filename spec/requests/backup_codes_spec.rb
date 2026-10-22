@@ -19,6 +19,15 @@ RSpec.describe "Making new backup codes", type: :request do
     expect(user.reload.otp_backup_codes).not_to include(*old_digests)
   end
 
+  it "accepts a backup code in place of the authenticator code, for someone without their phone" do
+    backup_code = user.generate_otp_backup_codes!.first
+    user.save!
+
+    post backup_codes_path, params: { code: backup_code }
+
+    expect(Nokogiri::HTML(response.body).css(".backup-codes li").size).to eq(SignInCredentials::BACKUP_CODE_COUNT)
+  end
+
   it "keeps the codes as they were for a wrong code" do
     old_digests = user.reload.otp_backup_codes
 
