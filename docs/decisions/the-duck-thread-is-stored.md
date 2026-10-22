@@ -111,8 +111,9 @@ owner's. That is accepted on these terms: they are deleted with the account,
 filtered from logs and `inspect` (`threads` matches the `thread` entry in
 `filter_parameter_logging.rb`), scoped to their owner, and kept out of every
 provider prompt but the duck's own. `duck_thread_isolation_spec` holds that
-for generation, review, the judges, mastery and planning (`IsolationScope`
-and the mastery and verdict models); the dashboard's duck partial
+for generation, review, the judges, mastery and planning (everything under
+`app/models`, `app/services`, `app/jobs`, `app/prompts` and `app/clients`
+but `DuckThread`, `DailyExercise`, `User` and the sweep job); the dashboard's duck partial
 is the only other reader. Giving them a
 reader, or a longer window, is a new decision, not an extension of this one.
 

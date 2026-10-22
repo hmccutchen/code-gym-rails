@@ -9,6 +9,7 @@ paths:
   - "app/models/{exercise_section,concept_vocabulary,language_prompts,scenario_pools,concept_bucket,real_source,judge_verdict,verdict_schema,code_format,daily_exercise,suggested_concept,mermaid_source}.rb"
   - "app/models/exercise_section/**"
   - "app/models/code_format/**"
+  - "app/clients/code_format/**"
   - "app/jobs/{generate_daily_exercises_job,regenerate_exercise_job}.rb"
   - "app/views/responses/bodies/**"
   - "script/{compare_models,model_comparison,forced_concept_drafts,solve_agreement,report_answer_positions,answer_position_balance}.rb"

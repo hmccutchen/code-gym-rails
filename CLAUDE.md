@@ -205,9 +205,9 @@ rather than only catching it afterward:
 - No new behavior without a test; no assertion weakened to make one pass.
 - No comment left false by the change that touched it.
 - No read across an isolation boundary. Each is pinned by a spec:
-  - Nothing in `IsolationScope` (`app/services`, `app/jobs`, `app/prompts`,
-    `app/clients` and the pure decision objects), and neither the mastery nor
-    the verdict models, reads trial state (`trial_isolation_spec`).
+  - Nothing under `app/models`, `app/services`, `app/jobs`, `app/prompts` or
+    `app/clients` reads trial state, apart from the trial and key models and
+    `User` (`trial_isolation_spec`, which names them).
   - Generation, review, both judges, `ConceptMastery` and `KindDifficulty`
     never read track or suggestion state (`level_suggestion_isolation_spec`).
   - `SectionKindGuide` and `ConceptBookSources` never reach a provider prompt.

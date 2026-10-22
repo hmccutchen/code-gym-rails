@@ -42,10 +42,20 @@ rule for which reviewed sections count as evidence, and `AiService` writes
 it. It did not move to `ReviewPrompt`: raising it is a decision about
 evidence, not about the rubric's wording.
 
-**The isolation specs scan the same files as before.** `trial_isolation_spec`,
-`level_suggestion_isolation_spec`, `duck_thread_isolation_spec` and
-`section_kind_guide_spec` used to scan `app/{services,jobs}`. They now scan
-`IsolationScope` (`spec/support/isolation_scope.rb`): `app/services`,
-`app/jobs`, `app/prompts`, `app/clients` and the decision objects that moved
-to `app/models`, so a move out of `app/services` never shrinks what they
-check.
+**The isolation specs scan every layer below the views.**
+`trial_isolation_spec`, `level_suggestion_isolation_spec`,
+`duck_thread_isolation_spec` and `section_kind_guide_spec` used to scan
+`app/{services,jobs}` plus a few named models, so a decision object moved to
+`app/models` would have dropped out of them. They now scan every file under
+`app/models`, `app/services`, `app/jobs`, `app/prompts` and `app/clients`
+(`IsolationScope`, `spec/support/isolation_scope.rb`), less a short list of
+owners each spec names: the classes that hold that state, and `User`. A new
+model is scanned unless someone names it an owner.
+
+**Excerpt rotation restarts once.** `RealSource` excerpt ids are
+`"<path>#<method>"`, and each day's code review stores the id it used
+(`problem_set["code_review"]["source"]`), which `RealSource.pick` reads to
+rotate excerpts. Seven excerpts point at files this move relocated, so their
+ids changed. After the deploy, those seven read as never used and each user's
+rotation starts over, so an excerpt from the last few weeks can come back
+once. That costs one repeat and nothing else, so the old ids are not mapped.

@@ -69,8 +69,8 @@ read it before changing that area.
   a daily card's swap sheet shows the kind's `short` line, and the checked
   row also shows its example, both read from `SectionKindGuide`; a spec
   requires a one-sentence `short` for every kind. Like `ConceptBookSources` it
-  is never sent to a provider, and a spec fails if anything in
-  `IsolationScope` (`spec/support/isolation_scope.rb`) names it. Each example says what the engineer
+  is never sent to a provider, and a spec fails if anything below the views
+  but `HandWrittenLearnText` names it. Each example says what the engineer
   sees and is asked, never an answer, and the ambiguity hunt's names no gap
   and no kind of gap, since the real ones are that section's hidden answer
   key. Its keys must equal `ExerciseSection.keys`, so a new kind fails a spec
