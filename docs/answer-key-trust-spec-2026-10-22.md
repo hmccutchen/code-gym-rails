@@ -27,14 +27,27 @@ This change does six things:
   seven blind solves in the last week of logs
 - commits, before any data exists, to which fix gets built at what count
 
-The PR is built in two stages:
-- **Stage 1 builds the record, the replay, the page and the OpenAI schema
-  change.** It ends with your hand calls on the replay's mismatches **and**
-  on 10–15 randomly sampled matched records (see "Matched spot-checks").
-  `REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL` stays `false` through stage 1.
-- **Stage 2 is the fix the decision rule picks,** once the calls clear its
-  bar. It is mechanical by design: the rule below names exactly what gets
-  built for each outcome.
+The work is split into two PRs, with the hand calls in between on merged
+`main`:
+
+- **Stage 1 (this spec's PR)** builds the record, the replay, the page and
+  the OpenAI schema change. `REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL` stays
+  `false`.
+- **Stage 1 merges** once both of these are true. Nothing else holds it,
+  and no hand call is a merge condition:
+  - the OpenAI acceptance passes (see "Acceptance before stage 1 merges")
+  - the PR description states user 7's provider (see "Confirming the
+    diagnosis, before stage 1 merges")
+- **After the merge, on `main`:**
+  - run the replay
+  - make your hand calls on its mismatches and on the matched sample (see
+    "Matched spot-checks")
+  - let live solves accumulate
+
+  This takes weeks, and no branch is held open for it.
+- **Stage 2 is its own PR:** the fix the decision rule picks, once the
+  calls clear its bar. It is mechanical by design, because the rule below
+  names exactly what gets built for each outcome.
 
 ## What exists today
 
@@ -506,8 +519,8 @@ model family. When both are wrong the same way they agree, and the section
 records as matched. A mismatch-only sample can't see that failure, however
 large it grows.
 
-**Stage 1 therefore includes hand calls on 10–15 matched records, plus a
-second draw of 15–20 if the first shows 3 or more bad.**
+**After stage 1 merges, the hand calls include 10–15 matched records, plus
+a second draw of 15–20 if the first shows 3 or more bad.**
 - The page's random matched sample serves them from live plus replay, and
   never synthetic.
 - Each gets `key_right`, `both_wrong` or `both_defensible`.
@@ -665,8 +678,8 @@ page before review.
   `SOLVE_MISMATCH_TOLERATED_AT`, the judge prompt, the draft prompt and
   `JudgeVerdict` unchanged. Stage 2 changes whichever the decision rule
   selects, and nothing else.
-- **The edit-check revert keeps its current behavior** in both stages. This
-  PR records it and changes nothing about it.
+- **The edit-check revert keeps its current behavior** in both stages.
+  Stage 1 records it and changes nothing about it.
 - No persistent systems or canon.
 
 ## Tests
@@ -766,7 +779,7 @@ page before review.
 
 The replay fills that gap for the question "are the keys right?". It can't
 show what the judge at the time picked. That evidence, live solves, starts
-with this PR. At about seven judged design comparisons a week, even a 10%
+when stage 1 merges. At about seven judged design comparisons a week, even a 10%
 mismatch rate yields about one live disagreement a week.
 
 ## Size
@@ -787,16 +800,16 @@ in its own query object, so no controller method passes 25 lines. The only promp
 snapshots that change are the OpenAI request snapshots for schema'd
 purposes.
 
-**Money spent before stage 2:**
+**Money spent, by when:**
 
 | Step | Cost |
 |---|---|
-| Replay, Claude judge | about $0.85 to $4.20 |
-| Synthetic top-up, decided after the replay; corroboration only | about $15 for 120 sections, or $0 if skipped |
-| OpenAI schema acceptance, 28 calls, reasoning capped at 4,000 | 0.064M input tokens × the input price + 0.06M output tokens × the output price (expected); 0.146M output tokens × the output price (worst case); three times both if the first pass is ambiguous. `gpt-6-astra`'s prices are unverified |
-| Claude and Gemini acceptance, 28 calls | under $1 |
-| Hand calls | your time: the replay's mismatches, 10–15 matched records, and 15–20 more if the first draw shows 3 or more bad |
+| Before stage 1 merges: OpenAI schema acceptance, 28 calls, reasoning capped at 4,000 | 0.064M input tokens × the input price + 0.06M output tokens × the output price (expected); 0.146M output tokens × the output price (worst case); three times both if the first pass is ambiguous. `gpt-6-astra`'s prices are unverified |
+| Before stage 1 merges: Claude and Gemini acceptance, 28 calls | under $1 |
+| After the merge: replay, Claude judge | about $0.85 to $4.20; run the SQL count first |
+| After the merge: synthetic top-up, decided after the replay; corroboration only | about $15 for 120 sections, or $0 if skipped |
+| After the merge: hand calls | your time: the replay's mismatches, 10–15 matched records, and 15–20 more if the first draw shows 3 or more bad |
 
-Stage 2's size depends on the branch. D is a one-line flag change plus its
+Stage 2 is a separate PR, and its size depends on the branch. D is a one-line flag change plus its
 spec. A, B and C are each a prompt or `.arrange!` change, then a replay
 re-run as acceptance.
