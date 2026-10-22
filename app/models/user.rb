@@ -1,5 +1,7 @@
 # Design notes: docs/code-notes/app/models/user.md
 class User < ApplicationRecord
+  include SignInCredentials
+
   has_many :daily_exercises, dependent: :destroy
   has_many :daily_responses, dependent: :destroy, inverse_of: :user
   has_many :duck_threads,    dependent: :delete_all
@@ -79,7 +81,7 @@ class User < ApplicationRecord
 
   # Under a row lock: unlocked, parallel posts of one code each redeem it (spec/models/login_code_concurrency_spec.rb).
   def self.authenticate_login_code(email:, code:)
-    user = active.find_by(email: email.to_s.strip.downcase)
+    user = awaiting_password.find_by(email: email.to_s.strip.downcase)
     return nil unless user
 
     user.with_lock do
@@ -178,11 +180,9 @@ class User < ApplicationRecord
         email:                  "deleted-user-#{id}@anonymized.local",
         name:                   "Deleted user",
         api_keys:               nil,
-        login_code_sent_at:     nil,
-        login_code_digest:      nil,
-        login_code_attempts:    0,
         reminder_level:         :none,
-        anonymized_at:          Time.current
+        anonymized_at:          Time.current,
+        **sign_in_credentials_cleared
       )
     end
     true

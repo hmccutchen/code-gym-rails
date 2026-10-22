@@ -1,4 +1,14 @@
-# app/controllers/sessions_controller.rb
+# app/controllers/first_sign_ins_controller.rb
+
+This is the emailed-code path for accounts from before passwords. A follow-up
+PR deletes it once every account has enrolled
+(`docs/decisions/password-and-authenticator-sign-in.md`).
+
+## `#create`
+
+A code goes only to an account in `User.awaiting_password`, and the reply is
+the same for every address, so the page reveals nothing about who has an
+account. It creates no accounts.
 
 ## `#verify_code`
 

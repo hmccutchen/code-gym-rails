@@ -10,6 +10,9 @@ gem "stimulus-rails"
 gem "jbuilder"
 
 gem "bcrypt", "~> 3.1.7"
+gem "devise", "~> 5.0"
+gem "devise-two-factor", "~> 6.4"
+gem "rqrcode", "~> 3.2"
 
 gem "resend"
 

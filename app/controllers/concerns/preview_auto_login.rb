@@ -17,7 +17,7 @@ module PreviewAutoLogin
       # Never sign into an account the seeder did not create, and never 500 when seeding failed or the row is gone.
       return unless PreviewSeed.seeded?(user)
 
-      session[:user_id] = user.id
+      sign_in(user)
     end
 
     def remember_preview_sign_out

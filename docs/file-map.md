@@ -55,8 +55,7 @@ What each listed file does.
 - `app/services/day_hosts.rb` — `DayHosts`: which kinds can tag a concept today, bucket and strict no-rung vocabulary; pure
 - `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class
 - `app/models/invite_code.rb` — `InviteCode`: a code's digest, seats, deadline and trial terms; `.mint` prints the code once, `#redeem!` takes a seat atomically
-- `app/models/pending_trial.rb` — `PendingTrial`: a trial asked for on the public trial page, kept in the session until the emailed code is entered
-- `app/controllers/concerns/login_code_requests.rb` — `LoginCodeRequests`: mailing a login code and the limits on asking, shared by the login form and the trial form
+- `app/models/pending_trial.rb` — `PendingTrial`: a trial asked for on the public trial page, kept in the session until a confirmed account with that address signs in
 - `app/models/provider_credential.rb` — `ProviderCredential.for(user)`: own key, no key, or the house key for an active trial; raises for an ended one
 - `app/models/trial_allowance.rb` — `TrialAllowance.check!`: the per-account cap and the house-key guard, run ahead of every house-key call
 - `app/models/house_keys.rb` / `trial_mode.rb` — the house keys and guards from ENV, and the kill switch
@@ -121,7 +120,16 @@ What each listed file does.
 - `app/views/responses/_answered_sections.html.erb` — read-only render of a submitted day; shared by the dashboard's submitted state and every history entry. Its styles live in the layout's `<style>`, not a per-page block, precisely because it renders on both.
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
 - `app/controllers/history_controller.rb` — paginated list of submitted sessions
-- `app/controllers/sessions_controller.rb` — code request + verification, with rate limits
+- `app/controllers/users/sessions_controller.rb` — Devise's sign-in (email, password and an authenticator or backup code in one form), with per-address and per-IP limits prepended ahead of Devise's params authentication
+- `app/controllers/users/registrations_controller.rb` — Devise sign-up, routed for new and create only; marks the record as signing up so it must confirm its address, and limits sign-ups per IP
+- `app/controllers/first_sign_ins_controller.rb` — the emailed code for accounts from before passwords (`/login/first`): mails one only to `User.awaiting_password`, creates no accounts, signs in and sends the account to choose a password
+- `app/controllers/password_setups_controller.rb` — choosing a password for a signed-in account that has none
+- `app/controllers/two_factor_setups_controller.rb` — turning the authenticator on: the QR code and key, the confirming code, and the backup codes shown once
+- `app/helpers/two_factor_setups_helper.rb` — the authenticator QR code as inline SVG (`rqrcode`)
+- `app/models/concerns/sign_in_credentials.rb` — `SignInCredentials`: the Devise modules on `User`, who must confirm an address, anonymized accounts refused, the password validations, and enrolling the authenticator
+- `lib/sign_in_failure_app.rb` — `SignInFailureApp`: Devise's failure app, sending a signed-out JSON request to `/login` rather than `/login.json`
+- `config/initializers/devise.rb` — Devise settings: paranoid replies, 12-character passwords, a reset that never signs in, JSON treated as navigational, and the backup-code strategy ahead of the TOTP one
+- `app/views/devise/` — the login, sign-up, reset and confirmation pages; `app/views/shared/_auth_page_styles.html.erb` holds the styles every sign-in page shares
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
 - `app/controllers/concept_references_controller.rb` — one action: the same concept explained another way, on demand from inside its own disclosure. Persists nothing; owns the cap, since there is no model data for it to live on

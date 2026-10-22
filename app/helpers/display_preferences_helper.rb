@@ -1,6 +1,6 @@
 module DisplayPreferencesHelper
   def display_preferences
-    @display_preferences ||= logged_in? ? DisplayPreferences.for(current_user) : DisplayPreferences.signed_out
+    @display_preferences ||= user_signed_in? ? DisplayPreferences.for(current_user) : DisplayPreferences.signed_out
   end
 
   # Setup always links the optional stylesheets so a choice applies before it is saved.

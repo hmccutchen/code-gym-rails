@@ -234,7 +234,8 @@ user-facing must go through the existing zone-wrapping convention
 (`ApplicationController#use_time_zone`), never assume server/UTC time.
 
 **Does the diff touch load-bearing auth or mail infrastructure?**
-`SessionsController`, `ApplicationMailer`, and `config/environments/*.rb`
+`config/initializers/devise.rb`, `SignInCredentials`, `Users::SessionsController`,
+the setup checks in `ApplicationController`, `ApplicationMailer`, and `config/environments/*.rb`
 mailer settings get extra scrutiny and must not be bundled into an unrelated
 feature PR.
 

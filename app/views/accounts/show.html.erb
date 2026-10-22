@@ -37,7 +37,7 @@
   </p>
 
   <div class="account-actions">
-    <%= button_to t("accounts.show.log_out"), logout_path, method: :delete, class: "btn btn-ghost" %>
+    <%= button_to t("accounts.show.log_out"), destroy_user_session_path, method: :delete, class: "btn btn-ghost" %>
   </div>
 
   <div class="generation-toggle">

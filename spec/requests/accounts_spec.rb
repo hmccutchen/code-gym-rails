@@ -39,7 +39,7 @@ RSpec.describe "Accounts", type: :request do
     it "redirects to login when logged out" do
       get account_path
 
-      expect(response).to redirect_to(login_path)
+      expect(response).to redirect_to(new_user_session_path)
     end
   end
 
@@ -61,7 +61,7 @@ RSpec.describe "Accounts", type: :request do
 
       delete account_path
 
-      expect(response).to redirect_to(login_path)
+      expect(response).to redirect_to(new_user_session_path)
       follow_redirect!
       expect(response.body).to include("Your account has been deleted.")
 
@@ -72,7 +72,7 @@ RSpec.describe "Accounts", type: :request do
 
       # Session is gone: a follow-up request is no longer authenticated.
       get history_path
-      expect(response).to redirect_to(login_path)
+      expect(response).to redirect_to(new_user_session_path)
     end
 
     it "does nothing when logged out" do
@@ -80,7 +80,7 @@ RSpec.describe "Accounts", type: :request do
 
       delete account_path
 
-      expect(response).to redirect_to(login_path)
+      expect(response).to redirect_to(new_user_session_path)
       expect(user.reload).not_to be_anonymized
     end
 
@@ -93,7 +93,7 @@ RSpec.describe "Accounts", type: :request do
 
       delete account_path
 
-      expect(response).to redirect_to(login_path)
+      expect(response).to redirect_to(new_user_session_path)
       expect(user.reload.anonymized_at).to eq(first_stamp)
     end
   end
@@ -253,7 +253,7 @@ RSpec.describe "Accounts", type: :request do
 
       patch toggle_generation_account_path
 
-      expect(response).to redirect_to(login_path)
+      expect(response).to redirect_to(new_user_session_path)
       expect(user.reload.paused_generation_at).to be_nil
     end
   end

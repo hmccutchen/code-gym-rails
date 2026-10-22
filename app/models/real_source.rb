@@ -212,7 +212,6 @@ class RealSource
     Method.new("app/models/user.rb", "authenticate_login_code"),
     Method.new("app/models/user.rb", "current_streak"),
     Method.new("app/models/push_subscription.rb", "register!"),
-    Method.new("app/controllers/sessions_controller.rb", "verify_code"),
     Method.new("app/services/ai_service.rb", "flatten_history"),
     Method.new("app/services/ai_service.rb", "annotate_retention_concept"),
     Method.new("app/models/user.rb", "resume_generation!"),
