@@ -24,7 +24,7 @@ class CompetencyGate
     private
 
     def responses
-      @user.daily_responses.submitted.where.not(ai_review: [ nil, {} ])
+      @user.daily_responses.submitted.reviewed
            .where(RUBRIC_STAMPED, version: AiService::RUBRIC_VERSION).preload(:daily_exercise)
     end
 
