@@ -16,14 +16,16 @@ bin/rails runner 'require "web_push"; k = WebPush.generate_key; puts "VAPID_PUBL
 ```
 
 Keep the pair stable. Rotating it invalidates every subscription already
-issued: existing endpoints keep 201-ing but silently stop being delivered, and
-every user has to turn reminders on again from the device. If you do rotate,
-clear the `push_subscriptions` table in the same deploy so the launch
-re-subscribe re-registers everyone rather than leaving dead rows behind. The
-page unsubscribes a device's subscription made with the old key before it
-subscribes again, since the browser refuses a new key otherwise
-(`code_gym/push.js`). Run the generate command in your own terminal and paste
-the values into Railway; they are secrets.
+issued: existing endpoints keep 201-ing but silently stop being delivered. If
+you do rotate, clear the `push_subscriptions` table in the same deploy and leave
+`reminder_level` alone. Every page then mounts the launch re-subscribe for
+anyone with reminders on, and a device with notification permission still
+granted re-registers itself on its next visit, with no reminders delivered
+before that. The page replaces a subscription made with the old key, since the
+browser refuses a new key otherwise (`code_gym/push.js`). A device whose
+permission was reset gets the Account page's repair prompt. Run the generate
+command in your own terminal and paste the values into Railway; they are
+secrets.
 
 ## Vars to set
 

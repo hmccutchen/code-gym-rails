@@ -11,7 +11,10 @@ RSpec.describe ClearProviderKeysAndPushSubscriptions do
   end
 
   it "clears every stored key and the provider it chose, without decrypting them" do
-    own_key.update_column(:api_keys, "ciphertext the rotated keys cannot read")
+    ActiveRecord::Base.connection.execute(
+      "UPDATE users SET api_keys = 'ciphertext the rotated keys cannot read' WHERE id = #{own_key.id}"
+    )
+    expect { User.find(own_key.id).api_keys }.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
 
     migrate_up
 

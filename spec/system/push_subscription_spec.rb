@@ -9,8 +9,10 @@ RSpec.describe "Re-subscribing to push reminders on launch", type: :system do
     script = <<~JS
       window.pushPosts = [];
       window.pushSubscribed = false;
+      window.unsubscribed = false;
       const subscription = {
         endpoint: #{endpoint.to_json},
+        unsubscribe: async () => { window.unsubscribed = true; return true; },
         toJSON() { return { endpoint: this.endpoint, keys: { p256dh: "p256dh-key", auth: "auth-key" } }; }
       };
       const pushManager = {
@@ -63,7 +65,6 @@ RSpec.describe "Re-subscribing to push reminders on launch", type: :system do
       window.unsubscribed = false;
       const oldSubscription = {
         endpoint: "https://fcm.googleapis.com/fcm/send/old-key-endpoint",
-        options: { applicationServerKey: new Uint8Array([1, 2, 3]).buffer },
         unsubscribe: async () => { window.unsubscribed = true; current = null; return true; }
       };
       const newSubscription = {
@@ -115,6 +116,7 @@ RSpec.describe "Re-subscribing to push reminders on launch", type: :system do
 
     sleep 0.5
     expect(page.evaluate_script("window.pushPosts")).to eq([])
+    expect(page.evaluate_script("window.unsubscribed")).to be(false)
     expect(user.push_subscriptions.reload.count).to eq(1)
   end
 end
