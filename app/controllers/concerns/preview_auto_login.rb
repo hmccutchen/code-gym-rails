@@ -9,9 +9,9 @@ module PreviewAutoLogin
     private
 
     def preview_auto_login
+      return if controller_name == "sessions"
       return if current_user
       return if cookies[SIGNED_OUT_COOKIE].present?
-      return if controller_name == "sessions"
 
       user = User.active.find_by(email: PreviewSeed.target_email)
       # Never sign into an account the seeder did not create, and never 500 when seeding failed or the row is gone.

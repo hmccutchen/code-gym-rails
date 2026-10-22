@@ -30,6 +30,25 @@ RSpec.describe "Resetting a forgotten password", type: :request do
     expect(session["warden.user.user.key"]).to be_nil
   end
 
+  it "signs in an account with no authenticator yet after a reset, and sends it to set one up" do
+    user.update_columns(otp_required_for_login: false)
+
+    reset_password
+
+    expect(session["warden.user.user.key"]).to be_present
+    follow_redirect!
+    expect(response).to redirect_to(two_factor_setup_path)
+  end
+
+  it "limits reset emails per address" do
+    allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+    5.times { post user_password_path, params: { user: { email: user.email } } }
+
+    expect { post user_password_path, params: { user: { email: user.email } } }
+      .not_to change(ActionMailer::Base.deliveries, :count)
+    expect(response).to have_http_status(:too_many_requests)
+  end
+
   it "still asks for the authenticator code after a reset" do
     reset_password
 

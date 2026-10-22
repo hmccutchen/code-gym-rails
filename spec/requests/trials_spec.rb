@@ -7,11 +7,10 @@ RSpec.describe "Trials", type: :request do
     post start_trial_path, params: { email: email, invite_code: code, provider: provider, consent: consent }
   end
 
-  def sign_up_and_log_in(email: "new@example.com")
+  def sign_up_and_confirm(email: "new@example.com")
     post user_registration_path, params: { user: { name: "New", email: email, password: AuthHelpers::SPEC_PASSWORD,
                                                    password_confirmation: AuthHelpers::SPEC_PASSWORD } }
     get user_confirmation_path(confirmation_token: confirmation_token_mailed_to(email))
-    post user_session_path, params: { user: { email: email, password: AuthHelpers::SPEC_PASSWORD } }
   end
 
   def confirmation_token_mailed_to(email)
@@ -21,7 +20,7 @@ RSpec.describe "Trials", type: :request do
 
   def start_and_sign_up(**options)
     start(**options)
-    sign_up_and_log_in(email: options.fetch(:email, "new@example.com"))
+    sign_up_and_confirm(email: options.fetch(:email, "new@example.com"))
   end
 
   describe "signed out, with an email and a code" do
@@ -44,16 +43,16 @@ RSpec.describe "Trials", type: :request do
       expect(response).to redirect_to(new_trial_path)
     end
 
-    it "sends the visitor to sign up and starts the trial on the chosen provider at their first sign-in" do
+    it "sends the visitor to sign up and starts the trial on the chosen provider once the address is confirmed" do
       invite, code = mint_trial_code(seats: 1, days: 7, cap: 12)
 
       travel_to(Time.utc(2026, 10, 7, 14)) do
         expect { start(code: code.downcase) }.not_to change(User, :count)
         expect(response).to redirect_to(new_user_registration_path)
-        expect(flash[:notice]).to include("Your trial starts the first time you log in")
+        expect(flash[:notice]).to include("Your trial starts when you follow the confirmation link")
         expect(invite.reload.redeemed_count).to eq(0)
 
-        sign_up_and_log_in
+        sign_up_and_confirm
 
         expect(response).to redirect_to(root_path)
         expect(flash[:notice]).to eq("Your trial has started.")
@@ -123,7 +122,7 @@ RSpec.describe "Trials", type: :request do
       start(code: code)
       invite.redeem!
 
-      sign_up_and_log_in
+      sign_up_and_confirm
 
       expect(response).to redirect_to(trial_path)
       expect(User.find_by!(email: "new@example.com")).not_to be_trial

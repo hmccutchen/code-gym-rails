@@ -17,10 +17,14 @@ authentication; otherwise rendering the refusal would sign in the posted user
 the password still has to guess a 6-digit code, and a used code cannot be
 replayed.
 
+**Mail.** Password reset and confirmation emails (`Users::PasswordsController`,
+`Users::ConfirmationsController`) are capped at 5 per address and 20 per IP in
+15 minutes, so nobody can flood an inbox or the sending domain through them.
+
 **Sign-up and enrollment.** `Users::RegistrationsController` allows 10
 sign-ups per IP an hour, which bounds account and mail creation by address
-rotation. `TwoFactorSetupsController` allows 10 enrollment attempts per
-account in 15 minutes.
+rotation. `TwoFactorSetupsController` and `BackupCodesController` allow 10
+attempts per account in 15 minutes.
 
 **The emailed code for accounts from before passwords.** A 6-digit code is a
 weak enough secret that the guessing bound is part of the design.

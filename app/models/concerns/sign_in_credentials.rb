@@ -13,6 +13,8 @@ module SignInCredentials
     def confirmation_required?
       !confirmed? && (@signing_up || confirmation_token.present?)
     end
+
+    def otp_required_for_login = true
   end
 
   included do
@@ -35,14 +37,25 @@ module SignInCredentials
 
   def password_set? = encrypted_password.present?
 
-  def two_factor_enrolled? = otp_required_for_login
+  def two_factor_enrolled? = self[:otp_required_for_login]
 
+  # Under the row lock, so a double-submitted form cannot write two sets and show the person the losing one.
   def enroll_two_factor!(code)
-    return nil unless otp_secret.present? && validate_and_consume_otp!(code)
+    with_lock do
+      return nil if two_factor_enrolled? || otp_secret.blank? || !validate_and_consume_otp!(code)
 
-    backup_codes = generate_otp_backup_codes!
-    update!(otp_required_for_login: true)
-    backup_codes
+      backup_codes = generate_otp_backup_codes!
+      update!(otp_required_for_login: true)
+      backup_codes
+    end
+  end
+
+  def regenerate_backup_codes!(code)
+    with_lock do
+      return nil unless two_factor_enrolled? && validate_and_consume_otp!(code)
+
+      generate_otp_backup_codes!.tap { save!(validate: false) }
+    end
   end
 
   def prepare_two_factor_secret!

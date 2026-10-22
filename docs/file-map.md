@@ -123,6 +123,10 @@ What each listed file does.
 - `app/controllers/users/sessions_controller.rb` — Devise's sign-in (email, password and an authenticator or backup code in one form), with per-address and per-IP limits prepended ahead of Devise's params authentication
 - `app/controllers/users/registrations_controller.rb` — Devise sign-up, routed for new and create only; marks the record as signing up so it must confirm its address, and limits sign-ups per IP
 - `app/controllers/first_sign_ins_controller.rb` — the emailed code for accounts from before passwords (`/login/first`): mails one only to `User.awaiting_password`, creates no accounts, signs in and sends the account to choose a password
+- `app/controllers/users/confirmations_controller.rb` — the confirmation link signs in an account without an authenticator and leads to enrollment; limits resends per address and per IP
+- `app/controllers/users/passwords_controller.rb` — password reset: signs in only an account without an authenticator, and limits reset emails per address and per IP
+- `app/controllers/backup_codes_controller.rb` — a new set of backup codes from the Account page, for a current authenticator code
+- `app/controllers/concerns/posted_user_email.rb` — `PostedUserEmail`: the address a Devise form posted, normalized, for keying rate limits
 - `app/controllers/password_setups_controller.rb` — choosing a password for a signed-in account that has none
 - `app/controllers/two_factor_setups_controller.rb` — turning the authenticator on: the QR code and key, the confirming code, and the backup codes shown once
 - `app/helpers/two_factor_setups_helper.rb` — the authenticator QR code as inline SVG (`rqrcode`)

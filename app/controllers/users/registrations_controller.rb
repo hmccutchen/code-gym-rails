@@ -1,4 +1,6 @@
 class Users::RegistrationsController < Devise::RegistrationsController
+  include PostedUserEmail
+
   RATE_LIMIT_STORE = LazyCacheStore.new
 
   rate_limit to: 10, within: 1.hour, with: -> { sign_ups_limited }, store: RATE_LIMIT_STORE,
@@ -21,7 +23,7 @@ class Users::RegistrationsController < Devise::RegistrationsController
   end
 
   def sign_ups_limited
-    build_resource(email: params.dig(:user, :email).to_s)
+    build_resource(email: posted_user_email)
     flash.now[:alert] = t("registrations.rate_limited")
     render :new, status: :too_many_requests
   end

@@ -52,6 +52,8 @@
 
   <%= render "accounts/push_reminders" if WebPushCredentials.configured? %>
 
+  <%= render "accounts/backup_codes" %>
+
   <%= render "accounts/api_usage", totals: @usage_totals, since: @usage_since %>
 
   <div class="danger-zone">

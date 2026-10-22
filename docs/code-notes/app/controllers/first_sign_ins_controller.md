@@ -6,9 +6,9 @@ PR deletes it once every account has enrolled
 
 ## `#create`
 
-A code goes only to an account in `User.awaiting_password`, and the reply is
-the same for every address, so the page reveals nothing about who has an
-account. It creates no accounts.
+A code goes only to an account in `User.awaiting_password`, and the reply
+text is the same for every address. Hashing a code for a real account takes a
+little longer, which the rate limits bound. It creates no accounts.
 
 ## `#verify_code`
 

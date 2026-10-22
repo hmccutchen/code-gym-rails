@@ -73,6 +73,18 @@ RSpec.describe "Finishing account setup", type: :request do
       expect(response).to redirect_to(root_path)
     end
 
+    it "sends a second submit of the enrollment form to Account, where new backup codes can be made" do
+      get two_factor_setup_path
+      code = user.reload.current_otp
+      post two_factor_setup_path, params: { code: code }
+      allow_any_instance_of(TwoFactorSetupsController).to receive(:require_not_enrolled)
+
+      post two_factor_setup_path, params: { code: code }
+
+      expect(response).to redirect_to(account_path)
+      expect(flash[:notice]).to include("already on")
+    end
+
     it "refuses a wrong code and keeps the authenticator off" do
       get two_factor_setup_path
       post two_factor_setup_path, params: { code: wrong_code_for(user.reload.current_otp) }

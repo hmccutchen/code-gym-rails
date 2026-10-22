@@ -147,6 +147,7 @@ RSpec.describe "Preview auto-login", type: :request do
       controller.send(:preview_auto_login)
 
       expect(signed_in_as).to be_empty
+      expect(controller).not_to have_received(:current_user)
     end
 
     it "already logged in is left alone" do

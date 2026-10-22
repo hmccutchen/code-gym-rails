@@ -12,7 +12,8 @@ Rails.application.routes.draw do
 
   devise_for :users, path: "", skip: :registrations,
                      path_names: { sign_in: "login", sign_out: "logout" },
-                     controllers: { sessions: "users/sessions" }
+                     controllers: { sessions: "users/sessions", confirmations: "users/confirmations",
+                                    passwords: "users/passwords" }
 
   devise_scope :user do
     get  "signup", to: "users/registrations#new",    as: :new_user_registration
@@ -25,6 +26,7 @@ Rails.application.routes.draw do
 
   resource :password_setup,   only: [ :edit, :update ]
   resource :two_factor_setup, only: [ :show, :create ]
+  resource :backup_codes, only: :create
 
   get   "setup", to: "api_keys#edit"
   patch "setup", to: "api_keys#update"

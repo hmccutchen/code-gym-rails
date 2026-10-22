@@ -55,6 +55,16 @@ RSpec.describe "Accounts", type: :request do
   end
 
   describe "DELETE /account" do
+    it "resets the whole session, not only the sign-in" do
+      user = create_user_with_key(email: "leaving@example.com", name: "Leaving")
+      login_as(user)
+      post first_sign_in_path, params: { email: "someone@example.com" }
+
+      delete account_path
+
+      expect(session[:pending_login_email]).to be_nil
+    end
+
     it "anonymizes the user, clears the session and redirects to login" do
       user = create_user_with_key(email: "leaving@example.com", name: "Leaving")
       login_as(user)

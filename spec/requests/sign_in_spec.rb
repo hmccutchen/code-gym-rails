@@ -44,7 +44,7 @@ RSpec.describe "Signing in with a password and an authenticator code", type: :re
       sign_in_with(password: "wrong #{password}")
 
       expect(signed_in?).to be(false)
-      expect(flash[:alert]).to eq(no_code_message).and eq("Incorrect email, password or code.")
+      expect(flash[:alert]).to eq(no_code_message).and start_with("Incorrect email, password or code.")
     end
 
     it "refuses a wrong code" do
@@ -75,13 +75,30 @@ RSpec.describe "Signing in with a password and an authenticator code", type: :re
       expect(signed_in?).to be(false)
     end
 
-    it "signs in an account with no authenticator yet on its password, then sends it to set one up" do
+    it "refuses the right password for an account with no authenticator, as it refuses a wrong one" do
       unenrolled = User.create!(email: "new@example.com", name: "New", password: password)
 
       sign_in_with(email: unenrolled.email, code: "")
-      follow_redirect!
+      unenrolled_reply = [ response.status, flash[:alert] ]
+      sign_in_with(email: unenrolled.email, password: "wrong #{password}", code: "")
 
-      expect(response).to redirect_to(two_factor_setup_path)
+      expect(session["warden.user.user.key"]).to be_nil
+      expect([ response.status, flash[:alert] ]).to eq(unenrolled_reply)
+    end
+
+    it "refuses a backup code with the wrong password" do
+      backup_code = user.generate_otp_backup_codes!.first
+      user.save!
+
+      sign_in_with(password: "wrong #{password}", code: backup_code)
+
+      expect(signed_in?).to be(false)
+    end
+
+    it "answers a malformed user param with the login page, not a 500" do
+      post user_session_path, params: { user: "not-a-hash" }
+
+      expect(response.status).to be < 500
     end
 
     it "refuses an account that signed up but has not confirmed its address" do
@@ -92,7 +109,7 @@ RSpec.describe "Signing in with a password and an authenticator code", type: :re
       sign_in_with(email: registrant.email, code: "")
 
       expect(signed_in?).to be(false)
-      expect(flash[:alert]).to match(/confirm your email address/i)
+      expect(flash[:alert]).to include("the link in your confirmation email")
     end
 
     it "sends the user back to the page they were bounced from" do

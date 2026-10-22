@@ -20,13 +20,45 @@ RSpec.describe "Signing up", type: :request do
     expect(User.find_by!(email: "new@example.com")).to have_attributes(name: "New Dev", confirmed_at: nil)
   end
 
-  it "confirms the account from the emailed link, after which it can log in" do
+  it "confirms the account from the emailed link, signs it in and sends it to set up the authenticator" do
     sign_up
     get user_confirmation_path(confirmation_token: confirmation_token)
-    post user_session_path, params: { user: { email: "new@example.com", password: password } }
 
     expect(User.find_by!(email: "new@example.com")).to be_confirmed
     expect(response).to redirect_to(root_path)
+    follow_redirect!
+    expect(response).to redirect_to(two_factor_setup_path)
+  end
+
+  it "signs nobody in from a confirmation link that was already used" do
+    sign_up
+    token = confirmation_token
+    get user_confirmation_path(confirmation_token: token)
+    delete destroy_user_session_path
+
+    get user_confirmation_path(confirmation_token: token)
+
+    expect(session["warden.user.user.key"]).to be_nil
+  end
+
+  it "never signs in an account that already has an authenticator from a confirmation link" do
+    enrolled = enroll_two_factor(create_user_with_key(email: "enrolled@example.com"))
+    enrolled.send_confirmation_instructions
+
+    get user_confirmation_path(confirmation_token: confirmation_token)
+
+    expect(enrolled.reload).to be_confirmed
+    expect(session["warden.user.user.key"]).to be_nil
+  end
+
+  it "limits confirmation emails per address" do
+    allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+    sign_up
+    5.times { post user_confirmation_path, params: { user: { email: "new@example.com" } } }
+
+    expect { post user_confirmation_path, params: { user: { email: "new@example.com" } } }
+      .not_to change(ActionMailer::Base.deliveries, :count)
+    expect(response).to have_http_status(:too_many_requests)
   end
 
   it "refuses a short password, a mismatched confirmation, a missing name and a taken address" do

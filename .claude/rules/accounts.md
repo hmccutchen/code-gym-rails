@@ -1,6 +1,7 @@
 ---
 paths:
-  - "app/controllers/{first_sign_ins,password_setups,two_factor_setups,trials,accounts,application}_controller.rb"
+  - "app/controllers/{first_sign_ins,password_setups,two_factor_setups,backup_codes,trials,accounts,application}_controller.rb"
+  - "app/controllers/concerns/posted_user_email.rb"
   - "app/controllers/users/**"
   - "app/controllers/concerns/preview_auto_login.rb"
   - "app/channels/application_cable/connection.rb"
@@ -10,6 +11,7 @@ paths:
   - "config/initializers/devise.rb"
   - "app/services/{preview_environment,preview_seed,preview_mail,lazy_cache_store}.rb"
   - "app/views/{first_sign_ins,password_setups,two_factor_setups,devise,trials,user_mailer}/**"
+  - "app/views/accounts/_backup_codes.html.erb"
   - "app/views/shared/_auth_page_styles.html.erb"
   - "app/views/dashboard/{_trial_banner,_trial_ended}.html.erb"
   - "app/views/api_keys/{_trial_note,_key_guide}.html.erb"
@@ -41,12 +43,16 @@ read it before changing that area.
   (`docs/decisions/password-and-authenticator-sign-in.md`): Devise with
   `devise-two-factor`: a password plus a TOTP code or a single-use backup
   code, checked together by the gem's strategies on Devise's own
-  `sessions#create`, with one message for every failure. Sign-up needs email
-  confirmation, but only for accounts created through sign-up
-  (`SignInCredentials::DeviseOverrides#confirmation_required?`). A password
-  reset never signs in. `ApplicationController` sends a signed-in account
-  with no password, then one with no authenticator, to set them up before
-  anything else. Never call `current_user` in `Users::SessionsController`
+  `sessions#create`, with one message for every failure. Every form sign-in
+  needs a code (`DeviseOverrides#otp_required_for_login` is always true), so
+  an account without an authenticator gets in only through its inbox: the
+  confirmation link, a password reset, or the emailed code, each of which
+  leads to enrollment. Sign-up needs email confirmation, but only for
+  accounts created through sign-up (`#confirmation_required?`). A reset signs
+  in only an account without an authenticator. `ApplicationController` sends a
+  signed-in account with no password, then one with no authenticator, to set
+  them up before anything else. Enrollment and backup-code regeneration run
+  under the row lock. Never call `current_user` in `Users::SessionsController`
   before params authentication is allowed: the rate limits are prepended
   for that reason, and the stale-token handler reads
   `warden.authenticated?(:user)`.
@@ -60,8 +66,9 @@ read it before changing that area.
   since `#verify_code` reads the address from the session. A follow-up PR
   deletes this path once every account has enrolled.
 - **Login rate limits** (`docs/decisions/login-rate-limits.md`): sign-in
-  attempts per address and per IP, sign-ups per IP, enrollment attempts per
-  account, and the emailed-code limits per address and per IP. Each limit
+  attempts, reset emails and confirmation emails per address and per IP,
+  sign-ups per IP, enrollment and backup-code attempts per account, and the
+  emailed-code limits per address and per IP. Each limit
   needs its own `name:`, and `LazyCacheStore` resolves `Rails.cache` per
   call.
 - **Preview apps** (`docs/decisions/preview-apps.md`):

@@ -1,0 +1,10 @@
+<div class="backup-codes-reset">
+  <h2><%= t("backup_codes.heading") %></h2>
+  <p><%= t("backup_codes.intro") %></p>
+  <%= form_with url: backup_codes_path, method: :post do |f| %>
+    <%= f.label :code, t("backup_codes.code_label") %>
+    <%= f.text_field :code, inputmode: "numeric", pattern: "[0-9]*", maxlength: 6, required: true,
+                            autocomplete: "one-time-code" %>
+    <%= f.submit t("backup_codes.submit"), class: "btn btn-ghost" %>
+  <% end %>
+</div>

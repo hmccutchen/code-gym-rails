@@ -18,15 +18,17 @@ The owner made each of these calls:
   Devise strategy.
 - **Backup codes** for a lost phone (`:two_factor_backupable`), ten
   single-use codes shown once when the authenticator is turned on
-  (`SignInCredentials::BACKUP_CODE_COUNT`). An admin can reset anyone who
-  loses those too. A Devise emailed reset was turned down for the
-  authenticator, because whoever holds the inbox could then take the account.
+  (`SignInCredentials::BACKUP_CODE_COUNT`). The Account page makes a new set
+  for anyone who enters a current authenticator code (`BackupCodesController`),
+  so an open session alone cannot take them. A Devise emailed reset was
+  turned down for the authenticator, because whoever holds the inbox could
+  then take the account.
 - **Open sign-up with email confirmation** (`:confirmable`). Anyone can
   register, and the account works only after the emailed link is followed.
   That keeps the old guarantee that the address belongs to the person.
-- **An emailed password reset link** (`:recoverable`). The reset never signs
-  in (`sign_in_after_reset_password = false`), so the authenticator code is
-  still needed after it, and an inbox alone is not enough to get in.
+- **An emailed password reset link** (`:recoverable`). For an account with an
+  authenticator the reset never signs in, so the code is still needed after
+  it, and an inbox alone is not enough to get in.
 - **Existing accounts enroll at their next sign-in.** Each of them has no
   password, so the login page offers them one last emailed code
   (`FirstSignInsController`, `/login/first`). Right after it they must set a
@@ -44,10 +46,48 @@ in order, for a signed-in user outside Devise's own controllers:
 3. `require_provider`, unchanged, sends an account with no key to Setup.
 
 The setup controllers skip only the checks that come after their own step.
-An account that registered but has not set up its authenticator can still
-sign in with its password alone, since `otp_required_for_login` is false, and
-the second check then sends it to the setup page. So the authenticator is
-required for every page except its own setup.
+
+## No account is ever protected by a password alone
+
+An account without an authenticator cannot sign in with its password. Its
+only ways in prove the inbox, and each leads straight to enrollment:
+
+- the confirmation link (`Users::ConfirmationsController#show` signs the
+  account in);
+- a password reset (`Users::PasswordsController#sign_in_after_reset_password?`
+  is true only for an account without an authenticator);
+- the emailed code, for accounts from before passwords.
+
+Without this, whoever knew an account's password before it enrolled could
+attach their own authenticator and keep the backup codes: someone reusing a
+leaked password, or someone who signed up with another person's address and
+waited for them to follow the confirmation link. The rule is enforced at the
+strategy: `SignInCredentials::DeviseOverrides#otp_required_for_login` is
+always true, so `devise-two-factor` asks every form sign-in for a code, and an
+account with no secret can never supply one. The column of that name now only
+records whether the authenticator is on, read through `#two_factor_enrolled?`.
+The refusal gets the same message and status as any other failure, so the
+login page does not reveal that a password was right.
+
+A confirmation link signs in only an account without an authenticator, and
+only once, since a confirmed account cannot be confirmed again. Enrollment and
+backup-code regeneration run under the user row lock, so a double-submitted
+form cannot write two sets of backup codes and show the person the losing one.
+A second enrollment submit goes to the Account page, which can make new codes.
+
+## Recovering an account that lost both
+
+There is no admin page. From a Rails console on `web`, turn the authenticator
+off:
+
+```ruby
+User.find_by!(email: "person@example.com")
+    .update!(otp_required_for_login: false, otp_secret: nil, otp_backup_codes: nil, consumed_timestep: nil)
+```
+
+The person then resets their password from the login page. The reset signs
+them in, because the account has no authenticator, and sends them to set one
+up again.
 
 ## The login form takes all three values at once
 
@@ -57,7 +97,8 @@ strategies (`two_factor_backupable`, then `two_factor_authenticatable`) check
 them in one request. A two-page flow (password first, then code) would have
 meant holding a half-signed-in user in the session ourselves, which is the
 hand-built state this change set out to remove. Every failure gets one
-message, "Incorrect email, password or code", so the reply does not say which
+message, which starts "Incorrect email, password or code" and points an
+account still being set up at its emails, so the reply does not say which
 part was wrong. A code is consumed when used (`consumed_timestep`), so the
 same code cannot sign in twice.
 
@@ -98,9 +139,10 @@ it to `/login` rather than `/login.json`.
 ## Limits
 
 `Users::SessionsController` allows 10 sign-in attempts per address and 20
-per IP in 15 minutes. `Users::RegistrationsController` allows 10 sign-ups per
-IP an hour. `TwoFactorSetupsController` allows 10 enrollment attempts per
-account in 15 minutes. The emailed-code path keeps its old limits, apart from
+per IP in 15 minutes. Password reset and confirmation emails are capped at 5
+per address and 20 per IP in 15 minutes. `Users::RegistrationsController`
+allows 10 sign-ups per IP an hour. `TwoFactorSetupsController` and
+`BackupCodesController` allow 10 attempts per account in 15 minutes. The emailed-code path keeps its old limits, apart from
 the daily per-IP cap on code requests, which existed to bound account
 creation: that path no longer creates accounts.
 
@@ -115,3 +157,30 @@ creation: that path no longer creates accounts.
 - `PreviewAutoLogin` signs the seeded reviewer in through Devise's `sign_in`.
   The seed gives that account a random password and an authenticator, so
   auto-login lands past the setup checks.
+
+## What the replies still reveal
+
+- **Sign-up** says "Email has already been taken" for a registered address.
+  Devise's paranoid mode does not cover registration, and an open sign-up
+  page has to say why an address was refused. This was accepted for a team
+  app.
+- **Mail is sent inside the request.** A reset or confirmation for a real
+  address takes longer than one for an unknown address, and a mail outage
+  fails only for real addresses. Sending through `deliver_later` would remove
+  that, but would put the raw reset and confirmation tokens into
+  `solid_queue_jobs` arguments, which are kept for a day, where today they
+  exist only in the email. The rate limits above bound how much can be
+  learned this way.
+- **The emailed code** gives the same reply for every address, but hashing a
+  code for a real account takes a little longer.
+
+## Shipping the columns with the code that reads them
+
+`.claude/rules/deployment.md` asks a new column to ship a release before code
+reads it, because the worker can start on new code before `web`'s pre-deploy
+migration finishes. This PR ships both together. The worker never signs
+anyone in, and the Devise callbacks on an update read only columns it guards
+with `respond_to?` or checks only when a password or email changes, which the
+worker never does. `encrypts :otp_secret` reads its column only when it is
+accessed. So a worker on the old schema keeps saving users, and a one-line
+migration PR first was judged not worth a release.

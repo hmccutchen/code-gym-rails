@@ -17,6 +17,7 @@ class TwoFactorSetupsController < ApplicationController
   def create
     @backup_codes = current_user.enroll_two_factor!(params[:code].to_s)
     return render(:backup_codes) if @backup_codes
+    return redirect_to(account_path, notice: t("two_factor_setups.already_on")) if current_user.two_factor_enrolled?
 
     @secret = current_user.otp_secret
     flash.now[:alert] = t("two_factor_setups.code_rejected")

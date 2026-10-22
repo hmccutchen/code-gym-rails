@@ -66,6 +66,16 @@ RSpec.describe SignInCredentials, type: :model do
       expect(user.invalidate_otp_backup_code!(codes.first)).to be(true)
     end
 
+    it "refuses a second enrollment, even with a fresh code, so the backup codes already shown stay valid" do
+      user.prepare_two_factor_secret!
+      codes = user.enroll_two_factor!(user.current_otp)
+
+      travel(31.seconds) do
+        expect(user.enroll_two_factor!(user.current_otp)).to be_nil
+      end
+      expect(user.reload.invalidate_otp_backup_code!(codes.first)).to be(true)
+    end
+
     it "returns nil and stays off for a wrong code or a missing secret" do
       expect(user.enroll_two_factor!("123456")).to be_nil
 
@@ -82,7 +92,7 @@ RSpec.describe SignInCredentials, type: :model do
 
     user.anonymize!
 
-    expect(user.reload).to have_attributes(encrypted_password: "", otp_secret: nil, otp_required_for_login: false,
+    expect(user.reload).to have_attributes(encrypted_password: "", otp_secret: nil, two_factor_enrolled?: false,
                                            otp_backup_codes: nil, login_code_digest: nil)
   end
 end

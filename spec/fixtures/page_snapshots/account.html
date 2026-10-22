@@ -644,6 +644,16 @@
 
   
 
+  <div class="backup-codes-reset">
+  <h2>Backup codes</h2>
+  <p>Lost your backup codes, or used most of them? Enter a code from your authenticator app to make ten new ones. The old ones stop working.</p>
+  <form action="/backup_codes" accept-charset="UTF-8" method="post">
+    <label for="code">6-digit code from your authenticator app</label>
+    <input inputmode="numeric" pattern="[0-9]*" maxlength="6" required="required" autocomplete="one-time-code" size="6" type="text" name="code" id="code" />
+    <input type="submit" name="commit" value="Make new backup codes" class="btn btn-ghost" data-disable-with="Make new backup codes" />
+</form></div>
+
+
   <div class="api-usage">
   <h2>API usage this month</h2>
     <p>No requests sent with your API key since September 1.</p>

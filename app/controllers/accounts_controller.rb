@@ -11,7 +11,7 @@ class AccountsController < ApplicationController
   # DELETE /account
   def destroy
     current_user.anonymize!
-    sign_out(current_user)
+    sign_out_all_scopes
     redirect_to new_user_session_path, notice: t("flash.accounts.deleted")
   end
 

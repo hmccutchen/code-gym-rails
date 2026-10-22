@@ -88,6 +88,7 @@ en:
       log_in: "Already have an account? Log in."
     rate_limited: "Too many sign-ups from this network. Try again later."
   passwords:
+    rate_limited: "Too many reset requests. Try again in a few minutes."
     new:
       page_title: "Reset your password"
       intro: "Enter your email and we'll send you a link to choose a new password. You'll still need your authenticator code to log in."
@@ -96,9 +97,17 @@ en:
       page_title: "Choose a new password"
       submit: "Save new password"
   confirmations:
+    rate_limited: "Too many confirmation emails requested. Try again in a few minutes."
     new:
       page_title: "Resend confirmation"
       submit: "Resend confirmation email"
+  backup_codes:
+    heading: "Backup codes"
+    intro: "Lost your backup codes, or used most of them? Enter a code from your authenticator app to make ten new ones. The old ones stop working."
+    code_label: "6-digit code from your authenticator app"
+    submit: "Make new backup codes"
+    code_rejected: "That code didn't match, so your backup codes are unchanged."
+    rate_limited: "Too many attempts. Try again in a few minutes."
   password_setups:
     edit:
       page_title: "Choose a password"
@@ -117,6 +126,7 @@ en:
       submit: "Turn on"
     code_rejected: "That code didn't match. Check that your phone's clock is right and try the newest code."
     rate_limited: "Too many attempts. Try again in a few minutes."
+    already_on: "Your authenticator is already on. If you didn't save your backup codes, make new ones below."
     backup_codes:
       page_title: "Save your backup codes"
       intro: "Each code logs you in once if you lose your phone. Save them somewhere safe now, because this is the only time they're shown."
@@ -125,13 +135,13 @@ en:
     page_title: "Trial"
     heading: "Trial"
     intro: "Enter the invite code you were given and choose a provider to try Coding Gym on a shared key."
-    start_intro: "Try Coding Gym on a shared key with the invite code you were given. You'll create an account next, and the trial starts the first time you log in."
+    start_intro: "Try Coding Gym on a shared key with the invite code you were given. You'll create an account next, and the trial starts when you confirm your email address."
     unavailable: "Trials aren't available right now. You can still use Coding Gym with an API key of your own."
     log_in_instead: "Have an account, or using your own key? Log in."
     code_label: "Invite code"
     provider_label: "Provider"
     provider_needed: "Choose the provider your trial runs on."
-    sign_up_to_start: "Create an account with the same email address. Your trial starts the first time you log in after confirming it."
+    sign_up_to_start: "Create an account with the same email address. Your trial starts when you follow the confirmation link."
     consent_label: "I understand what is sent and to whom."
     submit: "Start trial"
     started: "Your trial has started."
@@ -942,8 +952,8 @@ en:
         dismiss: "Dismiss"
   devise:
     failure:
-      invalid: "Incorrect email, password or code."
-      not_found_in_database: "Incorrect email, password or code."
+      invalid: "Incorrect email, password or code. Haven't set up your authenticator app yet? Use the link in your confirmation email, or reset your password."
+      not_found_in_database: "Incorrect email, password or code. Haven't set up your authenticator app yet? Use the link in your confirmation email, or reset your password."
       unauthenticated: "Log in first."
       unconfirmed: "Confirm your email address first. The link is in the email we sent you."
       inactive: "This account can't log in."
@@ -954,8 +964,9 @@ en:
     registrations:
       signed_up_but_unconfirmed: "We've emailed you a confirmation link. Follow it to activate your account, then log in."
     confirmations:
-      confirmed: "Your email address is confirmed. Log in to set up your authenticator app."
+      confirmed: "Your email address is confirmed. Now set up your authenticator app."
       send_paranoid_instructions: "If that address has an account waiting for confirmation, we've emailed it a new link."
     passwords:
       send_paranoid_instructions: "If that address has an account, we've emailed it a link to reset the password."
+      updated: "Your password has been changed. Now set up your authenticator app."
       updated_not_active: "Your password has been changed. Log in with it and your authenticator code."
