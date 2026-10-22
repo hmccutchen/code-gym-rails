@@ -10,6 +10,7 @@
   .judge-solve .flag { color: var(--red); font-weight: 600; font-size: .85rem; }
   .judge-solve .side-by-side { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
   .judge-solve .verdict-form { display: grid; gap: .5rem; margin-top: .75rem; max-width: 36rem; }
+  .withheld-note { display: block; color: var(--muted); font-size: .8rem; }
   .judge-solve-waiting { color: var(--muted); font-size: .85rem; margin: .3rem 0; }
 </style>
 
@@ -19,7 +20,8 @@
 
 <div class="section">
   <p><%= t("admin.judge_solves.index.intro") %></p>
-  <p class="withheld-count"><strong><%= t("admin.judge_solves.index.withheld", count: @counts.withheld) %></strong></p>
+  <p class="withheld-count"><strong><%= t("admin.judge_solves.index.withheld", count: @counts.withheld) %></strong>
+    <span class="withheld-note"><%= t("admin.judge_solves.index.withheld_explained") %></span></p>
 
   <h2><%= t("admin.judge_solves.index.outcomes_heading") %></h2>
   <table class="solve-counts outcome-counts">
@@ -65,21 +67,21 @@
   <div class="solve-filters">
     <span><%= t("admin.judge_solves.index.filters.source") %>:</span>
     <% JudgeSolve::Listing::SOURCE_FILTERS.each_key do |source| %>
-      <%= link_to t("admin.judge_solves.index.sources.#{source}"), admin_judge_solves_path(@listing.filters.merge(source: source)), class: ("current" if @listing.source == source) %>
+      <%= link_to t("admin.judge_solves.index.sources.#{source}"), admin_judge_solves_path(@listing.filters(page: 1).merge(source: source)), class: ("current" if @listing.source == source) %>
     <% end %>
   </div>
   <div class="solve-filters">
     <span><%= t("admin.judge_solves.index.filters.show") %>:</span>
     <% JudgeSolve::Listing::SHOWS.each do |show| %>
-      <%= link_to t("admin.judge_solves.index.shows.#{show}"), admin_judge_solves_path(@listing.filters.merge(show: show)), class: ("current" if @listing.show == show) %>
+      <%= link_to t("admin.judge_solves.index.shows.#{show}"), admin_judge_solves_path(@listing.filters(page: 1).merge(show: show)), class: ("current" if @listing.show == show) %>
     <% end %>
     <% if @listing.matched_sample? %><span><%= t("admin.judge_solves.index.filters.sample_size", n: @listing.n) %></span><% end %>
   </div>
   <div class="solve-filters">
     <span><%= t("admin.judge_solves.index.filters.call") %>:</span>
-    <%= link_to t("admin.judge_solves.index.filters.any_call"), admin_judge_solves_path(@listing.filters.except(:call)), class: ("current" if @listing.call.nil?) %>
+    <%= link_to t("admin.judge_solves.index.filters.any_call"), admin_judge_solves_path(@listing.filters(page: 1).except(:call)), class: ("current" if @listing.call.nil?) %>
     <% JudgeSolve::Listing::CALL_FILTERS.each do |call| %>
-      <%= link_to t("admin.judge_solves.calls.#{call}"), admin_judge_solves_path(@listing.filters.merge(call: call)), class: ("current" if @listing.call == call) %>
+      <%= link_to t("admin.judge_solves.calls.#{call}"), admin_judge_solves_path(@listing.filters(page: 1).merge(call: call)), class: ("current" if @listing.call == call) %>
     <% end %>
   </div>
 
@@ -90,10 +92,21 @@
     <%= render "entry", solve: solve, listing: @listing %>
   <% end %>
 
+  <% if @listing.page_count > 1 %>
+    <nav class="solve-filters pagination" aria-label="<%= t("admin.judge_solves.index.pages_label") %>">
+      <% if @listing.page > 1 %><%= link_to t("admin.judge_solves.index.newer"), admin_judge_solves_path(@listing.filters(page: @listing.page - 1)), rel: "prev" %><% end %>
+      <span><%= t("admin.judge_solves.index.page", page: @listing.page, last: @listing.page_count) %></span>
+      <% if @listing.page < @listing.page_count %><%= link_to t("admin.judge_solves.index.older"), admin_judge_solves_path(@listing.filters(page: @listing.page + 1)), rel: "next" %><% end %>
+    </nav>
+  <% end %>
+
   <% if @listing.waiting.any? %>
     <h2><%= t("admin.judge_solves.index.waiting_heading") %></h2>
-    <% @listing.waiting.each do |solve| %>
-      <%= render "waiting", solve: solve %>
+    <% @listing.waiting.each do |placeholder| %>
+      <%= render "waiting", placeholder: placeholder %>
+    <% end %>
+    <% if (beyond = @listing.waiting_beyond_limit).positive? %>
+      <p class="judge-solve-waiting waiting-more"><%= t("admin.judge_solves.index.waiting_more", count: beyond) %></p>
     <% end %>
   <% end %>
 </div>

@@ -42,11 +42,15 @@ RSpec.describe "Admin::JudgeSolves", type: :request do
 
   def page = Nokogiri::HTML(response.body)
 
-  def withheld_line = page.at_css(".withheld-count").text
+  def withheld_line = page.at_css(".withheld-count strong").text
+
+  def placeholders = page.css(".judge-solve-waiting:not(.waiting-more)").map { |node| node.text.squish }
+
+  def placeholder_text(solve) = "#{solve.created_at.to_date.iso8601} · #{solve.source} · #{solve.rung} · waiting for the engineer's review"
 
   def expect_hidden(solve, tag)
     expect(entry(solve)).to be_nil
-    expect(page.at_css("##{ActionView::RecordIdentifier.dom_id(solve)}").text).to include("waiting for the engineer's review")
+    expect(placeholders).to include(placeholder_text(solve))
     expect(response.body).not_to include("Deciding #{tag}", "piece_a_#{tag}", "piece_b_#{tag}", "Title #{tag}",
                                          "Scenario #{tag}", "Principle #{tag}", "Fails #{tag}")
     expect(page.css("form.verdict-form").map { |form| URI(form["action"]).path }).not_to include(admin_judge_solve_path(solve))
@@ -71,8 +75,7 @@ RSpec.describe "Admin::JudgeSolves", type: :request do
 
       expect_hidden(live, "live")
       expect_hidden(replay, "replay")
-      expect(page.at_css("##{ActionView::RecordIdentifier.dom_id(live)}").text.squish)
-        .to eq("#{live.created_at.to_date.iso8601} · live · senior · waiting for the engineer's review")
+      expect(placeholders).to contain_exactly(placeholder_text(live), placeholder_text(replay))
     end
 
     it "hides a live row whose shipped is false by accident, with its key and pick nowhere in the body" do
@@ -228,6 +231,62 @@ RSpec.describe "Admin::JudgeSolves", type: :request do
       expect(ids).to eq([ reverted, new_mismatch, old_mismatch, matched ].map { |s| ActionView::RecordIdentifier.dom_id(s) })
     end
 
+    it "shows one placeholder and one withheld section for a hidden section with an edit, as for one without" do
+      solve!("draft", shipped: false)
+      solve!("edit", edit_check: true)
+      plain_day = exercise_for(member, Date.yesterday)
+      plain = solve!("plain", on: plain_day)
+      login_as(admin)
+
+      get admin_judge_solves_path(show: "all")
+
+      expect(placeholders.size).to eq(2)
+      expect(placeholders).to include(placeholder_text(plain))
+      expect(withheld_line).to eq("Withheld pending review: 2")
+    end
+
+    it "caps the placeholders and says how many more are waiting" do
+      stub_const("JudgeSolve::Listing::WAITING_LIMIT", 2)
+      4.times { |offset| solve!("w#{offset}", on: exercise_for(member, Date.current - offset.days)) }
+      login_as(admin)
+
+      get admin_judge_solves_path
+
+      expect(placeholders.size).to eq(2)
+      expect(page.at_css(".waiting-more").text).to eq("and 2 more")
+    end
+
+    describe "paging" do
+      before do
+        stub_const("JudgeSolve::Listing::PAGE_SIZE", 2)
+        review!
+        3.times { |offset| solve!("p#{offset}", created_at: offset.minutes.ago) }
+        login_as(admin)
+      end
+
+      def listed = page.css("article.judge-solve").size
+
+      it "shows a fixed page of entries and links to the next with the filters kept" do
+        get admin_judge_solves_path(source: "real")
+
+        expect(listed).to eq(2)
+        expect(page.at_css("nav.pagination a[rel='next']")["href"]).to eq(admin_judge_solves_path(source: "real", show: "mismatches", page: 2))
+
+        get admin_judge_solves_path(source: "real", page: 2)
+
+        expect(listed).to eq(1)
+        expect(page.at_css("nav.pagination").text).to include("Page 2 of 2")
+        expect(page.at_css("a[rel='prev']")["href"]).to eq(admin_judge_solves_path(source: "real", show: "mismatches"))
+      end
+
+      it "drops the page when a filter changes and reads an out-of-range page as the last" do
+        get admin_judge_solves_path(page: 99)
+
+        expect(listed).to eq(1)
+        expect(page.css(".solve-filters a").map { |link| link["href"] }).to all(satisfy { |href| !href.include?("page=") })
+      end
+    end
+
     describe "filters" do
       let!(:live_mismatch) { solve!("live_mismatch") }
       let!(:live_matched) { solve!("live_matched", matched: true, judge_pick: "a", human_call: "key_right") }
@@ -317,6 +376,17 @@ RSpec.describe "Admin::JudgeSolves", type: :request do
         expect(page.css(".judge-solve-waiting")).to be_empty
       end
 
+      it "draws nothing when the call filter names a call, and the usual sample for uncalled" do
+        review!
+        sampled_row = solve!("eligible", matched: true, judge_pick: "a")
+
+        get admin_judge_solves_path(show: "matched_sample", call: "key_right")
+        expect(sampled).to be_empty
+
+        get admin_judge_solves_path(show: "matched_sample", call: "uncalled")
+        expect(sampled).to eq([ ActionView::RecordIdentifier.dom_id(sampled_row) ])
+      end
+
       it "respects n and clamps it" do
         review!
         4.times { |i| solve!("m#{i}", matched: true, judge_pick: "a") }
@@ -335,7 +405,7 @@ RSpec.describe "Admin::JudgeSolves", type: :request do
     describe "header counts" do
       it "leaves hidden rows out of every count and counts them only on the withheld line" do
         solve!("hidden")
-        solve!("hidden_matched", matched: true, judge_pick: "a")
+        solve!("hidden_matched", on: exercise_for(member, Date.yesterday), matched: true, judge_pick: "a")
         login_as(admin)
 
         get admin_judge_solves_path
@@ -435,14 +505,38 @@ RSpec.describe "Admin::JudgeSolves", type: :request do
                                             shipped: true, source: "live")
     end
 
-    it "clears the call when the blank option is chosen" do
-      row.update!(human_call: "key_right")
+    it "clears the call when the blank option is chosen, stamping the time" do
+      row.update_columns(human_call: "key_right", human_called_at: 2.days.ago)
       review!
       login_as(admin)
 
-      patch admin_judge_solve_path(row), params: { judge_solve: { human_call: "" } }
+      patch admin_judge_solve_path(row), params: { judge_solve: { human_call: "", human_note: "" } }
 
-      expect(row.reload.human_call).to be_nil
+      expect(row.reload).to have_attributes(human_call: nil, human_note: nil)
+      expect(row.human_called_at).to be_within(5.seconds).of(Time.current)
+    end
+
+    it "leaves the call time alone on a note-only save" do
+      called_at = 2.days.ago.change(usec: 0)
+      row.update_columns(human_call: "key_right", human_called_at: called_at)
+      review!
+      login_as(admin)
+
+      patch admin_judge_solve_path(row), params: { judge_solve: { human_call: "key_right", human_note: "second look" } }
+
+      expect(row.reload).to have_attributes(human_call: "key_right", human_note: "second look", human_called_at: called_at)
+    end
+
+    it "keeps the page in the redirect" do
+      stub_const("JudgeSolve::Listing::PAGE_SIZE", 1)
+      solve!("other", created_at: 1.day.ago)
+      review!
+      login_as(admin)
+
+      patch admin_judge_solve_path(row, page: 2), params: { judge_solve: { human_call: "key_right" } }
+
+      expect(response).to redirect_to(admin_judge_solves_path(source: "live", show: "mismatches", page: 2,
+                                                              anchor: ActionView::RecordIdentifier.dom_id(row)))
     end
   end
 end

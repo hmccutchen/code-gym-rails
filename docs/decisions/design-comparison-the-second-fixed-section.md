@@ -154,17 +154,23 @@ key the engineer has. `shipped` takes no part in the rule, so a wrong
 - The header counts readable rows only, by source: solved, matched,
   mismatched and unsolved; reverts by reason; and two call tables, one for
   mismatches and one for matched records. A call table counts each section
-  version once (rows sharing a `section_digest`, the latest call winning, under
-  that row's source) and leaves out unsolved rows and principal engineer,
-  where disagreement is already tolerated. One more line, "withheld pending
-  review: n", counts hidden rows with no breakdown at all. The page computes
+  version once (rows sharing a `section_digest`; a row with a call beats one
+  without, then the latest call wins, and the version counts under that row's
+  source) and leaves out unsolved rows and principal engineer, where
+  disagreement is already tolerated. `human_called_at` moves only when the
+  call itself changes, so saving a note never reorders that pick. One more
+  line, "withheld pending review: n", counts hidden sections (one per
+  exercise, section and set, however many judge passes it took) with no
+  breakdown at all. The page computes
   no bound and names no branch; you apply the spec's decision rule yourself,
   from the live and replay columns together.
 - `source` picks live (the default, what shipped), real (live plus replay,
   what the decision rule counts), replay, synthetic or all. `show` picks
   mismatches and reverts (the default), reverts only, a random matched
   sample of `n` uncalled records (15 by default, never synthetic), or all.
-  `call` narrows to uncalled records or one call.
+  `call` narrows to uncalled records or one call; the matched sample is
+  empty under a named call, since its pool is uncalled records. Entries come
+  25 to a page.
 - Entries list reverted edits first, then mismatches, newest first. Each
   shows its metadata, the problem, both pieces, the key, the judge's pick
   and a form offering only the calls that fit (`key_right`, `judge_right` or
@@ -172,9 +178,10 @@ key the engineer has. `shipped` takes no part in the rule, so a wrong
   `both_defensible` on a match) plus a note. A reverted edit shows the
   shipped original's prose beside the edited prose once both are readable,
   and a live row links to its replay and back.
-- A hidden row shows only as "waiting for the engineer's review" with its
-  date, source and rung, in a list of its own that the outcome filters and
-  ordering don't touch, and a save on it is a 404.
+- A hidden section shows only as one "waiting for the engineer's review"
+  line per source with its date, source and rung, in a list of its own that
+  the outcome filters and ordering don't touch, capped with an "and n more"
+  line. A save on a hidden row is a 404.
 
 **The reference stays closed.** A concept's reference opens on its own on
 first exposure for every other kind; for this one it names and illustrates

@@ -29,9 +29,20 @@ would leak the key. A missing `never_shown_reason` only hides a row that was
 safe to show, which costs nothing until the day is reviewed.
 
 `JudgeSolve.withheld` is the complement: every row `readable` leaves out.
-The admin page uses it twice, for the bare "withheld pending review" count
-and for the placeholders, which load only the id, source, rung and creation
-time.
+The admin page reads it per section (`WITHHELD_SECTION`: exercise, section
+and set), never per row. A section the judge edited has two hidden rows, the
+pre-edit draft and the edit check, and a per-row count would show that an
+edit happened. `.withheld_section_count` is the header's number, and
+`JudgeSolve::Listing` groups the placeholders the same way.
+
+## `human_called_at` moves only with the call
+
+`before_update` stamps `human_called_at` when `human_call` changes, clearing
+it included, and at no other time. The admin header picks one call per
+section version by the latest `human_called_at`, so a stamp on a note-only
+save would let an edited note on a replay row outrank the real call on its
+live twin. The stamp is on update only, so a row created with a call keeps
+the time it was given.
 
 ## Why `never_shown_reason` leaves out the edit cases
 

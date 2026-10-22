@@ -34,7 +34,7 @@
 
   <% ExerciseSection::DesignComparison::PIECES.each do |piece| %>
     <h4><%= t("admin.judge_solves.entry.piece", piece: piece.upcase) %></h4>
-    <pre class="snippet"><%= highlighted_code(section["piece_#{piece}"], solve.daily_exercise&.language) %></pre>
+    <pre class="snippet"><%= highlighted_code(section["piece_#{piece}"], listing.language_for(solve)) %></pre>
   <% end %>
 
   <p class="answer-key"><strong><%= t("admin.judge_solves.entry.key", better: solve.key_better.upcase) %></strong></p>

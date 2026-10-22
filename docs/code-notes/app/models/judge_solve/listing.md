@@ -9,21 +9,35 @@ it.
 `#entries` reads `JudgeSolve.readable` and is the only source of row content
 on the page. The `show` and `call` filters and the order apply to it alone.
 
-`#waiting` lists `JudgeSolve.withheld` rows as "waiting for the engineer's
-review". It loads only `PLACEHOLDER_COLUMNS` (id, source, rung, created_at),
-so no piece, key or pick is ever read into memory for a hidden row. It's
-filtered by source and nothing else. If the `show=mismatches` filter applied
-to hidden rows, a placeholder showing up under it would say that today's
-section was a mismatch. The waiting list is ordered by creation time only,
-for the same reason: ordering reverted edits first would reveal a revert.
+`#waiting` lists withheld sections as "waiting for the engineer's review".
+It groups `JudgeSolve.withheld` rows by `JudgeSolve::WITHHELD_SECTION`
+(exercise, section and set) and by source, and plucks only the source, the
+earliest row's rung and the earliest creation time into a `Placeholder`. No
+piece, key or pick is ever read into memory for a hidden row.
 
-The waiting list is left off for `matched_sample`, which draws readable rows
+It shows one placeholder per section, not per row. A section the judge
+edited has two hidden rows, the pre-edit draft and the edit check, so a
+placeholder per row would show that the judge asked for an edit. Grouped
+this way, an edited section and an unedited one look the same.
+
+The placeholders are filtered by source and nothing else. If the
+`show=mismatches` filter applied to hidden rows, a placeholder showing up
+under it would say that today's section was a mismatch. They're ordered by
+time only, for the same reason: ordering reverted edits first would reveal a
+revert. The list is left off for `matched_sample`, which draws readable rows
 only, and for a `call` filter naming a call, since a hidden row has none.
 
-The list still shows one placeholder per hidden row. A day whose design
-comparison was edited has two hidden rows (the pre-edit draft and the edit
-check), so the count of placeholders shows that an edit happened. It doesn't
-show whether the edit was kept or why, or anything about the key.
+## Bounds
+
+Entries come `PAGE_SIZE` to a page, offset-paged like `/history`, with the
+`page` parameter carried through the filters and the redirect after a save.
+A filter link drops it, so changing a filter starts again at page 1. An
+out-of-range page reads as the last page. The placeholders stop at
+`WAITING_LIMIT`, and the page says how many more are waiting.
+
+The entry view needs only the exercise's language for highlighting, so
+`#language_for` plucks `id` and `language` for the page's exercises in one
+query rather than loading whole exercise rows, whose `problem_set` is large.
 
 ## What `show=mismatches` holds
 
@@ -38,7 +52,9 @@ narrows to the reverts; `show=all` adds matched and unsolved rows.
 `ORDER BY random() LIMIT n` over readable, matched, uncalled rows below
 principal engineer, from the source filter minus synthetic. A reload can
 draw differently, and a called row leaves the pool. `n` defaults to 15 and
-is clamped to 1..50, so a typo can't ask for the whole table.
+is clamped to 1..50, so a typo can't ask for the whole table. The pool is
+uncalled rows, so a `call` filter naming a call draws nothing, and
+`call=uncalled` draws the usual sample. The sample is never paged.
 
 ## Companions: the shipped original and the replay link
 

@@ -54,6 +54,15 @@ RSpec.describe JudgeSolve::Counts, type: :model do
       expect(after.withheld).to eq(1)
     end
 
+    it "counts a hidden section once, whether or not the judge edited it" do
+      solve!("draft", shipped: false)
+      solve!("edit", edit_check: true)
+      solve!("replayed", source: "replay")
+      solve!("plain", on: exercise_on(Date.yesterday))
+
+      expect(counts.withheld).to eq(2)
+    end
+
     it "leaves a hidden reverted edit out of the revert counts" do
       solve!("edited", edit_check: true, shipped: false, edit_reverted: true, revert_reason: "solve_mismatch")
 
@@ -63,8 +72,8 @@ RSpec.describe JudgeSolve::Counts, type: :model do
 
     it "carries no breakdown on the withheld line" do
       solve!("hidden_live")
-      solve!("hidden_replay", source: "replay", matched: true, judge_pick: "a")
-      solve!("hidden_principal", rung: "principal_engineer")
+      solve!("hidden_replay", on: exercise_on(Date.yesterday), source: "replay", matched: true, judge_pick: "a")
+      solve!("hidden_principal", on: exercise_on(Date.current - 2.days), rung: "principal_engineer")
 
       expect(counts.withheld).to eq(3)
       expect(described_class.public_instance_methods(false)).to contain_exactly(:outcome, :reverted, :withheld, :mismatch_call, :matched_call)
@@ -114,6 +123,28 @@ RSpec.describe JudgeSolve::Counts, type: :model do
       solve!("same", source: "replay")
 
       expect(counts.mismatch_call("live", "both_defensible")).to eq(1)
+      expect(counts.mismatch_call("replay", "uncalled")).to eq(0)
+    end
+
+    it "keeps a version under the live row's call after a note-only save on its replay row" do
+      solve!("same", human_call: "key_right", human_called_at: 1.day.ago)
+      replay = solve!("same", source: "replay")
+
+      replay.update!(human_note: "looked again")
+
+      expect(replay.reload.human_called_at).to be_nil
+      expect(counts.mismatch_call("live", "key_right")).to eq(1)
+      expect(counts.mismatch_call("replay", "uncalled")).to eq(0)
+    end
+
+    it "keeps a version under the live row's call after the replay row's call is cleared" do
+      solve!("same", human_call: "key_right", human_called_at: 1.day.ago)
+      replay = solve!("same", source: "replay", human_call: "judge_right", human_called_at: 2.days.ago)
+
+      replay.update!(human_call: nil)
+
+      expect(replay.reload.human_called_at).to be_within(5.seconds).of(Time.current)
+      expect(counts.mismatch_call("live", "key_right")).to eq(1)
       expect(counts.mismatch_call("replay", "uncalled")).to eq(0)
     end
 

@@ -13,8 +13,11 @@ generated, an admin who is also an engineer would learn that today's section
 was a mismatch before answering it. So the outcome, revert and call counts
 all start from `JudgeSolve.readable`, and a hidden row moves none of them.
 
-The one number about hidden rows is `#withheld`, a plain count of
-`JudgeSolve.withheld` with no source, outcome or rung. It keeps the
+The one number about hidden rows is `#withheld`, the number of hidden
+sections (`JudgeSolve.withheld_section_count`, one per exercise, section and
+set) with no source, outcome or rung. It counts sections rather than rows
+because an edited section has two hidden rows, so a row count would reveal
+the edit. It keeps the
 denominator honest: you can see that rows exist which the tables leave out,
 without learning anything about them. `#withheld` takes no arguments, so
 nothing can ask it for a breakdown, and `counts_spec` holds that.
@@ -23,9 +26,13 @@ nothing can ask it for a breakdown, and `counts_spec` holds that.
 
 The decision rule's unit is a distinct section version. A live solve and its
 replay share a `section_digest`, and they count once. `#latest_call_per_version`
-does this in SQL with `DISTINCT ON (section_digest)`, ordered so that the row
-with the latest `human_called_at` wins and a called row beats an uncalled one
-(`NULLS LAST`). Ties fall to the highest id, so the result is stable.
+does this in SQL with `DISTINCT ON (section_digest)`, ordered so that a row
+with a call beats one without (`human_call IS NULL` sorts false first), then
+the latest `human_called_at` wins. Ties fall to the highest id, so the result
+is stable. Preferring a call first means clearing the call on one row of a
+version never hides the call on its twin. `human_called_at` moves only when
+the call changes (see `docs/code-notes/app/models/judge_solve.md`), so
+editing a note never reorders the pick either.
 
 The winning row's `source` is the source the version counts under. A version
 judged live and replayed therefore appears in one column only, and live plus
