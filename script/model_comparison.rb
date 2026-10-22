@@ -171,8 +171,7 @@ class ModelComparison
   private
 
   def judge_shape_route(provider)
-    service = provider[:service]
-    service::MODEL_FOR_PURPOSE.fetch("judge_section", service::DEFAULT_ROUTE).merge(provider.fetch(:route, {}))
+    provider[:service].new(@api_key).send(:route_for, "judge_section").merge(provider.fetch(:route, {}))
   end
 
   def judge_shape_row(service, user, fixture)
