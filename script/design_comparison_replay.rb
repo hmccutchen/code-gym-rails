@@ -55,12 +55,13 @@ class DesignComparisonReplay
   end
 
   def candidates
-    section = "problem_set -> #{quote(KIND.key)}"
-    scope = DailyExercise.where("#{section} -> #{quote(KIND::ANSWER_KEY_FIELD)} ->> 'better' IN (:pieces)", pieces: KIND::PIECES)
-                         .where("#{section} ->> 'pitched_at' IN (:rungs)", rungs: KindDifficulty::LEVELS)
-                         .where.not("dropped_sections ? :key", key: KIND.key)
-    PIECE_FIELDS.reduce(scope) { |found, field| found.where("coalesce(#{section} ->> #{quote(field)}, '') <> ''") }
-                .order(:date, :id)
+    scope = DailyExercise.where("problem_set -> :kind -> :key_field ->> 'better' IN (:pieces)",
+                                kind: KIND.key, key_field: KIND::ANSWER_KEY_FIELD, pieces: KIND::PIECES)
+                         .where("problem_set -> :kind ->> 'pitched_at' IN (:rungs)", kind: KIND.key, rungs: KindDifficulty::LEVELS)
+                         .where.not("dropped_sections ? :kind", kind: KIND.key)
+    PIECE_FIELDS.reduce(scope) do |found, field|
+      found.where("coalesce(problem_set -> :kind ->> :field, '') <> ''", kind: KIND.key, field: field)
+    end.order(:date, :id)
   end
 
   def pending_exercises
@@ -142,8 +143,6 @@ class DesignComparisonReplay
               "#{@usage.sum { |call| call[:tokens_in] }} in / #{@usage.sum { |call| call[:tokens_out] }} out tokens"
     @out.puts "Read the agreement on the admin page, which hides each record until its day is reviewed."
   end
-
-  def quote(value) = DailyExercise.connection.quote(value)
 
   def claude_service
     raise MissingKey, "ANTHROPIC_API_KEY is not set. Calls are billed to it, never to a user's stored key." unless @api_key
