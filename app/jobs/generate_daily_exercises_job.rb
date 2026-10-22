@@ -4,7 +4,7 @@ class GenerateDailyExercisesJob < ApplicationJob
   limits_concurrency key: ->(args = {}) { args[:user_id] },
                      group: ->(args = {}) { self.class.name if args[:user_id] },
                      to: 1, on_conflict: :discard,
-                     duration: AiService::JUDGED_GENERATION_BUDGET.seconds
+                     duration: CallProfiles::JUDGED_GENERATION_BUDGET.seconds
 
   def perform(user_id: nil)
     if user_id

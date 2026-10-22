@@ -48,7 +48,7 @@ Prettier's cap; it is a margin, not a measured figure. The window comes to
 `/regenerate` refused, and the page on its generating state, for that long.
 
 The generating poller sizes its attempts from the larger of this window and
-`AiService::JUDGED_GENERATION_BUDGET`, so it keeps polling for the whole
+`CallProfiles::JUDGED_GENERATION_BUDGET`, so it keeps polling for the whole
 window.
 
 ## `#regeneration_offered?`

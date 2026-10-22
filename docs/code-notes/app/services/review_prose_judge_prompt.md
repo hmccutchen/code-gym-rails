@@ -1,6 +1,6 @@
 # `ReviewProseJudgePrompt`
 
-The prompt for the optional second pass that rewords a graded review's prose, moved out of `AiService` (#431). `AiService#judge_review_prose` still projects the review, makes the call and parses the verdict against that same projection. The token cap and the read timeout stay on `AiService` as call settings. `ReviewProseJudge` is the switch that decides whether the pass runs at all.
+The prompt for the optional second pass that rewords a graded review's prose, moved out of `AiService` (#431). `AiService#judge_review_prose` still projects the review, makes the call and parses the verdict against that same projection. Its token cap and read timeout are call settings, in `CallProfiles`. `ReviewProseJudge` is the switch that decides whether the pass runs at all.
 
 ## `.generate`
 

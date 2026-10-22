@@ -140,7 +140,7 @@ A rejected section gets `DailyPlan::DAILY_JUDGE_RETRIES` (2) retries when
 its kind is one of the plan's daily kinds and `ROTATED_JUDGE_RETRIES` (1)
 otherwise (`DailyPlan::Result#judge_retries`). The extra retry follows the
 daily place, not the kind, because every set is built around those
-sections. `AiService::JUDGED_GENERATION_BUDGET` reads the larger of the two.
+sections. `CallProfiles::JUDGED_GENERATION_BUDGET` reads the larger of the two.
 
 ## Which kinds count as offered
 

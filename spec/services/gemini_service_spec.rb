@@ -61,8 +61,8 @@ RSpec.describe GeminiService do
 
     it "bounds the request so a hung provider cannot block a thread forever" do
       conn = service.send(:build_connection)
-      expect(conn.options.open_timeout).to eq(AiService::OPEN_TIMEOUT)
-      expect(conn.options.timeout).to eq(AiService::READ_TIMEOUT)
+      expect(conn.options.open_timeout).to eq(CallProfiles::OPEN_TIMEOUT)
+      expect(conn.options.timeout).to eq(CallProfiles::READ_TIMEOUT)
     end
   end
 
@@ -86,9 +86,9 @@ RSpec.describe GeminiService do
       attempts = []
       service.instance_variable_set(:@conn, recording_connection(attempts, raise_timeout: false))
 
-      call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
+      call_provider(service, system: "sys", prompt: "p", read_timeout: CallProfiles::GENERATION_READ_TIMEOUT)
 
-      expect(attempts).to eq([ AiService::GENERATION_READ_TIMEOUT ])
+      expect(attempts).to eq([ CallProfiles::GENERATION_READ_TIMEOUT ])
     end
 
     # A timed-out generation was very likely finished and billed, so retrying pays for it again.
@@ -97,7 +97,7 @@ RSpec.describe GeminiService do
       service.instance_variable_set(:@conn, recording_connection(attempts))
 
       expect {
-        call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
+        call_provider(service, system: "sys", prompt: "p", read_timeout: CallProfiles::GENERATION_READ_TIMEOUT)
       }.to raise_error(ProviderError::TimeoutError, /Network error calling Gemini/)
 
       expect(attempts.size).to eq(1)
@@ -109,10 +109,10 @@ RSpec.describe GeminiService do
       service.instance_variable_set(:@conn, recording_connection(attempts))
 
       expect {
-        call_provider(service, system: "sys", prompt: "p", read_timeout: AiService::REVIEW_READ_TIMEOUT)
+        call_provider(service, system: "sys", prompt: "p", read_timeout: CallProfiles::REVIEW_READ_TIMEOUT)
       }.to raise_error(ProviderError::TimeoutError, /Network error calling Gemini/)
 
-      expect(attempts).to eq([ AiService::REVIEW_READ_TIMEOUT ])
+      expect(attempts).to eq([ CallProfiles::REVIEW_READ_TIMEOUT ])
     end
 
     it "still retries a short call that times out" do
@@ -326,14 +326,14 @@ RSpec.describe GeminiService do
       expect(fake_conn).to receive(:post) do |_url, body|
         parsed = JSON.parse(body)
         expect(parsed["generation_config"]).to eq(
-          "max_output_tokens" => AiService::DUCK_RESPONSE_MAX_TOKENS,
+          "max_output_tokens" => CallProfiles::DUCK_RESPONSE_MAX_TOKENS,
           "thinking_level"    => GeminiService::MINIMAL_THINKING_LEVEL
         )
         expect(parsed).not_to have_key("max_output_tokens")
         fake_response
       end
 
-      call_provider(service, system: "sys", prompt: "p", max_tokens: AiService::DUCK_RESPONSE_MAX_TOKENS)
+      call_provider(service, system: "sys", prompt: "p", max_tokens: CallProfiles::DUCK_RESPONSE_MAX_TOKENS)
     end
 
     it "asks for minimal thinking whenever it caps the budget, so the cap is not spent reasoning" do

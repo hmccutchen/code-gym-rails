@@ -13,7 +13,7 @@ replayed exactly as received, and only assistant *text* is stored here).
 `history` began as an optional keyword on `#call`, added after
 `cache_system:` and `max_tokens:`. All three are now fields of
 `AiService::Request`: `cache_system` and `max_tokens` are set per purpose in
-`AiService::CALL_PROFILES`, and `history` is a per-call value. The
+`CallProfiles::BY_PURPOSE`, and `history` is a per-call value. The
 additive-keyword pattern was replaced because each new keyword meant editing
 five `app/` files and every spec that overrode `#call`, while the settings are
 facts about a purpose. Every other caller leaves `history` empty and is
