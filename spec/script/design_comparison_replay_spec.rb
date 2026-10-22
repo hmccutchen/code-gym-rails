@@ -59,7 +59,8 @@ RSpec.describe DesignComparisonReplay do
       expect(out.string).to include("design comparisons to judge: 3", "week of 2026-09-28: 2", "week of 2026-10-05: 1",
                                     "user #{user.id}: 2", "user #{other_user.id}: 1",
                                     "first date: 2026-10-01, last date: 2026-10-06",
-                                    "cost bound: at most $0.06 (3 judge calls at $0.019 each)")
+                                    "worst-case bound: $0.06 (3 × $0.019 per judge call; claude-sonnet-5-5 at list price " \
+                                    "with 3500 input tokens estimated and its full #{AiService::JUDGE_MAX_TOKENS}-token output cap)")
       expect_no_section_text
     end
   end
@@ -153,21 +154,61 @@ RSpec.describe DesignComparisonReplay do
       expect(JudgeSolve.count).to eq(0)
     end
 
-    it "records a failed call as unsolved and carries on with the next section" do
-      first = exercise_on(Date.current - 1)
-      second = exercise_on(Date.current)
+    it "records the judge's own failures as unsolved and carries on with the next section" do
+      exercises = Array.new(5) { |offset| exercise_on(Date.current - offset) }.reverse
       judge_replies << ->(_section) { raise JudgeVerdict::Invalid, "unknown status \"maybe\"" }
-      judge_replies << ->(_section) { raise ProviderError::RateLimitError, "SECRET_PROVIDER_BODY" }
+      judge_replies << ->(_section) { raise ProviderError::RefusalError, "SECRET_PROVIDER_BODY" }
+      judge_replies << ->(_section) { raise ProviderError::TruncatedResponseError, "SECRET_PROVIDER_BODY" }
+      judge_replies << ->(_section) { raise ProviderError::InvalidResponseError, "SECRET_PROVIDER_BODY" }
 
       replay.run
 
-      expect(first.judge_solves.sole).to have_attributes(source: "replay", matched: nil, judge_pick: nil, judge_status: nil,
-                                                         unsolved_reason: "invalid_output",
-                                                         unsolved_detail: "unknown status \"maybe\"", shipped: true)
-      expect(second.judge_solves.sole).to have_attributes(matched: nil, unsolved_reason: "rate_limit", unsolved_detail: nil)
-      expect(out.string).to include("unsolved (invalid_output)", "unsolved (rate_limit)", "recorded 2 (0 solved, 2 unsolved)")
+      expect(exercises.first.judge_solves.sole).to have_attributes(source: "replay", matched: nil, judge_pick: nil,
+                                                                   judge_status: nil, unsolved_reason: "invalid_output",
+                                                                   unsolved_detail: "unknown status \"maybe\"", shipped: true)
+      expect(exercises[1..3].map { |exercise| exercise.judge_solves.sole.unsolved_reason })
+        .to eq(%w[refusal truncated invalid_json])
+      expect(exercises[1..3].map { |exercise| exercise.judge_solves.sole.unsolved_detail }).to all(be_nil)
+      expect(exercises.last.judge_solves.sole.matched).to be(true)
+      expect(out.string).to include("unsolved (invalid_output)", "unsolved (refusal)", "recorded 5 (1 solved, 4 unsolved)")
       expect(out.string).not_to include("maybe")
       expect_no_section_text
+    end
+
+    [
+      [ ProviderError::BillingError, "out_of_credit" ], [ ProviderError::AuthenticationError, "authentication" ],
+      [ ProviderError::RateLimitError, "rate_limit" ], [ ProviderError::TimeoutError, "timeout" ],
+      [ ActiveRecord::ConnectionNotEstablished, "other" ], [ IOError, "other" ], [ SetupError, "other" ]
+    ].each do |error, reason|
+      it "stops on #{error.name}, records nothing for that section, and a re-run picks it up" do
+        first, second, third = Array.new(3) { |offset| exercise_on(Date.current - offset) }.reverse
+        judge_replies << ->(_section) { JudgeVerdict.new(status: :keep, solve: "a") }
+        judge_replies << ->(_section) { raise error, "SECRET_PROVIDER_BODY" }
+
+        replay.run
+
+        expect(judged.size).to eq(2)
+        expect(JudgeSolve.pluck(:daily_exercise_id)).to eq([ first.id ])
+        expect(out.string).to include("stopped at daily_exercise #{second.id}: provider call failed (#{reason})",
+                                      "1 of 3 recorded before it. Run again to continue.", "recorded 1 (1 solved, 0 unsolved)")
+        expect_no_section_text
+
+        replay.run
+
+        expect(JudgeSolve.where(source: "replay").pluck(:daily_exercise_id)).to contain_exactly(first.id, second.id, third.id)
+        expect(JudgeSolve.where(source: "replay")).to all(have_attributes(unsolved_reason: nil))
+      end
+    end
+
+    it "stops with the scrubbed message and the exercise id when a record is refused" do
+      first, second = Array.new(2) { |offset| exercise_on(Date.current - offset) }.reverse
+      allow(JudgeSolve).to receive(:record!).and_raise(JudgeSolve::RecordError, "judge_solves row refused: judge_solves_source")
+
+      replay.run
+
+      expect(judged.size).to eq(1)
+      expect(out.string).to include("stopped at daily_exercise #{first.id}: judge_solves row refused: judge_solves_source")
+      expect(out.string).not_to include("daily_exercise #{second.id}")
     end
     it "cuts a long refusal message to the live flow's limit" do
       exercise = exercise_on(Date.current)
@@ -203,7 +244,7 @@ RSpec.describe DesignComparisonReplay do
     end
 
     it "spreads the sections across the rungs and the vocabulary and records them with no user or exercise" do
-      replay.synthesize(user.id, 8)
+      replay.synthesize(user.id, 8, run: true)
 
       expect(drafts.map { |draft| draft[:rung] }.tally).to eq(KindDifficulty::LEVELS.index_with(2))
       KindDifficulty::LEVELS.each do |rung|
@@ -223,16 +264,120 @@ RSpec.describe DesignComparisonReplay do
     it "records nothing for a draft that ingest refused, and carries on" do
       allow_any_instance_of(ClaudeService).to receive(:retry_section).and_return(nil, section)
 
-      replay.synthesize(user.id, 2)
+      replay.synthesize(user.id, 2, run: true)
 
       expect(JudgeSolve.count).to eq(1)
       expect(out.string).to include("[1/2] junior", "no section drafted, nothing recorded", "recorded 1 (1 solved, 0 unsolved)")
     end
 
     it "aborts before any call when no key is set" do
-      expect { replay(key: nil).synthesize(user.id, 2) }.to raise_error(described_class::MissingKey)
+      expect { replay(key: nil).synthesize(user.id, 2, run: true) }.to raise_error(described_class::MissingKey)
       expect(drafts).to be_empty
       expect(JudgeSolve.count).to eq(0)
     end
+
+    it "prints the plan by rung and the worst-case bound, and calls nothing, without --run" do
+      prices      = ModelComparison::LIST_PRICE_PER_MILLION
+      draft_cost  = (10_000 * prices["claude-opus-5-5"][:input] + ClaudeService::MAX_TOKENS * prices["claude-opus-5-5"][:output]) / 1e6
+      judge_cost  = (3_500 * prices["claude-sonnet-5-5"][:input] + AiService::JUDGE_MAX_TOKENS * prices["claude-sonnet-5-5"][:output]) / 1e6
+      per_section = draft_cost + judge_cost
+
+      expect { replay(key: nil).synthesize(user.id, 6) }.not_to change { [ JudgeSolve.count, ApiUsage.count ] }
+
+      expect(drafts).to be_empty
+      expect(judged).to be_empty
+      expect(out.string).to include("synthetic design comparisons to draft: 6 (target 6, already recorded: 0)",
+                                    "rung junior: 2", "rung mid_level: 2", "rung senior: 1", "rung principal_engineer: 1",
+                                    "worst-case bound: $#{format('%.2f', 6 * per_section)} " \
+                                    "(6 × $#{format('%.3f', per_section)} per section; claude-opus-5-5 at list price with " \
+                                    "10000 input tokens estimated and its full #{ClaudeService::MAX_TOKENS}-token output cap, " \
+                                    "then claude-sonnet-5-5")
+      expect(out.string.index("rung junior")).to be < out.string.index("rung principal_engineer")
+    end
+
+    it "continues the plan from the synthetic records already written" do
+      replay.synthesize(user.id, 3, run: true)
+      first_run = drafts.dup
+
+      replay.synthesize(user.id, 5, run: true)
+
+      expect(JudgeSolve.where(source: "synthetic").count).to eq(5)
+      expect(drafts.drop(3).map { |draft| draft[:rung] }).to eq(%w[principal_engineer junior])
+      expect(drafts.drop(3)).not_to include(*first_run)
+      expect(out.string).to include("synthetic design comparisons to draft: 2 (target 5, already recorded: 3)")
+    end
+
+    it "stops on an infrastructure failure while drafting and records nothing for that slot" do
+      calls = 0
+      allow_any_instance_of(ClaudeService).to receive(:retry_section) do |_service, draft, kind, concept|
+        calls += 1
+        raise ActiveRecord::ConnectionNotEstablished if calls == 2
+
+        section(concept: concept, pitched_at: draft.difficulty.rung_for(kind, skill_level: draft.user.skill_level))
+      end
+
+      replay.synthesize(user.id, 4, run: true)
+
+      expect(calls).to eq(2)
+      expect(JudgeSolve.count).to eq(1)
+      expect(out.string).to include("stopped at mid_level", "provider call failed (other)")
+    end
+
+    it "plans and drafts on the user's own date, not the runner's" do
+      user.update!(time_zone: "Pacific/Kiritimati")
+      dates = []
+      allow(ForcedConceptDrafts).to receive(:rung_draft).and_wrap_original do |original, *args|
+        dates << Date.current
+        original.call(*args)
+      end
+      allow(ConceptVocabulary).to receive(:selectable_for_section).and_wrap_original do |original, *args, **options|
+        dates << Date.current
+        original.call(*args, **options)
+      end
+
+      travel_to(Time.utc(2026, 10, 22, 12)) { replay.synthesize(user.id, 1, run: true) }
+
+      expect(dates).to be_present
+      expect(dates).to all(eq(Date.new(2026, 10, 23)))
+    end
+  end
+end
+
+RSpec.describe DesignComparisonReplay, "billing" do
+  let(:user) { User.create!(email: "replay-billing@example.com", name: "Billing") }
+  let(:seen) { [] }
+
+  # Real connection with only the adapter swapped, so the key header is the one the service sets.
+  before do
+    requests = seen
+    allow_any_instance_of(ClaudeService).to receive(:build_connection).and_wrap_original do |original|
+      original.call.tap do |connection|
+        connection.adapter :test do |stub|
+          stub.post(ClaudeService::API_URL) do |env|
+            requests << env.request_headers
+            [ 200, {}, { "content" => [ { "type" => "text", "text" => { "status" => "keep", "better" => "a" }.to_json } ],
+                         "usage" => { "input_tokens" => 70, "output_tokens" => 30 } }.to_json ]
+          end
+        end
+      end
+    end
+  end
+
+  it "bills only the runner's key and writes no usage or suggested-concept rows" do
+    section = { "title" => "t", "scenario" => "s", "question" => "q", "piece_a" => "a = 1", "piece_b" => "b = 2",
+                "concept" => "n_plus_one", "pitched_at" => "senior",
+                "answer_key" => { "better" => "a", "deciding_fact" => "f", "principle" => "p", "why_other_fails" => "w" } }
+    user.store_api_key("sk-ant-users-own-stored-key", provider: "anthropic")
+    user.save!
+    DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                          problem_set: { "design_comparison" => section })
+    out = StringIO.new
+
+    expect { described_class.new(api_key: "sk-ant-runner-env-key", out: out).run }
+      .not_to change { [ ApiUsage.count, SuggestedConcept.count ] }
+
+    expect(seen.map { |headers| headers["x-api-key"] }).to eq([ "sk-ant-runner-env-key" ])
+    expect(JudgeSolve.sole).to have_attributes(source: "replay", matched: true, judge_pick: "a")
+    expect(out.string).to include("70 in / 30 out tokens")
   end
 end

@@ -1,17 +1,32 @@
-require_relative "forced_concept_drafts"
+require_relative "model_comparison"
 
 # Prints counts and ids only, never a solve, a key or section text, so its output can be pasted anywhere.
 class DesignComparisonReplay
   KIND = ExerciseSection::DesignComparison
   SOURCE = "replay".freeze
+  SYNTHETIC = "synthetic".freeze
   PIECE_FIELDS = KIND::PIECES.map { |piece| "piece_#{piece}" }.freeze
-  JUDGE_FAILURES = [ JudgeVerdict::Invalid, ProviderError, SetupError, *AiService::INFRASTRUCTURE_ERRORS ].freeze
+  CALL_FAILURES = [ JudgeVerdict::Invalid, ProviderError, SetupError, *AiService::INFRASTRUCTURE_ERRORS ].freeze
 
-  # Worst case per call from docs/answer-key-trust-spec-2026-10-22.md, "Count and cost" and "Topping up".
-  JUDGE_CALL_COST_BOUND = 0.019
-  SYNTHETIC_SECTION_COST_BOUND = 0.12
+  # The reply's own faults; any other failure is the account, the network or the provider, and stops the run.
+  OWN_FAILURES = %w[invalid_output refusal truncated invalid_json].freeze
+
+  # Estimates from docs/answer-key-trust-spec-2026-10-22.md, "Count and cost"; see this file's code note for the draft's.
+  JUDGE_INPUT_TOKENS = 3_500
+  DRAFT_INPUT_TOKENS = 10_000
 
   class MissingKey < StandardError; end
+  class Stop < StandardError; end
+
+  def self.worst_case_cost(purpose, input_tokens)
+    model  = ClaudeService::MODEL_FOR_PURPOSE.fetch(purpose, ClaudeService::DEFAULT_ROUTE)[:model]
+    price  = ModelComparison::LIST_PRICE_PER_MILLION.fetch(model)
+    output = output_cap(purpose)
+    { model: model, input: input_tokens, output: output,
+      dollars: (input_tokens * price[:input] + output * price[:output]) / 1_000_000.0 }
+  end
+
+  def self.output_cap(purpose) = AiService::CALL_PROFILES.fetch(purpose)[:max_tokens] || ClaudeService::MAX_TOKENS
 
   def initialize(api_key:, out: $stdout, rejudge: false)
     @api_key = api_key.presence
@@ -25,33 +40,32 @@ class DesignComparisonReplay
     @out.puts "design comparisons to judge: #{pending.size} (already replayed and skipped: #{candidates.size - pending.size})"
     return if pending.empty?
 
-    print_counts("week of", pending.group_by { |exercise| exercise.date.beginning_of_week })
-    print_counts("user", pending.group_by(&:user_id))
+    print_counts("week of", pending.group_by { |exercise| exercise.date.beginning_of_week }.sort)
+    print_counts("user", pending.group_by(&:user_id).sort)
     @out.puts "first date: #{pending.map(&:date).min}, last date: #{pending.map(&:date).max}"
-    @out.puts "cost bound: at most $#{format('%.2f', pending.size * JUDGE_CALL_COST_BOUND)} " \
-              "(#{pending.size} judge calls at $#{JUDGE_CALL_COST_BOUND} each)"
+    print_bound(pending.size, "judge call", [ judge_cost ])
   end
 
   def run
     service = claude_service
     pending = pending_exercises
-    rows = pending.each_with_index.map do |exercise, index|
-      replay(service, exercise).tap { |row| print_progress(index + 1, pending.size, "daily_exercise #{exercise.id}", row) }
+    rows = until_stopped(pending, label: ->(exercise) { "daily_exercise #{exercise.id}" }) do |exercise|
+      replay(service, exercise)
     end
     print_summary(rows)
   end
 
-  def synthesize(user_id, count)
-    service = claude_service
-    user    = User.find(user_id)
-    plan    = synthetic_plan(user.language_for_today, count)
-    @out.puts "synthesizing #{count} design comparisons, cost bound $#{format('%.2f', count * SYNTHETIC_SECTION_COST_BOUND)}"
-    rows = plan.each_with_index.filter_map do |(rung, concept), index|
-      row = synthetic(service, user, rung, concept)
-      print_progress(index + 1, count, "#{rung} #{concept}", row)
-      row
+  def synthesize(user_id, target, run: false)
+    user = User.find(user_id)
+    Time.use_zone(user.effective_time_zone) do
+      plan = synthetic_plan(user.language_for_today, target)
+      print_synthetic_plan(plan, target)
+      next unless run && plan.any?
+
+      service = claude_service
+      rows = until_stopped(plan, label: ->(slot) { slot.join(" ") }) { |rung, concept| synthetic(service, user, rung, concept) }
+      print_summary(rows)
     end
-    print_summary(rows)
   end
 
   def candidates
@@ -75,22 +89,46 @@ class DesignComparisonReplay
 
   private
 
+  def until_stopped(items, label:)
+    rows    = []
+    current = nil
+    items.each_with_index do |item, index|
+      current = item
+      row = yield(item)
+      print_progress(index + 1, items.size, label.call(item), row)
+      rows << row if row
+    end
+    rows
+  rescue Stop => e
+    @out.puts "stopped at #{label.call(current)}: #{e.message}. Nothing was recorded for it; " \
+              "#{rows.size} of #{items.size} recorded before it. Run again to continue."
+    rows
+  end
+
   def replay(service, exercise)
     section = exercise.problem_set[KIND.key]
     solve   = judged_solve(service, exercise.user, section, rung: section["pitched_at"])
     JudgeSolve.record!(exercise, [ solve ], source: SOURCE)
     solve
+  rescue JudgeSolve::RecordError => e
+    raise Stop, e.message
   end
 
   def synthetic(service, user, rung, concept)
-    section = service.send(:retry_section, ForcedConceptDrafts.rung_draft(user, user.language_for_today, rung), KIND, concept)
+    section = draft(service, user, rung, concept)
     return unless section
 
     solve = judged_solve(service, user, section, rung: rung).with(shipped: false)
     JudgeSolve.record_synthetic!([ solve ], draft_model: service.model_for("retry_section"))
     solve
-  rescue ProviderError, SetupError => e
-    @out.puts "draft failed: #{rung} #{concept} (#{AiService.judge_fallback_reason(e)})"
+  rescue JudgeSolve::RecordError => e
+    raise Stop, e.message
+  end
+
+  def draft(service, user, rung, concept)
+    service.send(:retry_section, ForcedConceptDrafts.rung_draft(user, user.language_for_today, rung), KIND, concept)
+  rescue *CALL_FAILURES => e
+    @out.puts "draft failed: #{rung} #{concept} (#{own_failure_reason(e)})"
     nil
   end
 
@@ -106,25 +144,50 @@ class DesignComparisonReplay
 
   def judge(service, user, section, rung, identity)
     [ service.judge_section(user, KIND, section, rung: rung, locked: false), identity ]
-  rescue *JUDGE_FAILURES => e
-    [ AiService.judge_fallback_reason(e), identity.merge(unsolved_detail: refusal_detail(e)) ]
+  rescue *CALL_FAILURES => e
+    [ own_failure_reason(e), identity.merge(unsolved_detail: refusal_detail(e)) ]
+  end
+
+  def own_failure_reason(error)
+    reason = AiService.judge_fallback_reason(error)
+    raise Stop, "provider call failed (#{reason})" unless OWN_FAILURES.include?(reason)
+
+    reason
   end
 
   def refusal_detail(error)
     error.message.truncate(JudgedGeneration::REFUSAL_DETAIL_LIMIT) if error.is_a?(JudgeVerdict::Invalid)
   end
 
-  def synthetic_plan(language, count)
+  def synthetic_plan(language, target)
     rungs = KindDifficulty::LEVELS
-    Array.new(count) do |index|
+    (JudgeSolve.where(source: SYNTHETIC, section: KIND.key).count...target).map do |index|
       rung     = rungs[index % rungs.size]
       concepts = ConceptVocabulary.selectable_for_section(KIND.key, language, rung: rung)
       [ rung, concepts[(index / rungs.size) % concepts.size] ]
     end
   end
 
+  def judge_cost = self.class.worst_case_cost("judge_section", JUDGE_INPUT_TOKENS)
+
+  def print_synthetic_plan(plan, target)
+    @out.puts "synthetic design comparisons to draft: #{plan.size} (target #{target}, already recorded: #{target - plan.size})"
+    print_counts("rung", plan.group_by(&:first).sort_by { |rung, _| KindDifficulty::LEVELS.index(rung) })
+    print_bound(plan.size, "section", [ self.class.worst_case_cost("retry_section", DRAFT_INPUT_TOKENS), judge_cost ])
+  end
+
+  def print_bound(count, unit, calls)
+    per_unit = calls.sum { |call| call[:dollars] }
+    @out.puts "worst-case bound: $#{format('%.2f', count * per_unit)} (#{count} × $#{format('%.3f', per_unit)} per #{unit}; " \
+              "#{calls.map { |call| cost_assumption(call) }.join(', then ')})"
+  end
+
+  def cost_assumption(call)
+    "#{call[:model]} at list price with #{call[:input]} input tokens estimated and its full #{call[:output]}-token output cap"
+  end
+
   def print_counts(label, groups)
-    groups.sort_by { |value, _| value }.each { |value, exercises| @out.puts "  #{label} #{value}: #{exercises.size}" }
+    groups.each { |value, items| @out.puts "  #{label} #{value}: #{items.size}" }
   end
 
   def print_progress(position, total, label, solve)
