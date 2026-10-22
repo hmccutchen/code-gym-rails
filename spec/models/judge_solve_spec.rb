@@ -232,8 +232,40 @@ RSpec.describe JudgeSolve, type: :model do
     it "writes nothing when any row is refused" do
       solves = [ solve, solve(edit_reverted: true, revert_reason: nil) ]
 
-      expect { described_class.record!(exercise, solves) }.to raise_error(ActiveRecord::StatementInvalid)
+      expect { described_class.record!(exercise, solves) }.to raise_error(described_class::RecordError)
       expect(described_class.count).to eq(0)
+    end
+
+    def refusal_from(solves)
+      described_class.record!(exercise, solves)
+    rescue described_class::RecordError => error
+      error
+    end
+
+    def expect_no_row_contents(error)
+      expect(error.cause).to be_nil
+      expect(error.message).not_to include("Failing row", "fewer writes", "Two caches", "a = 1", "b = 2", "caching")
+    end
+
+    it "names only the constraint when the database refuses a row" do
+      error = refusal_from([ solve(edit_reverted: true, revert_reason: nil) ])
+
+      expect(error.message).to eq("judge_solves row refused: judge_solves_revert_reason_iff_reverted")
+      expect_no_row_contents(error)
+    end
+
+    it "names only the column when a not-null column is missing" do
+      error = refusal_from([ solve(key_better: nil) ])
+
+      expect(error.message).to eq("judge_solves row refused: key_better")
+      expect_no_row_contents(error)
+    end
+
+    it "names only the attribute when validation refuses a row" do
+      error = refusal_from([ solve(edit_reverted: true, revert_reason: "made_up") ])
+
+      expect(error.message).to eq("judge_solves row refused: revert_reason")
+      expect_no_row_contents(error)
     end
 
     it "writes nothing for no solves" do
@@ -313,9 +345,18 @@ RSpec.describe JudgeSolve, type: :model do
       expect(described_class.readable).not_to include(other)
     end
 
-    it "agrees with DailyResponse#reviewed? for every response state" do
+    it "hides a row whose own section is not reviewed, even when another section of the day is" do
+      create_solve
+      review!(exercise, ai_review: { "code_review" => { "rating" => "solid" } })
+
+      expect(described_class.readable).to be_empty
+    end
+
+    it "agrees with DailyResponse#section_reviewed? for every response state" do
       states = {
         reviewed: { ai_review: { "design_comparison" => { "rating" => "solid" } }, submitted: true },
+        other_section_reviewed: { ai_review: { "code_review" => { "rating" => "solid" } }, submitted: true },
+        section_not_a_hash: { ai_review: { "design_comparison" => "pending" }, submitted: true },
         submitted_unreviewed: { ai_review: nil, submitted: true },
         unsubmitted: { ai_review: nil, submitted: false },
         empty_review: { ai_review: {}, submitted: true },
@@ -327,7 +368,8 @@ RSpec.describe JudgeSolve, type: :model do
         response = attrs && review!(day, **attrs)
         record = create_solve(daily_exercise_id: day.id)
 
-        expect(described_class.readable.include?(record)).to eq(response&.reviewed? || false), name.to_s
+        expected = response&.section_reviewed?(record.section) || false
+        expect(described_class.readable.include?(record)).to eq(expected), name.to_s
       end
     end
   end

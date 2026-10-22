@@ -15,8 +15,8 @@ it, the page gives the answer away. So `JudgeSolve.readable` starts from
 gives nothing away:
 
 1. `source = 'synthetic'`. No engineer ever sees the section.
-2. The exercise's response has been reviewed. The engineer has already
-   answered and seen the review.
+2. The row's own section has been reviewed on the exercise's response. The
+   engineer has already answered it and seen its review.
 3. `never_shown_reason` is present. It's written when the row is created, and
    it records that this version's pieces and key never reached the engineer.
 
@@ -51,21 +51,26 @@ The check constraint allows a reason only on `source = 'live'` rows with
 `shipped = FALSE`. Replay rows judge what shipped, and synthetic rows are
 already readable, so neither needs one.
 
-## Why "reviewed" is `DailyResponse.reviewed`
+## Why "reviewed" means the row's own section
 
-`DailyResponse#reviewed?` (`ai_review.present?`) is the authority on whether a
-response has been reviewed. `DailyResponse.reviewed` is the same rule in SQL:
-`ai_review` is neither NULL nor `{}`. The two agree for every value the app
-writes. `ResponseReview` is the only writer, and it always stores a Hash, so
-the column holds NULL, `{}` or a filled Hash. A non-Hash blank such as `[]`
-or `""` would read as unreviewed in Ruby but reviewed in SQL. Nothing writes
-one. `judge_solve_spec` ("agrees with DailyResponse#reviewed?") compares scope
-membership with the predicate for a reviewed response, a submitted one with
-no review, an unsubmitted one, an empty review and no response at all.
+The engineer's page shows a section's key only once that section has its
+review: `DailyResponse#section_reviewed?(section)`, which is
+`ai_review&.dig(section).is_a?(Hash)`. A day can be partly reviewed, with
+`code_review` graded and `design_comparison` not yet. The response is then
+`reviewed?`, but the design comparison's key is still hidden on the page. A
+per-response test would show the judge's row for that section early, so
+`readable` checks the row's own section.
 
-The scope reads the reviewed exercises through a subquery on
-`daily_exercise_id` rather than a join, so it composes with `.or` and with
-any later filter without duplicating rows.
+`DailyResponse.section_reviewed_condition(section)` is the same test in SQL:
+`jsonb_typeof(ai_review -> section) = 'object'`. A JSON object is exactly
+what Ruby reads back as a Hash, and a missing key, a NULL review or a
+non-object value all fail both. `readable` uses it inside a correlated
+`EXISTS` on the row's `daily_exercise_id` and `section`, so it composes with
+`.or` and never duplicates rows. `judge_solve_spec` ("agrees with
+DailyResponse#section_reviewed?") compares scope membership with the
+predicate for a reviewed section, another section reviewed, a non-Hash
+section value, a submitted response with no review, an unsubmitted one, an
+empty review and no response at all.
 
 ## The `human_call` constraint is NULL-safe
 
@@ -114,6 +119,17 @@ spec. The exercise supplies `user_id`, `daily_exercise_id` and
 `live`) and `draft_model`. `app_revision` defaults to
 `JudgeSolve.app_revision`, the one place that reads `RAILWAY_GIT_COMMIT_SHA`,
 and it's stored as NULL when the variable is blank or absent.
+
+A refused row raises `JudgeSolve::RecordError`, never the original error.
+A PostgreSQL CHECK or NOT NULL violation carries
+`DETAIL: Failing row contains (...)`, the whole row with `judged_section`
+and its `answer_key`. The jobs log an error's message, so that text would put
+the key in the log before review. `RecordError`'s message names only the
+constraint (or, for a NOT NULL violation, the column) read from the
+PostgreSQL error fields, or the attribute names a validation refused, or the
+error class when neither is available. It's raised with `cause: nil` so an
+error reporter that walks the cause chain finds nothing either. The
+transaction has already rolled back when it's raised, so no row is written.
 
 ## The `solve` inflection
 

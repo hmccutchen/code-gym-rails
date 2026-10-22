@@ -17,6 +17,8 @@ class JudgeSolve < ApplicationRecord
 
   APP_REVISION_ENV = "RAILWAY_GIT_COMMIT_SHA".freeze
 
+  class RecordError < StandardError; end
+
   validates :revert_reason, inclusion: { in: REVERT_REASONS }, allow_nil: true
   validate :human_call_fits_matched
 
@@ -25,8 +27,15 @@ class JudgeSolve < ApplicationRecord
   scope :readable, -> {
     where(source: "synthetic")
       .or(where.not(never_shown_reason: nil))
-      .or(where(daily_exercise_id: DailyResponse.reviewed.select(:daily_exercise_id)))
+      .or(where(section_review_exists))
   }
+
+  def self.section_review_exists
+    responses = DailyResponse.arel_table
+    DailyResponse.where(responses[:daily_exercise_id].eq(arel_table[:daily_exercise_id]))
+                 .where(DailyResponse.section_reviewed_condition(arel_table[:section]))
+                 .arel.exists
+  end
 
   def self.calls_for(matched)
     case matched
@@ -47,7 +56,18 @@ class JudgeSolve < ApplicationRecord
         ))
       end
     end
+  rescue ActiveRecord::StatementInvalid, ActiveRecord::RecordInvalid => error
+    raise RecordError, "judge_solves row refused: #{refusal_name(error)}", cause: nil
   end
+
+  def self.refusal_name(error)
+    return error.record.errors.attribute_names.join(", ") if error.is_a?(ActiveRecord::RecordInvalid)
+
+    result = error.cause.respond_to?(:result) ? error.cause.result : nil
+    result&.error_field(PG::Result::PG_DIAG_CONSTRAINT_NAME) ||
+      result&.error_field(PG::Result::PG_DIAG_COLUMN_NAME) || error.class.name
+  end
+  private_class_method :refusal_name
 
   private
 

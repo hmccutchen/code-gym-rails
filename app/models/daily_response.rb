@@ -46,6 +46,11 @@ class DailyResponse < ApplicationRecord
              .distinct.pluck(Arel.sql("jsonb_object_keys(section_ratings)")).to_set
   end
 
+  def self.section_reviewed_condition(section)
+    review = Arel::Nodes::InfixOperation.new("->", arel_table[:ai_review], section)
+    Arel::Nodes::NamedFunction.new("jsonb_typeof", [ review ]).eq("object")
+  end
+
   def self.review_points(value)
     case value
     when Array then value.map { |v| v.to_s.strip }.reject(&:blank?)
