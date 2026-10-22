@@ -10,17 +10,22 @@ USAGE = <<~TEXT.freeze
   ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb review_prose USER_ID [LIMIT]
   ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb review_prose_fixtures
   ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb review_calibration
+  OPENAI_API_KEY=sk-...         bin/rails runner script/compare_models.rb judge_shape openai
+    (judge_shape takes claude, openai or gemini, billed to ANTHROPIC_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY)
 TEXT
 
 require_relative "model_comparison"
 
 mode, id, *rest = ARGV
-api_key = ENV["ANTHROPIC_API_KEY"].presence
-known_modes = ModelComparison::CANDIDATES.keys + %w[judge_fixtures judge_concept review_prose_fixtures]
+known_modes = ModelComparison::CANDIDATES.keys + %w[judge_fixtures judge_concept review_prose_fixtures judge_shape]
 
-abort("ANTHROPIC_API_KEY is not set. Calls are billed to it, never to a user's stored key.\n\n#{USAGE}") unless api_key
 abort(USAGE) unless known_modes.include?(mode)
 abort(USAGE) if %w[judge_fixtures review_prose_fixtures review_calibration].exclude?(mode) && id.blank?
+abort(USAGE) if mode == "judge_shape" && ModelComparison::JUDGE_SHAPE_PROVIDERS.exclude?(id)
+
+key_variable = mode == "judge_shape" ? ModelComparison::JUDGE_SHAPE_PROVIDERS.fetch(id)[:key_variable] : "ANTHROPIC_API_KEY"
+api_key = ENV[key_variable].presence
+abort("#{key_variable} is not set. Calls are billed to it, never to a user's stored key.\n\n#{USAGE}") unless api_key
 
 comparison = ModelComparison.new(api_key: api_key)
 
@@ -32,6 +37,7 @@ when "judge"          then comparison.judge(id)
 when "judge_fixtures" then comparison.judge_fixtures
 when "review_prose_fixtures" then comparison.review_prose_fixtures
 when "review_calibration" then comparison.review_calibration
+when "judge_shape"    then comparison.judge_shape(id)
 when "judge_concept"
   concept, per_rung = rest
   per_rung = per_rung ? Integer(per_rung, exception: false) : 2

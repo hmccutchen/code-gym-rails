@@ -13,8 +13,9 @@ row in `AiService::CALL_PROFILES`, so a typo cannot quietly route nothing.
 **OpenAI** sends generation and its retry to `gpt-6.1-sol` at `high`
 effort, the section judge to `gpt-6-astra` at `low`, and everything else to
 `gpt-6-sol` with reasoning off (`none`). None of these routes has been
-compared against another model, because `script/compare_models.rb` runs
-only Claude. A capped OpenAI call normally sends effort `none` from
+compared against another model, because `script/compare_models.rb`
+compares only Claude models (its `judge_shape` mode checks whether one
+provider's judge replies parse, and compares nothing). A capped OpenAI call normally sends effort `none` from
 `OpenaiService::REASONING_OFF`, its counterpart to `THINKING_OFF`, because
 `max_output_tokens` caps reasoning and reply together. GPT-6.1 Sol and
 Astra have no `none`, so a capped purpose can go to either only when its
