@@ -24,6 +24,7 @@ class DailyResponse < ApplicationRecord
   validates :date, uniqueness: { scope: :user_id }
 
   scope :submitted, -> { where.not(submitted_at: nil) }
+  scope :reviewed, -> { where.not(ai_review: [ nil, {} ]) }
 
   AI_REVIEW_FIELDS = {
     "correct"          => { list: true  },

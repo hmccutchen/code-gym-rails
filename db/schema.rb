@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_17_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -158,6 +158,48 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_17_090000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["code_digest"], name: "index_invite_codes_on_code_digest", unique: true
+  end
+
+  create_table "judge_solves", force: :cascade do |t|
+    t.bigint "user_id"
+    t.bigint "daily_exercise_id"
+    t.datetime "set_generated_at"
+    t.string "source", null: false
+    t.string "section", null: false
+    t.integer "attempt", null: false
+    t.boolean "edit_check", null: false
+    t.boolean "shipped", null: false
+    t.string "never_shown_reason"
+    t.boolean "edit_reverted", null: false
+    t.string "revert_reason"
+    t.string "rung", null: false
+    t.boolean "locked", null: false
+    t.string "concept"
+    t.string "judge_status"
+    t.string "judge_pick"
+    t.string "key_better", null: false
+    t.boolean "matched"
+    t.string "unsolved_reason"
+    t.string "unsolved_detail"
+    t.jsonb "judged_section", null: false
+    t.string "section_digest", null: false
+    t.string "judge_provider", null: false
+    t.string "judge_model", null: false
+    t.string "draft_model"
+    t.string "app_revision"
+    t.string "human_call"
+    t.text "human_note"
+    t.datetime "human_called_at"
+    t.datetime "created_at", null: false
+    t.index ["daily_exercise_id", "section", "section_digest"], name: "idx_on_daily_exercise_id_section_section_digest_badb8b5c25"
+    t.index ["edit_reverted", "created_at"], name: "index_judge_solves_on_edit_reverted_and_created_at"
+    t.index ["source", "matched", "created_at"], name: "index_judge_solves_on_source_and_matched_and_created_at"
+    t.index ["user_id"], name: "index_judge_solves_on_user_id"
+    t.check_constraint "edit_reverted = (revert_reason IS NOT NULL)", name: "judge_solves_revert_reason_iff_reverted"
+    t.check_constraint "matched IS NULL AND human_call IS NULL OR matched IS TRUE AND (human_call IS NULL OR (human_call::text = ANY (ARRAY['key_right'::character varying, 'both_wrong'::character varying, 'both_defensible'::character varying]::text[]))) OR matched IS FALSE AND (human_call IS NULL OR (human_call::text = ANY (ARRAY['key_right'::character varying, 'judge_right'::character varying, 'both_defensible'::character varying]::text[])))", name: "judge_solves_human_call_by_matched"
+    t.check_constraint "never_shown_reason IS NULL OR (never_shown_reason::text = ANY (ARRAY['replaced_by_retry'::character varying, 'section_dropped'::character varying]::text[])) AND shipped = false AND source::text = 'live'::text", name: "judge_solves_never_shown_reason"
+    t.check_constraint "source::text = 'synthetic'::text OR user_id IS NOT NULL AND daily_exercise_id IS NOT NULL AND set_generated_at IS NOT NULL", name: "judge_solves_owner_unless_synthetic"
+    t.check_constraint "source::text = ANY (ARRAY['live'::character varying, 'replay'::character varying, 'synthetic'::character varying]::text[])", name: "judge_solves_source"
   end
 
   create_table "level_suggestion_events", force: :cascade do |t|
@@ -420,6 +462,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_17_090000) do
   add_foreign_key "duck_threads", "daily_exercises"
   add_foreign_key "duck_threads", "users"
   add_foreign_key "featured_concepts", "users"
+  add_foreign_key "judge_solves", "daily_exercises"
+  add_foreign_key "judge_solves", "users"
   add_foreign_key "level_suggestion_events", "users"
   add_foreign_key "push_subscriptions", "users"
   add_foreign_key "review_follow_ups", "daily_responses"
