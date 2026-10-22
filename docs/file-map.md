@@ -65,7 +65,7 @@ What each listed file does.
 - `script/mint_invite_code.rb` — mints one invite code and prints it once
 - `script/record_competency_gate_fixture.rb` — rebuilds `spec/fixtures/competency_gate/default_pair_histories.json` from the gate as it stands; run only for a deliberate gate change
 - `app/models/provider_failure.rb` — `ProviderFailure`: the kind of failure a page can explain, from the error the boundary rescued; pure
-- `app/models/provider_error.rb` — `ProviderError` and its subclasses: the failures a provider call raises, carrying the HTTP status, quota id, retry wait and provider; `ProviderFailure` and `AiService.error_code_for` classify them
+- `app/models/provider_error.rb` — `ProviderError` and its subclasses: the failures a provider call raises, carrying the HTTP status, quota id, retry wait and provider. Each class states its own codes (`.error_code`, `.failure_code`, `.judge_fallback_reason`, `.failure_kind`), inherited by its subclasses, and `AiService.error_code_for`, `.failure_code_for`, `.judge_fallback_reason` and `ProviderFailure.classify` read them
 - `app/models/setup_error.rb` — `SetupError`: a problem with an account's setup or the app's own data (no usable provider, the fake provider outside a local environment, an unsupported language); not a `ProviderError`, but rescued and recorded beside one and classified by `ProviderFailure` as `setup`
 - `app/models/reset_clock.rb` — `ResetClock`: when a failed call's limit lifts, for the sentence's reset time; pure
 - `app/models/provider_failure_text.rb` — `ProviderFailureText`: one failure as a sentence for a person, from the `provider_failures` locale table, in the reader's zone and against the clock; `#full` for a page, `#brief` for a status line

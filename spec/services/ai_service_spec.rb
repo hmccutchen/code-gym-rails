@@ -5689,7 +5689,7 @@ RSpec.describe AiService, ".judge_fallback_reason" do
     end
   end
 
-  it "is the table both judges read" do
+  it "is the reason both judges read" do
     expect(JudgedGeneration.private_instance_methods).not_to include(:judge_fallback_reason)
     expect(AiService.private_instance_methods).not_to include(:review_judge_fallback_reason)
   end

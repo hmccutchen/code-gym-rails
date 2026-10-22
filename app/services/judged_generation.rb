@@ -155,7 +155,7 @@ class JudgedGeneration
   end
 
   def unjudged_retry(retried, outcome)
-    return [ *drop(outcome), true ] if outcome[:fallback] == ProviderError::DeadlineError::FALLBACK_REASON
+    return [ *drop(outcome), true ] if outcome[:fallback] == ProviderError::DeadlineError.judge_fallback_reason
 
     [ retried, outcome.merge(status: :keep), true ]
   end

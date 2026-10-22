@@ -127,10 +127,14 @@ lengthen a string past `UserText.tagged`'s cap downstream. Code over
 `MAX_GENERATED_CODE_LENGTH` is rejected, never truncated: cut code no longer
 matches the plan it is graded as, and raising keeps the round retryable.
 
-## `.error_code_for`
+## `.error_code_for`, `.failure_code_for` and `.judge_fallback_reason`
 
-A class method so `JudgedGeneration` names failures the same way this class
-does.
+Class methods so `JudgedGeneration` and `ReviewGrading` name failures the same
+way this class does. Each reads the code from the error's own class (see
+`docs/code-notes/app/models/provider_error.md`). `.judge_fallback_reason`
+keeps the cases that are not about a `ProviderError` class: a verdict the
+judge's reply failed (`invalid_output`), a Ruby `Timeout::Error`, and a bare
+`ProviderError` with a status, which reads as `http_<status>`.
 
 ## `#judged_generation_provider`
 
