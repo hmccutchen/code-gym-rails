@@ -1,0 +1,99 @@
+<% page_title t("admin.judge_solves.index.title") %>
+<style>
+  .solve-counts { border-collapse: collapse; margin: .5rem 0 1.25rem; font-size: .85rem; }
+  .solve-counts th, .solve-counts td { text-align: left; padding: .3rem .6rem; border-bottom: 1px solid var(--border); }
+  .solve-counts th { color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; }
+  .solve-filters { display: flex; flex-wrap: wrap; gap: .4rem 1rem; margin: .5rem 0; font-size: .85rem; }
+  .solve-filters .current { font-weight: 600; }
+  .judge-solve { border: 1px solid var(--border); border-radius: 8px; padding: .9rem 1rem; margin: 1rem 0; }
+  .judge-solve .meta { color: var(--muted); font-size: .8rem; margin: .15rem 0; }
+  .judge-solve .flag { color: var(--red); font-weight: 600; font-size: .85rem; }
+  .judge-solve .side-by-side { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+  .judge-solve .verdict-form { display: grid; gap: .5rem; margin-top: .75rem; max-width: 36rem; }
+  .judge-solve-waiting { color: var(--muted); font-size: .85rem; margin: .3rem 0; }
+</style>
+
+<div class="page-header">
+  <h1><%= t("admin.judge_solves.index.heading") %></h1>
+</div>
+
+<div class="section">
+  <p><%= t("admin.judge_solves.index.intro") %></p>
+  <p class="withheld-count"><strong><%= t("admin.judge_solves.index.withheld", count: @counts.withheld) %></strong></p>
+
+  <h2><%= t("admin.judge_solves.index.outcomes_heading") %></h2>
+  <table class="solve-counts outcome-counts">
+    <thead>
+      <tr>
+        <th><%= t("admin.judge_solves.index.source_column") %></th>
+        <% JudgeSolve::Counts::OUTCOMES.each_key do |name| %><th><%= t("admin.judge_solves.index.outcomes.#{name}") %></th><% end %>
+      </tr>
+    </thead>
+    <tbody>
+      <% JudgeSolve::SOURCES.each do |source| %>
+        <tr data-source="<%= source %>">
+          <td><%= t("admin.judge_solves.index.sources.#{source}") %></td>
+          <% JudgeSolve::Counts::OUTCOMES.each_key do |name| %><td data-outcome="<%= name %>"><%= @counts.outcome(source, name) %></td><% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <h2><%= t("admin.judge_solves.index.reverts_heading") %></h2>
+  <table class="solve-counts revert-counts">
+    <thead>
+      <tr>
+        <th><%= t("admin.judge_solves.index.source_column") %></th>
+        <% JudgeSolve::REVERT_REASONS.each do |reason| %><th><%= t("admin.judge_solves.revert_reasons.#{reason}") %></th><% end %>
+      </tr>
+    </thead>
+    <tbody>
+      <% JudgeSolve::SOURCES.each do |source| %>
+        <tr data-source="<%= source %>">
+          <td><%= t("admin.judge_solves.index.sources.#{source}") %></td>
+          <% JudgeSolve::REVERT_REASONS.each do |reason| %><td data-reason="<%= reason %>"><%= @counts.reverted(source, reason) %></td><% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <%= render "call_table", heading: t("admin.judge_solves.index.mismatch_calls_heading"), table_class: "mismatch-calls",
+                           calls: JudgeSolve::Counts::MISMATCH_CALL_ROWS, count: @counts.method(:mismatch_call) %>
+  <%= render "call_table", heading: t("admin.judge_solves.index.matched_calls_heading"), table_class: "matched-calls",
+                           calls: JudgeSolve::Counts::MATCHED_CALL_ROWS, count: @counts.method(:matched_call) %>
+
+  <div class="solve-filters">
+    <span><%= t("admin.judge_solves.index.filters.source") %>:</span>
+    <% JudgeSolve::Listing::SOURCE_FILTERS.each_key do |source| %>
+      <%= link_to t("admin.judge_solves.index.sources.#{source}"), admin_judge_solves_path(@listing.filters.merge(source: source)), class: ("current" if @listing.source == source) %>
+    <% end %>
+  </div>
+  <div class="solve-filters">
+    <span><%= t("admin.judge_solves.index.filters.show") %>:</span>
+    <% JudgeSolve::Listing::SHOWS.each do |show| %>
+      <%= link_to t("admin.judge_solves.index.shows.#{show}"), admin_judge_solves_path(@listing.filters.merge(show: show)), class: ("current" if @listing.show == show) %>
+    <% end %>
+    <% if @listing.matched_sample? %><span><%= t("admin.judge_solves.index.filters.sample_size", n: @listing.n) %></span><% end %>
+  </div>
+  <div class="solve-filters">
+    <span><%= t("admin.judge_solves.index.filters.call") %>:</span>
+    <%= link_to t("admin.judge_solves.index.filters.any_call"), admin_judge_solves_path(@listing.filters.except(:call)), class: ("current" if @listing.call.nil?) %>
+    <% JudgeSolve::Listing::CALL_FILTERS.each do |call| %>
+      <%= link_to t("admin.judge_solves.calls.#{call}"), admin_judge_solves_path(@listing.filters.merge(call: call)), class: ("current" if @listing.call == call) %>
+    <% end %>
+  </div>
+
+  <% if @listing.entries.empty? %>
+    <p style="color: var(--muted);"><%= t("admin.judge_solves.index.empty") %></p>
+  <% end %>
+  <% @listing.entries.each do |solve| %>
+    <%= render "entry", solve: solve, listing: @listing %>
+  <% end %>
+
+  <% if @listing.waiting.any? %>
+    <h2><%= t("admin.judge_solves.index.waiting_heading") %></h2>
+    <% @listing.waiting.each do |solve| %>
+      <%= render "waiting", solve: solve %>
+    <% end %>
+  <% end %>
+</div>

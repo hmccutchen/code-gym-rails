@@ -28,6 +28,11 @@ generation control flow. If it were ever wrong, a scope that trusted it
 would leak the key. A missing `never_shown_reason` only hides a row that was
 safe to show, which costs nothing until the day is reviewed.
 
+`JudgeSolve.withheld` is the complement: every row `readable` leaves out.
+The admin page uses it twice, for the bare "withheld pending review" count
+and for the placeholders, which load only the id, source, rung and creation
+time.
+
 ## Why `never_shown_reason` leaves out the edit cases
 
 The judge may edit only `title`, `scenario` and `question`. The pieces and

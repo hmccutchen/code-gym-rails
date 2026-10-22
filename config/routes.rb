@@ -91,5 +91,6 @@ Rails.application.routes.draw do
         patch :dismiss
       end
     end
+    resources :judge_solves, only: [ :index, :update ]
   end
 end

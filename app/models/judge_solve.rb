@@ -8,6 +8,7 @@ class JudgeSolve < ApplicationRecord
   NEVER_SHOWN_REASONS = %w[replaced_by_retry section_dropped].freeze
   MATCHED_CALLS = %w[key_right both_wrong both_defensible].freeze
   MISMATCH_CALLS = %w[key_right judge_right both_defensible].freeze
+  UNCALLED = "uncalled".freeze
 
   SOLVE_FIELDS = %i[
     section attempt edit_check rung locked concept judged_section
@@ -29,6 +30,8 @@ class JudgeSolve < ApplicationRecord
       .or(where.not(never_shown_reason: nil))
       .or(where(section_review_exists))
   }
+
+  scope :withheld, -> { where.not(id: readable.select(:id)) }
 
   def self.section_review_exists
     responses = DailyResponse.arel_table
