@@ -92,3 +92,11 @@
   should wait for it; the app already does, and the spec was fixed instead
 - `ProfileController`'s checks and `User`'s level callbacks into a
   `ProfileUpdate` form `#476 open`
+
+## Wed Oct 21
+
+- rotate every production secret after the Railway breach `#482`
+  **why:** Railway reported a breach and paused builds
+  **I decided:** clear the stored provider keys and have users add new ones,
+  rather than re-encrypt keys that may already be exposed; build the PR now and
+  merge it with the new variables once Railway is back
