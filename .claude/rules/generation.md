@@ -65,6 +65,9 @@ read it before changing that area.
   page, the judge, the duck (which gains only `piece_a` and `piece_b`) or the
   `[difficulty_diagnostics]` log before review, and the judge's outcomes for
   this kind omit evidence and reason, with the reply parsed `log_raw: false`.
+  Each blind solve is a `JudgedGeneration::Solve`, handed back on
+  `AiService::JudgedSet#solves` and written to `judge_solves` by the jobs; solves
+  never ride `outcomes` or `finish`, and `shipped` comes from the control flow.
   `.reject_unusable!` refuses unusable pieces or keys; `DEFERRED_CONCEPTS`
   stay out of its vocabulary; `.rejudge_edits?` is true only here;
   `REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL` stays false until a person has read

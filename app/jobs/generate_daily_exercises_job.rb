@@ -1,4 +1,6 @@
 class GenerateDailyExercisesJob < ApplicationJob
+  include RecordsJudgeSolves
+
   queue_as :default
 
   limits_concurrency key: ->(args = {}) { args[:user_id] },
@@ -68,16 +70,7 @@ class GenerateDailyExercisesJob < ApplicationJob
     judged   = judge ? service.generate_judged_exercise(user, language: language)
                      : service.generate_unjudged_exercise(user, language: language)
 
-    DailyExercise.create!(
-      user:             user,
-      date:             Date.current,
-      problem_set:      judged.problem_set,
-      dropped_sections: judged.dropped_sections,
-      plan_notes:       judged.plan_notes,
-      generated_at:     Time.current,
-      language:         language
-    )
-
+    write_set(user, judged, language, service)
     user.clear_generation_failure! if user.last_generation_error_date.present?
 
     Rails.logger.info("Generated exercise for user #{user.id} on #{Date.current}")
@@ -93,6 +86,21 @@ class GenerateDailyExercisesJob < ApplicationJob
   rescue ActiveRecord::RecordInvalid => e
     raise unless e.record.errors[:date].present?
     Rails.logger.info("Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)")
+  end
+
+  def write_set(user, judged, language, service)
+    DailyExercise.transaction do
+      exercise = DailyExercise.create!(
+        user:             user,
+        date:             Date.current,
+        problem_set:      judged.problem_set,
+        dropped_sections: judged.dropped_sections,
+        plan_notes:       judged.plan_notes,
+        generated_at:     Time.current,
+        language:         language
+      )
+      record_judge_solves(exercise, judged.solves, drafted_by: service)
+    end
   end
 
   # Two generations can race and the loser writes last, so with a set present, clear the error instead.
