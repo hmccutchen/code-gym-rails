@@ -91,6 +91,8 @@ this one.
 
 ## Wed Oct 21
 
+### Hassan
+
 - the pseudocode critique claim onto `DailyResponse`, with a token so a
   stale caller can't clear a newer claim `#474`
 - one raising `wait_for` and one 20-second wait limit for the system specs
@@ -99,3 +101,11 @@ this one.
   should wait for it; the app already does, and the spec was fixed instead
 - `ProfileController`'s checks and `User`'s level callbacks into a
   `ProfileUpdate` form `#476 open`
+
+### Hassan
+
+- rotate every production secret after the Railway breach `#482`
+  **why:** Railway reported a breach and paused builds
+  **I decided:** clear the stored provider keys and have users add new ones,
+  rather than re-encrypt keys that may already be exposed; build the PR now and
+  merge it with the new variables once Railway is back
