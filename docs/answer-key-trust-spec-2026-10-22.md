@@ -633,6 +633,10 @@ Stimulus controller is needed.
 
 **Header:** plain counts, no computed bound or branch. You apply the
 decision rule from these yourself.
+- **Every count covers readable rows only.** A hidden row's outcome would
+  say whether today's unanswered design comparison was a mismatch.
+- **One line, "withheld pending review: n",** keeps the denominator honest
+  without saying anything about the rows in it.
 - solved, matched, mismatched and unsolved, by source
 - edits reverted, by reason and by source
 - **mismatch calls:** a table of `human_call` by source (live, replay,
@@ -664,10 +668,18 @@ decision rule from these yourself.
 are rendered only once that exercise's `DailyResponse` is reviewed. Before
 that, the entry shows as "waiting for the engineer's review", with no
 pieces, key, pick or form. This applies to replay records too, since a
-replay judges a shipped section. A record that never shipped (a rejected
-draft, a dropped retry, a reverted edit's edited text) shows at once. The
-admin is also a user, and the answer-key rule forbids showing a key on a
-page before review.
+replay judges a shipped section.
+
+A row is shown before review only when it is positively known never to
+have reached the engineer:
+- a rejected attempt that a retry replaced with freshly generated pieces
+- every attempt of a dropped section
+- a synthetic record
+
+Anything unproven stays hidden. That includes a reverted edit's edited text
+and the pre-edit draft of a kept edit, because an edit only changes the
+prose, so both carry the shipped pieces and key. The admin is also a user,
+and the answer-key rule forbids showing a key on a page before review.
 
 **Links.** The suggested-concepts page links to this page. Copy goes under
 `admin.judge_solves` in `config/locales/en.yml`.
@@ -741,7 +753,10 @@ page before review.
   - an unreviewed shipped record hides its key, pick and form, for both
     sources
   - a reviewed one shows them
-  - a never-shipped one shows at once
+  - a row known never to have been shown (a replaced attempt, a dropped
+    section) shows at once, and a reverted edit's edited text stays hidden
+  - the header's counts leave hidden rows out, and the withheld line counts
+    them
   - each filter works
   - `matched_sample` serves only uncalled, solved, matched records, from
     live and replay only, never past `n`, and never an unreviewed shipped
