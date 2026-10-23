@@ -10,7 +10,7 @@ class SessionsController < ApplicationController
 
   limit_login_code_requests only: :create
 
-  rate_limit to: 10, within: User::LOGIN_CODE_EXPIRY,
+  rate_limit to: 10, within: User::LOGIN_RATE_LIMIT_WINDOW,
              with:  -> { rate_limited(t("sessions.rate_limited.code_attempts")) },
              store: RATE_LIMIT_STORE,
              name:  "code_attempts",

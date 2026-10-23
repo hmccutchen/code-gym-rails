@@ -19,6 +19,17 @@ RSpec.describe "Login rate limits", type: :request do
       expect(response.body).to include('name="email"')
     end
 
+    it "keeps an address's request limit for longer than a code lives" do
+      5.times { post login_path, params: { email: "dev@example.com" } }
+
+      travel(User::LOGIN_CODE_EXPIRY + 2.minutes) do
+        expect {
+          post login_path, params: { email: "dev@example.com" }
+        }.not_to have_enqueued_mail(UserMailer, :login_code)
+      end
+      expect(response).to have_http_status(:too_many_requests)
+    end
+
     it "keeps the refused request's message off the pending code field" do
       5.times do
         post login_path, params: { email: "dev@example.com" }

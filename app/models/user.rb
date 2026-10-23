@@ -54,7 +54,8 @@ class User < ApplicationRecord
 
   def push_reminders_enabled? = !reminders_none?
 
-  LOGIN_CODE_EXPIRY = 15.minutes
+  LOGIN_CODE_EXPIRY = 10.minutes
+  LOGIN_RATE_LIMIT_WINDOW = 15.minutes
   LOGIN_CODE_MAX_ATTEMPTS = 5
 
   def self.login_code_expiry_in_words

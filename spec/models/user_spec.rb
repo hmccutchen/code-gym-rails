@@ -167,6 +167,15 @@ RSpec.describe User, type: :model do
       end
     end
 
+    it "accepts a code at 9 minutes and refuses it at 11" do
+      user = create_user
+      raw_code = user.generate_login_code!
+      travel(9.minutes) { expect(User.authenticate_login_code(email: user.email, code: raw_code)).to eq(user) }
+
+      raw_code = user.generate_login_code!
+      travel(11.minutes) { expect(User.authenticate_login_code(email: user.email, code: raw_code)).to be_nil }
+    end
+
     it "returns nil for an email with no pending login" do
       create_user
       expect(User.authenticate_login_code(email: "nobody@example.com", code: "123456")).to be_nil
