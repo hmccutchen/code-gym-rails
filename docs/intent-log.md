@@ -141,6 +141,7 @@ this one.
 - replay first against a local dump of `daily_exercises`, then production
   **why:** the real mismatch rate the night stage 1 merges, for under a
   dollar, tells me whether there's enough signal to continue
+- stage 1: send OpenAI the judge's reply schema, with a tool to measure it `#485`
 
 *Postponed: the recurring systems themselves, until I've read real mismatch
 data.*
