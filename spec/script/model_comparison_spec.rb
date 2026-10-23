@@ -95,7 +95,7 @@ RSpec.describe ModelComparison do
   it "leaves DailyPlan.for as it found it" do
     comparison.generate(user.id)
 
-    expect(DailyPlan.method(:for).source_location.first).to end_with("app/services/daily_plan.rb")
+    expect(DailyPlan.method(:for).source_location.first).to end_with("app/models/daily_plan.rb")
   end
 
   it "prints the rating, missed points and next step of each answered section's review" do

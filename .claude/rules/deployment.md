@@ -10,7 +10,7 @@ paths:
   - "config/environments/**"
   - "config/initializers/active_record_encryption.rb"
   - "lib/boot/**"
-  - "app/services/schema_wait.rb"
+  - "app/clients/schema_wait.rb"
   - "db/migrate/**"
 ---
 

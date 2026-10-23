@@ -253,7 +253,7 @@ it nil; the `judge_review` row of `CallProfiles::BY_PURPOSE` sets
 `single_attempt`, and no other profile does. The additive-keyword pattern
 was replaced because each new keyword meant editing five `app/` files and
 every spec that overrode `#call`, while the settings are facts about a purpose.
-`spec/services/provider_request_characterization_spec.rb` records the body
+`spec/clients/provider_request_characterization_spec.rb` records the body
 each purpose's request sends to each provider and fails on any changed
 byte, which holds every caller that passes no schema byte-identical.
 

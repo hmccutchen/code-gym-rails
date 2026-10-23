@@ -10,7 +10,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
       problem_set: { "code_review" => { "question" => "Find the issue", "snippet" => "def a; end", "pitched_at" => level } })
     DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
       answers: { "code_review" => "An answer with sufficient detail" }, section_ratings: { "code_review" => "right_level" },
-      ai_review: { "code_review" => { "rating" => "solid", "correct" => "Correct", "rubric" => AiService::RUBRIC_VERSION } })
+      ai_review: { "code_review" => { "rating" => "solid", "correct" => "Correct", "rubric" => ReviewedSectionResults::RUBRIC_VERSION } })
   end
 
   def qualifying_days

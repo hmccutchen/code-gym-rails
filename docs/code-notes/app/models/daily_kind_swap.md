@@ -7,7 +7,7 @@ is shaped the way it is.
 ## Why it lives in `app/models`
 
 It reads `DailyExercise#regeneration_offered?`, which reads trial state, and
-CLAUDE.md keeps trial state out of everything under `app/services`. It sits
+CLAUDE.md keeps trial state out of `app/services`. It sits
 beside `ConceptDrills`, the other user-locked write that is not a record.
 
 ## The order of the checks
