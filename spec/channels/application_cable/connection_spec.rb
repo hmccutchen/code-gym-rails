@@ -8,6 +8,12 @@ RSpec.describe ApplicationCable::Connection, type: :channel do
     expect(connection.current_user).to eq(user)
   end
 
+  it "rejects a session that still names an anonymized user" do
+    user.anonymize!
+
+    expect { connect session: { user_id: user.id } }.to have_rejected_connection
+  end
+
   it "rejects the connection when there is no logged-in user in the session" do
     expect { connect session: {} }.to have_rejected_connection
   end
