@@ -22,9 +22,9 @@ class GeminiService < AiService
 
   # `methods: []` routes every retry decision through retry_if; a listed method is retried without consulting it.
   RETRY_OPTIONS = {
-    max:                 AiService::RETRY_MAX,
+    max:                 CallProfiles::RETRY_MAX,
     interval:            0.5,
-    max_interval:        AiService::RETRY_MAX_INTERVAL,
+    max_interval:        CallProfiles::RETRY_MAX_INTERVAL,
     backoff_factor:      2,
     interval_randomness: 0.5,
     methods:             [],
@@ -130,8 +130,8 @@ class GeminiService < AiService
 
   def build_connection
     Faraday.new do |f|
-      f.options.open_timeout      = OPEN_TIMEOUT
-      f.options.timeout           = READ_TIMEOUT
+      f.options.open_timeout      = CallProfiles::OPEN_TIMEOUT
+      f.options.timeout           = CallProfiles::READ_TIMEOUT
       f.headers["x-goog-api-key"] = @api_key
       f.headers["content-type"]   = "application/json"
       f.request :retry, RETRY_OPTIONS

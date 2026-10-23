@@ -19,7 +19,7 @@ was cron-only at first, but a user who opened the dashboard before their
 8am tick got an on-demand set, and the batch then found the day filled, so
 an early riser was rarely judged. The cost of the change is a longer
 spinner on the dashboard, which is why `dashboard/_generating` polls for
-`AiService::JUDGED_GENERATION_BUDGET` rather than the draft's budget alone.
+`CallProfiles::JUDGED_GENERATION_BUDGET` rather than the draft's budget alone.
 A weekend "generate anyway" set stays on the single-stage path.
 
 **Regeneration is judged on a weekday, under a deadline.**
@@ -49,7 +49,7 @@ start, so a slow pickup comes out of the same budget.
   included) must still end in time, or it raises `ProviderError::DeadlineError`,
   a `TimeoutError`. The worst case comes from the request itself, so a
   blocking request reserves its shorter read and not the profile's. It shares
-  one formula with `AiService.worst_case_seconds_for`, which the constants
+  one formula with `CallProfiles.worst_case_seconds_for`, which the constants
   above use. Checking the worst case rather than the clock alone makes the
   deadline a ceiling on the job: a call begun just before it can't overrun.
 - **What a stop costs.** Because the check sits in `call_and_log`, it runs
@@ -249,7 +249,7 @@ mention JSON was judged on OpenAI (#253).
 `history:` before them. They are now fields of `AiService::Request`.
 `judge_section` and `judge_review_prose` (`ReviewProseVerdict.schema`) pass
 a schema to `AiService.request_for` per call, and every other caller leaves
-it nil; the `judge_review` row of `AiService::CALL_PROFILES` sets
+it nil; the `judge_review` row of `CallProfiles::BY_PURPOSE` sets
 `single_attempt`, and no other profile does. The additive-keyword pattern
 was replaced because each new keyword meant editing five `app/` files and
 every spec that overrode `#call`, while the settings are facts about a purpose.

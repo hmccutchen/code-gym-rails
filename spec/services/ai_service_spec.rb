@@ -9,32 +9,32 @@ RSpec.describe AiService do
     REVIEW_OVERHEAD_SECONDS = 1.minute.to_i
 
     def provider_review_budget_seconds
-      (TRANSLATIONS_BEFORE_GRADING * AiService.worst_case_call_seconds(AiService::READ_TIMEOUT)) +
-        AiService.worst_case_call_seconds(AiService::REVIEW_READ_TIMEOUT) +
-        AiService.single_attempt_call_seconds(AiService::REVIEW_JUDGE_READ_TIMEOUT) +
+      (TRANSLATIONS_BEFORE_GRADING * CallProfiles.worst_case_call_seconds(CallProfiles::READ_TIMEOUT)) +
+        CallProfiles.worst_case_call_seconds(CallProfiles::REVIEW_READ_TIMEOUT) +
+        CallProfiles.single_attempt_call_seconds(CallProfiles::REVIEW_JUDGE_READ_TIMEOUT) +
         AiService::DIFFICULTY_ASSESSMENT_GRACE_SECONDS
     end
 
     it "counts one attempt and its open timeout for a single-attempt call" do
-      expect(AiService.single_attempt_call_seconds(30)).to eq(30 + AiService::OPEN_TIMEOUT)
+      expect(CallProfiles.single_attempt_call_seconds(30)).to eq(30 + CallProfiles::OPEN_TIMEOUT)
     end
 
     it "counts every attempt and its open timeout in a call's worst case" do
-      expect(AiService.worst_case_call_seconds(AiService::GENERATION_READ_TIMEOUT))
-        .to eq((AiService::RETRY_MAX + 1) * (AiService::GENERATION_READ_TIMEOUT + AiService::OPEN_TIMEOUT) +
-               (AiService::RETRY_MAX * AiService::RETRY_MAX_INTERVAL))
+      expect(CallProfiles.worst_case_call_seconds(CallProfiles::GENERATION_READ_TIMEOUT))
+        .to eq((CallProfiles::RETRY_MAX + 1) * (CallProfiles::GENERATION_READ_TIMEOUT + CallProfiles::OPEN_TIMEOUT) +
+               (CallProfiles::RETRY_MAX * CallProfiles::RETRY_MAX_INTERVAL))
     end
 
     it "gives a judged generation every attempt of each stage, for every retry the most-retried kind gets" do
       retry_cycles = [ DailyPlan::DAILY_JUDGE_RETRIES, DailyPlan::ROTATED_JUDGE_RETRIES ].max
-      stages = [ AiService::GENERATION_READ_TIMEOUT, AiService::READ_TIMEOUT ] +
-               ([ AiService::RETRY_READ_TIMEOUT, AiService::READ_TIMEOUT ] * retry_cycles) +
-               [ AiService::READ_TIMEOUT ]
+      stages = [ CallProfiles::GENERATION_READ_TIMEOUT, CallProfiles::READ_TIMEOUT ] +
+               ([ CallProfiles::RETRY_READ_TIMEOUT, CallProfiles::READ_TIMEOUT ] * retry_cycles) +
+               [ CallProfiles::READ_TIMEOUT ]
 
       expect(retry_cycles).to eq(2)
       expect(ExerciseSection.all.select(&:rejudge_edits?)).to eq([ ExerciseSection::DesignComparison ])
-      expect(AiService::JUDGED_GENERATION_BUDGET)
-        .to be >= stages.sum { |timeout| AiService.worst_case_call_seconds(timeout) }
+      expect(CallProfiles::JUDGED_GENERATION_BUDGET)
+        .to be >= stages.sum { |timeout| CallProfiles.worst_case_call_seconds(timeout) }
     end
 
     it "keeps a judged generation shorter than the interval between batch ticks, so the batch never bills a second generation for the same day" do
@@ -42,7 +42,7 @@ RSpec.describe AiService do
       schedule = YAML.load_file(Rails.root.join("config/recurring.yml"))
                      .fetch("production").fetch("generate_daily_exercises").fetch("schedule")
 
-      expect(AiService::JUDGED_GENERATION_BUDGET).to be < Fugit::Cron.parse(schedule).rough_frequency
+      expect(CallProfiles::JUDGED_GENERATION_BUDGET).to be < Fugit::Cron.parse(schedule).rough_frequency
     end
 
     it "keeps the provider budget below the review claim window" do
@@ -63,17 +63,17 @@ RSpec.describe AiService do
 
     it "reads the retry limits call_budget_seconds assumes" do
       [ ClaudeService, GeminiService, OpenaiService ].each do |provider|
-        expect(provider::RETRY_OPTIONS).to include(max: AiService::RETRY_MAX, max_interval: AiService::RETRY_MAX_INTERVAL)
+        expect(provider::RETRY_OPTIONS).to include(max: CallProfiles::RETRY_MAX, max_interval: CallProfiles::RETRY_MAX_INTERVAL)
       end
     end
 
     it "keeps every computed backoff sleep within RETRY_MAX_INTERVAL, since faraday-retry adds jitter after that cap" do
       [ ClaudeService, GeminiService, OpenaiService ].each do |provider|
         options = provider::RETRY_OPTIONS
-        largest = options[:interval] * (options[:backoff_factor]**(AiService::RETRY_MAX - 1))
+        largest = options[:interval] * (options[:backoff_factor]**(CallProfiles::RETRY_MAX - 1))
         jitter  = options[:interval_randomness] * options[:interval]
 
-        expect([ largest, options[:max_interval] ].min + jitter).to be <= AiService::RETRY_MAX_INTERVAL
+        expect([ largest, options[:max_interval] ].min + jitter).to be <= CallProfiles::RETRY_MAX_INTERVAL
       end
     end
 
@@ -82,7 +82,7 @@ RSpec.describe AiService do
     end
 
     it "gives generation a budget far larger than the short-call one, since it is one long non-streaming call on a thinking model" do
-      expect(AiService::GENERATION_READ_TIMEOUT).to be > AiService::READ_TIMEOUT * 4
+      expect(CallProfiles::GENERATION_READ_TIMEOUT).to be > CallProfiles::READ_TIMEOUT * 4
     end
   end
 
@@ -184,7 +184,7 @@ RSpec.describe AiService do
     ].freeze
 
     it "covers every profiled purpose except the two conversational ones" do
-      all_purposes = AiService::CALL_PROFILES.keys
+      all_purposes = CallProfiles::BY_PURPOSE.keys
 
       expect(all_purposes).to contain_exactly(*SINGLE_SHOT_PURPOSES, "review_follow_up", "duck_thread")
     end
@@ -2623,27 +2623,27 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: full_problem_set.to_json)
       svc.generate_exercise(user)
 
-      expect(svc.last_read_timeout).to eq(AiService::GENERATION_READ_TIMEOUT)
+      expect(svc.last_read_timeout).to eq(CallProfiles::GENERATION_READ_TIMEOUT)
     end
 
     it "tightens the budget when a request thread is blocked on the call" do
       svc = double_class.new(canned_text: full_problem_set.to_json)
       svc.generate_exercise(user, blocking: true)
 
-      expect(svc.last_read_timeout).to eq(AiService::SYNC_GENERATION_READ_TIMEOUT)
+      expect(svc.last_read_timeout).to eq(CallProfiles::SYNC_GENERATION_READ_TIMEOUT)
     end
 
     it "keeps the blocking budget between the short-call and worker budgets" do
-      expect(AiService::SYNC_GENERATION_READ_TIMEOUT).to be > AiService::READ_TIMEOUT
-      expect(AiService::SYNC_GENERATION_READ_TIMEOUT).to be < AiService::GENERATION_READ_TIMEOUT
+      expect(CallProfiles::SYNC_GENERATION_READ_TIMEOUT).to be > CallProfiles::READ_TIMEOUT
+      expect(CallProfiles::SYNC_GENERATION_READ_TIMEOUT).to be < CallProfiles::GENERATION_READ_TIMEOUT
     end
 
     it "computes the worst-case wait for whichever read timeout it is given" do
-      expect(AiService.call_budget_seconds(AiService::READ_TIMEOUT))
-        .to eq((AiService::READ_TIMEOUT * (AiService::RETRY_MAX + 1)) + (AiService::RETRY_MAX * AiService::RETRY_MAX_INTERVAL))
+      expect(CallProfiles.call_budget_seconds(CallProfiles::READ_TIMEOUT))
+        .to eq((CallProfiles::READ_TIMEOUT * (CallProfiles::RETRY_MAX + 1)) + (CallProfiles::RETRY_MAX * CallProfiles::RETRY_MAX_INTERVAL))
 
-      expect(AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT))
-        .to be > AiService.call_budget_seconds(AiService::READ_TIMEOUT)
+      expect(CallProfiles.call_budget_seconds(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT))
+        .to be > CallProfiles.call_budget_seconds(CallProfiles::READ_TIMEOUT)
     end
 
     it "sends each grading call with the review budget and the difficulty note with the short one" do
@@ -2654,8 +2654,8 @@ RSpec.describe AiService do
       svc.review_sections(user, exercise, response, sections: %w[code_review])
 
       expect(double_class.read_timeouts_by_purpose).to contain_exactly(
-        [ "review_response",   AiService::REVIEW_READ_TIMEOUT ],
-        [ "assess_difficulty", AiService::READ_TIMEOUT ]
+        [ "review_response",   CallProfiles::REVIEW_READ_TIMEOUT ],
+        [ "assess_difficulty", CallProfiles::READ_TIMEOUT ]
       )
     end
 
@@ -2674,9 +2674,9 @@ RSpec.describe AiService do
       svc.review_sections(user, exercise, response, sections: %w[pseudocode_to_code])
 
       expect(double_class.read_timeouts_by_purpose).to contain_exactly(
-        [ "pseudocode_translate", AiService::READ_TIMEOUT ],
-        [ "review_response",      AiService::REVIEW_READ_TIMEOUT ],
-        [ "assess_difficulty",    AiService::READ_TIMEOUT ]
+        [ "pseudocode_translate", CallProfiles::READ_TIMEOUT ],
+        [ "review_response",      CallProfiles::REVIEW_READ_TIMEOUT ],
+        [ "assess_difficulty",    CallProfiles::READ_TIMEOUT ]
       )
     end
   end
@@ -2944,7 +2944,7 @@ RSpec.describe AiService do
 
       svc.explain_concept_differently(user, reference)
 
-      expect(svc.last_max_tokens).to eq(AiService::CONCEPT_ALTERNATE_MAX_TOKENS)
+      expect(svc.last_max_tokens).to eq(CallProfiles::CONCEPT_ALTERNATE_MAX_TOKENS)
     end
 
     it "logs usage under its own purpose" do
@@ -3310,8 +3310,8 @@ RSpec.describe AiService do
       kind  = ExerciseSection::PseudocodeToCode
       chars = kind::MAX_CRITIQUE_POINTS * kind::MAX_CRITIQUE_POINT_LENGTH
 
-      expect(AiService::PSEUDOCODE_CRITIQUE_MAX_TOKENS).to be > chars / 3
-      expect(AiService::PSEUDOCODE_CRITIQUE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
+      expect(CallProfiles::PSEUDOCODE_CRITIQUE_MAX_TOKENS).to be > chars / 3
+      expect(CallProfiles::PSEUDOCODE_CRITIQUE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
     end
 
     it "gives the thinking partner the problem statement, which is the whole task" do
@@ -3467,8 +3467,8 @@ RSpec.describe AiService do
     end
 
     it "gives a reply room for an explanation while staying far below a review's ceiling" do
-      expect(AiService::DUCK_RESPONSE_MAX_TOKENS).to eq(400)
-      expect(AiService::DUCK_RESPONSE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
+      expect(CallProfiles::DUCK_RESPONSE_MAX_TOKENS).to eq(400)
+      expect(CallProfiles::DUCK_RESPONSE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
     end
 
     it "passes DUCK_RESPONSE_MAX_TOKENS, distinct from other AiService calls' ceilings" do
@@ -3476,8 +3476,8 @@ RSpec.describe AiService do
 
       svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
 
-      expect(svc.last_max_tokens).to eq(AiService::DUCK_RESPONSE_MAX_TOKENS)
-      expect(AiService::DUCK_RESPONSE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
+      expect(svc.last_max_tokens).to eq(CallProfiles::DUCK_RESPONSE_MAX_TOKENS)
+      expect(CallProfiles::DUCK_RESPONSE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
     end
 
     it "logs usage under its own purpose" do
@@ -3686,7 +3686,7 @@ RSpec.describe AiService do
     end
 
     it "keeps its output ceiling" do
-      expect(captured_call(thread: []).max_tokens).to eq(AiService::DUCK_RESPONSE_MAX_TOKENS)
+      expect(captured_call(thread: []).max_tokens).to eq(CallProfiles::DUCK_RESPONSE_MAX_TOKENS)
     end
 
     it "still routes to the duck branch of FakeService" do
@@ -3972,8 +3972,8 @@ RSpec.describe AiService do
       service = double_class.new(canned_text: valid_json)
       service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
 
-      expect(service.last_read_timeout).to eq(AiService::CONCEPT_REFERENCE_READ_TIMEOUT)
-      expect(AiService::CONCEPT_REFERENCE_READ_TIMEOUT).to be > AiService::READ_TIMEOUT
+      expect(service.last_read_timeout).to eq(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT)
+      expect(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT).to be > CallProfiles::READ_TIMEOUT
     end
 
     [ ClaudeService, GeminiService, OpenaiService ].to_h { |provider| [ provider, provider::API_URL ] }.each do |provider_class, url|
@@ -3991,7 +3991,7 @@ RSpec.describe AiService do
         end)
 
         expect { service.generate_concept_reference(user, "n_plus_one", "ruby_rails") }.to raise_error(ProviderError::TimeoutError)
-        expect(attempts).to eq([ [ AiService::CONCEPT_REFERENCE_READ_TIMEOUT, true ] ])
+        expect(attempts).to eq([ [ CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT, true ] ])
       end
     end
 
@@ -4122,7 +4122,7 @@ RSpec.describe AiService do
 
       expect { service.generate_recognition_guide(user, "code_smell") }
         .to change { ApiUsage.where(purpose: "generate_recognition_guide").count }.by(1)
-      expect(service.last_read_timeout).to eq(AiService::CONCEPT_REFERENCE_READ_TIMEOUT)
+      expect(service.last_read_timeout).to eq(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT)
     end
 
     it "cannot see any exercise, because it takes only the user and the group" do
@@ -4321,26 +4321,26 @@ RSpec.describe AiService do
       capturing_class.new(canned_text: { "rating" => "solid" }.to_json)
                      .review_sections(user, exercise, response, sections: %w[code_review])
 
-      expect(caps).to include([ :difficulty, AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS ])
+      expect(caps).to include([ :difficulty, CallProfiles::DIFFICULTY_ASSESSMENT_MAX_TOKENS ])
       expect(caps).to include([ :grade, nil ])
-      expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
+      expect(CallProfiles::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
     end
 
     it "budgets at least 160 tokens per section a day can hold, the observed per-section output (#168)" do
       floor = ExerciseSection::MAX_SECTIONS * 160
 
-      expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be >= floor
+      expect(CallProfiles::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be >= floor
     end
 
     it "grows with the reason length a day's sections may use" do
       longest_valid_reasons = ExerciseSection::MAX_SECTIONS * DailyResponse::MAX_DIFFICULTY_REASON_LENGTH /
-                              AiService::DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN
+                              CallProfiles::DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN
 
-      expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be >= longest_valid_reasons
+      expect(CallProfiles::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be >= longest_valid_reasons
     end
 
     it "is an Integer, since every provider serializes it straight into the request" do
-      expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be_an(Integer)
+      expect(CallProfiles::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be_an(Integer)
     end
 
     it "tells the model the reason's character limit" do
@@ -4638,8 +4638,8 @@ RSpec.describe AiService, "#judge_section" do
     svc.judge_section(user, ExerciseSection::CodeReview, section, rung: "senior", locked: true)
 
     expect(captured.purpose).to eq("judge_section")
-    expect(captured.max_tokens).to eq(AiService::JUDGE_MAX_TOKENS)
-    expect(captured).to have_attributes(read_timeout: AiService::READ_TIMEOUT, cache_system: false,
+    expect(captured.max_tokens).to eq(CallProfiles::JUDGE_MAX_TOKENS)
+    expect(captured).to have_attributes(read_timeout: CallProfiles::READ_TIMEOUT, cache_system: false,
                                         single_attempt: false, allow_truncated: false)
     expect(captured.system).to include("checking one section of a generated coding exercise")
     expect(captured.system).to include("Never reject a problem for being hard.")
@@ -4883,7 +4883,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     { judged: :generate_judged_exercise, unjudged: :generate_unjudged_exercise }.each do |path, method|
       it "checks the draft against the time left after planning, not before it (#{path})" do
         now = [ start ]
-        deadline = GenerationDeadline.new(start + AiService.worst_case_seconds_for("generate_exercise"), clock: -> { now.first })
+        deadline = GenerationDeadline.new(start + CallProfiles.worst_case_seconds_for("generate_exercise"), clock: -> { now.first })
         allow(DailyPlan).to receive(:for).and_wrap_original do |original, *args, **kwargs|
           original.call(*args, **kwargs).tap { now[0] = start + 1 }
         end
@@ -4896,7 +4896,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     end
 
     it "stops a judge call that no longer fits once the draft is back, keeping the drafted sections" do
-      draft_only = start + AiService.worst_case_seconds_for("generate_exercise")
+      draft_only = start + CallProfiles.worst_case_seconds_for("generate_exercise")
       clock = -> { purposes.empty? ? start : draft_only }
       deadline = GenerationDeadline.new(draft_only, clock: clock)
 
@@ -4910,7 +4910,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       service = FakeService.new("fake-key")
       draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false)
       now = [ start ]
-      retry_and_judge = AiService.worst_case_seconds_for("retry_section") + AiService.worst_case_seconds_for("judge_section")
+      retry_and_judge = CallProfiles.worst_case_seconds_for("retry_section") + CallProfiles.worst_case_seconds_for("judge_section")
       deadline = GenerationDeadline.new(start + retry_and_judge, clock: -> { now.first })
       allow(GenerationLadders).to receive(:for).and_wrap_original do |original, *args|
         original.call(*args).tap { now[0] = start + 1 }
@@ -4925,7 +4925,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     it "starts a retry only when its re-judge fits after it, so a retried section is never shipped unjudged" do
       service = FakeService.new("fake-key")
       draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false)
-      retry_alone = GenerationDeadline.new(Time.current + AiService.worst_case_seconds_for("retry_section"))
+      retry_alone = GenerationDeadline.new(Time.current + CallProfiles.worst_case_seconds_for("retry_section"))
 
       expect { service.send(:retry_section, draft, ExerciseSection::Pattern, "service_objects", deadline: retry_alone) }
         .to raise_error(ProviderError::DeadlineError)
@@ -4937,7 +4937,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       ends_at = start + 1.hour
       allow(ProblemSetIngest).to receive(:call).and_wrap_original do |original, *args, **kwargs|
         original.call(*args, **kwargs).tap do
-          now[0] = ends_at - AiService.worst_case_seconds_for("judge_section") + 1 if kwargs[:expected_keys] == [ "code_review" ]
+          now[0] = ends_at - CallProfiles.worst_case_seconds_for("judge_section") + 1 if kwargs[:expected_keys] == [ "code_review" ]
         end
       end
       allow_any_instance_of(FakeService).to receive(:judge_section).and_wrap_original do |original, user, kind, section, **options|
@@ -5307,10 +5307,10 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
 
     expect(timeouts).to eq(
-      "generate_exercise" => AiService::GENERATION_READ_TIMEOUT,
-      "retry_section"     => AiService::RETRY_READ_TIMEOUT
+      "generate_exercise" => CallProfiles::GENERATION_READ_TIMEOUT,
+      "retry_section"     => CallProfiles::RETRY_READ_TIMEOUT
     )
-    expect(AiService::RETRY_READ_TIMEOUT).to be < AiService::GENERATION_READ_TIMEOUT
+    expect(CallProfiles::RETRY_READ_TIMEOUT).to be < CallProfiles::GENERATION_READ_TIMEOUT
   end
 
   it "records a retry separately from the initial draft" do
@@ -5645,15 +5645,15 @@ RSpec.describe AiService, "#judge_review_prose" do
 
   it "calls judge_review once, capped, on its own timeout, with the verdict schema" do
     request = captured_call
-    expect(request).to have_attributes(purpose: "judge_review", max_tokens: AiService::REVIEW_JUDGE_MAX_TOKENS,
-                                       read_timeout: AiService::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true,
+    expect(request).to have_attributes(purpose: "judge_review", max_tokens: CallProfiles::REVIEW_JUDGE_MAX_TOKENS,
+                                       read_timeout: CallProfiles::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true,
                                        cache_system: false, allow_truncated: false,
                                        response_schema: ReviewProseVerdict.schema, system: ReviewProseJudgePrompt::SYSTEM)
   end
 
   it "keeps the measured headroom its cap is justified by" do
-    expect(AiService::REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS * 4)
-      .to be <= AiService::REVIEW_JUDGE_MAX_TOKENS
+    expect(CallProfiles::REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS * 4)
+      .to be <= CallProfiles::REVIEW_JUDGE_MAX_TOKENS
   end
 
   it "shows the projection and never the rating, code, answer or problem" do
@@ -5708,7 +5708,7 @@ RSpec.describe AiService, ".judge_fallback_reason" do
     end
   end
 
-  it "is the table both judges read" do
+  it "is the reason both judges read" do
     expect(JudgedGeneration.private_instance_methods).not_to include(:judge_fallback_reason)
     expect(AiService.private_instance_methods).not_to include(:review_judge_fallback_reason)
   end

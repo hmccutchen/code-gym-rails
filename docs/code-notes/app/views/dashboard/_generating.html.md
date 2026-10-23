@@ -10,7 +10,7 @@ are gone.
 ## Attempt cap
 
 `maxAttempts` derives from the poll interval and the larger of
-`AiService::JUDGED_GENERATION_BUDGET` and
+`CallProfiles::JUDGED_GENERATION_BUDGET` and
 `DailyExercise::REGENERATION_STALE_AFTER`, so a slower judged day never times
 the panel out before the job it is waiting on can finish. The view computes it
 because those constants are Ruby's.
