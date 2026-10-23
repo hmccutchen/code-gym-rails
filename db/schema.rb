@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_23_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_23_110000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -451,8 +451,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_100000) do
     t.jsonb "daily_section_kinds", default: [], null: false
     t.string "otp_secret"
     t.integer "consumed_timestep"
-    t.boolean "otp_required_for_login", default: false, null: false
     t.string "otp_backup_codes", array: true
+    t.datetime "two_factor_enabled_at"
+    t.datetime "second_factor_challenge_at"
+    t.integer "second_factor_challenge_failures", default: 0, null: false
+    t.integer "second_factor_failures", default: 0, null: false
+    t.datetime "second_factor_failures_since"
+    t.datetime "sessions_valid_after"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["invite_code_id"], name: "index_users_on_invite_code_id"
   end
