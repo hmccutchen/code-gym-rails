@@ -56,8 +56,7 @@ class SecondFactorChallengesController < ApplicationController
   def lock_out(retry_at)
     session.delete(PENDING_SECOND_FACTOR)
     @locked = true
-    render_new(t("second_factor_challenges.locked", time: l(retry_at.in_time_zone(@user.effective_time_zone), format: :long)),
-               :too_many_requests)
+    render_new(second_factor_cap_message(@user, retry_at), :too_many_requests)
   end
 
   def end_challenge(message)

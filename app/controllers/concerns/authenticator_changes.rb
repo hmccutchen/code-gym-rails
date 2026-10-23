@@ -19,12 +19,8 @@ module AuthenticatorChanges
     response.headers["Cache-Control"] = "no-store"
   end
 
-  def notify_second_factor_change(change)
-    UserMailer.second_factor_changed(current_user, change.to_s, Time.current).deliver_later
-  end
-
-  def daily_cap_message(retry_at)
-    t("second_factor_challenges.locked", time: l(retry_at.in_time_zone(current_user.effective_time_zone), format: :long))
+  def notify_second_factor_change(change, changed_at = Time.current)
+    UserMailer.second_factor_changed(current_user, change.to_s, changed_at).deliver_later
   end
 
   def show_recovery_codes(codes, notice)

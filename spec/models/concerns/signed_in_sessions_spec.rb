@@ -28,22 +28,38 @@ RSpec.describe SignedInSessions do
     end
   end
 
+  describe ".session_time and .signed_in_recently?" do
+    it "reads back a stamp session_stamp wrote, and nothing else" do
+      at = Time.current.floor(6)
+
+      expect(User.session_time(User.session_stamp(at))).to eq(at)
+      expect(User.session_time("not a stamp")).to be_nil
+      expect(User.session_time(nil)).to be_nil
+    end
+
+    it "counts a sign-in as recent for RECENT_SIGN_IN, and an unreadable stamp never" do
+      expect(User.signed_in_recently?(User.session_stamp(User::RECENT_SIGN_IN.ago + 1.second))).to be(true)
+      expect(User.signed_in_recently?(User.session_stamp(User::RECENT_SIGN_IN.ago - 1.second))).to be(false)
+      expect(User.signed_in_recently?("garbage")).to be(false)
+    end
+  end
+
   describe ".signed_in_through" do
     it "finds the active user a valid session names" do
-      expect(User.signed_in_through({ user_id: user.id, signed_in_at: User.session_stamp })).to eq(user)
+      expect(User.signed_in_through(user_id: user.id, signed_in_at: User.session_stamp)).to eq(user)
     end
 
     it "returns nil for an anonymized user" do
       user.anonymize!
 
-      expect(User.signed_in_through({ user_id: user.id, signed_in_at: User.session_stamp })).to be_nil
+      expect(User.signed_in_through(user_id: user.id, signed_in_at: User.session_stamp)).to be_nil
     end
 
     it "returns nil for a session signed in before sessions_valid_after" do
       stamp = User.session_stamp(1.minute.ago)
       user.update!(sessions_valid_after: Time.current)
 
-      expect(User.signed_in_through({ user_id: user.id, signed_in_at: stamp })).to be_nil
+      expect(User.signed_in_through(user_id: user.id, signed_in_at: stamp)).to be_nil
     end
   end
 end

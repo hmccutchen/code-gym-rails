@@ -45,8 +45,8 @@ RSpec.describe "Second-factor values in the log", type: :request do
 
     get account_authenticator_path
 
-    secret = user.reload.otp_secret
-    expect(response.body).to include(secret)
+    secret = response.body[/secret=([A-Z2-7]+)/, 1]
+    expect(secret).to be_present
     expect(log.string).to include("AuthenticatorsController#show")
     expect(log.string).not_to include(secret)
     expect(log.string).not_to include("otpauth://")

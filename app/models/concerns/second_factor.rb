@@ -6,10 +6,10 @@ module SecondFactor
   SECOND_FACTOR_FAILURE_WINDOW = 24.hours
   SECOND_FACTOR_CHALLENGE_FAILURES = 5
   SECOND_FACTOR_CHALLENGE_LIFETIME = 5.minutes
-  RECENT_SIGN_IN = 15.minutes
   RECOVERY_CODE_COUNT = 10
+  RECOVERY_CODE_LENGTH = 10
   RECOVERY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".freeze
-  RECOVERY_CODE_SHAPE = /\A[#{RECOVERY_CODE_ALPHABET}]{10}\z/
+  RECOVERY_CODE_SHAPE = /\A[#{RECOVERY_CODE_ALPHABET}]{#{RECOVERY_CODE_LENGTH}}\z/
   TOTP_ISSUER = "Coding Gym".freeze
   TOTP_INTERVAL = 30
 
@@ -23,6 +23,10 @@ module SecondFactor
     encrypts :otp_secret
   end
 
+  class_methods do
+    def new_second_factor_secret = ROTP::Base32.random
+  end
+
   def two_factor_enabled?
     two_factor_enabled_at.present?
   end
@@ -31,28 +35,22 @@ module SecondFactor
     otp_backup_codes.to_a.size
   end
 
-  def authenticator_uri
-    totp_for(otp_secret).provisioning_uri(email)
+  def authenticator_uri(secret)
+    totp_for(secret).provisioning_uri(email)
   end
 
-  def prepare_second_factor!
-    with_lock do
-      next if two_factor_enabled?
-      update!(otp_secret: ROTP::Base32.random) if otp_secret.blank?
-      otp_secret
-    end
-  end
-
-  def enable_second_factor!(code)
+  # The secret is the setup page's own, from its session; it reaches the row only here, once a code for it verifies.
+  def enable_second_factor!(code, secret:)
+    step = secret.present? && matching_totp_step(normalize_code(code), secret)
+    codes = step ? new_recovery_codes : []
+    digests = recovery_code_digests(codes)
     with_lock do
       next Outcome.new(status: :already_on) if two_factor_enabled?
-      step = otp_secret.present? && matching_totp_step(normalize_code(code))
       next Outcome.new(status: :rejected) unless step
 
       now = Time.current.floor(6)
-      codes = new_recovery_codes
-      update!(consumed_timestep: step, two_factor_enabled_at: now, sessions_valid_after: now,
-              otp_backup_codes: recovery_code_digests(codes))
+      update!(otp_secret: secret, consumed_timestep: step, two_factor_enabled_at: now, sessions_valid_after: now,
+              otp_backup_codes: digests)
       Outcome.new(status: :enabled, recovery_codes: codes, changed_at: now, remaining: codes.size)
     end
   end
@@ -68,11 +66,9 @@ module SecondFactor
   end
 
   def second_factor_challenge_open?(issued_at)
-    issued = Time.iso8601(issued_at.to_s)
-    second_factor_challenge_at.present? && issued == second_factor_challenge_at &&
+    issued = self.class.session_time(issued_at)
+    issued.present? && second_factor_challenge_at.present? && issued == second_factor_challenge_at &&
       second_factor_challenge_at > SECOND_FACTOR_CHALLENGE_LIFETIME.ago
-  rescue ArgumentError
-    false
   end
 
   def answer_second_factor_challenge!(code, issued_at:)
@@ -84,12 +80,13 @@ module SecondFactor
   end
 
   def regenerate_recovery_codes!(code)
+    codes = new_recovery_codes
+    digests = recovery_code_digests(codes)
     with_lock do
       verified = verify_under_lock(code)
       next verified unless verified.accepted?
 
-      codes = new_recovery_codes
-      update!(otp_backup_codes: recovery_code_digests(codes))
+      update!(otp_backup_codes: digests)
       Outcome.new(status: :regenerated, recovery_codes: codes, remaining: codes.size)
     end
   end
@@ -154,9 +151,9 @@ module SecondFactor
     Outcome.new(status: :recovery_code, remaining: otp_backup_codes.size)
   end
 
-  def matching_totp_step(code)
+  def matching_totp_step(code, secret = otp_secret)
     after = consumed_timestep && consumed_timestep * TOTP_INTERVAL
-    timestamp = totp_for(otp_secret).verify(code, drift_behind: TOTP_INTERVAL, drift_ahead: TOTP_INTERVAL, after: after)
+    timestamp = totp_for(secret).verify(code, drift_behind: TOTP_INTERVAL, drift_ahead: TOTP_INTERVAL, after: after)
     timestamp && timestamp / TOTP_INTERVAL
   end
 
@@ -186,8 +183,8 @@ module SecondFactor
 
   def new_recovery_codes
     Array.new(RECOVERY_CODE_COUNT) do
-      letters = Array.new(10) { RECOVERY_CODE_ALPHABET[SecureRandom.random_number(RECOVERY_CODE_ALPHABET.size)] }
-      "#{letters.first(5).join}-#{letters.last(5).join}"
+      letters = Array.new(RECOVERY_CODE_LENGTH) { RECOVERY_CODE_ALPHABET[SecureRandom.random_number(RECOVERY_CODE_ALPHABET.size)] }
+      letters.each_slice(RECOVERY_CODE_LENGTH / 2).map(&:join).join("-")
     end
   end
 

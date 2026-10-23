@@ -19,33 +19,27 @@ RSpec.describe SecondFactor, type: :model do
     User::SECOND_FACTOR_DAILY_FAILURES.times { user.verify_second_factor!(wrong_totp(secret)) }
   end
 
-  describe "#prepare_second_factor!" do
-    it "makes a 160-bit secret once and returns the same one to a second setup page" do
-      secret = user.prepare_second_factor!
+  describe ".new_second_factor_secret" do
+    it "makes a fresh 160-bit secret each time" do
+      secret = User.new_second_factor_secret
 
       expect(ROTP::Base32.decode(secret).bytesize).to eq(20)
-      expect(User.find(user.id).prepare_second_factor!).to eq(secret)
-    end
-
-    it "returns nothing once the authenticator is on" do
-      enroll_second_factor(user)
-
-      expect(user.prepare_second_factor!).to be_nil
+      expect(User.new_second_factor_secret).not_to eq(secret)
     end
   end
 
   describe "#enable_second_factor!" do
-    it "needs a valid code for the pending secret" do
-      secret = user.prepare_second_factor!
+    let(:secret) { User.new_second_factor_secret }
 
-      expect(user.enable_second_factor!(wrong_totp(secret)).status).to eq(:rejected)
+    it "needs a valid code for the setup page's secret, and stores nothing until one verifies" do
+      expect(user.enable_second_factor!(wrong_totp(secret), secret: secret).status).to eq(:rejected)
+      expect(user.enable_second_factor!(code_at(secret, 0), secret: nil).status).to eq(:rejected)
       expect(user.reload.two_factor_enabled?).to be(false)
+      expect(user.otp_secret).to be_nil
     end
 
     it "turns it on, returns ten recovery codes and ends earlier sessions at the same time" do
-      secret = user.prepare_second_factor!
-
-      outcome = user.enable_second_factor!(code_at(secret, 0))
+      outcome = user.enable_second_factor!(code_at(secret, 0), secret: secret)
 
       expect(outcome.status).to eq(:enabled)
       expect(outcome.recovery_codes.size).to eq(User::RECOVERY_CODE_COUNT)
@@ -53,18 +47,19 @@ RSpec.describe SecondFactor, type: :model do
       user.reload
       expect(user.two_factor_enabled_at).to eq(outcome.changed_at)
       expect(user.sessions_valid_after).to eq(outcome.changed_at)
+      expect(user.otp_secret).to eq(secret)
     end
 
     it "refuses a second call without making new codes" do
       secret, _codes = enroll_second_factor(user)
       digests = user.reload.otp_backup_codes
 
-      expect(user.enable_second_factor!(code_at(secret, 0)).status).to eq(:already_on)
+      expect(user.enable_second_factor!(code_at(secret, 0), secret: User.new_second_factor_secret).status).to eq(:already_on)
       expect(user.reload.otp_backup_codes).to eq(digests)
     end
 
-    it "refuses a code when no secret has been prepared" do
-      expect(user.enable_second_factor!("123456").status).to eq(:rejected)
+    it "refuses a code when the session holds no setup secret" do
+      expect(user.enable_second_factor!("123456", secret: nil).status).to eq(:rejected)
     end
   end
 
@@ -287,7 +282,7 @@ RSpec.describe SecondFactor, type: :model do
   end
 
   it "stores otp_secret encrypted" do
-    secret = user.prepare_second_factor!
+    secret, _codes = enroll_second_factor(user)
 
     raw = User.connection.select_value("SELECT otp_secret FROM users WHERE id = #{user.id}")
 

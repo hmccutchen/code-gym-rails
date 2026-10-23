@@ -10,7 +10,7 @@ class RecoveryCodesController < ApplicationController
     case outcome.status
     when :regenerated then regenerated(outcome.recovery_codes)
     when :rejected    then redirect_to account_path, alert: t("authenticators.code_rejected")
-    when :locked      then redirect_to account_path, alert: daily_cap_message(outcome.retry_at)
+    when :locked      then redirect_to account_path, alert: second_factor_cap_message(current_user, outcome.retry_at)
     else raise ArgumentError, "unhandled recovery code outcome: #{outcome.status}"
     end
   end

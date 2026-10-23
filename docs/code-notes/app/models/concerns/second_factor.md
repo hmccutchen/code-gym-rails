@@ -1,10 +1,12 @@
 # app/models/concerns/second_factor.rb
 
-The optional authenticator app. `docs/optional-totp-spec-2026-10-23.md` has the decisions; this note covers the parts of the code that look odd without them.
+The optional authenticator app. `docs/decisions/passwordless-sign-in.md` has the decisions; this note covers the parts of the code that look odd without them.
 
 ## Every write runs under the row lock
 
 Each public method that reads and then writes the second-factor columns runs inside `with_lock`, which reloads the row first. Two submits of the same code then run one after the other, and the second sees the step the first stored. `verify_under_lock` exists so `regenerate_recovery_codes!` and `disable_second_factor!` can verify inside the lock they already hold.
+
+The ten recovery-code digests are built before the lock is taken, since nothing in them depends on the row. At production cost they take about two seconds, and the login code check waits on the same row lock. `enable_second_factor!` checks the code against the given secret first and builds digests only when it matches, so a wrong setup code costs no bcrypt work. `regenerate_recovery_codes!` can't tell beforehand whether a recovery-shaped code is right, so it builds them on every call; the change rate limit and the daily cap bound that.
 
 ## Telling a TOTP from a recovery code by shape
 

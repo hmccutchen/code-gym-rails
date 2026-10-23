@@ -48,14 +48,17 @@ read it before changing that area.
   with `User.session_stamp`, and a session counts only while that stamp is at
   or after `users.sessions_valid_after`. `current_user` and the cable
   connection both resolve the user through `User.signed_in_through`, never a
-  lookup of their own. A new sign-in path that skips the stamp signs its
+  lookup of their own, and pass it the two session values rather than the
+  session. `User.session_time` is the one reader of a stamp. A new sign-in path that skips the stamp signs its
   users out on their next request.
 - **Second factor** (`docs/decisions/passwordless-sign-in.md`): an optional
   authenticator app (`SecondFactor`). Every read-then-write of its columns
   runs under the user row lock. Every count of wrong codes lives on the row,
   never in the session. Recovery-shaped input is compared only against the
   bcrypt digests and anything else only as a TOTP. Turning it on needs a
-  sign-in from the last 15 minutes; turning it off or making new codes needs
+  sign-in from the last 15 minutes and a code for the setup key, which lives
+  only in that browser's session until the code verifies, so no other session
+  ever sees the key that gets enrolled; turning it off or making new codes needs
   an authenticator or recovery code, never the emailed code. Turning it on or
   off sets `sessions_valid_after` and re-stamps the current session. Every
   code field is named `otp_code`, and pages showing the key or codes send

@@ -5,12 +5,12 @@ RSpec.describe "Authenticator setup", type: :request do
 
   let(:user) { create_user_with_key(email: "dev@example.com") }
 
-  def secret_on_page
-    response.body[/secret=([A-Z2-7]+)/, 1]
+  def secret_on_page(browser = self)
+    browser.response.body[/secret=([A-Z2-7]+)/, 1]
   end
 
-  def setup_code_for(account)
-    current_totp(account.reload.otp_secret)
+  def setup_code(browser = self)
+    current_totp(secret_on_page(browser))
   end
 
   def sign_in_with_both_factors(account, secret)
@@ -48,13 +48,13 @@ RSpec.describe "Authenticator setup", type: :request do
 
       get account_authenticator_path
 
-      secret = user.reload.otp_secret
+      secret = secret_on_page
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("otpauth://totp/Coding%20Gym:dev%40example.com?secret=#{secret}")
       expect(response.body).to include(secret.scan(/.{1,4}/).join(" "))
       svg = Nokogiri::HTML5(response.body).at_css("svg.qr-code")
       expect(svg).to be_present
-      expect(svg.to_html).to eq(Nokogiri::HTML5(helper_svg_for(user)).at_css("svg.qr-code").to_html)
+      expect(svg.to_html).to eq(Nokogiri::HTML5(helper_svg_for(user, secret)).at_css("svg.qr-code").to_html)
     end
 
     it "is never cached" do
@@ -74,8 +74,40 @@ RSpec.describe "Authenticator setup", type: :request do
       expect(response).to redirect_to(account_path)
     end
 
-    def helper_svg_for(account)
-      ApplicationController.helpers.extend(AuthenticatorSetupsHelper).qr_code_svg(account.authenticator_uri)
+    def helper_svg_for(account, secret)
+      ApplicationController.helpers.extend(AuthenticatorSetupsHelper).qr_code_svg(account.authenticator_uri(secret))
+    end
+  end
+
+  describe "the setup key" do
+    it "stays in this browser's session, off the account, until a right code turns the authenticator on" do
+      login_as(user)
+      get account_authenticator_path
+      first_view = secret_on_page
+
+      get account_authenticator_path
+
+      expect(secret_on_page).to eq(first_view)
+      expect(user.reload.otp_secret).to be_nil
+    end
+
+    it "differs between sessions, so a key read in another one is never the key the owner enrolls" do
+      intruder = open_session
+      owner = open_session
+      [ intruder, owner ].each do |browser|
+        browser.post login_path, params: { email: user.email }
+        browser.post verify_login_code_path, params: { code: user.generate_login_code! }
+        browser.get account_authenticator_path
+      end
+      intruder_key = secret_on_page(intruder)
+      owner_key = secret_on_page(owner)
+      expect(intruder_key).not_to eq(owner_key)
+
+      owner.post account_authenticator_path, params: { otp_code: current_totp(owner_key) }
+
+      expect(user.reload.two_factor_enabled?).to be(true)
+      expect(user.otp_secret).to eq(owner_key)
+      expect(user.otp_secret).not_to eq(intruder_key)
     end
   end
 
@@ -84,7 +116,7 @@ RSpec.describe "Authenticator setup", type: :request do
       login_as(user)
       get account_authenticator_path
 
-      post account_authenticator_path, params: { otp_code: setup_code_for(user) }
+      post account_authenticator_path, params: { otp_code: setup_code }
 
       expect(response).to have_http_status(:ok)
       expect(response.headers["Cache-Control"]).to eq("no-store")
@@ -92,7 +124,7 @@ RSpec.describe "Authenticator setup", type: :request do
       expect(codes.size).to eq(10)
       expect(user.reload.two_factor_enabled?).to be(true)
 
-      post account_authenticator_path, params: { otp_code: setup_code_for(user) }
+      post account_authenticator_path, params: { otp_code: "000000" }
 
       expect(response).to redirect_to(account_path)
       expect(response.body).not_to include(codes.first)
@@ -101,7 +133,7 @@ RSpec.describe "Authenticator setup", type: :request do
     it "re-renders the setup page after a wrong code" do
       login_as(user)
       get account_authenticator_path
-      right = setup_code_for(user)
+      right = setup_code
 
       post account_authenticator_path, params: { otp_code: right == "000000" ? "000001" : "000000" }
 
@@ -115,7 +147,7 @@ RSpec.describe "Authenticator setup", type: :request do
       get account_authenticator_path
 
       travel User::RECENT_SIGN_IN + 1.second do
-        post account_authenticator_path, params: { otp_code: setup_code_for(user) }
+        post account_authenticator_path, params: { otp_code: setup_code }
       end
 
       expect(response).to have_http_status(:forbidden)
@@ -179,12 +211,12 @@ RSpec.describe "Authenticator setup", type: :request do
       travel 1.second
 
       a.get account_authenticator_path
-      a.post account_authenticator_path, params: { otp_code: setup_code_for(user) }
+      a.post account_authenticator_path, params: { otp_code: setup_code(a) }
       expect(user.reload.two_factor_enabled?).to be(true)
 
       b.get history_path
       expect(b.response.location).to eq(login_url)
-      expect(User.signed_in_through(b.session)).to be_nil
+      expect(User.signed_in_through(user_id: b.session[:user_id], signed_in_at: b.session[:signed_in_at])).to be_nil
       a.get history_path
       expect(a.response).to have_http_status(:ok)
     end
@@ -214,10 +246,10 @@ RSpec.describe "Authenticator setup", type: :request do
     it "mails one notice when the authenticator is turned on, with neither the key nor a code" do
       login_as(user)
       get account_authenticator_path
-      secret = user.reload.otp_secret
+      secret = secret_on_page
 
       perform_enqueued_jobs do
-        post account_authenticator_path, params: { otp_code: setup_code_for(user) }
+        post account_authenticator_path, params: { otp_code: setup_code }
       end
 
       notices = ActionMailer::Base.deliveries.select { |mail| mail.subject.include?("sign-in settings") }

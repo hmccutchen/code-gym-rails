@@ -137,7 +137,7 @@ What each listed file does.
 - `app/controllers/recovery_codes_controller.rb` — `POST /account/recovery_codes`: a new set of recovery codes, shown once
 - `app/controllers/concerns/sign_in_completion.rb` — `SignInCompletion`: finishing a sign-in (`reset_session`, the stamp, `return_to`, a pending trial) and issuing the second-factor challenge
 - `app/controllers/concerns/authenticator_changes.rb` — `AuthenticatorChanges`: the shared rate limit, `no-store`, the change notice and the recovery code page for both authenticator controllers
-- `app/models/concerns/signed_in_sessions.rb` — `SignedInSessions`: `User.signed_in_through(session)`, the one check that a session is signed in and not ended by `sessions_valid_after`
+- `app/models/concerns/signed_in_sessions.rb` — `SignedInSessions`: `User.session_time`, the one reader of a sign-in stamp, `User.signed_in_recently?`, and `User.signed_in_through(user_id:, signed_in_at:)`, the one check that a session is signed in and not ended by `sessions_valid_after`
 - `app/models/concerns/second_factor.rb` — `SecondFactor`: the authenticator secret, TOTP and recovery code checks, the sign-in challenge and the daily cap, each write under the row lock
 - `app/helpers/authenticator_setups_helper.rb` — the setup page's inline QR code SVG and the setup key in groups of four
 - `app/javascript/controllers/copy_text_controller.js` — the Copy buttons on the setup key and recovery codes, selecting the text instead when the clipboard is missing or refuses

@@ -6,7 +6,7 @@
   <p><%= t("authenticators.show.intro") %></p>
 
   <div class="setup-step">
-    <%= link_to t("authenticators.show.open_link"), current_user.authenticator_uri, class: "btn btn-primary" %>
+    <%= link_to t("authenticators.show.open_link"), current_user.authenticator_uri(@secret), class: "btn btn-primary" %>
   </div>
 
   <div class="setup-step" data-controller="copy-text"
@@ -21,7 +21,7 @@
 
   <div class="setup-step">
     <p><%= t("authenticators.show.qr_label") %></p>
-    <%= qr_code_svg(current_user.authenticator_uri) %>
+    <%= qr_code_svg(current_user.authenticator_uri(@secret)) %>
   </div>
 
   <%= form_with url: account_authenticator_path, method: :post do |f| %>
