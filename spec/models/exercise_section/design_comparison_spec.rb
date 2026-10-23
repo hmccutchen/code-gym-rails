@@ -272,5 +272,9 @@ RSpec.describe ExerciseSection::DesignComparison do
       expect(described_class.solve_matches_key?(section, "b")).to be(true)
       expect(described_class.solve_matches_key?(section, "a")).to be(false)
     end
+
+    it "names the solve its stored key gives" do
+      expect(described_class.keyed_solve({ "answer_key" => { "better" => "a" } })).to eq("a")
+    end
   end
 end

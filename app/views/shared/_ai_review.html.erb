@@ -54,15 +54,14 @@
       <% Array(response.review_alternates[section]).each do |alt| %>
         <p class="alternate-item"><%= alt %></p>
       <% end %>
-      <% if Array(response.review_alternates[section]).size < DailyResponse::MAX_ALTERNATES_PER_SECTION %>
+      <% if response.alternates_left(section).positive? %>
         <button type="button" class="btn btn-ghost btn-sm explain-differently"
                 data-review-alternates-target="button"
                 data-action="review-alternates#explain"><%= t("review.explain_differently") %></button>
       <% end %>
       <span class="alternate-status" aria-live="polite" data-review-alternates-target="status"></span>
     </div>
-    <% turns = response.review_follow_ups.select { |t| t.section == section }.sort_by { |t| [ t.created_at, t.id ] } %>
-    <% asked = turns.count { |t| t.role_user? } %>
+    <% turns = response.follow_up_turns(section) %>
     <div class="follow-ups" data-section="<%= section %>" data-controller="follow-ups"
          data-follow-ups-section-value="<%= section %>"
          data-follow-ups-url-value="<%= follow_ups_response_path(response) %>"
@@ -74,7 +73,7 @@
           <p class="follow-up-turn follow-up-<%= turn.role %>"><%= turn.content %></p>
         <% end %>
       </div>
-      <% if asked < DailyResponse::MAX_FOLLOW_UPS_PER_SECTION %>
+      <% if response.follow_ups_left(section).positive? %>
         <div class="follow-up-form" data-follow-ups-target="form">
           <label class="visually-hidden" for="follow-up-input-<%= response.id %>-<%= section %>"><%= t("review.follow_up_label") %></label>
           <input type="text" class="follow-up-input" id="follow-up-input-<%= response.id %>-<%= section %>" placeholder="<%= t("review.follow_up_placeholder") %>"

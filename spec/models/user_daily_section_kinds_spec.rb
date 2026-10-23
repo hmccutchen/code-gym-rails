@@ -34,7 +34,7 @@ RSpec.describe User, "daily section kinds" do
   it "keeps a daily kind out of the kinds a weight or exclusion may name" do
     user.update!(daily_section_kinds: %w[challenge code_review])
 
-    expect(user.send(:rotatable_keys)).not_to include("challenge")
+    expect(ExerciseSection.rotatable(daily: user.section_kind_settings.daily).map(&:key)).not_to include("challenge")
     expect(user.update(section_kind_weights: { "challenge" => 2.0 })).to be(false)
     expect(user.update(section_kind_weights: { "architecture" => 2.0 })).to be(true)
   end
@@ -53,19 +53,19 @@ RSpec.describe User, "daily section kinds" do
     user.update!(section_kind_weights: { "challenge" => 2.0 }, excluded_section_kinds: %w[parsons_problem])
     user.update!(daily_section_kinds: %w[challenge parsons_problem])
 
-    attrs = user.keep_unrendered_preferences(section_kind_weights: { "architecture" => 0.5 }, excluded_section_kinds: [])
+    attrs = user.section_kind_settings.keep_unrendered(section_kind_weights: { "architecture" => 0.5 }, excluded_section_kinds: [])
 
     expect(attrs).to eq(section_kind_weights: { "challenge" => 2.0, "architecture" => 0.5 },
                         excluded_section_kinds: %w[parsons_problem])
-    expect(user.keep_unrendered_preferences(name: "Kept")).to eq(name: "Kept")
+    expect(user.section_kind_settings.keep_unrendered(name: "Kept")).to eq(name: "Kept")
   end
 
   it "drops a retired kind's stored entries instead of carrying them into the next save" do
     user.update_columns(section_kind_weights: { "retired_kind" => 2.0 }, excluded_section_kinds: %w[retired_kind],
                         section_kind_levels: { "retired_kind" => "senior" }, locked_section_kinds: %w[retired_kind])
 
-    attrs = user.keep_unrendered_preferences(section_kind_weights: {}, excluded_section_kinds: [],
-                                             section_kind_levels: {}, locked_section_kinds: [])
+    attrs = user.section_kind_settings.keep_unrendered(section_kind_weights: {}, excluded_section_kinds: [],
+                                                       section_kind_levels: {}, locked_section_kinds: [])
 
     expect(attrs).to eq(section_kind_weights: {}, excluded_section_kinds: [], section_kind_levels: {}, locked_section_kinds: [])
   end

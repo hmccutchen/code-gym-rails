@@ -4,6 +4,28 @@
 
 The cap is enforced on the server as well as in the view. Hiding the button does not stop a crafted request.
 
+## `#alternates_left`, `#follow_ups_left` and `#follow_up_turns`
+
+These are the one statement of each per-section cap and of a section's
+follow-up thread. The review partial, `ResponsesController` and the append
+methods below all read them.
+
+`#follow_up_turns` filters and sorts the loaded `review_follow_ups` in Ruby
+and never queries, so `/history`, which preloads the association, renders
+every entry's thread and cap from one query. It sorts by `created_at`, then
+`id`, because an exchange's two turns can share a timestamp, and without the
+`id` an answer could render before its question.
+
+## `#append_alternate!` and `#append_follow_up!`
+
+Each takes the row lock, reads what is left in the section again and either
+appends or writes nothing. It returns how many are left after the append, or
+`:capped` when another request filled the cap while the provider call ran.
+The caller's own count before the call is read outside the lock, so it can be
+stale, and only this check keeps concurrent requests under the cap.
+`#append_follow_up!` writes the question and the answer under the same lock,
+so no question is stored without its answer.
+
 ## `AI_REVIEW_FIELDS`
 
 `shared/_ai_review` and `ReviewMailer` both read this list. `next_step` is not a list field because it is meant to name one thing to study.
@@ -54,9 +76,30 @@ the claim gone and writes nothing (`ResponsesController#store_review`).
 
 Nil values are dropped from the merged round. That lets a caller clear a claim in the same merge that records its result.
 
-## `#pseudocode_claimed?`
+## `#pseudocode_critique_claimed?`
 
 It reuses `REVIEW_CLAIM_STALE_AFTER` on purpose: both checks ask whether a paid provider call may still be running.
+
+## `#claim_pseudocode_critique!`
+
+Claims the round before the provider call, so the once-per-section cap on a
+paid call also bounds the spend. It returns the token it wrote, or nil when
+the round is critiqued or a fresh claim is in flight.
+
+This claim doesn't use `Claimable`, because it is a key inside the
+`pseudocode_rounds` JSON column, one per section, and `Claimable` takes a
+claim with one conditional `UPDATE` on a column. It keeps the same rules
+under the row lock instead: the token is the timestamp written, at
+microsecond precision, and only the caller holding it may write or release.
+
+## `#record_pseudocode_critique!` and `#release_pseudocode_critique!`
+
+Both check the token under the row lock first. A call that outran the stale
+window may find its claim taken over. Writing or clearing then would wipe the
+newer call's claim and let a third paid call start while the second is still
+running. Recording the result also releases the claim, so the two can never
+disagree. A release after a handled provider failure hands the round back, so
+the engineer can retry without waiting out the stale window.
 
 ## `#completeness`
 
@@ -65,3 +108,15 @@ The zero guard matters: a payload with no Hash sections has no section keys, and
 ## `#improved_code_visible?`
 
 Improved code is revealed only from a concept's second exposure onward. A section tagged blank or `"other"` is not gated.
+
+## `.reviewed` and `.section_reviewed_condition`
+
+These state `#reviewed?` and `#section_reviewed?` in SQL, for queries that
+can't load each response. `.reviewed` is `ai_review` neither NULL nor `{}`.
+`ResponseReview` only ever writes a Hash, so that matches `ai_review.present?`
+for every value the column holds. `CompetencyGate::Evidence` and
+`LevelSuggestion::Evidence` read it. `.section_reviewed_condition(section)`
+takes an Arel node for the section key and tests
+`jsonb_typeof(ai_review -> section) = 'object'`, which is what
+`#section_reviewed?`'s `is_a?(Hash)` reads. `JudgeSolve.readable` uses it, and
+`judge_solve_spec` compares the two across response states.

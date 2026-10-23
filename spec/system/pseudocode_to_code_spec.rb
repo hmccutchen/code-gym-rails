@@ -18,7 +18,7 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
   def open_dashboard(user)
     create_exercise_for(user)
     visit_as(user)
-    expect(page).to have_content(/Pseudocode to Code/i, wait: 10)
+    expect(page).to have_content(/Pseudocode to Code/i)
   end
 
   def write_plan(text)
@@ -35,7 +35,7 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
       write_plan(PLAN)
 
       click_button "Check my plan"
-      expect(page).to have_selector(".pseudocode-critique li", text: /never says what happens when the input list is empty/i, wait: 10)
+      expect(page).to have_selector(".pseudocode-critique li", text: /never says what happens when the input list is empty/i)
       expect(page).to have_button("Check my plan", disabled: true)
       expect(find(".pseudocode-status").text).to eq("")
 
@@ -51,10 +51,10 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
       open_dashboard(user)
       write_plan(PLAN)
       click_button "Check my plan"
-      expect(page).to have_selector(".pseudocode-critique li", text: /input list is empty/i, wait: 10)
+      expect(page).to have_selector(".pseudocode-critique li", text: /input list is empty/i)
 
       visit current_path
-      expect(page).to have_button("Check my plan", disabled: true, wait: 10)
+      expect(page).to have_button("Check my plan", disabled: true)
       expect(page).to have_selector(".pseudocode-critique li", text: /input list is empty/i)
     end
   end
@@ -87,7 +87,7 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
 
       click_button "Submit answers"
 
-      expect(page).to have_content("def merge_ranges", wait: 20)
+      expect(page).to have_content("def merge_ranges")
       expect(page).to have_content(/implemented literally — gaps and all/i)
 
       round = user.daily_responses.find_by(date: Date.current).pseudocode_round("pseudocode_to_code")

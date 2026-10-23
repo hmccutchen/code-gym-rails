@@ -11,7 +11,7 @@ class ResponsesController < ApplicationController
   MAX_DUCK_MESSAGE_LENGTH = 2_000
 
   DUCK_REPLY_BYTES_PER_TOKEN = 4
-  DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE = AiService::DUCK_RESPONSE_MAX_TOKENS * DUCK_REPLY_BYTES_PER_TOKEN
+  DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE = CallProfiles::DUCK_RESPONSE_MAX_TOKENS * DUCK_REPLY_BYTES_PER_TOKEN
   MAX_DUCK_THREAD_BYTES = MAX_DUCK_TURNS_PER_SECTION *
     (MAX_DUCK_MESSAGE_LENGTH * 4 + DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE)
 
@@ -70,33 +70,15 @@ class ResponsesController < ApplicationController
 
   # POST /responses/:id/explain_differently
   def explain_differently
-    existing = Array(@response.review_alternates[@section])
-    if existing.size >= DailyResponse::MAX_ALTERNATES_PER_SECTION
-      return render_section_error(t("errors.responses.alternates_used", count: DailyResponse::MAX_ALTERNATES_PER_SECTION))
-    end
+    return render_section_error(alternates_used_message) unless @response.alternates_left(@section).positive?
 
     alternate = AiService.for(current_user).explain_differently(
       current_user, @response.daily_exercise, @response,
-      section: @section, prior_alternates: existing
+      section: @section, prior_alternates: Array(@response.review_alternates[@section])
     )
 
-    capped = false
-    remaining = nil
-    @response.with_lock do
-      current = Array(@response.review_alternates[@section])
-      if current.size >= DailyResponse::MAX_ALTERNATES_PER_SECTION
-        capped = true
-      else
-        @response.review_alternates = @response.review_alternates.merge(@section => current + [ alternate ])
-        @response.save!
-        remaining = DailyResponse::MAX_ALTERNATES_PER_SECTION - current.size - 1
-      end
-    end
-
-    if capped
-      render_section_error(t("errors.responses.alternates_used", count: DailyResponse::MAX_ALTERNATES_PER_SECTION))
-    else
-      render json: { status: "ok", alternate: alternate, remaining: remaining }
+    capped_outcome(@response.append_alternate!(@section, alternate), alternates_used_message) do |remaining|
+      { alternate: alternate, remaining: remaining }
     end
   rescue ProviderError, SetupError => e
     render_provider_failure(e, :alternate)
@@ -107,35 +89,18 @@ class ResponsesController < ApplicationController
     question = UserText.clean(params[:question], limit: UserText::MAX_QUESTION_LENGTH).strip
     return render_section_error(t("errors.responses.question_blank")) if question.blank?
 
-    asked = @response.review_follow_ups.where(section: @section, role: :user).count
-    if asked >= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION
-      return render_section_error(t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
-    end
+    return render_section_error(follow_ups_used_message) unless @response.follow_ups_left(@section).positive?
 
-    thread = @response.review_follow_ups.for_section(@section).map { |t| { role: t.role, content: t.content } }
+    thread = @response.follow_up_turns(@section).map { |turn| { role: turn.role, content: turn.content } }
 
     answer = AiService.for(current_user).answer_follow_up(
       current_user, @response.daily_exercise, @response,
       section: @section, question: question, thread: thread
     )
 
-    capped = false
-    remaining = nil
-    @response.with_lock do
-      current_count = @response.review_follow_ups.where(section: @section, role: :user).count
-      if current_count >= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION
-        capped = true
-      else
-        @response.review_follow_ups.create!(section: @section, role: :user, content: question)
-        @response.review_follow_ups.create!(section: @section, role: :assistant, content: answer)
-        remaining = DailyResponse::MAX_FOLLOW_UPS_PER_SECTION - current_count - 1
-      end
-    end
-
-    if capped
-      render_section_error(t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
-    else
-      render json: { status: "ok", question: question, answer: answer, remaining: remaining }
+    outcome = @response.append_follow_up!(@section, question: question, answer: answer)
+    capped_outcome(outcome, follow_ups_used_message) do |remaining|
+      { question: question, answer: answer, remaining: remaining }
     end
   rescue ProviderError, SetupError => e
     render_provider_failure(e, :follow_up)
@@ -175,21 +140,17 @@ class ResponsesController < ApplicationController
     return unless (context = load_pseudocode_context)
 
     row, section, pseudocode = context
-    return render_section_error(critique_busy_message(row, section)) unless claim_pseudocode_round!(row, section, "critique", :critiqued?)
+    token = row.claim_pseudocode_critique!(section)
+    return render_section_error(critique_busy_message(row, section)) unless token
 
     result = AiService.for(current_user).critique_pseudocode(
       current_user, row.daily_exercise, section: section, pseudocode: pseudocode
     )
-
-    write_pseudocode_round!(row, section, "critique",
-      "initial_pseudocode" => pseudocode,
-      "gaps_found"         => result[:gaps_found],
-      "critique"           => result[:gaps],
-      "critiqued_at"       => Time.current.iso8601)
+    row.record_pseudocode_critique!(section, token, pseudocode: pseudocode, gaps_found: result[:gaps_found], gaps: result[:gaps])
 
     render json: { status: "ok", gaps_found: result[:gaps_found], gaps: result[:gaps] }
   rescue ProviderError, SetupError => e
-    release_pseudocode_claim!(row, section, "critique")
+    row.release_pseudocode_critique!(section, token) if token
     render_provider_failure(e, :critique)
   end
 
@@ -317,6 +278,22 @@ class ResponsesController < ApplicationController
     end
   end
 
+  def capped_outcome(outcome, capped_message)
+    case outcome
+    when Integer then render json: { status: "ok", **yield(outcome) }
+    when :capped then render_section_error(capped_message)
+    else raise ArgumentError, "unhandled append outcome: #{outcome.inspect}"
+    end
+  end
+
+  def alternates_used_message
+    t("errors.responses.alternates_used", count: DailyResponse::MAX_ALTERNATES_PER_SECTION)
+  end
+
+  def follow_ups_used_message
+    t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION)
+  end
+
   def stale_duck_page?(exercise) = params[:draft_scope].to_s != exercise.draft_scope
 
   # An Integer is the new version; :stale covers a moved version, a regenerated set and a deleted account.
@@ -372,29 +349,6 @@ class ResponsesController < ApplicationController
     end
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
     current_user.daily_responses.find_by!(date: Date.current)
-  end
-
-  def claim_pseudocode_round!(row, section, phase, done)
-    claimed = false
-
-    row.with_lock do
-      next if row.public_send(done, section) || row.pseudocode_claimed?(section, phase)
-
-      row.merge_pseudocode_round!(section, "#{phase}_claimed_at" => Time.current.iso8601)
-      claimed = true
-    end
-
-    claimed
-  end
-
-  def write_pseudocode_round!(row, section, phase, attrs)
-    row.with_lock { row.merge_pseudocode_round!(section, attrs.merge("#{phase}_claimed_at" => nil)) }
-  end
-
-  def release_pseudocode_claim!(row, section, phase)
-    return if row.nil?
-
-    row.with_lock { row.merge_pseudocode_round!(section, "#{phase}_claimed_at" => nil) }
   end
 
   def critique_busy_message(row, section)

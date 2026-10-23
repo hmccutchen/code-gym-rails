@@ -20,8 +20,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
 
   def open_dashboard
     visit_with_todays_set(user)
-    expect(page).to have_content(/Code Review/i, wait: 10)
-    wait_for_js
+    expect(page).to have_content(/Code Review/i)
   end
 
   def keep_an_unsent_answer
@@ -32,7 +31,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
 
   def reopen_dashboard
     visit root_path
-    expect(page).to have_content(/Code Review/i, wait: 10)
+    expect(page).to have_content(/Code Review/i)
     wait_for_js
   end
 
@@ -43,14 +42,14 @@ RSpec.describe "Answers through a lost connection", type: :system do
 
       find(code_review_field).fill_in(with: answer)
 
-      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"), wait: 10)
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"))
       expect(stored_draft["answers"]["code_review"]).to eq(answer)
       expect(page.evaluate_script("window.CodeGymSaveStatus.pending()")).to be(true)
       expect(user.daily_responses).to be_empty
 
       go_offline(false)
 
-      expect(page).to have_no_css("#save-status", visible: true, wait: 10)
+      expect(page).to have_no_css("#save-status", visible: true)
       expect(user.daily_responses.sole.answers["code_review"]).to eq(answer)
       wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null")
     end
@@ -144,7 +143,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       JS
 
       find(code_review_field).fill_in(with: answer)
-      expect(page).to have_css("#save-status", text: "The server said no.", wait: 10)
+      expect(page).to have_css("#save-status", text: "The server said no.")
       page.execute_script("window.dispatchEvent(new Event('online'))")
 
       expect(page.evaluate_script("window.saveAttempts")).to eq(1)
@@ -171,7 +170,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       rate_section("code_review", value: "right_level")
       page.execute_script("window.releaseFirstSave()")
 
-      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"), wait: 10)
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"))
       expect(stored_draft["ratings"]).to eq("code_review" => "right_level")
     end
   end
@@ -192,7 +191,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
 
       page.execute_script("window.releaseSave()")
 
-      expect(page).to have_css("#save-status", text: /the set changed/i, wait: 10)
+      expect(page).to have_css("#save-status", text: /the set changed/i)
       expect(find(code_review_field).value).to eq("Text from the newer tab.")
     end
   end
@@ -243,7 +242,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
                                    answers: { "code_review" => answer }, submitted_at: Time.current)
 
       visit root_path
-      expect(page).to have_no_css("#gym-form", wait: 10)
+      expect(page).to have_no_css("#gym-form")
 
       wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null")
     end
@@ -257,7 +256,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
 
       find(code_review_field).fill_in(with: answer)
 
-      expect(page).to have_css("#save-status", text: I18n.t("save_status.generic"), wait: 10)
+      expect(page).to have_css("#save-status", text: I18n.t("save_status.generic"))
       expect(page).to have_no_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"))
     end
   end
@@ -281,7 +280,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       visit account_path
       click_button I18n.t("accounts.show.log_out")
 
-      expect(page).to have_current_path(login_path, wait: 10)
+      expect(page).to have_current_path(login_path)
       wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null")
     end
   end
@@ -294,10 +293,10 @@ RSpec.describe "Answers through a lost connection", type: :system do
       expect_ready_to_submit
       go_offline
       find(code_review_field).fill_in(with: "#{answer} One more line typed offline.")
-      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"), wait: 10)
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"))
 
       click_button I18n.t("dashboard.exercise.submit")
-      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.submit_offline"), wait: 10)
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.submit_offline"))
       page.execute_script("window.dispatchEvent(new Event('online'))")
       sleep 0.5
 
@@ -315,15 +314,15 @@ RSpec.describe "Answers through a lost connection", type: :system do
 
       click_button I18n.t("dashboard.exercise.submit")
 
-      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.submit_offline"), wait: 10)
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.submit_offline"))
       expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: false)
       expect(user.daily_responses.sole).not_to be_submitted
 
       go_offline(false)
-      expect(page).to have_no_css("#save-status", visible: true, wait: 10)
+      expect(page).to have_no_css("#save-status", visible: true)
       click_button I18n.t("dashboard.exercise.submit")
 
-      expect(page).to have_no_css("#gym-form", wait: 15)
+      expect(page).to have_no_css("#gym-form")
       expect(user.daily_responses.sole).to be_submitted
       expect(stored_draft).to be_nil
     end

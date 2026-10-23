@@ -84,6 +84,7 @@ RSpec.describe "Preview auto-login", type: :request do
       controller.send(:preview_auto_login)
 
       expect(session[:user_id]).to eq(user.id)
+      expect(User.find(user.id).session_signed_in_valid?(session[:signed_in_at])).to be(true)
     end
 
     it "prefers the configured preview address when one is set" do
@@ -149,6 +150,7 @@ RSpec.describe "Preview auto-login", type: :request do
       seeded_user
       real_user = User.create!(email: "already-logged-in@example.com", name: "Real")
       session[:user_id] = real_user.id
+      session[:signed_in_at] = User.session_stamp
 
       controller.send(:preview_auto_login)
 

@@ -24,6 +24,7 @@ class DailyResponse < ApplicationRecord
   validates :date, uniqueness: { scope: :user_id }
 
   scope :submitted, -> { where.not(submitted_at: nil) }
+  scope :reviewed, -> { where.not(ai_review: [ nil, {} ]) }
 
   AI_REVIEW_FIELDS = {
     "correct"          => { list: true  },
@@ -43,6 +44,11 @@ class DailyResponse < ApplicationRecord
   def self.answered_kinds_for(user)
     submitted.where(user: user).where("jsonb_typeof(section_ratings) = 'object'")
              .distinct.pluck(Arel.sql("jsonb_object_keys(section_ratings)")).to_set
+  end
+
+  def self.section_reviewed_condition(section)
+    review = Arel::Nodes::InfixOperation.new("->", arel_table[:ai_review], section)
+    Arel::Nodes::NamedFunction.new("jsonb_typeof", [ review ]).eq("object")
   end
 
   def self.review_points(value)
@@ -84,6 +90,40 @@ class DailyResponse < ApplicationRecord
     ai_review&.dig(section.to_s).is_a?(Hash)
   end
 
+  def alternates_left(section)
+    MAX_ALTERNATES_PER_SECTION - Array(review_alternates[section.to_s]).size
+  end
+
+  def follow_up_turns(section)
+    review_follow_ups.select { |turn| turn.section == section.to_s }.sort_by { |turn| [ turn.created_at, turn.id ] }
+  end
+
+  def follow_ups_left(section)
+    MAX_FOLLOW_UPS_PER_SECTION - follow_up_turns(section).count(&:role_user?)
+  end
+
+  def append_alternate!(section, alternate)
+    with_lock do
+      left = alternates_left(section)
+      next :capped unless left.positive?
+
+      stored = Array(review_alternates[section.to_s])
+      update!(review_alternates: review_alternates.merge(section.to_s => stored + [ alternate ]))
+      left - 1
+    end
+  end
+
+  def append_follow_up!(section, question:, answer:)
+    with_lock do
+      left = follow_ups_left(section)
+      next :capped unless left.positive?
+
+      review_follow_ups.create!(section: section.to_s, role: :user, content: question)
+      review_follow_ups.create!(section: section.to_s, role: :assistant, content: answer)
+      left - 1
+    end
+  end
+
   def pseudocode_round(section)
     pseudocode_rounds[section.to_s] || {}
   end
@@ -113,11 +153,37 @@ class DailyResponse < ApplicationRecord
     end
   end
 
-  def pseudocode_claimed?(section, phase)
-    claimed_at = pseudocode_round(section)["#{phase}_claimed_at"]
+  def pseudocode_critique_claimed?(section)
+    claimed_at = pseudocode_round(section)["critique_claimed_at"]
     return false if claimed_at.blank?
 
     Time.zone.parse(claimed_at) > REVIEW_CLAIM_STALE_AFTER.ago
+  end
+
+  def claim_pseudocode_critique!(section)
+    token = Time.current.iso8601(6)
+    with_lock do
+      next if critiqued?(section) || pseudocode_critique_claimed?(section)
+
+      merge_pseudocode_round!(section, "critique_claimed_at" => token)
+      token
+    end
+  end
+
+  def record_pseudocode_critique!(section, token, pseudocode:, gaps_found:, gaps:)
+    with_lock do
+      next false unless holds_pseudocode_critique?(section, token)
+
+      merge_pseudocode_round!(section, "initial_pseudocode" => pseudocode, "gaps_found" => gaps_found, "critique" => gaps,
+                                       "critiqued_at" => Time.current.iso8601, "critique_claimed_at" => nil)
+      true
+    end
+  end
+
+  def release_pseudocode_critique!(section, token)
+    with_lock do
+      merge_pseudocode_round!(section, "critique_claimed_at" => nil) if holds_pseudocode_critique?(section, token)
+    end
   end
 
   def self_rating_for(section) = section_ratings[section.to_s]
@@ -222,4 +288,8 @@ class DailyResponse < ApplicationRecord
     bucket = ConceptBucket.for(section, daily_exercise.language)
     user.concept_exposure_count(concept, bucket, on_or_before: date) >= 2
   end
+
+  private
+
+  def holds_pseudocode_critique?(section, token) = token.present? && pseudocode_round(section)["critique_claimed_at"] == token
 end

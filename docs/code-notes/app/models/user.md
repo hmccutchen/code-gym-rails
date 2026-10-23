@@ -11,14 +11,12 @@ A name that breaks the rules is cleaned and clamped rather than refused.
 Sign-up names the row after the email's local part, which can be long or
 oddly shaped, so refusing it would fail the login.
 
-## Section kind validations
+## `before_save :bump_section_kind_preferences_version` and `#section_kind_settings`
 
-The validations that check `section_kind_weights`, `excluded_section_kinds`,
-`section_kind_levels` and `locked_section_kinds` against the registry run only
-when that column changes. If they ran on every save, a kind retired from the
-registry would make every user who names it unsavable, logins included.
-
-## `before_save :bump_section_kind_preferences_version`
+`#section_kind_settings` builds `SectionKindSettings` from the user's columns
+and their stored values; the one validation `section_kind_settings_hold`
+adds its problems, and the callback below asks it whether any preference
+changed (see `docs/code-notes/app/models/section_kind_settings.md`).
 
 The version moves only when a preference changes, so an unrelated save (a
 login, a time zone) cannot make a pending Exercise mix save stale. The whole
@@ -84,46 +82,20 @@ Each prepared ladder is a billed rewrite of a shared reference. A trial
 account's calls run on a house key, so a trial is never offered the control
 and the endpoint queues nothing for one.
 
-## `#apply_track_change`
+## `#kind_rungs`
 
-Runs before every save and holds the `TrackChange` for a save that moves the
-track, or nil, so a later save on the same object never reads a stale one. It
-is declared ahead of `bump_section_kind_preferences_version`: callbacks run in
-declaration order and each `if:` is read when its callback is reached, so a
-skill-level-only save must clear its targets before the bump checks
-`section_kind_levels_changed?`. Otherwise the version would stay put and
-another tab could write the cleared levels back. The first track choice is not
-a track change.
+Each kind's rung, its target or else the skill level, read through
+`KindDifficulty#rungs`, the same reading generation uses. Level suggestions,
+their cutoffs and their event rows all work in rungs, so an account with no
+targets is handled the same way as one with a target for every kind.
 
-## `#kind_rungs`, `#record_level_changes` and `#record_level_suggestion_events`
+## No level callbacks
 
-`#kind_rungs` is each kind's rung, its target or else the skill level, read
-through `KindDifficulty#rungs`, the same reading generation uses. Level
-suggestions, their cutoffs and their event rows all work in rungs, so an
-account with no targets is handled the same way as one with a target for
-every kind.
-
-`#record_level_changes` runs before any save that changes
-`section_kind_levels` or `skill_level`, for every account, after
-`#apply_track_change`. It compares each kind's rung before the save
-(`*_in_database`) with its rung after, and records a cutoff at the new rung
-through the user's own today for each kind that moved onto
-`LevelSuggestion::LADDER` (junior, mid_level, senior). A target set, edited or
-cleared counts, and so does a skill-level change, which moves every kind
-without a target and every kind whose target the track change cleared. Results
-from an earlier stay at that rung then never count again, even after a detour
-through principal_engineer. A rung that did not move records nothing, and a
-move to principal_engineer records nothing, because no suggestion reaches it.
-The first track choice records nothing: there are no results yet to cut off.
-
-`#record_level_suggestion_events` runs in `after_save` under the same
-conditions. It passes `LevelSuggestionEvent.applied_rows` the levels and skill
-level from before and after the save (`*_before_last_save`), the cutoffs as
-they stood before, `shown_level_suggestions`, the moves a page posted and
-`ProfileController` checked under the row lock, and the kinds the track change
-cleared, which are labelled `skill_level_edit`. The insert runs in the save's
-transaction, so a failed insert raises and rolls back the level change and
-its cutoff together.
+`User` records no cutoff and writes no event row when its levels or skill
+level change. `ProfileUpdate`, the one flow that changes them on a saved
+account, does both explicitly through `LevelChange` (see its notes). A spec
+or script that sets levels with `update!` gets the new values and nothing
+else.
 
 ## `#recent_performance`
 
@@ -191,46 +163,7 @@ A concept that has left its vocabulary is not reinforced, since it would
 waste an entry and a retention slot. A nil bucket cannot occur in practice;
 it returns true.
 
-## `#locks_have_levels`
-
-This is a model validation because a CHECK constraint cannot run subqueries.
-A lock that slips past it anyway is inert, because `KindDifficulty#locked?`
-ignores a lock on a kind with no target.
-
 ## `#provider_has_a_stored_key`
 
 It skips an account with no keys map, since anonymized and trial accounts can
 name a provider while holding no keys.
-
-## `#every_slot_keeps_a_kind`
-
-It reads the slot roster from `ExerciseSection.optional_slots` for the
-user's own pair (`DailyKinds.for`), so a future slot that holds several
-kinds needs no edit here. It runs when the exclusions or the pair change, and
-reads `#emptied_slots`, which `DailyKindSwap` also asks to name the kinds in
-its refusal; it tests each slot with `KindPreferences#all_excluded?`, the
-predicate rotation's whole-slot fallback reads. A pair that leaves an optional slot holding only excluded kinds
-is refused, the same as an exclusion that would: rotation would otherwise
-fall back to the excluded kinds (`KindPreferences#eligible`), quietly undoing
-"never show me this". Single-kind slots are skipped.
-
-## `#keep_unrendered_preferences` and the rotatable-kind validations
-
-The Exercise mix form posts only the controls it renders, and which those
-are depends on the pair. Setup renders a weight and an exclude box for each
-kind in a multi-kind optional slot, which is `ExerciseSection.rotatable`, and
-difficulty controls for the daily kinds and every optional slot's kinds, which
-is `ExerciseSection.pickable`; `spec/requests/setup_unrendered_preferences_spec.rb`
-pins that the page renders exactly those. A daily kind has no weight row, and
-while a fourth kind is daily its two siblings have no row at all (D1).
-`ProfileController#profile_params` passes every save through
-`#keep_unrendered_preferences`, which merges back the stored weights and
-exclusions for kinds outside `rotatable` and the stored difficulty targets and
-locks for kinds outside `pickable`. A swap can therefore be undone without
-losing any of those settings, and an unrelated save never deletes them.
-Only entries for kinds still in `ExerciseSection.keys` are kept, so a retired
-kind's stored entries drop out on the next save that posts that field.
-`section_kind_weights_name_rotatable_kinds` and
-`excluded_section_kinds_name_rotatable_kinds` check only the entries a save
-adds or changes against `#rotatable_keys`; a kept entry was valid when it
-was stored and must not refuse an unrelated save.

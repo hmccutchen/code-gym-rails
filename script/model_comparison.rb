@@ -23,6 +23,14 @@ class ModelComparison
   REVIEW_CALIBRATION_FIXTURE_DIR = Rails.root.join("spec/fixtures/review_calibration")
   CONCEPT_DRAFT_DIR = Rails.root.join("tmp/judge_concept")
 
+  JUDGE_SHAPE_FIXTURES = "design_comparison_*.json".freeze
+  JUDGE_SHAPE_PROVIDERS = {
+    "claude" => { service: ClaudeService, key_variable: "ANTHROPIC_API_KEY" },
+    "openai" => { service: OpenaiService, key_variable: "OPENAI_API_KEY", route: { reasoning_allowance: 4_000 } },
+    "gemini" => { service: GeminiService, key_variable: "GEMINI_API_KEY" }
+  }.freeze
+  JUDGE_SHAPE_OUTCOMES = %i[invalid_output truncated solved other_error].freeze
+
   CALIBRATION_EXPECTED = {
     "complete" => %w[solid strong],
     "partial"  => %w[developing],
@@ -140,7 +148,43 @@ class ModelComparison
     end
   end
 
+  def judge_shape(provider_name)
+    provider = JUDGE_SHAPE_PROVIDERS.fetch(provider_name)
+    route    = judge_shape_route(provider)
+    usage    = []
+    service  = pinned_service(route, usage, provider: provider[:service])
+    user     = User.new(skill_level: "senior")
+    rows     = Dir[FIXTURE_DIR.join(JUDGE_SHAPE_FIXTURES)].sort.map { |path| judge_shape_row(service, user, load_fixture(path)) }
+
+    print_judge_shape(provider_name, route, rows, usage)
+  end
+
   private
+
+  def judge_shape_route(provider)
+    provider[:service].new(@api_key).send(:route_for, "judge_section").merge(provider.fetch(:route, {}))
+  end
+
+  def judge_shape_row(service, user, fixture)
+    service.judge_section(user, ExerciseSection.for(fixture["kind"]), fixture["section"], rung: fixture["rung"], locked: fixture["locked"])
+    { name: fixture["name"], outcome: :solved }
+  rescue JudgeVerdict::Invalid => e
+    { name: fixture["name"], outcome: :invalid_output, detail: e.message }
+  rescue ProviderError::TruncatedResponseError
+    { name: fixture["name"], outcome: :truncated }
+  rescue ProviderError, SetupError => e
+    { name: fixture["name"], outcome: :other_error, detail: e.class.name }
+  end
+
+  def print_judge_shape(provider_name, route, rows, usage)
+    settings = route.except(:model).map { |setting, value| "#{setting}: #{value}" }.join(", ")
+    counts   = JUDGE_SHAPE_OUTCOMES.map { |outcome| "#{outcome} #{rows.count { |row| row[:outcome] == outcome }}/#{rows.size}" }
+
+    @out.puts "=== judge_shape: #{provider_name} · #{route[:model]}#{" (#{settings})" if settings.present?} ==="
+    @out.puts "#{counts.join(' · ')} · #{usage.sum { |call| call[:tokens_in] }} in / #{usage.sum { |call| call[:tokens_out] }} out"
+    rows.select { |row| row[:detail] }.each { |row| @out.puts "  #{row[:name]}: #{row[:outcome]}: #{row[:detail]}" }
+    @out.puts
+  end
 
   def draft_concept_sections(forced, user, concept, per_rung)
     route = ClaudeService::MODEL_FOR_PURPOSE.fetch("retry_section")
@@ -384,10 +428,10 @@ class ModelComparison
   end
 
   # A subclass per route: it turns the prose judge off through the class method review_grading_provider reads.
-  def pinned_service(route, usage)
+  def pinned_service(route, usage, provider: ClaudeService)
     lock = Mutex.new
 
-    Class.new(ClaudeService) do
+    Class.new(provider) do
       def self.judges_review_prose? = false
 
       define_method(:route_for) { |_purpose| route }
@@ -498,8 +542,8 @@ class ModelComparison
 
     largest = results.max_by(&:tokens_out)
     slowest = results.max_by(&:ms)
-    @out.puts "largest reply: #{largest.tokens_out} out (#{largest.label}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap · " \
-              "slowest: #{slowest.ms}ms (#{slowest.label}) of the #{AiService::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout"
+    @out.puts "largest reply: #{largest.tokens_out} out (#{largest.label}) of the #{CallProfiles::REVIEW_JUDGE_MAX_TOKENS} cap · " \
+              "slowest: #{slowest.ms}ms (#{slowest.label}) of the #{CallProfiles::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout"
   end
 
   def issue_rates(edits, valid_count)
@@ -605,8 +649,8 @@ class ModelComparison
   end
 
   def over_generation_timeout(mode, run)
-    return "" unless mode == "generate" && run.seconds > AiService::GENERATION_READ_TIMEOUT
+    return "" unless mode == "generate" && run.seconds > CallProfiles::GENERATION_READ_TIMEOUT
 
-    " (over the #{AiService::GENERATION_READ_TIMEOUT}s generation read timeout)"
+    " (over the #{CallProfiles::GENERATION_READ_TIMEOUT}s generation read timeout)"
   end
 end

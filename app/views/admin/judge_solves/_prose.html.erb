@@ -1,0 +1,4 @@
+<%# Locals: section, a readable row's judged_section. %>
+<% ExerciseSection::DesignComparison.prose_fields.each do |field| %>
+  <p><strong><%= t("admin.judge_solves.entry.#{field}") %>:</strong> <%= section[field] %></p>
+<% end %>

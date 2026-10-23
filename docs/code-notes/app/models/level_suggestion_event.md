@@ -23,7 +23,7 @@ the skill level's rung as `to_level` (#390 recorded nil), and a target set to
 the rung the skill level already gave writes nothing.
 
 - `suggestion`: the kind's target changed and the move matches a step the
-  dashboard card or Setup posted, which `ProfileController` checked against
+  dashboard card or Setup posted, which `ProfileUpdate` checked against
   the stored rung under the row lock.
 - `setup_edit`: any other target change.
 - `skill_level_edit`: the target did not change, and the rung moved because

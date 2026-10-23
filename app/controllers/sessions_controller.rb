@@ -1,5 +1,6 @@
 class SessionsController < ApplicationController
   include LoginCodeRequests
+  include SignInCompletion
 
   skip_before_action :require_login
   skip_before_action :require_provider
@@ -10,7 +11,7 @@ class SessionsController < ApplicationController
 
   limit_login_code_requests only: :create
 
-  rate_limit to: 10, within: User::LOGIN_CODE_EXPIRY,
+  rate_limit to: 10, within: User::LOGIN_RATE_LIMIT_WINDOW,
              with:  -> { rate_limited(t("sessions.rate_limited.code_attempts")) },
              store: RATE_LIMIT_STORE,
              name:  "code_attempts",
@@ -42,21 +43,13 @@ class SessionsController < ApplicationController
 
   # POST /login/code — the email comes from this browser's session, never a form field.
   def verify_code
+    checked_at = Time.current
     email = pending_login_email
     user  = email.present? ? User.authenticate_login_code(email: email, code: params[:code].to_s) : nil
+    return reject_login_code(email) unless user
+    return start_second_factor_challenge(user) if user.two_factor_enabled?
 
-    if user
-      trial = PendingTrial.take(session)
-      destination = start_new_session_for(user)
-      return finish_pending_trial(user, trial) if trial
-
-      redirect_to destination || root_path, notice: t("sessions.welcome_back", name: user.name)
-    else
-      @code_rejected = true
-      flash.now[:alert] =
-        email.present? ? t("sessions.code_rejected_retry") : t("sessions.code_rejected_request_new")
-      render :new, status: :unprocessable_content
-    end
+    complete_sign_in(user, checked_at: checked_at)
   end
 
   def destroy
@@ -66,12 +59,11 @@ class SessionsController < ApplicationController
 
   private
 
-  def finish_pending_trial(user, trial)
-    case trial.start_for(user)
-    when :started     then redirect_to root_path, notice: t("trials.started")
-    when :has_own_key then redirect_to setup_path, alert: t("trials.has_own_key")
-    else                   redirect_to trial_path, alert: t("trials.code_rejected")
-    end
+  def reject_login_code(email)
+    @code_rejected = true
+    flash.now[:alert] =
+      email.present? ? t("sessions.code_rejected_retry") : t("sessions.code_rejected_request_new")
+    render :new, status: :unprocessable_content
   end
 
   def login_code_requests_limited(message) = rate_limited(message)
@@ -92,16 +84,8 @@ class SessionsController < ApplicationController
     stamped_at = session[:pending_login_at]
     return false if stamped_at.blank?
 
-    Time.iso8601(stamped_at.to_s) < User::LOGIN_CODE_EXPIRY.ago
+    !User.login_pending?(email: session[:pending_login_email], requested_at: Time.iso8601(stamped_at.to_s))
   rescue ArgumentError
     false
-  end
-
-  # Read return_to before reset_session, which discards everything written before authentication.
-  def start_new_session_for(user)
-    destination = session[:return_to]
-    reset_session
-    session[:user_id] = user.id
-    destination
   end
 end

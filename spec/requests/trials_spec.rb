@@ -57,6 +57,22 @@ RSpec.describe "Trials", type: :request do
       end
     end
 
+    it "starts the trial with a code mailed after a queue delay, though the request is older" do
+      _invite, code = mint_trial_code(seats: 1, days: 7)
+
+      travel_to(Time.utc(2026, 10, 23, 15)) do
+        start(code: code)
+        travel(3.minutes)
+        perform_enqueued_jobs
+        travel(9.minutes)
+
+        post verify_login_code_path, params: { code: emailed_code }
+
+        expect(response).to redirect_to(root_path)
+        expect(User.find_by!(email: "new@example.com")).to be_trial_active
+      end
+    end
+
     it "starts a trial on OpenAI when its house key is set" do
       stub_env("HOUSE_OPENAI_API_KEY" => "sk-house")
       _invite, code = mint_trial_code

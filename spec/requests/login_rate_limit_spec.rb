@@ -19,6 +19,17 @@ RSpec.describe "Login rate limits", type: :request do
       expect(response.body).to include('name="email"')
     end
 
+    it "keeps an address's request limit for longer than a code lives" do
+      5.times { post login_path, params: { email: "dev@example.com" } }
+
+      travel(User::LOGIN_CODE_EXPIRY + 2.minutes) do
+        expect {
+          post login_path, params: { email: "dev@example.com" }
+        }.not_to have_enqueued_mail(UserMailer, :login_code)
+      end
+      expect(response).to have_http_status(:too_many_requests)
+    end
+
     it "keeps the refused request's message off the pending code field" do
       5.times do
         post login_path, params: { email: "dev@example.com" }
@@ -87,6 +98,26 @@ RSpec.describe "Login rate limits", type: :request do
       expect {
         post login_path, params: { email: "dev50@example.com" }
       }.not_to have_enqueued_mail(UserMailer, :login_code)
+      expect(response).to have_http_status(:too_many_requests)
+    end
+
+    it "counts the trial form's requests in the same daily bucket" do
+      stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+      _invite, invite_code = mint_trial_code(seats: 10)
+      45.times do |n|
+        travel(16.minutes) if (n % 20).zero? && n.positive?
+        post login_path, params: { email: "dev#{n}@example.com" }
+      end
+      travel(16.minutes)
+      5.times do |n|
+        post start_trial_path, params: { email: "trial#{n}@example.com", invite_code: invite_code,
+                                         provider: "fake", consent: "1" }
+      end
+
+      expect {
+        post start_trial_path, params: { email: "trial5@example.com", invite_code: invite_code,
+                                         provider: "fake", consent: "1" }
+      }.not_to change(User, :count)
       expect(response).to have_http_status(:too_many_requests)
     end
   end

@@ -200,8 +200,12 @@ class ExerciseSection
       nil
     end
 
+    def keyed_solve(section)
+      raise NotImplementedError, "#{self} has judge_solve_options and must name the solve its key gives"
+    end
+
     def solve_matches_key?(section, solve)
-      raise NotImplementedError, "#{self} has judge_solve_options and must compare a solve with its key"
+      keyed_solve(section) == solve
     end
 
     def translated_before_grading?

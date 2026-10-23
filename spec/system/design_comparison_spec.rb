@@ -16,7 +16,7 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
   def in_progress = /#{I18n.t("responses.section_status.in_progress")}/i
 
   def wait_for_saved_comparison(user, answer)
-    Timeout.timeout(10) { sleep 0.05 until user.daily_responses.reload.first&.answers&.dig("design_comparison") == answer }
+    wait_for { user.daily_responses.reload.first&.answers&.dig("design_comparison") == answer }
   end
 
   def hidden_answer
@@ -53,8 +53,8 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
       rate_section("design_comparison")
       expect(page).to have_selector("#rating-nudge", visible: :hidden)
 
-      Timeout.timeout(10) do
-        sleep 0.05 until user.daily_responses.reload.first&.answered?("design_comparison")
+      wait_for do
+        user.daily_responses.reload.first&.answered?("design_comparison")
       end
       expect(user.daily_responses.sole.answers["design_comparison"]).to eq("pick:b\n#{reason}")
 
@@ -80,8 +80,8 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
       within(comparison) { expect(find_field("What decides it?").value).to eq(reason) }
 
       find("textarea[data-field='code_review']").fill_in(with: "An answer to the code review that is long enough.")
-      Timeout.timeout(10) do
-        sleep 0.05 until user.daily_responses.reload.sole.answers["code_review"].present?
+      wait_for do
+        user.daily_responses.reload.sole.answers["code_review"].present?
       end
 
       expect(ExerciseSection::DesignComparison.parse_answer(user.daily_responses.sole.answers["design_comparison"]))

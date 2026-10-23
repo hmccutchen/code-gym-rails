@@ -1,0 +1,18 @@
+<%# Locals: heading, table_class, calls (the rows, uncalled first), count (callable taking source and call). %>
+<h2><%= heading %></h2>
+<table class="solve-counts <%= table_class %>">
+  <thead>
+    <tr>
+      <th><%= t("admin.judge_solves.index.filters.call") %></th>
+      <% JudgeSolve::SOURCES.each do |source| %><th><%= t("admin.judge_solves.index.sources.#{source}") %></th><% end %>
+    </tr>
+  </thead>
+  <tbody>
+    <% calls.each do |call| %>
+      <tr data-call="<%= call %>">
+        <td><%= t("admin.judge_solves.calls.#{call}") %></td>
+        <% JudgeSolve::SOURCES.each do |source| %><td data-source="<%= source %>"><%= count.call(source, call) %></td><% end %>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

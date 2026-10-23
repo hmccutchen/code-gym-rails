@@ -1,8 +1,9 @@
 ---
 paths:
-  - "app/services/level_suggestion.rb"
-  - "app/services/level_suggestion/**"
-  - "app/models/{track_change,level_suggestion_event,level_suggestion_step,user,kind_difficulty}.rb"
+  - "app/models/level_suggestion.rb"
+  - "app/models/level_suggestion/**"
+  - "app/models/{track_change,level_change,level_suggestion_event,level_suggestion_step,user,kind_difficulty}.rb"
+  - "app/forms/profile_update.rb"
   - "app/controllers/{welcome,profile,level_suggestion_answers,level_suggestion_dismissals,api_keys}_controller.rb"
   - "app/views/welcome/**"
   - "app/views/dashboard/_level_suggestion.html.erb"
@@ -12,7 +13,7 @@ paths:
   - "spec/**/*{level_suggestion,track,welcome,skill_level,profile}*"
   - "app/controllers/dashboard_controller.rb"
   - "spec/**/level_suggestion/**"
-  - "spec/**/*{api_keys,user_level_changes}*"
+  - "spec/**/*api_keys*"
 ---
 
 # Tracks, skill level and level suggestions
@@ -27,8 +28,10 @@ read it before changing that area.
   `PATCH /profile` with `choose_track` checks exactly two keys and a
   `LevelSuggestion::LADDER` level under the user-row lock, else 422.
   `TrackChange` is the one rule for which unlocked targets a track change
-  clears, and `User#apply_track_change` stays declared ahead of
-  `bump_section_kind_preferences_version`. Suggestions never reach principal
+  clears. `ProfileUpdate` applies it, records cutoffs and writes event rows
+  through `LevelChange`, in that order and in one transaction, before and
+  after the save; `User` has no level callbacks, so a save outside
+  `ProfileUpdate` records none. Suggestions never reach principal
   engineer. `track_chosen_at` is a flag, not a clock. `users.learning_track`
   is in `User.ignored_columns` and nothing reads or writes it; the next
   release drops it. A post carrying `learning_track` still gets a 422.
@@ -37,7 +40,7 @@ read it before changing that area.
   without an explicit Apply. `LevelSuggestion` reads only answered, un-eased,
   `pitched_at`- and `RUBRIC_VERSION`-stamped results, never suggests to or
   from principal engineer, and skips locked kinds. A rung change records a
-  cutoff under the user-row lock (`User#record_level_changes`), except a move
+  cutoff under the user-row lock (`LevelChange#record_cutoffs`), except a move
   to principal engineer and the first-run track choice, which record none.
   Posted `LevelSuggestionStep`s whose `from` differs from the stored rung get
   a 409. Generation, review, both judges, `ConceptMastery` and

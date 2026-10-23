@@ -46,7 +46,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
     seed_parsons_exercise
     stub_sortable_cdn(cdn)
     visit_as(user)
-    expect(page).to have_css("ol[data-parsons-blocks][data-parsons-wired]", wait: 10)
+    expect(page).to have_css("ol[data-parsons-blocks][data-parsons-wired]")
   end
 
   # The page shows opaque tokens, so read the arrangement back through the server's own decoding.
@@ -98,14 +98,14 @@ RSpec.describe "Parsons reorder controls", type: :system do
         expect(page).to have_content("1 of 3 answered")
         expect(page).to have_css('.hint-slot[data-hint-for="parsons_problem"] > details.hint')
         expect(page).to have_selector("#rating-nudge", visible: :hidden)
-        Timeout.timeout(10) do
-          sleep 0.05 until user.daily_responses.reload.first&.answered?("parsons_problem")
+        wait_for do
+          user.daily_responses.reload.first&.answered?("parsons_problem")
         end
         visit root_path
         expect(page).to have_content("1 of 3 answered")
         expect(page).to have_selector("#rating-nudge", visible: :hidden)
         click_button "Submit answers"
-        expect(page).to have_content("Review ready!", wait: 10)
+        expect(page).to have_content("Review ready!")
         expect(user.daily_responses.reload.sole.section_ratings).to eq("parsons_problem" => "right_level")
       end
     end
@@ -134,7 +134,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)
 
-      expect(page).to have_css("ol[data-parsons-blocks][data-sortable-done]", wait: 10)
+      expect(page).to have_css("ol[data-parsons-blocks][data-sortable-done]")
       expect(page).to have_no_css(".parsons-move-up")
       expect(page).to have_no_css(".parsons-move-down")
     end
@@ -144,7 +144,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :blocked)
 
-      expect(page).to have_css(".parsons-move-up", count: 3, wait: 10)
+      expect(page).to have_css(".parsons-move-up", count: 3)
       expect(page).to have_no_css("ol[data-parsons-blocks][data-sortable-done]")
 
       all(".parsons-move-down").first.click
@@ -180,8 +180,8 @@ RSpec.describe "Parsons reorder controls", type: :system do
 
       find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(%i[control down])
 
-      Timeout.timeout(10) do
-        sleep 0.05 until user.daily_responses.reload.first&.answers&.dig("parsons_problem") == "order:0,2,1"
+      wait_for do
+        user.daily_responses.reload.first&.answers&.dig("parsons_problem") == "order:0,2,1"
       end
     end
   end
@@ -195,7 +195,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
 
       find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(%i[control down])
 
-      expect(page).to have_css("ol[data-parsons-blocks] .parsons-block", text: "names.uniq", wait: 10)
+      expect(page).to have_css("ol[data-parsons-blocks] .parsons-block", text: "names.uniq")
       expect(user.daily_responses.reload).to be_empty
     end
   end
@@ -210,7 +210,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
 
       find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(%i[control down])
 
-      expect(page).to have_css("#save-status", text: "that last change wasn't saved", wait: 10)
+      expect(page).to have_css("#save-status", text: "that last change wasn't saved")
     end
   end
 
@@ -236,7 +236,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
       page.execute_script("localStorage.setItem('code-gym-answer-draft', #{copy.to_json.to_json})")
 
       visit root_path
-      expect(page).to have_css("ol[data-parsons-blocks][data-parsons-wired]", wait: 10)
+      expect(page).to have_css("ol[data-parsons-blocks][data-parsons-wired]")
 
       expect(find(field, visible: :all).value).to eq(rendered)
     end

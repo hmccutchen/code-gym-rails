@@ -1,5 +1,8 @@
 # Design notes: docs/code-notes/app/models/user.md
 class User < ApplicationRecord
+  include SignedInSessions
+  include SecondFactor
+
   has_many :daily_exercises, dependent: :destroy
   has_many :daily_responses, dependent: :destroy, inverse_of: :user
   has_many :duck_threads,    dependent: :delete_all
@@ -13,8 +16,6 @@ class User < ApplicationRecord
 
   self.ignored_columns += %w[learning_track]
 
-  attr_accessor :shown_level_suggestions, :track_change
-
   serialize :api_keys, coder: JSON
   encrypts :api_keys
 
@@ -25,43 +26,30 @@ class User < ApplicationRecord
 
   DAILY_SECTION_COUNTS = (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
   AUTOMATIC_SECTION_COUNT = "automatic".freeze
+  SKILL_LEVEL_RULE = "must be one of #{SKILL_LEVELS.join(', ')}".freeze
+  DAILY_SECTION_COUNT_RULE = "must be #{AUTOMATIC_SECTION_COUNT} or one of #{DAILY_SECTION_COUNTS.to_a.join(', ')}".freeze
 
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :name,  presence: true
   before_validation :clean_name, if: :name_changed?
-  validates :skill_level, inclusion: { in: SKILL_LEVELS }
+  validates :skill_level, inclusion: { in: SKILL_LEVELS, message: SKILL_LEVEL_RULE }
   validates :provider, inclusion: { in: ->(_) { AiProvider.keys } }, allow_nil: true
   validate :api_keys_name_providers, if: :api_keys_changed?
   validate :provider_has_a_stored_key, if: -> { provider_changed? || api_keys_changed? }
   validates :language, inclusion: { in: LANGUAGES }
   validate :time_zone_must_be_loadable
-  validate :section_kind_weights_name_rotatable_kinds,   if: :section_kind_weights_changed?
-  validate :excluded_section_kinds_name_rotatable_kinds, if: :excluded_section_kinds_changed?
-  validate :every_slot_keeps_a_kind,                     if: -> { excluded_section_kinds_changed? || daily_section_kinds_changed? }
-  validate :daily_section_kinds_name_a_full_set,         if: :daily_section_kinds_changed?
-  validate :section_kind_levels_name_section_kinds,      if: :section_kind_levels_changed?
-  validate :locked_section_kinds_name_section_kinds,     if: :locked_section_kinds_changed?
-  validate :locks_have_levels, if: -> { section_kind_levels_changed? || locked_section_kinds_changed? }
+  validate :section_kind_settings_hold
   validate :display_preferences_name_known_options, if: :display_preferences_changed?
-  validates :daily_section_count, numericality: { only_integer: true, in: DAILY_SECTION_COUNTS }, allow_nil: true,
-                                  if: :daily_section_count_changed?
+  validates :daily_section_count, numericality: { only_integer: true, in: DAILY_SECTION_COUNTS, message: DAILY_SECTION_COUNT_RULE },
+                                  allow_nil: true, if: :daily_section_count_changed?
 
   normalizes :display_preferences, with: ->(values) { DisplayPreferences.sparse(values) }
   normalizes :api_keys, with: ->(keys) { keys.presence }
 
   before_save { email.downcase! }
 
-  # Ahead of the version bump, which reads section_kind_levels_changed? when it is reached.
-  before_save :apply_track_change
-  before_save :bump_section_kind_preferences_version, if: :section_kind_preferences_changed?
-  before_save :record_level_changes, if: -> {
-    persisted? && !choosing_track? && (section_kind_levels_changed? || skill_level_changed?)
-  }
-  after_save :record_level_suggestion_events, if: -> {
-    !previously_new_record? && !chose_track? &&
-      (saved_change_to_section_kind_levels? || saved_change_to_skill_level?)
-  }
+  before_save :bump_section_kind_preferences_version, if: -> { section_kind_settings.changed? }
 
   scope :active, -> { where(anonymized_at: nil) }
 
@@ -69,11 +57,20 @@ class User < ApplicationRecord
 
   def push_reminders_enabled? = !reminders_none?
 
-  LOGIN_CODE_EXPIRY = 15.minutes
+  LOGIN_CODE_EXPIRY = 10.minutes
+  LOGIN_RATE_LIMIT_WINDOW = 15.minutes
   LOGIN_CODE_MAX_ATTEMPTS = 5
 
   def self.login_code_expiry_in_words
     LOGIN_CODE_EXPIRY.inspect
+  end
+
+  # Scoped to `active` so an anonymized user's open session, in another tab or on the cable, stops resolving.
+  def self.signed_in(user_id) = active.find_by(id: user_id)
+
+  def self.login_pending?(email:, requested_at:)
+    sent_at = active.find_by(email: email.to_s.strip.downcase)&.login_code_sent_at
+    [ requested_at, sent_at ].compact.max >= LOGIN_CODE_EXPIRY.ago
   end
 
   def generate_login_code!
@@ -184,14 +181,23 @@ class User < ApplicationRecord
       duck_threads.delete_all
 
       update!(
-        email:                  "deleted-user-#{id}@anonymized.local",
-        name:                   "Deleted user",
-        api_keys:               nil,
-        login_code_sent_at:     nil,
-        login_code_digest:      nil,
-        login_code_attempts:    0,
-        reminder_level:         :none,
-        anonymized_at:          Time.current
+        email:                            "deleted-user-#{id}@anonymized.local",
+        name:                             "Deleted user",
+        api_keys:                         nil,
+        login_code_sent_at:               nil,
+        login_code_digest:                nil,
+        login_code_attempts:              0,
+        otp_secret:                       nil,
+        consumed_timestep:                nil,
+        otp_backup_codes:                 nil,
+        two_factor_enabled_at:            nil,
+        sessions_valid_after:             nil,
+        second_factor_challenge_at:       nil,
+        second_factor_challenge_failures: 0,
+        second_factor_failures:           0,
+        second_factor_failures_since:     nil,
+        reminder_level:                   :none,
+        anonymized_at:                    Time.current
       )
     end
     true
@@ -409,23 +415,7 @@ class User < ApplicationRecord
 
   def provider_label = AiProvider.label(provider)
 
-  def emptied_slots(daily:)
-    preferences = KindPreferences.new(weights: {}, excluded: Array(excluded_section_kinds))
-    ExerciseSection.optional_slots(daily: daily).select do |_slot, kinds|
-      kinds.size > 1 && preferences.all_excluded?(kinds)
-    end
-  end
-
-  def keep_unrendered_preferences(attrs)
-    daily    = DailyKinds.for(self)
-    weighted = ExerciseSection.rotatable(daily: daily).map(&:key)
-    shown    = ExerciseSection.pickable(daily: daily).map(&:key)
-    keep_hidden(attrs, :section_kind_weights, section_kind_weights.except(*weighted))
-    keep_hidden(attrs, :excluded_section_kinds, excluded_section_kinds - weighted)
-    keep_hidden(attrs, :section_kind_levels, section_kind_levels.except(*shown))
-    keep_hidden(attrs, :locked_section_kinds, locked_section_kinds - shown)
-    attrs
-  end
+  def section_kind_settings = SectionKindSettings.for(self)
 
   def held_exercise
     return nil unless paused_generation_at?
@@ -493,110 +483,6 @@ class User < ApplicationRecord
     self.section_kind_preferences_version += 1
   end
 
-  def choosing_track?
-    track_chosen_at_changed? && track_chosen_at_in_database.nil?
-  end
-
-  def chose_track?
-    saved_change_to_track_chosen_at? && track_chosen_at_before_last_save.nil?
-  end
-
-  def apply_track_change
-    self.track_change = (TrackChange.new(levels: section_kind_levels, locked: locked_section_kinds,
-                                         from: skill_level_in_database, to: skill_level) if track_changing?)
-    self.section_kind_levels = track_change.levels if track_change
-  end
-
-  def track_changing? = persisted? && !choosing_track? && skill_level_changed?
-
-  def record_level_changes
-    before = KindDifficulty.new(levels: section_kind_levels_in_database || {}, locked: [])
-                           .rungs(skill_level: skill_level_in_database)
-    moved = kind_rungs.select { |key, rung| before[key] != rung && LevelSuggestion::LADDER.include?(rung) }
-    return if moved.empty?
-
-    through = Time.use_zone(effective_time_zone) { Date.current }.iso8601
-    self.level_suggestion_cutoffs = level_suggestion_cutoffs.merge(
-      moved.to_h { |key, rung| [ key, { "level" => rung, "through" => through } ] }
-    )
-  end
-
-  def record_level_suggestion_events
-    level_suggestion_events.create!(LevelSuggestionEvent.applied_rows(
-      self,
-      before: { levels: section_kind_levels_before_last_save || {}, skill_level: skill_level_before_last_save },
-      after: { levels: section_kind_levels, skill_level: skill_level },
-      shown: shown_level_suggestions || {},
-      cutoffs: level_suggestion_cutoffs_before_last_save || {},
-      cleared: track_change&.cleared || []
-    ))
-  end
-
-  def keep_hidden(attrs, field, hidden)
-    return unless attrs.key?(field)
-
-    known = ExerciseSection.keys
-    attrs[field] = hidden.is_a?(Hash) ? hidden.slice(*known).merge(attrs[field]) : attrs[field] | (hidden & known)
-  end
-
-  def rotatable_keys
-    ExerciseSection.rotatable(daily: DailyKinds.for(self)).map(&:key)
-  end
-
-  def daily_section_kinds_name_a_full_set
-    DailyKinds.problems_with(daily_section_kinds).each { |problem| errors.add(:daily_section_kinds, problem) }
-  end
-
-  def section_kind_weights_name_rotatable_kinds
-    return errors.add(:section_kind_weights, "must be an object") unless section_kind_weights.is_a?(Hash)
-
-    stored = section_kind_weights_in_database.is_a?(Hash) ? section_kind_weights_in_database : {}
-    section_kind_weights.each do |key, value|
-      next if stored.key?(key) && stored[key] == value
-
-      errors.add(:section_kind_weights, "names an unknown section kind: #{key}") if rotatable_keys.exclude?(key)
-      errors.add(:section_kind_weights, "has an unsupported weight for #{key}") if KindPreferences::MULTIPLIERS.exclude?(value)
-    end
-  end
-
-  def excluded_section_kinds_name_rotatable_kinds
-    return errors.add(:excluded_section_kinds, "must be a list") unless excluded_section_kinds.is_a?(Array)
-
-    (excluded_section_kinds - Array(excluded_section_kinds_in_database) - rotatable_keys).each do |key|
-      errors.add(:excluded_section_kinds, "names an unknown section kind: #{key}")
-    end
-  end
-
-  def section_kind_preferences_changed?
-    section_kind_weights_changed? || excluded_section_kinds_changed? ||
-      section_kind_levels_changed? || locked_section_kinds_changed? || daily_section_kinds_changed?
-  end
-
-  def section_kind_levels_name_section_kinds
-    return errors.add(:section_kind_levels, "must be an object") unless section_kind_levels.is_a?(Hash)
-
-    section_kind_levels.each do |key, value|
-      errors.add(:section_kind_levels, "names an unknown section kind: #{key}") if ExerciseSection.keys.exclude?(key)
-      errors.add(:section_kind_levels, "has an unsupported level for #{key}") if KindDifficulty::LEVELS.exclude?(value)
-    end
-  end
-
-  def locked_section_kinds_name_section_kinds
-    return errors.add(:locked_section_kinds, "must be a list") unless locked_section_kinds.is_a?(Array)
-
-    (locked_section_kinds - ExerciseSection.keys).each do |key|
-      errors.add(:locked_section_kinds, "names an unknown section kind: #{key}")
-    end
-  end
-
-  def locks_have_levels
-    return unless locked_section_kinds.is_a?(Array) && section_kind_levels.is_a?(Hash)
-
-    (locked_section_kinds - section_kind_levels.keys).each do |key|
-      errors.add(:locked_section_kinds, "locks #{key} without a difficulty target")
-    end
-  end
-
   def api_keys_name_providers
     return if api_keys.nil?
     return errors.add(:api_keys, "must be a map of provider to key") unless api_keys.is_a?(Hash)
@@ -613,15 +499,11 @@ class User < ApplicationRecord
     errors.add(:provider, "has no stored key") unless api_keys.key?(provider)
   end
 
-  def display_preferences_name_known_options
-    DisplayPreferences.problems_with(display_preferences).each { |problem| errors.add(:display_preferences, problem) }
+  def section_kind_settings_hold
+    section_kind_settings.problems.each { |attribute, problem| errors.add(attribute, problem) }
   end
 
-  def every_slot_keeps_a_kind
-    return unless excluded_section_kinds.is_a?(Array)
-
-    emptied_slots(daily: DailyKinds.for(self)).each_key do |slot|
-      errors.add(:excluded_section_kinds, "must leave at least one #{slot} section in rotation")
-    end
+  def display_preferences_name_known_options
+    DisplayPreferences.problems_with(display_preferences).each { |problem| errors.add(:display_preferences, problem) }
   end
 end

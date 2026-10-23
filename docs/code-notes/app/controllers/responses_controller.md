@@ -22,13 +22,12 @@ Synchronous: the caller posts through `fetch` and appends the reply in place.
 
 ## `#explain_differently` and `#follow_ups`
 
-The count check before the provider call is advisory. The re-check under the
-row lock is what keeps concurrent requests under the cap.
+The check before the provider call only saves a paid call that would be
+refused anyway. `DailyResponse#append_alternate!` and `#append_follow_up!`
+check the cap again under the row lock, and the action only maps what they
+return (`#capped_outcome`).
 
 ## `#follow_ups`
-
-Both turns, the question and the answer, are written under the same lock, so
-no question is stored without its answer.
 
 The reply returns the cleaned question, so the transcript never claims an
 answer to text the provider never saw.
@@ -79,7 +78,13 @@ truthy value and would let the action carry on.
 
 ## `#pseudocode_critique`
 
-Round 1: one text-only critique of the engineer's plan.
+Round 1: one text-only critique of the engineer's plan. The claim, the write
+and the release are `DailyResponse`'s (`#claim_pseudocode_critique!`), and
+the action keeps only the token. A critique whose claim went stale and was
+taken over is still shown to the engineer, since it was paid for, but it is
+not stored: the newer call's result is the one the round keeps, so a reload
+can show a different critique from the one first shown. If the newer call
+fails instead, its release leaves the round open and a new check is allowed.
 
 ## `#stale_answer_sections`
 
@@ -119,20 +124,6 @@ only after the request has passed validation.
 Rescues both `RecordInvalid` and `RecordNotUnique`, since the model validation
 and the unique index both guard uniqueness. The create runs inside a
 SAVEPOINT because `#create` already wraps it in a transaction.
-
-## `#claim_pseudocode_round!`
-
-Claims the round before the provider call, so a cap on a paid call also bounds
-the spend. The claim expires the way `#review`'s claim does.
-
-## `#write_pseudocode_round!`
-
-Writing the result also releases the claim, so the two can never disagree.
-
-## `#release_pseudocode_claim!`
-
-After a handled provider failure, the round is handed back so the engineer can
-retry without waiting out the stale window.
 
 ## `#pseudocode_error`
 

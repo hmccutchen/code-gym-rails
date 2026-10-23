@@ -13,8 +13,8 @@ RSpec.describe GenerationDiagnostics do
              coverage: Struct.new(:kind, :reason).new(ExerciseSection::Challenge, "gap"), size: size)
   end
   let(:draft) do
-    AiService.const_get(:Draft).new(problem_set: {}, plan: plan, kinds: kinds, difficulty: KindDifficulty.none, ladders: {},
-                                    history: [], suggested_concepts: [], unusable_sections: [])
+    ExerciseDraft::Draft.new(user: user, language: "ruby_rails", problem_set: {}, plan: plan, kinds: kinds,
+                             difficulty: KindDifficulty.none, ladders: {}, history: [], suggested_concepts: [], unusable_sections: [])
   end
 
   # Every section carries every answer-key field any kind declares, so a new kind or a new field is covered unchanged.
@@ -43,6 +43,18 @@ RSpec.describe GenerationDiagnostics do
     expect(lines.map { |line| line[/\A\[\w+\]/] }.uniq)
       .to contain_exactly("[set_size]", "[unusable_section]", "[retention]", "[shared_concept]", "[coverage]", "[difficulty_diagnostics]")
     expect(lines).to all(satisfy { |line| line.exclude?(sentinel) })
+  end
+
+  it "keeps the judge's pick, the answer key and the solves out of the payload a judged generation logs" do
+    judged = nil
+    lines = logged_lines { judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails") }
+
+    payload = lines.grep(/\A\[difficulty_diagnostics\]/).sole
+    key = judged.problem_set.fetch("design_comparison").fetch("answer_key")
+    expect(judged.solves).not_to be_empty
+    expect(payload).to include("solve_matched")
+    expect(payload).not_to include("answer_key", "\"better\"", "judge_pick", "judged_section", "solves", "Solve",
+                                   key.fetch("deciding_fact"), key.fetch("why_other_fails"))
   end
 
   it "reports each dropped concept on its own track's retention line" do

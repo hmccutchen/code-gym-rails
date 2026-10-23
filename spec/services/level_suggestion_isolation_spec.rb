@@ -62,24 +62,21 @@ RSpec.describe "Track choice and level suggestion isolation" do
   end
 
   let(:state_readers) do
-    /learning_track|track_chosen|choose_track|track_change|TrackChange|level_suggestion|LevelSuggestion|TrackGraduation|
-     shown_level_suggestions/x
+    /learning_track|track_chosen|choose_track|track_change|TrackChange|LevelChange|level_suggestion|LevelSuggestion|
+     TrackGraduation/x
   end
 
   it "keeps track and suggestion state out of generation, review, judges, ConceptMastery, KindDifficulty and DailyKinds" do
-    own = %w[app/services/level_suggestion.rb app/services/level_suggestion/evidence.rb]
-    files = Rails.root.glob("app/{services,jobs}/**/*.rb").map { |file| file.relative_path_from(Rails.root).to_s } +
-            %w[app/models/concept_mastery.rb app/models/judge_verdict.rb
-               app/models/review_prose_verdict.rb app/models/kind_difficulty.rb app/models/daily_kinds.rb
-               app/models/daily_kind_swap.rb]
+    own = %w[app/models/level_suggestion.rb app/models/level_suggestion/evidence.rb app/models/level_suggestion_event.rb
+             app/models/level_suggestion_step.rb app/models/level_change.rb app/models/track_change.rb app/models/user.rb]
 
-    readers = (files - own).select { |file| File.read(Rails.root.join(file)).match?(state_readers) }
+    readers = (isolation_scope - own).select { |file| File.read(Rails.root.join(file)).match?(state_readers) }
     expect(readers).to eq([])
   end
 
   it "would catch a reader of each name it guards" do
     %w[learning_track track_chosen_at choose_track track_change TrackChange level_suggestion_cutoffs
-       level_suggestions LevelSuggestion TrackGraduation shown_level_suggestions level_suggestion_answers].each do |name|
+       level_suggestions LevelSuggestion TrackGraduation LevelChange level_suggestion_answers].each do |name|
       expect("user.#{name}").to match(state_readers)
     end
   end

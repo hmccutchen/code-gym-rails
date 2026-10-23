@@ -1,17 +1,21 @@
 ---
 paths:
-  - "app/services/{ai_service,generation_prompt,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt,problem_set_ingest,fake_service,judged_generation,caller_zone_thread}.rb"
-  - "app/services/generation_prompt/**"
+  - "app/clients/{ai_service,fake_service,caller_zone_thread}.rb"
+  - "app/prompts/{generation_prompt,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt}.rb"
+  - "app/models/problem_set_ingest.rb"
+  - "app/services/{judged_generation,exercise_draft}.rb"
+  - "app/prompts/generation_prompt/**"
   - "app/services/judged_generation/**"
   - "app/models/{exercise_section,concept_vocabulary,language_prompts,scenario_pools,concept_bucket,real_source,judge_verdict,verdict_schema,code_format,daily_exercise,suggested_concept,mermaid_source}.rb"
   - "app/models/exercise_section/**"
   - "app/models/code_format/**"
+  - "app/clients/code_format/**"
   - "app/jobs/{generate_daily_exercises_job,regenerate_exercise_job}.rb"
   - "app/views/responses/bodies/**"
   - "script/{compare_models,model_comparison,forced_concept_drafts,solve_agreement,report_answer_positions,answer_position_balance}.rb"
   - "spec/fixtures/judge/**"
-  - "spec/**/*{ai_service,judged_generation,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt,problem_set_ingest,exercise_section,real_source,judge_verdict,code_format,concept_vocabulary,generate_daily_exercises,regenerate_exercise}*"
-  - "app/services/{daily_plan,section_rotation,section_count,day_hosts}.rb"
+  - "spec/**/*{ai_service,judged_generation,exercise_draft,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt,problem_set_ingest,exercise_section,real_source,judge_verdict,code_format,concept_vocabulary,generate_daily_exercises,regenerate_exercise}*"
+  - "app/models/{daily_plan,section_rotation,section_count,day_hosts}.rb"
   - "app/models/exercise_history_entry.rb"
   - "app/views/responses/answers/_design_comparison.html.erb"
   - "app/views/responses/_answered_sections.html.erb"
@@ -65,6 +69,9 @@ read it before changing that area.
   page, the judge, the duck (which gains only `piece_a` and `piece_b`) or the
   `[difficulty_diagnostics]` log before review, and the judge's outcomes for
   this kind omit evidence and reason, with the reply parsed `log_raw: false`.
+  Each blind solve is a `JudgedGeneration::Solve`, handed back on
+  `AiService::JudgedSet#solves` and written to `judge_solves` by the jobs; solves
+  never ride `outcomes` or `finish`, and `shipped` comes from the control flow.
   `.reject_unusable!` refuses unusable pieces or keys; `DEFERRED_CONCEPTS`
   stay out of its vocabulary; `.rejudge_edits?` is true only here;
   `REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL` stays false until a person has read

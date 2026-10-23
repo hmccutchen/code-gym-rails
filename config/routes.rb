@@ -13,6 +13,8 @@ Rails.application.routes.draw do
   get    "login",        to: "sessions#new"
   post   "login",        to: "sessions#create"
   post   "login/code",   to: "sessions#verify_code", as: :verify_login_code
+  get    "login/second-factor", to: "second_factor_challenges#new", as: :second_factor_challenge
+  post   "login/second-factor", to: "second_factor_challenges#create"
   delete "logout",       to: "sessions#destroy", as: :logout
 
   get   "setup", to: "api_keys#edit"
@@ -27,6 +29,10 @@ Rails.application.routes.draw do
 
   resource :account, only: [ :show, :destroy ] do
     patch :toggle_generation, on: :member
+    resource :authenticator, only: [ :show, :create, :destroy ] do
+      delete :sign_in_again
+    end
+    resources :recovery_codes, only: :create
   end
 
   resource :push_subscription, only: [ :create, :update, :destroy ]
@@ -91,5 +97,6 @@ Rails.application.routes.draw do
         patch :dismiss
       end
     end
+    resources :judge_solves, only: [ :index, :update ]
   end
 end

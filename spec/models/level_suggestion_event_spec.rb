@@ -88,6 +88,13 @@ RSpec.describe LevelSuggestionEvent, type: :model do
       expect(kinds.map { |row| row[:source] }.uniq).to eq([ "skill_level_edit" ])
     end
 
+    it "labels each kind by its own cause when one save changes a target and the skill level" do
+      kinds = rows(before: {}, after: { "pattern" => "senior" }, before_skill: "junior", after_skill: "mid_level")
+
+      expect(kinds.find { |row| row[:kind] == "pattern" }[:source]).to eq("setup_edit")
+      expect(kinds.find { |row| row[:kind] == "code_review" }[:source]).to eq("skill_level_edit")
+    end
+
     it "leaves counts at their defaults for a move from principal engineer" do
       row = rows(before: { "pattern" => "principal_engineer" }, after: { "pattern" => "senior" }).sole
 

@@ -39,8 +39,9 @@ arrives. A call that fails before a reply arrives writes one row with zero
 tokens, through the same `#log_usage`, from `call_and_log`'s rescue: one row
 per call, whatever faraday-retry did inside it, and the write never changes
 the error the caller sees. A refusal or truncation is marked on the row its
-tokens were billed to. `AiService.failure_code_for` is the one map from an
-error class to a code.
+tokens were billed to. Each `ProviderError` class states its code
+(`.failure_code`, inherited unless it states its own), and
+`AiService.failure_code_for` reads it.
 
 **A row also records what it cost.** `cost_usd` is priced in `#log_usage`,
 at call time, from the provider subclass's `PRICE_PER_MILLION`: one

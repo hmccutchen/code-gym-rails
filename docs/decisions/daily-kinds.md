@@ -37,7 +37,7 @@ that never swaps plans and prompts exactly as before.
 the default pair, so an untouched account stores nothing. Order is the
 place: index 0 is the first daily section and index 1 the second. A
 non-empty list must name exactly `COUNT` distinct known kinds, holding at
-most one fourth-slot kind (`User#daily_section_kinds_name_a_full_set`).
+most one fourth-slot kind (`SectionKindSettings#daily_kind_problems`).
 
 ## Normalized on read
 
@@ -124,7 +124,7 @@ slots. Every reader takes the pair:
   shares.
 - `ExerciseSection.for_plan(daily:, rotation:)` lists the day's kinds;
   `DailyPlan::Result#kinds` is the one call site the generation prompt,
-  `AiService#draft_exercise` and `script/forced_concept_drafts.rb` read.
+  `ExerciseDraft.call` and `script/forced_concept_drafts.rb` read.
   `slot_kinds` refuses a rotation that names a slot the pair leaves no room
   for.
 - `DailyPlan::Result#rotation` holds what the rotation (and any coverage
@@ -140,7 +140,7 @@ A rejected section gets `DailyPlan::DAILY_JUDGE_RETRIES` (2) retries when
 its kind is one of the plan's daily kinds and `ROTATED_JUDGE_RETRIES` (1)
 otherwise (`DailyPlan::Result#judge_retries`). The extra retry follows the
 daily place, not the kind, because every set is built around those
-sections. `AiService::JUDGED_GENERATION_BUDGET` reads the larger of the two.
+sections. `CallProfiles::JUDGED_GENERATION_BUDGET` reads the larger of the two.
 
 ## Which kinds count as offered
 
@@ -157,8 +157,8 @@ minus the excluded ones, as before.
 
 ## Weights and exclusions on a daily kind
 
-`User#rotatable_keys` reads the user's layout, so a weight or exclusion can't
-be added for a daily kind. Rotation and coverage read only optional slots, so
+`SectionKindSettings` checks weights and exclusions against the user's
+layout, so a weight or exclusion can't be added for a daily kind. Rotation and coverage read only optional slots, so
 a weight or exclusion stored on a kind before it became daily is ignored while
 it is daily.
 
@@ -168,8 +168,8 @@ setting:
 - The Exercise mix form posts only the controls on screen. A daily kind has
   no weight row there, and while a fourth kind is daily its two siblings have
   no row at all, so neither their weights and exclusions nor their difficulty
-  targets and locks are posted. `ProfileController` passes every save through
-  `User#keep_unrendered_preferences`, which merges back the stored weights and
+  targets and locks are posted. `ProfileUpdate` passes every save through
+  `SectionKindSettings#keep_unrendered`, which merges back the stored weights and
   exclusions for kinds outside `ExerciseSection.rotatable` and the stored
   targets and locks for kinds outside `ExerciseSection.pickable`, the two sets
   Setup renders controls for.
@@ -177,12 +177,12 @@ setting:
   old pair. Its next save gets the usual 409, and the reply's
   `layout_changed`, decided by the server from the `layout` the page posts,
   makes the page reload instead of saving with controls missing.
-- `section_kind_weights_name_rotatable_kinds` and
-  `excluded_section_kinds_name_rotatable_kinds` check only the entries a save
+- `SectionKindSettings` checks only the weight and exclusion entries a save
   adds or changes, so a kept entry for a daily kind never refuses a save, and
   a new entry for one still is.
 
-`User#every_slot_keeps_a_kind` runs when the exclusions or the pair change. A
+`SectionKindSettings` checks for an emptied slot when the exclusions or the
+pair change. A
 pair that leaves an optional slot with every kind excluded is refused, and
 `DailyKindSwap` names those kinds in its refusal. Without that, rotation would
 fall back to the excluded kinds (`KindPreferences#eligible`) and the user's

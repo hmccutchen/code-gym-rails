@@ -47,7 +47,7 @@ RSpec.describe "Code block wrapping", type: :system do
 
   # Fitting runs from a ResizeObserver a moment later, so this retries until the gap matches.
   def expect_gap(index, columns, before: "=")
-    page.document.synchronize(5) do
+    page.document.synchronize do
       actual = gap_columns(index, before: before)
       raise Capybara::ExpectationNotMet, "line #{index} showed #{actual} columns before `#{before}`, expected #{columns}" unless actual == columns
     end

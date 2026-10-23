@@ -34,13 +34,16 @@ class ApplicationController < ActionController::Base
     history_path(page: (page unless page == 1))
   end
 
-  # Scoped to `active` so an anonymized user's open session in another tab stops resolving on its next request.
   def current_user
-    @current_user ||= User.active.find_by(id: session[:user_id])
+    @current_user ||= User.signed_in_through(user_id: session[:user_id], signed_in_at: session[:signed_in_at])
   end
 
   def logged_in?
     current_user.present?
+  end
+
+  def second_factor_cap_message(user, retry_at)
+    t("second_factor_challenges.locked", time: l(retry_at.in_time_zone(user.effective_time_zone), format: :long))
   end
 
   def own_key?
@@ -49,9 +52,13 @@ class ApplicationController < ActionController::Base
 
   def require_login
     unless logged_in?
-      session[:return_to] = request.fullpath
+      session[:return_to] = request.fullpath if page_navigation?
       redirect_to login_path, alert: t("flash.application.login_required")
     end
+  end
+
+  def page_navigation?
+    request.get? && request.accept.to_s.include?("text/html")
   end
 
   def require_provider

@@ -37,14 +37,14 @@ has its own rescue. It rescues `StandardError`, not just `ProviderError`,
 because `Thread#value` re-raises whatever `ReviewGrading#grade_section`'s narrower rescue
 misses, and no judge failure may cost the engineer the review. A failure
 returns the grade unchanged and logs `[review_judge_fallback]` with a fixed
-reason code from `AiService.judge_fallback_reason`, the table the section
+reason code from `AiService.judge_fallback_reason`, which the section
 judge also reads, never the error message, which can carry provider text. The call is billed as `judge_review`, which is in
 `ApiUsage::PURPOSES`, and capped by `REVIEW_JUDGE_MAX_TOKENS` (1,500). The
 cap was re-checked against the comparison script on 2026-10-09; the run
 record at the end of this doc has the measured figures.
 
 **One attempt, and a 12-minute claim.** The `judge_review` profile in
-`AiService::CALL_PROFILES` sets `single_attempt: true`, which refuses every
+`CallProfiles::BY_PURPOSE` sets `single_attempt: true`, which refuses every
 retry, status retries included, and runs the call on
 `REVIEW_JUDGE_READ_TIMEOUT`. The grading stage's time budget now includes
 that one call (`OPEN_TIMEOUT + REVIEW_JUDGE_READ_TIMEOUT`), so
@@ -175,6 +175,6 @@ The budget checks still pass with room, measured on the corrected prompt:
 the largest reply used a fraction of `REVIEW_JUDGE_MAX_TOKENS` and the
 slowest call a tenth of `REVIEW_JUDGE_READ_TIMEOUT`.
 `REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS` moves to what this run measured;
-that constant and its section in `docs/code-notes/app/services/ai_service.md`
+that constant and its section in `docs/code-notes/app/clients/ai_service.md`
 are where the number and its remaining headroom are stated, so they are not
 restated here to go stale.

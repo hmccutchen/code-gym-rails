@@ -49,64 +49,10 @@ RSpec.describe User, "track", type: :model do
       expect(user.first_run?).to be false
       expect(read_learning_track(user)).to be_nil
     end
-
-    it "records no cutoff and no event for the first choice" do
-      user = new_account
-      user.choose_track("senior")
-      user.save!
-
-      expect(user.reload.level_suggestion_cutoffs).to eq({})
-      expect(user.level_suggestion_events).to be_empty
-    end
   end
 
   it "ignores learning_track until the next release drops the column" do
     expect(User.column_names).not_to include("learning_track")
     expect(ActiveRecord::Base.connection.column_exists?(:users, :learning_track)).to be(true)
-  end
-
-  describe "a track change" do
-    let(:preset) { ExerciseSection.keys.index_with { "junior" } }
-
-    it "clears targets at the old level and bumps the preferences version on a skill-level-only save" do
-      user = chosen(skill_level: "junior", section_kind_levels: preset)
-      version = user.section_kind_preferences_version
-
-      user.update!(skill_level: "mid_level")
-
-      expect(user.reload.section_kind_levels).to eq({})
-      expect(user.section_kind_preferences_version).to eq(version + 1)
-    end
-
-    it "records a cutoff at the new rung and a skill_level_edit event for each cleared kind that moved" do
-      user = chosen(skill_level: "junior", section_kind_levels: { "code_review" => "junior", "pattern" => "mid_level" })
-
-      user.update!(skill_level: "mid_level")
-
-      expect(user.reload.level_suggestion_cutoffs).to include(
-        "code_review" => { "level" => "mid_level", "through" => "2026-10-16" }
-      )
-      events = user.level_suggestion_events.where(kind: "code_review")
-      expect(events.pluck(:source, :from_level, :to_level)).to eq([ [ "skill_level_edit", "junior", "mid_level" ] ])
-      expect(user.level_suggestion_events.where(kind: "pattern")).to be_empty
-    end
-
-    it "leaves the version alone when nothing is cleared" do
-      user = chosen(skill_level: "junior", section_kind_levels: { "pattern" => "senior" })
-      version = user.section_kind_preferences_version
-
-      user.update!(skill_level: "mid_level")
-
-      expect(user.reload.section_kind_levels).to eq("pattern" => "senior")
-      expect(user.section_kind_preferences_version).to eq(version)
-    end
-
-    it "holds no track change on a later save that does not move the track" do
-      user = chosen(skill_level: "junior", section_kind_levels: preset)
-      user.update!(skill_level: "mid_level")
-      user.update!(name: "Renamed")
-
-      expect(user.track_change).to be_nil
-    end
   end
 end

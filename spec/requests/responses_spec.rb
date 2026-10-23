@@ -1289,7 +1289,7 @@ RSpec.describe "Responses", type: :request do
       post follow_ups_response_path(r), params: { section: "code_review", question: "Why is that slow?" }
       expect(response).to have_http_status(:ok)
 
-      turns = r.reload.review_follow_ups.for_section("code_review")
+      turns = r.reload.follow_up_turns("code_review")
       expect(turns.map(&:role)).to eq(%w[user assistant])
       expect(turns.first.content).to eq("Why is that slow?")
       expect(turns.last.content).to eq("Because the query runs per row.")
@@ -1688,7 +1688,7 @@ RSpec.describe ResponsesController, "duck thread byte allowance" do
   it "gives a full-length reply room whatever the cap is" do
     allowance = described_class::DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE
 
-    expect(allowance).to be >= AiService::DUCK_RESPONSE_MAX_TOKENS * described_class::DUCK_REPLY_BYTES_PER_TOKEN
+    expect(allowance).to be >= CallProfiles::DUCK_RESPONSE_MAX_TOKENS * described_class::DUCK_REPLY_BYTES_PER_TOKEN
     expect(described_class::MAX_DUCK_THREAD_BYTES).to be > allowance * described_class::MAX_DUCK_TURNS_PER_SECTION
   end
 end

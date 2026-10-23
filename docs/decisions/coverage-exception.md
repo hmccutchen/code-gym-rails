@@ -33,7 +33,7 @@ section to a sparse day, so adding nothing is the right answer, and taking
 rotation's fallback would weaken "never show me this kind" for the sake of
 symmetry. This was decided on 2026-10-16 while building per-user daily
 kinds (PR 1 of the daily kind swap), and the difference is not an
-inconsistency to fix. `spec/services/coverage_exception_spec.rb` ("never
+inconsistency to fix. `spec/models/coverage_exception_spec.rb` ("never
 adds a kind the user excluded") pins it with `pattern`, a slot holding one
 kind, where rotation's fallback would have added it.
 

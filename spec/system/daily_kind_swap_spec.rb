@@ -7,7 +7,6 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
   before do
     visit_with_todays_set(user)
-    wait_for_js
   end
 
   def panel(place) = find("#daily-kind-swap-panel-#{place}")
@@ -20,15 +19,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
   def focused(script) = page.evaluate_script("document.activeElement.#{script}")
 
-  def trigger_focused?
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Capybara.default_max_wait_time
-    loop do
-      return true if page.evaluate_script("document.activeElement.classList.contains('daily-kind-trigger')")
-      return false if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
-
-      sleep 0.05
-    end
-  end
+  def trigger_focused? = wait_for { page.evaluate_script("document.activeElement.classList.contains('daily-kind-trigger')") }
 
   def open_sheet(place)
     within(panel(place)) { find("button.daily-kind-trigger").click }
@@ -297,8 +288,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     fill_in_answer("code_review", "The answer that is submitted while both swaps are still queued.")
     rate_section("code_review")
     click_button "Submit answers"
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Capybara.default_max_wait_time
-    sleep 0.05 until user.daily_responses.reload.first&.submitted? || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+    wait_for { user.daily_responses.reload.first&.submitted? }
     expect(user.daily_responses.sole).to be_submitted
   end
 
@@ -315,7 +305,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     wait_for_js_condition("window.heldSwaps.length === 2")
     release_swap
 
-    expect(page).to have_content("✓ Submitted", wait: 10)
+    expect(page).to have_content("✓ Submitted")
     expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
   end
 
@@ -349,7 +339,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page).to have_css("#{sheet(1)} .daily-kind-error", text: I18n.t("save_status.generic"))
     primary(1).click
     release_swap
-    expect(page).to have_content("✓ Submitted", wait: 10)
+    expect(page).to have_content("✓ Submitted")
     expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
   end
 
@@ -428,7 +418,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
   def retry_swap_and_expect_reload
     confirm_swap(1, "pattern")
-    wait_for_js_condition("window.swapPage === undefined", timeout: 8)
+    wait_for_js_condition("window.swapPage === undefined")
     expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
   end
 
@@ -452,7 +442,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page.evaluate_script("window.swapPage")).to be(true)
 
     release_swap
-    wait_for_js_condition("window.swapPage === undefined", timeout: 8)
+    wait_for_js_condition("window.swapPage === undefined")
     expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
   end
 
@@ -469,7 +459,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     fill_in_answer("code_review", "The answer an autosave is still carrying when the submit goes out.")
     wait_for_js_condition("window.releaseAutosave")
     submit_one_answer
-    expect(page).to have_css("#leave-held", wait: 15)
+    expect(page).to have_css("#leave-held")
 
     page.execute_script("window.releaseAutosave()")
     wait_for_js_condition("window.reviewHandoffs === 1")
@@ -514,13 +504,13 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     page.execute_script("window.firstPage = true")
     fill_in_answer("code_review", "An edit on the old set that the server refuses as stale.")
 
-    wait_for_js_condition("window.firstPage === undefined", timeout: 8)
+    wait_for_js_condition("window.firstPage === undefined")
     expect(page).to have_css("[data-controller='generating']")
     expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.stale_reloaded"))
     page.execute_script("window.reviewPage = true")
     response.update!(reviewing_since: nil)
 
-    wait_for_js_condition("window.reviewPage === undefined", timeout: 10)
+    wait_for_js_condition("window.reviewPage === undefined")
     expect(page).to have_no_css("[data-controller='generating']")
   end
 
@@ -578,7 +568,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
     finish_saved(1)
     submit_one_answer
-    expect(page).to have_content("✓ Submitted", wait: 10)
+    expect(page).to have_content("✓ Submitted")
     expect(user.reload.daily_section_kinds).to eq(%w[challenge pattern])
   end
 

@@ -100,6 +100,61 @@ RSpec.describe DailyResponse, type: :model do
       expect(response.translated?("pseudocode_to_code")).to be(true)
       expect(response.critiqued?("pseudocode_to_code")).to be(false)
     end
+
+    describe "the critique claim" do
+      let(:section) { "pseudocode_to_code" }
+      let(:response) { response_for({}) }
+
+      def record(token)
+        response.record_pseudocode_critique!(section, token, pseudocode: "sort then walk", gaps_found: false, gaps: [])
+      end
+
+      it "returns a token, then refuses a second claim while the first is fresh" do
+        token = response.claim_pseudocode_critique!(section)
+
+        expect(token).to be_present
+        expect(response.reload.pseudocode_round(section)["critique_claimed_at"]).to eq(token)
+        expect(response.claim_pseudocode_critique!(section)).to be_nil
+      end
+
+      it "refuses a claim once the round has been critiqued" do
+        record(response.claim_pseudocode_critique!(section))
+
+        expect(response.claim_pseudocode_critique!(section)).to be_nil
+      end
+
+      it "records the critique and releases the claim with the token that took it" do
+        token = response.claim_pseudocode_critique!(section)
+
+        expect(record(token)).to be(true)
+        round = response.reload.pseudocode_round(section)
+        expect(round).to include("initial_pseudocode" => "sort then walk", "gaps_found" => false, "critique" => [])
+        expect(round).not_to have_key("critique_claimed_at")
+        expect(response.critiqued?(section)).to be(true)
+      end
+
+      it "lets a stale claim be taken over, and leaves the new claim alone when the old caller writes or releases" do
+        stale = response.claim_pseudocode_critique!(section)
+        travel DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute
+        fresh = response.claim_pseudocode_critique!(section)
+
+        expect(fresh).to be_present
+        expect(fresh).not_to eq(stale)
+        expect(record(stale)).to be(false)
+        response.release_pseudocode_critique!(section, stale)
+
+        expect(response.reload.pseudocode_round(section)["critique_claimed_at"]).to eq(fresh)
+        expect(response.critiqued?(section)).to be(false)
+      end
+
+      it "hands the round back on release with its own token" do
+        token = response.claim_pseudocode_critique!(section)
+        response.release_pseudocode_critique!(section, token)
+
+        expect(response.reload.pseudocode_round(section)).not_to have_key("critique_claimed_at")
+        expect(response.claim_pseudocode_critique!(section)).to be_present
+      end
+    end
   end
 
   describe ".review_points" do
@@ -817,6 +872,97 @@ RSpec.describe DailyResponse, type: :model do
       )
       expect(response.section_reviewed?("code_review")).to be(true)
       expect(response.section_reviewed?("pattern")).to be(false)
+    end
+  end
+
+  describe "capped appends" do
+    let(:user) { User.create!(email: "caps@example.com", name: "C") }
+    let(:response) do
+      exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                       problem_set: { "code_review" => { "question" => "q" } })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+    end
+
+    def fill_follow_ups(row, count)
+      count.times do |i|
+        row.review_follow_ups.create!(section: "code_review", role: :user, content: "q#{i}")
+        row.review_follow_ups.create!(section: "code_review", role: :assistant, content: "a#{i}")
+      end
+    end
+
+    describe "#append_alternate!" do
+      it "appends and returns how many are left" do
+        expect(response.append_alternate!("code_review", "first")).to eq(DailyResponse::MAX_ALTERNATES_PER_SECTION - 1)
+        expect(response.reload.review_alternates["code_review"]).to eq([ "first" ])
+      end
+
+      it "counts what is left only after it holds the row lock" do
+        expect(response).to receive(:lock!).ordered.and_call_original
+        expect(response).to receive(:alternates_left).ordered.and_call_original
+
+        response.append_alternate!("code_review", "first")
+      end
+
+      it "returns :capped without writing when another request filled the cap after this copy was read" do
+        stale = DailyResponse.find(response.id)
+        full = Array.new(DailyResponse::MAX_ALTERNATES_PER_SECTION) { |i| "other #{i}" }
+        response.update!(review_alternates: { "code_review" => full })
+
+        expect(stale.append_alternate!("code_review", "late")).to eq(:capped)
+        expect(response.reload.review_alternates["code_review"]).to eq(full)
+      end
+    end
+
+    describe "#alternates_left" do
+      it "counts down from the cap as alternates are stored" do
+        expect { response.append_alternate!("code_review", "first") }
+          .to change { response.alternates_left("code_review") }.by(-1)
+      end
+    end
+
+    describe "#append_follow_up!" do
+      it "stores the question and answer in order and returns how many are left" do
+        expect(response.append_follow_up!("code_review", question: "why?", answer: "because"))
+          .to eq(DailyResponse::MAX_FOLLOW_UPS_PER_SECTION - 1)
+        expect(response.reload.follow_up_turns("code_review").map { |t| [ t.role, t.content ] })
+          .to eq([ [ "user", "why?" ], [ "assistant", "because" ] ])
+      end
+
+      it "counts what is left only after it holds the row lock" do
+        expect(response).to receive(:lock!).ordered.and_call_original
+        expect(response).to receive(:follow_ups_left).ordered.and_call_original
+
+        response.append_follow_up!("code_review", question: "why?", answer: "because")
+      end
+
+      it "returns :capped without writing when another request filled the cap after this copy was read" do
+        stale = DailyResponse.find(response.id)
+        expect(stale.follow_ups_left("code_review")).to eq(DailyResponse::MAX_FOLLOW_UPS_PER_SECTION)
+        fill_follow_ups(response, DailyResponse::MAX_FOLLOW_UPS_PER_SECTION)
+
+        expect(stale.append_follow_up!("code_review", question: "late?", answer: "late")).to eq(:capped)
+        expect(response.review_follow_ups.count).to eq(DailyResponse::MAX_FOLLOW_UPS_PER_SECTION * 2)
+      end
+    end
+
+    describe "#follow_up_turns" do
+      it "keeps only the section's turns, breaking a created_at tie by id so an answer never sorts before its question" do
+        same_time = Time.current
+        answer = response.review_follow_ups.create!(section: "code_review", role: :assistant, content: "a", created_at: same_time)
+        question = response.review_follow_ups.create!(section: "code_review", role: :user, content: "q", created_at: same_time)
+        response.review_follow_ups.create!(section: "pattern", role: :user, content: "other")
+
+        expect(response.reload.follow_up_turns("code_review")).to eq([ answer, question ])
+      end
+    end
+
+    describe "#follow_ups_left" do
+      it "counts only the questions asked in that section" do
+        fill_follow_ups(response, 1)
+
+        expect(response.follow_ups_left("code_review")).to eq(DailyResponse::MAX_FOLLOW_UPS_PER_SECTION - 1)
+        expect(response.follow_ups_left("pattern")).to eq(DailyResponse::MAX_FOLLOW_UPS_PER_SECTION)
+      end
     end
   end
 end

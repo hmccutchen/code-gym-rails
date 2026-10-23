@@ -95,7 +95,7 @@ RSpec.describe ModelComparison do
   it "leaves DailyPlan.for as it found it" do
     comparison.generate(user.id)
 
-    expect(DailyPlan.method(:for).source_location.first).to end_with("app/services/daily_plan.rb")
+    expect(DailyPlan.method(:for).source_location.first).to end_with("app/models/daily_plan.rb")
   end
 
   it "prints the rating, missed points and next step of each answered section's review" do
@@ -308,6 +308,82 @@ end
     expect(out.string).to include("issues=padding: \"Once upon a time\"")
   end
 
+  describe "judge shape" do
+    let(:shape_fixtures) { Dir[Rails.root.join("spec/fixtures/judge/design_comparison_*.json")].sort }
+    let(:shape_comparison) { described_class.new(api_key: "sk-proj-ShapeRunnerKey", out: out) }
+
+    def fixture_section(name)
+      JSON.parse(File.read(Rails.root.join("spec/fixtures/judge/#{name}.json")))["section"]
+    end
+
+    def openai_connection(bodies, text)
+      Faraday.new do |f|
+        f.adapter :test do |stub|
+          stub.post(OpenaiService::API_URL) do |env|
+            bodies << JSON.parse(env.body)
+            [ 200, {}, { "status" => "completed", "usage" => { "input_tokens" => 50, "output_tokens" => 20 },
+                         "output" => [ { "type" => "message", "content" => [ { "type" => "output_text", "text" => text } ] } ] }.to_json ]
+          end
+        end
+      end
+    end
+
+    it "runs the 14 design comparison fixtures once on OpenAI's judge route with a 4,000-token reasoning allowance" do
+      bodies = []
+      allow_any_instance_of(OpenaiService).to receive(:build_connection).and_return(openai_connection(bodies, '{"status":"keep","better":"a"}'))
+
+      expect { shape_comparison.judge_shape("openai") }.not_to change(ApiUsage, :count)
+
+      route = OpenaiService::MODEL_FOR_PURPOSE.fetch("judge_section")
+      expect(shape_fixtures.size).to eq(14)
+      expect(bodies.size).to eq(14)
+      expect(bodies.map { |body| [ body["model"], body.dig("reasoning", "effort"), body["max_output_tokens"] ] }.uniq)
+        .to eq([ [ route[:model], route[:effort], CallProfiles::JUDGE_MAX_TOKENS + 4_000 ] ])
+      expect(out.string).to include("=== judge_shape: openai · #{route[:model]} (effort: #{route[:effort]}, reasoning_allowance: 4000) ===")
+      expect(out.string).to include("invalid_output 0/14 · truncated 0/14 · solved 14/14 · other_error 0/14 · 700 in / 280 out")
+    end
+
+    it "counts each outcome and prints the invalid verdict's message, never a solve, a key or the reply" do
+      invalid_message = begin
+        JudgeVerdict.parse({ "status" => "keep", "better" => "A" }, kind: ExerciseSection::DesignComparison)
+      rescue JudgeVerdict::Invalid => e
+        e.message
+      end
+      failures = {
+        fixture_section("design_comparison_junior_valid") => JudgeVerdict::Invalid.new(invalid_message),
+        fixture_section("design_comparison_senior_valid") => ProviderError::TruncatedResponseError.new("cut off: raw reply text"),
+        fixture_section("design_comparison_surface_tell") => ProviderError::RateLimitError.new("raw provider body")
+      }
+      allow_any_instance_of(OpenaiService).to receive(:judge_section) do |_service, _user, _kind, section, **|
+        raise failures[section] if failures.key?(section)
+
+        JudgeVerdict.new(status: :keep, solve: "b")
+      end
+
+      shape_comparison.judge_shape("openai")
+
+      expect(out.string).to include("invalid_output 1/14 · truncated 1/14 · solved 11/14 · other_error 1/14")
+      expect(out.string).to include("  design_comparison_junior_valid: invalid_output: #{invalid_message}")
+      expect(out.string).to include("  design_comparison_surface_tell: other_error: ProviderError::RateLimitError")
+      expect(out.string).not_to include("raw reply text", "raw provider body", "sk-proj-ShapeRunnerKey", "solve=")
+      expect(out.string).not_to match(/"[ab]"/)
+      ExerciseSection.all_answer_key_fields.each { |field| expect(out.string).not_to include(field) }
+    end
+
+    it "pins Claude and Gemini to their production judge route, unchanged" do
+      { "claude" => ClaudeService, "gemini" => GeminiService }.each do |name, service_class|
+        allow_any_instance_of(service_class).to receive(:judge_section).and_return(JudgeVerdict.new(status: :keep, solve: "a"))
+        route = service_class::MODEL_FOR_PURPOSE.fetch("judge_section", service_class::DEFAULT_ROUTE)
+
+        shape_comparison.judge_shape(name)
+
+        expect(out.string).to include("=== judge_shape: #{name} · #{route[:model]}")
+      end
+      expect(out.string).not_to include("reasoning_allowance")
+      expect(out.string.scan("solved 14/14").size).to eq(2)
+    end
+  end
+
   describe "review calibration" do
     let(:fixtures) { Dir[ModelComparison::REVIEW_CALIBRATION_FIXTURE_DIR.join("*.json")] }
 
@@ -439,12 +515,12 @@ end
       # ai_review is jsonb, which does not keep key order, so labels are read back from the output.
       calls = sonnet_block.scan(/^(\S+ \w+): keep \d+ms · (\d+) out$/)
       expect(calls.map(&:last)).to eq(%w[100 1400])
-      expect(sonnet_block).to include("largest reply: 1400 out (#{calls.last.first}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap")
+      expect(sonnet_block).to include("largest reply: 1400 out (#{calls.last.first}) of the #{CallProfiles::REVIEW_JUDGE_MAX_TOKENS} cap")
 
       first_haiku_label = haiku_block[/^(\S+ \w+): keep \d+ms · 750 out$/, 1]
-      expect(haiku_block).to include("largest reply: 750 out (#{first_haiku_label}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap")
+      expect(haiku_block).to include("largest reply: 750 out (#{first_haiku_label}) of the #{CallProfiles::REVIEW_JUDGE_MAX_TOKENS} cap")
       [ sonnet_block, haiku_block ].each do |block|
-        expect(block).to match(/slowest: \d+ms \(\S+ \w+\) of the #{AiService::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout/)
+        expect(block).to match(/slowest: \d+ms \(\S+ \w+\) of the #{CallProfiles::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout/)
       end
     end
 

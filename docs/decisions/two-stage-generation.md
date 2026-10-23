@@ -19,7 +19,7 @@ was cron-only at first, but a user who opened the dashboard before their
 8am tick got an on-demand set, and the batch then found the day filled, so
 an early riser was rarely judged. The cost of the change is a longer
 spinner on the dashboard, which is why `dashboard/_generating` polls for
-`AiService::JUDGED_GENERATION_BUDGET` rather than the draft's budget alone.
+`CallProfiles::JUDGED_GENERATION_BUDGET` rather than the draft's budget alone.
 A weekend "generate anyway" set stays on the single-stage path.
 
 **Regeneration is judged on a weekday, under a deadline.**
@@ -49,7 +49,7 @@ start, so a slow pickup comes out of the same budget.
   included) must still end in time, or it raises `ProviderError::DeadlineError`,
   a `TimeoutError`. The worst case comes from the request itself, so a
   blocking request reserves its shorter read and not the profile's. It shares
-  one formula with `AiService.worst_case_seconds_for`, which the constants
+  one formula with `CallProfiles.worst_case_seconds_for`, which the constants
   above use. Checking the worst case rather than the clock alone makes the
   deadline a ceiling on the job: a call begun just before it can't overrun.
 - **What a stop costs.** Because the check sits in `call_and_log`, it runs
@@ -206,7 +206,13 @@ section stands unedited, `fallback` records the reason from
 `invalid_json`, `refusal`, `timeout`, `deadline` when a regeneration's
 deadline left no time to start the call, the shared error code, or
 `http_<status>` when the provider refused the request itself), and
-`[judge_fallback]` warns. The one exception is a retry's re-judge stopped by
+`[judge_fallback]` warns. The warning adds the error's message only for a
+refused verdict (`JudgeVerdict::Invalid`), never for a provider error, whose
+body can echo the section. An `Invalid` message never depends on the
+submitted `better`, but it can echo a short value the judge wrote (an
+unknown status, issue type, principle or field name), so it is cut to
+`JudgedGeneration::REFUSAL_DETAIL_LIMIT` characters; that echo is the
+remaining risk. The one exception is a retry's re-judge stopped by
 the deadline, which drops the section (see the regeneration deadline above).
 Provider errors carry the response's HTTP status
 (`ProviderError#http_status`); authentication and rate-limit errors keep
@@ -237,17 +243,23 @@ at the root and every property required, and `VerdictSchema` builds an
 input message mentions JSON, and the system prompt goes in `instructions`,
 which it does not check, so `OpenaiService` ends the input with
 `JSON_MODE_REQUEST`. Before that, only a section whose own text happened to
-mention JSON was judged on OpenAI (#253).
+mention JSON was judged on OpenAI (#253). JSON mode alone left the model to
+learn the reply's shape from the prompt text, which never lists the design
+comparison's `better` field among its reply shapes, so `JSON_MODE_REQUEST`
+now reads "Reply with a JSON object matching this JSON Schema:" and the
+request's schema follows it as compact JSON. Strict mode stays off for the
+`anyOf` reason above, so `.parse` is still what holds the shape
+(`docs/answer-key-trust-spec-2026-10-22.md`, "Judge failures").
 `response_schema:` and `single_attempt:` began as optional keywords on
 `#call`, added one at a time like `cache_system:`, `max_tokens:` and
 `history:` before them. They are now fields of `AiService::Request`.
 `judge_section` and `judge_review_prose` (`ReviewProseVerdict.schema`) pass
 a schema to `AiService.request_for` per call, and every other caller leaves
-it nil; the `judge_review` row of `AiService::CALL_PROFILES` sets
+it nil; the `judge_review` row of `CallProfiles::BY_PURPOSE` sets
 `single_attempt`, and no other profile does. The additive-keyword pattern
 was replaced because each new keyword meant editing five `app/` files and
 every spec that overrode `#call`, while the settings are facts about a purpose.
-`spec/services/provider_request_characterization_spec.rb` records the body
+`spec/clients/provider_request_characterization_spec.rb` records the body
 each purpose's request sends to each provider and fails on any changed
 byte, which holds every caller that passes no schema byte-identical.
 

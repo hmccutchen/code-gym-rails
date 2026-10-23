@@ -123,6 +123,40 @@ RSpec.describe JudgeVerdict do
       end
     end
 
+    it "words every refusal the same whatever better was submitted, so no refusal message carries the solve" do
+      issue = { "type" => "padding", "evidence" => "x" }
+      refused = [
+        { "status" => "maybe" },
+        { "status" => "edit", "issues" => [], "fields" => { "question" => "q" } },
+        { "status" => "edit", "issues" => [ "padding" ], "fields" => { "question" => "q" } },
+        { "status" => "edit", "issues" => [ { "type" => "vibes", "evidence" => "x" } ], "fields" => { "question" => "q" } },
+        { "status" => "edit", "issues" => [ { "type" => "padding", "evidence" => " " } ], "fields" => { "question" => "q" } },
+        { "status" => "edit", "issues" => [ issue ], "fields" => [] },
+        { "status" => "edit", "issues" => [ issue ], "fields" => { "piece_a" => "rewritten" } },
+        { "status" => "edit", "issues" => [ issue ], "fields" => { "question" => " " } },
+        { "status" => "reject", "principle" => "too_hard", "evidence" => "x", "reason" => "r" },
+        { "status" => "reject", "principle" => "underdetermined", "evidence" => "", "reason" => "r" },
+        { "status" => "reject", "principle" => "underdetermined", "evidence" => "x", "reason" => nil }
+      ]
+      refusal = lambda do |raw, better|
+        described_class.parse(raw.merge("better" => better), kind: comparison)
+        :parsed
+      rescue described_class::Invalid => e
+        e.message
+      end
+
+      refused.each do |raw|
+        messages = [ "a", "b", "zebra-solve", "A", 1, nil ].map { |better| refusal.call(raw, better) }
+        expect(messages.uniq.size).to eq(1), "#{raw.inspect} refused with #{messages.uniq.inspect}"
+        expect(messages.first).not_to eq(:parsed)
+        expect(messages.first).not_to include("zebra-solve")
+      end
+      unsolved = [ "zebra-solve", "A", 1, nil ].map { |better| refusal.call({ "status" => "keep" }, better) }
+      expect(unsolved.uniq).to contain_exactly(a_string_matching(/as better/))
+      expect { described_class.parse([ { "better" => "zebra-solve" } ], kind: comparison) }
+        .to raise_error(described_class::Invalid) { |error| expect(error.message).not_to include("zebra-solve") }
+    end
+
     it "carries no solve for a kind the judge does not solve" do
       expect(described_class.parse({ "status" => "keep", "better" => "a" }, kind: kind).solve).to be_nil
     end

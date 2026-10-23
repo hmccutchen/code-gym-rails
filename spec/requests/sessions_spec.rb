@@ -2,6 +2,8 @@ require "rails_helper"
 
 RSpec.describe "Sessions", type: :request do
   describe "POST /login" do
+    include ActiveJob::TestHelper
+
     # Drives BCrypt under bundler, which 500'd in production when bcrypt was missing from the Gemfile.
     it "creates a first-time user and enqueues the login code email" do
       expect {
@@ -11,6 +13,15 @@ RSpec.describe "Sessions", type: :request do
 
       expect(response).to redirect_to(login_path)
       expect(flash[:notice]).to match(/check your email/i)
+    end
+
+    it "queues the email with the account alone, so the plain code is never stored in the queue or printed by the enqueue log" do
+      user = User.create!(email: "known@example.com", name: "Known")
+
+      expect {
+        post login_path, params: { email: "known@example.com" }
+      }.to have_enqueued_mail(UserMailer, :login_code).with(user)
+      expect(user.reload.login_code_digest).to be_nil
     end
 
     it "mails a code regardless of any touch_device hint in the params" do
@@ -31,10 +42,20 @@ RSpec.describe "Sessions", type: :request do
       user = User.create!(email: "known@example.com", name: "Known")
 
       expect {
-        post login_path, params: { email: "KNOWN@example.com" }
+        perform_enqueued_jobs { post login_path, params: { email: "KNOWN@example.com" } }
       }.not_to change(User, :count)
 
       expect(user.reload.login_code_digest).to be_present
+    end
+
+    it "creates the account at the request, signs it in with the first valid code, and never adds a second row" do
+      expect { post login_path, params: { email: "first@example.com" } }.to change(User, :count).by(1)
+      user = User.find_by!(email: "first@example.com")
+
+      post verify_login_code_path, params: { code: user.generate_login_code! }
+      expect(session[:user_id]).to eq(user.id)
+
+      expect { post login_path, params: { email: "first@example.com" } }.not_to change(User, :count)
     end
 
     it "names a new account after the email's local part" do
@@ -119,6 +140,36 @@ RSpec.describe "Sessions", type: :request do
 
   describe "POST /login/code" do
     include ActiveJob::TestHelper
+
+    def emailed_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
+
+    it "accepts a code mailed after a queue delay for its full life, though the request is older" do
+      travel_to(Time.utc(2026, 10, 23, 15)) do
+        post login_path, params: { email: "dev@example.com" }
+        travel(3.minutes)
+        perform_enqueued_jobs
+        travel(9.minutes)
+
+        post verify_login_code_path, params: { code: emailed_code }
+
+        expect(response).to redirect_to(root_path)
+        expect(session[:user_id]).to be_present
+      end
+    end
+
+    it "lets the pending sign-in lapse once the code it waited for has expired" do
+      travel_to(Time.utc(2026, 10, 23, 15)) do
+        post login_path, params: { email: "dev@example.com" }
+        travel(3.minutes)
+        perform_enqueued_jobs
+        travel(User::LOGIN_CODE_EXPIRY + 1.second)
+
+        post verify_login_code_path, params: { code: emailed_code }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to eq(I18n.t("sessions.code_rejected_request_new"))
+      end
+    end
 
     it "logs the user in with the code emailed after POST /login" do
       perform_enqueued_jobs do
@@ -215,6 +266,21 @@ RSpec.describe "Sessions", type: :request do
 
       expect(session[:user_id]).to be_present
       expect(session.id.public_id).not_to eq(pre_login_session_id)
+    end
+
+    it "discards everything written before sign-in, including the CSRF token", :with_csrf do
+      user = User.create!(email: "dev@example.com", name: "Dev")
+      get login_path
+      post login_path, params: { email: user.email, authenticity_token: response.body[/name="authenticity_token" value="([^"]+)"/, 1] }
+      follow_redirect!
+      pre_login_csrf_token = session[:_csrf_token]
+      expect(pre_login_csrf_token).to be_present
+
+      post verify_login_code_path, params: { code: user.generate_login_code!,
+                                             authenticity_token: response.body[/name="authenticity_token" value="([^"]+)"/, 1] }
+
+      expect(session.to_hash.keys - %w[session_id flash _csrf_token]).to contain_exactly("user_id", "signed_in_at")
+      expect(session[:_csrf_token]).not_to eq(pre_login_csrf_token)
     end
 
     it "issues a new session on logout" do

@@ -10,10 +10,12 @@ gem "stimulus-rails"
 gem "jbuilder"
 
 gem "bcrypt", "~> 3.1.7"
+gem "rotp", "~> 6.3"
+gem "rqrcode", "~> 3.2"
 
 gem "resend"
 
-gem "pagy", "~> 43.7"
+gem "pagy", "~> 43.8"
 
 gem "rouge", "~> 5.1"
 
@@ -52,6 +54,8 @@ end
 
 group :development do
   gem "web-console"
+
+  gem "archspec", "~> 1.1", require: false
 end
 
 group :test do

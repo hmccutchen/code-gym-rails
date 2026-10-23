@@ -56,7 +56,7 @@ RSpec.describe "Allowing notifications on a device after reminders are already o
     expect(page).to have_text(I18n.t("accounts.push_reminders.repair"))
     click_button I18n.t("accounts.push_reminders.repair_button")
 
-    Timeout.timeout(10) { sleep 0.1 until user.push_subscriptions.reload.exists?(endpoint: new_endpoint) }
+    wait_for { user.push_subscriptions.reload.exists?(endpoint: new_endpoint) }
     expect(page.evaluate_script(%(Number(sessionStorage.getItem("permissionRequests"))))).to eq(1)
     expect(user.reload.reminder_level).to eq("ready_and_nudges")
   end

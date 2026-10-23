@@ -536,4 +536,92 @@ RSpec.describe RegenerateExerciseJob, type: :job do
       expect(exercise.reload.problem_set).to eq("code_review" => { "question" => "new" })
     end
   end
+
+  describe "the judge's solves" do
+    let(:logged) { StringIO.new }
+
+    def stub_judged(solves, &before_return)
+      judged = AiService::JudgedSet.new(problem_set: { "code_review" => { "question" => "new" } }, dropped_sections: [],
+                                        outcomes: {}, plan_notes: {}, solves: solves)
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:model_for).with("generate_exercise").and_return("claude-opus-5-5")
+      allow(fake_service).to receive(:generate_judged_exercise) { before_return&.call; judged }
+      allow(fake_service).to receive(:generate_unjudged_exercise) { judged.with(solves: []) }
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    end
+
+    it "adds the new set's solves as a group of their own and keeps the replaced set's" do
+      exercise = claimed_exercise
+      old_generated_at = exercise.generated_at
+      JudgeSolve.record!(exercise, [ live_solve ])
+      stub_judged([ live_solve(judge_pick: "a", matched: false) ])
+
+      described_class.new.perform(user_id: user.id)
+
+      exercise.reload
+      expect(exercise.judge_solves.group(:set_generated_at).count.keys)
+        .to contain_exactly(be_within(1.second).of(old_generated_at), be_within(1.second).of(exercise.generated_at))
+      expect(exercise.judge_solves.find_by(set_generated_at: exercise.generated_at))
+        .to have_attributes(matched: false, source: "live", draft_model: "claude-opus-5-5")
+    end
+
+    it "lets a review of the new set show the new set's records and never the replaced set's" do
+      exercise = claimed_exercise
+      replaced = JudgeSolve.record!(exercise, [ live_solve ]).sole
+      stub_judged([ live_solve(judge_pick: "a", matched: false) ])
+
+      described_class.new.perform(user_id: user.id)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                            answers: { "design_comparison" => "a" * 20 },
+                            ai_review: { "design_comparison" => { "rating" => "solid" } })
+
+      expect(JudgeSolve.readable).to contain_exactly(have_attributes(set_generated_at: exercise.reload.generated_at))
+      expect(JudgeSolve.readable).not_to include(replaced)
+    end
+
+    it "writes nothing when its claim was released under the call" do
+      exercise = claimed_exercise
+      stub_judged([ live_solve ]) { exercise.update_columns(regenerating_since: nil) }
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(JudgeSolve.count).to eq(0)
+    end
+
+    it "writes nothing when a reviewed response keeps today's set" do
+      exercise = claimed_exercise
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                            answers: { "code_review" => "a" * 20 }, ai_review: { "code_review" => { "rating" => "developing" } })
+      stub_judged([ live_solve ])
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(JudgeSolve.count).to eq(0)
+    end
+
+    it "writes none for an unjudged weekend set", :own_clock do
+      travel_to Time.utc(2026, 10, 17, 15, 0, 0) do
+        claimed_exercise
+        stub_judged([ live_solve ])
+
+        described_class.new.perform(user_id: user.id)
+
+        expect(JudgeSolve.count).to eq(0)
+      end
+    end
+
+    it "keeps the new set when a record is refused, and logs the refusal without the section or its key" do
+      exercise = claimed_exercise
+      stub_judged([ live_solve(revert_reason: "judge_failed") ])
+      allow(Rails).to receive(:logger).and_return(ActiveSupport::Logger.new(logged))
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(exercise.reload.problem_set).to eq("code_review" => { "question" => "new" })
+      expect(exercise.regenerating_since).to be_nil
+      expect(JudgeSolve.count).to eq(0)
+      expect(logged.string).to include("[judge_solves_record_failed] user=#{user.id} exercise=#{exercise.id} reason=")
+      expect(logged.string).not_to include("SECRET", "Which fits?", "a = 1")
+    end
+  end
 end

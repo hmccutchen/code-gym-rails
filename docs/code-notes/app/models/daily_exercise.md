@@ -39,7 +39,7 @@ day's full budget (2,302 s) never has to fit in the window.
 The deadline bounds provider calls only. After the last one, the job still
 ingests (on the single-stage path that includes `CodeFormat`, whose Prettier
 run is capped at `CodeFormat::Javascript::TIMEOUT_SECONDS`, 20 s), writes the
-`finish_generation` diagnostics, waits for the response and exercise locks
+`ExerciseDraft.finish` diagnostics, waits for the response and exercise locks
 behind any autosave or submit, and updates the row. If the claim went stale in
 that gap, a second click could take it and the first job would discard its
 billed result. `WRITE_MARGIN`, 60 s, covers that work three times over at
@@ -48,7 +48,7 @@ Prettier's cap; it is a margin, not a measured figure. The window comes to
 `/regenerate` refused, and the page on its generating state, for that long.
 
 The generating poller sizes its attempts from the larger of this window and
-`AiService::JUDGED_GENERATION_BUDGET`, so it keeps polling for the whole
+`CallProfiles::JUDGED_GENERATION_BUDGET`, so it keeps polling for the whole
 window.
 
 ## `#regeneration_offered?`

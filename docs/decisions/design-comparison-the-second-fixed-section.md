@@ -105,6 +105,84 @@ check inside the section: a section that restates a defect to find,
 rather than offering a choice between two working designs, is a
 scope_mismatch.
 
+**Blind solves and reverted edits are kept.** Since the answer-key trust
+work (`docs/answer-key-trust-spec-2026-10-22.md`, stage 1 plan
+`docs/answer-key-trust-stage1-plan-2026-10-22.md`), every judge pass on this
+kind is written to `judge_solves`: the section exactly as the judge saw it,
+its key, the judge's pick, whether they matched, and why a failed solve
+failed (`JudgeVerdict::Invalid`'s message, which never quotes the pick).
+`JudgedGeneration` still writes nothing; it hands back one
+`JudgedGeneration::Solve` per pass on `AiService::JudgedSet#solves`, never
+inside `outcomes`, and both generation jobs record them with the set.
+`shipped` comes from the control flow, which already knows which attempt
+settled and whether an edit was kept. An edit check whose edit was thrown
+away carries `edit_reverted` and its `revert_reason` (`solve_mismatch`,
+`judge_rejected` or `judge_failed`), and the shipped original sits in the
+same attempt's row with `edit_check: false`. The
+`[judge_solve_mismatch]` log line and `outcomes[:solve_matched]` are
+unchanged, and `REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL` stays false until a
+person has read the disagreements this record makes readable.
+
+**The replay.** `script/replay_design_comparison_solves.rb` judges every
+stored design comparison with today's judge and writes `source: "replay"`
+rows, skipping a section version it already judged (same exercise, section
+and `section_digest`) unless told to re-judge. It defaults to a dry run that
+prints the count and the cost bound. `--synthesize N` writes
+`source: "synthetic"` rows for sections generated only for measurement,
+which no engineer ever saw. Live rows say what the judge thought at the
+time; replay rows say what today's judge thinks of the same shipped section.
+Only live and replay rows count toward a decision; synthetic ones only
+corroborate.
+
+**Hidden unless proven.** A row holds a key, so `JudgeSolve.readable` is the
+only way any page reads one, and it starts from hidden. A row is readable
+when it is synthetic, when it carries a `never_shown_reason`
+(`replaced_by_retry` or `section_dropped`, recorded when the row is written,
+for versions whose pieces never reached the engineer), or when the row's own
+section has been reviewed on its exercise's response and the row belongs to
+the set that was reviewed (its `set_generated_at` is the exercise's
+`generated_at`, so a regenerated set's old rows stay hidden). Everything else stays
+hidden, including an unshipped row with no reason. A reverted edit's edited
+text and the pre-edit draft of a kept edit have no reason on purpose: an edit
+changes only the title, scenario and question, so both carry the pieces and
+key the engineer has. `shipped` takes no part in the rule, so a wrong
+`shipped` value can't leak a key. The reasoning is in
+`docs/code-notes/app/models/judge_solve.md`.
+
+**Reading `/admin/judge_solves`.** The page, linked from
+`/admin/suggested_concepts`, is for an admin in `ADMIN_EMAILS`.
+- The header counts readable rows only, by source: solved, matched,
+  mismatched and unsolved; reverts by reason; and two call tables, one for
+  mismatches and one for matched records. A call table counts each section
+  version once (rows sharing a `section_digest`; a row with a call beats one
+  without, then the latest call wins, and the version counts under that row's
+  source) and leaves out unsolved rows and principal engineer, where
+  disagreement is already tolerated. `human_called_at` moves only when the
+  call itself changes, so saving a note never reorders that pick. One more
+  line, "withheld pending review: n", counts hidden sections (one per
+  exercise, section and set, however many judge passes it took) with no
+  breakdown at all. The page computes
+  no bound and names no branch; you apply the spec's decision rule yourself,
+  from the live and replay columns together.
+- `source` picks live (the default, what shipped), real (live plus replay,
+  what the decision rule counts), replay, synthetic or all. `show` picks
+  mismatches and reverts (the default), reverts only, a random matched
+  sample of `n` uncalled records (15 by default, never synthetic), or all.
+  `call` narrows to uncalled records or one call; the matched sample is
+  empty under a named call, since its pool is uncalled records. Entries come
+  25 to a page.
+- Entries list reverted edits first, then mismatches, newest first. Each
+  shows its metadata, the problem, both pieces, the key, the judge's pick
+  and a form offering only the calls that fit (`key_right`, `judge_right` or
+  `both_defensible` on a mismatch; `key_right`, `both_wrong` or
+  `both_defensible` on a match) plus a note. A reverted edit shows the
+  shipped original's prose beside the edited prose once both are readable,
+  and a live row links to its replay and back.
+- A hidden section shows only as one "waiting for the engineer's review"
+  line per source with its date, source and rung, in a list of its own that
+  the outcome filters and ordering don't touch, capped with an "and n more"
+  line. A save on a hidden row is a 404.
+
 **The reference stays closed.** A concept's reference opens on its own on
 first exposure for every other kind; for this one it names and illustrates
 the principle the grade asks for, so `.reference_opens_before_answer?` is

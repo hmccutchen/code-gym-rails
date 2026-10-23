@@ -1,5 +1,7 @@
 # Design notes: docs/code-notes/app/jobs/regenerate_exercise_job.md
 class RegenerateExerciseJob < ApplicationJob
+  include RecordsJudgeSolves
+
   queue_as :default
 
   def perform(user_id:)
@@ -17,7 +19,8 @@ class RegenerateExerciseJob < ApplicationJob
 
     # The claim's timestamp is this worker's token; a cleared and retaken claim is present but not ours.
     claim = exercise.regenerating_since
-    generated = generate(user, exercise.language, GenerationDeadline.new(claim + DailyExercise::REGENERATION_DEADLINE))
+    service = AiService.for(user)
+    generated = generate(service, user, exercise.language, GenerationDeadline.new(claim + DailyExercise::REGENERATION_DEADLINE))
 
     kept_for = exercise.with_response_locked do |existing|
       # Re-read the claim under the lock: carry_forward or a later click can take it during the provider call.
@@ -35,6 +38,7 @@ class RegenerateExerciseJob < ApplicationJob
         regenerated_at:     Time.current,
         regenerating_since: nil
       )
+      record_judge_solves(exercise, generated.solves, drafted_by: service)
       nil
     end
 
@@ -51,8 +55,7 @@ class RegenerateExerciseJob < ApplicationJob
     release(user, exercise, claim, e) { user.record_generation_message!("Generation returned an unusable set — try again.") }
   end
 
-  def generate(user, language, deadline)
-    service = AiService.for(user)
+  def generate(service, user, language, deadline)
     return service.generate_unjudged_exercise(user, language: language, deadline: deadline) unless AiService.judged_on?(Date.current)
 
     service.generate_judged_exercise(user, language: language, deadline: deadline)

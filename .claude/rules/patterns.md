@@ -28,7 +28,7 @@ says what a deviation from one requires.
   Each subclass owns its `provider_key`, `key_pattern` and any environment
   restriction.
 - **One class per prompt family** — prompt text moves out of `AiService` one
-  family at a time (#431), into a class at `app/services/*_prompt.rb`; those
+  family at a time (#431), into a class at `app/prompts/*_prompt.rb`; those
   files are the list of moved families, so no doc repeats it. A prompt class
   is pure: it takes values, never a record, a user or a database read, and
   returns the per-call keywords `AiService.request_for` takes (`system:` and
@@ -36,8 +36,8 @@ says what a deviation from one requires.
   A family is the prompts about one subject, and one class may hold several
   purposes (the concept reference and its reframe are one family). The class
   holds its family's text and nothing else: settings stay in
-  `CALL_PROFILES`, and the call, the reply checks and the logging stay in
-  `AiService`. That text includes a fixed message a page sends into the
+  `CallProfiles::BY_PURPOSE`, and the call, the reply checks and the logging
+  stay in `AiService`. That text includes a fixed message a page sends into the
   family's prompt, which the page reads from the class
   (`DuckPrompt::EXPLAIN_REQUEST`). A family built in two stages gets one
   method per stage, each returning that stage's string, such as the review's
@@ -57,7 +57,7 @@ says what a deviation from one requires.
 - **One request value per provider call** — every provider call carries one
   `AiService::Request`: the purpose, the per-call values (system, prompt,
   history, response schema) and the settings (token cap, read timeout,
-  caching, single attempt, allowed truncation). `AiService::CALL_PROFILES`
+  caching, single attempt, allowed truncation). `CallProfiles::BY_PURPOSE`
   is the one place a purpose's settings live. A call site builds its request
   with `AiService.request_for`, naming only its purpose and its per-call
   values, and hands it to `call_and_log(user, request)`. `Request.build`
@@ -100,7 +100,9 @@ says what a deviation from one requires.
   takes them as a `Provider` struct of callables, with a `providers:` factory
   that returns a fresh one for each thread (`JudgedGeneration::Provider`,
   `ReviewGrading::Provider`, built by `AiService#judged_generation_provider`
-  and `#review_grading_provider`). `AiService` keeps the calls and builds the prompts, or
+  and `#review_grading_provider`). `ExerciseDraft` takes one
+  `ExerciseDraft::Provider` (`AiService#exercise_draft_provider`), since a
+  draft makes one call and a retry runs on the thread that asked for it. `AiService` keeps the calls and builds the prompts, or
   takes them from a prompt class;
   the module keeps the orchestration and the policy, and its specs drive it
   with lambdas. Threads start through `CallerZoneThread.start`, and
@@ -115,8 +117,11 @@ says what a deviation from one requires.
   call is declared with `Claimable` (`claim :name, column:, stale_after:`),
   released only with the token `#claim_<name>!` returned, and checked again
   under the row lock before anything is written, since a claim that went
-  stale may now belong to another caller. Anything that locks an exercise and
-  its response goes through `DailyExercise#with_response_locked`.
+  stale may now belong to another caller. The pseudocode critique claim is a
+  key inside a JSON column, so it lives on `DailyResponse`
+  (`#claim_pseudocode_critique!`) and keeps the same token rule under the row
+  lock. Anything that locks an exercise and its response goes through
+  `DailyExercise#with_response_locked`.
 - **The server decides; the page shows its answer** — when a page needs a
   rule the server owns, the browser holds no copy of it. The server renders its
   answer onto the page and sends it again in every reply, and the script only
@@ -144,7 +149,20 @@ says what a deviation from one requires.
   that model (`ConceptReference::GUIDE_FIELDS`, `RecognitionGuide::FIELDS`),
   and `AiService` reads it there. Each language's prompt wording is
   `LanguagePrompts` and the scenario settings are `ScenarioPools`, read by
-  `AiService` and `GenerationPrompt`. `AiProvider`, the provider
-  registry, is the one model that may name `AiService` or a provider class;
-  a model that needs provider timing asks it, and `app_source_spec` fails on
-  any other model that names one.
+  `AiService` and `GenerationPrompt`. Each purpose's call settings and the
+  timing built from them are `CallProfiles`, which names no provider, so a
+  model, view or job reads a worst-case call time there. `AiProvider`, the
+  provider registry, is the one model that may name `AiService` or a provider
+  class, for a provider's own quota day, and `app_source_spec` fails on any
+  other model that names one.
+- **Folders by layer** (`docs/decisions/folders-by-layer.md`) — a folder
+  under `app/` says which layer its classes are in. `app/services` holds only
+  classes that orchestrate side effects (a claim, a write, a provider call
+  fanned out, a push). Pure decisions are in `app/models`, prompt classes in
+  `app/prompts`, and adapters to the outside (the provider clients, push
+  credentials, the Node formatter, environment switches, thread and cache
+  helpers) in `app/clients`. Moving a file between them keeps its constant
+  name. `Archspec.rb` fails CI when a model or prompt class references a
+  service or a client; `AiProvider`, the provider registry, is the one
+  exception. A new class goes in the folder for what it does, not next to
+  the class that first calls it.

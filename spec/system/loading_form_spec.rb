@@ -52,7 +52,7 @@ RSpec.describe "Forms that show a loading state", type: :system do
 
     delete_button.click
 
-    Timeout.timeout(10) { sleep 0.1 until user.reload.anonymized_at }
+    wait_for { user.reload.anonymized_at }
     expect(user.reload.anonymized_at).to be_present
   end
 
@@ -60,7 +60,7 @@ RSpec.describe "Forms that show a loading state", type: :system do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
       fill_in_answer("code_review", "An answer long enough to create today's draft response.")
-      Timeout.timeout(10) { sleep 0.1 until user.daily_responses.reload.any? }
+      wait_for { user.daily_responses.reload.any? }
       visit root_path
       wait_for_js
       form = %(form[action="#{start_over_response_path(user.daily_responses.sole)}"])
@@ -70,7 +70,7 @@ RSpec.describe "Forms that show a loading state", type: :system do
       find("#{form} button").click
 
       expect(page.evaluate_script("window.submits")).to eq([ false ])
-      Timeout.timeout(5) { sleep 0.05 until submit_button_state(form)["disabled"] }
+      wait_for { submit_button_state(form)["disabled"] }
       expect(submit_button_state(form)).to eq("disabled" => true, "loading" => true, "label" => I18n.t("dashboard.exercise.starting_over"))
 
       page.execute_script(%(window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }))))

@@ -19,6 +19,30 @@ reads the PR list from GitHub. It answers only for PRs you opened since the date
 in `docs/intent/_since`. Never edit `docs/intent-log.md` by hand, since
 `compose.rb` generates it.
 
+**Every PR gets two reviews once the implementation is done, each run by a
+separate agent.** After the suites pass and before the PR is marked ready,
+start a subagent for each review. The session that wrote the code has
+already decided it is right, so it doesn't review its own work.
+
+- **Critical review:** the `critical-reviewer` agent
+  (`.claude/agents/critical-reviewer.md`) judges the change's design as a
+  whole, using the whole repository.
+- **Layered-design review:** `/layered-rails:review` checks layer boundaries,
+  callbacks, concerns and where each class lives. It comes from the
+  `layered-rails` plugin, which each developer installs. If it isn't
+  installed, say so in the PR rather than skipping the review silently.
+
+**Findings are checked before any code changes.** Hand both reviews' findings
+to another fresh agent. It checks each finding against the code and reports
+it as confirmed, with the file and line or a failing spec that shows it, or
+as rejected, with the reason. Fix only confirmed findings, test-first. When a
+finding would change the design, the person who asked for the work decides
+before anything changes. Out-of-scope findings become GitHub issues. Post a
+PR comment listing what was fixed, what was rejected and why, and which
+issues were opened. Reviewers can run specs, and two runs sharing the test
+database fail falsely, so don't run the suite while a review agent is
+working.
+
 ## Code Style
 
 ### Comment rules — never ignored
@@ -51,8 +75,8 @@ Python. The cop names below are the Ruby side.
   `.claude/rules/` file and its full text in `docs/decisions/`. The reasoning
   behind one file's code lives in
   `docs/code-notes/`, at the file's own path with `.md` in place of its last
-  extension (`app/services/ai_service.rb` →
-  `docs/code-notes/app/services/ai_service.md`;
+  extension (`app/clients/ai_service.rb` →
+  `docs/code-notes/app/clients/ai_service.md`;
   `app/views/layouts/application.html.erb` →
   `docs/code-notes/app/views/layouts/application.html.md`).
   A comment may point there in its one line.
@@ -85,7 +109,7 @@ debugging write-up, an answer to a question — follow the same plain-language
 standard the app asks its own generated prose to meet.
 The app's copy is `PromptStandards::PLAIN_LANGUAGE_STANDARD`, shared by the
 prompts that explain, reframe, answer follow-ups on, or grade an engineer's
-work. `spec/services/prompt_standards_spec.rb` fails when the list below drifts
+work. `spec/prompts/prompt_standards_spec.rb` fails when the list below drifts
 from it.
 
 Avoid, in order of how often these actually show up:
@@ -177,7 +201,7 @@ the section-kind registry, pure decision objects, single authority per fact,
 one prompt line per vocabulary group, provider calls as callables,
 outcomes at the HTTP edge, claims and lock order, the server decides and the
 page shows its answer, page behavior as Stimulus controllers, one way to send
-a request, and domain data kept off provider classes.
+a request, domain data kept off provider classes, and folders by layer.
 `.claude/rules/patterns.md` states each one and loads with any file under
 `app/`, `lib/`, `spec/`, `config/`, `script/` or `db/`. Deviating from one is
 allowed, but the PR description must say why; an unexplained departure is
@@ -205,8 +229,9 @@ rather than only catching it afterward:
 - No new behavior without a test; no assertion weakened to make one pass.
 - No comment left false by the change that touched it.
 - No read across an isolation boundary. Each is pinned by a spec:
-  - Nothing under `app/services` or `app/jobs`, and neither the mastery nor
-    the verdict models, reads trial state (`trial_isolation_spec`).
+  - Nothing under `app/models`, `app/services`, `app/jobs`, `app/prompts` or
+    `app/clients` reads trial state, apart from the trial and key models and
+    `User` (`trial_isolation_spec`, which names them).
   - Generation, review, both judges, `ConceptMastery` and `KindDifficulty`
     never read track or suggestion state (`level_suggestion_isolation_spec`).
   - `SectionKindGuide` and `ConceptBookSources` never reach a provider prompt.
@@ -225,7 +250,7 @@ rather than only catching it afterward:
   `Metrics` is disabled.
 
 **What CI does and doesn't tell you.** The workflow runs RSpec, system specs,
-RuboCop, Brakeman, and `importmap audit`. It does *not* run a Ruby dependency
+RuboCop, `bin/comment-check`, `archspec check`, Brakeman, and `importmap audit`. It does *not* run a Ruby dependency
 CVE audit (`bundle-audit` is not installed) or any complexity check, and this
 repository has no branch protection — so no check gates a merge. CI is
 advisory signal; it is not evidence that anything was verified.
@@ -242,7 +267,7 @@ advisory signal; it is not evidence that anything was verified.
 - **web-push** — VAPID-signed daily reminder notifications (`PushDelivery`)
 - **BCrypt** — login code digests
 - **ActiveRecord Encryption** — encrypts each user's provider API key at rest
-- **Railway** — hosting (web + worker services, postgres service)
+- **Railway** — hosting (web + worker services, and a `Database` service running Railway's Postgres 18 template)
 - **Docker** — Railway builds the image from the `Dockerfile`, as its build logs show, although `railway.toml` still names Nixpacks
 
 ## Architecture
