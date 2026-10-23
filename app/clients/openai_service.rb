@@ -20,7 +20,7 @@ class OpenaiService < AiService
     "gpt-6-luna" => "none"
   }.freeze
 
-  JSON_MODE_REQUEST = "Reply with a JSON object.".freeze
+  JSON_MODE_REQUEST = "Reply with a JSON object matching this JSON Schema:".freeze
 
   # `methods: []` routes every retry decision through retry_if; an exhausted-quota 429 is retried too, as statuses match.
   RETRY_OPTIONS = {
@@ -47,14 +47,20 @@ class OpenaiService < AiService
       model:        route[:model],
       instructions: request.system,
       input:        request.history.map { |turn| { role: turn[:role], content: turn[:content] } } +
-                    [ { role: "user", content: request.response_schema ? "#{request.prompt}\n\n#{JSON_MODE_REQUEST}" : request.prompt } ],
+                    [ { role: "user", content: user_content(request) } ],
       store:        false,
       reasoning:    { effort: effort_for(route, capped: request.max_tokens.present?) }
     }
     body[:max_output_tokens] = request.max_tokens + route.fetch(:reasoning_allowance, 0) if request.max_tokens
-    # JSON mode, since strict schemas forbid VerdictSchema's root anyOf and optional fields; .parse still holds the shape.
+    # JSON mode with the schema in the prompt, since strict schemas forbid VerdictSchema's root anyOf and optional fields.
     body[:text] = { format: { type: "json_object" } } if request.response_schema
     body
+  end
+
+  def user_content(request)
+    return request.prompt unless request.response_schema
+
+    "#{request.prompt}\n\n#{JSON_MODE_REQUEST}\n#{request.response_schema.to_json}"
   end
 
   INSUFFICIENT_QUOTA = "insufficient_quota".freeze

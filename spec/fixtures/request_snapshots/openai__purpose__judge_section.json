@@ -4,7 +4,7 @@
   "input": [
     {
       "role": "user",
-      "content": "PROMPT TEXT\n\nReply with a JSON object."
+      "content": "PROMPT TEXT\n\nReply with a JSON object matching this JSON Schema:\n{\"anyOf\":[{\"type\":\"object\",\"properties\":{\"status\":{\"const\":\"keep\"}},\"required\":[\"status\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"status\":{\"const\":\"edit\"},\"issues\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"referential_ambiguity\",\"technical_ambiguity\",\"unstated_incidental_term\",\"leakage\",\"padding\",\"answer_instruction\",\"sequencing\"]},\"evidence\":{\"type\":\"string\"}},\"required\":[\"type\",\"evidence\"],\"additionalProperties\":false}},\"fields\":{\"type\":\"object\",\"properties\":{\"scenario\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"teaching_note\":{\"type\":\"string\"}},\"required\":[],\"additionalProperties\":false}},\"required\":[\"status\",\"issues\",\"fields\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"status\":{\"const\":\"reject\"},\"principle\":{\"type\":\"string\",\"enum\":[\"scope_mismatch\",\"unstated_prerequisite\",\"underdetermined\",\"reasoning_failure\"]},\"evidence\":{\"type\":\"string\"},\"reason\":{\"type\":\"string\"}},\"required\":[\"status\",\"principle\",\"evidence\",\"reason\"],\"additionalProperties\":false}]}"
     }
   ],
   "store": false,
