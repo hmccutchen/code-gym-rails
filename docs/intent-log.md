@@ -162,3 +162,7 @@ data.*
   **I decided:** backup codes for a lost phone, open sign-up with email
   confirmation, an emailed password reset, and existing accounts enrolling at
   their next sign-in with one last emailed code
+
+## Fri Oct 23
+
+- the test rules say CI runs on Postgres 18 `#492`
