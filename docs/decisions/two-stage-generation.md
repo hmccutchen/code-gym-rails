@@ -243,7 +243,13 @@ at the root and every property required, and `VerdictSchema` builds an
 input message mentions JSON, and the system prompt goes in `instructions`,
 which it does not check, so `OpenaiService` ends the input with
 `JSON_MODE_REQUEST`. Before that, only a section whose own text happened to
-mention JSON was judged on OpenAI (#253).
+mention JSON was judged on OpenAI (#253). JSON mode alone left the model to
+learn the reply's shape from the prompt text, which never lists the design
+comparison's `better` field among its reply shapes, so `JSON_MODE_REQUEST`
+now reads "Reply with a JSON object matching this JSON Schema:" and the
+request's schema follows it as compact JSON. Strict mode stays off for the
+`anyOf` reason above, so `.parse` is still what holds the shape
+(`docs/answer-key-trust-spec-2026-10-22.md`, "Judge failures").
 `response_schema:` and `single_attempt:` began as optional keywords on
 `#call`, added one at a time like `cache_system:`, `max_tokens:` and
 `history:` before them. They are now fields of `AiService::Request`.

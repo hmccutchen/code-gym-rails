@@ -41,8 +41,9 @@ read it before changing that area.
   capped purpose cannot route to Opus 5.5, and an OpenAI model without `none`
   needs a `reasoning_allowance`. `judge_section`, review and `duck_thread`
   stay on Sonnet as measured decisions; Haiku would end the duck's prompt
-  caching. `script/compare_models.rb` runs only Claude, so the OpenAI routes
-  are uncompared.
+  caching. `script/compare_models.rb` compares only Claude models, so the
+  OpenAI routes are uncompared; its `judge_shape` mode checks one provider's
+  judge replies against the verdict shape and picks no model.
 - **Conversational calls send real turns**
   (`docs/decisions/conversational-calls-send-real-turns.md`): `#duck_response`
   and `#answer_follow_up` pass prior turns to `AiService.request_for` as
