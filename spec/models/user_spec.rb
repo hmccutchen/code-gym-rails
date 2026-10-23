@@ -1621,6 +1621,16 @@ RSpec.describe User, type: :model do
           .to change { user.reload.section_kind_preferences_version }.by(1)
       end
 
+      it "leaves the preferences version alone on an unrelated save or a preference assigned its stored value" do
+        user = create_user_with_key
+        user.update!(section_kind_levels: { "pattern" => "junior" })
+
+        expect { user.generate_login_code! }.not_to(change { user.reload.section_kind_preferences_version })
+        expect { user.update!(name: "Renamed") }.not_to(change { user.reload.section_kind_preferences_version })
+        expect { user.update!(section_kind_levels: { "pattern" => "junior" }, excluded_section_kinds: []) }
+          .not_to(change { user.reload.section_kind_preferences_version })
+      end
+
       it "still saves unrelated attributes when a stored level names a retired kind" do
         user = create_user_with_key
         user.update_columns(section_kind_levels: { "retired_kind" => "senior" })

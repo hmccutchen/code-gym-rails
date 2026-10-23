@@ -52,7 +52,7 @@ disabled options and a refused post can never disagree.
 Whether a kind repeats one already daily, or is a second fourth, is
 `DailyKinds.conflict`, which `DailyKinds.normalize` also places kinds with;
 the swap only maps its answer to a reason. Whether a slot would be left with
-every kind excluded is `User#emptied_slots`, built on
+every kind excluded is `SectionKindSettings#emptied_slots`, built on
 `KindPreferences#all_excluded?`, the same test rotation's fallback reads.
 
 ## Storing the default as an empty list

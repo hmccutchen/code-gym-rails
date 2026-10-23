@@ -12,7 +12,7 @@ can keep a starved kind out. Weights deliberately do not touch
 *slot* wins a scarce spot, and a kind a weight could never actually place
 there would let a slot win on strength it can't back up; only exclusion,
 which really can remove a kind from contention, is allowed to move that max.
-User validation refuses an exclusion that would empty a slot, so
+Validation (`SectionKindSettings`) refuses an exclusion that would empty a slot, so
 `SectionRotation` never has to render a slot with nothing eligible in it.
 Storage is sparse — a kind left at the default multiplier stores no key at
 all — so a user who has never touched either control is byte-identical to
