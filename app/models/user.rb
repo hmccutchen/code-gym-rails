@@ -36,13 +36,7 @@ class User < ApplicationRecord
   validate :provider_has_a_stored_key, if: -> { provider_changed? || api_keys_changed? }
   validates :language, inclusion: { in: LANGUAGES }
   validate :time_zone_must_be_loadable
-  validate :section_kind_weights_name_rotatable_kinds,   if: :section_kind_weights_changed?
-  validate :excluded_section_kinds_name_rotatable_kinds, if: :excluded_section_kinds_changed?
-  validate :every_slot_keeps_a_kind,                     if: -> { excluded_section_kinds_changed? || daily_section_kinds_changed? }
-  validate :daily_section_kinds_name_a_full_set,         if: :daily_section_kinds_changed?
-  validate :section_kind_levels_name_section_kinds,      if: :section_kind_levels_changed?
-  validate :locked_section_kinds_name_section_kinds,     if: :locked_section_kinds_changed?
-  validate :locks_have_levels, if: -> { section_kind_levels_changed? || locked_section_kinds_changed? }
+  validate :section_kind_settings_hold
   validate :display_preferences_name_known_options, if: :display_preferences_changed?
   validates :daily_section_count, numericality: { only_integer: true, in: DAILY_SECTION_COUNTS, message: DAILY_SECTION_COUNT_RULE },
                                   allow_nil: true, if: :daily_section_count_changed?
@@ -52,7 +46,7 @@ class User < ApplicationRecord
 
   before_save { email.downcase! }
 
-  before_save :bump_section_kind_preferences_version, if: :section_kind_preferences_changed?
+  before_save :bump_section_kind_preferences_version, if: -> { section_kind_settings.changed? }
 
   scope :active, -> { where(anonymized_at: nil) }
 
@@ -400,23 +394,7 @@ class User < ApplicationRecord
 
   def provider_label = AiProvider.label(provider)
 
-  def emptied_slots(daily:)
-    preferences = KindPreferences.new(weights: {}, excluded: Array(excluded_section_kinds))
-    ExerciseSection.optional_slots(daily: daily).select do |_slot, kinds|
-      kinds.size > 1 && preferences.all_excluded?(kinds)
-    end
-  end
-
-  def keep_unrendered_preferences(attrs)
-    daily    = DailyKinds.for(self)
-    weighted = ExerciseSection.rotatable(daily: daily).map(&:key)
-    shown    = ExerciseSection.pickable(daily: daily).map(&:key)
-    keep_hidden(attrs, :section_kind_weights, section_kind_weights.except(*weighted))
-    keep_hidden(attrs, :excluded_section_kinds, excluded_section_kinds - weighted)
-    keep_hidden(attrs, :section_kind_levels, section_kind_levels.except(*shown))
-    keep_hidden(attrs, :locked_section_kinds, locked_section_kinds - shown)
-    attrs
-  end
+  def section_kind_settings = SectionKindSettings.for(self)
 
   def held_exercise
     return nil unless paused_generation_at?
@@ -484,71 +462,6 @@ class User < ApplicationRecord
     self.section_kind_preferences_version += 1
   end
 
-  def keep_hidden(attrs, field, hidden)
-    return unless attrs.key?(field)
-
-    known = ExerciseSection.keys
-    attrs[field] = hidden.is_a?(Hash) ? hidden.slice(*known).merge(attrs[field]) : attrs[field] | (hidden & known)
-  end
-
-  def rotatable_keys
-    ExerciseSection.rotatable(daily: DailyKinds.for(self)).map(&:key)
-  end
-
-  def daily_section_kinds_name_a_full_set
-    DailyKinds.problems_with(daily_section_kinds).each { |problem| errors.add(:daily_section_kinds, problem) }
-  end
-
-  def section_kind_weights_name_rotatable_kinds
-    return errors.add(:section_kind_weights, "must be an object") unless section_kind_weights.is_a?(Hash)
-
-    stored = section_kind_weights_in_database.is_a?(Hash) ? section_kind_weights_in_database : {}
-    section_kind_weights.each do |key, value|
-      next if stored.key?(key) && stored[key] == value
-
-      errors.add(:section_kind_weights, "names an unknown section kind: #{key}") if rotatable_keys.exclude?(key)
-      errors.add(:section_kind_weights, "has an unsupported weight for #{key}, which must be one of #{KindPreferences::MULTIPLIERS.join(', ')}") if KindPreferences::MULTIPLIERS.exclude?(value)
-    end
-  end
-
-  def excluded_section_kinds_name_rotatable_kinds
-    return errors.add(:excluded_section_kinds, "must be a list") unless excluded_section_kinds.is_a?(Array)
-
-    (excluded_section_kinds - Array(excluded_section_kinds_in_database) - rotatable_keys).each do |key|
-      errors.add(:excluded_section_kinds, "names an unknown section kind: #{key}")
-    end
-  end
-
-  def section_kind_preferences_changed?
-    section_kind_weights_changed? || excluded_section_kinds_changed? ||
-      section_kind_levels_changed? || locked_section_kinds_changed? || daily_section_kinds_changed?
-  end
-
-  def section_kind_levels_name_section_kinds
-    return errors.add(:section_kind_levels, "must be an object") unless section_kind_levels.is_a?(Hash)
-
-    section_kind_levels.each do |key, value|
-      errors.add(:section_kind_levels, "names an unknown section kind: #{key}") if ExerciseSection.keys.exclude?(key)
-      errors.add(:section_kind_levels, "has an unsupported level for #{key}, which must be one of #{KindDifficulty::LEVELS.join(', ')}") if KindDifficulty::LEVELS.exclude?(value)
-    end
-  end
-
-  def locked_section_kinds_name_section_kinds
-    return errors.add(:locked_section_kinds, "must be a list") unless locked_section_kinds.is_a?(Array)
-
-    (locked_section_kinds - ExerciseSection.keys).each do |key|
-      errors.add(:locked_section_kinds, "names an unknown section kind: #{key}")
-    end
-  end
-
-  def locks_have_levels
-    return unless locked_section_kinds.is_a?(Array) && section_kind_levels.is_a?(Hash)
-
-    (locked_section_kinds - section_kind_levels.keys).each do |key|
-      errors.add(:locked_section_kinds, "locks #{key} without a difficulty target")
-    end
-  end
-
   def api_keys_name_providers
     return if api_keys.nil?
     return errors.add(:api_keys, "must be a map of provider to key") unless api_keys.is_a?(Hash)
@@ -565,15 +478,11 @@ class User < ApplicationRecord
     errors.add(:provider, "has no stored key") unless api_keys.key?(provider)
   end
 
-  def display_preferences_name_known_options
-    DisplayPreferences.problems_with(display_preferences).each { |problem| errors.add(:display_preferences, problem) }
+  def section_kind_settings_hold
+    section_kind_settings.problems.each { |attribute, problem| errors.add(attribute, problem) }
   end
 
-  def every_slot_keeps_a_kind
-    return unless excluded_section_kinds.is_a?(Array)
-
-    emptied_slots(daily: DailyKinds.for(self)).each_key do |slot|
-      errors.add(:excluded_section_kinds, "must leave at least one #{slot} section in rotation")
-    end
+  def display_preferences_name_known_options
+    DisplayPreferences.problems_with(display_preferences).each { |problem| errors.add(:display_preferences, problem) }
   end
 end

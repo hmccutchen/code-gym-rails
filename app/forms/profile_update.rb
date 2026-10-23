@@ -151,6 +151,6 @@ class ProfileUpdate
     %i[section_kind_weights section_kind_levels display_preferences].each do |key|
       permitted[key] = permitted[key].to_h if permitted.key?(key)
     end
-    @user.keep_unrendered_preferences(permitted.to_h)
+    @user.section_kind_settings.keep_unrendered(permitted.to_h)
   end
 end
