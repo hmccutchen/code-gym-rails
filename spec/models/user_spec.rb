@@ -900,6 +900,14 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "columns" do
+    it "has none of the Devise password, reset or confirmation columns, and keeps the authenticator columns" do
+      expect(User.column_names & %w[encrypted_password reset_password_token reset_password_sent_at
+                                    confirmation_token confirmed_at confirmation_sent_at]).to be_empty
+      expect(User.column_names).to include("otp_secret", "consumed_timestep", "otp_backup_codes", "otp_required_for_login")
+    end
+  end
+
   describe "#anonymize!" do
     it "replaces or clears every identifying field" do
       user = create_user(email: "real@example.com", name: "Real Person")
