@@ -199,3 +199,11 @@ data.*
   **why:** I was signed out right after turning it on, every emailed code then
   said it was wrong, and the home-screen app ended on a 404
   **I decided:** Turn on stays disabled until the page's scripts load
+- with the authenticator on, my address and then its code, with no emailed
+  code; the emailed code gets its own page with a way to start again `#496`
+  **why:** asking for the emailed code and then the authenticator felt
+  redundant, and the email form under the code field was confusing
+  **I decided:** a lost phone gets in with a recovery code only, the console
+  beyond that; I accept that anyone with my address can use up the daily cap,
+  that the login page shows who has the authenticator on, and the chance of a
+  guessed code that leaves; a separate PR from the double-tap fix
