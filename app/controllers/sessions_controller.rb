@@ -92,7 +92,7 @@ class SessionsController < ApplicationController
     stamped_at = session[:pending_login_at]
     return false if stamped_at.blank?
 
-    Time.iso8601(stamped_at.to_s) < User::LOGIN_CODE_EXPIRY.ago
+    !User.login_pending?(email: session[:pending_login_email], requested_at: Time.iso8601(stamped_at.to_s))
   rescue ArgumentError
     false
   end

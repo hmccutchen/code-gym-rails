@@ -111,6 +111,25 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe ".login_pending?" do
+    it "stays pending until the later of the request and the code mailed for it expires" do
+      user = create_user
+      requested_at = Time.current
+      travel(3.minutes) { user.generate_login_code! }
+
+      travel(12.minutes) { expect(User.login_pending?(email: user.email, requested_at: requested_at)).to be(true) }
+      travel(13.minutes + 1.second) { expect(User.login_pending?(email: user.email, requested_at: requested_at)).to be(false) }
+    end
+
+    it "runs from the request while no code has been minted, as when the mail job has not run yet" do
+      user = create_user
+      requested_at = Time.current
+
+      travel(User::LOGIN_CODE_EXPIRY - 1.second) { expect(User.login_pending?(email: user.email, requested_at: requested_at)).to be(true) }
+      travel(User::LOGIN_CODE_EXPIRY + 1.second) { expect(User.login_pending?(email: user.email, requested_at: requested_at)).to be(false) }
+    end
+  end
+
   describe "login codes" do
     it "generates a code digest, with attempts reset to zero" do
       user = create_user

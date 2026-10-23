@@ -141,6 +141,36 @@ RSpec.describe "Sessions", type: :request do
   describe "POST /login/code" do
     include ActiveJob::TestHelper
 
+    def emailed_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
+
+    it "accepts a code mailed after a queue delay for its full life, though the request is older" do
+      travel_to(Time.utc(2026, 10, 23, 15)) do
+        post login_path, params: { email: "dev@example.com" }
+        travel(3.minutes)
+        perform_enqueued_jobs
+        travel(9.minutes)
+
+        post verify_login_code_path, params: { code: emailed_code }
+
+        expect(response).to redirect_to(root_path)
+        expect(session[:user_id]).to be_present
+      end
+    end
+
+    it "lets the pending sign-in lapse once the code it waited for has expired" do
+      travel_to(Time.utc(2026, 10, 23, 15)) do
+        post login_path, params: { email: "dev@example.com" }
+        travel(3.minutes)
+        perform_enqueued_jobs
+        travel(User::LOGIN_CODE_EXPIRY + 1.second)
+
+        post verify_login_code_path, params: { code: emailed_code }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to eq(I18n.t("sessions.code_rejected_request_new"))
+      end
+    end
+
     it "logs the user in with the code emailed after POST /login" do
       perform_enqueued_jobs do
         post login_path, params: { email: "dev@example.com" }
