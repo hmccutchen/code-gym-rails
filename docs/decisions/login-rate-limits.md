@@ -3,8 +3,8 @@
 A 6-digit code is a weak enough secret that the
 guessing bound is part of the design, not an optimization. `SessionsController`
 caps code requests at 5 per address, code requests at 20 per IP, and
-submissions at 10 per IP, all per `LOGIN_CODE_EXPIRY`, via Rails'
-`rate_limit`, plus code requests at 50 per IP per day and submissions at
+submissions at 10 per IP, all per `LOGIN_RATE_LIMIT_WINDOW` (15 minutes),
+via Rails' `rate_limit`, plus code requests at 50 per IP per day and submissions at
 10 per address per hour. The per-IP request caps are the ones that bound an
 attacker who varies the address rather than hammering one: an unrecognized
 address creates an account and sends mail, so without them a single client
@@ -18,3 +18,16 @@ bucket. `LazyCacheStore` exists solely
 because `rate_limit` binds its `store:` at class-load time; resolving
 `Rails.cache` per call keeps production on Solid Cache and keeps the limits
 testable against the test env's `:null_store`.
+
+The windows are 15 minutes, while a code lives 10 (`LOGIN_CODE_EXPIRY`).
+They used to share one constant, so shortening a code's life would also
+have loosened every 15-minute limit. A per-address request limit that
+outlasts the code still stops fresh codes from resetting the guess count.
+
+Every per-IP limit keys on `request.remote_ip`. Nothing configures trusted
+proxies, so whether that is the client's address behind Railway's edge is
+unconfirmed. Before going public, run the check in
+`docs/passwordless-sign-in-spec-2026-10-23.md` ("Not in this PR: trusted
+proxies"). It compares the logged IP from two devices with their real
+addresses, and sends a spoofed `X-Forwarded-For` header. Record both
+results here.

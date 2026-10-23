@@ -32,11 +32,18 @@ read it before changing that area.
   requests and tokens per provider from `ApiUsage.own_key_totals`, in the
   user's zone. House-key rows stay out, since the account's key did not pay
   for them. Input counts cache reads and writes; no cost is shown.
+- **Passwordless sign-in** (`docs/decisions/passwordless-sign-in.md`): the
+  emailed code is the only first factor, and no password column is ever
+  added. A code request creates the account. Sign-in runs `reset_session`
+  before setting `session[:user_id]`, and `require_login` saves the return
+  address only for a GET whose `Accept` names `text/html`. There is no second
+  factor until the optional authenticator ships. The admin page is
+  single-factor until then. The `otp_*` columns are kept but unread.
 - **Emailed-code auth**: No passwords and no links. `User#generate_login_code!`
   mints a 6-digit code, stores a BCrypt digest, and returns the raw code for
   the mailer; `User.authenticate_login_code` verifies it against the stored
   BCrypt digest, never against the raw code.
-  Codes expire in 15 minutes (`User::LOGIN_CODE_EXPIRY`) and die after five
+  Codes expire in 10 minutes (`User::LOGIN_CODE_EXPIRY`) and die after five
   wrong guesses (`LOGIN_CODE_MAX_ATTEMPTS`). A code is redeemable **only in
   the browser that requested it** — `SessionsController#verify_code` reads the
   address from `session[:pending_login_email]`, never from a form field, so a
@@ -45,7 +52,8 @@ read it before changing that area.
   cost of having one credential instead of two.
 - **Login rate limits** (`docs/decisions/login-rate-limits.md`):
   `SessionsController` bounds guessing of the 6-digit code with per-address
-  and per-IP `rate_limit`s on code requests and submissions. The per-IP
+  and per-IP `rate_limit`s on code requests and submissions, each over
+  `User::LOGIN_RATE_LIMIT_WINDOW` (15 minutes) rather than the code's life. The per-IP
   request caps stop account and mail creation by address rotation; the
   per-address submission cap stops rotating IPs. Each limit needs its own
   `name:`, and `LazyCacheStore` resolves `Rails.cache` per call.
