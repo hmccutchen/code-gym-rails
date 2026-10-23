@@ -81,6 +81,8 @@ RSpec.describe "Learn lessons", type: :request do
     end
 
     it "has no concept page and cannot be drilled" do
+      # A test sign-in is written by its first request, and a 404 raised there would discard it.
+      get learn_path
       get learn_concept_path(bucket: "ruby_rails", concept: lesson)
       expect(response).to have_http_status(:not_found)
 

@@ -36,7 +36,7 @@ RSpec.describe "Conventions held over .claude/rules" do
   it "loads an area rule with every prompt class, so editing one brings in the isolation it must keep" do
     area_globs = rule_files.reject { |path| File.basename(path) == "patterns.md" }
                            .flat_map { |path| Array(paths_of(path)).flat_map { |glob| alternatives(glob) } }
-    prompt_classes = (Dir[Rails.root.join("app/services/*_prompt.rb")] + [ Rails.root.join("app/services/section_context.rb").to_s ]).map { |path| relative(path) }
+    prompt_classes = Dir[Rails.root.join("app/prompts/*.rb")].map { |path| relative(path) }
 
     unloaded = prompt_classes.reject { |file| area_globs.any? { |glob| File.fnmatch?(glob, file, File::FNM_PATHNAME) } }
 

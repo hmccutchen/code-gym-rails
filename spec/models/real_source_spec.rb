@@ -21,6 +21,11 @@ RSpec.describe RealSource do
       expect(ids.uniq.size).to eq(ids.size)
     end
 
+    it "has a unique file name and method, which is what carries its history across a folder move" do
+      names = RealSource.all.map { |excerpt| File.basename(excerpt.id) }
+      expect(names.uniq.size).to eq(names.size)
+    end
+
     # The model writes a next migration against the table as it stands, so the table must still exist.
     it "shows every migration's tables as they stand today, and no method any schema" do
       RealSource::SCHEMA_REVIEW.each do |excerpt|
@@ -47,7 +52,7 @@ RSpec.describe RealSource do
   end
 
   describe RealSource::Method do
-    let(:excerpt) { described_class.new("app/services/weighted_roll.rb", "pick") }
+    let(:excerpt) { described_class.new("app/models/weighted_roll.rb", "pick") }
 
     it "slices exactly the named def, nothing around it" do
       text = excerpt.text
@@ -58,7 +63,7 @@ RSpec.describe RealSource do
     end
 
     it "does not resolve a method that is not there" do
-      expect(described_class.new("app/services/weighted_roll.rb", "not_a_method")).not_to be_resolvable
+      expect(described_class.new("app/models/weighted_roll.rb", "not_a_method")).not_to be_resolvable
     end
 
     it "does not resolve a file that is not there" do
@@ -66,13 +71,13 @@ RSpec.describe RealSource do
     end
 
     it "keys its id on the method as well as the file" do
-      expect(excerpt.id).to eq("app/services/weighted_roll.rb#pick")
+      expect(excerpt.id).to eq("app/models/weighted_roll.rb#pick")
     end
 
     it "says the copy is altered, so the exercise cannot read as a bug report" do
       expect(excerpt.scenario).to include("altered for this exercise")
       expect(excerpt.scenario).to include("The deployed method is fine")
-      expect(excerpt.scenario).to include("`app/services/weighted_roll.rb`, `#pick`")
+      expect(excerpt.scenario).to include("`app/models/weighted_roll.rb`, `#pick`")
     end
 
     it "instructs exactly one flaw in a modified copy, never unchanged" do
@@ -237,7 +242,7 @@ RSpec.describe RealSource do
     end
 
     it "skips an entry that no longer resolves and says so" do
-      stale = RealSource::Method.new("app/services/weighted_roll.rb", "renamed_away")
+      stale = RealSource::Method.new("app/models/weighted_roll.rb", "renamed_away")
       stub_const("RealSource::POOLS", { application_code: [ stale, pool.first ] })
       allow(Rails.logger).to receive(:warn)
 
@@ -262,6 +267,15 @@ RSpec.describe RealSource do
       exercise_on(Date.current - 7,  source: "b#two")
 
       expect(RealSource.last_seen_for(user)).to eq("a#one" => Date.current - 3, "b#two" => Date.current - 7)
+    end
+
+    [ [ 2, 5 ], [ 5, 2 ] ].each do |before_move, after_move|
+      it "counts an id stamped before its file moved folders as the current id, keeping the later of #{before_move} and #{after_move} days ago" do
+        exercise_on(Date.current - before_move, source: "app/services/weighted_roll.rb#pick")
+        exercise_on(Date.current - after_move, source: "app/models/weighted_roll.rb#pick")
+
+        expect(RealSource.last_seen_for(user)).to eq("app/models/weighted_roll.rb#pick" => Date.current - 2)
+      end
     end
 
     it "ignores toy days, which carry no trace" do

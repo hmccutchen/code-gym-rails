@@ -1,6 +1,7 @@
 ---
 paths:
-  - "app/services/{ai_service,duck_prompt,follow_up_prompt,claude_service,gemini_service,openai_service,fake_service,lazy_cache_store}.rb"
+  - "app/clients/{ai_service,claude_service,gemini_service,openai_service,fake_service,lazy_cache_store}.rb"
+  - "app/prompts/{duck_prompt,follow_up_prompt}.rb"
   - "app/models/{ai_provider,call_profiles,api_usage,provider_credential,provider_error,provider_failure,provider_failure_text,reset_clock,concept_reference_failures,user}.rb"
   - "app/controllers/concerns/{provider_call_limits,provider_failure_rendering,json_errors}.rb"
   - "app/controllers/{application,api_keys,responses,concept_references,daily_exercises}_controller.rb"
@@ -28,7 +29,7 @@ read it before changing that area.
   `AiService.for(user)` is the only dispatch. Use `User#store_api_key`,
   `User#api_key` and `User#stored_providers`; no keys stores NULL.
   `ResponseReview` sets `daily_responses.review_provider` on every review.
-- **Provider abstraction**: `AiService` is a template-method base class owning provider orchestration, JSON parsing, usage logging, and calls each prompt class (`app/services/*_prompt.rb`; `.claude/rules/patterns.md` says what one holds) for its text; the concept vocabularies those prompts draw from live in `ConceptVocabulary`. `AiService#call(request)` is the template for the HTTP round trip; subclasses implement `request_body`, `read_result`, `raise_for_status` and `provider_name` behind it, plus `build_connection`, define the `API_URL` it posts to, and own which model each purpose routes to (see "Per-purpose model routing" below). Each call carries one `AiService::Request` built by `AiService.request_for` from the purpose's row in `CallProfiles::BY_PURPOSE` (see `.claude/rules/patterns.md`), the provider-neutral module that also holds the timeouts, retry counts and worst-case call times. Adding a provider means adding a subclass and an `AiProvider.all` entry, not editing the base. The registry follows `ExerciseSection.all`'s explicit class-list pattern, so Zeitwerk loads each class when asked rather than relying on subclasses having already registered themselves. `User` validates against its keys and Setup uses the subclasses' key patterns. It is also where a model asks for a provider's own quota day (`.daily_quota_reset_at`), so no other model names a provider class; call timing is no provider's fact and is read from `CallProfiles`. `FakeService` has no key pattern and is available only in local environments; a manually stored fake provider is still refused in production.
+- **Provider abstraction**: `AiService` is a template-method base class owning provider orchestration, JSON parsing, usage logging, and calls each prompt class (`app/prompts/*_prompt.rb`; `.claude/rules/patterns.md` says what one holds) for its text; the concept vocabularies those prompts draw from live in `ConceptVocabulary`. `AiService#call(request)` is the template for the HTTP round trip; subclasses implement `request_body`, `read_result`, `raise_for_status` and `provider_name` behind it, plus `build_connection`, define the `API_URL` it posts to, and own which model each purpose routes to (see "Per-purpose model routing" below). Each call carries one `AiService::Request` built by `AiService.request_for` from the purpose's row in `CallProfiles::BY_PURPOSE` (see `.claude/rules/patterns.md`), the provider-neutral module that also holds the timeouts, retry counts and worst-case call times. Adding a provider means adding a subclass and an `AiProvider.all` entry, not editing the base. The registry follows `ExerciseSection.all`'s explicit class-list pattern, so Zeitwerk loads each class when asked rather than relying on subclasses having already registered themselves. `User` validates against its keys and Setup uses the subclasses' key patterns. It is also where a model asks for a provider's own quota day (`.daily_quota_reset_at`), so no other model names a provider class; call timing is no provider's fact and is read from `CallProfiles`. `FakeService` has no key pattern and is available only in local environments; a manually stored fake provider is still refused in production.
 - **Per-purpose model routing**
   (`docs/decisions/per-purpose-model-routing.md`): Each provider routes a call
   by its `purpose` through its own `MODEL_FOR_PURPOSE`, falling back to
@@ -40,8 +41,9 @@ read it before changing that area.
   capped purpose cannot route to Opus 5.5, and an OpenAI model without `none`
   needs a `reasoning_allowance`. `judge_section`, review and `duck_thread`
   stay on Sonnet as measured decisions; Haiku would end the duck's prompt
-  caching. `script/compare_models.rb` runs only Claude, so the OpenAI routes
-  are uncompared.
+  caching. `script/compare_models.rb` compares only Claude models, so the
+  OpenAI routes are uncompared; its `judge_shape` mode checks one provider's
+  judge replies against the verdict shape and picks no model.
 - **Conversational calls send real turns**
   (`docs/decisions/conversational-calls-send-real-turns.md`): `#duck_response`
   and `#answer_follow_up` pass prior turns to `AiService.request_for` as

@@ -40,6 +40,14 @@ The judge sees each draft as locked, as the draft was, so it measures against ex
 
 A provider failure becomes an error row. One timeout neither ends the run nor counts as invalid output.
 
+## `JUDGE_SHAPE_PROVIDERS`
+
+OpenAI's judge route runs with a 4,000-token reasoning allowance here, in place of production's 25,000. The run checks whether replies carry the verdict's shape, and a lower cap keeps 14 calls cheap while a reply that hits it still shows up as `truncated`. The other providers run their production route unchanged. The reasoning is in `docs/answer-key-trust-spec-2026-10-22.md`, under "Acceptance before stage 1 merges".
+
+## `#judge_shape`
+
+It prints counts and `JudgeVerdict::Invalid` messages only. That class's messages name a missing or unknown value and never the pick, and other errors print as their class name, since a provider's message can quote the reply.
+
 ## `#pinned_service`
 
 The pinned service answers `judges_review_prose?` with false, so a run measures the grader alone whatever the deployment's `REVIEW_PROSE_JUDGE` switch says.

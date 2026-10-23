@@ -11,7 +11,7 @@ paths:
   - "app/assets/javascripts/code_gym_bootstrap.js"
   - "app/jobs/regenerate_exercise_job.rb"
   - "spec/**/*{response,dashboard,answer,submit,parsons,offline,draft,fold}*"
-  - "app/services/problem_set_ingest.rb"
+  - "app/models/problem_set_ingest.rb"
   - "app/views/shared/_duck_thread.html.erb"
   - "app/javascript/controllers/review_button_controller.js"
   - "spec/**/*{daily_exercises,save_status}*"

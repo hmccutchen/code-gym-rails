@@ -1,0 +1,21 @@
+<% page_title t("two_factor_setups.show.page_title") %>
+<%= render "shared/auth_page_styles" %>
+
+<div class="login-wrap">
+  <h1><%= t("two_factor_setups.show.page_title") %></h1>
+  <p><%= t("two_factor_setups.show.intro") %></p>
+
+  <div class="otp-qr" role="img" aria-label="<%= t("two_factor_setups.show.qr_label") %>">
+    <%= two_factor_qr_svg(current_user, @secret) %>
+  </div>
+  <p><%= t("two_factor_setups.show.secret_label") %><br><code class="otp-secret"><%= @secret %></code></p>
+
+  <%= form_with url: two_factor_setup_path, method: :post do |f| %>
+    <div class="form-field">
+      <%= f.label :code, t("two_factor_setups.show.code_label") %>
+      <%= f.text_field :code, inputmode: "numeric", pattern: "[0-9]*", maxlength: 6, required: true,
+                              autocomplete: "one-time-code", autofocus: true %>
+    </div>
+    <%= f.submit t("two_factor_setups.show.submit"), class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
+  <% end %>
+</div>

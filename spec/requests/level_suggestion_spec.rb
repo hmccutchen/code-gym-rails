@@ -20,7 +20,7 @@ RSpec.describe "Level suggestion proposals", type: :request do
       answers: sections.transform_values { "a" * 20 },
       section_ratings: sections.to_h { |key, section| [ key, section[:self] || (too_hard.include?(key) ? "too_hard" : "right_level") ] },
       ai_review: sections.transform_values do |section|
-        { "rating" => section.fetch(:ai, "solid"), "correct" => "c", "rubric" => AiService::RUBRIC_VERSION }
+        { "rating" => section.fetch(:ai, "solid"), "correct" => "c", "rubric" => ReviewedSectionResults::RUBRIC_VERSION }
       end
     )
   end
@@ -415,7 +415,7 @@ RSpec.describe "Level suggestion proposals", type: :request do
 
     it "requires authentication" do
       dismiss([ "code_review" ])
-      expect(response).to redirect_to(login_path)
+      expect(response).to redirect_to(new_user_session_path)
     end
 
     it "keeps a cutoff another request wrote while this one was running" do
@@ -439,9 +439,10 @@ RSpec.describe "Level suggestion proposals", type: :request do
       user = track_user
       reviewed_day(user, Date.current - LevelSuggestion::WINDOW, { "code_review" => "junior" })
       login_as(user)
+      get account_path
       other_tab = ActionDispatch::Integration::Session.new(Rails.application)
-      other_tab.post login_path, params: { email: user.email }
-      other_tab.post verify_login_code_path, params: { code: user.generate_login_code! }
+      login_as(user)
+      other_tab.get account_path
       advanced = false
       allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
         evidence = original.call(*args)

@@ -18,7 +18,7 @@ RSpec.describe "Preview auto-login", type: :request do
     it "leaves an unauthenticated request at the login page" do
       get root_path
 
-      expect(response).to redirect_to(login_path)
+      expect(response).to redirect_to(new_user_session_path)
     end
   end
 
@@ -49,17 +49,17 @@ RSpec.describe "Preview auto-login", type: :request do
       expect(names).not_to include(:remember_preview_sign_out)
     end
 
-    # Prepended so it runs before require_login; re-including into an ApplicationController subclass is a no-op.
-    it "runs the sign-in before a require_login declared ahead of it" do
+    # Prepended so it runs before authenticate_user!; re-including into an ApplicationController subclass is a no-op.
+    it "runs the sign-in before a authenticate_user! declared ahead of it" do
       ENV[PreviewEnvironment::VAR] = "1"
       klass = Class.new(ActionController::Base) do
-        before_action :require_login
+        before_action :authenticate_user!
         include PreviewAutoLogin
       end
 
       names = callbacks_for(klass)
 
-      expect(names.index(:preview_auto_login)).to be < names.index(:require_login)
+      expect(names.index(:preview_auto_login)).to be < names.index(:authenticate_user!)
     ensure
       ENV.delete(PreviewEnvironment::VAR)
     end
@@ -71,10 +71,14 @@ RSpec.describe "Preview auto-login", type: :request do
     let(:session)    { {} }
     let(:cookies)    { {} }
 
+    let(:signed_in_as) { [] }
+
     before do
       allow(controller).to receive(:session).and_return(session)
       allow(controller).to receive(:cookies).and_return(cookies)
       allow(controller).to receive(:controller_name).and_return("dashboard")
+      allow(controller).to receive(:current_user).and_return(nil)
+      allow(controller).to receive(:sign_in) { |user| signed_in_as << user }
       controller.extend(PreviewAutoLogin::Behavior)
     end
 
@@ -83,7 +87,7 @@ RSpec.describe "Preview auto-login", type: :request do
 
       controller.send(:preview_auto_login)
 
-      expect(session[:user_id]).to eq(user.id)
+      expect(signed_in_as).to eq([ user ])
     end
 
     it "prefers the configured preview address when one is set" do
@@ -92,14 +96,14 @@ RSpec.describe "Preview auto-login", type: :request do
 
       controller.send(:preview_auto_login)
 
-      expect(session[:user_id]).to eq(user.id)
+      expect(signed_in_as).to eq([ user ])
     ensure
       ENV.delete(PreviewSeed::EMAIL_VAR)
     end
 
     it "declines silently, never with a 500, when the seeded user does not exist" do
       expect { controller.send(:preview_auto_login) }.not_to raise_error
-      expect(session).to be_empty
+      expect(signed_in_as).to be_empty
     end
 
     it "declines for a real account that happens to sit at the configured address" do
@@ -108,7 +112,7 @@ RSpec.describe "Preview auto-login", type: :request do
 
       controller.send(:preview_auto_login)
 
-      expect(session[:user_id]).to be_nil
+      expect(signed_in_as).to be_empty
     end
 
     it "declines for an account carrying no API key at all" do
@@ -116,7 +120,7 @@ RSpec.describe "Preview auto-login", type: :request do
 
       controller.send(:preview_auto_login)
 
-      expect(session[:user_id]).to be_nil
+      expect(signed_in_as).to be_empty
     end
 
     it "declines for an anonymized user, which User.active excludes" do
@@ -124,7 +128,7 @@ RSpec.describe "Preview auto-login", type: :request do
 
       controller.send(:preview_auto_login)
 
-      expect(session[:user_id]).to be_nil
+      expect(signed_in_as).to be_empty
     end
 
     it "declines when the signed-out cookie is present" do
@@ -133,36 +137,35 @@ RSpec.describe "Preview auto-login", type: :request do
 
       controller.send(:preview_auto_login)
 
-      expect(session[:user_id]).to be_nil
+      expect(signed_in_as).to be_empty
     end
 
-    it "declines inside SessionsController so code login still works" do
+    it "declines on the emailed-code page too, so an older account can still use it" do
       seeded_user
-      allow(controller).to receive(:controller_name).and_return("sessions")
+      allow(controller).to receive(:controller_name).and_return("first_sign_ins")
 
       controller.send(:preview_auto_login)
 
-      expect(session[:user_id]).to be_nil
+      expect(signed_in_as).to be_empty
+    end
+
+    it "declines on every Devise page, so signing in, signing up and resetting still work" do
+      seeded_user
+      allow(controller).to receive(:devise_controller?).and_return(true)
+
+      controller.send(:preview_auto_login)
+
+      expect(signed_in_as).to be_empty
+      expect(controller).not_to have_received(:current_user)
     end
 
     it "already logged in is left alone" do
       seeded_user
-      real_user = User.create!(email: "already-logged-in@example.com", name: "Real")
-      session[:user_id] = real_user.id
+      allow(controller).to receive(:current_user).and_return(User.create!(email: "already-logged-in@example.com", name: "Real"))
 
       controller.send(:preview_auto_login)
 
-      expect(session[:user_id]).to eq(real_user.id)
-    end
-
-    # current_user does not memoize nil, so a session id pointing at no user must not block auto-login.
-    it "does not block auto-login when the session id points at no user" do
-      user = seeded_user
-      session[:user_id] = user.id + 1_000_000
-
-      controller.send(:preview_auto_login)
-
-      expect(session[:user_id]).to eq(user.id)
+      expect(signed_in_as).to be_empty
     end
   end
 
@@ -171,9 +174,13 @@ RSpec.describe "Preview auto-login", type: :request do
     let(:session)    { {} }
     let(:cookies)    { {} }
 
+    let(:signed_in_as) { [] }
+
     before do
       allow(controller).to receive(:session).and_return(session)
       allow(controller).to receive(:cookies).and_return(cookies)
+      allow(controller).to receive(:current_user).and_return(nil)
+      allow(controller).to receive(:sign_in) { |user| signed_in_as << user }
       controller.extend(PreviewAutoLogin::Behavior)
     end
 
@@ -217,7 +224,7 @@ RSpec.describe "Preview auto-login", type: :request do
       allow(controller).to receive(:controller_name).and_return("dashboard")
       controller.send(:preview_auto_login)
 
-      expect(session[:user_id]).to be_nil
+      expect(signed_in_as).to be_empty
     end
   end
 end
