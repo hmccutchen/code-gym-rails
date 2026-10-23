@@ -30,6 +30,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_110000) do
     t.string "failure"
     t.string "quota_id"
     t.boolean "house_key", default: false, null: false
+    t.decimal "cost_usd", precision: 14, scale: 8
     t.index ["provider", "house_key", "created_at"], name: "index_api_usages_on_provider_and_house_key_and_created_at"
     t.index ["user_id", "date"], name: "index_api_usages_on_user_id_and_date"
     t.index ["user_id"], name: "index_api_usages_on_user_id"

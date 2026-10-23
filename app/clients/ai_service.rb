@@ -76,6 +76,33 @@ class AiService
 
   def self.judges_review_prose? = false
 
+  Price = Data.define(:input, :output, :cache_write, :cache_read, :checked_on) do
+    def initialize(checked_on:, **rates)
+      super(checked_on:, **rates.to_h { |name, rate| [ name, Price.rate(name, rate) ] })
+    end
+
+    def self.rate(name, value)
+      BigDecimal(value.to_s).tap { |rate| raise ArgumentError, "#{name} rate is negative" if rate.negative? }
+    end
+  end
+  PRICE_PER_MILLION = {}.freeze
+
+  def self.prices_usage? = false
+  PRICED_TOKENS = { input: :input_tokens, output: :output_tokens,
+                    cache_write: :cache_write_tokens, cache_read: :cache_read_tokens }.freeze
+
+  def self.price_for(model) = self::PRICE_PER_MILLION[model]
+
+  def self.cost_usd(result)
+    return if !prices_usage? || result[:tokens_unknown]
+
+    counts = PRICED_TOKENS.transform_values { |key| result[key].to_i }
+    return BigDecimal(0) if counts.values.all?(&:zero?)
+
+    price = price_for(result[:model]) or return
+    counts.sum { |rate, count| count * price.public_send(rate) } / 1_000_000
+  end
+
   JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes, :solves) do
     def initialize(solves: [], **) = super
   end
@@ -521,6 +548,7 @@ class AiService
         http_status: result[:http_status],
         failure:     result[:failure],
         quota_id:    result[:quota_id],
+        cost_usd:    usage_cost(result),
         purpose:    purpose,
         date:       Date.current
       )
@@ -531,6 +559,12 @@ class AiService
       "tokens_in=#{result[:input_tokens].to_i} tokens_out=#{result[:output_tokens].to_i}: " \
       "#{e.class}: #{e.message}"
     )
+  end
+
+  def usage_cost(result)
+    self.class.cost_usd(result).tap do |cost|
+      Rails.logger.warn("[usage] #{self.class} has no price for model=#{result[:model].inspect}; cost_usd left null") if cost.nil? && self.class.prices_usage? && !result[:tokens_unknown]
+    end
   end
 
   def call_and_log(user, request, deadline: GenerationDeadline::NONE)
@@ -566,7 +600,8 @@ class AiService
 
   def failed_call_result(error, purpose)
     { input_tokens: 0, output_tokens: 0, model: routed_model(purpose),
-      http_status: error.http_status, failure: self.class.failure_code_for(error), quota_id: error.quota_id }
+      http_status: error.http_status, failure: self.class.failure_code_for(error), quota_id: error.quota_id,
+      tokens_unknown: error.class.leaves_tokens_unknown? }
   end
 
   def reply_failure_code(result, allow_truncated)

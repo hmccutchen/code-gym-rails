@@ -194,3 +194,8 @@ data.*
   **I decided:** another fresh agent checks each finding against the code
   before anything is changed
 - the test rules say CI runs on Postgres 18
+- the cost of each API call on its usage row, for Anthropic keys only for now
+  `#472 open`
+  **I decided:** Gemini and OpenAI rows store a null cost until those providers
+  are priced on purpose; prices stay on the provider classes beside the routes;
+  the design doc leaves the PR; a timed-out call stores a null cost

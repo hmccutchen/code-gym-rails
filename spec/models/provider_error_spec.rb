@@ -62,4 +62,10 @@ RSpec.describe ProviderError do
   it "explains a fully rejected draft by default" do
     expect(ProviderError::AllSectionsRejectedError.new.message).to start_with("Every section of today's draft failed its quality check")
   end
+
+  it "marks only a timeout as leaving the billed tokens unknown" do
+    unknown = ObjectSpace.each_object(Class).select { |klass| klass <= ProviderError && klass.leaves_tokens_unknown? }
+
+    expect(unknown).to eq([ ProviderError::TimeoutError ])
+  end
 end
