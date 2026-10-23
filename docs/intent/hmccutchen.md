@@ -165,3 +165,5 @@ data.*
   the only account; a 10-minute code with the rate-limit windows kept at 15;
   trusted proxies, with a spoofed-header test, split out and required before I
   post publicly
+- from my layered review of the Devise removal: keep the login code out of the
+  job queue, and give the signed-in lookup one home
