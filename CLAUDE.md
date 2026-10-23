@@ -243,7 +243,7 @@ advisory signal; it is not evidence that anything was verified.
 - **web-push** — VAPID-signed daily reminder notifications (`PushDelivery`)
 - **BCrypt** — login code digests
 - **ActiveRecord Encryption** — encrypts each user's provider API key at rest
-- **Railway** — hosting (web + worker services, postgres service)
+- **Railway** — hosting (web + worker services, and a `Database` service running Railway's Postgres 18 template)
 - **Docker** — Railway builds the image from the `Dockerfile`, as its build logs show, although `railway.toml` still names Nixpacks
 
 ## Architecture
