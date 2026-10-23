@@ -142,3 +142,10 @@ data.*
 - moved production onto a fresh Railway Postgres, then deleted the old
   database and the copy job `#489`
   **I decided:** a fresh database rather than rotating the old one's password
+- sign-in through Devise: a password plus an authenticator code, replacing
+  the emailed code `#490`
+  **why:** after the breach I wanted the security-critical parts from
+  maintained libraries rather than our own code
+  **I decided:** backup codes for a lost phone, open sign-up with email
+  confirmation, an emailed password reset, and existing accounts enrolling at
+  their next sign-in with one last emailed code

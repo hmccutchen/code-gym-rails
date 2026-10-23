@@ -7,7 +7,7 @@ RSpec.describe "Welcome", type: :request do
 
   it "requires login" do
     get "/welcome"
-    expect(response).to redirect_to(login_path)
+    expect(response).to redirect_to(new_user_session_path)
   end
 
   it "sends a first-run account from setup to the question" do

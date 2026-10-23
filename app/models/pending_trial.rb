@@ -1,4 +1,4 @@
-# The seat is taken only once the emailed code proves the address, so nobody spends one on an address they can't read.
+# The seat is taken only once a confirmed account signs in, so nobody spends one on an address they can't read.
 class PendingTrial
   KEY = :pending_trial
 
@@ -8,6 +8,8 @@ class PendingTrial
   end
 
   def self.forget(session) = session.delete(KEY)
+
+  def self.email(session) = session[KEY].is_a?(Hash) ? session[KEY]["email"] : nil
 
   # Read once: a login takes it, whatever happens to the trial.
   def self.take(session)

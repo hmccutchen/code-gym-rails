@@ -61,9 +61,13 @@ customers.each { |c| puts loyalty_tier(c) }
 
 ## Getting started
 
-1. Go to [coding-gym.pro](https://coding-gym.pro) and sign in with your
-   email. You'll get a 6-digit code; there are no passwords. Your first
-   sign-in creates your account.
+1. Go to [coding-gym.pro](https://coding-gym.pro) and create an account with
+   your email and a password. Follow the link in the confirmation email, then
+   scan the QR code with an authenticator app such as 1Password, Google
+   Authenticator or Authy, and save the backup codes it shows you. After that,
+   you sign in with your password and a code from the app. Had an account
+   before passwords? Use "Had an account before passwords? Sign in with an emailed code." on the login page once,
+   and it walks you through the same setup.
 2. On the Setup page, add an API key from one of these providers. The app uses
    your own key, so you pay only for your own exercises.
    - Anthropic: https://console.anthropic.com/settings/keys

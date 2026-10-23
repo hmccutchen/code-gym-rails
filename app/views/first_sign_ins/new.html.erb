@@ -1,0 +1,23 @@
+<% page_title t("first_sign_ins.new.page_title") %>
+<%= render "shared/auth_page_styles" %>
+
+<div class="login-wrap">
+  <h1><%= t("app_name") %></h1>
+  <% if pending_login_email.present? %>
+    <%= render "first_sign_ins/pending" %>
+
+    <%# Keep the form below the pending banner: see docs/code-notes/app/views/first_sign_ins/new.html.md %>
+    <p class="pending-divider"><%= t("first_sign_ins.new.resend_prompt") %></p>
+  <% else %>
+    <p><%= t("first_sign_ins.new.intro_html") %></p>
+  <% end %>
+
+  <%= form_with url: first_sign_in_path, method: :post do |f| %>
+    <div class="form-field">
+      <%= f.label :email, t("first_sign_ins.new.email_label") %>
+      <%= f.email_field :email, placeholder: t("first_sign_ins.new.email_placeholder"), required: true, autocomplete: "email" %>
+    </div>
+    <%= f.submit t("first_sign_ins.new.submit"), class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
+  <% end %>
+  <p class="auth-links"><%= link_to t("first_sign_ins.new.log_in"), new_user_session_path %></p>
+</div>
