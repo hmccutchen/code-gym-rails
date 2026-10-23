@@ -166,7 +166,7 @@ data.*
 ## Fri Oct 23
 
 - back to passwordless sign-in: take Devise out and restore the emailed code
-  as the only first factor, spec first `#491 open`
+  as the only first factor, spec first `#491`
   **why:** I want no password column ever, with an authenticator app as an
   optional second factor later
   **I decided:** open sign-up exactly as before, with the account created when
