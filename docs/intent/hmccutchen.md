@@ -176,3 +176,8 @@ data.*
   turning it on or off ends every other session; recovery codes compared only
   for recovery-shaped input; a copy fallback that selects the text; the phone
   check split into the local network before merge and production after
+- every PR gets a critical and a layered-design review, each by a separate
+  agent `#492`
+  **I decided:** another fresh agent checks each finding against the code
+  before anything is changed
+- the test rules say CI runs on Postgres 18
