@@ -5,7 +5,7 @@ RSpec.describe "Display preferences in the layout", type: :request do
   let(:user) { create_user_with_key }
 
   it "renders the decorative pattern outside the moving content by default, including when signed out" do
-    [ login_path, history_path ].each do |path|
+    [ new_user_session_path, history_path ].each do |path|
       login_as(user) if path == history_path
       get path
       document = Nokogiri::HTML5(response.body)
@@ -95,7 +95,7 @@ RSpec.describe "Display preferences in the layout", type: :request do
   end
 
   it "follows the device on a signed-out page" do
-    get login_path
+    get new_user_session_path
 
     expect(html_tag).to eq('<html lang="en" data-theme="device">')
     expect(display_links.map { |link| link["media"] }).to include("(prefers-color-scheme: light)")

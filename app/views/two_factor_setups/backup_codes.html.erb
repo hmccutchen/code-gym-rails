@@ -1,0 +1,16 @@
+<% page_title t("two_factor_setups.backup_codes.page_title") %>
+<%= render "shared/auth_page_styles" %>
+
+<div class="login-wrap">
+  <h1><%= t("two_factor_setups.backup_codes.page_title") %></h1>
+  <p><%= t("two_factor_setups.backup_codes.intro") %></p>
+
+  <ul class="backup-codes">
+    <% @backup_codes.each do |code| %>
+      <li><%= code %></li>
+    <% end %>
+  </ul>
+
+  <%= link_to t("two_factor_setups.backup_codes.continue"), root_path,
+              class: "btn btn-primary", style: "display:block;padding:.75rem;" %>
+</div>

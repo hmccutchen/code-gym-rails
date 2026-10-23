@@ -138,6 +138,6 @@ RSpec.describe "Concept reference alternate framings", type: :request do
   it "requires a login" do
     post_alternate
 
-    expect(response).to redirect_to(login_path)
+    expect(response).to redirect_to(new_user_session_path)
   end
 end

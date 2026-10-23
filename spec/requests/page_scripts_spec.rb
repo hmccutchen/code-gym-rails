@@ -21,7 +21,7 @@ RSpec.describe "Page scripts", type: :request do
 
   it "renders that text for a signed-out visitor too, since the session-expired sentence is what a stale page shows" do
     reset!
-    get login_path
+    get new_user_session_path
     body = doc.at_css("body")
 
     expect(body["data-signed-out-text"]).to eq(I18n.t("request.signed_out"))
@@ -32,7 +32,7 @@ RSpec.describe "Page scripts", type: :request do
     expect(doc.at_css("body")["data-signed-out-page"]).to be_nil
 
     reset!
-    get login_path
+    get new_user_session_path
 
     expect(doc.at_css("body")["data-signed-out-page"]).to eq("true")
   end
