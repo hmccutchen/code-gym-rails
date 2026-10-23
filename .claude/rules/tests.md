@@ -103,7 +103,7 @@ a particular mode calls `pin_code_review_mode` (`spec/support/code_review_mode_h
 which stubs only the mode's weights. A `WeightedRoll.pick` stub without
 `with(...)` matches every roll, so it replaces the `:toy` pin without failing.
 
-CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml`).
+CI runs the suite against Postgres 18, the major version production runs, on every PR (see `.github/workflows/ci.yml`).
 
 When a scoped run is enough and when it isn't — the shared authorities that
 always pull in the full suite — is stated once, in
