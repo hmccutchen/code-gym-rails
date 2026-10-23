@@ -177,7 +177,7 @@ RSpec.describe "History", type: :request do
   describe "GET /history" do
     it "requires login" do
       get history_path
-      expect(response).to redirect_to(new_user_session_path)
+      expect(response).to redirect_to(login_path)
     end
 
     it "never renders improved_code for the architecture section" do

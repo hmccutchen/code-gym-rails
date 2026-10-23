@@ -84,7 +84,7 @@ RSpec.describe "Focusable controls are large enough not to trigger iOS zoom", ty
   end
 
   it "renders no undersized control on the login form" do
-    visit new_user_session_path
+    visit login_path
     expect(page).to have_css(".form-field input")
 
     expect_no_undersized_controls(minimum_controls: 1)

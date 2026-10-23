@@ -42,112 +42,37 @@ en:
   sessions:
     new:
       page_title: "Log in"
-      intro: "Daily dev exercises."
-      email_label: "Email"
-      email_placeholder: "you@company.com"
-      password_label: "Password"
-      otp_label: "Authenticator or backup code"
-      otp_hint: "Haven't set up an authenticator app yet? Use the link in your confirmation email, or reset your password."
-      submit: "Log in"
-      sign_up: "New here? Create an account."
-      forgot_password: "Forgot your password?"
-      resend_confirmation: "Didn't get the confirmation email?"
-      first_sign_in: "Had an account before passwords? Sign in with an emailed code."
-    rate_limited:
-      sign_in_attempts: "Too many sign-in attempts. Try again in a few minutes."
-  first_sign_ins:
-    new:
-      page_title: "First sign-in"
-      intro_html: "Signing in for the first time since passwords arrived?<br>Enter your email and we'll send you a one-time code."
+      intro_html: "Daily dev exercises.<br>Enter your email to get a login code."
       resend_prompt: "Didn't get the email? Request a new code below, or use a different address."
       email_label: "Work email *"
       email_placeholder: "you@company.com"
       submit: "Send code"
-      log_in: "Already set a password? Log in."
     pending:
       message: "Enter the 6-digit code we emailed you."
       code_label: "6-digit code from the email"
       code_placeholder: "123456"
       submit: "Verify code"
-    code_sent: "If that address has an account without a password, we've emailed it a 6-digit code. It expires in %{expiry}."
-    choose_password: "Welcome back, %{name}. Choose a password to finish moving your account over."
+    code_sent: "Check your email for a 6-digit login code. It expires in %{expiry}."
+    welcome_back: "Welcome back, %{name}!"
     code_rejected_retry: "Incorrect or expired code. Try again, or request a new one below."
     code_rejected_request_new: "Incorrect or expired code. Request a new one below."
+    logged_out: "Logged out."
+    email_not_accepted: "That email address didn't work. Check it for typos and try again."
     rate_limited:
       code_requests_for_address: "Too many code requests for that address. Try again in a few minutes."
       code_requests: "Too many code requests. Try again in a few minutes."
       code_attempts: "Too many attempts. Try again in a few minutes."
-  registrations:
-    new:
-      page_title: "Create an account"
-      name_label: "Name"
-      email_label: "Work email"
-      password_label: "Password (at least %{minimum} characters)"
-      password_confirmation_label: "Confirm password"
-      submit: "Create account"
-      log_in: "Already have an account? Log in."
-    rate_limited: "Too many sign-ups from this network. Try again later."
-  passwords:
-    rate_limited: "Too many reset requests. Try again in a few minutes."
-    new:
-      page_title: "Reset your password"
-      intro: "Enter your email and we'll send you a link to choose a new password. You'll still need your authenticator code to log in."
-      submit: "Send reset link"
-    edit:
-      page_title: "Choose a new password"
-      submit: "Save new password"
-  confirmations:
-    rate_limited: "Too many confirmation emails requested. Try again in a few minutes."
-    new:
-      page_title: "Resend confirmation"
-      submit: "Resend confirmation email"
-  backup_codes:
-    heading: "Authenticator and backup codes"
-    intro: "Lost your backup codes, or used most of them? Enter a code from your authenticator app, or one of your backup codes, to make ten new ones. The old ones stop working."
-    code_label: "Authenticator or backup code"
-    submit: "Make new backup codes"
-    code_rejected: "That code didn't match, so your backup codes are unchanged."
-    rate_limited: "Too many attempts. Try again in a few minutes."
-  authenticator_moves:
-    intro: "Got a new phone? Enter a code from your old phone, or a backup code, to turn the authenticator off. You'll scan a new QR code straight after."
-    submit: "Move to a new phone"
-    released: "Your old authenticator is off. Scan this QR code with your new phone."
-    code_rejected: "That code didn't match, so your authenticator is unchanged."
-    rate_limited: "Too many attempts. Try again in a few minutes."
-  password_setups:
-    edit:
-      page_title: "Choose a password"
-      intro: "Coding Gym now signs you in with a password and an authenticator app. Choose your password first."
-      password_label: "Password (at least %{minimum} characters)"
-      password_confirmation_label: "Confirm password"
-      submit: "Save password"
-    saved: "Password saved. Now set up your authenticator app."
-  two_factor_setups:
-    show:
-      page_title: "Set up your authenticator"
-      intro: "Scan this QR code with an authenticator app such as 1Password, Google Authenticator or Authy, then enter the 6-digit code it shows."
-      qr_label: "QR code for your authenticator app"
-      secret_label: "Can't scan it? Enter this key instead:"
-      code_label: "6-digit code from the app"
-      submit: "Turn on"
-    code_rejected: "That code didn't match. Check that your phone's clock is right and try the newest code."
-    rate_limited: "Too many attempts. Try again in a few minutes."
-    already_on: "Your authenticator is already on. If you didn't save your backup codes, make new ones below."
-    backup_codes:
-      page_title: "Save your backup codes"
-      intro: "Each code logs you in once if you lose your phone. Save them somewhere safe now, because this is the only time they're shown."
-      continue: "I've saved them. Continue"
   trials:
     page_title: "Trial"
     heading: "Trial"
     intro: "Enter the invite code you were given and choose a provider to try Coding Gym on a shared key."
-    start_intro: "Try Coding Gym on a shared key with the invite code you were given. You'll create an account next, and the trial starts when you confirm your email address."
+    start_intro: "Try Coding Gym on a shared key with the invite code you were given. We'll email you a code to confirm your address, and the trial starts when you enter it."
     unavailable: "Trials aren't available right now. You can still use Coding Gym with an API key of your own."
     log_in_instead: "Have an account, or using your own key? Log in."
     code_label: "Invite code"
     provider_label: "Provider"
     provider_needed: "Choose the provider your trial runs on."
-    sign_up_to_start: "Create an account with the same email address. Your trial starts when you follow the confirmation link."
+    code_sent: "Check your email for a 6-digit login code. It expires in %{expiry}. Your trial starts when you enter it."
     consent_label: "I understand what is sent and to whom."
     submit: "Start trial"
     started: "Your trial has started."
@@ -179,6 +104,7 @@ en:
   flash:
     application:
       session_expired: "Your session expired — please try again."
+      login_required: "Please log in first."
       api_key_needed: "Add your API key to get started."
     admin:
       not_authorized: "Not authorized."
@@ -302,8 +228,6 @@ en:
         title: "%{provider} sent back something Coding Gym couldn't use, so %{outcome}."
         next: "Try again. If it keeps happening, tell the person who runs Coding Gym."
   errors:
-    messages:
-      already_confirmed: "was already confirmed. If you haven't set up your authenticator app yet, reset your password to finish."
     no_exercise_today: "No exercise set for today."
     provider_calls_limited: "You've reached the limit on AI requests for now. Try again later."
     section_not_in_exercise: "That section isn't part of this exercise."
@@ -1048,23 +972,3 @@ en:
         note_label: "Note"
         save: "Save call"
         called_at: "Last saved %{time}"
-  devise:
-    failure:
-      invalid: "Incorrect email, password or code. Still setting up your account? Use the newest link in your confirmation email, or reset your password if you've already confirmed it."
-      not_found_in_database: "Incorrect email, password or code. Still setting up your account? Use the newest link in your confirmation email, or reset your password if you've already confirmed it."
-      unauthenticated: "Log in first."
-      unconfirmed: "Confirm your email address first. The link is in the email we sent you."
-      inactive: "This account can't log in."
-    sessions:
-      signed_in: "Welcome back."
-      signed_out: "Logged out."
-      already_signed_out: "Logged out."
-    registrations:
-      signed_up_but_unconfirmed: "We've emailed you a confirmation link. Follow it to activate your account, then log in."
-    confirmations:
-      confirmed: "Your email address is confirmed. Now set up your authenticator app."
-      send_paranoid_instructions: "If that address has an account waiting for confirmation, we've emailed it a new link."
-    passwords:
-      send_paranoid_instructions: "If that address has an account, we've emailed it a link to reset the password."
-      updated: "Your password has been changed. Now set up your authenticator app."
-      updated_not_active: "Your password has been changed. Log in with it and your authenticator code."

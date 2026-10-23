@@ -10,24 +10,10 @@ Rails.application.routes.draw do
 
   mount ActionCable.server => "/cable"
 
-  devise_for :users, path: "", skip: :registrations,
-                     path_names: { sign_in: "login", sign_out: "logout" },
-                     controllers: { sessions: "users/sessions", confirmations: "users/confirmations",
-                                    passwords: "users/passwords" }
-
-  devise_scope :user do
-    get  "signup", to: "users/registrations#new",    as: :new_user_registration
-    post "signup", to: "users/registrations#create", as: :user_registration
-  end
-
-  get  "login/first",      to: "first_sign_ins#new",         as: :first_sign_in
-  post "login/first",      to: "first_sign_ins#create"
-  post "login/first/code", to: "first_sign_ins#verify_code", as: :verify_first_sign_in
-
-  resource :password_setup,   only: [ :edit, :update ]
-  resource :two_factor_setup, only: [ :show, :create ]
-  resource :backup_codes, only: :create
-  resource :authenticator_move, only: :create
+  get    "login",        to: "sessions#new"
+  post   "login",        to: "sessions#create"
+  post   "login/code",   to: "sessions#verify_code", as: :verify_login_code
+  delete "logout",       to: "sessions#destroy", as: :logout
 
   get   "setup", to: "api_keys#edit"
   patch "setup", to: "api_keys#update"

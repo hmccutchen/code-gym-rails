@@ -22,7 +22,7 @@ RSpec.describe "Navigation", type: :request do
 
   it "renders no tab bar for someone signed out" do
     reset!
-    get new_user_session_path
+    get login_path
 
     expect(response.body).not_to include("tab-bar\" role")
   end

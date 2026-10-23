@@ -100,7 +100,7 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
   end
 
   it "follows the device's mask and tint on a signed-out page" do
-    visit new_user_session_path
+    visit login_path
     page.driver.with_playwright_page do |pw|
       pw.emulate_media(colorScheme: "light")
       expect_pattern("gym-pattern-tile", "rgb(91, 71, 214)")

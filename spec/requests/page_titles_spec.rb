@@ -6,7 +6,7 @@ RSpec.describe "Page titles", type: :request do
   end
 
   it "names the login page" do
-    get new_user_session_path
+    get login_path
 
     expect(title).to eq("Log in – Coding Gym")
   end

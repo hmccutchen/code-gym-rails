@@ -1,8 +1,0 @@
-<%# Locals: resource, the record whose errors are listed %>
-<% if resource.errors.any? %>
-  <ul id="form-errors" class="form-errors" role="alert">
-    <% resource.errors.full_messages.each do |message| %>
-      <li><%= message %></li>
-    <% end %>
-  </ul>
-<% end %>

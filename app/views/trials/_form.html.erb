@@ -2,8 +2,8 @@
 <%= form_with url: url, method: :post do |f| %>
   <% if signed_out %>
     <div class="form-field">
-      <%= f.label :email, t("first_sign_ins.new.email_label") %>
-      <%= f.email_field :email, value: params[:email], placeholder: t("first_sign_ins.new.email_placeholder"), required: true, autocomplete: "email" %>
+      <%= f.label :email, t("sessions.new.email_label") %>
+      <%= f.email_field :email, value: params[:email], placeholder: t("sessions.new.email_placeholder"), required: true, autocomplete: "email" %>
     </div>
   <% end %>
   <div class="form-field">

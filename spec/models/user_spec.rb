@@ -95,6 +95,41 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe ".signed_in" do
+    it "resolves a session id to its account" do
+      user = create_user
+
+      expect(User.signed_in(user.id)).to eq(user)
+    end
+
+    it "resolves nothing for an anonymized account or an empty session" do
+      user = create_user
+      user.anonymize!
+
+      expect(User.signed_in(user.id)).to be_nil
+      expect(User.signed_in(nil)).to be_nil
+    end
+  end
+
+  describe ".login_pending?" do
+    it "stays pending until the later of the request and the code mailed for it expires" do
+      user = create_user
+      requested_at = Time.current
+      travel(3.minutes) { user.generate_login_code! }
+
+      travel(12.minutes) { expect(User.login_pending?(email: user.email, requested_at: requested_at)).to be(true) }
+      travel(13.minutes + 1.second) { expect(User.login_pending?(email: user.email, requested_at: requested_at)).to be(false) }
+    end
+
+    it "runs from the request while no code has been minted, as when the mail job has not run yet" do
+      user = create_user
+      requested_at = Time.current
+
+      travel(User::LOGIN_CODE_EXPIRY - 1.second) { expect(User.login_pending?(email: user.email, requested_at: requested_at)).to be(true) }
+      travel(User::LOGIN_CODE_EXPIRY + 1.second) { expect(User.login_pending?(email: user.email, requested_at: requested_at)).to be(false) }
+    end
+  end
+
   describe "login codes" do
     it "generates a code digest, with attempts reset to zero" do
       user = create_user
@@ -165,6 +200,15 @@ RSpec.describe User, type: :model do
       travel(User::LOGIN_CODE_EXPIRY + 1.minute) do
         expect(User.authenticate_login_code(email: user.email, code: raw_code)).to be_nil
       end
+    end
+
+    it "accepts a code at 9 minutes and refuses it at 11" do
+      user = create_user
+      raw_code = user.generate_login_code!
+      travel(9.minutes) { expect(User.authenticate_login_code(email: user.email, code: raw_code)).to eq(user) }
+
+      raw_code = user.generate_login_code!
+      travel(11.minutes) { expect(User.authenticate_login_code(email: user.email, code: raw_code)).to be_nil }
     end
 
     it "returns nil for an email with no pending login" do
@@ -891,6 +935,14 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "columns" do
+    it "has none of the Devise password, reset or confirmation columns, and keeps the authenticator columns" do
+      expect(User.column_names & %w[encrypted_password reset_password_token reset_password_sent_at
+                                    confirmation_token confirmed_at confirmation_sent_at]).to be_empty
+      expect(User.column_names).to include("otp_secret", "consumed_timestep", "otp_backup_codes", "otp_required_for_login")
+    end
+  end
+
   describe "#anonymize!" do
     it "replaces or clears every identifying field" do
       user = create_user(email: "real@example.com", name: "Real Person")
@@ -907,6 +959,15 @@ RSpec.describe User, type: :model do
       expect(user.login_code_sent_at).to be_nil
       expect(user.anonymized_at).to be_present
       expect(user).to be_anonymized
+    end
+
+    it "clears an authenticator left from the Devise sign-in" do
+      user = create_user
+      user.update_columns(otp_secret: "stored-ciphertext", consumed_timestep: 59_000_000, otp_backup_codes: [ "digest" ])
+
+      user.anonymize!
+
+      expect(user.reload.attributes.values_at("otp_secret", "consumed_timestep", "otp_backup_codes")).to all(be_nil)
     end
 
     it "stops push reminders and drops the endpoints they would reach" do

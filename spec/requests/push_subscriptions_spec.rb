@@ -120,7 +120,7 @@ RSpec.describe "Push subscriptions", type: :request do
 
       post push_subscription_path, params: valid_params
 
-      expect(response).to redirect_to(new_user_session_path)
+      expect(response).to redirect_to(login_path)
     end
 
     it "does not walk a nudges user back to ready when their browser re-enrols" do
@@ -254,7 +254,7 @@ RSpec.describe "Push subscriptions", type: :request do
     it "mounts no push controller for a logged-out visitor" do
       configure_vapid
 
-      get new_user_session_path
+      get login_path
 
       expect(response.body).not_to include("push-launch")
       expect(response.body).not_to include("push-enable")

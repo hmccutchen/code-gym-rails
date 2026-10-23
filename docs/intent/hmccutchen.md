@@ -156,6 +156,17 @@ data.*
 
 ## Fri Oct 23
 
+- back to passwordless sign-in: take Devise out and restore the emailed code
+  as the only first factor, spec first `#491`
+  **why:** I want no password column ever, with an authenticator app as an
+  optional second factor later
+  **I decided:** open sign-up exactly as before, with the account created when
+  a code is requested; drop the Devise columns in the same PR, since mine is
+  the only account; a 10-minute code with the rate-limit windows kept at 15;
+  trusted proxies, with a spoofed-header test, split out and required before I
+  post publicly
+- from my layered review: the login code out of the job queue, and one
+  signed-in lookup
 - every PR gets a critical and a layered-design review, each by a separate
   agent `#492`
   **I decided:** another fresh agent checks each finding against the code

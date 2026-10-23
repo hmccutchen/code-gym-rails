@@ -13,7 +13,7 @@ paths:
 
 
 ```
-User logs in (password + authenticator code; Devise)
+User logs in (emailed 6-digit code)
   └→ enters their own Anthropic, Gemini or OpenAI API key (stored encrypted per-user;
      the key's prefix determines user.provider)
 

@@ -9,7 +9,7 @@ module ApplicationCable
     private
 
     def find_verified_user
-      env["warden"].user(:user) || reject_unauthorized_connection
+      User.signed_in(request.session[:user_id]) || reject_unauthorized_connection
     end
   end
 end
