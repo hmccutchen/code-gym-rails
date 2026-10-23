@@ -50,7 +50,7 @@ class JudgeSolve::Counts
 
   def latest_call_per_version(matched)
     JudgeSolve.readable.where(matched: matched)
-              .where.not(rung: JudgedGeneration::SOLVE_MISMATCH_TOLERATED_AT)
+              .where.not(rung: JudgeVerdict::SOLVE_MISMATCH_TOLERATED_AT)
               .select("DISTINCT ON (judge_solves.section_digest) judge_solves.source, judge_solves.human_call")
               .order(Arel.sql("judge_solves.section_digest, judge_solves.human_call IS NULL, judge_solves.human_called_at DESC NULLS LAST, judge_solves.id DESC"))
   end

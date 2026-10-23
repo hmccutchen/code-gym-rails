@@ -41,7 +41,7 @@ the mismatch and the matched table, when its live judge and its replay judge
 disagreed. The tables are kept apart on purpose, as the spec asks.
 
 Unsolved rows drop out because the tables filter on `matched` being true or
-false. Rows at `JudgedGeneration::SOLVE_MISMATCH_TOLERATED_AT` drop out
+false. Rows at `JudgeVerdict::SOLVE_MISMATCH_TOLERATED_AT` drop out
 because that rung already accepts disagreement; the constant is the one
 authority for which rung that is.
 

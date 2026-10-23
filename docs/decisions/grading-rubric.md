@@ -38,8 +38,10 @@ measured. The check runs before the prose judge, and when the judge
 rewrites a review the positions move into `graded_prose`, beside the list
 they number.
 
-**`AiService::RUBRIC_VERSION`** is stamped into every review the prompt
-grades (`ai_review[section]["rubric"]`, server-owned). A review without it
+**`ReviewedSectionResults::RUBRIC_VERSION`** is stamped into every review the prompt
+grades (`ai_review[section]["rubric"]`, server-owned). It lives with
+`ReviewedSectionResults`, the rule for which reviewed sections count as
+evidence, and `AiService` writes it. A review without it
 was graded with no rubric, so its rating answers a different question; an
 evidence reader that compares ratings to a bar reads only stamped reviews.
 A stamp rather than a cutoff date, because grading knows which prompt it

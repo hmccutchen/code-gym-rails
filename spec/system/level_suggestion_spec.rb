@@ -10,7 +10,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
       problem_set: kinds.index_with { { "question" => "Find the issue", "snippet" => "def a; end", "pitched_at" => "junior" } })
     DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
       answers: kinds.index_with { "An answer with sufficient detail" }, section_ratings: kinds.index_with { "right_level" },
-      ai_review: kinds.index_with { { "rating" => "solid", "correct" => "Correct", "rubric" => AiService::RUBRIC_VERSION } })
+      ai_review: kinds.index_with { { "rating" => "solid", "correct" => "Correct", "rubric" => ReviewedSectionResults::RUBRIC_VERSION } })
   end
 
   # Today holds only code review, so the dashboard renders one section while three kinds have five results each.

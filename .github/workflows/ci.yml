@@ -56,6 +56,9 @@ jobs:
       - name: Check comments in ERB, JavaScript, CSS, YAML and Python
         run: bin/comment-check
 
+      - name: Check architecture boundaries
+        run: bundle exec archspec check
+
   test:
     runs-on: ubuntu-latest
 

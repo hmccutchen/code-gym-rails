@@ -280,7 +280,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       visit account_path
       click_button I18n.t("accounts.show.log_out")
 
-      expect(page).to have_current_path(login_path)
+      expect(page).to have_current_path(new_user_session_path)
       wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null")
     end
   end

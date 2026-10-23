@@ -49,7 +49,7 @@ no figure. Otherwise the weeks figure applies.
 larger of `GAP_WEEKDAYS + 1` and `(CAP_WEEKDAYS + 1) × candidates`, and the
 candidates are `CoverageException.candidate_kinds`, the same list `.for`
 picks from. The picker only rounds it to weeks of five weekdays.
-`spec/services/coverage_exception_cadence_spec.rb` runs the real `.for` over
+`spec/models/coverage_exception_cadence_spec.rb` runs the real `.for` over
 400 synthetic weekdays and checks the steady recurrence equals that figure
 for several candidate counts.
 

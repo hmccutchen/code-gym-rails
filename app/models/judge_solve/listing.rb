@@ -87,7 +87,7 @@ class JudgeSolve::Listing
     return JudgeSolve.none if call && call != JudgeSolve::UNCALLED
 
     JudgeSolve.readable.where(source: sources - NEVER_SAMPLED_SOURCES, matched: true, human_call: nil)
-              .where.not(rung: JudgedGeneration::SOLVE_MISMATCH_TOLERATED_AT)
+              .where.not(rung: JudgeVerdict::SOLVE_MISMATCH_TOLERATED_AT)
               .order(Arel.sql("random()")).limit(n)
   end
 

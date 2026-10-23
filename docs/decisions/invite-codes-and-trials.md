@@ -21,12 +21,12 @@ the `sessions.new.trial_link` copy) reopens trials. Until then, the Account
 page's monthly usage table shows own-key accounts what they send.
 
 **Two ways in.** `/trial/start` is public: an email, the code, a
-provider and the consent checkbox. It checks the code (`#available?`)
-before mailing anything, mails a login code through the same
-`LoginCodeRequests` concern and limits the login form uses, and keeps a
-`PendingTrial` in the session. Entering the emailed code takes the seat and
-starts the trial, so nobody can spend a seat on an address they cannot
-read; asking for a plain login code drops the pending trial. A signed-in
+provider and the consent checkbox. It checks the code (`#available?`),
+keeps a `PendingTrial` in the session and sends the visitor to sign up. The
+seat is taken when a confirmed account with that address signs in
+(`ApplicationController#after_sign_in_path_for`), so nobody can spend a seat
+on an address they cannot read; a different account signing in first in the
+same browser takes nothing. A signed-in
 account with no key uses `/trial`, which asks for the code and provider
 only.
 
@@ -64,8 +64,9 @@ concurrent calls can overshoot by the fan-out width per account, times
 the accounts calling at once; the provider's spend limit is the hard
 stop, by design. `spec/services/trial_isolation_spec.rb` pins
 byte-identical generation and judge calls for a trial and an own-key twin,
-and that nothing under `app/services`, `app/jobs` or the mastery and
-verdict models reads trial state. A trial account's failures read in the
+and that nothing under `app/models`, `app/services`, `app/jobs`,
+`app/prompts` or `app/clients` reads trial state, apart from the trial and
+key models and `User`, which the spec names. A trial account's failures read in the
 `trial` variant (`ProviderFailureText.variant_for`): the two trial kinds
 only exist there, and `daily_limit`, `bad_key` and `out_of_credit` name
 the trial's key rather than the reader's, while the rest fall back to the

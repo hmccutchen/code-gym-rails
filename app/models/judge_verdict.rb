@@ -6,6 +6,7 @@ class JudgeVerdict
   PRINCIPLES  = %w[scope_mismatch unstated_prerequisite underdetermined reasoning_failure].freeze
   STATUSES    = %w[keep edit reject].freeze
   SOLVE_FIELD = "better".freeze
+  SOLVE_MISMATCH_TOLERATED_AT = "principal_engineer".freeze
 
   attr_reader :status, :issues, :fields, :principle, :evidence, :reason, :solve
 
