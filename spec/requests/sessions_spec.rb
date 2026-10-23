@@ -109,6 +109,17 @@ RSpec.describe "Sessions", type: :request do
         .to eq([ "Verify code", "Start again" ])
     end
 
+    it "carries an alert sent to /login through to the code page" do
+      post login_path, params: { email: "dev@example.com" }
+
+      get root_path
+      follow_redirect!
+      expect(response).to redirect_to(login_code_path)
+      follow_redirect!
+
+      expect(response.body).to include(I18n.t("flash.application.login_required"))
+    end
+
     it "sends a pending login to the code page" do
       post login_path, params: { email: "dev@example.com" }
       expect(response).to redirect_to(login_code_path)

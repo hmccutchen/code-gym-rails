@@ -785,7 +785,7 @@ en:
     show:
       page_title: "Authenticator app"
       heading: "Add an authenticator app"
-      intro: "After this, signing in asks for the emailed code and then a code from your authenticator app."
+      intro: "After this, signing in asks for your email address and then a code from your authenticator app, with no emailed code."
       open_link: "Open in authenticator app"
       key_label: "Or enter this setup key in the app:"
       qr_label: "Or scan this QR code from another device:"

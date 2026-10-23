@@ -10,7 +10,7 @@ The owner decided to keep sign-in passwordless:
 - a password adds a secret to leak and a reset flow to secure;
 - the emailed code already proves the inbox, which a password reset would rely on anyway.
 
-The second factor worth having is possession of a phone. That came as an optional authenticator in the PR after #491 (#493), not as a password. The section below holds its decisions.
+The extra factor worth having is possession of a phone. That came as an optional authenticator in the PR after #491 (#493), not as a password. The section below holds its decisions.
 
 #493 asked for the emailed code and then the authenticator code. The owner found that redundant, and decided that once the authenticator is on it replaces the emailed code. The trade-offs are under "Stated plainly".
 
@@ -36,10 +36,10 @@ The second factor worth having is possession of a phone. That came as an optiona
 2. **`two_factor_enabled_at` replaced `otp_required_for_login`.** It's a nullable datetime: set when the authenticator is turned on, nil when it's off. The Account page shows it as "On since".
 3. **Turning it on needs a recent sign-in:** `session[:signed_in_at]` within the last 15 minutes (`User::RECENT_SIGN_IN`), plus a valid code from the new authenticator. A stolen session therefore can't turn on an authenticator the owner doesn't have, which would lock the owner out. An older session is asked to sign in again first.
    - **The setup key belongs to one session.** The setup page makes a key and keeps it in that browser's encrypted session (`AuthenticatorsController#pending_secret`). The key reaches `users.otp_secret` only when a code for it turns the authenticator on (`User#enable_second_factor!`), so viewing the page writes nothing. Two sessions see two different keys. Without this, an inbox-only session could read the key, the owner could later enroll that same key, and the intruder would then pass both factors. A reload in the same session keeps its key; signing in again shows a new one.
-4. **Turning it off, and making new recovery codes, need an authenticator code or a recovery code.** The emailed code is refused, since the inbox is the factor this one backs up.
+4. **Turning it off, and making new recovery codes, need an authenticator code or a recovery code.** The emailed code is refused, since the inbox is the factor the authenticator replaces.
 5. **Every change mails the account a notice:** turning it on, turning it off, and making new recovery codes. The notice says what changed and when, never the key or a code.
 6. **Ten recovery codes,** shown once. Each is 10 characters from a 32-letter alphabet with no `0`, `O`, `1` or `I`, written as two groups of five, for 50 bits. Each is stored as a bcrypt digest and works once.
-7. **No "remember this device".** Every sign-in asks for the second factor once it's on.
+7. **No "remember this device".** Every sign-in asks for the authenticator once it's on.
 8. **A daily cap of 20 wrong codes per account in 24 hours.** Only failures count. It covers the sign-in step, turning the authenticator off, and making new codes. Once it's reached, those three refuse every code, recovery codes included, until 24 hours after the first failure in the window.
 9. **Every count of wrong codes lives on the user row,** never in the session cookie. A copied cookie replayed later therefore can't bring back a zero count. The row, rather than the cache, keeps the counts through a cache eviction or a deploy.
 10. **Secrets stay out of caches and logs.** The setup page and every page showing recovery codes send `Cache-Control: no-store`. Every code field is named `otp_code`, which the existing `:otp` filter hides, and nothing writes the setup key or the `otpauth://` link to the log. `spec/requests/second_factor_logging_spec.rb` pins this.
@@ -67,8 +67,9 @@ When the address belongs to an account with the authenticator on, `SessionsContr
 - **The login page tells whether an address has the authenticator on.** It goes to the second step instead of the code page.
 - **A new request ends the open challenge.** Each `POST /login` for the address issues a fresh challenge, so someone sending the address while the owner is on the second step sends the owner back to the start. The per-address request limit bounds how often.
 - **With the authenticator on, the inbox alone can't sign in.** Neither the emailed code nor anything else in the inbox opens the account.
+- **With the authenticator on, one 6-digit code is the whole credential.** Anyone who knows the address can open challenges, and the daily cap is the only limit that binds: the per-challenge, per-account and per-address limits allow far more. At 20 guesses a day, a persistent attacker has about a 2% chance in a year of guessing a code (see "Why 20 a day"). Before this change the same guesses also needed the inbox.
 - **Deploying the sign-in stamp signed everyone out once.** No session from before it had `signed_in_at`, so each counted as signed out.
-- **Someone holding the inbox can turn the authenticator on with their own phone.** A fresh sign-in through the emailed code is all decision 3 asks for, and the recovery codes go to them. The owner then can't sign in until the console reset under "Lost phone and codes" below, and the change notice goes to the same inbox. The authenticator guards against a stolen session or a guessed code, not against someone who already reads the inbox.
+- **Someone holding the inbox can turn the authenticator on with their own phone.** A fresh sign-in through the emailed code is all decision 3 asks for, and the recovery codes go to them. The owner then can't sign in until the console reset under "Lost phone and codes" below, and the change notice goes to the same inbox. The authenticator guards against a stolen session or a guessed code, not against someone who already reads the inbox before it is turned on.
 - **Recovery codes are the only way past a lost phone** short of the console.
 - **Rolling back to code from before the authenticator turns it off silently.** That code never reads `two_factor_enabled_at`, so an enrolled account signs in with the emailed code alone, and `sessions_valid_after` stops ending sessions. The columns survive, so redeploying this code turns enrollments back on. Tell the account owners before such a rollback.
 
