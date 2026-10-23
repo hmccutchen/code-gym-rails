@@ -19,6 +19,30 @@ reads the PR list from GitHub. It answers only for PRs you opened since the date
 in `docs/intent/_since`. Never edit `docs/intent-log.md` by hand, since
 `compose.rb` generates it.
 
+**Every PR gets two reviews once the implementation is done, each run by a
+separate agent.** After the suites pass and before the PR is marked ready,
+start a subagent for each review. The session that wrote the code has
+already decided it is right, so it doesn't review its own work.
+
+- **Critical review:** the `critical-reviewer` agent
+  (`.claude/agents/critical-reviewer.md`) judges the change's design as a
+  whole, using the whole repository.
+- **Layered-design review:** `/layered-rails:review` checks layer boundaries,
+  callbacks, concerns and where each class lives. It comes from the
+  `layered-rails` plugin, which each developer installs. If it isn't
+  installed, say so in the PR rather than skipping the review silently.
+
+**Findings are checked before any code changes.** Hand both reviews' findings
+to another fresh agent. It checks each finding against the code and reports
+it as confirmed, with the file and line or a failing spec that shows it, or
+as rejected, with the reason. Fix only confirmed findings, test-first. When a
+finding would change the design, the person who asked for the work decides
+before anything changes. Out-of-scope findings become GitHub issues. Post a
+PR comment listing what was fixed, what was rejected and why, and which
+issues were opened. Reviewers can run specs, and two runs sharing the test
+database fail falsely, so don't run the suite while a review agent is
+working.
+
 ## Code Style
 
 ### Comment rules — never ignored

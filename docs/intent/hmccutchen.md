@@ -167,3 +167,8 @@ data.*
   post publicly
 - from my layered review: the login code out of the job queue, and one
   signed-in lookup
+- every PR gets a critical and a layered-design review, each by a separate
+  agent `#492`
+  **I decided:** another fresh agent checks each finding against the code
+  before anything is changed
+- the test rules say CI runs on Postgres 18
