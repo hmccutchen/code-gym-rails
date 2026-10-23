@@ -12,9 +12,9 @@ The session's `signed_in_at` is the time the controller read before checking the
 
 ## The pending second factor
 
-When the emailed code is right and the account has the authenticator on, `start_second_factor_challenge` does not sign in. It issues a challenge on the user row and stores `session[:pending_second_factor]`, holding the user id and the challenge's issue time.
+When the account has the authenticator on, the address alone reaches `start_second_factor_challenge` from `SessionsController#create`, and an emailed code from the trial form reaches it from `#verify_code`. It does not sign in. It issues a challenge on the user row and stores `session[:pending_second_factor]`, holding the user id and the challenge's issue time.
 
 - The marker only says which challenge this browser holds. The count of wrong codes is on the row (`second_factor_challenge_failures`), so replaying an earlier copy of the cookie can't bring back a zero count.
 - The marker sets no `user_id`, so `current_user`, every page and the cable connection treat the browser as signed out until the second step passes.
-- The pending emailed-code keys are removed, because that code has been used.
+- The pending emailed-code keys are removed: the code was used, or none was sent.
 - `return_to` and a pending trial stay in place for the second step to read.

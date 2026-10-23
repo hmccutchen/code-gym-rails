@@ -131,7 +131,7 @@ What each listed file does.
 - `app/views/responses/_answered_sections.html.erb` — read-only render of a submitted day; shared by the dashboard's submitted state and every history entry. Its styles live in the layout's `<style>`, not a per-page block, precisely because it renders on both.
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
 - `app/controllers/history_controller.rb` — paginated list of submitted sessions
-- `app/controllers/sessions_controller.rb` — code request + verification, with rate limits
+- `app/controllers/sessions_controller.rb` — code request, the code page, verification and starting again, with rate limits; an account with the authenticator on goes from its address to the second step
 - `app/controllers/second_factor_challenges_controller.rb` — `/login/second-factor`: the authenticator or recovery code asked for after the emailed code, when the account has the authenticator on
 - `app/controllers/authenticators_controller.rb` — `/account/authenticator`: the setup page, turning the authenticator on and off, and the sign-in-again page for an old session
 - `app/controllers/recovery_codes_controller.rb` — `POST /account/recovery_codes`: a new set of recovery codes, shown once

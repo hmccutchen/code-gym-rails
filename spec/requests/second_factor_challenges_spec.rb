@@ -7,9 +7,8 @@ RSpec.describe "Second-factor sign-in", type: :request do
   let(:recovery_codes) { enrollment.last }
   let(:session_cookie) { "_code_gym_rails_session" }
 
-  def enter_emailed_code
+  def enter_email
     post login_path, params: { email: user.email }
-    post verify_login_code_path, params: { code: user.generate_login_code! }
   end
 
   def wrong_totp
@@ -21,8 +20,8 @@ RSpec.describe "Second-factor sign-in", type: :request do
     post second_factor_challenge_path, params: { otp_code: code }
   end
 
-  it "sends a right emailed code to the second step without signing in" do
-    enter_emailed_code
+  it "sends the email address straight to the second step without signing in or mailing a code" do
+    expect { enter_email }.not_to have_enqueued_mail(UserMailer, :login_code)
 
     expect(response).to redirect_to(second_factor_challenge_path)
     expect(session[:user_id]).to be_nil
@@ -32,7 +31,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
   end
 
   it "shows one code field named otp_code" do
-    enter_emailed_code
+    enter_email
     follow_redirect!
 
     expect(response).to have_http_status(:ok)
@@ -41,7 +40,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
   end
 
   it "signs in with a TOTP and runs the full session reset" do
-    enter_emailed_code
+    enter_email
 
     answer(current_totp(secret))
 
@@ -51,7 +50,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
   end
 
   it "signs in with a recovery code and says how many are left" do
-    enter_emailed_code
+    enter_email
 
     answer(recovery_codes.first)
 
@@ -61,7 +60,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
   end
 
   it "re-renders the page after a wrong code" do
-    enter_emailed_code
+    enter_email
 
     answer(wrong_totp)
 
@@ -71,7 +70,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
   end
 
   it "ends the challenge on the row after five wrong codes" do
-    enter_emailed_code
+    enter_email
 
     5.times { answer(wrong_totp) }
 
@@ -82,7 +81,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
   end
 
   it "keeps counting when an earlier copy of the cookie is replayed" do
-    enter_emailed_code
+    enter_email
     saved_cookie = cookies[session_cookie]
 
     4.times { answer(wrong_totp) }
@@ -98,7 +97,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
   end
 
   it "sends an expired challenge back to the login page" do
-    enter_emailed_code
+    enter_email
 
     travel User::SECOND_FACTOR_CHALLENGE_LIFETIME + 1.second do
       answer(current_totp(secret))
@@ -117,7 +116,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
 
   it "keeps return_to through the second step" do
     get history_path
-    enter_emailed_code
+    enter_email
 
     answer(current_totp(secret))
 
@@ -141,7 +140,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
 
   it "shows when to try again once the daily cap is reached" do
     user.update!(second_factor_failures: User::SECOND_FACTOR_DAILY_FAILURES, second_factor_failures_since: 1.hour.ago)
-    enter_emailed_code
+    enter_email
 
     answer(current_totp(secret))
 
@@ -167,7 +166,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
 
     def wrong_answers_across_challenges(count)
       count.times do |n|
-        enter_emailed_code if (n % 4).zero?
+        enter_email if (n % 4).zero?
         answer(wrong_totp)
       end
     end
@@ -187,7 +186,6 @@ RSpec.describe "Second-factor sign-in", type: :request do
         7.times do |n|
           if (n % 4).zero?
             post login_path, params: { email: account.email }
-            post verify_login_code_path, params: { code: account.generate_login_code! }
           end
           answer("000000")
         end

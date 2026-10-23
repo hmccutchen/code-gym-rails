@@ -12,33 +12,51 @@ class SessionsController < ApplicationController
   limit_login_code_requests only: :create
 
   rate_limit to: 10, within: User::LOGIN_RATE_LIMIT_WINDOW,
-             with:  -> { rate_limited(t("sessions.rate_limited.code_attempts")) },
+             with:  -> { code_attempts_limited },
              store: RATE_LIMIT_STORE,
              name:  "code_attempts",
              only:  :verify_code
 
   rate_limit to: 10, within: 1.hour,
              by:    -> { pending_login_email || request.remote_ip },
-             with:  -> { rate_limited(t("sessions.rate_limited.code_attempts")) },
+             with:  -> { code_attempts_limited },
              store: RATE_LIMIT_STORE,
              name:  "code_attempts_for_address",
              only:  :verify_code
 
   # GET /login
   def new
-    redirect_to root_path if logged_in?
+    return redirect_to root_path if logged_in?
+
+    redirect_to login_code_path if pending_login_email.present?
   end
 
-  # POST /login — the pending state written here is what makes the code redeemable in this browser.
+  # POST /login — an account with an authenticator skips the email; the pending state makes a code redeemable here.
   def create
     PendingTrial.forget(session)
-    mail_login_code(normalized_email)
+    authenticator_user = User.active.find_by(email: normalized_email)
+    return start_second_factor_challenge(authenticator_user) if authenticator_user&.two_factor_enabled?
 
-    redirect_to login_path,
+    mail_login_code(normalized_email)
+    redirect_to login_code_path,
                 notice: t("sessions.code_sent", expiry: User.login_code_expiry_in_words)
   rescue ActiveRecord::RecordInvalid
     flash.now[:alert] = t("sessions.email_not_accepted")
     render :new, status: :unprocessable_content
+  end
+
+  # GET /login/code
+  def enter_code
+    return redirect_to root_path if logged_in?
+
+    redirect_to login_path if pending_login_email.blank?
+  end
+
+  # DELETE /login/code
+  def start_over
+    session.delete(:pending_login_email)
+    session.delete(:pending_login_at)
+    redirect_to login_path
   end
 
   # POST /login/code — the email comes from this browser's session, never a form field.
@@ -60,15 +78,19 @@ class SessionsController < ApplicationController
   private
 
   def reject_login_code(email)
+    return redirect_to login_path, alert: t("sessions.code_rejected_request_new") if email.blank?
+
     @code_rejected = true
-    flash.now[:alert] =
-      email.present? ? t("sessions.code_rejected_retry") : t("sessions.code_rejected_request_new")
-    render :new, status: :unprocessable_content
+    flash.now[:alert] = t("sessions.code_rejected_retry")
+    render :enter_code, status: :unprocessable_content
   end
 
-  def login_code_requests_limited(message) = rate_limited(message)
+  def code_attempts_limited
+    flash.now[:alert] = t("sessions.rate_limited.code_attempts")
+    render :enter_code, status: :too_many_requests
+  end
 
-  def rate_limited(message)
+  def login_code_requests_limited(message)
     flash.now[:alert] = message
     render :new, status: :too_many_requests
   end

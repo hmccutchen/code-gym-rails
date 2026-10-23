@@ -38,9 +38,12 @@ read it before changing that area.
   requests and tokens per provider from `ApiUsage.own_key_totals`, in the
   user's zone. House-key rows stay out, since the account's key did not pay
   for them. Input counts cache reads and writes; no cost is shown.
-- **Passwordless sign-in** (`docs/decisions/passwordless-sign-in.md`): the
-  emailed code is the only first factor, and no password column is ever
-  added. A code request creates the account. Sign-in runs `reset_session`
+- **Passwordless sign-in** (`docs/decisions/passwordless-sign-in.md`): an
+  account signs in with its address and then the emailed code, or the
+  authenticator in place of that code once it is on; no password column is
+  ever added. A code request creates the account; the code field lives on
+  `GET /login/code`, which `GET /login` redirects to while one is pending.
+  Sign-in runs `reset_session`
   before setting `session[:user_id]` (`SignInCompletion`), and
   `require_login` saves the return address only for a GET whose `Accept`
   names `text/html`.
@@ -59,7 +62,8 @@ read it before changing that area.
   sign-in from the last 15 minutes and a code for the setup key, which lives
   only in that browser's session until the code verifies, so no other session
   ever sees the key that gets enrolled; turning it off or making new codes needs
-  an authenticator or recovery code, never the emailed code. Turning it on or
+  an authenticator or recovery code, never the emailed code, and with it on
+  the emailed code never signs in. Turning it on or
   off sets `sessions_valid_after` and re-stamps the current session. Every
   code field is named `otp_code`, and pages showing the key or codes send
   `no-store`.
