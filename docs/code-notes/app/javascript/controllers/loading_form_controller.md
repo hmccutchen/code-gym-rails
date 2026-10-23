@@ -41,3 +41,15 @@ The cost is that those three buttons need JavaScript. The dashboard already
 needs it for answering and submitting. On the Account page only deletion does:
 logging out, pausing and resuming generation, and the reminder settings still
 submit without it.
+
+## Sign-in and authenticator forms
+
+The email, emailed-code, second-step, Turn on, Turn off, new recovery codes
+and trial forms all use it. Each of those posts spends something on the
+server: a login code is cleared once it is redeemed, and turning the
+authenticator on ends every other session. Sign-in requests take a second or
+two in production, so a second tap was easy. The browser then showed the
+second response, which said the spent code was wrong, or signed the user out
+before they saw their recovery codes. Disabling the button after the first
+submit stops the second post. `code_login_spec` and `second_factor_spec` each
+double-tap the button to pin this.

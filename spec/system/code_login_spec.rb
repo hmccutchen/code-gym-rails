@@ -17,6 +17,23 @@ RSpec.describe "Logging in with an emailed code", type: :system do
     expect(page).to have_current_path(root_path)
   end
 
+  it "signs in on a double tap of Verify code instead of showing the second tap's rejection" do
+    visit login_path
+    fill_in "Work email *", with: user.email
+    click_button "Send code"
+
+    fill_in "6-digit code from the email", with: user.generate_login_code!
+    wait_for_js
+    page.execute_script(<<~JS)
+      const button = [...document.querySelectorAll("input[type=submit]")].find((b) => b.value === "Verify code");
+      button.click();
+      setTimeout(() => button.click(), 20);
+    JS
+
+    expect(page).to have_current_path(root_path)
+    expect(page).to have_no_content("Incorrect or expired code")
+  end
+
   it "keeps the request form on the page so a new code is always one click away" do
     visit login_path
     fill_in "Work email *", with: user.email
