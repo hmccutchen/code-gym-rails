@@ -1,0 +1,4 @@
+<%# Locals: placeholder, a JudgeSolve::Listing::Placeholder for one withheld section. %>
+<p class="judge-solve-waiting">
+  <%= t("admin.judge_solves.waiting.label", date: placeholder.created_at.to_date.iso8601, source: t("admin.judge_solves.index.sources.#{placeholder.source}"), rung: placeholder.rung) %>
+</p>

@@ -4,7 +4,6 @@ class JudgedGeneration
   Provider = Data.define(:judge_section, :retry_section, :judge_identity)
 
   REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL = false
-  SOLVE_MISMATCH_TOLERATED_AT = "principal_engineer".freeze
 
   RETRY_FIELDS = %i[retry_principle retry_issues retry_evidence retry_reason].freeze
 
@@ -215,7 +214,7 @@ class JudgedGeneration
 
   def settled(kind, verdict, matched)
     return verdict unless REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL && matched == false && !verdict.reject?
-    return verdict if rung_for(kind) == SOLVE_MISMATCH_TOLERATED_AT
+    return verdict if rung_for(kind) == JudgeVerdict::SOLVE_MISMATCH_TOLERATED_AT
 
     JudgeVerdict.new(status: :reject, principle: "underdetermined", solve: verdict.solve)
   end

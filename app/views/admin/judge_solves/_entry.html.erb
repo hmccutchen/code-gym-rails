@@ -1,0 +1,68 @@
+<%# Locals: solve (a JudgeSolve.readable row), listing (the JudgeSolve::Listing it came from). %>
+<% section = solve.judged_section %>
+<% key = section.fetch(ExerciseSection::DesignComparison::ANSWER_KEY_FIELD, {}) %>
+<% original = listing.original_for(solve) %>
+<% unknown = t("admin.judge_solves.entry.unknown") %>
+<article class="judge-solve" id="<%= dom_id(solve) %>" data-source="<%= solve.source %>">
+  <p class="meta"><%= t("admin.judge_solves.entry.meta", date: solve.created_at.to_date.iso8601, user: solve.user_id || unknown,
+                        source: t("admin.judge_solves.index.sources.#{solve.source}"), rung: solve.rung,
+                        locked: (t("admin.judge_solves.entry.locked") if solve.locked?), concept: solve.concept || unknown) %></p>
+  <p class="meta"><%= t("admin.judge_solves.entry.attempt", attempt: solve.attempt,
+                        edit_check: (t("admin.judge_solves.entry.edit_check") if solve.edit_check?),
+                        shipped: t("admin.judge_solves.entry.#{solve.shipped? ? 'shipped' : 'not_shipped'}")) %></p>
+  <p class="meta"><%= t("admin.judge_solves.entry.judge", status: solve.judge_status || unknown, provider: solve.judge_provider,
+                        model: solve.judge_model, draft_model: solve.draft_model || unknown, revision: solve.app_revision || unknown) %></p>
+  <% if solve.edit_reverted? %>
+    <p class="flag"><%= t("admin.judge_solves.entry.reverted", reason: t("admin.judge_solves.revert_reasons.#{solve.revert_reason}")) %></p>
+  <% end %>
+  <% if solve.never_shown_reason %>
+    <p class="meta"><%= t("admin.judge_solves.entry.never_shown", reason: t("admin.judge_solves.never_shown_reasons.#{solve.never_shown_reason}")) %></p>
+  <% end %>
+
+  <div class="side-by-side">
+    <% if original %>
+      <div class="original-prose">
+        <h3><%= t("admin.judge_solves.entry.original_heading") %></h3>
+        <%= render "prose", section: original.judged_section %>
+      </div>
+    <% end %>
+    <div class="edited-prose">
+      <% if original %><h3><%= t("admin.judge_solves.entry.edited_heading") %></h3><% end %>
+      <%= render "prose", section: section %>
+    </div>
+  </div>
+
+  <% ExerciseSection::DesignComparison::PIECES.each do |piece| %>
+    <h4><%= t("admin.judge_solves.entry.piece", piece: piece.upcase) %></h4>
+    <pre class="snippet"><%= highlighted_code(section["piece_#{piece}"], listing.language_for(solve)) %></pre>
+  <% end %>
+
+  <p class="answer-key"><strong><%= t("admin.judge_solves.entry.key", better: solve.key_better.upcase) %></strong></p>
+  <% ExerciseSection::DesignComparison::PROVIDER_KEY_FIELDS.each do |field| %>
+    <p><strong><%= t("admin.judge_solves.entry.#{field}") %>:</strong> <%= key[field] %></p>
+  <% end %>
+  <% if solve.judge_pick %>
+    <p class="judge-pick"><strong><%= t("admin.judge_solves.entry.pick", pick: solve.judge_pick.upcase) %></strong></p>
+  <% else %>
+    <p class="flag"><%= t("admin.judge_solves.entry.unsolved", reason: solve.unsolved_reason || unknown) %></p>
+    <% if solve.unsolved_detail %><p class="meta"><%= t("admin.judge_solves.entry.unsolved_detail", detail: solve.unsolved_detail) %></p><% end %>
+  <% end %>
+
+  <% listing.counterparts_for(solve).each do |other| %>
+    <p class="counterpart"><%= link_to t("admin.judge_solves.entry.counterpart", source: t("admin.judge_solves.index.sources.#{other.source}")),
+                                       admin_judge_solves_path(source: "all", show: "all", anchor: dom_id(other)) %></p>
+  <% end %>
+
+  <% calls = JudgeSolve.calls_for(solve.matched) %>
+  <% if calls.any? %>
+    <%= form_with model: solve, url: admin_judge_solve_path(solve, **listing.filters), method: :patch, class: "verdict-form" do |f| %>
+      <strong><%= t("admin.judge_solves.entry.call_heading") %></strong>
+      <%= f.label :human_call, t("admin.judge_solves.entry.call_label") %>
+      <%= f.select :human_call, calls.map { |call| [ t("admin.judge_solves.calls.#{call}"), call ] }, include_blank: t("admin.judge_solves.entry.no_call") %>
+      <%= f.label :human_note, t("admin.judge_solves.entry.note_label") %>
+      <%= f.text_area :human_note, rows: 3 %>
+      <% if solve.human_called_at %><p class="meta"><%= t("admin.judge_solves.entry.called_at", time: solve.human_called_at.iso8601) %></p><% end %>
+      <%= f.submit t("admin.judge_solves.entry.save"), class: "btn btn-ghost btn-sm" %>
+    <% end %>
+  <% end %>
+</article>

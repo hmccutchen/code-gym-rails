@@ -8,6 +8,8 @@ class JudgeSolve < ApplicationRecord
   NEVER_SHOWN_REASONS = %w[replaced_by_retry section_dropped].freeze
   MATCHED_CALLS = %w[key_right both_wrong both_defensible].freeze
   MISMATCH_CALLS = %w[key_right judge_right both_defensible].freeze
+  UNCALLED = "uncalled".freeze
+  WITHHELD_SECTION = %i[daily_exercise_id section set_generated_at].freeze
 
   SOLVE_FIELDS = %i[
     section attempt edit_check rung locked concept judged_section
@@ -23,12 +25,19 @@ class JudgeSolve < ApplicationRecord
   validate :human_call_fits_matched
 
   before_save :stamp_section_digest, if: :judged_section_changed?
+  before_update :stamp_human_called_at, if: :human_call_changed?
 
   scope :readable, -> {
     where(source: "synthetic")
       .or(where.not(never_shown_reason: nil))
       .or(where(section_review_exists))
   }
+
+  scope :withheld, -> { where.not(id: readable.select(:id)) }
+
+  def self.withheld_section_count
+    unscoped.from(withheld.group(*WITHHELD_SECTION).select("1"), :sections).count
+  end
 
   def self.section_review_exists
     responses = DailyResponse.arel_table
@@ -82,6 +91,10 @@ class JudgeSolve < ApplicationRecord
     return if human_call.nil? || self.class.calls_for(matched).include?(human_call)
 
     errors.add(:human_call, :inclusion, value: human_call)
+  end
+
+  def stamp_human_called_at
+    self.human_called_at = Time.current
   end
 
   def stamp_section_digest
