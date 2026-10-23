@@ -2,6 +2,5 @@
   <p style="color:var(--muted);margin-bottom:.5rem;"><%= t("dashboard.generation_failed.title") %></p>
   <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem;"><%= message %></p>
   <%= button_to t("dashboard.generation_failed.try_again"), generate_path, method: :post, class: "btn btn-ghost btn-sm",
-        form: { data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore",
-                        loading_form_label_value: t("dashboard.generating_label") } } %>
+        form: { data: loading_form_data(label: t("dashboard.generating_label")) } %>
 </div>

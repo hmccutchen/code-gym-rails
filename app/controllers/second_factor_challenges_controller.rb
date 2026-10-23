@@ -28,6 +28,7 @@ class SecondFactorChallengesController < ApplicationController
   def create
     checked_at = Time.current
     outcome = @user.answer_second_factor_challenge!(params[:otp_code], issued_at: pending_second_factor["at"])
+    remember_sign_in(@user, second_factor_proof) if outcome.accepted?
     case outcome.status
     when :totp            then complete_sign_in(@user, checked_at: checked_at)
     when :recovery_code   then complete_sign_in_with_recovery_code(outcome.remaining, checked_at)
@@ -44,8 +45,16 @@ class SecondFactorChallengesController < ApplicationController
   def require_open_challenge
     @user = User.active.find_by(id: pending_second_factor["user_id"])
     return if @user&.second_factor_challenge_open?(pending_second_factor["at"])
+    return complete_repeated_sign_in if request.post? && repeat_of_recent_sign_in?(@user, second_factor_proof)
 
     end_challenge(t("second_factor_challenges.expired"))
+  end
+
+  def second_factor_proof = [ pending_second_factor["user_id"], pending_second_factor["at"], params[:otp_code].to_s ]
+
+  def complete_repeated_sign_in
+    PendingTrial.forget(session)
+    complete_sign_in(@user, checked_at: Time.current)
   end
 
   def complete_sign_in_with_recovery_code(remaining, checked_at)

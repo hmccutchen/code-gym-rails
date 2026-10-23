@@ -24,7 +24,7 @@
     <%= qr_code_svg(current_user.authenticator_uri(@secret)) %>
   </div>
 
-  <%= form_with url: account_authenticator_path, method: :post, data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore" } do |f| %>
+  <%= form_with url: account_authenticator_path, method: :post, data: loading_form_data do |f| %>
     <div class="form-field">
       <%= f.label :otp_code, t("authenticators.show.code_label") %>
       <%= f.text_field :otp_code, inputmode: "numeric", pattern: "[0-9 ]*", autocomplete: "one-time-code", required: true %>

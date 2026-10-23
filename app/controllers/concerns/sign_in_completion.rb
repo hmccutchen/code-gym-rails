@@ -1,8 +1,27 @@
 # Design notes: docs/code-notes/app/controllers/concerns/sign_in_completion.md
 module SignInCompletion
   PENDING_SECOND_FACTOR = :pending_second_factor
+  REPEAT_WINDOW = 30.seconds
 
   private
+
+  # A double tap posts twice with the pre-sign-in cookie; the proof holds that browser's own pending stamp and its code.
+  def remember_sign_in(user, proof)
+    Rails.cache.write(sign_in_repeat_key(user), sign_in_repeat_digest(proof), expires_in: REPEAT_WINDOW)
+  end
+
+  def repeat_of_recent_sign_in?(user, proof)
+    return false if user.nil? || proof.any?(&:blank?)
+
+    remembered = Rails.cache.read(sign_in_repeat_key(user))
+    remembered.present? && ActiveSupport::SecurityUtils.secure_compare(remembered, sign_in_repeat_digest(proof))
+  end
+
+  def sign_in_repeat_key(user) = "sign_in_repeat/#{user.id}"
+
+  def sign_in_repeat_digest(proof)
+    OpenSSL::HMAC.hexdigest("SHA256", Rails.application.secret_key_base, proof.map(&:to_s).join("\n"))
+  end
 
   def complete_sign_in(user, checked_at:)
     trial = PendingTrial.take(session)

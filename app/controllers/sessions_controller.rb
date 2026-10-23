@@ -64,6 +64,7 @@ class SessionsController < ApplicationController
     checked_at = Time.current
     email = pending_login_email
     user  = email.present? ? User.authenticate_login_code(email: email, code: params[:code].to_s) : nil
+    user ? remember_sign_in(user, login_code_proof(email)) : user = repeated_login(email)
     return reject_login_code(email) unless user
     return start_second_factor_challenge(user) if user.two_factor_enabled?
 
@@ -76,6 +77,16 @@ class SessionsController < ApplicationController
   end
 
   private
+
+  def login_code_proof(email) = [ email, session[:pending_login_at], params[:code].to_s ]
+
+  def repeated_login(email)
+    user = email.present? ? User.active.find_by(email: email) : nil
+    return unless repeat_of_recent_sign_in?(user, login_code_proof(email))
+
+    PendingTrial.forget(session)
+    user
+  end
 
   def reject_login_code(email)
     return redirect_to login_path, alert: t("sessions.code_rejected_request_new") if email.blank?

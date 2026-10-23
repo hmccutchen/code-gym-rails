@@ -5,7 +5,7 @@
 <%# Design notes: docs/code-notes/app/views/sessions/_pending.html.md %>
 <% code_alert = flash[:alert].present? && action_name == "verify_code" %>
 <% flash_ids = [ ("flash-alert" if code_alert), ("flash-notice" if flash[:notice].present?) ].compact %>
-<%= form_with url: verify_login_code_path, method: :post, data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore" } do |f| %>
+<%= form_with url: verify_login_code_path, method: :post, data: loading_form_data do |f| %>
   <div class="form-field">
     <%= f.label :code, t("sessions.pending.code_label") %>
     <%= f.text_field :code, inputmode: "numeric", pattern: "[0-9]*", maxlength: 6,

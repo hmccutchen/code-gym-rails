@@ -5,7 +5,7 @@
   <h1><%= t("app_name") %></h1>
   <p><%= t("sessions.new.intro_html") %></p>
 
-  <%= form_with url: login_path, method: :post, data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore" } do |f| %>
+  <%= form_with url: login_path, method: :post, data: loading_form_data do |f| %>
     <div class="form-field">
       <%= f.label :email, t("sessions.new.email_label") %>
       <%= f.email_field :email, placeholder: t("sessions.new.email_placeholder"), required: true, autocomplete: "email" %>

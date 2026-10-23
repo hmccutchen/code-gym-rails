@@ -160,41 +160,36 @@ data.*
   as the only first factor, spec first `#491`
   **why:** I want no password column ever, with an authenticator app as an
   optional second factor later
-  **I decided:** open sign-up exactly as before, with the account created when
-  a code is requested; drop the Devise columns in the same PR, since mine is
-  the only account; a 10-minute code with the rate-limit windows kept at 15;
-  trusted proxies, with a spoofed-header test, split out and required before I
-  post publicly
+  **I decided:** open sign-up as before; the Devise columns dropped in the same
+  PR, mine being the only account; a 10-minute code, 15-minute limits; trusted
+  proxies split out, required before going public
 - from my layered review: the login code out of the job queue, and one
   signed-in lookup
 - an optional authenticator app as a second sign-in factor, spec and plan
   first, stacked on the passwordless PR `#493`
   **why:** possession of a phone is the second factor worth having, and the
   inbox alone is all that protects an account today
-  **I decided:** a daily cap of 20 wrong codes; every wrong-code count kept on
-  the user row, not the cookie; no-store on pages with the key or codes;
-  turning it on or off ends every other session; recovery codes compared only
-  for recovery-shaped input; a copy fallback that selects the text; the phone
-  check split into the local network before merge and production after
-- from the review of the authenticator PR: each session gets its own setup key
-  **I decided:** the key stays in the session until a code verifies; the model
-  takes session values, not the session; the spec and plan docs leave the PR;
-  extracting the concern from `User` is a follow-up issue
+  **I decided:** 20 wrong codes a day; wrong-code counts on the row; no-store
+  on secret pages; turning it on or off ends other sessions; recovery codes
+  matched by shape; a copy fallback; phone checks local first, production after
+- from its review: each session gets its own setup key, and the spec and plan
+  docs leave the PR
+  **I decided:** the model takes session values; extraction is an issue
 - every PR gets a critical and a layered-design review, each by a separate
   agent `#492`
-  **I decided:** another fresh agent checks each finding against the code
-  before anything is changed
-- the test rules say CI runs on Postgres 18
+  **I decided:** a fresh agent checks each finding before anything changes
 - locked out after turning on the authenticator: stop a double tap posting
   the sign-in forms twice `#495`
   **why:** I was signed out right after turning it on, every emailed code then
   said it was wrong, and the home-screen app ended on a 404
-  **I decided:** Turn on stays disabled until the page's scripts load
-- with the authenticator on, my address and then its code, with no emailed
-  code; the emailed code gets its own page with a way to start again `#496`
+  **I decided:** Turn on and New recovery codes start disabled; the server
+  accepts a repeat of a sign-in this browser just completed
+- with the authenticator on, sign in with the address and its code, no emailed
+  code `#496`
   **why:** asking for the emailed code and then the authenticator felt
   redundant, and the email form under the code field was confusing
-  **I decided:** a lost phone gets in with a recovery code only, the console
-  beyond that; I accept that anyone with my address can use up the daily cap,
-  that the login page shows who has the authenticator on, and the chance of a
-  guessed code that leaves; a separate PR from the double-tap fix
+  **I decided:** a recovery code is the only way past a lost phone; I accept
+  the address-only lockout, the visible authenticator flag and the guessing
+  risk; the emailed code gets its own page; separate from the double-tap fix
+- each API call's cost on its usage row, Anthropic keys only `#472`
+  **I decided:** prices stay on the providers; a timeout costs null

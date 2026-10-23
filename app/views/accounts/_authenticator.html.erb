@@ -4,14 +4,14 @@
     <p><%= t("accounts.authenticator.when_on", date: l(current_user.two_factor_enabled_at.in_time_zone(current_user.effective_time_zone).to_date, format: :long),
              remaining: t("accounts.authenticator.remaining", count: current_user.recovery_codes_remaining)) %></p>
 
-    <%= form_with url: account_recovery_codes_path, method: :post, class: "authenticator-form", data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore" } do |f| %>
+    <%= form_with url: account_recovery_codes_path, method: :post, class: "authenticator-form", data: loading_form_data do |f| %>
       <h3><%= t("accounts.authenticator.regenerate_heading") %></h3>
       <%= f.label :otp_code, t("accounts.authenticator.code_label"), for: "regenerate_otp_code" %>
       <%= f.text_field :otp_code, id: "regenerate_otp_code", autocomplete: "one-time-code", autocapitalize: "characters", spellcheck: false, required: true %>
-      <%= f.submit t("accounts.authenticator.regenerate"), class: "btn btn-ghost" %>
+      <%= f.submit t("accounts.authenticator.regenerate"), class: "btn btn-ghost", disabled: true %>
     <% end %>
 
-    <%= form_with url: account_authenticator_path, method: :delete, class: "authenticator-form", data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore" } do |f| %>
+    <%= form_with url: account_authenticator_path, method: :delete, class: "authenticator-form", data: loading_form_data do |f| %>
       <h3><%= t("accounts.authenticator.disable_heading") %></h3>
       <p><%= t("accounts.authenticator.disable_note") %></p>
       <%= f.label :otp_code, t("accounts.authenticator.code_label"), for: "disable_otp_code" %>

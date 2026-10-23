@@ -37,14 +37,15 @@ form with a confirm message renders its button `disabled`, and `connect()`
 enables it. Awaiting readiness would not do: there is no safe way to replay an
 unconfirmed submit.
 
-The authenticator setup's Turn on renders disabled for the same reason,
-although it has no confirm message. Its response is the only time the
-recovery codes are shown, and a second post before the controller connected
-would replace that page with the Account page.
+The authenticator setup's Turn on and the Account page's New recovery codes
+render disabled for the same reason, although neither has a confirm message.
+Each response is the only time its recovery codes are shown. A second post
+before the controller connected would replace that page with the Account
+page, and after New recovery codes the old codes would already be gone.
 
 The cost is that those buttons need JavaScript. The dashboard already
-needs it for answering and submitting. On the Account page only deletion does:
-logging out, pausing and resuming generation, and the reminder settings still
+needs it for answering and submitting. On the Account page only deletion and New
+recovery codes do: logging out, pausing and resuming generation, and the reminder settings still
 submit without it. The authenticator setup page needs it to turn the authenticator on.
 
 ## Sign-in and authenticator forms
@@ -56,6 +57,11 @@ authenticator on ends every other session. Sign-in requests take a second or
 two in production, so a second tap was easy. The browser then showed the
 second response, which said the spent code was wrong, or signed the user out
 before they saw their recovery codes. Disabling the button after the first
-submit stops the second post. `sign_in_form_guards_spec` checks that each of
-these forms is wired to the controller. `code_login_spec` and
+submit stops the second post. A tap that lands before the controller connects
+still posts twice on the sign-in forms, so the server accepts that repeat:
+`SignInCompletion#repeat_of_recent_sign_in?` signs in a second post that
+carries the same pending stamp and code within `REPEAT_WINDOW`. That keeps
+sign-in working without JavaScript. Every form gets its wiring from
+`LoadingFormHelper#loading_form_data`, and `sign_in_form_guards_spec` checks
+that each of these forms is wired to both actions, `submit` and `restore`. `code_login_spec` and
 `second_factor_spec` double-tap Verify code and Turn on in a real browser.

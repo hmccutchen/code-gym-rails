@@ -15,6 +15,21 @@ RSpec.describe "per-purpose model routing" do
     end
   end
 
+  it "prices every model ClaudeService routes a purpose to, with input and output above zero" do
+    routed = (ClaudeService::MODEL_FOR_PURPOSE.values + [ ClaudeService::DEFAULT_ROUTE ]).map { |route| route[:model] }.uniq
+
+    routed.each do |model|
+      price = ClaudeService.price_for(model)
+      expect(price).to be_a(AiService::Price), "#{model} has no entry in ClaudeService::PRICE_PER_MILLION"
+      expect([ price.input, price.output ]).to all(be > 0), "#{model} has a zero input or output rate"
+      expect(price.checked_on).to be_a(Date)
+    end
+  end
+
+  it "prices usage for Anthropic keys only" do
+    expect(AiProvider.all.select(&:prices_usage?)).to eq([ ClaudeService ])
+  end
+
   [ ClaudeService, GeminiService, OpenaiService ].each do |service_class|
     it "answers which model #{service_class} routes each purpose to without making a call" do
       service = service_class.new("test-key")
