@@ -190,6 +190,6 @@ data.*
   redundant, and the email form under the code field was confusing
   **I decided:** a recovery code is the only way past a lost phone; I accept
   the address-only lockout, the visible authenticator flag and the guessing
-  risk; the emailed code gets its own page; separate from the double-tap fix
+  risk; the emailed code gets its own page; a factor check where sign-in ends
 - each API call's cost on its usage row, Anthropic keys only `#472`
   **I decided:** prices stay on the providers; a timeout costs null

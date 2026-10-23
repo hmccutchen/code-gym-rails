@@ -62,8 +62,8 @@ en:
     logged_out: "Logged out."
     email_not_accepted: "That email address didn't work. Check it for typos and try again."
     rate_limited:
-      code_requests_for_address: "Too many code requests for that address. Try again in a few minutes."
-      code_requests: "Too many code requests. Try again in a few minutes."
+      code_requests_for_address: "Too many sign-in requests for that address. Try again in a few minutes."
+      code_requests: "Too many sign-in requests. Try again in a few minutes."
       code_attempts: "Too many attempts. Try again in a few minutes."
   second_factor_challenges:
     new:

@@ -6,6 +6,22 @@ RSpec.describe "Login rate limits", type: :request do
     allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
   end
 
+  it "shows the email form, not a code field, when the attempt limit trips with no sign-in pending" do
+    11.times { post verify_login_code_path, params: { code: "123456" } }
+
+    expect(response).to have_http_status(:too_many_requests)
+    expect(response.body).to include(%(name="email"))
+    expect(response.body).not_to include(%(name="code"))
+  end
+
+  it "words the request limit as sign-in requests, since an authenticator account is sent no code" do
+    user = create_user_with_key(email: "dev@example.com")
+    enroll_second_factor(user)
+    6.times { post login_path, params: { email: user.email } }
+
+    expect(response.body).to include("Too many sign-in requests for that address.")
+  end
+
   describe "requesting codes" do
     it "stops a sixth request for the same address inside the window" do
       5.times { post login_path, params: { email: "dev@example.com" } }

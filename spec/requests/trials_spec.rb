@@ -152,7 +152,7 @@ RSpec.describe "Trials", type: :request do
       start(code: code)
 
       expect(response).to have_http_status(:too_many_requests)
-      expect(response.body).to include("Too many code requests for that address.")
+      expect(response.body).to include("Too many sign-in requests for that address.")
     end
 
     it "says trials are not available under the kill switch" do
