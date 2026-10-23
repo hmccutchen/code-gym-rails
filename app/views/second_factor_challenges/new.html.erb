@@ -6,7 +6,7 @@
   <% unless @locked %>
     <p id="second-factor-message"><%= t("second_factor_challenges.new.message") %></p>
 
-    <%= form_with url: second_factor_challenge_path, method: :post, data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore" } do |f| %>
+    <%= form_with url: second_factor_challenge_path, method: :post, data: loading_form_data do |f| %>
       <div class="form-field">
         <%= f.label :otp_code, t("second_factor_challenges.new.code_label") %>
         <%= f.text_field :otp_code, inputmode: "text", autocomplete: "one-time-code", autocapitalize: "characters",

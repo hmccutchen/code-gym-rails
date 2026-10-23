@@ -6,7 +6,9 @@ RSpec.describe "Submit guards on the sign-in and authenticator forms", type: :re
 
   def guarded_form?(action)
     Nokogiri::HTML(response.body).css(%(form[action="#{action}"])).any? do |form|
-      form["data-controller"] == "loading-form" && form["data-action"].to_s.include?("submit->loading-form#submit")
+      actions = form["data-action"].to_s.split
+      form["data-controller"] == "loading-form" &&
+        actions.include?("submit->loading-form#submit") && actions.include?("pageshow@window->loading-form#restore")
     end
   end
 
@@ -62,6 +64,15 @@ RSpec.describe "Submit guards on the sign-in and authenticator forms", type: :re
 
       expect(guarded_form?(account_authenticator_path)).to be(true)
       expect(guarded_form?(account_recovery_codes_path)).to be(true)
+    end
+
+    it "renders New recovery codes disabled, so a tap before the controller connects can't replace codes the page never shows" do
+      login_as(user)
+      post second_factor_challenge_path, params: { otp_code: current_totp(secret) }
+      get account_path
+
+      button = Nokogiri::HTML(response.body).at_css(%(form[action="#{account_recovery_codes_path}"] input[type="submit"]))
+      expect(button["disabled"]).not_to be_nil
     end
   end
 end

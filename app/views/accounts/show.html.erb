@@ -68,7 +68,6 @@
     <p><%= t("accounts.show.danger_body") %></p>
     <%= button_to t("accounts.show.delete"), account_path, method: :delete,
           class: "btn btn-danger", disabled: true,
-          form: { id: "delete-account-form", data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore",
-                                                     loading_form_confirm_message_value: t("accounts.show.delete_confirm") } } %>
+          form: { id: "delete-account-form", data: loading_form_data(confirm_message: t("accounts.show.delete_confirm")) } %>
   </div>
 </div>

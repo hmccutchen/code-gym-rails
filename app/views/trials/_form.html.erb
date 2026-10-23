@@ -1,5 +1,5 @@
 <%# Required locals: url (form target), providers (provider keys a trial can start on), signed_out (ask for an email). %>
-<%= form_with url: url, method: :post, data: { controller: "loading-form", action: "submit->loading-form#submit pageshow@window->loading-form#restore" } do |f| %>
+<%= form_with url: url, method: :post, data: loading_form_data do |f| %>
   <% if signed_out %>
     <div class="form-field">
       <%= f.label :email, t("sessions.new.email_label") %>
