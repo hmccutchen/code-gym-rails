@@ -185,6 +185,10 @@ data.*
   turning it on or off ends every other session; recovery codes compared only
   for recovery-shaped input; a copy fallback that selects the text; the phone
   check split into the local network before merge and production after
+- from the review of the authenticator PR: each session gets its own setup key
+  **I decided:** the key stays in the session until a code verifies; the model
+  takes session values, not the session; the spec and plan docs leave the PR;
+  extracting the concern from `User` is a follow-up issue
 - every PR gets a critical and a layered-design review, each by a separate
   agent `#492`
   **I decided:** another fresh agent checks each finding against the code
