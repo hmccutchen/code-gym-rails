@@ -549,8 +549,8 @@ class ModelComparison
 
     largest = results.max_by(&:tokens_out)
     slowest = results.max_by(&:ms)
-    @out.puts "largest reply: #{largest.tokens_out} out (#{largest.label}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap · " \
-              "slowest: #{slowest.ms}ms (#{slowest.label}) of the #{AiService::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout"
+    @out.puts "largest reply: #{largest.tokens_out} out (#{largest.label}) of the #{CallProfiles::REVIEW_JUDGE_MAX_TOKENS} cap · " \
+              "slowest: #{slowest.ms}ms (#{slowest.label}) of the #{CallProfiles::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout"
   end
 
   def issue_rates(edits, valid_count)
@@ -656,8 +656,8 @@ class ModelComparison
   end
 
   def over_generation_timeout(mode, run)
-    return "" unless mode == "generate" && run.seconds > AiService::GENERATION_READ_TIMEOUT
+    return "" unless mode == "generate" && run.seconds > CallProfiles::GENERATION_READ_TIMEOUT
 
-    " (over the #{AiService::GENERATION_READ_TIMEOUT}s generation read timeout)"
+    " (over the #{CallProfiles::GENERATION_READ_TIMEOUT}s generation read timeout)"
   end
 end

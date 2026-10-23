@@ -1,6 +1,6 @@
 # `SectionJudgePrompt`
 
-The prompt for the judge that checks one generated section before an engineer sees it, moved out of `AiService` (#431). `AiService#judge_section` still makes the call, under the generation deadline, and parses the verdict through `JudgeVerdict.parse`. `JUDGE_MAX_TOKENS` stays on `AiService` as a call setting.
+The prompt for the judge that checks one generated section before an engineer sees it, moved out of `AiService` (#431). `AiService#judge_section` still makes the call, under the generation deadline, and parses the verdict through `JudgeVerdict.parse`. `CallProfiles::JUDGE_MAX_TOKENS` holds its token cap, as a call setting.
 
 ## `.generate`
 

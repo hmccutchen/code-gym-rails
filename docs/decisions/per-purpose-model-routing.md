@@ -8,7 +8,7 @@ differently (`effort` on Claude, `thinking_level` on Gemini,
 `reasoning.effort` on OpenAI). Each provider reads the purpose from the
 request `call_and_log` hands to `#call`. Because an unlisted purpose falls
 back silently, `spec/services/model_routing_spec.rb` fails on a key with no
-row in `AiService::CALL_PROFILES`, so a typo cannot quietly route nothing.
+row in `CallProfiles::BY_PURPOSE`, so a typo cannot quietly route nothing.
 
 **OpenAI** sends generation and its retry to `gpt-6.1-sol` at `high`
 effort, the section judge to `gpt-6-astra` at `low`, and everything else to

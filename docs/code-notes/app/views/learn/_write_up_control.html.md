@@ -10,7 +10,7 @@ This partial only renders the control and the values the controller reads.
 
 The 2-second interval is the one place that number lives. The attempt cap
 derives from it and from
-`AiService.call_budget_seconds(CONCEPT_REFERENCE_READ_TIMEOUT)`, the worst-case
+`CallProfiles.call_budget_seconds(CONCEPT_REFERENCE_READ_TIMEOUT)`, the worst-case
 time a concept-reference call can take across every retry it is allowed. This
 follows `dashboard/_generating.html.erb`: a hardcoded attempt count had no
 relationship to how long the job could actually run.

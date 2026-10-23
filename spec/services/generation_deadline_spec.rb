@@ -9,7 +9,7 @@ RSpec.describe GenerationDeadline do
 
   def request(purpose, blocking: false) = AiService.request_for(purpose, system: "s", prompt: "p", blocking: blocking)
 
-  def worst(purpose) = AiService.worst_case_seconds_for(purpose)
+  def worst(purpose) = CallProfiles.worst_case_seconds_for(purpose)
 
   describe "#ensure_fits!" do
     it "lets a call start when its own worst case still ends by the deadline" do

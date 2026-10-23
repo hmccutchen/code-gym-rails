@@ -338,7 +338,7 @@ end
       expect(shape_fixtures.size).to eq(14)
       expect(bodies.size).to eq(14)
       expect(bodies.map { |body| [ body["model"], body.dig("reasoning", "effort"), body["max_output_tokens"] ] }.uniq)
-        .to eq([ [ route[:model], route[:effort], AiService::JUDGE_MAX_TOKENS + 4_000 ] ])
+        .to eq([ [ route[:model], route[:effort], CallProfiles::JUDGE_MAX_TOKENS + 4_000 ] ])
       expect(out.string).to include("=== judge_shape: openai · #{route[:model]} (effort: #{route[:effort]}, reasoning_allowance: 4000) ===")
       expect(out.string).to include("invalid_output 0/14 · truncated 0/14 · solved 14/14 · other_error 0/14 · 700 in / 280 out")
     end
@@ -515,12 +515,12 @@ end
       # ai_review is jsonb, which does not keep key order, so labels are read back from the output.
       calls = sonnet_block.scan(/^(\S+ \w+): keep \d+ms · (\d+) out$/)
       expect(calls.map(&:last)).to eq(%w[100 1400])
-      expect(sonnet_block).to include("largest reply: 1400 out (#{calls.last.first}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap")
+      expect(sonnet_block).to include("largest reply: 1400 out (#{calls.last.first}) of the #{CallProfiles::REVIEW_JUDGE_MAX_TOKENS} cap")
 
       first_haiku_label = haiku_block[/^(\S+ \w+): keep \d+ms · 750 out$/, 1]
-      expect(haiku_block).to include("largest reply: 750 out (#{first_haiku_label}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap")
+      expect(haiku_block).to include("largest reply: 750 out (#{first_haiku_label}) of the #{CallProfiles::REVIEW_JUDGE_MAX_TOKENS} cap")
       [ sonnet_block, haiku_block ].each do |block|
-        expect(block).to match(/slowest: \d+ms \(\S+ \w+\) of the #{AiService::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout/)
+        expect(block).to match(/slowest: \d+ms \(\S+ \w+\) of the #{CallProfiles::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout/)
       end
     end
 
