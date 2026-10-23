@@ -205,21 +205,21 @@ class RealSource
 
   # Never-seen ties drain in list order (see .pick), so append new entries, never insert.
   APPLICATION_CODE = [
-    Method.new("app/services/weighted_roll.rb", "pick"),
-    Method.new("app/services/section_rotation.rb", "pick_kind"),
-    Method.new("app/services/section_count.rb", "for"),
+    Method.new("app/models/weighted_roll.rb", "pick"),
+    Method.new("app/models/section_rotation.rb", "pick_kind"),
+    Method.new("app/models/section_count.rb", "for"),
     Method.new("app/models/user.rb", "carry_forward"),
     Method.new("app/models/user.rb", "authenticate_login_code"),
     Method.new("app/models/user.rb", "current_streak"),
     Method.new("app/models/push_subscription.rb", "register!"),
-    Method.new("app/services/ai_service.rb", "flatten_history"),
-    Method.new("app/services/ai_service.rb", "annotate_retention_concept"),
+    Method.new("app/clients/ai_service.rb", "flatten_history"),
+    Method.new("app/clients/ai_service.rb", "annotate_retention_concept"),
     Method.new("app/models/user.rb", "resume_generation!"),
     Method.new("app/models/user.rb", "held_exercise"),
     Method.new("app/models/concept_mastery.rb", "retention_schedule_for"),
     Method.new("app/models/concept_mastery.rb", "record_review!"),
-    Method.new("app/services/section_count.rb", "capped_window"),
-    Method.new("app/services/daily_plan.rb", "retention_checks_for"),
+    Method.new("app/models/section_count.rb", "capped_window"),
+    Method.new("app/models/daily_plan.rb", "retention_checks_for"),
     Method.new("app/models/daily_response.rb", "improved_code_visible?"),
     Method.new("app/jobs/generate_daily_exercises_job.rb", "generate_if_due"),
     Method.new("app/jobs/send_push_reminder_job.rb", "stage_for"),
@@ -258,7 +258,16 @@ class RealSource
         .where("problem_set -> 'code_review' ->> 'source' IS NOT NULL")
         .group("problem_set -> 'code_review' ->> 'source'")
         .maximum(:date)
+        .each_with_object({}) do |(stored_id, date), seen|
+          id = current_id(stored_id)
+          seen[id] = [ seen[id], date ].compact.max
+        end
   end
+
+  def self.current_id(stored_id)
+    all.find { |excerpt| File.basename(excerpt.id) == File.basename(stored_id) }&.id || stored_id
+  end
+  private_class_method :current_id
 
   def self.usable?(excerpt)
     return true if excerpt.resolvable?

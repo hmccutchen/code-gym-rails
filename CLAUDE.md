@@ -51,8 +51,8 @@ Python. The cop names below are the Ruby side.
   `.claude/rules/` file and its full text in `docs/decisions/`. The reasoning
   behind one file's code lives in
   `docs/code-notes/`, at the file's own path with `.md` in place of its last
-  extension (`app/services/ai_service.rb` →
-  `docs/code-notes/app/services/ai_service.md`;
+  extension (`app/clients/ai_service.rb` →
+  `docs/code-notes/app/clients/ai_service.md`;
   `app/views/layouts/application.html.erb` →
   `docs/code-notes/app/views/layouts/application.html.md`).
   A comment may point there in its one line.
@@ -85,7 +85,7 @@ debugging write-up, an answer to a question — follow the same plain-language
 standard the app asks its own generated prose to meet.
 The app's copy is `PromptStandards::PLAIN_LANGUAGE_STANDARD`, shared by the
 prompts that explain, reframe, answer follow-ups on, or grade an engineer's
-work. `spec/services/prompt_standards_spec.rb` fails when the list below drifts
+work. `spec/prompts/prompt_standards_spec.rb` fails when the list below drifts
 from it.
 
 Avoid, in order of how often these actually show up:
@@ -177,7 +177,7 @@ the section-kind registry, pure decision objects, single authority per fact,
 one prompt line per vocabulary group, provider calls as callables,
 outcomes at the HTTP edge, claims and lock order, the server decides and the
 page shows its answer, page behavior as Stimulus controllers, one way to send
-a request, and domain data kept off provider classes.
+a request, domain data kept off provider classes, and folders by layer.
 `.claude/rules/patterns.md` states each one and loads with any file under
 `app/`, `lib/`, `spec/`, `config/`, `script/` or `db/`. Deviating from one is
 allowed, but the PR description must say why; an unexplained departure is
@@ -205,8 +205,9 @@ rather than only catching it afterward:
 - No new behavior without a test; no assertion weakened to make one pass.
 - No comment left false by the change that touched it.
 - No read across an isolation boundary. Each is pinned by a spec:
-  - Nothing under `app/services` or `app/jobs`, and neither the mastery nor
-    the verdict models, reads trial state (`trial_isolation_spec`).
+  - Nothing under `app/models`, `app/services`, `app/jobs`, `app/prompts` or
+    `app/clients` reads trial state, apart from the trial and key models and
+    `User` (`trial_isolation_spec`, which names them).
   - Generation, review, both judges, `ConceptMastery` and `KindDifficulty`
     never read track or suggestion state (`level_suggestion_isolation_spec`).
   - `SectionKindGuide` and `ConceptBookSources` never reach a provider prompt.
@@ -225,7 +226,7 @@ rather than only catching it afterward:
   `Metrics` is disabled.
 
 **What CI does and doesn't tell you.** The workflow runs RSpec, system specs,
-RuboCop, Brakeman, and `importmap audit`. It does *not* run a Ruby dependency
+RuboCop, `bin/comment-check`, `archspec check`, Brakeman, and `importmap audit`. It does *not* run a Ruby dependency
 CVE audit (`bundle-audit` is not installed) or any complexity check, and this
 repository has no branch protection — so no check gates a merge. CI is
 advisory signal; it is not evidence that anything was verified.

@@ -55,6 +55,8 @@ end
 
 group :development do
   gem "web-console"
+
+  gem "archspec", "~> 1.1", require: false
 end
 
 group :test do

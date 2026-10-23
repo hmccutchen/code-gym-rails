@@ -33,8 +33,9 @@ RSpec.describe SectionKindGuide do
   end
 
   # Static copy must never reach a prompt, so nothing on the generation or review path may read it.
-  it "is read by nothing under app/services or app/jobs" do
-    readers = Rails.root.glob("app/{services,jobs}/**/*.rb").select { |path| path.read.include?("SectionKindGuide") }
+  it "is read by nothing below the views but itself and the Learn text list" do
+    own = %w[app/models/section_kind_guide.rb app/models/hand_written_learn_text.rb]
+    readers = (isolation_scope - own).select { |path| Rails.root.join(path).read.include?("SectionKindGuide") }
     expect(readers).to eq([])
   end
 end

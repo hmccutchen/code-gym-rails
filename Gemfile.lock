@@ -77,6 +77,9 @@ GEM
       uri (>= 0.13.1)
     addressable (2.9.0)
       public_suffix (>= 2.0.2, < 8.0)
+    archspec (1.1.0)
+      prism (>= 1.0)
+      rubydex (~> 0.4.0)
     ast (2.4.3)
     base64 (0.3.0)
     bcrypt (3.1.22)
@@ -392,6 +395,11 @@ GEM
       rubocop-performance (>= 1.24)
       rubocop-rails (>= 2.30)
     ruby-progressbar (1.13.0)
+    rubydex (0.4.1)
+    rubydex (0.4.1-aarch64-linux)
+    rubydex (0.4.1-arm64-darwin)
+    rubydex (0.4.1-x86_64-darwin)
+    rubydex (0.4.1-x86_64-linux)
     securerandom (0.4.1)
     solid_cable (4.1.0)
       actioncable (>= 7.2)
@@ -468,6 +476,7 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  archspec (~> 1.1)
   bcrypt (~> 3.1.7)
   bootsnap
   brakeman

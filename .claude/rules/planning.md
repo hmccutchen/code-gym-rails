@@ -1,21 +1,22 @@
 ---
 paths:
-  - "app/services/{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,reviewed_section_results,weighted_roll,generation_ladders}.rb"
-  - "app/services/{competency_gate,coverage_exception}/**"
+  - "app/models/{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,reviewed_section_results,weighted_roll,generation_ladders}.rb"
+  - "app/models/competency_gate/**"
+  - "app/models/coverage_exception/**"
   - "app/models/{concept_mastery,kind_preferences,kind_difficulty,concept_drills,concept_hosts,ladder_coverage,exercise_history_entry,user,daily_exercise}.rb"
   - "app/controllers/{concept_drills,accounts,profile,api_keys}_controller.rb"
   - "app/forms/profile_update.rb"
   - "app/controllers/concerns/exercise_mix_ladders.rb"
   - "app/views/api_keys/**"
   - "app/javascript/controllers/exercise_mix_controller.js"
-  - "spec/**/*{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,concept_mastery,kind_preferences,kind_difficulty,concept_drills,accounts,user_spec,exercise_mix,generation_ladders}*"
+  - "spec/**/*{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,concept_mastery,kind_preferences,kind_difficulty,concept_drills,accounts,user_spec,exercise_mix,generation_ladders,section_kind_settings}*"
   - "app/controllers/dashboard_controller.rb"
   - "app/views/dashboard/**"
   - "app/jobs/{generate_daily_exercises_job,regenerate_exercise_job}.rb"
   - "app/models/daily_response.rb"
   - "spec/**/competency_gate/**"
   - "spec/**/*{weighted_roll,daily_exercise}*"
-  - "app/models/{daily_kinds,daily_kind_swap}.rb"
+  - "app/models/{daily_kinds,daily_kind_swap,section_kind_settings}.rb"
   - "app/models/daily_kind_swap/**"
   - "app/controllers/daily_kinds_controller.rb"
   - "app/views/daily_kinds/**"
@@ -79,7 +80,7 @@ read it before changing that area.
   one `DailyKindSwapEvent`. An Exercise mix save keeps every stored setting
   Setup does not render under the current pair: weights and exclusions
   outside `ExerciseSection.rotatable`, targets and locks outside `.pickable`
-  (`User#keep_unrendered_preferences`). A 409 tells a page rendered for
+  (`SectionKindSettings#keep_unrendered`). A 409 tells a page rendered for
   another pair to reload (`layout_changed`).
 - **Daily sections setting** (`docs/decisions/daily-sections-setting.md`):
   `User#daily_section_count` is Automatic (nil) or a count in
