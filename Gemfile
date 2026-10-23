@@ -10,6 +10,8 @@ gem "stimulus-rails"
 gem "jbuilder"
 
 gem "bcrypt", "~> 3.1.7"
+gem "rotp", "~> 6.3"
+gem "rqrcode", "~> 3.2"
 
 gem "resend"
 

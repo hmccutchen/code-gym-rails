@@ -53,6 +53,17 @@ module AuthHelpers
     click_button "Verify code"
   end
 
+  def enroll_second_factor(user)
+    secret = user.prepare_second_factor!
+    previous_step_code_leaving_the_current_one_unused = current_totp(secret, at: User::TOTP_INTERVAL.seconds.ago)
+    outcome = user.enable_second_factor!(previous_step_code_leaving_the_current_one_unused)
+    [ secret, outcome.recovery_codes ]
+  end
+
+  def current_totp(secret, at: Time.current)
+    ROTP::TOTP.new(secret).at(at)
+  end
+
   # A hardcoded wrong code could match the random real one, so derive one that never collides.
   def wrong_code_for(raw_code)
     format("%06d", (raw_code.to_i + 1) % 1_000_000)
