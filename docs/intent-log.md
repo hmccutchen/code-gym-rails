@@ -174,3 +174,12 @@ data.*
   the only account; a 10-minute code with the rate-limit windows kept at 15;
   trusted proxies, with a spoofed-header test, split out and required before I
   post publicly
+- an optional authenticator app as a second sign-in factor, spec and plan
+  first, stacked on the passwordless PR `#493 open`
+  **why:** possession of a phone is the second factor worth having, and the
+  inbox alone is all that protects an account today
+  **I decided:** a daily cap of 20 wrong codes; every wrong-code count kept on
+  the user row, not the cookie; no-store on pages with the key or codes;
+  turning it on or off ends every other session; recovery codes compared only
+  for recovery-shaped input; a copy fallback that selects the text; the phone
+  check split into the local network before merge and production after
