@@ -34,10 +34,10 @@ class SessionsController < ApplicationController
   # POST /login — an account with an authenticator skips the email; the pending state makes a code redeemable here.
   def create
     PendingTrial.forget(session)
-    authenticator_user = User.active.find_by(email: normalized_email)
-    return start_second_factor_challenge(authenticator_user) if authenticator_user&.two_factor_enabled?
+    user = User.active.find_by(email: normalized_email)
+    return start_second_factor_challenge(user) if user && !user.emailed_code_signs_in?
 
-    mail_login_code(normalized_email)
+    mail_login_code(normalized_email, user)
     redirect_to login_code_path,
                 notice: t("sessions.code_sent", expiry: User.login_code_expiry_in_words)
   rescue ActiveRecord::RecordInvalid
@@ -54,8 +54,7 @@ class SessionsController < ApplicationController
 
   # DELETE /login/code
   def start_over
-    session.delete(:pending_login_email)
-    session.delete(:pending_login_at)
+    forget_pending_login
     redirect_to login_path
   end
 
@@ -66,9 +65,9 @@ class SessionsController < ApplicationController
     user  = email.present? ? User.authenticate_login_code(email: email, code: params[:code].to_s) : nil
     user ? remember_sign_in(user, login_code_proof(email)) : user = repeated_login(email)
     return reject_login_code(email) unless user
-    return start_second_factor_challenge(user) if user.two_factor_enabled?
+    return start_second_factor_challenge(user) unless user.emailed_code_signs_in?
 
-    complete_sign_in(user, checked_at: checked_at)
+    complete_sign_in(user, checked_at: checked_at, factor: :emailed_code)
   end
 
   def destroy
@@ -78,7 +77,7 @@ class SessionsController < ApplicationController
 
   private
 
-  def login_code_proof(email) = [ email, session[:pending_login_at], params[:code].to_s ]
+  def login_code_proof(email) = [ email, pending_login_stamp, params[:code].to_s ]
 
   def repeated_login(email)
     user = email.present? ? User.active.find_by(email: email) : nil
@@ -97,6 +96,8 @@ class SessionsController < ApplicationController
   end
 
   def code_attempts_limited
+    return login_code_requests_limited(t("sessions.rate_limited.code_attempts")) if pending_login_email.blank?
+
     flash.now[:alert] = t("sessions.rate_limited.code_attempts")
     render :enter_code, status: :too_many_requests
   end
@@ -104,21 +105,5 @@ class SessionsController < ApplicationController
   def login_code_requests_limited(message)
     flash.now[:alert] = message
     render :new, status: :too_many_requests
-  end
-
-  def pending_login_email
-    return nil if pending_login_expired?
-
-    session[:pending_login_email].presence
-  end
-
-  # An unreadable stamp counts as still pending: a stale banner is cheaper than rejecting a live code after a deploy.
-  def pending_login_expired?
-    stamped_at = session[:pending_login_at]
-    return false if stamped_at.blank?
-
-    !User.login_pending?(email: session[:pending_login_email], requested_at: Time.iso8601(stamped_at.to_s))
-  rescue ArgumentError
-    false
   end
 end

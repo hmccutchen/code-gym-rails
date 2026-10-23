@@ -1,7 +1,10 @@
 # Design notes: docs/code-notes/app/controllers/concerns/sign_in_completion.md
 module SignInCompletion
+  include PendingLogin
+
   PENDING_SECOND_FACTOR = :pending_second_factor
   REPEAT_WINDOW = 30.seconds
+  WrongFactor = Class.new(StandardError)
 
   private
 
@@ -23,7 +26,10 @@ module SignInCompletion
     OpenSSL::HMAC.hexdigest("SHA256", Rails.application.secret_key_base, proof.map(&:to_s).join("\n"))
   end
 
-  def complete_sign_in(user, checked_at:)
+# The last check before a session exists, so no sign-in path can finish an authenticator account on the emailed code.
+def complete_sign_in(user, checked_at:, factor:)
+  raise WrongFactor, "#{factor} can't finish user #{user.id}'s sign-in" unless finishes_sign_in?(user, factor)
+
     trial = PendingTrial.take(session)
     destination = start_new_session_for(user, checked_at)
     return finish_pending_trial(user, trial) if trial
@@ -31,9 +37,16 @@ module SignInCompletion
     redirect_to destination || root_path, notice: t("sessions.welcome_back", name: user.name)
   end
 
-  def start_second_factor_challenge(user)
-    session.delete(:pending_login_email)
-    session.delete(:pending_login_at)
+def finishes_sign_in?(user, factor)
+  case factor
+  when :emailed_code  then user.emailed_code_signs_in?
+  when :authenticator then user.two_factor_enabled?
+  else false
+  end
+end
+
+def start_second_factor_challenge(user)
+    forget_pending_login
     session[PENDING_SECOND_FACTOR] = { "user_id" => user.id,
                                        "at" => User.session_stamp(user.issue_second_factor_challenge!) }
     redirect_to second_factor_challenge_path

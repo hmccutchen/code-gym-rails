@@ -4,6 +4,8 @@
 
 ## Finishing a sign-in
 
+Every caller names the factor that passed: `:emailed_code` from `SessionsController#verify_code`, `:authenticator` from the second step. `finishes_sign_in?` refuses the emailed code for an account with the authenticator on (`User#emailed_code_signs_in?`), and any other factor, by raising `WrongFactor`. The controllers already route such an account to the authenticator step; this is the check that holds if a later sign-in path forgets to.
+
 `complete_sign_in` takes the pending trial and `return_to` before `start_new_session_for` runs `reset_session`, since the reset discards both. It then sets `session[:user_id]` and `session[:signed_in_at]` (`SignedInSessions`).
 
 ## The stamp predates the code check
@@ -16,7 +18,7 @@ When the account has the authenticator on, the address alone reaches `start_seco
 
 - The marker only says which challenge this browser holds. The count of wrong codes is on the row (`second_factor_challenge_failures`), so replaying an earlier copy of the cookie can't bring back a zero count.
 - The marker sets no `user_id`, so `current_user`, every page and the cable connection treat the browser as signed out until the second step passes.
-- The pending emailed-code keys are removed: the code was used, or none was sent.
+- The pending emailed-code keys are removed (`PendingLogin#forget_pending_login`): the code was used, or none was sent.
 - `return_to` and a pending trial stay in place for the second step to read.
 
 ## A repeated sign-in post

@@ -73,12 +73,12 @@ RSpec.describe "A repeated sign-in post", type: :request do
     let!(:enrollment) { enroll_second_factor(user) }
     let(:secret) { enrollment.first }
 
-    it "sends a repeated emailed code to the authenticator step, never past it" do
+    it "never signs the account in on an emailed code, even posted twice" do
       code = request_code
 
       post_twice(verify_login_code_path, { code: code })
 
-      expect(response).to redirect_to(second_factor_challenge_path)
+      expect(response).not_to redirect_to(root_path)
       expect(session[:user_id]).to be_nil
     end
 

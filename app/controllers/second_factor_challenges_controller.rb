@@ -30,7 +30,7 @@ class SecondFactorChallengesController < ApplicationController
     outcome = @user.answer_second_factor_challenge!(params[:otp_code], issued_at: pending_second_factor["at"])
     remember_sign_in(@user, second_factor_proof) if outcome.accepted?
     case outcome.status
-    when :totp            then complete_sign_in(@user, checked_at: checked_at)
+    when :totp            then complete_sign_in(@user, checked_at: checked_at, factor: :authenticator)
     when :recovery_code   then complete_sign_in_with_recovery_code(outcome.remaining, checked_at)
     when :rejected        then render_new(t("second_factor_challenges.rejected"), :unprocessable_content)
     when :locked          then lock_out(outcome.retry_at)
@@ -54,11 +54,11 @@ class SecondFactorChallengesController < ApplicationController
 
   def complete_repeated_sign_in
     PendingTrial.forget(session)
-    complete_sign_in(@user, checked_at: Time.current)
+    complete_sign_in(@user, checked_at: Time.current, factor: :authenticator)
   end
 
   def complete_sign_in_with_recovery_code(remaining, checked_at)
-    complete_sign_in(@user, checked_at: checked_at)
+    complete_sign_in(@user, checked_at: checked_at, factor: :authenticator)
     flash[:notice] = t("second_factor_challenges.recovery_code_used", count: remaining)
   end
 
