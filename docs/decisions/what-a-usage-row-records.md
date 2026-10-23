@@ -47,15 +47,20 @@ tokens were billed to. Each `ProviderError` class states its code
 at call time, from the provider subclass's `PRICE_PER_MILLION`: one
 `AiService::Price` per model, holding US-dollar list rates per million tokens
 for input, output, cache writes and cache reads, plus the date someone
-checked them. Pricing at call time means a later price change never
+checked them. Only Anthropic keys are priced for now (`AiService.prices_usage?`,
+true for `ClaudeService` alone): a Gemini or OpenAI row always stores a null
+cost, with no warning, until its provider is priced on purpose. Each `Price`
+refuses a missing or negative rate when the table is built, so a bad entry
+fails at boot rather than inside `#log_usage`. Pricing at call time means a later price change never
 rewrites history, as a lookup at read time would. Null means unknown, never
 zero: a model with no price writes null and a warning, and every row from
 before the column existed stays null. A backfill of the rows that already
 named a model was considered and declined, since it needed three providers'
 price changelogs for about three weeks of rows that only the operator would
 see, and the gap closes on its own when October ends
-(`docs/superpowers/specs/2026-10-20-api-usage-cost-design.md`). A call with
-no tokens of any kind costs zero. `model_routing_spec` fails when a routed
-model has no price, so routing to a new model means pricing it first. The
+(`docs/superpowers/specs/2026-10-20-api-usage-cost-design.md`). On a priced
+provider, a call with no tokens of any kind costs zero. `model_routing_spec`
+fails when a Claude route has no price, or a zero input or output rate, so
+routing to a new Claude model means pricing it first. The
 figure is a list-price estimate: a free tier, credits or a discount on the
 key is invisible to the app.

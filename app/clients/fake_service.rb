@@ -5,10 +5,6 @@ class FakeService < AiService
 
   def self.judges_review_prose? = true
 
-  PRICE_PER_MILLION = {
-    "fake" => Price.new(input: 0, output: 0, cache_write: 0, cache_read: 0, checked_on: Date.new(2026, 10, 20))
-  }.freeze
-
   EXERCISE_PROBLEM_SET = {
     "code_review" => {
       "question" => "This method recalculates a customer's loyalty tier every time it's called, even inside a loop over the whole customer list. What's the issue and how would you fix it?",

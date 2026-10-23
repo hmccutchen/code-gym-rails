@@ -297,6 +297,20 @@ RSpec.describe AiService do
       expect(ApiUsage.last.cost_usd).to eq(0)
     end
 
+    [ GeminiService, OpenaiService ].each do |service_class|
+      it "leaves the cost unknown for #{service_class}, which isn't priced, without a warning" do
+        svc = service_class.new("test-key")
+        allow(svc).to receive(:call).and_return(text: "{}", input_tokens: 5, output_tokens: 5, truncated: false, model: "some-model")
+        allow(Rails.logger).to receive(:warn)
+
+        svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p"))
+
+        expect(ApiUsage.last.cost_usd).to be_nil
+        expect(Rails.logger).not_to have_received(:warn).with(/no price/)
+        expect(service_class.cost_usd(model: "some-model", input_tokens: 0, output_tokens: 0)).to be_nil
+      end
+    end
+
     it "leaves the cost unknown and warns when the model has no price, without failing the call" do
       svc = ClaudeService.new("test-key")
       allow(svc).to receive(:call).and_return(text: "{}", input_tokens: 5, output_tokens: 5, truncated: false, model: "claude-unpriced")

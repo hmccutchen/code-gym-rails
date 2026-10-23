@@ -253,10 +253,14 @@ table that cost questions rely on.
 The row's `cost_usd` is priced here, at call time, from the subclass's
 `PRICE_PER_MILLION`, so a later price change never rewrites an old row. A model
 with no price writes a null cost and a warning instead of raising, because the
-call the row records has already happened.
+call the row records has already happened. A provider whose `prices_usage?` is
+false, every provider but Claude for now, writes a null cost and no warning,
+since the gap is deliberate.
 
 ## `.cost_usd`
 
-A result with no tokens of any kind costs zero whatever its model, so a call
-that failed before a reply is never left unknown. Rates go through `to_s` into
-`BigDecimal`, so `0.2` stays two tenths rather than a float's nearest value.
+On a priced provider, a result with no tokens of any kind costs zero whatever
+its model, so a call that failed before a reply is never left unknown. `Price`
+turns each rate into a `BigDecimal` through `to_s` when the table is built, so
+`0.2` stays two tenths rather than a float's nearest value, and a missing or
+negative rate raises at boot rather than on a call.

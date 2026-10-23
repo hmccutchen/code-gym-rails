@@ -17,6 +17,8 @@ class ClaudeService < AiService
     "judge_review"      => { model: "claude-sonnet-5-5", effort: "high" }
   }.then { |routes| routes.merge("retry_section" => routes.fetch("generate_exercise")) }.freeze
 
+  def self.prices_usage? = true
+
   PRICE_PER_MILLION = {
     "claude-opus-5-5"   => Price.new(input: 4, output: 20, cache_write: 5, cache_read: 0.2, checked_on: Date.new(2026, 10, 6)),
     "claude-sonnet-5-5" => Price.new(input: 2, output: 10, cache_write: 2.5, cache_read: 0.2, checked_on: Date.new(2026, 10, 6)),
