@@ -188,4 +188,5 @@ data.*
 - the cost of each API call on its usage row, for Anthropic keys only for now
   `#472 open`
   **I decided:** Gemini and OpenAI rows store a null cost until those providers
-  are priced on purpose
+  are priced on purpose; prices stay on the provider classes beside the routes;
+  the design doc leaves the PR

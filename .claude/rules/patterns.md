@@ -145,7 +145,10 @@ says what a deviation from one requires.
 - **Domain data stays off provider classes** — lists and tables the domain
   owns live in a module of their own (`ConceptVocabulary`), and `AiService`
   and `GenerationPrompt` read them; `AiService` keeps only what is about
-  talking to a provider. A field list a model validates or checks lives on
+  talking to a provider. List prices are the exception: a rate is a fact
+  about one provider's model, as its routes are, so a priced subclass keeps
+  `PRICE_PER_MILLION` beside `MODEL_FOR_PURPOSE`
+  (`docs/decisions/what-a-usage-row-records.md`). A field list a model validates or checks lives on
   that model (`ConceptReference::GUIDE_FIELDS`, `RecognitionGuide::FIELDS`),
   and `AiService` reads it there. Each language's prompt wording is
   `LanguagePrompts` and the scenario settings are `ScenarioPools`, read by
