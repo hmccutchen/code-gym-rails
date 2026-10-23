@@ -1,7 +1,7 @@
 ---
 paths:
-  - "app/services/level_suggestion.rb"
-  - "app/services/level_suggestion/**"
+  - "app/models/level_suggestion.rb"
+  - "app/models/level_suggestion/**"
   - "app/models/{track_change,level_change,level_suggestion_event,level_suggestion_step,user,kind_difficulty}.rb"
   - "app/forms/profile_update.rb"
   - "app/controllers/{welcome,profile,level_suggestion_answers,level_suggestion_dismissals,api_keys}_controller.rb"

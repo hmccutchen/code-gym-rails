@@ -9,7 +9,7 @@ module ReviewedLevelDays
       answers: sections.transform_values { "a" * 20 },
       section_ratings: sections.transform_values { |section| section.fetch(:self, "right_level") },
       ai_review: sections.transform_values do |section|
-        { "rating" => section.fetch(:ai, "solid"), "correct" => "c", "rubric" => AiService::RUBRIC_VERSION }
+        { "rating" => section.fetch(:ai, "solid"), "correct" => "c", "rubric" => ReviewedSectionResults::RUBRIC_VERSION }
       end
     )
   end
