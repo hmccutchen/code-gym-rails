@@ -6,6 +6,10 @@
 
 `complete_sign_in` takes the pending trial and `return_to` before `start_new_session_for` runs `reset_session`, since the reset discards both. It then sets `session[:user_id]` and `session[:signed_in_at]` (`SignedInSessions`).
 
+## The stamp predates the code check
+
+The session's `signed_in_at` is the time the controller read before checking the code (`checked_at`), not the time the session is written. The code check reads the account under the row lock and then releases it. If the authenticator is turned on or off from another session in that gap, this request acted on the old state, but the change's `sessions_valid_after` is later than `checked_at`, so the new session counts as signed out on its next request. Stamping the write time instead would let an email-only session outlive the authenticator being turned on. `spec/requests/signed_in_sessions_spec.rb` interleaves both changes.
+
 ## The pending second factor
 
 When the emailed code is right and the account has the authenticator on, `start_second_factor_challenge` does not sign in. It issues a challenge on the user row and stores `session[:pending_second_factor]`, holding the user id and the challenge's issue time.

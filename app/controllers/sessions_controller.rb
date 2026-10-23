@@ -43,12 +43,13 @@ class SessionsController < ApplicationController
 
   # POST /login/code — the email comes from this browser's session, never a form field.
   def verify_code
+    checked_at = Time.current
     email = pending_login_email
     user  = email.present? ? User.authenticate_login_code(email: email, code: params[:code].to_s) : nil
     return reject_login_code(email) unless user
     return start_second_factor_challenge(user) if user.two_factor_enabled?
 
-    complete_sign_in(user)
+    complete_sign_in(user, checked_at: checked_at)
   end
 
   def destroy

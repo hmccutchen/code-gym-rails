@@ -4,9 +4,9 @@ module SignInCompletion
 
   private
 
-  def complete_sign_in(user)
+  def complete_sign_in(user, checked_at:)
     trial = PendingTrial.take(session)
-    destination = start_new_session_for(user)
+    destination = start_new_session_for(user, checked_at)
     return finish_pending_trial(user, trial) if trial
 
     redirect_to destination || root_path, notice: t("sessions.welcome_back", name: user.name)
@@ -34,11 +34,12 @@ module SignInCompletion
   end
 
   # Read return_to before reset_session, which discards everything written before authentication.
-  def start_new_session_for(user)
+  def start_new_session_for(user, checked_at)
     destination = session[:return_to]
     reset_session
     session[:user_id]      = user.id
-    session[:signed_in_at] = User.session_stamp
+    # Taken before the code check, so an authenticator change that commits after that check still ends this session.
+    session[:signed_in_at] = User.session_stamp(checked_at)
     destination
   end
 end
