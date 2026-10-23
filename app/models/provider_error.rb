@@ -19,6 +19,8 @@ class ProviderError < StandardError
 
   def self.failure_kind = nil
 
+  def self.leaves_tokens_unknown? = false
+
   class AuthenticationError < ProviderError
     def self.error_code = "authentication"
     def self.failure_code = "authentication"
@@ -55,6 +57,8 @@ class ProviderError < StandardError
     def self.failure_code = "timeout"
     def self.judge_fallback_reason = "timeout"
     def self.failure_kind = "timeout"
+    # The provider may have run and billed part of the call before the read gave up.
+    def self.leaves_tokens_unknown? = true
   end
 
   class InvalidResponseError < ProviderError
@@ -81,6 +85,7 @@ class ProviderError < StandardError
     end
 
     def self.judge_fallback_reason = "deadline"
+    def self.leaves_tokens_unknown? = false
   end
 
   class AllSectionsRejectedError < ProviderError

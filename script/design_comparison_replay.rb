@@ -20,10 +20,10 @@ class DesignComparisonReplay
 
   def self.worst_case_cost(purpose, input_tokens)
     model  = ClaudeService::MODEL_FOR_PURPOSE.fetch(purpose, ClaudeService::DEFAULT_ROUTE)[:model]
-    price  = ModelComparison::LIST_PRICE_PER_MILLION.fetch(model)
+    price  = ClaudeService::PRICE_PER_MILLION.fetch(model)
     output = output_cap(purpose)
     { model: model, input: input_tokens, output: output,
-      dollars: (input_tokens * price[:input] + output * price[:output]) / 1_000_000.0 }
+      dollars: (input_tokens * price.input + output * price.output) / 1_000_000.0 }
   end
 
   def self.output_cap(purpose) = CallProfiles.fetch(purpose)[:max_tokens] || ClaudeService::MAX_TOKENS

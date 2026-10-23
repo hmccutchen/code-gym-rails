@@ -42,3 +42,31 @@ the error the caller sees. A refusal or truncation is marked on the row its
 tokens were billed to. Each `ProviderError` class states its code
 (`.failure_code`, inherited unless it states its own), and
 `AiService.failure_code_for` reads it.
+
+**A row also records what it cost.** `cost_usd` is priced in `#log_usage`,
+at call time, from the provider subclass's `PRICE_PER_MILLION`: one
+`AiService::Price` per model, holding US-dollar list rates per million tokens
+for input, output, cache writes and cache reads, plus the date someone
+checked them. The rates sit on the provider class beside its routes, not in
+a domain module, because a list price is a fact about one provider's model,
+as its routes are: routing to a new model and pricing it are one edit in one
+class, and `ApiUsage` receives a number and never looks a price up. Only Anthropic keys are priced for now (`AiService.prices_usage?`,
+true for `ClaudeService` alone): a Gemini or OpenAI row always stores a null
+cost, with no warning, until its provider is priced on purpose. Each `Price`
+refuses a missing or negative rate when the table is built, so a bad entry
+fails at boot rather than inside `#log_usage`. Pricing at call time means a later price change never
+rewrites history, as a lookup at read time would. Null means unknown, never
+zero: a model with no price writes null and a warning, and every row from
+before the column existed stays null. A backfill of the rows that already
+named a model was considered and declined, since it needed three providers'
+price changelogs for about three weeks of rows that only the operator would
+see, and the gap closes on its own when October ends. On a priced
+provider, a call with no tokens of any kind costs zero, except a timeout:
+the provider may have run and billed part of the call before the read gave
+up, so its row stores a null cost (`ProviderError.leaves_tokens_unknown?`,
+true for `TimeoutError` alone). A network error stays at zero, since a
+refused or dropped connection rarely reached the provider. `model_routing_spec`
+fails when a Claude route has no price, or a zero input or output rate, so
+routing to a new Claude model means pricing it first. The
+figure is a list-price estimate: a free tier, credits or a discount on the
+key is invisible to the app.
