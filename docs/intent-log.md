@@ -117,6 +117,28 @@ this one.
   **I decided:** clear the stored provider keys and have users add new ones,
   rather than re-encrypt keys that may already be exposed; build the PR now and
   merge it with the new variables once Railway is back
+- looked into a small recurring cast of fictional systems that carry the
+  consequences of past answers, report only
+  **why:** every exercise is a fresh start today, and I want a wrong answer on
+  day 12 to be the real cause of a slow page on day 40, never a flattering one
+- spec for keeping the judge's blind design-comparison solves and settling
+  key disagreements `#483`
+  **why:** a true consequence needs a trustworthy answer key, and nobody can
+  read why the judge and the key disagree, since the pick is logged and lost
+  **I decided:** `both_defensible` is a call of its own, because ambiguous
+  scenarios are what I most need to count; replayed and generated solves stay
+  apart from live ones and never pick the fix; matched records get hand
+  spot-checks, since drafter and judge are one model family and can agree
+  while both wrong
+  **I decided:** the fix is chosen by a rule written before the data, and I
+  apply it by hand from plain counts; stage 1 merges on the OpenAI check and
+  user 7's provider, and stage 2 is its own PR
+- replay first against a local dump of `daily_exercises`, then production
+  **why:** the real mismatch rate the night stage 1 merges, for under a
+  dollar, tells me whether there's enough signal to continue
+
+*Postponed: the recurring systems themselves, until I've read real mismatch
+data.*
 
 ## Thu Oct 22
 
