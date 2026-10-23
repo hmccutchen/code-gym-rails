@@ -200,7 +200,7 @@ Add helpers to `spec/support/auth_helpers.rb`:
 - **`show`:**
   - Signed in more than `RECENT_SIGN_IN` ago, judged from `session[:signed_in_at]`: render the "sign in again" page. Its button signs out, saves `return_to` as this page, and goes to `/login`.
   - Otherwise call `prepare_second_factor!` and render the setup page:
-    - the `otpauth://` link, built by `ROTP::TOTP#provisioning_uri` with `issuer: "Code Gym"`;
+    - the `otpauth://` link, built by `ROTP::TOTP#provisioning_uri` with `issuer: "Coding Gym"`, the name the app shows everywhere else;
     - the setup key in groups of four, with a Copy button;
     - the QR code as inline SVG.
   - With the authenticator already on, redirect to `/account`.

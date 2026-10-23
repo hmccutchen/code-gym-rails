@@ -1,0 +1,36 @@
+<% page_title t("authenticators.show.page_title") %>
+<%= render "authenticators/styles" %>
+
+<div class="authenticator-wrap">
+  <h1><%= t("authenticators.show.heading") %></h1>
+  <p><%= t("authenticators.show.intro") %></p>
+
+  <div class="setup-step">
+    <%= link_to t("authenticators.show.open_link"), current_user.authenticator_uri, class: "btn btn-primary" %>
+  </div>
+
+  <div class="setup-step" data-controller="copy-text"
+       data-copy-text-copied-text-value="<%= t("authenticators.copy.copied") %>"
+       data-copy-text-selected-text-value="<%= t("authenticators.copy.selected") %>">
+    <p><%= t("authenticators.show.key_label") %></p>
+    <div class="copy-row">
+      <span class="setup-key" data-copy-text-target="source"><%= grouped_key(@secret) %></span>
+      <%= render "authenticators/copy_button", label: t("authenticators.copy.button") %>
+    </div>
+  </div>
+
+  <div class="setup-step">
+    <p><%= t("authenticators.show.qr_label") %></p>
+    <%= qr_code_svg(current_user.authenticator_uri) %>
+  </div>
+
+  <%= form_with url: account_authenticator_path, method: :post do |f| %>
+    <div class="form-field">
+      <%= f.label :otp_code, t("authenticators.show.code_label") %>
+      <%= f.text_field :otp_code, inputmode: "numeric", pattern: "[0-9 ]*", autocomplete: "one-time-code", required: true %>
+    </div>
+    <%= f.submit t("authenticators.show.submit"), class: "btn btn-primary" %>
+  <% end %>
+
+  <p style="margin-top:1.5rem;"><%= link_to t("authenticators.show.back"), account_path %></p>
+</div>

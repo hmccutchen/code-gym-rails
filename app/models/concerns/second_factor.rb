@@ -10,7 +10,7 @@ module SecondFactor
   RECOVERY_CODE_COUNT = 10
   RECOVERY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".freeze
   RECOVERY_CODE_SHAPE = /\A[#{RECOVERY_CODE_ALPHABET}]{10}\z/
-  TOTP_ISSUER = "Code Gym".freeze
+  TOTP_ISSUER = "Coding Gym".freeze
   TOTP_INTERVAL = 30
 
   Outcome = Data.define(:status, :recovery_codes, :changed_at, :remaining, :retry_at) do
@@ -25,6 +25,14 @@ module SecondFactor
 
   def two_factor_enabled?
     two_factor_enabled_at.present?
+  end
+
+  def recovery_codes_remaining
+    otp_backup_codes.to_a.size
+  end
+
+  def authenticator_uri
+    totp_for(otp_secret).provisioning_uri(email)
   end
 
   def prepare_second_factor!

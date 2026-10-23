@@ -26,6 +26,7 @@
     "controllers/code_lines_controller": "/assets/controllers/code_lines_controller-DIGEST.js",
     "controllers/comparison_answer_controller": "/assets/controllers/comparison_answer_controller-DIGEST.js",
     "controllers/concept_alternates_controller": "/assets/controllers/concept_alternates_controller-DIGEST.js",
+    "controllers/copy_text_controller": "/assets/controllers/copy_text_controller-DIGEST.js",
     "controllers/daily_kind_swap_controller": "/assets/controllers/daily_kind_swap_controller-DIGEST.js",
     "controllers/display_preferences_controller": "/assets/controllers/display_preferences_controller-DIGEST.js",
     "controllers/duck_thread_controller": "/assets/controllers/duck_thread_controller-DIGEST.js",
@@ -67,6 +68,7 @@
 <link rel="modulepreload" href="/assets/controllers/code_lines_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/comparison_answer_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/concept_alternates_controller-DIGEST.js" nonce="NONCE">
+<link rel="modulepreload" href="/assets/controllers/copy_text_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/daily_kind_swap_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/display_preferences_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/duck_thread_controller-DIGEST.js" nonce="NONCE">
@@ -620,6 +622,13 @@
   .api-usage th:first-child, .api-usage td:first-child { text-align: left; padding-left: 0; }
   .api-usage th { color: var(--muted); font-weight: normal; }
   .api-usage td { font-variant-numeric: tabular-nums; }
+  .authenticator-settings { margin-top: 2.5rem; }
+  .authenticator-settings h2 { font-size: 1rem; margin-bottom: .4rem; }
+  .authenticator-settings h3 { font-size: .9rem; margin-bottom: .4rem; }
+  .authenticator-settings p { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
+  .authenticator-form { margin-top: 1.25rem; display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; }
+  .authenticator-form label { color: var(--muted); font-size: .85rem; }
+  .authenticator-form input[type="text"] { width: 100%; padding: .55rem .8rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); }
   .danger-zone { margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 2rem; }
   .danger-zone h2 { font-size: 1rem; color: var(--red); margin-bottom: .4rem; }
   .danger-zone p { color: var(--muted); font-size: .85rem; margin-bottom: 1rem; }
@@ -644,6 +653,13 @@
   </div>
 
   
+
+  <div class="authenticator-settings">
+  <h2>Authenticator app</h2>
+    <p>Signing in needs only the emailed code. Adding an authenticator app means a stolen inbox alone can&#39;t sign in.</p>
+    <a class="btn btn-ghost" href="/account/authenticator">Add an authenticator app</a>
+</div>
+
 
   <div class="api-usage">
   <h2>API usage this month</h2>

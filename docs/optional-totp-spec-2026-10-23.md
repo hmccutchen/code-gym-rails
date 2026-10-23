@@ -166,7 +166,7 @@ Add a section to the Account page, `/account`.
 - With an old sign-in (decision 3), the page says to sign in again. Its button signs out, saves `return_to` as this page, and goes to `/login`.
 
 **The setup page shows three things, in this order:**
-1. **"Open in authenticator app."** This is a link to `otpauth://totp/Code%20Gym:<email>?secret=<base32>&issuer=Code%20Gym&algorithm=SHA1&digits=6&period=30`, built by `ROTP::TOTP#provisioning_uri`. On a phone, the authenticator is on the same device as this page, so a link that opens it is the main path.
+1. **"Open in authenticator app."** This is a link to `otpauth://totp/Coding%20Gym:<email>?secret=<base32>&issuer=Coding%20Gym`, built by `ROTP::TOTP#provisioning_uri`. ROTP leaves out the algorithm, digits and period because they are the defaults every app assumes (SHA-1, 6, 30). On a phone, the authenticator is on the same device as this page, so a link that opens it is the main path.
 2. **The setup key as text,** in groups of four, with a "Copy" button. The button is a Stimulus controller using `navigator.clipboard`. This is the fallback when the link doesn't open the app, which can happen from an installed iOS PWA.
    - When the clipboard is missing or the write is refused, the controller selects the key so it can be copied by hand, and says so.
 3. **A QR code,** for setting up a phone from a desktop. It's an inline SVG from `RQRCode::QRCode#as_svg`, so it needs no script and passes the CSP.

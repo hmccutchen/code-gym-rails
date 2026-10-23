@@ -1,0 +1,22 @@
+<% page_title t("recovery_codes.show.page_title") %>
+<%= render "authenticators/styles" %>
+
+<div class="authenticator-wrap">
+  <h1><%= t("recovery_codes.show.heading") %></h1>
+  <p><%= t("recovery_codes.show.intro") %></p>
+
+  <div data-controller="copy-text"
+       data-copy-text-copied-text-value="<%= t("authenticators.copy.copied") %>"
+       data-copy-text-selected-text-value="<%= t("authenticators.copy.selected") %>">
+    <ul class="recovery-code-list" data-copy-text-target="source">
+      <% @recovery_codes.each do |code| %>
+        <li><%= code %></li>
+      <% end %>
+    </ul>
+    <div class="copy-row">
+      <%= render "authenticators/copy_button", label: t("authenticators.copy.copy_all") %>
+    </div>
+  </div>
+
+  <p style="margin-top:1.5rem;"><%= link_to t("recovery_codes.show.done"), account_path, class: "btn btn-primary" %></p>
+</div>

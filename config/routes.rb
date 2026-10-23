@@ -29,6 +29,10 @@ Rails.application.routes.draw do
 
   resource :account, only: [ :show, :destroy ] do
     patch :toggle_generation, on: :member
+    resource :authenticator, only: [ :show, :create, :destroy ] do
+      delete :sign_in_again
+    end
+    resources :recovery_codes, only: :create
   end
 
   resource :push_subscription, only: [ :create, :update, :destroy ]
