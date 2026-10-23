@@ -94,7 +94,7 @@ class AiService
   def self.price_for(model) = self::PRICE_PER_MILLION[model]
 
   def self.cost_usd(result)
-    return unless prices_usage?
+    return if !prices_usage? || result[:tokens_unknown]
 
     counts = PRICED_TOKENS.transform_values { |key| result[key].to_i }
     return BigDecimal(0) if counts.values.all?(&:zero?)
@@ -563,7 +563,7 @@ class AiService
 
   def usage_cost(result)
     self.class.cost_usd(result).tap do |cost|
-      Rails.logger.warn("[usage] #{self.class} has no price for model=#{result[:model].inspect}; cost_usd left null") if cost.nil? && self.class.prices_usage?
+      Rails.logger.warn("[usage] #{self.class} has no price for model=#{result[:model].inspect}; cost_usd left null") if cost.nil? && self.class.prices_usage? && !result[:tokens_unknown]
     end
   end
 
@@ -600,7 +600,8 @@ class AiService
 
   def failed_call_result(error, purpose)
     { input_tokens: 0, output_tokens: 0, model: routed_model(purpose),
-      http_status: error.http_status, failure: self.class.failure_code_for(error), quota_id: error.quota_id }
+      http_status: error.http_status, failure: self.class.failure_code_for(error), quota_id: error.quota_id,
+      tokens_unknown: error.class.leaves_tokens_unknown? }
   end
 
   def reply_failure_code(result, allow_truncated)

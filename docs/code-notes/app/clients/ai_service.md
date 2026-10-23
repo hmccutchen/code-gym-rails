@@ -260,7 +260,10 @@ since the gap is deliberate.
 ## `.cost_usd`
 
 On a priced provider, a result with no tokens of any kind costs zero whatever
-its model, so a call that failed before a reply is never left unknown. `Price`
+its model, so a call that failed before a reply is never left unknown. A
+timeout is the exception: `failed_call_result` carries `tokens_unknown` from
+`ProviderError.leaves_tokens_unknown?`, and the cost stays null with no warning,
+since a gap the error explains is not a missing price. `Price`
 turns each rate into a `BigDecimal` through `to_s` when the table is built, so
 `0.2` stays two tenths rather than a float's nearest value, and a missing or
 negative rate raises at boot rather than on a call.

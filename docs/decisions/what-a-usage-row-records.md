@@ -61,7 +61,11 @@ before the column existed stays null. A backfill of the rows that already
 named a model was considered and declined, since it needed three providers'
 price changelogs for about three weeks of rows that only the operator would
 see, and the gap closes on its own when October ends. On a priced
-provider, a call with no tokens of any kind costs zero. `model_routing_spec`
+provider, a call with no tokens of any kind costs zero, except a timeout:
+the provider may have run and billed part of the call before the read gave
+up, so its row stores a null cost (`ProviderError.leaves_tokens_unknown?`,
+true for `TimeoutError` alone). A network error stays at zero, since a
+refused or dropped connection rarely reached the provider. `model_routing_spec`
 fails when a Claude route has no price, or a zero input or output rate, so
 routing to a new Claude model means pricing it first. The
 figure is a list-price estimate: a free tier, credits or a discount on the

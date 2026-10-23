@@ -288,13 +288,24 @@ RSpec.describe AiService do
       expect(ApiUsage.last.cost_usd).to eq(BigDecimal("0.0014"))
     end
 
-    it "records zero cost for a call that failed before any tokens" do
+    it "records zero cost for a call refused before any tokens" do
+      svc = ClaudeService.new("test-key")
+      allow(svc).to receive(:call).and_raise(ProviderError::NetworkError, "connection refused")
+
+      expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }
+        .to raise_error(ProviderError::NetworkError)
+      expect(ApiUsage.last.cost_usd).to eq(0)
+    end
+
+    it "leaves the cost of a timed-out call unknown, without a warning, since the provider may have billed part of it" do
       svc = ClaudeService.new("test-key")
       allow(svc).to receive(:call).and_raise(ProviderError::TimeoutError, "slow")
+      allow(Rails.logger).to receive(:warn)
 
       expect { svc.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")) }
         .to raise_error(ProviderError::TimeoutError)
-      expect(ApiUsage.last.cost_usd).to eq(0)
+      expect(ApiUsage.last).to have_attributes(cost_usd: nil, failure: "timeout", tokens_in: 0)
+      expect(Rails.logger).not_to have_received(:warn).with(/no price/)
     end
 
     [ GeminiService, OpenaiService ].each do |service_class|

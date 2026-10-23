@@ -189,4 +189,4 @@ data.*
   `#472 open`
   **I decided:** Gemini and OpenAI rows store a null cost until those providers
   are priced on purpose; prices stay on the provider classes beside the routes;
-  the design doc leaves the PR
+  the design doc leaves the PR; a timed-out call stores a null cost
