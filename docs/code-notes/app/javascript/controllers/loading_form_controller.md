@@ -37,10 +37,15 @@ form with a confirm message renders its button `disabled`, and `connect()`
 enables it. Awaiting readiness would not do: there is no safe way to replay an
 unconfirmed submit.
 
-The cost is that those three buttons need JavaScript. The dashboard already
+The authenticator setup's Turn on renders disabled for the same reason,
+although it has no confirm message. Its response is the only time the
+recovery codes are shown, and a second post before the controller connected
+would replace that page with the Account page.
+
+The cost is that those buttons need JavaScript. The dashboard already
 needs it for answering and submitting. On the Account page only deletion does:
 logging out, pausing and resuming generation, and the reminder settings still
-submit without it.
+submit without it. The authenticator setup page needs it to turn the authenticator on.
 
 ## Sign-in and authenticator forms
 

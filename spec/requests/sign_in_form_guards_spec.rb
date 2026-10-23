@@ -37,6 +37,14 @@ RSpec.describe "Submit guards on the sign-in and authenticator forms", type: :re
     expect(guarded_form?(account_authenticator_path)).to be(true)
   end
 
+  it "renders Turn on disabled, so a tap before the controller connects can't post twice and lose the recovery codes" do
+    login_as(user)
+    get account_authenticator_path
+
+    button = Nokogiri::HTML(response.body).at_css(%(form[action="#{account_authenticator_path}"] input[type="submit"]))
+    expect(button["disabled"]).not_to be_nil
+  end
+
   context "with the authenticator on" do
     let!(:secret) { enroll_second_factor(user).first }
 
