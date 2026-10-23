@@ -22,7 +22,7 @@ Rails.application.configure do
 
   config.active_storage.service = :local
 
-  # Opens every email in a browser tab, so login codes need no local SMTP server.
+  # Opens every email in a browser tab, so confirmation and reset links need no local SMTP server.
   config.action_mailer.delivery_method = :letter_opener
 
   # Don't care if the mailer can't send.

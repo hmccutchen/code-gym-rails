@@ -1,6 +1,8 @@
 ---
 paths:
-  - "app/services/{response_review,review_grading,review_prose_judge,review_prose_judge_prompt,review_prompt,difficulty_prompt,ai_service}.rb"
+  - "app/services/{response_review,review_grading}.rb"
+  - "app/clients/{review_prose_judge,ai_service}.rb"
+  - "app/prompts/{review_prose_judge_prompt,review_prompt,difficulty_prompt,prompt_standards}.rb"
   - "app/models/{review_prose_verdict,rubric_check,daily_response,review_follow_up}.rb"
   - "app/controllers/responses_controller.rb"
   - "app/views/shared/_ai_review.html.erb"

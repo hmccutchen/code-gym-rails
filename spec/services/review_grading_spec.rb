@@ -297,7 +297,7 @@ RSpec.describe ReviewGrading do
     end
     let(:logged) { StringIO.new }
     let(:grade) { FakeService::REVIEW_SECTION.deep_stringify_keys.merge("missed" => [ "SENTINEL-G one.", "SENTINEL-G two." ]) }
-    let(:stamped) { grade.merge("rubric" => AiService::RUBRIC_VERSION) }
+    let(:stamped) { grade.merge("rubric" => ReviewedSectionResults::RUBRIC_VERSION) }
     let(:graded_prose) { grade.slice(*DailyResponse::AI_REVIEW_FIELDS.keys, "essential_gaps") }
 
     around do |example|
@@ -492,13 +492,13 @@ RSpec.describe ReviewGrading do
     it "stamps the rubric version on every graded review, replacing any copy the provider sent" do
       result = graded(base.merge("essential_gaps" => [], "rubric" => 99))
 
-      expect(result[:review]["rubric"]).to eq(AiService::RUBRIC_VERSION)
+      expect(result[:review]["rubric"]).to eq(ReviewedSectionResults::RUBRIC_VERSION)
     end
 
     it "stamps a computed rating too, since the same prompt graded its prose" do
       result = graded(base.merge("essential_gaps" => []), section: "parsons_problem")
 
-      expect(result[:review]["rubric"]).to eq(AiService::RUBRIC_VERSION)
+      expect(result[:review]["rubric"]).to eq(ReviewedSectionResults::RUBRIC_VERSION)
     end
 
     it "checks the grader's own rating when a parsons section has no blocks to compute from" do

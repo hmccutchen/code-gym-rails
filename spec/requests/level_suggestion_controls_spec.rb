@@ -17,7 +17,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
         problem_set: sections.transform_values { |rung| { "question" => "q", "snippet" => "s", "pitched_at" => rung } })
       DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
         answers: sections.transform_values { "a" * 20 }, section_ratings: sections.transform_values { "right_level" },
-        ai_review: sections.transform_values { { "rating" => "solid", "correct" => "c", "rubric" => AiService::RUBRIC_VERSION } })
+        ai_review: sections.transform_values { { "rating" => "solid", "correct" => "c", "rubric" => ReviewedSectionResults::RUBRIC_VERSION } })
     end
   end
 

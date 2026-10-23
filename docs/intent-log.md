@@ -109,6 +109,11 @@ this one.
 - each `ProviderError` class carries its own failure codes `#478`
 - section-kind preference rules off `User` into `SectionKindSettings`
   `#479`
+- `app/services` sorted by layer into models, prompts and clients, with
+  Archspec enforcing the direction in CI `#480`
+  **I decided:** the pure decisions go flat into `app/models` so no class is
+  renamed, prompt classes get `app/prompts`, and Archspec is added as a gem
+  with a CI step
 
 ### Hassan
 
@@ -136,6 +141,8 @@ this one.
 - replay first against a local dump of `daily_exercises`, then production
   **why:** the real mismatch rate the night stage 1 merges, for under a
   dollar, tells me whether there's enough signal to continue
+- stage 1: a table and model to keep the judge's blind solves `#484`
+- stage 1: record each live blind judge solve with the set `#486`
 
 *Postponed: the recurring systems themselves, until I've read real mismatch
 data.*
@@ -145,3 +152,10 @@ data.*
 - moved production onto a fresh Railway Postgres, then deleted the old
   database and the copy job `#489`
   **I decided:** a fresh database rather than rotating the old one's password
+- sign-in through Devise: a password plus an authenticator code, replacing
+  the emailed code `#490`
+  **why:** after the breach I wanted the security-critical parts from
+  maintained libraries rather than our own code
+  **I decided:** backup codes for a lost phone, open sign-up with email
+  confirmation, an emailed password reset, and existing accounts enrolling at
+  their next sign-in with one last emailed code

@@ -44,12 +44,10 @@ RSpec.describe "Trial isolation", type: :model do
 
   it "keeps trial state out of generation, review, judges and ConceptMastery" do
     own = %w[app/models/provider_credential.rb app/models/trial_allowance.rb app/models/house_keys.rb
-             app/models/trial_mode.rb app/models/invite_code.rb]
-    files = Rails.root.glob("app/{services,jobs}/**/*.rb").map { |file| file.relative_path_from(Rails.root).to_s } +
-            %w[app/models/concept_mastery.rb app/models/judge_verdict.rb
-               app/models/review_prose_verdict.rb app/models/kind_difficulty.rb]
+             app/models/trial_mode.rb app/models/invite_code.rb app/models/pending_trial.rb app/models/trial_status.rb
+             app/models/user.rb]
 
-    readers = (files - own).select do |file|
+    readers = (isolation_scope - own).select do |file|
       File.read(Rails.root.join(file)).match?(/trial_ends_at|trial_active\?|invite_code|HouseKeys|TrialMode/)
     end
     expect(readers).to eq([])
