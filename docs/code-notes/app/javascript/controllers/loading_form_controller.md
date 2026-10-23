@@ -51,5 +51,6 @@ authenticator on ends every other session. Sign-in requests take a second or
 two in production, so a second tap was easy. The browser then showed the
 second response, which said the spent code was wrong, or signed the user out
 before they saw their recovery codes. Disabling the button after the first
-submit stops the second post. `code_login_spec` and `second_factor_spec` each
-double-tap the button to pin this.
+submit stops the second post. `sign_in_form_guards_spec` checks that each of
+these forms is wired to the controller. `code_login_spec` and
+`second_factor_spec` double-tap Verify code and Turn on in a real browser.
