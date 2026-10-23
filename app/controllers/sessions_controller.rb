@@ -44,10 +44,9 @@ class SessionsController < ApplicationController
   # POST /login/code — the email comes from this browser's session, never a form field.
   def verify_code
     checked_at = Time.current
-    email = pending_login_email
-    user  = email.present? ? User.authenticate_login_code(email: email, code: params[:code].to_s) : nil
-    user ? remember_sign_in(user, login_code_proof(email)) : user = repeated_login(email)
-    return reject_login_code(email) unless user
+    user = redeem_login_code(checked_at)
+    user, checked_at = repeated_login unless user
+    return reject_login_code(pending_login_email) unless user
     return start_second_factor_challenge(user) if user.two_factor_enabled?
 
     complete_sign_in(user, checked_at: checked_at)
@@ -60,14 +59,23 @@ class SessionsController < ApplicationController
 
   private
 
-  def login_code_proof(email) = [ email, session[:pending_login_at], params[:code].to_s ]
+  # The proof is recorded inside the redemption's row lock, so a duplicate waiting on that lock always finds it.
+  def redeem_login_code(checked_at)
+    email = pending_login_email
+    return if email.blank?
 
-  def repeated_login(email)
-    user = email.present? ? User.active.find_by(email: email) : nil
-    return unless repeat_of_recent_sign_in?(user, login_code_proof(email))
+    User.authenticate_login_code(email: email, code: params[:code].to_s) { |user| remember_sign_in(user, login_code_proof, checked_at) }
+  end
+
+  def login_code_proof = [ session[:pending_login_email], session[:pending_login_at], params[:code].to_s ]
+
+  # Reads the session's address directly: the first post cleared the code, which can end the pending sign-in's life.
+  def repeated_login
+    user = session[:pending_login_email].present? ? User.active.find_by(email: session[:pending_login_email]) : nil
+    checked_at = recent_sign_in_checked_at(user, login_code_proof) or return
 
     PendingTrial.forget(session)
-    user
+    [ user, checked_at ]
   end
 
   def reject_login_code(email)
