@@ -49,9 +49,13 @@ class ApplicationController < ActionController::Base
 
   def require_login
     unless logged_in?
-      session[:return_to] = request.fullpath
+      session[:return_to] = request.fullpath if page_navigation?
       redirect_to login_path, alert: t("flash.application.login_required")
     end
+  end
+
+  def page_navigation?
+    request.get? && request.accept.to_s.include?("text/html")
   end
 
   def require_provider
