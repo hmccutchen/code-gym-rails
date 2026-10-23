@@ -18,7 +18,7 @@ additive-keyword pattern was replaced because each new keyword meant editing
 five `app/` files and every spec that overrode `#call`, while the settings are
 facts about a purpose. Every other caller leaves `history` empty and is
 byte-identical. Two specs hold that jointly, because neither can alone —
-`spec/services/provider_request_characterization_spec.rb` records the body
+`spec/clients/provider_request_characterization_spec.rb` records the body
 each purpose's request sends to each provider and fails on any changed byte,
 and `ai_service_spec`'s "single-shot purposes" group drives the other public
 entry points and asserts the history each one's request reaches `#call` with

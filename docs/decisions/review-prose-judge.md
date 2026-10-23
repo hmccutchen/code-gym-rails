@@ -175,6 +175,6 @@ The budget checks still pass with room, measured on the corrected prompt:
 the largest reply used a fraction of `REVIEW_JUDGE_MAX_TOKENS` and the
 slowest call a tenth of `REVIEW_JUDGE_READ_TIMEOUT`.
 `REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS` moves to what this run measured;
-that constant and its section in `docs/code-notes/app/services/ai_service.md`
+that constant and its section in `docs/code-notes/app/clients/ai_service.md`
 are where the number and its remaining headroom are stated, so they are not
 restated here to go stale.

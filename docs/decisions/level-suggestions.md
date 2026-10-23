@@ -28,7 +28,7 @@ are omitted; exclusions remain a scheduling preference.
 `LevelSuggestion::Evidence` preloads exercises for the latest 60 submitted
 responses with stored review data. Only reviewed responses and answered,
 un-eased sections with a `pitched_at` stamp, an AI rating and the current
-`AiService::RUBRIC_VERSION` stamp contribute, because the AI rating now
+`ReviewedSectionResults::RUBRIC_VERSION` stamp contribute, because the AI rating now
 decides alone and only a rubric grade rates against the stated level.
 Raising `RUBRIC_VERSION` restarts suggestion evidence, as it does for the
 competency gate. The AI rating's calibration for these moves is unverified,

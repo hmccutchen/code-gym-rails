@@ -1,0 +1,141 @@
+require "faraday"
+require "faraday/retry"
+
+# Design notes: docs/code-notes/app/clients/gemini_service.md
+class GeminiService < AiService
+  API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
+
+  def self.provider_key = "gemini"
+
+  def self.quota_day_zone = "America/Los_Angeles"
+
+  def self.daily_quota_reset_at(failed_at) = quota_day(failed_at).end
+  def self.key_pattern = /\A(AIza|AQ\.)/
+
+  DEFAULT_ROUTE = { model: "gemini-3.5-flash" }.freeze
+  MODEL_FOR_PURPOSE = {
+    "generate_exercise" => DEFAULT_ROUTE,
+    "retry_section"     => DEFAULT_ROUTE
+  }.freeze
+
+  MINIMAL_THINKING_LEVEL = "minimal".freeze
+
+  # `methods: []` routes every retry decision through retry_if; a listed method is retried without consulting it.
+  RETRY_OPTIONS = {
+    max:                 CallProfiles::RETRY_MAX,
+    interval:            0.5,
+    max_interval:        CallProfiles::RETRY_MAX_INTERVAL,
+    backoff_factor:      2,
+    interval_randomness: 0.5,
+    methods:             [],
+    retry_if:            AiService::RETRY_TIMEOUT_GUARD,
+    retry_statuses:      [ 429, 500, 502, 503, 504 ]
+  }.freeze
+
+  private
+
+  def provider_name = "Gemini"
+
+  def request_body(request)
+    body = {
+      model:              route_for(request.purpose)[:model],
+      system_instruction: request.system,
+      input:              flatten_history(request.history, request.prompt),
+      store:              false
+    }
+    # The cap and minimal thinking go together under generation_config; the API ignores a top-level max_output_tokens.
+    if request.max_tokens
+      body[:generation_config] = { max_output_tokens: request.max_tokens, thinking_level: MINIMAL_THINKING_LEVEL }
+    end
+    body[:response_format] = json_format(request.response_schema) if request.response_schema
+    body
+  end
+
+  def read_result(parsed, request)
+    usage  = read_usage(parsed["usage"] || {}, request.purpose)
+    status = parsed["status"]
+    return unfinished_reply(usage, status) if status && FINISHED_STATUSES.exclude?(status)
+
+    model_output = Array(parsed["steps"]).find { |s| s["type"] == "model_output" }
+    text_parts   = Array(model_output && model_output["content"]).select { |c| c["type"] == "text" }.map { |c| c["text"] }
+    usage.merge(text: text_parts.join, truncated: parsed["status"] == "incomplete")
+  end
+
+  def read_usage(usage, purpose)
+    cached_tokens = usage["total_cached_tokens"].to_i
+    {
+      input_tokens:       usage["total_input_tokens"].to_i - cached_tokens,
+      output_tokens:      usage["total_output_tokens"].to_i + usage["total_thought_tokens"].to_i,
+      model:              routed_model(purpose),
+      cache_read_tokens:  cached_tokens,
+      cache_write_tokens: 0
+    }
+  end
+
+  # An invalid key arrives as a 400 with API_KEY_INVALID; never log these bodies, since they can echo the key.
+  def raise_for_status(resp)
+    raise_if_key_rejected("Google", resp.status)
+    error = error_envelope(resp.body)
+    raise_if_key_invalid(error, resp.status)
+
+    if resp.status == 429
+      raise ProviderError::RateLimitError.new("Gemini API error 429", http_status: 429,
+                                              quota_id: quota_id_from(error), retry_after: retry_delay_from(resp, error))
+    end
+
+    log_raw_snippet("Gemini API error #{resp.status} body", resp.body)
+    message = extract_provider_message(resp.body, fallback: "Gemini API error #{resp.status}")
+    raise ProviderError.new(message, http_status: resp.status)
+  end
+
+  def raise_if_key_invalid(error, status)
+    return unless error_reasons(error).include?("API_KEY_INVALID")
+
+    Rails.logger.error("Google authentication failed (HTTP #{status}, API_KEY_INVALID)")
+    raise ProviderError::AuthenticationError.new("Google rejected your API key or its permissions. Check it in Settings.",
+                                                 http_status: status)
+  end
+
+  def error_details(error, type)
+    Array(error["details"]).select { |detail| detail.is_a?(Hash) && detail["@type"].to_s.end_with?(type) }
+  end
+
+  def error_reasons(error)
+    error_details(error, "ErrorInfo").map { |detail| detail["reason"] }
+  end
+
+  # The daily violation decides the wait, so it wins over a per-minute one beside it.
+  def quota_id_from(error)
+    ids = error_details(error, "QuotaFailure").flat_map { |detail| Array(detail["violations"]) }
+                                              .filter_map { |violation| violation["quotaId"] if violation.is_a?(Hash) }
+    ids.find { |id| id.match?(ProviderFailure::DAILY_QUOTA_PATTERN) } || ids.first
+  end
+
+  def retry_delay_from(resp, error)
+    delay = error_details(error, "RetryInfo").filter_map { |detail| detail["retryDelay"] }.first.to_s
+    return delay.to_f.ceil if delay.match?(/\A\d+(\.\d+)?s\z/)
+
+    retry_after_seconds(resp)
+  end
+
+  def routed_model(purpose) = route_for(purpose)[:model]
+
+  def route_for(purpose)
+    MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)
+  end
+
+  def json_format(schema)
+    { type: "text", mime_type: "application/json", schema: schema }
+  end
+
+  def build_connection
+    Faraday.new do |f|
+      f.options.open_timeout      = CallProfiles::OPEN_TIMEOUT
+      f.options.timeout           = CallProfiles::READ_TIMEOUT
+      f.headers["x-goog-api-key"] = @api_key
+      f.headers["content-type"]   = "application/json"
+      f.request :retry, RETRY_OPTIONS
+      f.adapter :net_http
+    end
+  end
+end
