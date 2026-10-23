@@ -162,3 +162,15 @@ data.*
   **I decided:** backup codes for a lost phone, open sign-up with email
   confirmation, an emailed password reset, and existing accounts enrolling at
   their next sign-in with one last emailed code
+
+## Fri Oct 23
+
+- back to passwordless sign-in: take Devise out and restore the emailed code
+  as the only first factor, spec first `#491 open`
+  **why:** I want no password column ever, with an authenticator app as an
+  optional second factor later
+  **I decided:** open sign-up exactly as before, with the account created when
+  a code is requested; drop the Devise columns in the same PR, since mine is
+  the only account; a 10-minute code with the rate-limit windows kept at 15;
+  trusted proxies, with a spoofed-header test, split out and required before I
+  post publicly
