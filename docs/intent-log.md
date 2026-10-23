@@ -162,3 +162,11 @@ data.*
   **I decided:** backup codes for a lost phone, open sign-up with email
   confirmation, an emailed password reset, and existing accounts enrolling at
   their next sign-in with one last emailed code
+
+## Fri Oct 23
+
+- every PR gets a critical and a layered-design review, each by a separate
+  agent `#492`
+  **I decided:** another fresh agent checks each finding against the code
+  before anything is changed
+- the test rules say CI runs on Postgres 18
