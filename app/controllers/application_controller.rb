@@ -35,11 +35,15 @@ class ApplicationController < ActionController::Base
   end
 
   def current_user
-    @current_user ||= User.signed_in(session[:user_id])
+    @current_user ||= User.signed_in_through(user_id: session[:user_id], signed_in_at: session[:signed_in_at])
   end
 
   def logged_in?
     current_user.present?
+  end
+
+  def second_factor_cap_message(user, retry_at)
+    t("second_factor_challenges.locked", time: l(retry_at.in_time_zone(user.effective_time_zone), format: :long))
   end
 
   def own_key?

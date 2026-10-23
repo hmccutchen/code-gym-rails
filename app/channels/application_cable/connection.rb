@@ -9,7 +9,7 @@ module ApplicationCable
     private
 
     def find_verified_user
-      User.signed_in(request.session[:user_id]) || reject_unauthorized_connection
+      User.signed_in_through(user_id: request.session[:user_id], signed_in_at: request.session[:signed_in_at]) || reject_unauthorized_connection
     end
   end
 end

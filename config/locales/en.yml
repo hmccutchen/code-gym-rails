@@ -62,6 +62,20 @@ en:
       code_requests_for_address: "Too many code requests for that address. Try again in a few minutes."
       code_requests: "Too many code requests. Try again in a few minutes."
       code_attempts: "Too many attempts. Try again in a few minutes."
+  second_factor_challenges:
+    new:
+      page_title: "Authenticator code"
+      message: "Your account has an authenticator app turned on. Enter the code it shows, or one of your recovery codes."
+      code_label: "Code from your authenticator app, or a recovery code"
+      submit: "Verify"
+      start_again: "Start again with a new emailed code"
+    rejected: "That code didn't work. Check your authenticator app and try again."
+    too_many_wrong_codes: "Too many wrong codes. Request a new emailed code to try again."
+    expired: "Your sign-in timed out. Request a new emailed code to try again."
+    locked: "This account has had too many wrong authenticator codes in the last day. You can try again after %{time}."
+    recovery_code_used:
+      one: "You signed in with a recovery code. You have 1 recovery code left."
+      other: "You signed in with a recovery code. You have %{count} recovery codes left."
   trials:
     page_title: "Trial"
     heading: "Trial"
@@ -100,6 +114,14 @@ en:
         Enter it in the browser where you requested it — the code will not work
         anywhere else. It expires in %{expiry}. If you
         didn't request this, you can ignore it.
+      sign_off: "— Coding Gym"
+    second_factor_changed:
+      subject: "Your Coding Gym sign-in settings changed"
+      greeting: "Hi %{name},"
+      enabled: "An authenticator app was turned on for your Coding Gym account on %{time}. Every other device was signed out."
+      disabled: "The authenticator app was turned off for your Coding Gym account on %{time}. Every other device was signed out, and signing in now needs only the emailed code."
+      recovery_codes: "New recovery codes were made for your Coding Gym account on %{time}. The old ones no longer work."
+      not_you: "If you didn't do this, someone else may have access to your email. Secure your email account first, then sign in to Coding Gym and check the authenticator settings on your Account page."
       sign_off: "— Coding Gym"
   flash:
     application:
@@ -756,7 +778,57 @@ en:
       saved: "Saved ✓"
       error: "Couldn't save"
       aria_label: "Your display name"
+  authenticators:
+    show:
+      page_title: "Authenticator app"
+      heading: "Add an authenticator app"
+      intro: "After this, signing in asks for the emailed code and then a code from your authenticator app."
+      open_link: "Open in authenticator app"
+      key_label: "Or enter this setup key in the app:"
+      qr_label: "Or scan this QR code from another device:"
+      qr_alt: "QR code for adding Coding Gym to an authenticator app"
+      code_label: "Enter the 6-digit code your app shows"
+      submit: "Turn on"
+      back: "Back to Account"
+    sign_in_again:
+      page_title: "Sign in again"
+      heading: "Sign in again first"
+      body: "To add an authenticator app, you need to have signed in within the last 15 minutes. Sign in again, and you'll come back here."
+      button: "Sign in again"
+      notice: "Sign in again to add an authenticator app."
+    copy:
+      button: "Copy"
+      copy_all: "Copy all"
+      copied: "Copied"
+      selected: "Selected. Copy it with your device's copy command."
+    enabled: "The authenticator app is on. Every other device was signed out."
+    disabled: "The authenticator app is off. Every other device was signed out."
+    already_on: "The authenticator app is already on."
+    code_rejected: "That code didn't work. Enter a current code from your authenticator app, or a recovery code."
+    rate_limited: "Too many attempts. Try again in a few minutes."
+  recovery_codes:
+    show:
+      page_title: "Recovery codes"
+      heading: "Your recovery codes"
+      intro: "Each code works once, in place of a code from your authenticator app. This is the only time they are shown. Keep them somewhere other than your phone, such as a password manager."
+      done: "I've saved them"
+    regenerated: "New recovery codes are ready. The old ones no longer work."
   accounts:
+    authenticator:
+      heading: "Authenticator app"
+      when_off: "Signing in needs only the emailed code. Adding an authenticator app means a stolen inbox alone can't sign in."
+      add: "Add an authenticator app"
+      when_on: "On since %{date}. %{remaining}"
+      remaining:
+        zero: "You have no recovery codes left. Make new ones."
+        one: "You have 1 recovery code left."
+        other: "You have %{count} recovery codes left."
+      code_label: "Code from your authenticator app, or a recovery code"
+      regenerate_heading: "Make new recovery codes"
+      regenerate: "Make new recovery codes"
+      disable_heading: "Turn off the authenticator app"
+      disable: "Turn off"
+      disable_note: "Signing in will need only the emailed code, and every other device will be signed out."
     show:
       title: "Account"
       log_out: "Log out"

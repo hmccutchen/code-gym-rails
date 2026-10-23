@@ -149,6 +149,32 @@ RSpec.describe "Small screen layout", type: :system do
     expect(page_width).to eq(320)
   end
 
+  it "fits the authenticator setup, recovery code and second sign-in pages at 320px with the largest text" do
+    user = create_fake_provider_user
+    user.update!(display_preferences: LARGEST)
+    resize(320)
+    visit_as(user)
+
+    visit account_authenticator_path
+    apply_text_spacing
+    expect(page).to have_css("svg.qr-code")
+    expect(page_width).to eq(320)
+
+    secret = find(".setup-key").text.delete(" ")
+    fill_in "Enter the 6-digit code your app shows", with: current_totp(secret)
+    click_button "Turn on"
+    expect(page).to have_css(".recovery-code-list li", count: 10)
+    apply_text_spacing
+    expect(page_width).to eq(320)
+
+    visit account_path
+    click_button "Log out"
+    visit_as(user)
+    expect(page).to have_field("Code from your authenticator app, or a recovery code")
+    apply_text_spacing
+    expect(page_width).to eq(320)
+  end
+
   it "wraps Progress rows at 320px with the largest text and the spacing override" do
     user = create_fake_provider_user
     user.update!(display_preferences: LARGEST)

@@ -167,6 +167,19 @@ data.*
   post publicly
 - from my layered review: the login code out of the job queue, and one
   signed-in lookup
+- an optional authenticator app as a second sign-in factor, spec and plan
+  first, stacked on the passwordless PR `#493 open`
+  **why:** possession of a phone is the second factor worth having, and the
+  inbox alone is all that protects an account today
+  **I decided:** a daily cap of 20 wrong codes; every wrong-code count kept on
+  the user row, not the cookie; no-store on pages with the key or codes;
+  turning it on or off ends every other session; recovery codes compared only
+  for recovery-shaped input; a copy fallback that selects the text; the phone
+  check split into the local network before merge and production after
+- from the review of the authenticator PR: each session gets its own setup key
+  **I decided:** the key stays in the session until a code verifies; the model
+  takes session values, not the session; the spec and plan docs leave the PR;
+  extracting the concern from `User` is a follow-up issue
 - every PR gets a critical and a layered-design review, each by a separate
   agent `#492`
   **I decided:** another fresh agent checks each finding against the code

@@ -1,5 +1,8 @@
 # Design notes: docs/code-notes/app/models/user.md
 class User < ApplicationRecord
+  include SignedInSessions
+  include SecondFactor
+
   has_many :daily_exercises, dependent: :destroy
   has_many :daily_responses, dependent: :destroy, inverse_of: :user
   has_many :duck_threads,    dependent: :delete_all
@@ -178,17 +181,23 @@ class User < ApplicationRecord
       duck_threads.delete_all
 
       update!(
-        email:                  "deleted-user-#{id}@anonymized.local",
-        name:                   "Deleted user",
-        api_keys:               nil,
-        login_code_sent_at:     nil,
-        login_code_digest:      nil,
-        login_code_attempts:    0,
-        otp_secret:             nil,
-        consumed_timestep:      nil,
-        otp_backup_codes:       nil,
-        reminder_level:         :none,
-        anonymized_at:          Time.current
+        email:                            "deleted-user-#{id}@anonymized.local",
+        name:                             "Deleted user",
+        api_keys:                         nil,
+        login_code_sent_at:               nil,
+        login_code_digest:                nil,
+        login_code_attempts:              0,
+        otp_secret:                       nil,
+        consumed_timestep:                nil,
+        otp_backup_codes:                 nil,
+        two_factor_enabled_at:            nil,
+        sessions_valid_after:             nil,
+        second_factor_challenge_at:       nil,
+        second_factor_challenge_failures: 0,
+        second_factor_failures:           0,
+        second_factor_failures_since:     nil,
+        reminder_level:                   :none,
+        anonymized_at:                    Time.current
       )
     end
     true

@@ -1,0 +1,20 @@
+<% page_title t("second_factor_challenges.new.page_title") %>
+<%= render "sessions/login_styles" %>
+
+<div class="login-wrap">
+  <h1><%= t("app_name") %></h1>
+  <% unless @locked %>
+    <p id="second-factor-message"><%= t("second_factor_challenges.new.message") %></p>
+
+    <%= form_with url: second_factor_challenge_path, method: :post do |f| %>
+      <div class="form-field">
+        <%= f.label :otp_code, t("second_factor_challenges.new.code_label") %>
+        <%= f.text_field :otp_code, inputmode: "text", autocomplete: "one-time-code", autocapitalize: "characters",
+                         spellcheck: false, required: true,
+                         aria: { describedby: [ ("flash-alert" if flash[:alert].present?), "second-factor-message" ].compact.join(" ") } %>
+      </div>
+      <%= f.submit t("second_factor_challenges.new.submit"), class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
+    <% end %>
+  <% end %>
+  <p class="pending-divider"><%= link_to t("second_factor_challenges.new.start_again"), login_path %></p>
+</div>

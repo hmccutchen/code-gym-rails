@@ -1,12 +1,18 @@
 ---
 paths:
-  - "app/controllers/{sessions,trials,accounts,application}_controller.rb"
-  - "app/controllers/concerns/{login_code_requests,preview_auto_login}.rb"
+  - "app/controllers/{sessions,trials,accounts,application,second_factor_challenges,authenticators,recovery_codes}_controller.rb"
+  - "app/controllers/concerns/{login_code_requests,preview_auto_login,sign_in_completion,authenticator_changes}.rb"
   - "app/models/{invite_code,pending_trial,provider_credential,trial_allowance,trial_mode,trial_status,house_keys,user}.rb"
+  - "app/models/concerns/{signed_in_sessions,second_factor}.rb"
+  - "app/channels/application_cable/connection.rb"
   - "app/clients/{preview_environment,preview_mail,lazy_cache_store}.rb"
   - "app/services/preview_seed.rb"
-  - "app/views/{sessions,trials,user_mailer}/**"
+  - "app/views/{sessions,trials,user_mailer,second_factor_challenges,authenticators,recovery_codes}/**"
   - "app/views/dashboard/{_trial_banner,_trial_ended}.html.erb"
+  - "app/views/accounts/_authenticator.html.erb"
+  - "app/helpers/authenticator_setups_helper.rb"
+  - "app/mailers/user_mailer.rb"
+  - "app/javascript/controllers/copy_text_controller.js"
   - "app/views/api_keys/{_trial_note,_key_guide}.html.erb"
   - "lib/boot/app_host.rb"
   - "script/mint_invite_code.rb"
@@ -35,10 +41,28 @@ read it before changing that area.
 - **Passwordless sign-in** (`docs/decisions/passwordless-sign-in.md`): the
   emailed code is the only first factor, and no password column is ever
   added. A code request creates the account. Sign-in runs `reset_session`
-  before setting `session[:user_id]`, and `require_login` saves the return
-  address only for a GET whose `Accept` names `text/html`. There is no second
-  factor until the optional authenticator ships. The admin page is
-  single-factor until then. The `otp_*` columns are kept but unread.
+  before setting `session[:user_id]` (`SignInCompletion`), and
+  `require_login` saves the return address only for a GET whose `Accept`
+  names `text/html`.
+- **Session validity**: every sign-in path writes `session[:signed_in_at]`
+  with `User.session_stamp`, and a session counts only while that stamp is at
+  or after `users.sessions_valid_after`. `current_user` and the cable
+  connection both resolve the user through `User.signed_in_through`, never a
+  lookup of their own, and pass it the two session values rather than the
+  session. `User.session_time` is the one reader of a stamp. A new sign-in path that skips the stamp signs its
+  users out on their next request.
+- **Second factor** (`docs/decisions/passwordless-sign-in.md`): an optional
+  authenticator app (`SecondFactor`). Every read-then-write of its columns
+  runs under the user row lock. Every count of wrong codes lives on the row,
+  never in the session. Recovery-shaped input is compared only against the
+  bcrypt digests and anything else only as a TOTP. Turning it on needs a
+  sign-in from the last 15 minutes and a code for the setup key, which lives
+  only in that browser's session until the code verifies, so no other session
+  ever sees the key that gets enrolled; turning it off or making new codes needs
+  an authenticator or recovery code, never the emailed code. Turning it on or
+  off sets `sessions_valid_after` and re-stamps the current session. Every
+  code field is named `otp_code`, and pages showing the key or codes send
+  `no-store`.
 - **Emailed-code auth**: No passwords and no links. `User#generate_login_code!`
   mints a 6-digit code, stores a BCrypt digest, and returns the raw code.
   `UserMailer#login_code` calls it while building the email, so the plain code

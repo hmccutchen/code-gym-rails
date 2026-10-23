@@ -936,10 +936,12 @@ RSpec.describe User, type: :model do
   end
 
   describe "columns" do
-    it "has none of the Devise password, reset or confirmation columns, and keeps the authenticator columns" do
+    it "has none of the Devise columns, and has the authenticator, challenge and session columns" do
       expect(User.column_names & %w[encrypted_password reset_password_token reset_password_sent_at
-                                    confirmation_token confirmed_at confirmation_sent_at]).to be_empty
-      expect(User.column_names).to include("otp_secret", "consumed_timestep", "otp_backup_codes", "otp_required_for_login")
+                                    confirmation_token confirmed_at confirmation_sent_at otp_required_for_login]).to be_empty
+      expect(User.column_names).to include("otp_secret", "consumed_timestep", "otp_backup_codes", "two_factor_enabled_at",
+                                           "second_factor_challenge_at", "second_factor_challenge_failures",
+                                           "second_factor_failures", "second_factor_failures_since", "sessions_valid_after")
     end
   end
 
@@ -963,11 +965,17 @@ RSpec.describe User, type: :model do
 
     it "clears an authenticator left from the Devise sign-in" do
       user = create_user
-      user.update_columns(otp_secret: "stored-ciphertext", consumed_timestep: 59_000_000, otp_backup_codes: [ "digest" ])
+      user.update_columns(otp_secret: "stored-ciphertext", consumed_timestep: 59_000_000, otp_backup_codes: [ "digest" ],
+                          two_factor_enabled_at: 1.day.ago, sessions_valid_after: 1.day.ago,
+                          second_factor_challenge_at: 1.minute.ago, second_factor_failures_since: 1.hour.ago,
+                          second_factor_challenge_failures: 2, second_factor_failures: 3)
 
       user.anonymize!
 
-      expect(user.reload.attributes.values_at("otp_secret", "consumed_timestep", "otp_backup_codes")).to all(be_nil)
+      expect(user.reload.attributes.values_at("otp_secret", "consumed_timestep", "otp_backup_codes", "two_factor_enabled_at",
+                                              "sessions_valid_after", "second_factor_challenge_at",
+                                              "second_factor_failures_since")).to all(be_nil)
+      expect(user.attributes.values_at("second_factor_challenge_failures", "second_factor_failures")).to eq([ 0, 0 ])
     end
 
     it "stops push reminders and drops the endpoints they would reach" do
