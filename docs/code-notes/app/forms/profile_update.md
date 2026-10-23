@@ -74,7 +74,7 @@ Setup's skill-level select, which sends no version, could write back a
 cutoff map read before a Not now committed and lose that cutoff.
 
 Any Exercise mix field (`PREFERENCE_KEYS`) takes the lock too, with or
-without a version. `User#keep_unrendered_preferences` merges the stored
+without a version. `SectionKindSettings#keep_unrendered` merges the stored
 entries for unrendered controls into the save, and it must read the pair and
 those entries from the locked row, not from a copy a swap may have changed.
 
@@ -90,7 +90,7 @@ order of the two from ever deciding what is stored.
 ## The rendered layout is checked as well as the version
 
 Which Exercise mix controls a page has depends on the daily pair it was
-rendered for, and `User#keep_unrendered_preferences` keeps only what the
+rendered for, and `SectionKindSettings#keep_unrendered` keeps only what the
 current pair hides. A matching version does not prove the page has the right
 controls: a track save's reply hands the page the new version without
 rebuilding them, so after a swap in another tab the next mix save would pass

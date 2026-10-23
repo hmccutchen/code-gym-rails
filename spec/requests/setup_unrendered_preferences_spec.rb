@@ -20,7 +20,7 @@ RSpec.describe "Exercise mix settings Setup does not render", type: :request do
     user.update!(section_kind_levels: { "architecture" => "senior" })
     outside = User.connection.open_transactions
     merged_inside = []
-    allow_any_instance_of(User).to receive(:keep_unrendered_preferences).and_wrap_original do |original, *args|
+    allow_any_instance_of(SectionKindSettings).to receive(:keep_unrendered).and_wrap_original do |original, *args|
       merged_inside << (User.connection.open_transactions > outside)
       original.call(*args)
     end
