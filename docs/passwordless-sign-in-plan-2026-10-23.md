@@ -7,6 +7,7 @@ Work it in the order below. Each step is a commit that passes its own specs, so 
 **Merge conditions:**
 - CI is green on the final head: RSpec, system specs, lint (RuboCop, `bin/comment-check`, `archspec check`), Brakeman and `importmap audit`.
 - Login-code mail reaches you in production (step 0). After this deploy, the emailed code is the only way in.
+- A Rails console on production `web` opens and can mint a login code (step 0). It's the recovery path if mail fails or the new release is unhealthy.
 - The PR description lists everything in step 8's "PR description".
 
 Everything after the merge is listed at the end and isn't part of this PR.
@@ -23,6 +24,21 @@ If you want the halves in separate deploys as well, merge steps 0-6 as this PR a
 - **For you, in production, before merging:** confirm that mail to your address arrives. The deploy signs you out, and the emailed code is then the only way back in.
   - If your account has no password yet, request a code at `/login/first`.
   - If it has one, use "Forgot your password?" at `/password/new`, which sends through the same Resend delivery.
+  - The reset email proves only that Resend delivers. It says nothing about whether the restored code flow works; the post-deploy check covers that.
+- **For you, in production, before merging: a console on `web`.** Open a Rails console on the production `web` service, with `railway ssh` into `web` and then `bin/rails console`, or Railway's shell in the dashboard. Then check that you can mint and inspect a login code:
+  ```ruby
+  user = User.find_by!(email: "<your address>")
+  user.login_code_sent_at
+  user.login_code_attempts
+  user.generate_login_code!
+  ```
+  `generate_login_code!` returns the raw code and exists on today's `main`. Run it only while your browser has a pending sign-in: request a code first, then mint, because minting replaces the emailed code. Before merge that pending sign-in is `/login/first`; after merge it is `/login`.
+
+  **This console is the real recovery path.**
+  - **If mail fails after the deploy:** request a code at `/login`, mint one in the console, and enter that.
+  - **If the new release is unhealthy after the drop migration ran:** the old Devise release keeps serving. From the console on that release, `bin/rails db:rollback` puts the six columns back, empty, and `encrypted_password` defaults to `""`. That makes your account count as "awaiting password" again, so the old release's `/login/first` emails a code, or the console can mint one.
+
+  Confirm the console works before merging; it's the only way back in that doesn't depend on the new code or on mail.
 - **Note for later:** the result of this SQL, for the PR description:
   ```sql
   SELECT encrypted_password <> '' AS has_password, otp_required_for_login FROM users;
@@ -105,10 +121,29 @@ These specs describe code step 1 brought back, so they need no app change. Each 
 
 ## Step 5. `return_to` only for HTML GETs, and the signed-out JSON redirect
 
-- **`ApplicationController#require_login`:** set `session[:return_to] = request.fullpath` only when `request.get? && request.format.html?`. The redirect to `login_path` is unchanged for every format, and it is what `request.js` reads as signed out (`response.redirected`).
+**What sends what.** Every page script request goes through `CodeGymRequest.send` (`app/javascript/code_gym/request.js:21`), which sets `Accept: application/json`. That includes the dashboard poller (`generating_controller.js`, through `request.get`), and no page script calls `fetch` directly.
+
+**What `request.format.html?` returns in Rails 8.1.4**, checked with `ActionDispatch::Request` in this app:
+
+| `Accept` | `format.html?` | names `text/html` |
+|---|---|---|
+| `*/*`, a bare `fetch` | false | false |
+| `application/json`, from `request.js` | false | false |
+| none | **true** | false |
+| a browser navigation (`text/html,application/xhtml+xml,…,*/*;q=0.8`) | true | true |
+| an image request (`image/avif,image/webp,*/*`) | **true** | false |
+| a stylesheet request (`text/css,*/*;q=0.1`) | **true** | false |
+
+A bare `*/*` doesn't count as HTML. A missing header does, though, and so does any list that ends in `*/*`, because Rails treats browser-style `Accept` lists as HTML.
+
+So `format.html?` would save `return_to` for a signed-out image or stylesheet request, or for a client that sends no `Accept` header. The condition is tightened to a GET whose `Accept` names `text/html`, which only a page navigation sends.
+
+- **`ApplicationController#require_login`:** set `session[:return_to] = request.fullpath` only for `request.get? && request.accept.to_s.include?("text/html")`. Put that test in a private method named for what it means, such as `page_navigation?`. The redirect to `login_path` is unchanged for every format, and it is what `request.js` reads as signed out (`response.redirected`).
 - **Specs** (new file `spec/requests/require_login_spec.rb`):
   - Signed out, `GET /dashboard/status` with `Accept: application/json` gets a 302 with `Location` ending `/login`, and `session[:return_to]` is not set.
-  - Signed out, an HTML `GET /history` sets `session[:return_to]` to `/history`.
+  - Signed out, a GET with `Accept: */*`, as a bare `fetch` sends it, is redirected and does not set `session[:return_to]`.
+  - Signed out, a GET with `Accept: image/avif,image/webp,*/*` does not set `session[:return_to]`. Rails reads that list as HTML, so this example is the one that fails under a plain `format.html?`.
+  - Signed out, a browser-style `GET /history` (`Accept: text/html,application/xhtml+xml,*/*;q=0.8`) sets `session[:return_to]` to `/history`.
   - A signed-out `POST` sets nothing.
   - After a JSON redirect, signing in lands on the dashboard, not the JSON path.
 - **Then:** the full unit suite, since `ApplicationController` is shared.
