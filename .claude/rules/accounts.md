@@ -40,8 +40,10 @@ read it before changing that area.
   factor until the optional authenticator ships. The admin page is
   single-factor until then. The `otp_*` columns are kept but unread.
 - **Emailed-code auth**: No passwords and no links. `User#generate_login_code!`
-  mints a 6-digit code, stores a BCrypt digest, and returns the raw code for
-  the mailer; `User.authenticate_login_code` verifies it against the stored
+  mints a 6-digit code, stores a BCrypt digest, and returns the raw code.
+  `UserMailer#login_code` calls it while building the email, so the plain code
+  is never a job argument, which Solid Queue stores and the enqueue log
+  prints; `User.authenticate_login_code` verifies it against the stored
   BCrypt digest, never against the raw code.
   Codes expire in 10 minutes (`User::LOGIN_CODE_EXPIRY`) and die after five
   wrong guesses (`LOGIN_CODE_MAX_ATTEMPTS`). A code is redeemable **only in
