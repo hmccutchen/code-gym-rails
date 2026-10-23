@@ -34,9 +34,8 @@ class ApplicationController < ActionController::Base
     history_path(page: (page unless page == 1))
   end
 
-  # Scoped to `active` so an anonymized user's open session in another tab stops resolving on its next request.
   def current_user
-    @current_user ||= User.active.find_by(id: session[:user_id])
+    @current_user ||= User.signed_in_through(session)
   end
 
   def logged_in?

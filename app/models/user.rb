@@ -1,5 +1,7 @@
 # Design notes: docs/code-notes/app/models/user.md
 class User < ApplicationRecord
+  include SignedInSessions
+
   has_many :daily_exercises, dependent: :destroy
   has_many :daily_responses, dependent: :destroy, inverse_of: :user
   has_many :duck_threads,    dependent: :delete_all

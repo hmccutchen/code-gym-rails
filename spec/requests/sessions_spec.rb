@@ -238,7 +238,7 @@ RSpec.describe "Sessions", type: :request do
       post verify_login_code_path, params: { code: user.generate_login_code!,
                                              authenticity_token: response.body[/name="authenticity_token" value="([^"]+)"/, 1] }
 
-      expect(session.to_hash.keys - %w[session_id flash _csrf_token]).to eq([ "user_id" ])
+      expect(session.to_hash.keys - %w[session_id flash _csrf_token]).to contain_exactly("user_id", "signed_in_at")
       expect(session[:_csrf_token]).not_to eq(pre_login_csrf_token)
     end
 

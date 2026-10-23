@@ -101,7 +101,8 @@ class SessionsController < ApplicationController
   def start_new_session_for(user)
     destination = session[:return_to]
     reset_session
-    session[:user_id] = user.id
+    session[:user_id]      = user.id
+    session[:signed_in_at] = User.session_stamp
     destination
   end
 end

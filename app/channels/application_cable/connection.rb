@@ -9,7 +9,7 @@ module ApplicationCable
     private
 
     def find_verified_user
-      User.active.find_by(id: request.session[:user_id]) || reject_unauthorized_connection
+      User.signed_in_through(request.session) || reject_unauthorized_connection
     end
   end
 end
