@@ -1,0 +1,30 @@
+<% page_title t("registrations.new.page_title") %>
+<%= render "shared/auth_page_styles" %>
+
+<div class="login-wrap">
+  <h1><%= t("registrations.new.page_title") %></h1>
+
+  <%= form_with model: resource, scope: resource_name, url: user_registration_path do |f| %>
+    <%= render "devise/shared/error_messages", resource: resource %>
+    <div class="form-field">
+      <%= f.label :name, t("registrations.new.name_label") %>
+      <%= f.text_field :name, required: true, autocomplete: "name", autofocus: true %>
+    </div>
+    <div class="form-field">
+      <%= f.label :email, t("registrations.new.email_label") %>
+      <%= f.email_field :email, value: resource.email.presence || PendingTrial.email(session), required: true,
+                                autocomplete: "email" %>
+    </div>
+    <div class="form-field">
+      <%= f.label :password, t("registrations.new.password_label", minimum: Devise.password_length.min) %>
+      <%= f.password_field :password, required: true, minlength: Devise.password_length.min, autocomplete: "new-password" %>
+    </div>
+    <div class="form-field">
+      <%= f.label :password_confirmation, t("registrations.new.password_confirmation_label") %>
+      <%= f.password_field :password_confirmation, required: true, autocomplete: "new-password" %>
+    </div>
+    <%= f.submit t("registrations.new.submit"), class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
+  <% end %>
+
+  <div class="auth-links"><%= link_to t("registrations.new.log_in"), new_user_session_path %></div>
+</div>

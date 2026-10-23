@@ -2,6 +2,7 @@ class DailyExercise < ApplicationRecord
   belongs_to :user
   has_one    :daily_response, dependent: :destroy
   has_one    :duck_thread, dependent: :delete
+  has_many   :judge_solves, dependent: :destroy
 
   # Excludes "mixed": a stored "mixed" would flow back into generation through RegenerateExerciseJob.
   LANGUAGES = %w[ruby_rails javascript].freeze

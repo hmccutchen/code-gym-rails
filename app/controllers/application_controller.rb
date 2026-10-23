@@ -3,26 +3,46 @@ class ApplicationController < ActionController::Base
   include PreviewAutoLogin
   include JsonErrors
 
-  before_action :require_login
-  before_action :require_provider
+  before_action :authenticate_user!,  unless: :devise_controller?
+  before_action :require_password,    if: :user_signed_in?, unless: :devise_controller?
+  before_action :require_two_factor,  if: :user_signed_in?, unless: :devise_controller?
+  before_action :require_provider,    if: :user_signed_in?, unless: :devise_controller?
   around_action :use_time_zone
 
   # A stale CSRF token (e.g. a login page left open across a deploy) would otherwise be a raw 422.
   rescue_from ActionController::InvalidAuthenticityToken, with: :handle_invalid_token
 
-  helper_method :current_user, :logged_in?
 
   private
+
+  def after_sign_in_path_for(user)
+    trial = PendingTrial.take(session)
+    trial ? pending_trial_destination(user, trial) : super
+  end
+
+  def pending_trial_destination(user, trial)
+    case trial.start_for(user)
+    when :started
+      flash[:notice] = t("trials.started")
+      root_path
+    when :has_own_key
+      flash[:alert] = t("trials.has_own_key")
+      setup_path
+    else
+      flash[:alert] = t("trials.code_rejected")
+      trial_path
+    end
+  end
 
   def handle_invalid_token
     return redirect_to(root_path) if duplicate_login_submit?
 
-    redirect_to login_path, alert: t("flash.application.session_expired")
+    redirect_to new_user_session_path, alert: t("flash.application.session_expired")
   end
 
-  # A double-tapped login form arrives stale after the session rotates; logout is excluded so a failed sign-out shows.
+  # A double-tapped login form arrives stale after the session rotates; authenticated? reads the session, never the params.
   def duplicate_login_submit?
-    logged_in? && controller_name == "sessions" && %w[create verify_code].include?(action_name)
+    warden.authenticated?(:user) && controller_name == "first_sign_ins" && action_name == "verify_code"
   end
 
   def use_time_zone(&block)
@@ -34,30 +54,21 @@ class ApplicationController < ActionController::Base
     history_path(page: (page unless page == 1))
   end
 
-  # Scoped to `active` so an anonymized user's open session in another tab stops resolving on its next request.
-  def current_user
-    @current_user ||= User.active.find_by(id: session[:user_id])
-  end
-
-  def logged_in?
-    current_user.present?
-  end
-
   def own_key?
     current_user.api_key_present?
   end
 
-  def require_login
-    unless logged_in?
-      session[:return_to] = request.fullpath
-      redirect_to login_path, alert: t("flash.application.login_required")
-    end
+  def require_password
+    redirect_to edit_password_setup_path unless current_user.password_set?
+  end
+
+  def require_two_factor
+    redirect_to two_factor_setup_path unless current_user.two_factor_enrolled?
   end
 
   def require_provider
-    return unless logged_in?
     return if current_user.provider_ready? || current_user.trial?
-    return if controller_name == "api_keys" || controller_name == "sessions"
+    return if controller_name == "api_keys"
 
     redirect_to setup_path, notice: t("flash.application.api_key_needed")
   end

@@ -77,7 +77,7 @@ RSpec.describe "Focus ring", type: :system do
   # Login follows the device, so each palette's ring is checked under the scheme that selects it.
   it "rings the login fields in the dark palette" do
     page.driver.with_playwright_page { |pw| pw.emulate_media(colorScheme: "dark") }
-    visit login_path
+    visit new_user_session_path
     tab_to("input[type='email']")
 
     expect(outline_of_focused).to eq([ "solid", "2px", ring_color, "2px" ])
@@ -85,7 +85,7 @@ RSpec.describe "Focus ring", type: :system do
 
   it "rings the login fields in the light palette when the device asks for it" do
     page.driver.with_playwright_page { |pw| pw.emulate_media(colorScheme: "light") }
-    visit login_path
+    visit new_user_session_path
     tab_to("input[type='email']")
 
     expect(outline_of_focused).to eq([ "solid", "2px", "rgb(75, 55, 194)", "2px" ])

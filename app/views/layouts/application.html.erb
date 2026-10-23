@@ -486,7 +486,7 @@
   <% if display_preferences["background_pattern"] == "on" %>
     <div id="background-pattern" aria-hidden="true"></div>
   <% end %>
-  <% if logged_in? %>
+  <% if user_signed_in? %>
   <a class="skip-link" href="#main-content"><%= t("nav.skip_to_content") %></a>
   <nav data-controller="nav-menu"
        data-action="click@document->nav-menu#closeOnOutsideClick keydown@document->nav-menu#closeOnEscape">
@@ -537,9 +537,9 @@
     <%= yield %>
     </main>
   </div>
-  <%= render "shared/tab_bar" if logged_in? %>
-  <%= render "shared/push_script" if logged_in? && WebPushCredentials.configured? %>
-  <%= render "shared/save_status_banner" if logged_in? %>
+  <%= render "shared/tab_bar" if user_signed_in? %>
+  <%= render "shared/push_script" if user_signed_in? && WebPushCredentials.configured? %>
+  <%= render "shared/save_status_banner" if user_signed_in? %>
   <%= render "shared/pull_to_refresh" %>
 </body>
 </html>

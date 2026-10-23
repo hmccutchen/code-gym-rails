@@ -13,6 +13,13 @@
   .reminder-nudges label { display: flex; align-items: flex-start; gap: .5rem;
                            color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
   .reminder-nudges input[type="checkbox"] { margin-top: .2rem; flex: none; }
+  .authenticator-settings { margin-top: 2.5rem; }
+  .authenticator-settings h2 { font-size: 1rem; margin-bottom: .4rem; }
+  .authenticator-settings p { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
+  .authenticator-settings form { display: grid; gap: .4rem; margin-bottom: 1.5rem; }
+  .authenticator-settings label { color: var(--muted); font-size: .85rem; }
+  .authenticator-settings input[type="text"] { width: 100%; min-width: 0; }
+  .authenticator-settings .btn { justify-self: start; max-width: 100%; white-space: normal; }
   .api-usage { margin-top: 2.5rem; }
   .api-usage h2 { font-size: 1rem; margin-bottom: .4rem; }
   .api-usage p { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
@@ -37,7 +44,7 @@
   </p>
 
   <div class="account-actions">
-    <%= button_to t("accounts.show.log_out"), logout_path, method: :delete, class: "btn btn-ghost" %>
+    <%= button_to t("accounts.show.log_out"), destroy_user_session_path, method: :delete, class: "btn btn-ghost" %>
   </div>
 
   <div class="generation-toggle">
@@ -51,6 +58,8 @@
   </div>
 
   <%= render "accounts/push_reminders" if WebPushCredentials.configured? %>
+
+  <%= render "accounts/authenticator" %>
 
   <%= render "accounts/api_usage", totals: @usage_totals, since: @usage_since %>
 
