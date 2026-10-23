@@ -6,7 +6,7 @@
            write_up_control_status_url_value: learn_concept_status_path(bucket: @bucket, concept: @concept, awaiting: awaiting, generation_version: generation_version),
            write_up_control_rewritten_url_value: learn_concept_path(bucket: @bucket, concept: @concept, awaiting => "missing"),
            write_up_control_interval_ms_value: (poll_interval_s * 1000).to_i,
-           write_up_control_max_attempts_value: (AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT) / poll_interval_s).ceil,
+           write_up_control_max_attempts_value: (CallProfiles.call_budget_seconds(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT) / poll_interval_s).ceil,
            write_up_control_writing_text_value: t("learn.writing_guide"),
            write_up_control_failed_text_value: t("learn.write_guide_failed") }) %>>
   <p class="learn-no-guide"><%= message %></p>

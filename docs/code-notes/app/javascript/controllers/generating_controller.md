@@ -26,7 +26,7 @@ a late reply cannot reload the page or schedule another attempt.
 
 ## The budget stays in Ruby
 
-`maxAttempts` is computed in the view from `AiService::JUDGED_GENERATION_BUDGET`
+`maxAttempts` is computed in the view from `CallProfiles::JUDGED_GENERATION_BUDGET`
 and `DailyExercise::REGENERATION_STALE_AFTER`. Those are the authorities for
 how long a generation may take, and the controller reads the answer rather
 than deriving one.

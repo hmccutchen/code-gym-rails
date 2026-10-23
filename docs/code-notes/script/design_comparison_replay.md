@@ -122,7 +122,7 @@ lands, since extracting it now would conflict with that change.
 Each printed figure is a worst-case bound, worked out per call by
 `.worst_case_cost` from `ModelComparison::LIST_PRICE_PER_MILLION` for the
 model the purpose routes to, an input estimate, and the call's full output
-cap. The output cap is the purpose's `max_tokens` in `AiService::CALL_PROFILES`,
+cap. The output cap is the purpose's `max_tokens` in `CallProfiles`,
 or `ClaudeService::MAX_TOKENS` when the profile sets none. The printed line
 names each call's model, input estimate and cap.
 

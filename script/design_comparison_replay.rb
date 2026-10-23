@@ -26,7 +26,7 @@ class DesignComparisonReplay
       dollars: (input_tokens * price[:input] + output * price[:output]) / 1_000_000.0 }
   end
 
-  def self.output_cap(purpose) = AiService::CALL_PROFILES.fetch(purpose)[:max_tokens] || ClaudeService::MAX_TOKENS
+  def self.output_cap(purpose) = CallProfiles.fetch(purpose)[:max_tokens] || ClaudeService::MAX_TOKENS
 
   def initialize(api_key:, out: $stdout, rejudge: false)
     @api_key = api_key.presence

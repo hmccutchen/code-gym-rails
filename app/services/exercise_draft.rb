@@ -35,7 +35,7 @@ class ExerciseDraft
                                   ladders: retry_ladders(draft, kind))
     reply = provider.generate.call(user, "retry_section", language, prompt.render(only: kind, fixed_concept: concept),
                                    subject: "#{kind.key} retry",
-                                   deadline: deadline.leaving(AiService.worst_case_seconds_for("judge_section")))
+                                   deadline: deadline.leaving(CallProfiles.worst_case_seconds_for("judge_section")))
 
     ProblemSetIngest.call(
       reply, language: language,
