@@ -254,4 +254,4 @@ The per-IP limits key on `request.remote_ip`. Nothing on main sets `config.actio
 1. **The account is created when a code is requested,** as before #490. A first valid code signs in an existing row; it never creates one.
 2. **The rate-limit windows stay at 15 minutes** under `User::LOGIN_RATE_LIMIT_WINDOW`. Only the code's life drops to 10 minutes.
 3. **`otp_required_for_login` is left untouched** for PR 2 to drop or rename.
-4. **`return_to` is saved only for HTML GET requests,** fixed in this PR.
+4. **`return_to` is saved only for HTML GET requests,** fixed while restoring `require_login`.
