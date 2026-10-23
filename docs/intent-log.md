@@ -107,6 +107,8 @@ this one.
   **I decided:** stacked branches, one per issue, each PR based on the one
   before
 - each `ProviderError` class carries its own failure codes `#478`
+- section-kind preference rules off `User` into `SectionKindSettings`
+  `#479`
 
 ### Hassan
 
