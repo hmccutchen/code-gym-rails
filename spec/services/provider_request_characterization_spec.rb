@@ -10,12 +10,12 @@ RSpec.describe "provider request characterization" do
   KEYWORD_SHAPES = {
     "plain"                 => {},
     "cache_system"          => { cache_system: true },
-    "long_read_timeout"     => { read_timeout: AiService::GENERATION_READ_TIMEOUT },
+    "long_read_timeout"     => { read_timeout: CallProfiles::GENERATION_READ_TIMEOUT },
     "capped_max_tokens"     => { max_tokens: 250 },
-    "routed_generation"     => { purpose: "generate_exercise", read_timeout: AiService::GENERATION_READ_TIMEOUT }
+    "routed_generation"     => { purpose: "generate_exercise", read_timeout: CallProfiles::GENERATION_READ_TIMEOUT }
   }.freeze
 
-  # Each purpose's per-call values; its settings come from CALL_PROFILES, so a snapshot proves the profile matches its call site.
+  # Each purpose's per-call values; its settings come from CallProfiles::BY_PURPOSE, so a snapshot proves the profile matches its call site.
   PURPOSE_SHAPES = {
     "generate_exercise"           => {},
     "generate_exercise_blocking"  => { blocking: true },

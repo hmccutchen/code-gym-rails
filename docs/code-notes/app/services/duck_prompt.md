@@ -1,6 +1,6 @@
 # `DuckPrompt`
 
-The duck's prompt, moved out of `AiService` (#431). `AiService#duck_response` still makes the call, checks the reply and marks a cut-off one. It is one of the two conversational calls, so it returns `history:` beside `system:` and `prompt:`. The settings, system-prompt caching included, stay in `CALL_PROFILES`.
+The duck's prompt, moved out of `AiService` (#431). `AiService#duck_response` still makes the call, checks the reply and marks a cut-off one. It is one of the two conversational calls, so it returns `history:` beside `system:` and `prompt:`. The settings, system-prompt caching included, stay in `CallProfiles::BY_PURPOSE`.
 
 ## `.generate`
 
