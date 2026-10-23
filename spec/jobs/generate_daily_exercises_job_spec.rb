@@ -560,4 +560,54 @@ RSpec.describe GenerateDailyExercisesJob do
       end
     end
   end
+
+  describe "the judge's solves" do
+    let(:solves) { [ live_solve(shipped: false, never_shown_reason: "replaced_by_retry"), live_solve(attempt: 1) ] }
+    let(:logged) { StringIO.new }
+
+    def stub_judged(solves)
+      judged = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {}, plan_notes: {},
+                                        solves: solves)
+      svc = instance_double(ClaudeService, generate_judged_exercise: judged, generate_unjudged_exercise: judged.with(solves: []))
+      allow(svc).to receive(:model_for).with("generate_exercise").and_return("claude-opus-5-5")
+      allow(AiService).to receive(:for).with(user).and_return(svc)
+      svc
+    end
+
+    it "writes them with the row, as live records of that set, naming the model that drafted it" do
+      stub_judged(solves)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) { described_class.new.perform(user_id: user.id) }
+
+      exercise = DailyExercise.find_by!(user: user, date: Date.new(2026, 7, 13))
+      records = exercise.judge_solves.order(:attempt)
+      expect(records.map { |record| [ record.attempt, record.shipped, record.never_shown_reason ] })
+        .to eq([ [ 0, false, "replaced_by_retry" ], [ 1, true, nil ] ])
+      expect(records).to all(have_attributes(source: "live", user_id: user.id, set_generated_at: exercise.generated_at,
+                                             draft_model: "claude-opus-5-5", judge_model: "claude-sonnet-5-5"))
+    end
+
+    it "writes none for an unjudged weekend set" do
+      svc = stub_judged(solves)
+
+      travel_to(Time.utc(2026, 7, 18, 15, 0)) { described_class.new.perform(user_id: user.id) }
+
+      expect(svc).to have_received(:generate_unjudged_exercise)
+      expect(DailyExercise.exists?(user: user, date: Date.new(2026, 7, 18))).to be(true)
+      expect(JudgeSolve.count).to eq(0)
+    end
+
+    it "keeps the set when a record is refused, and logs the refusal without the section or its key" do
+      stub_judged([ live_solve, live_solve(attempt: 1, revert_reason: "solve_mismatch") ])
+      allow(Rails).to receive(:logger).and_return(ActiveSupport::Logger.new(logged))
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) { described_class.new.perform(user_id: user.id) }
+
+      exercise = DailyExercise.find_by!(user: user, date: Date.new(2026, 7, 13))
+      expect(JudgeSolve.count).to eq(0)
+      expect(logged.string).to include("[judge_solves_record_failed] user=#{user.id} exercise=#{exercise.id} reason=")
+      expect(logged.string).not_to include("SECRET", "Which fits?", "a = 1")
+      expect(user.reload.last_generation_error).to be_nil
+    end
+  end
 end

@@ -75,6 +75,25 @@ RSpec.describe ExerciseDraft do
     expect(section).to include("concept" => "service_objects", "pitched_at" => "senior")
   end
 
+  it "renders a retry prompt carrying none of the rejected section's text, so the retry starts from fresh pieces" do
+    real_prompt = provider.with(prompt: lambda { |*args, **options|
+      GenerationPrompt.new(*args, **options, retention_annotation: ->(*) { })
+    })
+    draft = described_class.call(user, language: "ruby_rails", provider: real_prompt)
+    rejected = draft.problem_set.fetch("design_comparison").merge(
+      "piece_a" => "def rejected_piece_alpha = 1", "piece_b" => "def rejected_piece_beta = 2",
+      "scenario" => "REJECTED-SCENARIO", "answer_key" => { "better" => "a", "deciding_fact" => "REJECTED-FACT" }
+    )
+    draft = draft.with(problem_set: draft.problem_set.merge("design_comparison" => rejected))
+    generated.clear
+    reply.replace("design_comparison" => FakeService::EXERCISE_PROBLEM_SET["design_comparison"].deep_dup)
+
+    described_class.retry_section(draft, ExerciseSection::DesignComparison, rejected["concept"], provider: real_prompt)
+
+    expect(generated.sole[:prompt]).to include(rejected["concept"])
+    expect(generated.sole[:prompt]).not_to include("rejected_piece_alpha", "rejected_piece_beta", "REJECTED-SCENARIO", "REJECTED-FACT")
+  end
+
   it "records each suggested concept through the provider when the set is finished, logging a failed one and keeping on" do
     suggestion = Struct.new(:bucket, :name)
     draft = draft_for.with(suggested_concepts: [ suggestion.new("ruby_rails", "first"), suggestion.new("ruby_rails", "second") ])

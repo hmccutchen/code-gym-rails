@@ -95,8 +95,8 @@ class ExerciseSection::DesignComparison < ExerciseSection
       true
     end
 
-    def solve_matches_key?(section, solve)
-      section.dig(ANSWER_KEY_FIELD, "better") == solve
+    def keyed_solve(section)
+      section.dig(ANSWER_KEY_FIELD, "better")
     end
 
     def narrow_vocabulary(vocabulary, rung: nil)

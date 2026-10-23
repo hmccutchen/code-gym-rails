@@ -15,8 +15,9 @@ it, the page gives the answer away. So `JudgeSolve.readable` starts from
 gives nothing away:
 
 1. `source = 'synthetic'`. No engineer ever sees the section.
-2. The row's own section has been reviewed on the exercise's response. The
-   engineer has already answered it and seen its review.
+2. The row's own section has been reviewed on the exercise's response, and
+   the row belongs to the set that response answered. The engineer has
+   already answered it and seen its review.
 3. `never_shown_reason` is present. It's written when the row is created, and
    it records that this version's pieces and key never reached the engineer.
 
@@ -71,6 +72,21 @@ DailyResponse#section_reviewed?") compares scope membership with the
 predicate for a reviewed section, another section reviewed, a non-Hash
 section value, a submitted response with no review, an unsubmitted one, an
 empty review and no response at all.
+
+## Why the review must be of the row's own set
+
+A regeneration replaces the set on the same `daily_exercises` row and keeps
+the replaced set's records, under their own `set_generated_at`. It destroys
+the old response, and it is refused once a review exists, so a review on that
+row is always of the current set. Without a check on the set, the new set's
+review would also show the replaced set's rows, whose key the engineer never
+answered. So the `EXISTS` joins `daily_exercises` and requires
+`daily_exercises.generated_at = judge_solves.set_generated_at`.
+
+That equality holds because `record!` copies `exercise.generated_at`, which
+Active Record has already cut to the column's microsecond precision when it
+was assigned, into a column of the same precision. `judge_solve_spec` checks
+the round trip with a nanosecond-precise time.
 
 ## The `human_call` constraint is NULL-safe
 

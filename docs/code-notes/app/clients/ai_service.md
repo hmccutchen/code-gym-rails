@@ -143,7 +143,24 @@ join this class's public API. Each closes over the generation's deadline and
 passes it to `#call_and_log`, which checks it after the request is built, since
 a retry's ladders and prompt can spend the time the check would have allowed.
 `ExerciseDraft.retry_section` passes the deadline less a judge's worst case,
-so its re-judge still has room.
+so its re-judge still has room. `judge_identity` names this provider and the
+model `#model_for("judge_section")` reads, for the solves `JudgedGeneration`
+hands back.
+
+## `#model_for`
+
+The public reader for the model a purpose routes to, backed by each
+subclass's private `routed_model` (and so its `route_for`). The jobs read the
+draft model through it and the judge's identity is built from it, so nothing
+parses a model name out of `ApiUsage`. `FakeService` answers `"fake"`, the
+model its replies report.
+
+## `JudgedSet`
+
+`solves` defaults to an empty list, so a set built without a judge (the
+unjudged path, and the job specs' stand-ins) carries none.
+`#generate_unjudged_exercise` still passes `solves: []` so the path reads the
+way it behaves.
 
 ## `#exercise_draft_provider` and `#generation_prompt`
 

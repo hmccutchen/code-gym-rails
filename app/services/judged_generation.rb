@@ -1,12 +1,14 @@
 # Design notes: docs/code-notes/app/services/judged_generation.md
 class JudgedGeneration
-  # judge_section(user, kind, section, rung:, locked:), retry_section(draft, kind, concept); both raise.
-  Provider = Data.define(:judge_section, :retry_section)
+  # judge_section(user, kind, section, rung:, locked:), retry_section(draft, kind, concept); both raise. judge_identity is a value.
+  Provider = Data.define(:judge_section, :retry_section, :judge_identity)
 
   REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL = false
   SOLVE_MISMATCH_TOLERATED_AT = "principal_engineer".freeze
 
   RETRY_FIELDS = %i[retry_principle retry_issues retry_evidence retry_reason].freeze
+
+  REFUSAL_DETAIL_LIMIT = 300
 
   def self.call(user:, draft:, providers:, finish:)
     new(user, draft, providers, finish).call
@@ -17,6 +19,9 @@ class JudgedGeneration
     @draft     = draft
     @providers = providers
     @finish    = finish
+    @chains    = draft.kinds.to_h do |kind|
+      [ kind.key, SolveChain.new(kind, rung: rung_for(kind), locked: draft.difficulty.locked?(kind)) ]
+    end
   end
 
   def call
@@ -31,7 +36,8 @@ class JudgedGeneration
     dropped = outcomes.select { |_, outcome| outcome[:dropped] }.keys
     reject_empty_day!(set, dropped)
     finish(set, dropped, outcomes)
-    AiService::JudgedSet.new(problem_set: set, dropped_sections: dropped, outcomes: outcomes, plan_notes: @draft.plan.notes)
+    AiService::JudgedSet.new(problem_set: set, dropped_sections: dropped, outcomes: outcomes, plan_notes: @draft.plan.notes,
+                             solves: @chains.flat_map { |key, chain| chain.solves(dropped: dropped.include?(key)) })
   end
 
   private
@@ -81,26 +87,40 @@ class JudgedGeneration
   end
 
   def judge_outcome(kind, section)
-    verdict, latency = judge_with_fallback(kind, section)
+    verdict, latency, pass = judge_with_fallback(kind, section)
     outcome = { status: :keep, issues: [], principle: nil, retries: 0,
                 dropped: false, fallback: nil, latency_ms: latency }
-    return [ kind.key, outcome.merge(fallback: verdict), section ] if verdict.is_a?(String)
+    matched = record_pass(kind, section, verdict, pass, attempt: 0)
+    return unjudged_draft(kind, section, outcome.merge(fallback: verdict)) if verdict.is_a?(String)
 
-    matched = solve_matched(kind, section, verdict)
     verdict = settled(kind, verdict, matched)
+    chain(kind).settle(0) unless verdict.reject?
     shipped, outcome = confirmed_edit(kind, section, verdict, with_solve(outcome, matched).merge(judgment(kind, verdict)))
     [ kind.key, outcome, shipped ]
+  end
+
+  def unjudged_draft(kind, section, outcome)
+    chain(kind).settle(0)
+    [ kind.key, outcome, section ]
   end
 
   def confirmed_edit(kind, section, verdict, outcome)
     edited = apply_verdict(verdict, section)
     return [ edited, outcome ] unless verdict.edit? && kind.rejudge_edits?
 
-    check, latency = judge_with_fallback(kind, edited)
-    matched  = check.is_a?(String) ? nil : solve_matched(kind, edited, check)
-    outcome  = with_solve(outcome, matched).merge(latency_ms: outcome[:latency_ms] + latency)
-    reverted = check.is_a?(String) || check.reject? || matched == false
-    [ reverted ? section : edited, outcome.merge(edit_reverted: reverted) ]
+    check, latency, pass = judge_with_fallback(kind, edited)
+    matched = check.is_a?(String) ? nil : solve_matched(kind, edited, check)
+    outcome = with_solve(outcome, matched).merge(latency_ms: outcome[:latency_ms] + latency)
+    reason  = revert_reason(check, matched)
+    chain(kind).record_edit_check(edited, check, matched, pass, revert_reason: reason)
+    [ reason ? section : edited, outcome.merge(edit_reverted: !reason.nil?) ]
+  end
+
+  def revert_reason(check, matched)
+    if check.is_a?(String) then "judge_failed"
+    elsif check.reject?    then "judge_rejected"
+    elsif matched == false then "solve_mismatch"
+    end
   end
 
   # `source` marks a scenario ProblemSetIngest stamped from the real file, which the judge must not rewrite.
@@ -140,23 +160,26 @@ class JudgedGeneration
   end
 
   def rejudge(kind, retried, outcome)
-    verdict, latency = judge_with_fallback(kind, retried)
+    verdict, latency, pass = judge_with_fallback(kind, retried)
     outcome = outcome.merge(retries: outcome[:retries] + 1, latency_ms: outcome[:latency_ms] + latency)
-    return unjudged_retry(retried, record_attempt(outcome).merge(fallback: verdict)) if verdict.is_a?(String)
+    matched = record_pass(kind, retried, verdict, pass, attempt: outcome[:retries])
+    return unjudged_retry(kind, retried, record_attempt(outcome).merge(fallback: verdict)) if verdict.is_a?(String)
 
-    matched = solve_matched(kind, retried, verdict)
     verdict = settled(kind, verdict, matched)
     outcome = record_attempt(with_solve(outcome, matched), verdict)
     return [ retried, outcome, false ] if verdict.reject?
+
+    chain(kind).settle(outcome[:retries])
 
     # Keep the draft's principle and issues: they are the only record that this section was ever rejected.
     shipped, outcome = confirmed_edit(kind, retried, verdict, outcome.merge(status: verdict.status))
     [ shipped, outcome, true ]
   end
 
-  def unjudged_retry(retried, outcome)
+  def unjudged_retry(kind, retried, outcome)
     return [ *drop(outcome), true ] if outcome[:fallback] == ProviderError::DeadlineError.judge_fallback_reason
 
+    chain(kind).settle(outcome[:retries])
     [ retried, outcome.merge(status: :keep), true ]
   end
 
@@ -178,6 +201,14 @@ class JudgedGeneration
     end
   end
 
+  def record_pass(kind, section, verdict, pass, attempt:)
+    matched = solve_matched(kind, section, verdict) unless verdict.is_a?(String)
+    chain(kind).record(section, verdict, matched, pass, attempt: attempt)
+    matched
+  end
+
+  def chain(kind) = @chains.fetch(kind.key)
+
   def with_solve(outcome, matched)
     matched.nil? ? outcome : outcome.merge(solve_matched: outcome.fetch(:solve_matched, []) + [ matched ])
   end
@@ -194,19 +225,23 @@ class JudgedGeneration
   end
 
   def judge_with_fallback(kind, section)
-    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    verdict = @providers.call.judge_section.call(
-      @user, kind, section, rung: rung_for(kind), locked: @draft.difficulty.locked?(kind)
-    )
-    [ verdict, elapsed_ms(started) ]
+    started  = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    provider = @providers.call
+    verdict  = provider.judge_section.call(@user, kind, section, rung: rung_for(kind), locked: @draft.difficulty.locked?(kind))
+    [ verdict, elapsed_ms(started), provider.judge_identity ]
   rescue JudgeVerdict::Invalid, ProviderError, *AiService::INFRASTRUCTURE_ERRORS => e
     reason = AiService.judge_fallback_reason(e)
-    Rails.logger.warn("[judge_fallback] user=#{@user.id} section=#{kind.key} reason=#{reason}#{fallback_detail(kind, e)}")
-    [ reason, elapsed_ms(started) ]
+    Rails.logger.warn("[judge_fallback] user=#{@user.id} section=#{kind.key} reason=#{reason}#{fallback_detail(e)}")
+    [ reason, elapsed_ms(started), (provider&.judge_identity || {}).merge(unsolved_detail: refusal_message(e)) ]
   end
 
-  def fallback_detail(kind, error)
-    kind.judge_solve_options ? "" : ": #{error.message}"
+  def fallback_detail(error)
+    message = refusal_message(error)
+    message ? ": #{message}" : ""
+  end
+
+  def refusal_message(error)
+    error.message.truncate(REFUSAL_DETAIL_LIMIT) if error.is_a?(JudgeVerdict::Invalid)
   end
 
   def retry_section(kind, concept)
