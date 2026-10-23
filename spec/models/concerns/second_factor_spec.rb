@@ -196,6 +196,48 @@ RSpec.describe SecondFactor, type: :model do
     end
   end
 
+  describe "the sign-in challenge" do
+    let!(:enrollment) { enroll_second_factor(user) }
+    let(:secret) { enrollment.first }
+    let!(:issued_at) { User.session_stamp(user.issue_second_factor_challenge!) }
+
+    it "is open only for the time it was issued, and only for its lifetime" do
+      expect(user.second_factor_challenge_open?(issued_at)).to be(true)
+      expect(user.second_factor_challenge_open?(User.session_stamp(1.second.ago))).to be(false)
+      expect(user.second_factor_challenge_open?("not a time")).to be(false)
+      travel User::SECOND_FACTOR_CHALLENGE_LIFETIME
+      expect(user.second_factor_challenge_open?(issued_at)).to be(false)
+    end
+
+    it "closes once a code is accepted" do
+      expect(user.answer_second_factor_challenge!(code_at(secret, 0), issued_at: issued_at).status).to eq(:totp)
+      expect(user.reload.second_factor_challenge_at).to be_nil
+    end
+
+    it "closes after five wrong codes and counts each toward the daily cap" do
+      statuses = Array.new(5) { user.answer_second_factor_challenge!(wrong_totp(secret), issued_at: issued_at).status }
+
+      expect(statuses).to eq(%i[rejected rejected rejected rejected challenge_ended])
+      expect(user.reload).to have_attributes(second_factor_challenge_at: nil, second_factor_failures: 5)
+    end
+
+    it "refuses a right code once the challenge is closed" do
+      user.update!(second_factor_challenge_at: nil)
+
+      expect(user.answer_second_factor_challenge!(code_at(secret, 0), issued_at: issued_at).status).to eq(:expired)
+    end
+
+    it "closes when the daily cap is reached and says when to try again" do
+      user.update!(second_factor_failures: User::SECOND_FACTOR_DAILY_FAILURES, second_factor_failures_since: 1.hour.ago)
+
+      outcome = user.answer_second_factor_challenge!(code_at(secret, 0), issued_at: issued_at)
+
+      expect(outcome.status).to eq(:locked)
+      expect(outcome.retry_at).to eq(user.second_factor_failures_since + User::SECOND_FACTOR_FAILURE_WINDOW)
+      expect(user.reload.second_factor_challenge_at).to be_nil
+    end
+  end
+
   describe "#regenerate_recovery_codes!" do
     let!(:enrollment) { enroll_second_factor(user) }
     let(:secret) { enrollment.first }

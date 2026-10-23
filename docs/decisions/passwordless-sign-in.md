@@ -20,7 +20,7 @@ The second factor worth having is possession of a phone. That comes as an option
   - It lives 10 minutes (`User::LOGIN_CODE_EXPIRY`) and dies after five wrong guesses.
   - It is redeemed under the user row lock, so it can be used only once.
   - It works only in the browser that asked for it, because `SessionsController#verify_code` reads the address from the session.
-- **Signing in.** A valid code runs `reset_session` before `session[:user_id]` is set (`SessionsController#start_new_session_for`). That gives a new session id and a new CSRF token, and it discards everything written before sign-in. `return_to` and a pending trial are read first, so they survive.
+- **Signing in.** A valid code runs `reset_session` before `session[:user_id]` is set (`SignInCompletion#start_new_session_for`). That gives a new session id and a new CSRF token, and it discards everything written before sign-in. `return_to` and a pending trial are read first, so they survive.
 - **Signed-out requests.** `require_login` redirects every signed-out request to `/login`. `request.js` reads that redirect as "signed out". The return address is saved only for a page navigation: a GET whose `Accept` names `text/html`. An expired dashboard poll therefore never becomes the page you land on after signing in.
 - **Limits.** `docs/decisions/login-rate-limits.md` has them. Their windows are 15 minutes (`User::LOGIN_RATE_LIMIT_WINDOW`), longer than a code lives.
 

@@ -62,6 +62,20 @@ en:
       code_requests_for_address: "Too many code requests for that address. Try again in a few minutes."
       code_requests: "Too many code requests. Try again in a few minutes."
       code_attempts: "Too many attempts. Try again in a few minutes."
+  second_factor_challenges:
+    new:
+      page_title: "Authenticator code"
+      message: "Your account has an authenticator app turned on. Enter the code it shows, or one of your recovery codes."
+      code_label: "Code from your authenticator app, or a recovery code"
+      submit: "Verify"
+      start_again: "Start again with a new emailed code"
+    rejected: "That code didn't work. Check your authenticator app and try again."
+    too_many_wrong_codes: "Too many wrong codes. Request a new emailed code to try again."
+    expired: "Your sign-in timed out. Request a new emailed code to try again."
+    locked: "This account has had too many wrong authenticator codes in the last day. You can try again after %{time}."
+    recovery_code_used:
+      one: "You signed in with a recovery code. You have 1 recovery code left."
+      other: "You signed in with a recovery code. You have %{count} recovery codes left."
   trials:
     page_title: "Trial"
     heading: "Trial"

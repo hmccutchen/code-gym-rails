@@ -18,6 +18,12 @@ RSpec.describe ApplicationCable::Connection, type: :channel do
     expect { connect session: {} }.to have_rejected_connection
   end
 
+  it "rejects a session still waiting on its second factor" do
+    marker = { "user_id" => user.id, "at" => User.session_stamp(user.issue_second_factor_challenge!) }
+
+    expect { connect session: { pending_second_factor: marker } }.to have_rejected_connection
+  end
+
   it "rejects a session with no sign-in stamp" do
     expect { connect session: { user_id: user.id } }.to have_rejected_connection
   end

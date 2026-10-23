@@ -12,4 +12,4 @@ A session with no stamp, or one that doesn't parse, is rejected. That signs out 
 
 ## Who writes the stamp
 
-`SessionsController#start_new_session_for` and `PreviewAutoLogin` are the only places that sign a session in, and each writes `session[:signed_in_at]` with `User.session_stamp`. A new sign-in path must write it too, or its sessions are rejected on the next request. `spec/requests/preview_auto_login_spec.rb` and `spec/requests/sessions_spec.rb` fail if either stops.
+`SignInCompletion#start_new_session_for` and `PreviewAutoLogin` are the only places that sign a session in, and each writes `session[:signed_in_at]` with `User.session_stamp`. A new sign-in path must write it too, or its sessions are rejected on the next request. `spec/requests/preview_auto_login_spec.rb` and `spec/requests/sessions_spec.rb` fail if either stops.

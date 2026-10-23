@@ -13,8 +13,8 @@ module SecondFactor
   TOTP_ISSUER = "Code Gym".freeze
   TOTP_INTERVAL = 30
 
-  Outcome = Data.define(:status, :recovery_codes, :changed_at, :remaining) do
-    def initialize(status:, recovery_codes: [], changed_at: nil, remaining: nil) = super
+  Outcome = Data.define(:status, :recovery_codes, :changed_at, :remaining, :retry_at) do
+    def initialize(status:, recovery_codes: [], changed_at: nil, remaining: nil, retry_at: nil) = super
 
     def accepted? = status.in?(%i[totp recovery_code])
   end
@@ -53,6 +53,28 @@ module SecondFactor
     with_lock { verify_under_lock(code) }
   end
 
+  def issue_second_factor_challenge!
+    now = Time.current.floor(6)
+    with_lock { update!(second_factor_challenge_at: now, second_factor_challenge_failures: 0) }
+    now
+  end
+
+  def second_factor_challenge_open?(issued_at)
+    issued = Time.iso8601(issued_at.to_s)
+    second_factor_challenge_at.present? && issued == second_factor_challenge_at &&
+      second_factor_challenge_at > SECOND_FACTOR_CHALLENGE_LIFETIME.ago
+  rescue ArgumentError
+    false
+  end
+
+  def answer_second_factor_challenge!(code, issued_at:)
+    with_lock do
+      next Outcome.new(status: :expired) unless second_factor_challenge_open?(issued_at)
+
+      settle_second_factor_challenge(verify_under_lock(code))
+    end
+  end
+
   def regenerate_recovery_codes!(code)
     with_lock do
       verified = verify_under_lock(code)
@@ -80,10 +102,25 @@ module SecondFactor
   private
 
   def verify_under_lock(code)
-    return Outcome.new(status: :locked) if second_factor_locked?
+    return Outcome.new(status: :locked, retry_at: second_factor_failures_since + SECOND_FACTOR_FAILURE_WINDOW) if second_factor_locked?
 
     outcome = check_second_factor(normalize_code(code))
     record_second_factor_failure unless outcome.accepted?
+    outcome
+  end
+
+  def settle_second_factor_challenge(outcome)
+    return end_second_factor_challenge(outcome) unless outcome.status == :rejected
+
+    failures = second_factor_challenge_failures + 1
+    return end_second_factor_challenge(Outcome.new(status: :challenge_ended)) if failures >= SECOND_FACTOR_CHALLENGE_FAILURES
+
+    update!(second_factor_challenge_failures: failures)
+    outcome
+  end
+
+  def end_second_factor_challenge(outcome)
+    update!(second_factor_challenge_at: nil, second_factor_challenge_failures: 0)
     outcome
   end
 

@@ -1,11 +1,13 @@
 ---
 paths:
-  - "app/controllers/{sessions,trials,accounts,application}_controller.rb"
-  - "app/controllers/concerns/{login_code_requests,preview_auto_login}.rb"
+  - "app/controllers/{sessions,trials,accounts,application,second_factor_challenges}_controller.rb"
+  - "app/controllers/concerns/{login_code_requests,preview_auto_login,sign_in_completion}.rb"
   - "app/models/{invite_code,pending_trial,provider_credential,trial_allowance,trial_mode,trial_status,house_keys,user}.rb"
+  - "app/models/concerns/{signed_in_sessions,second_factor}.rb"
+  - "app/channels/application_cable/connection.rb"
   - "app/clients/{preview_environment,preview_mail,lazy_cache_store}.rb"
   - "app/services/preview_seed.rb"
-  - "app/views/{sessions,trials,user_mailer}/**"
+  - "app/views/{sessions,trials,user_mailer,second_factor_challenges}/**"
   - "app/views/dashboard/{_trial_banner,_trial_ended}.html.erb"
   - "app/views/api_keys/{_trial_note,_key_guide}.html.erb"
   - "lib/boot/app_host.rb"

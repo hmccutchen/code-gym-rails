@@ -1,5 +1,6 @@
 class SessionsController < ApplicationController
   include LoginCodeRequests
+  include SignInCompletion
 
   skip_before_action :require_login
   skip_before_action :require_provider
@@ -44,19 +45,10 @@ class SessionsController < ApplicationController
   def verify_code
     email = pending_login_email
     user  = email.present? ? User.authenticate_login_code(email: email, code: params[:code].to_s) : nil
+    return reject_login_code(email) unless user
+    return start_second_factor_challenge(user) if user.two_factor_enabled?
 
-    if user
-      trial = PendingTrial.take(session)
-      destination = start_new_session_for(user)
-      return finish_pending_trial(user, trial) if trial
-
-      redirect_to destination || root_path, notice: t("sessions.welcome_back", name: user.name)
-    else
-      @code_rejected = true
-      flash.now[:alert] =
-        email.present? ? t("sessions.code_rejected_retry") : t("sessions.code_rejected_request_new")
-      render :new, status: :unprocessable_content
-    end
+    complete_sign_in(user)
   end
 
   def destroy
@@ -66,12 +58,11 @@ class SessionsController < ApplicationController
 
   private
 
-  def finish_pending_trial(user, trial)
-    case trial.start_for(user)
-    when :started     then redirect_to root_path, notice: t("trials.started")
-    when :has_own_key then redirect_to setup_path, alert: t("trials.has_own_key")
-    else                   redirect_to trial_path, alert: t("trials.code_rejected")
-    end
+  def reject_login_code(email)
+    @code_rejected = true
+    flash.now[:alert] =
+      email.present? ? t("sessions.code_rejected_retry") : t("sessions.code_rejected_request_new")
+    render :new, status: :unprocessable_content
   end
 
   def login_code_requests_limited(message) = rate_limited(message)
@@ -95,14 +86,5 @@ class SessionsController < ApplicationController
     Time.iso8601(stamped_at.to_s) < User::LOGIN_CODE_EXPIRY.ago
   rescue ArgumentError
     false
-  end
-
-  # Read return_to before reset_session, which discards everything written before authentication.
-  def start_new_session_for(user)
-    destination = session[:return_to]
-    reset_session
-    session[:user_id]      = user.id
-    session[:signed_in_at] = User.session_stamp
-    destination
   end
 end
