@@ -18,3 +18,11 @@ When the emailed code is right and the account has the authenticator on, `start_
 - The marker sets no `user_id`, so `current_user`, every page and the cable connection treat the browser as signed out until the second step passes.
 - The pending emailed-code keys are removed, because that code has been used.
 - `return_to` and a pending trial stay in place for the second step to read.
+
+## A repeated sign-in post
+
+A double tap that lands before the page's scripts connect posts the same form twice, and both posts carry the cookie from before the first one answered. The first signs in; the second finds the code already spent. The browser shows the second response, so a good code read as wrong.
+
+`remember_sign_in` keeps, for `REPEAT_WINDOW`, an HMAC of what the first post proved: for the emailed code, the address, this browser's `pending_login_at` and the code; for the authenticator step, the user id, the challenge's issue time from this browser's marker, and the code. `repeat_of_recent_sign_in?` accepts a later post carrying exactly that proof, and the repeat takes the same branch the first post did, so a repeated emailed code for an authenticator account still goes to the authenticator step. A pending trial is dropped on a repeat, since the first post already started or refused it.
+
+Nothing new is reachable. Only this browser holds its pending stamp, which is written to the microsecond with `User.session_stamp`, and the code has to match too; anyone with both could have used the code first. The proof lives in the cache. If it's evicted, the repeat is refused as before.

@@ -1,0 +1,109 @@
+require "rails_helper"
+
+RSpec.describe "A repeated sign-in post", type: :request do
+  let(:user) { create_user_with_key(email: "dev@example.com") }
+  let(:session_cookie) { "_code_gym_rails_session" }
+
+  before { allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new) }
+
+  # A double tap sends both posts with the cookie from before the first one answered.
+  def post_twice(path, params)
+    cookie_before = cookies[session_cookie]
+    post path, params: params
+    first = response
+    cookies[session_cookie] = cookie_before
+    post path, params: params
+    first
+  end
+
+  def request_code
+    post login_path, params: { email: user.email }
+    user.generate_login_code!
+  end
+
+  it "signs in on the second post of an emailed code the first post just redeemed" do
+    code = request_code
+
+    first = post_twice(verify_login_code_path, { code: code })
+
+    expect(first).to redirect_to(root_path)
+    expect(response).to redirect_to(root_path)
+    expect(session[:user_id]).to eq(user.id)
+  end
+
+  it "refuses the repeat once the window has passed" do
+    code = request_code
+    cookie_before = cookies[session_cookie]
+    post verify_login_code_path, params: { code: code }
+    cookies[session_cookie] = cookie_before
+
+    travel SignInCompletion::REPEAT_WINDOW + 1.second do
+      post verify_login_code_path, params: { code: code }
+    end
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(session[:user_id]).to be_nil
+  end
+
+  it "refuses a different code sent with the cookie from before the sign-in" do
+    code = request_code
+    cookie_before = cookies[session_cookie]
+    post verify_login_code_path, params: { code: code }
+    cookies[session_cookie] = cookie_before
+
+    post verify_login_code_path, params: { code: wrong_code_for(code) }
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(session[:user_id]).to be_nil
+  end
+
+  it "refuses the redeemed code from another browser, which never had this sign-in pending" do
+    code = request_code
+    post verify_login_code_path, params: { code: code }
+
+    other = open_session
+    other.post login_path, params: { email: user.email }
+    other.post verify_login_code_path, params: { code: code }
+
+    expect(other.response).to have_http_status(:unprocessable_content)
+    expect(other.session[:user_id]).to be_nil
+  end
+
+  context "with the authenticator on" do
+    let!(:enrollment) { enroll_second_factor(user) }
+    let(:secret) { enrollment.first }
+
+    it "sends a repeated emailed code to the authenticator step, never past it" do
+      code = request_code
+
+      post_twice(verify_login_code_path, { code: code })
+
+      expect(response).to redirect_to(second_factor_challenge_path)
+      expect(session[:user_id]).to be_nil
+    end
+
+    it "signs in on the second post of an authenticator code the first post just accepted" do
+      post login_path, params: { email: user.email }
+      post verify_login_code_path, params: { code: user.generate_login_code! }
+
+      first = post_twice(second_factor_challenge_path, { otp_code: current_totp(secret) })
+
+      expect(first).to redirect_to(root_path)
+      expect(response).to redirect_to(root_path)
+      expect(session[:user_id]).to eq(user.id)
+    end
+
+    it "refuses a different authenticator code sent with the cookie from before the sign-in" do
+      post login_path, params: { email: user.email }
+      post verify_login_code_path, params: { code: user.generate_login_code! }
+      cookie_before = cookies[session_cookie]
+      post second_factor_challenge_path, params: { otp_code: current_totp(secret) }
+      cookies[session_cookie] = cookie_before
+
+      post second_factor_challenge_path, params: { otp_code: enrollment.last.first }
+
+      expect(response).to redirect_to(login_path)
+      expect(session[:user_id]).to be_nil
+    end
+  end
+end
