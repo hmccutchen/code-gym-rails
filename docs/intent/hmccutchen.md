@@ -132,6 +132,7 @@
 - replay first against a local dump of `daily_exercises`, then production
   **why:** the real mismatch rate the night stage 1 merges, for under a
   dollar, tells me whether there's enough signal to continue
+- stage 1: a table and model to keep the judge's blind solves `#484`
 
 *Postponed: the recurring systems themselves, until I've read real mismatch
 data.*

@@ -6,7 +6,7 @@ class LevelSuggestion
     attr_reader :results, :newest_date
 
     def self.for(user)
-      responses = user.daily_responses.submitted.where.not(ai_review: [ nil, {} ])
+      responses = user.daily_responses.submitted.reviewed
                       .preload(:daily_exercise).order(date: :desc).limit(RESPONSE_WINDOW)
                       .select(&:reviewed?)
       new(responses)

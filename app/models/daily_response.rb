@@ -24,6 +24,7 @@ class DailyResponse < ApplicationRecord
   validates :date, uniqueness: { scope: :user_id }
 
   scope :submitted, -> { where.not(submitted_at: nil) }
+  scope :reviewed, -> { where.not(ai_review: [ nil, {} ]) }
 
   AI_REVIEW_FIELDS = {
     "correct"          => { list: true  },
@@ -43,6 +44,11 @@ class DailyResponse < ApplicationRecord
   def self.answered_kinds_for(user)
     submitted.where(user: user).where("jsonb_typeof(section_ratings) = 'object'")
              .distinct.pluck(Arel.sql("jsonb_object_keys(section_ratings)")).to_set
+  end
+
+  def self.section_reviewed_condition(section)
+    review = Arel::Nodes::InfixOperation.new("->", arel_table[:ai_review], section)
+    Arel::Nodes::NamedFunction.new("jsonb_typeof", [ review ]).eq("object")
   end
 
   def self.review_points(value)

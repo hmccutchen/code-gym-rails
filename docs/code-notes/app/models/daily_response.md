@@ -108,3 +108,15 @@ The zero guard matters: a payload with no Hash sections has no section keys, and
 ## `#improved_code_visible?`
 
 Improved code is revealed only from a concept's second exposure onward. A section tagged blank or `"other"` is not gated.
+
+## `.reviewed` and `.section_reviewed_condition`
+
+These state `#reviewed?` and `#section_reviewed?` in SQL, for queries that
+can't load each response. `.reviewed` is `ai_review` neither NULL nor `{}`.
+`ResponseReview` only ever writes a Hash, so that matches `ai_review.present?`
+for every value the column holds. `CompetencyGate::Evidence` and
+`LevelSuggestion::Evidence` read it. `.section_reviewed_condition(section)`
+takes an Arel node for the section key and tests
+`jsonb_typeof(ai_review -> section) = 'object'`, which is what
+`#section_reviewed?`'s `is_a?(Hash)` reads. `JudgeSolve.readable` uses it, and
+`judge_solve_spec` compares the two across response states.
