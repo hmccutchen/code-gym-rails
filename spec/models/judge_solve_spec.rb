@@ -282,6 +282,32 @@ RSpec.describe JudgeSolve, type: :model do
     end
   end
 
+  describe ".record_synthetic!" do
+    it "inserts synthetic rows with no user, exercise or set time" do
+      records = described_class.record_synthetic!([ solve(shipped: false), solve(rung: "junior", shipped: false) ],
+                                                  draft_model: "draft-model", app_revision: "abc123")
+
+      expect(records).to all(have_attributes(source: "synthetic", user_id: nil, daily_exercise_id: nil,
+                                             set_generated_at: nil, draft_model: "draft-model", app_revision: "abc123",
+                                             section_digest: SectionDigest.call(section)))
+      expect(records.map(&:rung)).to eq(%w[senior junior])
+      expect(described_class.readable).to match_array(records)
+    end
+
+    it "raises the same scrubbed error and writes nothing when any row is refused" do
+      error = begin
+        described_class.record_synthetic!([ solve, solve(edit_reverted: true, revert_reason: nil) ])
+      rescue described_class::RecordError => refused
+        refused
+      end
+
+      expect(error.message).to eq("judge_solves row refused: judge_solves_revert_reason_iff_reverted")
+      expect(error.cause).to be_nil
+      expect(error.message).not_to include("Failing row", "fewer writes", "Two caches", "a = 1", "b = 2")
+      expect(described_class.count).to eq(0)
+    end
+  end
+
   describe ".readable" do
     def review!(target_exercise, ai_review: { "design_comparison" => { "rating" => "solid" } }, submitted: true)
       DailyResponse.create!(user: user, daily_exercise: target_exercise, date: target_exercise.date,

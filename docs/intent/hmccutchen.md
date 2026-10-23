@@ -135,6 +135,7 @@
 - stage 1: a table and model to keep the judge's blind solves `#484`
 - stage 1: send OpenAI the judge's reply schema, with a tool to measure it `#485`
 - stage 1: record each live blind judge solve with the set `#486`
+- stage 1: a script that replays every stored design comparison through the judge `#487`
 
 *Postponed: the recurring systems themselves, until I've read real mismatch
 data.*

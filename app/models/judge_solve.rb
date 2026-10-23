@@ -50,17 +50,22 @@ class JudgeSolve < ApplicationRecord
   def self.app_revision = ENV[APP_REVISION_ENV].presence
 
   def self.record!(exercise, solves, source: "live", draft_model: nil, app_revision: self.app_revision)
+    write_solves!(solves, user_id: exercise.user_id, daily_exercise: exercise, set_generated_at: exercise.generated_at,
+                          source: source, draft_model: draft_model, app_revision: app_revision)
+  end
+
+  def self.record_synthetic!(solves, draft_model: nil, app_revision: self.app_revision)
+    write_solves!(solves, source: "synthetic", draft_model: draft_model, app_revision: app_revision)
+  end
+
+  def self.write_solves!(solves, stamps)
     transaction do
-      solves.map do |solve|
-        create!(SOLVE_FIELDS.index_with { |field| solve.public_send(field) }.merge(
-          user_id: exercise.user_id, daily_exercise: exercise, set_generated_at: exercise.generated_at,
-          source: source, draft_model: draft_model, app_revision: app_revision
-        ))
-      end
+      solves.map { |solve| create!(SOLVE_FIELDS.index_with { |field| solve.public_send(field) }.merge(stamps)) }
     end
   rescue ActiveRecord::StatementInvalid, ActiveRecord::RecordInvalid => error
     raise RecordError, "judge_solves row refused: #{refusal_name(error)}", cause: nil
   end
+  private_class_method :write_solves!
 
   def self.refusal_name(error)
     return error.record.errors.attribute_names.join(", ") if error.is_a?(ActiveRecord::RecordInvalid)
