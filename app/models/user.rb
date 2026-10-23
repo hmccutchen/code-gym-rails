@@ -68,6 +68,11 @@ class User < ApplicationRecord
   # Scoped to `active` so an anonymized user's open session, in another tab or on the cable, stops resolving.
   def self.signed_in(user_id) = active.find_by(id: user_id)
 
+  def self.login_pending?(email:, requested_at:)
+    sent_at = active.find_by(email: email.to_s.strip.downcase)&.login_code_sent_at
+    [ requested_at, sent_at ].compact.max >= LOGIN_CODE_EXPIRY.ago
+  end
+
   def generate_login_code!
     raw_code = format("%06d", SecureRandom.random_number(1_000_000))
     update!(
