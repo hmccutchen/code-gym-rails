@@ -37,6 +37,16 @@ RSpec.describe "Sessions", type: :request do
       expect(user.reload.login_code_digest).to be_present
     end
 
+    it "creates the account at the request, signs it in with the first valid code, and never adds a second row" do
+      expect { post login_path, params: { email: "first@example.com" } }.to change(User, :count).by(1)
+      user = User.find_by!(email: "first@example.com")
+
+      post verify_login_code_path, params: { code: user.generate_login_code! }
+      expect(session[:user_id]).to eq(user.id)
+
+      expect { post login_path, params: { email: "first@example.com" } }.not_to change(User, :count)
+    end
+
     it "names a new account after the email's local part" do
       post login_path, params: { email: "new.dev@example.com" }
 
@@ -215,6 +225,21 @@ RSpec.describe "Sessions", type: :request do
 
       expect(session[:user_id]).to be_present
       expect(session.id.public_id).not_to eq(pre_login_session_id)
+    end
+
+    it "discards everything written before sign-in, including the CSRF token", :with_csrf do
+      user = User.create!(email: "dev@example.com", name: "Dev")
+      get login_path
+      post login_path, params: { email: user.email, authenticity_token: response.body[/name="authenticity_token" value="([^"]+)"/, 1] }
+      follow_redirect!
+      pre_login_csrf_token = session[:_csrf_token]
+      expect(pre_login_csrf_token).to be_present
+
+      post verify_login_code_path, params: { code: user.generate_login_code!,
+                                             authenticity_token: response.body[/name="authenticity_token" value="([^"]+)"/, 1] }
+
+      expect(session.to_hash.keys - %w[session_id flash _csrf_token]).to eq([ "user_id" ])
+      expect(session[:_csrf_token]).not_to eq(pre_login_csrf_token)
     end
 
     it "issues a new session on logout" do

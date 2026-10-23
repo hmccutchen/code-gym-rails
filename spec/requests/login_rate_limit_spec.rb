@@ -89,6 +89,26 @@ RSpec.describe "Login rate limits", type: :request do
       }.not_to have_enqueued_mail(UserMailer, :login_code)
       expect(response).to have_http_status(:too_many_requests)
     end
+
+    it "counts the trial form's requests in the same daily bucket" do
+      stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+      _invite, invite_code = mint_trial_code(seats: 10)
+      45.times do |n|
+        travel(16.minutes) if (n % 20).zero? && n.positive?
+        post login_path, params: { email: "dev#{n}@example.com" }
+      end
+      travel(16.minutes)
+      5.times do |n|
+        post start_trial_path, params: { email: "trial#{n}@example.com", invite_code: invite_code,
+                                         provider: "fake", consent: "1" }
+      end
+
+      expect {
+        post start_trial_path, params: { email: "trial5@example.com", invite_code: invite_code,
+                                         provider: "fake", consent: "1" }
+      }.not_to change(User, :count)
+      expect(response).to have_http_status(:too_many_requests)
+    end
   end
 
   describe "submitting codes" do
