@@ -132,6 +132,15 @@ What each listed file does.
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
 - `app/controllers/history_controller.rb` — paginated list of submitted sessions
 - `app/controllers/sessions_controller.rb` — code request + verification, with rate limits
+- `app/controllers/second_factor_challenges_controller.rb` — `/login/second-factor`: the authenticator or recovery code asked for after the emailed code, when the account has the authenticator on
+- `app/controllers/authenticators_controller.rb` — `/account/authenticator`: the setup page, turning the authenticator on and off, and the sign-in-again page for an old session
+- `app/controllers/recovery_codes_controller.rb` — `POST /account/recovery_codes`: a new set of recovery codes, shown once
+- `app/controllers/concerns/sign_in_completion.rb` — `SignInCompletion`: finishing a sign-in (`reset_session`, the stamp, `return_to`, a pending trial) and issuing the second-factor challenge
+- `app/controllers/concerns/authenticator_changes.rb` — `AuthenticatorChanges`: the shared rate limit, `no-store`, the change notice and the recovery code page for both authenticator controllers
+- `app/models/concerns/signed_in_sessions.rb` — `SignedInSessions`: `User.signed_in_through(session)`, the one check that a session is signed in and not ended by `sessions_valid_after`
+- `app/models/concerns/second_factor.rb` — `SecondFactor`: the authenticator secret, TOTP and recovery code checks, the sign-in challenge and the daily cap, each write under the row lock
+- `app/helpers/authenticator_setups_helper.rb` — the setup page's inline QR code SVG and the setup key in groups of four
+- `app/javascript/controllers/copy_text_controller.js` — the Copy buttons on the setup key and recovery codes, selecting the text instead when the clipboard is missing or refuses
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
 - `app/controllers/concept_references_controller.rb` — one action: the same concept explained another way, on demand from inside its own disclosure. Persists nothing; owns the cap, since there is no model data for it to live on
@@ -154,6 +163,7 @@ What each listed file does.
 - `app/views/shared/_push_script.html.erb` — mounts the `push-launch` controller, which re-subscribes on launch through `app/javascript/code_gym/push.js`; rendered from the layout for a signed-in user when push is configured
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
 - `app/views/accounts/_api_usage.html.erb` — the Account page's table of this month's own-key requests and tokens per provider, from `ApiUsage.own_key_totals`
+- `app/views/accounts/_authenticator.html.erb` — the Account section for the authenticator app: a link to add it, or when it's on, the date, codes left, and the forms for new codes and turning it off
 - `app/views/pwa/service-worker.js.erb` — shows the notification, with the versioned icon. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing
 - `app/clients/schema_wait.rb` — blocks the worker's Railway pre-deploy step until the schema the Solid Queue supervisor boots against exists; waits rather than migrating, so migrations keep exactly one owner
 - `app/clients/preview_environment.rb` — single authority for "is this a Railway PR deployment," derived from `PREVIEW_APP`

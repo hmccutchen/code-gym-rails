@@ -31,3 +31,12 @@ unconfirmed. Before going public, run the check in
 proxies"). It compares the logged IP from two devices with their real
 addresses, and sends a spoofed `X-Forwarded-For` header. Record both
 results here.
+
+## The second factor
+
+An authenticator code is also 6 digits, so it gets the same treatment, plus two counts kept on the user row (`docs/decisions/passwordless-sign-in.md`):
+
+- **Second sign-in step** (`SecondFactorChallengesController`): 10 attempts per pending account and 20 per IP, each per `LOGIN_RATE_LIMIT_WINDOW`.
+- **Turning the authenticator on or off, and making new recovery codes** (`AuthenticatorChanges`): 10 per account per window, shared by both controllers through one `scope:`.
+- **Per challenge:** 5 wrong codes end the challenge, and the next try needs a new emailed code. The count is `second_factor_challenge_failures` on the row, so replaying an older cookie can't reset it.
+- **Per day:** 20 wrong codes in 24 hours refuse every code until the window that began at the first failure ends (`User::SECOND_FACTOR_DAILY_FAILURES`). The 15-minute limits alone would allow 350,400 guesses a year; the daily cap holds it to 7,300.

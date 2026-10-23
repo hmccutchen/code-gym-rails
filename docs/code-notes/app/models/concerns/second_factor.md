@@ -20,6 +20,10 @@ This matters for cost. A bcrypt comparison takes about 0.25 seconds at productio
 
 `SECOND_FACTOR_DAILY_FAILURES` wrong codes inside `SECOND_FACTOR_FAILURE_WINDOW` refuse every code, right or wrong, until the window that began at the first failure ends. Successes never count. The count lives on the row so a copied session cookie can't bring back a zero.
 
+## The sign-in challenge
+
+`issue_second_factor_challenge!` stamps `second_factor_challenge_at` and zeroes `second_factor_challenge_failures`. `answer_second_factor_challenge!` checks, under the same lock as the code check, that the browser's marker names that exact time and that it is under `SECOND_FACTOR_CHALLENGE_LIFETIME` old. A right code, the fifth wrong code (`SECOND_FACTOR_CHALLENGE_FAILURES`) or the daily cap clears the challenge, so every copy of the cookie stops working at once.
+
 ## Ending other sessions
 
 `enable_second_factor!` and `disable_second_factor!` set `sessions_valid_after` to the same time they return as `changed_at`. The controller writes that time into the current session, so only the other sessions end (`SignedInSessions`). The time is floored to microseconds so it compares equal to the stored column and to the session stamp.

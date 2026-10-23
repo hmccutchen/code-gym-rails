@@ -41,10 +41,25 @@ read it before changing that area.
 - **Passwordless sign-in** (`docs/decisions/passwordless-sign-in.md`): the
   emailed code is the only first factor, and no password column is ever
   added. A code request creates the account. Sign-in runs `reset_session`
-  before setting `session[:user_id]`, and `require_login` saves the return
-  address only for a GET whose `Accept` names `text/html`. There is no second
-  factor until the optional authenticator ships. The admin page is
-  single-factor until then. The `otp_*` columns are kept but unread.
+  before setting `session[:user_id]` (`SignInCompletion`), and
+  `require_login` saves the return address only for a GET whose `Accept`
+  names `text/html`.
+- **Session validity**: every sign-in path writes `session[:signed_in_at]`
+  with `User.session_stamp`, and a session counts only while that stamp is at
+  or after `users.sessions_valid_after`. `current_user` and the cable
+  connection both resolve the user through `User.signed_in_through`, never a
+  lookup of their own. A new sign-in path that skips the stamp signs its
+  users out on their next request.
+- **Second factor** (`docs/decisions/passwordless-sign-in.md`): an optional
+  authenticator app (`SecondFactor`). Every read-then-write of its columns
+  runs under the user row lock. Every count of wrong codes lives on the row,
+  never in the session. Recovery-shaped input is compared only against the
+  bcrypt digests and anything else only as a TOTP. Turning it on needs a
+  sign-in from the last 15 minutes; turning it off or making new codes needs
+  an authenticator or recovery code, never the emailed code. Turning it on or
+  off sets `sessions_valid_after` and re-stamps the current session. Every
+  code field is named `otp_code`, and pages showing the key or codes send
+  `no-store`.
 - **Emailed-code auth**: No passwords and no links. `User#generate_login_code!`
   mints a 6-digit code, stores a BCrypt digest, and returns the raw code for
   the mailer; `User.authenticate_login_code` verifies it against the stored
