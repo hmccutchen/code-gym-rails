@@ -101,7 +101,7 @@
 - section-kind preference rules off `User` into `SectionKindSettings`
   `#479`
 - `app/services` sorted by layer into models, prompts and clients, with
-  Archspec enforcing the direction in CI `#480 open`
+  Archspec enforcing the direction in CI `#480`
   **I decided:** the pure decisions go flat into `app/models` so no class is
   renamed, prompt classes get `app/prompts`, and Archspec is added as a gem
   with a CI step
