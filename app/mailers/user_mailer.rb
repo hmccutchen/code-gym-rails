@@ -1,9 +1,10 @@
 class UserMailer < ApplicationMailer
   SECOND_FACTOR_CHANGES = %w[enabled disabled recovery_codes].index_by(&:itself).freeze
 
-  def login_code(user, raw_code)
+  # Minted here, not passed in, so the plain code is never a job argument, which the queue stores and the enqueue log prints.
+  def login_code(user)
     @user     = user
-    @raw_code = raw_code
+    @raw_code = user.generate_login_code!
     mail(to: user.email)
   end
 

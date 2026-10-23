@@ -8,7 +8,7 @@ A session with no stamp, or one that doesn't parse, is rejected. That signs out 
 
 ## One lookup for pages and the cable
 
-`ApplicationController#current_user` and `ApplicationCable::Connection` both call `User.signed_in_through`. If the cable kept its own lookup, a websocket opened by an ended session would keep connecting after the pages had signed it out.
+`ApplicationController#current_user` and `ApplicationCable::Connection` both call `User.signed_in_through`. It finds the account through `User.signed_in`, which keeps the rule that only an active account resolves, and then checks the stamp. If the cable kept its own lookup, a websocket opened by an ended session would keep connecting after the pages had signed it out.
 
 ## Who writes the stamp
 

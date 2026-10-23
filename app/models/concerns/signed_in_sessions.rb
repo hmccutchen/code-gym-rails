@@ -5,7 +5,7 @@ module SignedInSessions
   class_methods do
     # Pages and the cable connection both resolve a session here, so the websocket can't outlive one the pages reject.
     def signed_in_through(session)
-      user = active.find_by(id: session[:user_id])
+      user = signed_in(session[:user_id])
       user if user&.session_signed_in_valid?(session[:signed_in_at])
     end
 

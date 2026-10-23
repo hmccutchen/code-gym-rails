@@ -441,7 +441,7 @@ RSpec.describe "Level suggestion proposals", type: :request do
       login_as(user)
       other_tab = ActionDispatch::Integration::Session.new(Rails.application)
       other_tab.post login_path, params: { email: user.email }
-      other_tab.post verify_login_code_path, params: { code: user.generate_login_code! }
+      other_tab.post verify_login_code_path, params: { code: user.reload.generate_login_code! }
       advanced = false
       allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
         evidence = original.call(*args)

@@ -95,6 +95,22 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe ".signed_in" do
+    it "resolves a session id to its account" do
+      user = create_user
+
+      expect(User.signed_in(user.id)).to eq(user)
+    end
+
+    it "resolves nothing for an anonymized account or an empty session" do
+      user = create_user
+      user.anonymize!
+
+      expect(User.signed_in(user.id)).to be_nil
+      expect(User.signed_in(nil)).to be_nil
+    end
+  end
+
   describe "login codes" do
     it "generates a code digest, with attempts reset to zero" do
       user = create_user

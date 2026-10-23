@@ -174,6 +174,8 @@ data.*
   the only account; a 10-minute code with the rate-limit windows kept at 15;
   trusted proxies, with a spoofed-header test, split out and required before I
   post publicly
+- from my layered review: the login code out of the job queue, and one
+  signed-in lookup
 - an optional authenticator app as a second sign-in factor, spec and plan
   first, stacked on the passwordless PR `#493 open`
   **why:** possession of a phone is the second factor worth having, and the

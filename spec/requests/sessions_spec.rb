@@ -2,6 +2,8 @@ require "rails_helper"
 
 RSpec.describe "Sessions", type: :request do
   describe "POST /login" do
+    include ActiveJob::TestHelper
+
     # Drives BCrypt under bundler, which 500'd in production when bcrypt was missing from the Gemfile.
     it "creates a first-time user and enqueues the login code email" do
       expect {
@@ -11,6 +13,15 @@ RSpec.describe "Sessions", type: :request do
 
       expect(response).to redirect_to(login_path)
       expect(flash[:notice]).to match(/check your email/i)
+    end
+
+    it "queues the email with the account alone, so the plain code is never stored in the queue or printed by the enqueue log" do
+      user = User.create!(email: "known@example.com", name: "Known")
+
+      expect {
+        post login_path, params: { email: "known@example.com" }
+      }.to have_enqueued_mail(UserMailer, :login_code).with(user)
+      expect(user.reload.login_code_digest).to be_nil
     end
 
     it "mails a code regardless of any touch_device hint in the params" do
@@ -31,7 +42,7 @@ RSpec.describe "Sessions", type: :request do
       user = User.create!(email: "known@example.com", name: "Known")
 
       expect {
-        post login_path, params: { email: "KNOWN@example.com" }
+        perform_enqueued_jobs { post login_path, params: { email: "KNOWN@example.com" } }
       }.not_to change(User, :count)
 
       expect(user.reload.login_code_digest).to be_present

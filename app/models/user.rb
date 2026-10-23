@@ -65,6 +65,9 @@ class User < ApplicationRecord
     LOGIN_CODE_EXPIRY.inspect
   end
 
+  # Scoped to `active` so an anonymized user's open session, in another tab or on the cable, stops resolving.
+  def self.signed_in(user_id) = active.find_by(id: user_id)
+
   def generate_login_code!
     raw_code = format("%06d", SecureRandom.random_number(1_000_000))
     update!(

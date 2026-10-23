@@ -14,7 +14,7 @@ The second factor worth having is possession of a phone. That came as an optiona
 
 ## How it works now
 
-- **Requesting a code.** `POST /login` with an email address creates the account when the address is new. Then it mails a code and records the pending sign-in in this browser's session (`LoginCodeRequests#mail_login_code`). This is open sign-up as it worked before #490: the account exists from the request, and the code proves the address.
+- **Requesting a code.** `POST /login` with an email address creates the account when the address is new. Then it queues the email and records the pending sign-in in this browser's session (`LoginCodeRequests#mail_login_code`). The mailer mints the code while it builds the email, so the job carries only the account: a code passed in as an argument would sit in plain text in `solid_queue_jobs` and in the enqueue log line. This is open sign-up as it worked before #490: the account exists from the request, and the code proves the address.
 - **The code.**
   - It comes from `SecureRandom`, and only its BCrypt digest is stored.
   - It lives 10 minutes (`User::LOGIN_CODE_EXPIRY`) and dies after five wrong guesses.
