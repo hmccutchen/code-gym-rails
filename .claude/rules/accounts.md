@@ -1,19 +1,11 @@
 ---
 paths:
-  - "app/controllers/{first_sign_ins,password_setups,two_factor_setups,backup_codes,authenticator_moves,trials,accounts,application}_controller.rb"
-  - "app/controllers/concerns/posted_user_email.rb"
-  - "app/controllers/users/**"
-  - "app/controllers/concerns/preview_auto_login.rb"
-  - "app/channels/application_cable/connection.rb"
-  - "app/helpers/two_factor_setups_helper.rb"
+  - "app/controllers/{sessions,trials,accounts,application}_controller.rb"
+  - "app/controllers/concerns/{login_code_requests,preview_auto_login}.rb"
   - "app/models/{invite_code,pending_trial,provider_credential,trial_allowance,trial_mode,trial_status,house_keys,user}.rb"
-  - "app/models/concerns/sign_in_credentials.rb"
-  - "config/initializers/devise.rb"
   - "app/clients/{preview_environment,preview_mail,lazy_cache_store}.rb"
   - "app/services/preview_seed.rb"
-  - "app/views/{first_sign_ins,password_setups,two_factor_setups,devise,trials,user_mailer}/**"
-  - "app/views/accounts/_authenticator.html.erb"
-  - "app/views/shared/_auth_page_styles.html.erb"
+  - "app/views/{sessions,trials,user_mailer}/**"
   - "app/views/dashboard/{_trial_banner,_trial_ended}.html.erb"
   - "app/views/api_keys/{_trial_note,_key_guide}.html.erb"
   - "lib/boot/app_host.rb"
@@ -30,8 +22,8 @@ read it before changing that area.
 
 - **Invite codes and trials** (`docs/decisions/invite-codes-and-trials.md`):
   An invite code starts a trial on a house key. `InviteCode#redeem!` takes a
-  seat in one statement, and the seat is taken only when a confirmed account
-  with the trial's address signs in. `ProviderCredential.for` picks the key, `TrialAllowance.check!`
+  seat in one statement, and the seat is taken only when the emailed code is
+  entered. `ProviderCredential.for` picks the key, `TrialAllowance.check!`
   runs before every house-key call, and generation, judges and mastery code
   never read trial state (`trial_isolation_spec`); trial branches render only
   for `User#on_trial?`. Trials are paused: the login page carries no trial
@@ -40,39 +32,23 @@ read it before changing that area.
   requests and tokens per provider from `ApiUsage.own_key_totals`, in the
   user's zone. House-key rows stay out, since the account's key did not pay
   for them. Input counts cache reads and writes; no cost is shown.
-- **Password and authenticator sign-in**
-  (`docs/decisions/password-and-authenticator-sign-in.md`): Devise with
-  `devise-two-factor`: a password plus a TOTP code or a single-use backup
-  code, checked together by the gem's strategies on Devise's own
-  `sessions#create`, with one message for every failure. Every form sign-in
-  needs a code (`DeviseOverrides#otp_required_for_login` is always true), so
-  an account without an authenticator gets in only through its inbox: the
-  confirmation link, a password reset, or the emailed code, each of which
-  leads to enrollment. Sign-up needs email confirmation, but only for
-  accounts created through sign-up (`#confirmation_required?`). A reset signs
-  in only an account without an authenticator. `ApplicationController` sends a
-  signed-in account with no password, then one with no authenticator, to set
-  them up before anything else. Enrollment, backup-code regeneration and
-  moving to a new phone run under the row lock and return a
-  `SignInCredentials::CodeOutcome`. Never call `current_user` in `Users::SessionsController`
-  before params authentication is allowed: the rate limits are prepended
-  for that reason, and the stale-token handler reads
-  `warden.authenticated?(:user)`.
-- **The emailed code for accounts from before passwords**: Only accounts
-  in `User.awaiting_password` (no password, not anonymized) can get one,
-  from `FirstSignInsController`, which creates no accounts and gives the
-  same reply for any address. `User#generate_login_code!` stores a BCrypt
-  digest and `User.authenticate_login_code` checks against it. Codes expire
-  in 15 minutes (`User::LOGIN_CODE_EXPIRY`), die after five wrong guesses
-  (`LOGIN_CODE_MAX_ATTEMPTS`), and work only in the browser that asked,
-  since `#verify_code` reads the address from the session. A follow-up PR
-  deletes this path once every account has enrolled.
-- **Login rate limits** (`docs/decisions/login-rate-limits.md`): sign-in
-  attempts, reset emails and confirmation emails per address and per IP,
-  sign-ups per IP, enrollment and backup-code attempts per account, and the
-  emailed-code limits per address and per IP. Each limit
-  needs its own `name:`, and `LazyCacheStore` resolves `Rails.cache` per
-  call.
+- **Emailed-code auth**: No passwords and no links. `User#generate_login_code!`
+  mints a 6-digit code, stores a BCrypt digest, and returns the raw code for
+  the mailer; `User.authenticate_login_code` verifies it against the stored
+  BCrypt digest, never against the raw code.
+  Codes expire in 15 minutes (`User::LOGIN_CODE_EXPIRY`) and die after five
+  wrong guesses (`LOGIN_CODE_MAX_ATTEMPTS`). A code is redeemable **only in
+  the browser that requested it** — `SessionsController#verify_code` reads the
+  address from `session[:pending_login_email]`, never from a form field, so a
+  code cannot be pointed at an account this browser did not ask about. That
+  binding is why cross-device login is not possible, which is a deliberate
+  cost of having one credential instead of two.
+- **Login rate limits** (`docs/decisions/login-rate-limits.md`):
+  `SessionsController` bounds guessing of the 6-digit code with per-address
+  and per-IP `rate_limit`s on code requests and submissions. The per-IP
+  request caps stop account and mail creation by address rotation; the
+  per-address submission cap stops rotating IPs. Each limit needs its own
+  `name:`, and `LazyCacheStore` resolves `Rails.cache` per call.
 - **Preview apps** (`docs/decisions/preview-apps.md`):
   `PreviewEnvironment.active?`, read from `PREVIEW_APP`, which only
   `railway.toml`'s `[environments.pr.deploy]` sets, is the single authority

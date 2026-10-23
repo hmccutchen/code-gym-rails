@@ -1,4 +1,4 @@
-# app/views/first_sign_ins/_pending.html.erb
+# app/views/sessions/_pending.html.erb
 
 ## Code field's `aria-describedby`
 

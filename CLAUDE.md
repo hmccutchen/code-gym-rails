@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A team Rails app for daily personalized coding exercises. Each engineer logs in with a password and a code from an authenticator app, adds their own AI provider API key (Anthropic, Gemini or OpenAI), and gets an AI-generated problem set each morning tailored to their performance history. They answer sections and rate difficulty before submitting. Submission requests an inline AI review; the submitted work and review feed into the next day's problem generation.
+A team Rails app for daily personalized coding exercises. Each engineer logs in (emailed 6-digit code, no passwords), adds their own AI provider API key (Anthropic, Gemini or OpenAI), and gets an AI-generated problem set each morning tailored to their performance history. They answer sections and rate difficulty before submitting. Submission requests an inline AI review; the submitted work and review feed into the next day's problem generation.
 
 ## Git Workflow
 
@@ -241,16 +241,15 @@ advisory signal; it is not evidence that anything was verified.
 - **Rouge** — server-side syntax highlighting for every code block (`CodeHighlight`)
 - **RuboCop and Prettier** — re-indent provider-written exercise code once, at ingest (`CodeFormat`); Prettier runs in Node from `vendor/prettier`
 - **web-push** — VAPID-signed daily reminder notifications (`PushDelivery`)
-- **Devise and devise-two-factor** — sign-in with a password and a TOTP code, backup codes, sign-up confirmation and password resets (`SignInCredentials`)
-- **BCrypt** — password, backup code and legacy login code digests
+- **BCrypt** — login code digests
 - **ActiveRecord Encryption** — encrypts each user's provider API key at rest
 - **Railway** — hosting (web + worker services, and a `Database` service running Railway's Postgres 18 template)
 - **Docker** — Railway builds the image from the `Dockerfile`, as its build logs show, although `railway.toml` still names Nixpacks
 
 ## Architecture
 
-- Each engineer signs in with a password and an authenticator code (Devise)
-  and stores their own Anthropic, Gemini or OpenAI key, encrypted; the key's prefix sets
+- Each engineer signs in with an emailed 6-digit code and stores their own
+  Anthropic, Gemini or OpenAI key, encrypted; the key's prefix sets
   `user.provider`, and `AiService.for(user)` dispatches on it.
 - At 8am on weekdays the Solid Queue cron runs `GenerateDailyExercisesJob`,
   which builds the day's set from the user's recent performance. A dashboard
@@ -282,7 +281,7 @@ area whose copy you change.
 - `.claude/rules/answers.md`: what counts as answered, autosave, offline saving, submit, folding, the reviewed-response invariant.
 - `.claude/rules/review.md`: the grading rubric, the review prose judge, the post-hoc difficulty note.
 - `.claude/rules/learn.md`: the Learn tab, concept references and guides, hand-written text, the Progress page, the weekly featured concept.
-- `.claude/rules/accounts.md`: password and authenticator sign-in and its limits, the emailed code for older accounts, invite codes and trials, preview apps, host resolution.
+- `.claude/rules/accounts.md`: emailed-code login and its limits, invite codes and trials, preview apps, host resolution.
 - `.claude/rules/pages.md`: history paging, server-side highlighting, the home-screen app and pull-to-refresh, display preferences, push reminders.
 - `.claude/rules/patterns.md`, `request-flow.md`, `models.md`, `tests.md`,
   `deployment.md`: the adopted patterns, the request flow, the model table,

@@ -6,7 +6,7 @@ RSpec.describe "Profile", type: :request do
   describe "PATCH /profile" do
     it "requires login" do
       patch profile_path, params: { user: { name: "New" } }
-      expect(response).to redirect_to(new_user_session_path)
+      expect(response).to redirect_to(login_path)
     end
 
     it "updates the name and returns it as JSON" do

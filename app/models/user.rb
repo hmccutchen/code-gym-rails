@@ -1,7 +1,5 @@
 # Design notes: docs/code-notes/app/models/user.md
 class User < ApplicationRecord
-  include SignInCredentials
-
   has_many :daily_exercises, dependent: :destroy
   has_many :daily_responses, dependent: :destroy, inverse_of: :user
   has_many :duck_threads,    dependent: :delete_all
@@ -75,11 +73,11 @@ class User < ApplicationRecord
 
   # Under a row lock: unlocked, parallel posts of one code each redeem it (spec/models/login_code_concurrency_spec.rb).
   def self.authenticate_login_code(email:, code:)
-    user = awaiting_password.find_by(email: email.to_s.strip.downcase)
+    user = active.find_by(email: email.to_s.strip.downcase)
     return nil unless user
 
     user.with_lock do
-      return nil if user.password_set? || user.login_code_digest.nil?
+      return nil if user.login_code_digest.nil?
       return nil if user.login_code_sent_at.nil? || user.login_code_sent_at < LOGIN_CODE_EXPIRY.ago
 
       if BCrypt::Password.new(user.login_code_digest) == code.to_s.strip
@@ -174,9 +172,11 @@ class User < ApplicationRecord
         email:                  "deleted-user-#{id}@anonymized.local",
         name:                   "Deleted user",
         api_keys:               nil,
+        login_code_sent_at:     nil,
+        login_code_digest:      nil,
+        login_code_attempts:    0,
         reminder_level:         :none,
-        anonymized_at:          Time.current,
-        **sign_in_credentials_cleared
+        anonymized_at:          Time.current
       )
     end
     true

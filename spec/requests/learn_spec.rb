@@ -89,10 +89,10 @@ RSpec.describe "Learn", type: :request do
     end
 
     it "requires login" do
-      delete destroy_user_session_path
+      delete logout_path
       get learn_path
 
-      expect(response).to redirect_to(new_user_session_path)
+      expect(response).to redirect_to(login_path)
     end
 
     # The bulk button counts rows, so "not written yet" must mean no row, distinct from a guide-less row.

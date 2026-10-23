@@ -55,15 +55,6 @@ RSpec.describe PreviewSeed do
       expect(user).to be_api_key_present
     end
 
-    it "creates the user with a password and an authenticator, so auto-login lands past the setup gates" do
-      set_target
-
-      user = PreviewSeed.run!
-
-      expect(user).to be_password_set
-      expect(user).to be_two_factor_enrolled
-    end
-
     it "downcases and strips the configured email" do
       set_target("  Reviewer@Example.COM  ")
 

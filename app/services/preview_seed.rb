@@ -37,10 +37,7 @@ class PreviewSeed
       skill_level: "senior",
       language:    "ruby_rails",
       provider:    "anthropic",
-      api_keys:    { "anthropic" => DUMMY_API_KEY },
-      password:    SecureRandom.hex(32),
-      otp_secret:  User.generate_otp_secret,
-      otp_required_for_login: true
+      api_keys:    { "anthropic" => DUMMY_API_KEY }
     ).find_or_create_by!(email: target_email)
   end
 

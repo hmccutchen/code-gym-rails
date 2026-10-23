@@ -38,28 +38,19 @@ module AuthHelpers
     { track_chosen_at: chosen ? Time.current : nil }
   end
 
-  SPEC_PASSWORD = "correct horse battery staple".freeze
-
-  # Warden directly, as Devise's own helper does, since its sign_in calls a login_as this one shadows.
+  # The code is minted after the POST because #authenticate_login_code reads the current digest.
   def login_as(user)
-    finish_account_setup(user)
-    Warden.on_next_request { |proxy| proxy.set_user(User.find(user.id), scope: :user, event: :authentication) }
+    post login_path, params: { email: user.email }
+    post verify_login_code_path, params: { code: user.generate_login_code! }
   end
 
   def visit_as(user)
-    login_as(user)
-    visit root_path
-  end
+    visit login_path
+    fill_in "Work email *", with: user.email
+    click_button "Send code"
 
-  def finish_account_setup(user)
-    return if user.password_set? && user.two_factor_enrolled?
-
-    user.update_columns(encrypted_password: Devise::Encryptor.digest(User, SPEC_PASSWORD), otp_required_for_login: true)
-  end
-
-  def enroll_two_factor(user, password: SPEC_PASSWORD)
-    user.update!(password: password, otp_secret: User.generate_otp_secret, otp_required_for_login: true)
-    user
+    fill_in "6-digit code from the email", with: user.generate_login_code!
+    click_button "Verify code"
   end
 
   # A hardcoded wrong code could match the random real one, so derive one that never collides.
@@ -69,8 +60,6 @@ module AuthHelpers
 end
 
 RSpec.configure do |config|
-  config.before { Warden.test_mode! }
-  config.after  { Warden.test_reset! }
   config.include AuthHelpers, type: :request
   config.include AuthHelpers, type: :channel
   config.include AuthHelpers, type: :helper

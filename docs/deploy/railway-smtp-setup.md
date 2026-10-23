@@ -58,7 +58,7 @@ Each `railway variable set` triggers a redeploy of that service by default.
 
 ## Verifying it worked
 
-After both services redeploy, request a password reset from the login page and
+After both services redeploy, request a login code from the login page and
 check the worker logs (`railway logs -s worker`). A bad API key or an
 unverified `MAIL_FROM` domain surfaces as a failed Solid Queue job
 (`raise_delivery_errors = true`), not silence. Remember that with

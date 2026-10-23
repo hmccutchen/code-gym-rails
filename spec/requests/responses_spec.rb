@@ -659,9 +659,9 @@ RSpec.describe "Responses", type: :request do
 
     it "requires login" do
       daily_response = create_reviewed_response(user)
-      delete destroy_user_session_path
+      delete logout_path
       post email_review_response_path(daily_response)
-      expect(response).to redirect_to(new_user_session_path)
+      expect(response).to redirect_to(login_path)
     end
 
     it "404s for another user's response" do
@@ -1441,10 +1441,10 @@ RSpec.describe "Responses", type: :request do
 
     it "requires login" do
       daily_response = create_response_for(user)
-      delete destroy_user_session_path
+      delete logout_path
 
       delete start_over_response_path(daily_response)
-      expect(response).to redirect_to(new_user_session_path)
+      expect(response).to redirect_to(login_path)
     end
 
     it "404s for another user's response" do

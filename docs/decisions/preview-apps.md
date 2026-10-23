@@ -23,10 +23,9 @@ is still an ordinary environment variable, though: typing it into a
 production or shared-scope Railway variable would enable this, which is why
 the name is reserved for PR deployments and set from committed config only.
 It skips
-the login pages, so signing in as someone else still works, and a deliberate
-logout sets a cookie that keeps the reviewer signed out. The seed gives the
-account a random password and an authenticator, so auto-login lands past the
-setup checks in `ApplicationController`.
+`SessionsController`, so real code login is unchanged and still
+testable, and a deliberate logout sets a cookie that keeps the reviewer
+signed out.
 
 **Accepted tradeoff:** a PR app's URL is internet-reachable, so this replaces
 "public URL, login wall" with "public URL, no wall" for anyone holding the
@@ -36,7 +35,7 @@ change is deliberate, not an oversight.
 
 **`DEFAULT_EMAIL` is undeliverable on purpose** (`.invalid`, RFC 2606), so it
 can never collide with a real mailbox. The cost is that a preview app's
-mail-sending actions (the "Email me this review" button, a password reset
+mail-sending actions (the "Email me this review" button, a login code
 requested for that address) fail loudly rather than silently: `PreviewMail`
 delivers inline and production config sets `raise_delivery_errors`. Set
 `PREVIEW_SEED_EMAIL` to a real address on the PR environment when a reviewer

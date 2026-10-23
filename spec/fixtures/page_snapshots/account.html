@@ -595,6 +595,7 @@
 
   <div class="container" data-pull-content>
     <main id="main-content" tabindex="-1">
+      <div class="flash notice" id="flash-notice">Welcome back, Existing!</div>
 
     <style>
   .account-wrap { max-width: 480px; margin: 5rem auto; }
@@ -610,13 +611,6 @@
   .reminder-nudges label { display: flex; align-items: flex-start; gap: .5rem;
                            color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
   .reminder-nudges input[type="checkbox"] { margin-top: .2rem; flex: none; }
-  .authenticator-settings { margin-top: 2.5rem; }
-  .authenticator-settings h2 { font-size: 1rem; margin-bottom: .4rem; }
-  .authenticator-settings p { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
-  .authenticator-settings form { display: grid; gap: .4rem; margin-bottom: 1.5rem; }
-  .authenticator-settings label { color: var(--muted); font-size: .85rem; }
-  .authenticator-settings input[type="text"] { width: 100%; min-width: 0; }
-  .authenticator-settings .btn { justify-self: start; max-width: 100%; white-space: normal; }
   .api-usage { margin-top: 2.5rem; }
   .api-usage h2 { font-size: 1rem; margin-bottom: .4rem; }
   .api-usage p { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
@@ -650,22 +644,6 @@
   </div>
 
   
-
-  <div class="authenticator-settings">
-  <h2>Authenticator and backup codes</h2>
-  <p>Lost your backup codes, or used most of them? Enter a code from your authenticator app, or one of your backup codes, to make ten new ones. The old ones stop working.</p>
-  <form action="/backup_codes" accept-charset="UTF-8" method="post">
-    <label for="backup-codes-code">Authenticator or backup code</label>
-    <input id="backup-codes-code" required="required" autocomplete="one-time-code" maxlength="12" size="12" type="text" name="code" />
-    <input type="submit" name="commit" value="Make new backup codes" class="btn btn-ghost" data-disable-with="Make new backup codes" />
-</form>
-  <p>Got a new phone? Enter a code from your old phone, or a backup code, to turn the authenticator off. You&#39;ll scan a new QR code straight after.</p>
-  <form action="/authenticator_move" accept-charset="UTF-8" method="post">
-    <label for="authenticator-move-code">Authenticator or backup code</label>
-    <input id="authenticator-move-code" required="required" autocomplete="one-time-code" maxlength="12" size="12" type="text" name="code" />
-    <input type="submit" name="commit" value="Move to a new phone" class="btn btn-ghost" data-disable-with="Move to a new phone" />
-</form></div>
-
 
   <div class="api-usage">
   <h2>API usage this month</h2>

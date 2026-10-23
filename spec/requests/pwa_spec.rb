@@ -57,7 +57,7 @@ RSpec.describe "PWA", type: :request do
   end
 
   describe "the layout's install tags" do
-    before { get new_user_session_path }
+    before { get login_path }
 
     it "declares the app installable and standalone-capable, including on iOS before 17.4" do
       expect(response.body).to include(%(<link rel="manifest" href="/manifest.json">))
@@ -122,7 +122,7 @@ RSpec.describe "PWA", type: :request do
     end
 
     it "lets the page reach under the home indicator, so the bar can pad itself clear of it" do
-      get new_user_session_path
+      get login_path
 
       expect(response.body).to include("viewport-fit=cover")
       expect(layout).to include("env(safe-area-inset-bottom)")
@@ -184,7 +184,7 @@ RSpec.describe "PWA", type: :request do
     end
 
     it "is rendered on every page, signed in or not" do
-      get new_user_session_path
+      get login_path
 
       expect(response.body).to include('id="pull-refresh"')
     end

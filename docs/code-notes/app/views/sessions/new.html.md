@@ -1,4 +1,4 @@
-# app/views/first_sign_ins/new.html.erb
+# app/views/sessions/new.html.erb
 
 ## Pending login banner
 

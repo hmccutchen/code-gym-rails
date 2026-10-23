@@ -7,20 +7,13 @@ RSpec.describe "Trials", type: :request do
     post start_trial_path, params: { email: email, invite_code: code, provider: provider, consent: consent }
   end
 
-  def sign_up_and_confirm(email: "new@example.com")
-    post user_registration_path, params: { user: { name: "New", email: email, password: AuthHelpers::SPEC_PASSWORD,
-                                                   password_confirmation: AuthHelpers::SPEC_PASSWORD } }
-    get user_confirmation_path(confirmation_token: confirmation_token_mailed_to(email))
+  def emailed_code
+    ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
   end
 
-  def confirmation_token_mailed_to(email)
-    mail = ActionMailer::Base.deliveries.reverse.find { |delivery| delivery.to == [ email ] }
-    mail.body.encoded[/confirmation_token=([^"&\s]+)/, 1]
-  end
-
-  def start_and_sign_up(**options)
-    start(**options)
-    sign_up_and_confirm(email: options.fetch(:email, "new@example.com"))
+  def start_and_verify(**options)
+    perform_enqueued_jobs { start(**options) }
+    post verify_login_code_path, params: { code: emailed_code }
   end
 
   describe "signed out, with an email and a code" do
@@ -43,16 +36,16 @@ RSpec.describe "Trials", type: :request do
       expect(response).to redirect_to(new_trial_path)
     end
 
-    it "sends the visitor to sign up and starts the trial on the chosen provider once the address is confirmed" do
+    it "mails a login code and starts the trial on the chosen provider once the code is entered" do
       invite, code = mint_trial_code(seats: 1, days: 7, cap: 12)
 
       travel_to(Time.utc(2026, 10, 7, 14)) do
-        expect { start(code: code.downcase) }.not_to change(User, :count)
-        expect(response).to redirect_to(new_user_registration_path)
-        expect(flash[:notice]).to include("Your trial starts when you follow the confirmation link")
+        expect { perform_enqueued_jobs { start(code: code.downcase) } }.to change(User, :count).by(1)
+        expect(response).to redirect_to(login_path)
+        expect(flash[:notice]).to include("Your trial starts when you enter it.")
         expect(invite.reload.redeemed_count).to eq(0)
 
-        sign_up_and_confirm
+        post verify_login_code_path, params: { code: emailed_code }
 
         expect(response).to redirect_to(root_path)
         expect(flash[:notice]).to eq("Your trial has started.")
@@ -64,20 +57,11 @@ RSpec.describe "Trials", type: :request do
       end
     end
 
-    it "fills the sign-up form with the address the trial was started for" do
-      _invite, code = mint_trial_code
-      start(code: code)
-
-      get new_user_registration_path
-
-      expect(response.body).to include('value="new@example.com"')
-    end
-
     it "starts a trial on OpenAI when its house key is set" do
       stub_env("HOUSE_OPENAI_API_KEY" => "sk-house")
       _invite, code = mint_trial_code
 
-      start_and_sign_up(code: code, provider: "openai")
+      start_and_verify(code: code, provider: "openai")
 
       expect(User.find_by!(email: "new@example.com")).to have_attributes(provider: "openai", trial?: true)
     end
@@ -96,20 +80,19 @@ RSpec.describe "Trials", type: :request do
         { code: good_code, provider: "gemini" } => "Choose the provider your trial runs on."
       }
       refusals.each do |options, message|
-        start(**options)
+        expect { start(**options) }.not_to have_enqueued_mail(UserMailer, :login_code)
         expect(response).to have_http_status(:unprocessable_content)
         expect(response.body).to include(CGI.escapeHTML(message))
         expect(response.body).to include('value="new@example.com"')
       end
-      expect(session[PendingTrial::KEY]).to be_nil
+      expect(User.find_by(email: "new@example.com")).to be_nil
     end
 
     it "takes no seat for an account that has a key of its own, and sends it to Setup" do
-      own = enroll_two_factor(create_user_with_key(email: "own@example.com"))
+      own = create_user_with_key(email: "own@example.com")
       invite, code = mint_trial_code
 
-      start(email: "own@example.com", code: code)
-      post user_session_path, params: { user: { email: own.email, password: AuthHelpers::SPEC_PASSWORD, otp_attempt: own.current_otp } }
+      start_and_verify(email: "own@example.com", code: code)
 
       expect(response).to redirect_to(setup_path)
       expect(flash[:alert]).to eq("You already have an API key, so you don't need a trial.")
@@ -119,28 +102,41 @@ RSpec.describe "Trials", type: :request do
 
     it "signs in without a trial when the last seat went between the form and the code" do
       invite, code = mint_trial_code(seats: 1)
-      start(code: code)
+      perform_enqueued_jobs { start(code: code) }
       invite.redeem!
 
-      sign_up_and_confirm
+      post verify_login_code_path, params: { code: emailed_code }
 
       expect(response).to redirect_to(trial_path)
       expect(User.find_by!(email: "new@example.com")).not_to be_trial
       follow_redirect!
-      expect(response).to redirect_to(two_factor_setup_path)
+      expect(response).to redirect_to(welcome_path)
       follow_redirect!
       expect(response.body).to include(CGI.escapeHTML("That code didn't work."))
     end
 
-    it "starts nothing for a different account that signs in first in the same browser" do
+    it "drops the trial when a plain login code is asked for afterwards" do
       invite, code = mint_trial_code
-      other = enroll_two_factor(create_user_with_key(email: "other@example.com"))
+      start(code: code)
+      perform_enqueued_jobs { post login_path, params: { email: "new@example.com" } }
+
+      post verify_login_code_path, params: { code: emailed_code }
+
+      expect(response).to redirect_to(root_path)
+      expect(User.find_by!(email: "new@example.com")).not_to be_trial
+      expect(invite.reload.redeemed_count).to eq(0)
+    end
+
+    it "counts code requests from the trial page and the login page together" do
+      allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+      _invite, code = mint_trial_code(seats: 10)
+
+      3.times { post login_path, params: { email: "new@example.com" } }
+      2.times { start(code: code) }
       start(code: code)
 
-      post user_session_path, params: { user: { email: other.email, password: AuthHelpers::SPEC_PASSWORD, otp_attempt: other.current_otp } }
-
-      expect(other.reload).not_to be_trial
-      expect(invite.reload.redeemed_count).to eq(0)
+      expect(response).to have_http_status(:too_many_requests)
+      expect(response.body).to include("Too many code requests for that address.")
     end
 
     it "says trials are not available under the kill switch" do
