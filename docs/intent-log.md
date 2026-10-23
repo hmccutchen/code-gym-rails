@@ -165,8 +165,8 @@ data.*
 
 ## Fri Oct 23
 
-- every PR gets a critical review and a layered-design review, each by a
-  separate agent, once the work is done `#492`
+- every PR gets a critical and a layered-design review, each by a separate
+  agent `#492`
   **I decided:** another fresh agent checks each finding against the code
   before anything is changed
 - the test rules say CI runs on Postgres 18
