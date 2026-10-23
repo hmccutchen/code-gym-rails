@@ -60,7 +60,7 @@ RSpec.describe DesignComparisonReplay do
                                     "user #{user.id}: 2", "user #{other_user.id}: 1",
                                     "first date: 2026-10-01, last date: 2026-10-06",
                                     "worst-case bound: $0.06 (3 × $0.019 per judge call; claude-sonnet-5-5 at list price " \
-                                    "with 3500 input tokens estimated and its full #{AiService::JUDGE_MAX_TOKENS}-token output cap)")
+                                    "with 3500 input tokens estimated and its full #{CallProfiles::JUDGE_MAX_TOKENS}-token output cap)")
       expect_no_section_text
     end
   end
@@ -279,7 +279,7 @@ RSpec.describe DesignComparisonReplay do
     it "prints the plan by rung and the worst-case bound, and calls nothing, without --run" do
       prices      = ModelComparison::LIST_PRICE_PER_MILLION
       draft_cost  = (10_000 * prices["claude-opus-5-5"][:input] + ClaudeService::MAX_TOKENS * prices["claude-opus-5-5"][:output]) / 1e6
-      judge_cost  = (3_500 * prices["claude-sonnet-5-5"][:input] + AiService::JUDGE_MAX_TOKENS * prices["claude-sonnet-5-5"][:output]) / 1e6
+      judge_cost  = (3_500 * prices["claude-sonnet-5-5"][:input] + CallProfiles::JUDGE_MAX_TOKENS * prices["claude-sonnet-5-5"][:output]) / 1e6
       per_section = draft_cost + judge_cost
 
       expect { replay(key: nil).synthesize(user.id, 6) }.not_to change { [ JudgeSolve.count, ApiUsage.count ] }
