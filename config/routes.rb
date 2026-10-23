@@ -13,6 +13,7 @@ Rails.application.routes.draw do
   get    "login",        to: "sessions#new"
   post   "login",        to: "sessions#create"
   post   "login/code",   to: "sessions#verify_code", as: :verify_login_code
+  get    "login/code",   to: redirect("/login")
   get    "login/second-factor", to: "second_factor_challenges#new", as: :second_factor_challenge
   post   "login/second-factor", to: "second_factor_challenges#create"
   delete "logout",       to: "sessions#destroy", as: :logout
