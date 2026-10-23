@@ -909,6 +909,15 @@ RSpec.describe User, type: :model do
       expect(user).to be_anonymized
     end
 
+    it "clears an authenticator left from the Devise sign-in" do
+      user = create_user
+      user.update_columns(otp_secret: "stored-ciphertext", consumed_timestep: 59_000_000, otp_backup_codes: [ "digest" ])
+
+      user.anonymize!
+
+      expect(user.reload.attributes.values_at("otp_secret", "consumed_timestep", "otp_backup_codes")).to all(be_nil)
+    end
+
     it "stops push reminders and drops the endpoints they would reach" do
       user = create_user
       user.update!(reminder_level: :ready)

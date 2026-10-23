@@ -175,6 +175,9 @@ class User < ApplicationRecord
         login_code_sent_at:     nil,
         login_code_digest:      nil,
         login_code_attempts:    0,
+        otp_secret:             nil,
+        consumed_timestep:      nil,
+        otp_backup_codes:       nil,
         reminder_level:         :none,
         anonymized_at:          Time.current
       )
