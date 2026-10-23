@@ -1342,8 +1342,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         interval = poller["data-generating-interval-value"].to_i / 1000.0
 
         expect(attempts).to be_positive
-        expect(attempts * interval).to be > AiService::GENERATION_READ_TIMEOUT
-        expect(attempts * interval).to be > AiService::JUDGED_GENERATION_BUDGET
+        expect(attempts * interval).to be > CallProfiles::GENERATION_READ_TIMEOUT
+        expect(attempts * interval).to be > CallProfiles::JUDGED_GENERATION_BUDGET
         expect(attempts * interval).to be > DailyExercise::REGENERATION_STALE_AFTER.to_i
       end
     end

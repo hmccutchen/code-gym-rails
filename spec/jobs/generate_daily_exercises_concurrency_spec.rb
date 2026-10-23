@@ -19,7 +19,7 @@ RSpec.describe GenerateDailyExercisesJob do
   # A permit shorter than judged generation would let a second billed generation start.
   it "holds the permit for the judged generation budget and recovers an abandoned expired permit" do
     job = described_class.new(user_id: 1)
-    expect(described_class.concurrency_duration).to be >= AiService::JUDGED_GENERATION_BUDGET.seconds
+    expect(described_class.concurrency_duration).to be >= CallProfiles::JUDGED_GENERATION_BUDGET.seconds
 
     freeze_time do
       permit = SolidQueue::Semaphore.create!(key: job.concurrency_key, value: 0,

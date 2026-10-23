@@ -3,37 +3,6 @@ require "json"
 # Design notes: docs/code-notes/app/services/ai_service.md
 class AiService
   FINISHED_STATUSES = %w[completed incomplete].freeze
-  OPEN_TIMEOUT = 10
-  READ_TIMEOUT = 45
-
-  GENERATION_READ_TIMEOUT      = 300
-  SYNC_GENERATION_READ_TIMEOUT = 90
-  RETRY_READ_TIMEOUT           = SYNC_GENERATION_READ_TIMEOUT
-
-  CONCEPT_REFERENCE_READ_TIMEOUT = SYNC_GENERATION_READ_TIMEOUT
-
-  REVIEW_READ_TIMEOUT = 120
-
-  REVIEW_JUDGE_READ_TIMEOUT = 30
-
-  RETRY_MAX          = 2
-  RETRY_MAX_INTERVAL = 8
-
-  def self.call_budget_seconds(read_timeout)
-    (read_timeout * (RETRY_MAX + 1)) + (RETRY_MAX * RETRY_MAX_INTERVAL)
-  end
-
-  def self.worst_case_call_seconds(read_timeout)
-    call_budget_seconds(read_timeout) + ((RETRY_MAX + 1) * OPEN_TIMEOUT)
-  end
-
-  def self.single_attempt_call_seconds(read_timeout)
-    OPEN_TIMEOUT + read_timeout
-  end
-
-  def self.call_worst_case_seconds(read_timeout:, single_attempt:)
-    single_attempt ? single_attempt_call_seconds(read_timeout) : worst_case_call_seconds(read_timeout)
-  end
 
   RETRY_TIMEOUT_GUARD = lambda do |env, exception|
     return false if env.request.context.to_h[:single_attempt]
@@ -42,80 +11,27 @@ class AiService
     !env.request.context.to_h[:long_running]
   end
 
-  DUCK_RESPONSE_MAX_TOKENS = 400
-
-  CONCEPT_ALTERNATE_MAX_TOKENS = 500
-
-  PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS = 100
-  PSEUDOCODE_CRITIQUE_MAX_TOKENS =
-    (ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINTS *
-      ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINT_LENGTH / 3) +
-    PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS
-
-  DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS = 150
-  DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN = 2.5
-  DIFFICULTY_ASSESSMENT_OVERRUN_HEADROOM = 2
-  DIFFICULTY_ASSESSMENT_MAX_TOKENS =
-    ((ExerciseSection::MAX_SECTIONS *
-      (DailyResponse::MAX_DIFFICULTY_REASON_LENGTH / DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN) *
-      DIFFICULTY_ASSESSMENT_OVERRUN_HEADROOM) +
-      DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS).ceil
-
   DIFFICULTY_ASSESSMENT_GRACE_SECONDS = 5
 
   MAX_GENERATED_CODE_LENGTH = 8_000
 
   RUBRIC_VERSION = 1
 
-  JUDGE_MAX_TOKENS = 1_200
-
-  REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 371
-
-  REVIEW_JUDGE_MAX_TOKENS = 1_500
-
   Request = Data.define(:purpose, :system, :prompt, :history, :response_schema,
                         :max_tokens, :read_timeout, :cache_system, :single_attempt, :allow_truncated) do
     def self.build(system:, prompt:, purpose: nil, **settings)
-      defaults = { history: [], response_schema: nil, max_tokens: nil, read_timeout: READ_TIMEOUT,
+      defaults = { history: [], response_schema: nil, max_tokens: nil, read_timeout: CallProfiles::READ_TIMEOUT,
                    cache_system: false, single_attempt: false, allow_truncated: false }
       new(purpose: purpose, system: system, prompt: prompt, **defaults.merge(settings))
     end
 
-    def worst_case_seconds = AiService.call_worst_case_seconds(read_timeout: read_timeout, single_attempt: single_attempt)
+    def worst_case_seconds = CallProfiles.call_worst_case_seconds(read_timeout: read_timeout, single_attempt: single_attempt)
   end
-
-  CALL_PROFILES = {
-    "generate_exercise"           => { read_timeout: GENERATION_READ_TIMEOUT, blocking_read_timeout: SYNC_GENERATION_READ_TIMEOUT },
-    "retry_section"               => { read_timeout: RETRY_READ_TIMEOUT },
-    "review_response"             => { cache_system: true, read_timeout: REVIEW_READ_TIMEOUT },
-    "assess_difficulty"           => { max_tokens: DIFFICULTY_ASSESSMENT_MAX_TOKENS },
-    "generate_concept_reference"  => { read_timeout: CONCEPT_REFERENCE_READ_TIMEOUT },
-    "generate_recognition_guide"  => { read_timeout: CONCEPT_REFERENCE_READ_TIMEOUT },
-    "explain_concept_differently" => { max_tokens: CONCEPT_ALTERNATE_MAX_TOKENS },
-    "explain_differently"         => {},
-    "review_follow_up"            => {},
-    "duck_thread"                 => { max_tokens: DUCK_RESPONSE_MAX_TOKENS, cache_system: true, allow_truncated: true },
-    "pseudocode_critique"         => { max_tokens: PSEUDOCODE_CRITIQUE_MAX_TOKENS },
-    "pseudocode_translate"        => {},
-    "judge_section"               => { max_tokens: JUDGE_MAX_TOKENS },
-    "judge_review"                => { max_tokens: REVIEW_JUDGE_MAX_TOKENS, read_timeout: REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true }
-  }.freeze
 
   def self.judged_on?(date) = date.on_weekday?
 
-  def self.worst_case_seconds_for(purpose)
-    profile = CALL_PROFILES.fetch(purpose)
-    call_worst_case_seconds(read_timeout: profile.fetch(:read_timeout, READ_TIMEOUT), single_attempt: profile.fetch(:single_attempt, false))
-  end
-
-  JUDGED_GENERATION_BUDGET = worst_case_seconds_for("generate_exercise") +
-                             worst_case_seconds_for("judge_section") +
-                             ([ DailyPlan::DAILY_JUDGE_RETRIES, DailyPlan::ROTATED_JUDGE_RETRIES ].max *
-                               (worst_case_seconds_for("retry_section") + worst_case_seconds_for("judge_section"))) +
-                             (ExerciseSection.all.any?(&:rejudge_edits?) ? worst_case_seconds_for("judge_section") : 0)
-
   def self.request_for(purpose, system:, prompt:, history: [], response_schema: nil, blocking: false)
-    profile  = CALL_PROFILES.fetch(purpose)
+    profile  = CallProfiles.fetch(purpose)
     settings = profile.except(:blocking_read_timeout)
     if blocking
       settings[:read_timeout] = profile.fetch(:blocking_read_timeout) { raise ArgumentError, "#{purpose} has no blocking read timeout" }
@@ -325,41 +241,16 @@ class AiService
     ReviewProseVerdict.parse(raw, projection: projection)
   end
 
-  def self.error_code_for(error)
-    case error
-    when ProviderError::AuthenticationError  then "authentication"
-    when ProviderError::RateLimitError       then "rate_limit"
-    when ProviderError::BillingError         then "out_of_credit"
-    when ProviderError::TrialEndedError      then "trial_ended"
-    when ProviderError::TrialAllowanceError  then "trial_allowance_used"
-    when ProviderError::InvalidResponseError then "invalid_response"
-    else                                          "other"
-    end
-  end
+  def self.error_code_for(error) = error.is_a?(ProviderError) ? error.class.error_code : ProviderError.error_code
 
-  def self.failure_code_for(error)
-    case error
-    when ProviderError::RateLimitError         then "rate_limit"
-    when ProviderError::AuthenticationError    then "authentication"
-    when ProviderError::BillingError           then "out_of_credit"
-    when ProviderError::TimeoutError           then "timeout"
-    when ProviderError::NetworkError           then "network"
-    when ProviderError::TruncatedResponseError then "truncated"
-    when ProviderError::InvalidResponseError   then "invalid_response"
-    when ProviderError::RefusalError           then "refusal"
-    else                                            "provider_error"
-    end
-  end
+  def self.failure_code_for(error) = error.is_a?(ProviderError) ? error.class.failure_code : ProviderError.failure_code
 
   def self.judge_fallback_reason(error)
     case error
     when JudgeVerdict::Invalid, ReviewProseVerdict::Invalid then "invalid_output"
-    when ProviderError::TruncatedResponseError              then "truncated"
-    when ProviderError::InvalidResponseError                then "invalid_json"
-    when ProviderError::RefusalError                        then "refusal"
-    when ProviderError::DeadlineError                       then ProviderError::DeadlineError::FALLBACK_REASON
-    when ProviderError::TimeoutError, Timeout::Error        then "timeout"
-    else                                                         http_status_code_for(error) || error_code_for(error)
+    when Timeout::Error                                     then ProviderError::TimeoutError.judge_fallback_reason
+    when ProviderError then error.class.judge_fallback_reason || http_status_code_for(error) || error_code_for(error)
+    else                                                         error_code_for(error)
     end
   end
 
@@ -476,7 +367,7 @@ class AiService
     end
   end
 
-  def long_running?(request) = request.read_timeout > READ_TIMEOUT
+  def long_running?(request) = request.read_timeout > CallProfiles::READ_TIMEOUT
 
   # Subclasses supply API_URL and the hooks below; read_result returns text, token and cache counts, model, truncated and refusal.
   def request_body(_request)

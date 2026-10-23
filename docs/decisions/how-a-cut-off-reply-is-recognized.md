@@ -11,7 +11,7 @@ missed it (#243). Since that status does not say why the reply stopped, the
 error says the provider "did not finish its reply" rather than naming a
 limit. Uncapped Gemini calls are flagged too, as uncapped Claude calls
 already were. The thinking partner's `duck_thread` profile in
-`AiService::CALL_PROFILES` sets `allow_truncated: true`, so a
+`CallProfiles::BY_PURPOSE` sets `allow_truncated: true`, so a
 partial reply is shown with an ellipsis, and an empty one still fails
 `text_or_raise`. Gemini and OpenAI both accept only `completed` or
 `incomplete`, through `AiService::FINISHED_STATUSES`. Any other status is an

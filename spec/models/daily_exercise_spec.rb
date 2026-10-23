@@ -273,11 +273,11 @@ RSpec.describe DailyExercise, type: :model do
 
     # A shorter claim lets a still-running job look abandoned, so a second one piles on.
     it "outlasts the worker's generation budget" do
-      expect(DailyExercise::REGENERATION_STALE_AFTER.to_i).to be > AiService::GENERATION_READ_TIMEOUT
+      expect(DailyExercise::REGENERATION_STALE_AFTER.to_i).to be > CallProfiles::GENERATION_READ_TIMEOUT
     end
 
     it "outlasts the draft call's worst case, retries included, plus job pickup" do
-      worst_case = AiService.worst_case_call_seconds(AiService::GENERATION_READ_TIMEOUT)
+      worst_case = CallProfiles.worst_case_call_seconds(CallProfiles::GENERATION_READ_TIMEOUT)
 
       expect(DailyExercise::REGENERATION_STALE_AFTER.to_i)
         .to be >= worst_case + DailyExercise::JOB_PICKUP_MARGIN.to_i
@@ -290,7 +290,7 @@ RSpec.describe DailyExercise, type: :model do
     end
 
     it "sets the deadline to one worst-case draft and judge, plus pickup" do
-      first_pass = AiService.worst_case_seconds_for("generate_exercise") + AiService.worst_case_seconds_for("judge_section")
+      first_pass = CallProfiles.worst_case_seconds_for("generate_exercise") + CallProfiles.worst_case_seconds_for("judge_section")
 
       expect(DailyExercise::REGENERATION_DEADLINE.to_i).to eq(first_pass + DailyExercise::JOB_PICKUP_MARGIN.to_i)
     end

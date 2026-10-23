@@ -10,7 +10,7 @@ sentence.
 
 The generation runs in Solid Queue, so nothing comes back on the request that
 starts it. The attempt ceiling is computed in Ruby from the poll interval and
-`AiService::CONCEPT_REFERENCE_READ_TIMEOUT`, so the page gives up when the call
+`CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT`, so the page gives up when the call
 behind it can no longer be running rather than after a number chosen here.
 
 ## Reaching the cap usually means a queued job

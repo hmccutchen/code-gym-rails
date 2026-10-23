@@ -36,8 +36,8 @@ says what a deviation from one requires.
   A family is the prompts about one subject, and one class may hold several
   purposes (the concept reference and its reframe are one family). The class
   holds its family's text and nothing else: settings stay in
-  `CALL_PROFILES`, and the call, the reply checks and the logging stay in
-  `AiService`. That text includes a fixed message a page sends into the
+  `CallProfiles::BY_PURPOSE`, and the call, the reply checks and the logging
+  stay in `AiService`. That text includes a fixed message a page sends into the
   family's prompt, which the page reads from the class
   (`DuckPrompt::EXPLAIN_REQUEST`). A family built in two stages gets one
   method per stage, each returning that stage's string, such as the review's
@@ -57,7 +57,7 @@ says what a deviation from one requires.
 - **One request value per provider call** — every provider call carries one
   `AiService::Request`: the purpose, the per-call values (system, prompt,
   history, response schema) and the settings (token cap, read timeout,
-  caching, single attempt, allowed truncation). `AiService::CALL_PROFILES`
+  caching, single attempt, allowed truncation). `CallProfiles::BY_PURPOSE`
   is the one place a purpose's settings live. A call site builds its request
   with `AiService.request_for`, naming only its purpose and its per-call
   values, and hands it to `call_and_log(user, request)`. `Request.build`
@@ -149,7 +149,9 @@ says what a deviation from one requires.
   that model (`ConceptReference::GUIDE_FIELDS`, `RecognitionGuide::FIELDS`),
   and `AiService` reads it there. Each language's prompt wording is
   `LanguagePrompts` and the scenario settings are `ScenarioPools`, read by
-  `AiService` and `GenerationPrompt`. `AiProvider`, the provider
-  registry, is the one model that may name `AiService` or a provider class;
-  a model that needs provider timing asks it, and `app_source_spec` fails on
-  any other model that names one.
+  `AiService` and `GenerationPrompt`. Each purpose's call settings and the
+  timing built from them are `CallProfiles`, which names no provider, so a
+  model, view or job reads a worst-case call time there. `AiProvider`, the
+  provider registry, is the one model that may name `AiService` or a provider
+  class, for a provider's own quota day, and `app_source_spec` fails on any
+  other model that names one.
