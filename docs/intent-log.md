@@ -177,7 +177,7 @@ data.*
 - from my layered review: the login code out of the job queue, and one
   signed-in lookup
 - an optional authenticator app as a second sign-in factor, spec and plan
-  first, stacked on the passwordless PR `#493 open`
+  first, stacked on the passwordless PR `#493`
   **why:** possession of a phone is the second factor worth having, and the
   inbox alone is all that protects an account today
   **I decided:** a daily cap of 20 wrong codes; every wrong-code count kept on
@@ -194,3 +194,8 @@ data.*
   **I decided:** another fresh agent checks each finding against the code
   before anything is changed
 - the test rules say CI runs on Postgres 18
+- locked out after turning on the authenticator: stop a double tap posting
+  the sign-in forms twice `#495`
+  **why:** I was signed out right after turning it on, every emailed code then
+  said it was wrong, and the home-screen app ended on a 404
+  **I decided:** Turn on stays disabled until the page's scripts load
