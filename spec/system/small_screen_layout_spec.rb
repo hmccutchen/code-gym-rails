@@ -153,7 +153,7 @@ RSpec.describe "Small screen layout", type: :system do
   end
 
   [ [ 390, {} ], [ 320, LARGEST ] ].each do |width, prefs|
-    it "keeps History inside a #{width}px screen#{' with the largest text' if prefs.any?} when a review or an answer holds a long path" do
+    it "keeps History inside a #{width}px screen#{' with the largest text' if prefs.any?} when a question, review or answer holds a long path" do
       travel_to(a_weekday) do
         user = create_fake_provider_user
         user.update!(display_preferences: prefs)
@@ -161,6 +161,10 @@ RSpec.describe "Small screen layout", type: :system do
         response = reviewed_day_for(user)
         response.update!(answers: response.answers.transform_values { "See #{long_path} here." },
                          ai_review: response.ai_review.transform_values { |review| review.merge("correct" => "Check #{long_path} first.") })
+        exercise = response.daily_exercise
+        exercise.update!(problem_set: exercise.problem_set.to_h do |key, data|
+          [ key, data.is_a?(Hash) ? data.merge("question" => "Why does #{long_path} fail?", "scenario" => "Open #{long_path}.") : data ]
+        end)
         resize(width)
         visit_as(user)
         visit history_path
