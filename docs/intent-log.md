@@ -198,7 +198,7 @@ data.*
 - the authenticator in place of the emailed code `#496`, onto main `#502`
   **I decided:** a double-tapped address gets its challenge back for 30 seconds
 - the system spec that flaked on CI `#499`
-- the Account page as phone cards, second of five redesign PRs `#504`
+- Account `#504` and Settings `#512 open` as phone cards, of five redesign PRs
   **I decided:** the card styles load everywhere; Reminders keeps Save;
   cards clear a landscape notch; the page column's padding named once; one
   rule hides anything hidden on a card page
@@ -206,3 +206,11 @@ data.*
   **I decided:** system specs stay in CI
 - edits typed behind a save survive a reload `#509`
   **I decided:** the copy keeps unconfirmed saves
+
+## Sat Oct 24
+
+- the draft copy holds one tab's unconfirmed saves, never merged across tabs
+  **I decided:** two tabs with identical answers may lose one unconfirmed save
+- a separate agent reviews each review-comment fix before it's pushed
+- a save queued behind a submit, already fixed; pinned with a spec `#521`
+- stop rebuilding the same rows per section and exposure `#517 open`

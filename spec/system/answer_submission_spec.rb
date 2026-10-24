@@ -361,7 +361,10 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
               return response
             })
           }
-          if (!window.holdAutosaves) return originalFetch(url, options)
+          if (!window.holdAutosaves) {
+            sessionStorage.setItem("savesSentAfterRelease", String(Number(sessionStorage.getItem("savesSentAfterRelease") || 0) + 1))
+            return originalFetch(url, options)
+          }
           return new Promise((resolve) => { held.push(() => originalFetch(url, options).then(resolve)); window.heldAutosaves = held.length })
         }
         const originalSetItem = Storage.prototype.setItem
@@ -382,6 +385,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       page.execute_script("window.releaseAutosaves()")
 
       expect(page).to have_content("Review ready!")
+      expect(page.evaluate_script("sessionStorage.getItem('savesSentAfterRelease')")).to eq("1")
       expect(page.evaluate_script("sessionStorage.getItem('copyWritesAfterSubmit')")).to be_nil
     end
   end
