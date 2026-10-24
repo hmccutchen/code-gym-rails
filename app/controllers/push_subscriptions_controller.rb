@@ -32,14 +32,17 @@ class PushSubscriptionsController < ApplicationController
     head :created
   end
 
-  # PATCH /push_subscription — only moves an enrolled user between levels; enrolment needs a click handler for iOS.
+  # PATCH /push_subscription — JSON for the switch, HTML for the no-script form; only moves an enrolled user between levels.
   def update
     return head :not_found unless WebPushCredentials.configured?
-    return redirect_to account_path unless current_user.push_reminders_enabled?
+    return refuse_nudges unless current_user.push_reminders_enabled?
 
-    current_user.update!(reminder_level: params[:nudges] == "1" ? :ready_and_nudges : :ready)
+    current_user.update!(reminder_level: nudges_wanted? ? :ready_and_nudges : :ready)
 
-    redirect_to account_path, notice: t("flash.push_subscriptions.settings_saved")
+    respond_to do |format|
+      format.html { redirect_to account_path, notice: t("flash.push_subscriptions.settings_saved") }
+      format.json { render json: { nudges: current_user.reminders_ready_and_nudges? } }
+    end
   end
 
   # DELETE /push_subscription
@@ -53,6 +56,17 @@ class PushSubscriptionsController < ApplicationController
   end
 
   private
+
+  def refuse_nudges
+    respond_to do |format|
+      format.html { redirect_to account_path }
+      format.json { render_json_error(t("accounts.push_reminders.nudges_unavailable"), status: :conflict) }
+    end
+  end
+
+  def nudges_wanted?
+    ActiveModel::Type::Boolean.new.cast(params[:nudges]) == true
+  end
 
   def valid_subscription?
     params[:p256dh].present? && params[:auth].present? && allowed_endpoint?

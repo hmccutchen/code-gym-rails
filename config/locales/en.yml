@@ -861,6 +861,7 @@ en:
     push_reminders:
       enabled: "Daily reminders are on. You'll get a notification when each weekday's set is ready."
       nudges_label: "Also remind me during the day if today's set isn't finished (hourly, %{window})"
+      nudges_unavailable: "Reminders are off on this account, so this setting can't change. Reload the page to see the current settings."
       save: "Save"
       turn_off: "Turn off daily reminders"
       repair: "This device hasn't allowed notifications yet, so reminders won't reach it."

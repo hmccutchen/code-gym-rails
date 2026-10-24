@@ -1,13 +1,28 @@
-# app/javascript/controllers/level_suggestions_switch_controller.js
+# app/javascript/controllers/save_switch_controller.js
 
 ## What it owns
 
-The "Suggest level changes" checkbox at the top of Setup's Exercise mix,
-shown to every account. It saves `users.level_suggestions` through
-`PATCH /profile`. It is kept apart from the Exercise mix controller because
-that controller owns the versioned preference save, and this setting bumps
-no `section_kind_preferences_version`, so mixing them would change the mix's
-409 handling.
+A checkbox that saves the moment it changes. Its first user is the "Suggest
+level changes" checkbox at the top of Setup's Exercise mix, shown to every
+account, which saves `users.level_suggestions` through `PATCH /profile`. That
+switch is kept apart from the Exercise mix controller because that controller
+owns the versioned preference save, and this setting bumps no
+`section_kind_preferences_version`, so mixing them would change the mix's 409
+handling. The controller was `level_suggestions_switch_controller.js` until it
+was generalized so Account's reminder nudges switch could share it (#507).
+
+## Values
+
+| Value | Meaning | Level suggestions | Nudges |
+|---|---|---|---|
+| `url` | where to PATCH | `profile_path` | `push_subscription_path` |
+| `key` | the `CodeGymSaveStatus` key | `"level_suggestions"` | `"nudges"` |
+| `field` | the body's key | `"level_suggestions"` | `"nudges"` |
+| `scope` | optional wrapper key | `"user"` | none |
+| `focus` | optional | set by the server when the card's link is followed | none |
+
+The body is `{ [scope]: { [field]: checked } }` with a scope, or
+`{ [field]: checked }` without one.
 
 ## The checkbox is reverted, not optimistic
 

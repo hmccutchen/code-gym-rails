@@ -38,7 +38,6 @@
     "controllers": "/assets/controllers/index-DIGEST.js",
     "controllers/learn_filter_controller": "/assets/controllers/learn_filter_controller-DIGEST.js",
     "controllers/level_suggestion_controller": "/assets/controllers/level_suggestion_controller-DIGEST.js",
-    "controllers/level_suggestions_switch_controller": "/assets/controllers/level_suggestions_switch_controller-DIGEST.js",
     "controllers/loading_form_controller": "/assets/controllers/loading_form_controller-DIGEST.js",
     "controllers/mermaid_controller": "/assets/controllers/mermaid_controller-DIGEST.js",
     "controllers/name_editor_controller": "/assets/controllers/name_editor_controller-DIGEST.js",
@@ -51,6 +50,7 @@
     "controllers/push_launch_controller": "/assets/controllers/push_launch_controller-DIGEST.js",
     "controllers/review_alternates_controller": "/assets/controllers/review_alternates_controller-DIGEST.js",
     "controllers/review_button_controller": "/assets/controllers/review_button_controller-DIGEST.js",
+    "controllers/save_switch_controller": "/assets/controllers/save_switch_controller-DIGEST.js",
     "controllers/time_zone_controller": "/assets/controllers/time_zone_controller-DIGEST.js",
     "controllers/welcome_controller": "/assets/controllers/welcome_controller-DIGEST.js",
     "controllers/write_up_control_controller": "/assets/controllers/write_up_control_controller-DIGEST.js",
@@ -80,7 +80,6 @@
 <link rel="modulepreload" href="/assets/controllers/index-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/learn_filter_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/level_suggestion_controller-DIGEST.js" nonce="NONCE">
-<link rel="modulepreload" href="/assets/controllers/level_suggestions_switch_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/loading_form_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/mermaid_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/name_editor_controller-DIGEST.js" nonce="NONCE">
@@ -93,6 +92,7 @@
 <link rel="modulepreload" href="/assets/controllers/push_launch_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/review_alternates_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/review_button_controller-DIGEST.js" nonce="NONCE">
+<link rel="modulepreload" href="/assets/controllers/save_switch_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/time_zone_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/welcome_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/write_up_control_controller-DIGEST.js" nonce="NONCE">
@@ -722,11 +722,11 @@
            data-exercise-mix-labels-value="[&quot;Much less&quot;,&quot;Less&quot;,&quot;Default&quot;,&quot;More&quot;,&quot;Much more&quot;]"
            data-exercise-mix-version-value="0">
     <summary>Exercise mix</summary>
-    <div id="level-suggestions-switch" class="mix-note" data-controller="level-suggestions-switch" data-level-suggestions-switch-url-value="/profile">
+    <div id="level-suggestions-switch" class="mix-note" data-controller="save-switch" data-save-switch-url-value="/profile" data-save-switch-key-value="level_suggestions" data-save-switch-field-value="level_suggestions" data-save-switch-scope-value="user">
   <label for="level-suggestions">
     <input type="checkbox" id="level-suggestions" checked
            aria-describedby="level-suggestions-hint"
-           data-level-suggestions-switch-target="checkbox" data-action="change->level-suggestions-switch#toggle">
+           data-save-switch-target="checkbox" data-action="change->save-switch#toggle">
     Suggest level changes
   </label>
   <p class="hint" id="level-suggestions-hint">When this is off, the dashboard stops suggesting level changes. You can still change levels yourself below, and turn this back on at any time.</p>

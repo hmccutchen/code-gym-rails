@@ -8,7 +8,7 @@ paths:
   - "app/views/welcome/**"
   - "app/views/dashboard/_level_suggestion.html.erb"
   - "app/views/api_keys/**"
-  - "app/javascript/controllers/{level_suggestion,level_suggestions_switch,welcome,exercise_mix,profile_preferences}_controller.js"
+  - "app/javascript/controllers/{level_suggestion,save_switch,welcome,exercise_mix,profile_preferences}_controller.js"
   - "script/{prepare_junior_ladders,junior_ladder_preparation}.rb"
   - "spec/**/*{level_suggestion,track,welcome,skill_level,profile}*"
   - "app/controllers/dashboard_controller.rb"

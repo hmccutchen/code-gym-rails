@@ -173,6 +173,48 @@ RSpec.describe "Push subscriptions", type: :request do
 
       expect(response).to have_http_status(:not_found)
     end
+
+    it "turns nudges on from the switch and answers JSON" do
+      configure_vapid
+      login_as(user)
+
+      patch push_subscription_path, params: { nudges: true }, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to eq("nudges" => true)
+      expect(user.reload.reminders_ready_and_nudges?).to be(true)
+    end
+
+    it "turns nudges off from the switch" do
+      configure_vapid
+      login_as(user)
+      user.update!(reminder_level: :ready_and_nudges)
+
+      patch push_subscription_path, params: { nudges: false }, as: :json
+
+      expect(response.parsed_body).to eq("nudges" => false)
+      expect(user.reload.reminders_ready?).to be(true)
+    end
+
+    it "answers 409 to the switch when reminders are off, changing nothing" do
+      configure_vapid
+      login_as(user)
+      user.update!(reminder_level: :none)
+
+      patch push_subscription_path, params: { nudges: true }, as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body).to include("status" => "error", "error" => I18n.t("accounts.push_reminders.nudges_unavailable"))
+      expect(user.reload.reminders_none?).to be(true)
+    end
+
+    it "answers 404 to the switch when no VAPID keypair is configured" do
+      login_as(user)
+
+      patch push_subscription_path, params: { nudges: true }, as: :json
+
+      expect(response).to have_http_status(:not_found)
+    end
   end
 
   describe "DELETE /push_subscription" do
