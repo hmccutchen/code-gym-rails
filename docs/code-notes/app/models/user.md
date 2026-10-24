@@ -130,6 +130,17 @@ The index is memoized per instance so a page that renders many responses
 never queries once per section. Several sections tagging the same concept on
 one day count as one exposure, which matches `ConceptMastery`.
 
+Each key holds a `Set` of dates rather than an array built with
+`array |= [date]`. The union form rescans the whole array for every concept
+tag, so the cost grew with the square of the account's age — the same concept
+is re-tagged for reinforcement, drills and retention checks, so one key really
+does collect a date per submitted day. On 500 submitted days the build
+measured 47ms, of which 33ms was that rescan; the `Set` form measured 4.6ms.
+The dashboard, `/history` and `/learn` all pay it, through `#first_exposure?`
+and the featured concept's "seen N times" line. The `Set` is also what keeps
+the one-exposure-a-day rule above true, so a plain array with `<<` would break
+the dedup that `spec/models/user_spec.rb` pins.
+
 ## `#language_for_today`
 
 For a "mixed" user, today's language is the opposite of the latest earlier

@@ -198,3 +198,9 @@ data.*
   **I decided:** the nudges switch saves on change; Connection gets a "Tap
   Save to apply" tag; value rows keep the invisible select
 - History scrolled sideways in the home-screen app; fixed there too
+
+## Sat Oct 24
+
+- find where the app has got slow and make those pages faster `#517`
+  **I decided:** the work goes in its own worktree, off main, so it stays
+  clear of the two branches I had open
