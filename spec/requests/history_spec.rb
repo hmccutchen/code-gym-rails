@@ -705,4 +705,38 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include('class="pagination"')
     end
   end
+
+  describe "concept reference lookups" do
+    it "looks each concept up once for the whole page rather than once per section" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "t",
+                               explanation: "e", code_example: "x", senior_lens: "s")
+      10.times do |i|
+        date = (i + 1).days.ago.to_date
+        exercise = DailyExercise.create!(
+          user: user, date: date, generated_at: Time.current,
+          problem_set: {
+            "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+            "pattern"     => { "title" => "P", "question" => "pq", "concept" => "n_plus_one" },
+            "challenge"   => { "question" => "cq", "concept" => "n_plus_one" }
+          }
+        )
+        DailyResponse.create!(
+          user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
+          answers: { "code_review" => "Answer with plenty of substance" }
+        )
+      end
+      login_as(user)
+      get history_path
+
+      lookups = 0
+      counter = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        lookups += 1 if payload[:sql].include?('FROM "concept_references"')
+      end
+      get history_path
+      ActiveSupport::Notifications.unsubscribe(counter)
+
+      expect(response.body).to include("N plus one")
+      expect(lookups).to eq(1)
+    end
+  end
 end
