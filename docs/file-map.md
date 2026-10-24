@@ -57,6 +57,7 @@ What each listed file does.
 - `app/models/invite_code.rb` — `InviteCode`: a code's digest, seats, deadline and trial terms; `.mint` prints the code once, `#redeem!` takes a seat atomically
 - `app/models/pending_trial.rb` — `PendingTrial`: a trial asked for on the public trial page, kept in the session until the emailed code is entered
 - `app/controllers/concerns/login_code_requests.rb` — `LoginCodeRequests`: mailing a login code and the limits on asking, shared by the login form and the trial form
+- `app/controllers/concerns/pending_login.rb` — `PendingLogin`: the one owner of the pending-login session keys, which the login and trial forms write and a sign-in clears
 - `app/models/provider_credential.rb` — `ProviderCredential.for(user)`: own key, no key, or the house key for an active trial; raises for an ended one
 - `app/models/trial_allowance.rb` — `TrialAllowance.check!`: the per-account cap and the house-key guard, run ahead of every house-key call
 - `app/models/house_keys.rb` / `trial_mode.rb` — the house keys and guards from ENV, and the kill switch
@@ -131,8 +132,8 @@ What each listed file does.
 - `app/views/responses/_answered_sections.html.erb` — read-only render of a submitted day; shared by the dashboard's submitted state and every history entry. Its styles live in the layout's `<style>`, not a per-page block, precisely because it renders on both.
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
 - `app/controllers/history_controller.rb` — paginated list of submitted sessions
-- `app/controllers/sessions_controller.rb` — code request + verification, with rate limits
-- `app/controllers/second_factor_challenges_controller.rb` — `/login/second-factor`: the authenticator or recovery code asked for after the emailed code, when the account has the authenticator on
+- `app/controllers/sessions_controller.rb` — code request, the code page, verification and starting again, with rate limits; an account with the authenticator on goes from its address to the second step
+- `app/controllers/second_factor_challenges_controller.rb` — `/login/second-factor`: the authenticator or recovery code asked for in place of the emailed code, when the account has the authenticator on
 - `app/controllers/authenticators_controller.rb` — `/account/authenticator`: the setup page, turning the authenticator on and off, and the sign-in-again page for an old session
 - `app/controllers/recovery_codes_controller.rb` — `POST /account/recovery_codes`: a new set of recovery codes, shown once
 - `app/controllers/concerns/sign_in_completion.rb` — `SignInCompletion`: finishing a sign-in (`reset_session`, the stamp, `return_to`, a pending trial) and issuing the second-factor challenge

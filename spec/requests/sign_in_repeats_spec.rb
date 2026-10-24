@@ -130,11 +130,15 @@ RSpec.describe "A repeated sign-in post", type: :request do
     let!(:enrollment) { enroll_second_factor(user) }
     let(:secret) { enrollment.first }
 
-    it "sends a repeated emailed code to the authenticator step, never past it" do
-      code = request_code
+    it "sends both posts of an emailed code from the trial form to the authenticator step, never past it" do
+      stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+      _invite, invite_code = mint_trial_code
+      post start_trial_path, params: { email: user.email, invite_code: invite_code, provider: "fake", consent: "1" }
+      code = user.generate_login_code!
 
-      post_twice(verify_login_code_path, { code: code })
+      first = post_twice(verify_login_code_path, { code: code })
 
+      expect(first).to redirect_to(second_factor_challenge_path)
       expect(response).to redirect_to(second_factor_challenge_path)
       expect(session[:user_id]).to be_nil
     end
@@ -176,7 +180,10 @@ RSpec.describe "A repeated sign-in post", type: :request do
     end
 
     it "gives both posts of a repeated emailed code the same authenticator challenge" do
-      code = request_code
+      stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+      _invite, invite_code = mint_trial_code
+      post start_trial_path, params: { email: user.email, invite_code: invite_code, provider: "fake", consent: "1" }
+      code = user.generate_login_code!
       cookie_before = cookies[session_cookie]
       post verify_login_code_path, params: { code: code }
       first_marker = session[:pending_second_factor]

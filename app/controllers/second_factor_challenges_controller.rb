@@ -66,7 +66,7 @@ class SecondFactorChallengesController < ApplicationController
   end
 
   def complete_sign_in_with_notice(notice, checked_at)
-    complete_sign_in(@user, checked_at: checked_at)
+    complete_sign_in(@user, checked_at: checked_at, factor: :authenticator)
     flash[:notice] = notice if notice
   end
 

@@ -11,7 +11,7 @@ RSpec.describe "Sessions", type: :request do
       }.to change(User, :count).by(1)
         .and have_enqueued_mail(UserMailer, :login_code)
 
-      expect(response).to redirect_to(login_path)
+      expect(response).to redirect_to(login_code_path)
       expect(flash[:notice]).to match(/check your email/i)
     end
 
@@ -104,18 +104,29 @@ RSpec.describe "Sessions", type: :request do
       expect(Nokogiri::HTML(response.body).at_css("input[type=submit]")["value"]).to eq("Send code")
 
       post login_path, params: { email: "dev@example.com" }
-      get login_path
-      expect(Nokogiri::HTML(response.body).css("input[type=submit]").map { |input| input["value"] })
-        .to eq([ "Verify code", "Send code" ])
+      get login_code_path
+      expect(Nokogiri::HTML(response.body).css("input[type=submit], button[type=submit]").map { |b| b["value"] || b.text.strip })
+        .to eq([ "Verify code", "Start again" ])
     end
 
-    it "offers the code form as soon as a login is pending" do
+    it "carries an alert sent to /login through to the code page" do
       post login_path, params: { email: "dev@example.com" }
+
+      get root_path
+      follow_redirect!
+      expect(response).to redirect_to(login_code_path)
+      follow_redirect!
+
+      expect(response.body).to include(I18n.t("flash.application.login_required"))
+    end
+
+    it "sends a pending login to the code page" do
+      post login_path, params: { email: "dev@example.com" }
+      expect(response).to redirect_to(login_code_path)
 
       get login_path
 
-      expect(response.body).to include("/login/code")
-      expect(response.body).to include("6-digit code")
+      expect(response).to redirect_to(login_code_path)
     end
 
     it "carries no polling or device-detection script" do
@@ -139,14 +150,59 @@ RSpec.describe "Sessions", type: :request do
   end
 
   describe "GET /login/code" do
-    it "sends a reload of a rejected code page back to the login page, keeping the pending sign-in" do
+    it "shows the code field with a way to start again, and no email field" do
       post login_path, params: { email: "dev@example.com" }
 
-      get "/login/code"
+      get login_code_path
+
+      page = Nokogiri::HTML(response.body)
+      expect(page.at_css(%(form[action="#{verify_login_code_path}"] input[name="code"]))).to be_present
+      expect(page.at_css(%(input[name="email"]))).to be_nil
+      expect(page.at_css(%(form[action="#{login_code_path}"] input[name="_method"][value="delete"]))).to be_present
+    end
+
+    it "sends a browser with no pending login to the email form" do
+      get login_code_path
 
       expect(response).to redirect_to(login_path)
-      follow_redirect!
-      expect(response.body).to include("6-digit code from the email")
+    end
+  end
+
+  describe "DELETE /login/code" do
+    it "forgets the pending login so the email form shows again" do
+      post login_path, params: { email: "dev@example.com" }
+
+      delete login_code_path
+
+      expect(response).to redirect_to(login_path)
+      get login_path
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Work email")
+    end
+  end
+
+  describe "POST /login for an account with the authenticator on" do
+    include ActiveJob::TestHelper
+
+    let(:user) { create_fake_provider_user }
+
+    before { enroll_second_factor(user) }
+
+    it "goes straight to the authenticator step and mails no code" do
+      expect { post login_path, params: { email: user.email.upcase } }.not_to have_enqueued_mail(UserMailer, :login_code)
+
+      expect(response).to redirect_to(second_factor_challenge_path)
+      expect(user.reload.login_code_digest).to be_nil
+      expect(session[:pending_login_email]).to be_nil
+      expect(session[:user_id]).to be_nil
+    end
+
+    it "still refuses to sign in on an emailed code alone" do
+      post login_path, params: { email: user.email }
+      session_code = user.generate_login_code!
+      post verify_login_code_path, params: { code: session_code }
+
+      expect(session[:user_id]).to be_nil
     end
   end
 
@@ -178,7 +234,7 @@ RSpec.describe "Sessions", type: :request do
 
         post verify_login_code_path, params: { code: emailed_code }
 
-        expect(response).to have_http_status(:unprocessable_content)
+        expect(response).to redirect_to(login_path)
         expect(flash[:alert]).to eq(I18n.t("sessions.code_rejected_request_new"))
       end
     end
@@ -245,21 +301,10 @@ RSpec.describe "Sessions", type: :request do
       expect(field["aria-invalid"]).to be_nil
     end
 
-    it "keeps an error from requesting a new code off the pending code field" do
-      post login_path, params: { email: "dev@example.com" }
-      follow_redirect!
-      post login_path, params: { email: "not-an-email" }
-
-      field = Nokogiri::HTML(response.body).at_css("input[name=code]")
-      expect(Nokogiri::HTML(response.body).at_css("#flash-alert")).to be_present
-      expect(field["aria-describedby"].split).to eq(%w[pending-message])
-      expect(field["aria-invalid"]).to be_nil
-    end
-
     it "returns nil-equivalent (no session) when there is no pending login in this browser" do
       post verify_login_code_path, params: { code: "123456" }
 
-      expect(response).to have_http_status(:unprocessable_content)
+      expect(response).to redirect_to(login_path)
       expect(session[:user_id]).to be_nil
     end
   end
@@ -348,7 +393,7 @@ RSpec.describe "Sessions", type: :request do
       end
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
 
-      get login_path
+      get login_code_path
       code_form_token = authenticity_token
 
       post verify_login_code_path, params: { code: raw_code, authenticity_token: code_form_token }
@@ -378,7 +423,7 @@ RSpec.describe "Sessions", type: :request do
       end
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
 
-      get login_path
+      get login_code_path
       post verify_login_code_path, params: { code: raw_code, authenticity_token: authenticity_token }
 
       delete logout_path, params: { authenticity_token: "stale-bogus-token" }
@@ -446,10 +491,11 @@ RSpec.describe "Sessions", type: :request do
       response.body.include?('name="email"')
     end
 
-    it "still offers the email form while a login is pending" do
+    it "reaches the email form from the code page through Start again" do
       post login_path, params: { email: "dev@example.com" }
 
-      get login_path
+      delete login_code_path
+      follow_redirect!
 
       expect(email_form_present?).to be(true)
     end
@@ -463,6 +509,7 @@ RSpec.describe "Sessions", type: :request do
       other_jar.post verify_login_code_path, params: { code: code }
 
       expect(other_jar.session[:user_id]).to be_nil
+      other_jar.follow_redirect!
       expect(other_jar.response.body).to include('name="email"')
     end
 

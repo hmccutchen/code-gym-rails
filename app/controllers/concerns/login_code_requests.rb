@@ -1,6 +1,7 @@
 # Shared by the login and trial forms, which count against the same limits so a second form is no second allowance.
 module LoginCodeRequests
   extend ActiveSupport::Concern
+  include PendingLogin
 
   RATE_LIMIT_STORE = LazyCacheStore.new
   SCOPE = "login_code_requests"
@@ -28,12 +29,11 @@ module LoginCodeRequests
   end
 
   # `active` only: an anonymized row's email was rewritten, so this creates a fresh account instead.
-  def mail_login_code(email)
-    user = User.active.find_by(email: email) || User.create!(email: email, name: email.split("@").first)
+  def mail_login_code(email, user = User.active.find_by(email: email))
+    user ||= User.create!(email: email, name: email.split("@").first)
     UserMailer.login_code(user).deliver_later
 
-    session[:pending_login_email] = email
-    session[:pending_login_at]    = User.session_stamp
+    remember_pending_login(email)
     user
   end
 end

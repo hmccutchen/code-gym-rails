@@ -34,14 +34,32 @@ RSpec.describe "Logging in with an emailed code", type: :system do
     expect(page).to have_no_content("Incorrect or expired code")
   end
 
-  it "keeps the request form on the page so a new code is always one click away" do
+  it "puts the code on a page of its own, with Start again back to the email form" do
     visit login_path
     fill_in "Work email *", with: user.email
     click_button "Send code"
 
+    expect(page).to have_current_path(login_code_path)
     expect(page).to have_field("6-digit code from the email")
+    expect(page).to have_no_field("Work email *")
+
+    click_button "Start again"
+
+    expect(page).to have_current_path(login_path)
     expect(page).to have_field("Work email *")
-    expect(page).to have_button("Send code")
+  end
+
+  it "keeps the code page on a reload, so the code being read stays the live one" do
+    visit login_path
+    fill_in "Work email *", with: user.email
+    click_button "Send code"
+    visit login_path
+
+    expect(page).to have_current_path(login_code_path)
+    fill_in "6-digit code from the email", with: user.generate_login_code!
+    click_button "Verify code"
+
+    expect(page).to have_current_path(root_path)
   end
 
   it "rejects a wrong code without losing the page" do
@@ -53,7 +71,7 @@ RSpec.describe "Logging in with an emailed code", type: :system do
     click_button "Verify code"
 
     # The email carries no link, so a rejection must send the user back to the form.
-    expect(page).to have_content("Incorrect or expired code. Try again, or request a new one below.")
+    expect(page).to have_content("Incorrect or expired code. Try again, or start again to get a new one.")
     expect(page).to have_field("6-digit code from the email")
   end
 end

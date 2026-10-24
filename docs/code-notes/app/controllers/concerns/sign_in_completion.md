@@ -4,6 +4,8 @@
 
 ## Finishing a sign-in
 
+Every caller names the factor that passed: `:emailed_code` from `SessionsController#verify_code`, `:authenticator` from the second step. `finishes_sign_in?` refuses the emailed code for an account with the authenticator on (`User#emailed_code_signs_in?`), and any other factor, by raising `WrongFactor`. The controllers already route such an account to the authenticator step; this is the check that holds if a later sign-in path forgets to.
+
 `complete_sign_in` takes the pending trial and `return_to` before `start_new_session_for` runs `reset_session`, since the reset discards both. It then sets `session[:user_id]` and `session[:signed_in_at]` (`SignedInSessions`).
 
 ## The stamp predates the code check
@@ -12,11 +14,11 @@ The session's `signed_in_at` is the time the controller read before checking the
 
 ## The pending second factor
 
-When the emailed code is right and the account has the authenticator on, `start_second_factor_challenge` does not sign in. It issues a challenge on the user row and stores `session[:pending_second_factor]`, holding the user id and the challenge's issue time.
+When the account has the authenticator on, the address alone reaches `start_second_factor_challenge` from `SessionsController#create`, and an emailed code from the trial form reaches it from `#verify_code`. It does not sign in. It issues a challenge on the user row and stores `session[:pending_second_factor]`, holding the user id and the challenge's issue time.
 
 - The marker only says which challenge this browser holds. The count of wrong codes is on the row (`second_factor_challenge_failures`), so replaying an earlier copy of the cookie can't bring back a zero count.
 - The marker sets no `user_id`, so `current_user`, every page and the cable connection treat the browser as signed out until the second step passes.
-- The pending emailed-code keys are removed, because that code has been used.
+- The pending emailed-code keys are removed (`PendingLogin#forget_pending_login`): the code was used, or none was sent.
 - `return_to` and a pending trial stay in place for the second step to read.
 
 ## A repeated sign-in post
@@ -33,6 +35,6 @@ These details keep the repeat from doing more than the first post did:
 - **Each sign-in keeps its own entry.** The cache key holds the proof's HMAC, so another browser signing in to the same account within the window doesn't overwrite this browser's proof.
 - **The repeat shows the first post's notice.** The proof stores the notice the first post set, such as how many recovery codes are left, so whichever response the browser keeps says the same thing.
 - **Replays count against the rate limits.** `SecondFactorChallengesController` declares its rate limits before `require_open_challenge`, so a replayed code is counted even when the challenge is already closed and the proof doesn't match.
-- **The emailed-code repeat reads the session's address directly,** not `pending_login_email`. The first post clears the code's `login_code_sent_at`, which can end a late-mailed sign-in's pending life, and the duplicate still has to find its proof. `SessionsController`'s per-address limit is keyed on that same address for the same reason. Keyed on `pending_login_email`, it would fall back to the IP once the pending life ended, and replays from rotating IPs would escape the account's cap.
+- **The emailed-code repeat reads the session's address directly (`pending_login_address`),** not `pending_login_email`. The first post clears the code's `login_code_sent_at`, which can end a late-mailed sign-in's pending life, and the duplicate still has to find its proof. `SessionsController`'s per-address limit is keyed on that same address for the same reason. Keyed on `pending_login_email`, it would fall back to the IP once the pending life ended, and replays from rotating IPs would escape the account's cap.
 
 Nothing new is reachable. Only this browser holds its pending stamp, which is written to the microsecond with `User.session_stamp`, and the code has to match too; anyone with both could have used the code first. The proof lives in the cache. If it's evicted, the repeat is refused as before.

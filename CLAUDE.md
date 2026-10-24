@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A team Rails app for daily personalized coding exercises. Each engineer logs in (emailed 6-digit code, no passwords), adds their own AI provider API key (Anthropic, Gemini or OpenAI), and gets an AI-generated problem set each morning tailored to their performance history. They answer sections and rate difficulty before submitting. Submission requests an inline AI review; the submitted work and review feed into the next day's problem generation.
+A team Rails app for daily personalized coding exercises. Each engineer logs in (emailed 6-digit code, or an authenticator app once they turn one on; no passwords), adds their own AI provider API key (Anthropic, Gemini or OpenAI), and gets an AI-generated problem set each morning tailored to their performance history. They answer sections and rate difficulty before submitting. Submission requests an inline AI review; the submitted work and review feed into the next day's problem generation.
 
 ## Git Workflow
 
@@ -272,7 +272,8 @@ advisory signal; it is not evidence that anything was verified.
 
 ## Architecture
 
-- Each engineer signs in with an emailed 6-digit code and stores their own
+- Each engineer signs in with an emailed 6-digit code, or an authenticator
+  app in its place once it is on, and stores their own
   Anthropic, Gemini or OpenAI key, encrypted; the key's prefix sets
   `user.provider`, and `AiService.for(user)` dispatches on it.
 - At 8am on weekdays the Solid Queue cron runs `GenerateDailyExercisesJob`,

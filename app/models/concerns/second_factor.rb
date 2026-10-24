@@ -31,6 +31,8 @@ module SecondFactor
     two_factor_enabled_at.present?
   end
 
+  def emailed_code_signs_in? = !two_factor_enabled?
+
   def recovery_codes_remaining
     otp_backup_codes.to_a.size
   end
