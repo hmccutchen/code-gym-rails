@@ -240,3 +240,4 @@ What each listed file does.
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway
+- `lefthook.yml` — git hooks: RuboCop and `bin/comment-check` on staged files before a commit; `archspec`, Brakeman, `importmap audit` and the unit suite before a push

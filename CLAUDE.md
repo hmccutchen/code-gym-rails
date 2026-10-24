@@ -252,7 +252,9 @@ rather than only catching it afterward:
 **What CI does and doesn't tell you.** The workflow runs RSpec, system specs,
 RuboCop, `bin/comment-check`, `archspec check`, Brakeman, and `importmap audit`. It does *not* run a Ruby dependency
 CVE audit (`bundle-audit` is not installed) or any complexity check, and this
-repository has no branch protection — so no check gates a merge. CI is
+repository has no branch protection — so no check gates a merge. The local
+hooks (`lefthook.yml`) run the same checks, except the system specs, before a
+push, but anyone can skip them. CI is
 advisory signal; it is not evidence that anything was verified.
 
 ## Stack
@@ -320,6 +322,12 @@ bin/rails db:prepare  # creates the database and loads the schema
 bin/dev               # starts the web server only
 bin/jobs              # optional: Solid Queue and the recurring schedule
 ```
+
+`bin/setup` also installs the git hooks in `lefthook.yml`: RuboCop and
+`bin/comment-check` on the staged files before each commit, and `archspec`,
+Brakeman, `importmap audit` and the unit suite before each push. On an older
+checkout, run `bundle exec lefthook install` once. `LEFTHOOK=0` skips them for
+one command; `docs/code-notes/lefthook.md` has the details.
 
 Development needs no environment variables. `config/database.yml` points at
 a local PostgreSQL through its default socket, Rails generates the

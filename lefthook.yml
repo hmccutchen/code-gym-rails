@@ -1,0 +1,34 @@
+# Design notes: docs/code-notes/lefthook.md
+pre-commit:
+  parallel: true
+  jobs:
+    - name: rubocop
+      glob: "{*.rb,*.rake,*.ru,Gemfile,Rakefile}"
+      exclude:
+        - ".claude/**"
+        - "vendor/**"
+        - "**/node_modules/**"
+      run: bin/rubocop --force-exclusion {staged_files}
+
+    - name: comment-check
+      glob: "*.{erb,js,mjs,css,yml,yaml,py}"
+      exclude:
+        - ".claude/**"
+        - "vendor/**"
+        - "**/node_modules/**"
+      run: bin/comment-check {staged_files}
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: archspec
+      run: bundle exec archspec check
+
+    - name: brakeman
+      run: bin/brakeman --no-pager --quiet
+
+    - name: importmap-audit
+      run: bin/importmap audit
+
+    - name: rspec
+      run: bundle exec rspec --exclude-pattern "system/**/*_spec.rb"
