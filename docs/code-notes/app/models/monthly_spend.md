@@ -1,0 +1,5 @@
+The projection counts weekdays because `GenerateDailyExercisesJob#generate_if_due` and the dashboard both skip weekends. The only way to spend on a weekend is the "Generate anyway" button, so spend per weekday is the rate worth extending across the month.
+
+The projection stays hidden until the 4th because a rate from one or two days is noise. It also needs no divide-by-zero check: a weekend is two days, so days 1 to 3 of any month always include a weekday, and by the 4th the count of elapsed weekdays is at least one. The spec asserts this for all twelve months of 2026, which start on all seven weekdays.
+
+Spend on a weekend lands in the numerator but adds no weekday to the denominator, so it makes the projection read slightly high. Rows written before #472 carry no cost, so October 2026's total misses that early spend and its projection reads low.
