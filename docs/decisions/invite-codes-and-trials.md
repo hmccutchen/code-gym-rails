@@ -18,7 +18,7 @@ trial runs to its end. The open question is cost: on a paid house key the
 app pays for every trial call, and Gemini's free tier is one shared pool
 too small for a group starting their day at once. Restoring the link (and
 the `sessions.new.trial_link` copy) reopens trials. Until then, the Account
-page's monthly usage table shows own-key accounts what they send.
+page's monthly usage card shows own-key accounts what they spend.
 
 **Two ways in.** `/trial/start` is public: an email, the code, a
 provider and the consent checkbox. It checks the code (`#available?`)
