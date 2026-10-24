@@ -6,7 +6,7 @@
 
     <%= form_with url: account_recovery_codes_path, method: :post, class: "authenticator-form", data: loading_form_data do |f| %>
       <h3><%= t("accounts.authenticator.regenerate_heading") %></h3>
-      <%= f.label :otp_code, t("accounts.authenticator.code_label"), for: "regenerate_otp_code" %>
+      <%= f.label :otp_code, t("accounts.authenticator.code_label"), for: "regenerate_otp_code", class: "card-note" %>
       <%= f.text_field :otp_code, id: "regenerate_otp_code", autocomplete: "one-time-code", autocapitalize: "characters", spellcheck: false, required: true %>
       <%= f.submit t("accounts.authenticator.regenerate"), class: "btn btn-ghost btn-block", disabled: true %>
     <% end %>
@@ -14,7 +14,7 @@
     <%= form_with url: account_authenticator_path, method: :delete, class: "authenticator-form", data: loading_form_data do |f| %>
       <h3><%= t("accounts.authenticator.disable_heading") %></h3>
       <p class="card-note"><%= t("accounts.authenticator.disable_note") %></p>
-      <%= f.label :otp_code, t("accounts.authenticator.code_label"), for: "disable_otp_code" %>
+      <%= f.label :otp_code, t("accounts.authenticator.code_label"), for: "disable_otp_code", class: "card-note" %>
       <%= f.text_field :otp_code, id: "disable_otp_code", autocomplete: "one-time-code", autocapitalize: "characters", spellcheck: false, required: true %>
       <%= f.submit t("accounts.authenticator.disable"), class: "btn btn-ghost btn-block" %>
     <% end %>

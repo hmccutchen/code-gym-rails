@@ -8,7 +8,7 @@
          <%= tag.attributes(data: push_enable_outcome_texts.merge(
                push_enable_repair_value: true,
                push_enable_repair_text_value: t("accounts.push_reminders.repair"))) %>>
-      <p class="reminder-status" id="push-repair-status" hidden data-push-enable-target="status"></p>
+      <p class="reminder-status card-note" id="push-repair-status" hidden data-push-enable-target="status"></p>
       <button type="button" id="push-repair" class="btn btn-ghost btn-block" hidden disabled
               data-push-enable-target="button" data-action="push-enable#enable"><%= t("accounts.push_reminders.repair_button") %></button>
     </div>
@@ -31,7 +31,7 @@
                push_enable_unsupported_text_value: t("accounts.push_reminders.unsupported"))) %>>
       <button type="button" id="push-enable" class="btn btn-ghost btn-block" disabled
               data-push-enable-target="button" data-action="push-enable#enable"><%= t("accounts.push_reminders.turn_on") %></button>
-      <p class="reminder-status" id="push-status" hidden data-push-enable-target="status"></p>
+      <p class="reminder-status card-note" id="push-status" hidden data-push-enable-target="status"></p>
     </div>
   <% end %>
 </section>

@@ -141,6 +141,7 @@ RSpec.describe "Accounts", type: :request do
         expect(card.at_css(".api-usage-unpriced").text.strip).to eq("2 requests aren't priced.")
         expect(card.at_css(".api-usage-note").text.strip).to eq("Estimated from list prices. Your provider's console shows the exact bill.")
         expect(card.css("table")).to be_empty
+        expect(card.css("p:not(.api-usage-total)").map { |p| p["class"].split }).to all(include("card-note"))
       end
     end
 
@@ -253,6 +254,15 @@ RSpec.describe "Accounts", type: :request do
       get account_path
 
       expect(card_headings).to eq([ nil, "Daily practice", "Authenticator app", "AI usage", "Session", "Danger zone" ])
+    end
+
+    it "styles the reminders offer's status line as a card note" do
+      configure_vapid
+      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+
+      get account_path
+
+      expect(Nokogiri::HTML(response.body).at_css("#push-status")["class"].split).to include("card-note")
     end
 
     it "puts Log out in the Session card as a full-width button" do

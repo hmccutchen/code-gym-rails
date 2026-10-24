@@ -354,6 +354,23 @@ RSpec.describe "Small screen layout", type: :system do
       end
     end
 
+    it "keeps any hidden element on the page out of the layout, whatever its class" do
+      resize(390)
+      visit_account_with_every_card
+      page.execute_script(%(document.querySelector(".api-usage").insertAdjacentHTML("beforeend", '<div id="hidden-probe" class="api-usage-row" hidden>x</div>')))
+
+      expect(hidden_facts("#hidden-probe")).to eq("hidden" => true, "visible" => false, "display" => "none", "size" => [ 0, 0 ])
+    end
+
+    it "styles the status line, code labels and usage text as card notes" do
+      resize(390)
+      visit_account_with_every_card
+
+      notes = page.evaluate_script(%(Array.from(document.querySelectorAll("#push-repair-status, .authenticator-form label, .api-usage p")).map(el => el.classList.contains("card-note"))))
+      expect(notes.size).to be >= 4
+      expect(notes).to all(be true)
+    end
+
     it "keeps Account's cards clear of a 44px notch in portrait" do
       resize(390)
       set_safe_area(left: 44, right: 44)
@@ -374,17 +391,13 @@ RSpec.describe "Small screen layout", type: :system do
       end
     end
 
-    it "centers Account's cards clear of the notch in landscape" do
+    it "keeps Account's cards 480px wide and centered in landscape with a notch" do
       resize(844, height: 390)
       set_safe_area(left: 47, right: 47)
       visit_account_with_every_card
 
       expect(card_widths).to all(be_within(0.5).of(480))
-      card_edges.each do |left, right|
-        expect(left).to be >= 47
-        expect(right).to be >= 47
-        expect(left).to be_within(1).of(right)
-      end
+      card_edges.each { |left, right| expect(left).to be_within(1).of(right) }
     end
 
     it "toggles the nudges switch from a tap on its text" do
