@@ -5,7 +5,7 @@ RSpec.describe "Re-subscribing to push reminders on launch", type: :system do
   let(:endpoint) { "https://fcm.googleapis.com/fcm/send/launch-endpoint" }
 
   # Headless Chromium cannot grant push, so the browser's push APIs are replaced before any page script runs.
-  def stub_push_apis
+  def stub_installed_push_apis
     script = <<~JS
       window.pushPosts = [];
       window.pushSubscribed = false;
@@ -34,21 +34,14 @@ RSpec.describe "Re-subscribing to push reminders on launch", type: :system do
     page.driver.with_playwright_page { |pw| pw.add_init_script(script: script) }
   end
 
-  around do |example|
-    ENV["VAPID_PUBLIC_KEY"] = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U"
-    ENV["VAPID_PRIVATE_KEY"] = "private"
-    example.run
-  ensure
-    ENV.delete("VAPID_PUBLIC_KEY")
-    ENV.delete("VAPID_PRIVATE_KEY")
-  end
+  around { |example| with_push_credentials { example.run } }
 
   def wait_until_subscribed
     wait_for { page.evaluate_script("window.pushSubscribed") }
   end
 
   it "registers an endpoint the server does not hold yet" do
-    stub_push_apis
+    stub_installed_push_apis
     visit_as(user)
     wait_for_js
     wait_until_subscribed
@@ -109,7 +102,7 @@ RSpec.describe "Re-subscribing to push reminders on launch", type: :system do
 
   it "posts nothing for an endpoint the server already holds" do
     user.push_subscriptions.create!(endpoint: endpoint, p256dh_key: "p256dh-key", auth_key: "auth-key")
-    stub_push_apis
+    stub_installed_push_apis
     visit_as(user)
     wait_for_js
     wait_until_subscribed
