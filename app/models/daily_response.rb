@@ -10,6 +10,7 @@ class DailyResponse < ApplicationRecord
 
   AI_RATING_FAVORABLE   = %w[solid strong].freeze
   AI_RATING_UNFAVORABLE = %w[beginner developing].freeze
+  AI_RATING_FIELD       = "rating".freeze
 
   DIFFICULTY_LEVELS = %w[straightforward moderate demanding].freeze
 
@@ -45,6 +46,28 @@ class DailyResponse < ApplicationRecord
     submitted.where(user: user).where("jsonb_typeof(section_ratings) = 'object'")
              .distinct.pluck(Arel.sql("jsonb_object_keys(section_ratings)")).to_set
   end
+
+  def self.with_ai_ratings_only(*columns)
+    names = columns.empty? ? column_names : columns.map(&:to_s)
+    unknown = names - column_names
+    raise ArgumentError, "Unknown DailyResponse columns: #{unknown.join(", ")}" if unknown.any?
+
+    select(*(names - [ "ai_review" ]).map { |name| arel_table[name] }, ai_ratings_projection).readonly
+  end
+
+  def self.ai_ratings_projection
+    review = "#{quoted_table_name}.#{connection.quote_column_name("ai_review")}"
+    Arel.sql(sanitize_sql_array([ <<~SQL.squish, { field: AI_RATING_FIELD } ]))
+      CASE WHEN jsonb_typeof(#{review}) = 'object' THEN
+        COALESCE((SELECT jsonb_object_agg(section.key, CASE
+                    WHEN jsonb_typeof(section.value) <> 'object' THEN section.value
+                    WHEN section.value ? :field THEN jsonb_build_object(:field, section.value -> :field)
+                    ELSE '{}'::jsonb END)
+                  FROM jsonb_each(#{review}) AS section), '{}'::jsonb)
+      ELSE #{review} END AS #{connection.quote_column_name("ai_review")}
+    SQL
+  end
+  private_class_method :ai_ratings_projection
 
   def self.section_reviewed_condition(section)
     review = Arel::Nodes::InfixOperation.new("->", arel_table[:ai_review], section)
@@ -202,7 +225,7 @@ class DailyResponse < ApplicationRecord
     self.class.usable_difficulty(ai_review&.dig(section.to_s, "difficulty"))
   end
 
-  def ai_rating_for(section)        = ai_review&.dig(section.to_s, "rating")
+  def ai_rating_for(section)        = ai_review&.dig(section.to_s, AI_RATING_FIELD)
   def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))
   def ai_rating_unfavorable?(section) = AI_RATING_UNFAVORABLE.include?(ai_rating_for(section))
 
