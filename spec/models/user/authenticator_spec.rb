@@ -354,6 +354,10 @@ RSpec.describe User::Authenticator, type: :model do
       expect(touched - %w[email sessions_valid_after]).to match_array(erased.keys.map(&:to_s))
     end
 
+    it "names every users column with a second-factor prefix, wherever it is written" do
+      expect(User.column_names.grep(/\A(otp_|second_factor_|two_factor_|consumed_)/)).to match_array(erased.keys.map(&:to_s))
+    end
+
     it "puts each column back to a new account's value" do
       expect(erased.transform_keys(&:to_s)).to eq(User.column_defaults.slice(*erased.keys.map(&:to_s)))
     end
