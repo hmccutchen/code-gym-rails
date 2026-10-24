@@ -15,7 +15,7 @@ moves `updated_at`. No cache is built (#518).
 The two changes below lower the cost per submitted day, but `.for` still
 reads every submitted response and its exercise, so its time still grows
 linearly with account age: about 60ms at 500 days and 100ms at 1000 on the
-harness below. #518 stays open on that point.
+harness below.
 
 ## What it loads
 
