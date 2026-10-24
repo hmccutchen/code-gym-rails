@@ -218,3 +218,6 @@ data.*
 - share the draft key and settled-save waits across system specs `#529`
 - keep Account styles with the partials that render them `#530`
 - keep pending-trial session access in a controller concern `#531`
+- move authenticator rules off User `#534 open`
+- move concept exposure reads into their own model `#535`
+- make push-disabled tests ignore exported VAPID values `#536 open`
