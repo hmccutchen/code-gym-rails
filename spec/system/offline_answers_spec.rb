@@ -267,6 +267,34 @@ RSpec.describe "Answers through a lost connection", type: :system do
     end
   end
 
+  it "doesn't carry another tab's unconfirmed save into this tab's edited copy" do
+    other_tab_answer = "Another tab's answer, which reached the server without a reply."
+    travel_to(a_weekday) do
+      open_dashboard
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch
+        window.fetch = (url, options) => new URL(url, location.href).pathname === "/responses" ? Promise.reject(new TypeError("offline")) : originalFetch(url, options)
+        const byKey = ([ a ], [ b ]) => (a < b ? -1 : a > b ? 1 : 0)
+        const rendered = {}
+        document.querySelectorAll("textarea[data-field]").forEach((area) => rendered[area.dataset.field] = area.defaultValue)
+        const landed = { ...rendered, code_review: #{other_tab_answer.to_json} }
+        const form = document.querySelector("[data-answer-form-draft-token-value]").dataset
+        localStorage.setItem("code-gym-answer-draft", JSON.stringify({ token: form.answerFormDraftTokenValue, scope: form.answerFormDraftScopeValue,
+          sent: [ JSON.stringify([ Object.entries(landed).sort(byKey), [] ]) ], answers: landed, ratings: {} }))
+      JS
+      other_field = all("textarea[data-field]").map { _1["data-field"] }.find { _1 != "code_review" && find(%(textarea[data-field="#{_1}"]), visible: :all).visible? }
+      find(%(textarea[data-field="#{other_field}"])).fill_in(with: answer)
+      wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.[#{other_field.to_json}] === #{answer.to_json}")
+      exercise = user.daily_exercises.sole
+      user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, answers: { "code_review" => other_tab_answer })
+
+      reopen_dashboard
+
+      expect(find(code_review_field).value).to eq(other_tab_answer)
+      expect(stored_draft).to be_nil
+    end
+  end
+
   it "keeps another tab's unconfirmed save in the shared list when this tab retries the same answers" do
     other_tab_answer = "Another tab's answer, which reached the server without a reply."
     travel_to(a_weekday) do

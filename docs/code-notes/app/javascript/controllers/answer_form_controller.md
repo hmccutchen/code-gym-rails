@@ -124,12 +124,15 @@ lists which paths use the gate and which deliberately don't.
 ## The copy on the device
 
 Every edit writes the answers and ratings to `code_gym/draft_store` with the
-draft token the copy was built on: the one the server rendered, or the one the
-last save reply carried. On connect, `restoreDraft()` puts a copy back when its
+draft token the copy was built on (the one the server rendered, or the one the
+last save reply carried), the draft scope, and this tab's unconfirmed saves.
+All tabs share one copy, and the last tab to edit owns it: an edit replaces the
+whole copy, its list included, so a copy is always one tab's complete view. On connect, `restoreDraft()` puts a copy back when its
 token equals the page's token, meaning the server's saved answers are still
 exactly the ones the copy started from, or in the one case described below,
 when a save landed but its reply didn't. Anything else (another day, a
-regenerated set, a Start over, a save from another tab or device) deletes it.
+regenerated set, a Start over, or a save from another tab or device that isn't
+in the copy's list) deletes it.
 The token is a digest of the saved answers and ratings, not `updated_at`,
 because a pseudocode round writes the same row without touching the answers.
 
@@ -158,12 +161,17 @@ the last confirmed reply, as `canonicalDraft` strings. `nextSave()` adds one
 on every attempt, retries included, since a retry carries newer text and
 either attempt may be the one that landed. It keeps the five most recent
 (`UNCONFIRMED_SAVES_KEPT`), so a long run of retries can't fill localStorage;
-an older one that landed falls back to the old loss. An attempt writes only
-that list, through `recordUnconfirmedSaves()`, and only into a copy that is
-still this tab's: the same token and scope, and exactly the answers it sends.
-All tabs share one copy, so a retry would otherwise overwrite a newer one
-another tab wrote meanwhile. Only an ok reply clears
-the list (`settleDraft()`), so a refused save's payload stays in it. That is
+an older one that landed falls back to the old loss. An attempt, unlike an
+edit, writes only that list, through `recordUnconfirmedSaves()`, and only into
+a copy with this tab's token and scope and exactly the answers it sends;
+otherwise a retry from a stale tab would overwrite a newer copy another tab
+wrote meanwhile. When those match, two tabs show the same answers, so it
+merges the stored list with its own (`sharedUnconfirmedSaves()`), this tab's
+saves last, rather than dropping the other tab's: restoring those answers over
+either tab's landed save restores that tab's later state. An edit never
+merges, since its answers are this tab's alone and the other tab's saves
+weren't typed under them. Only an ok reply clears the list (`settleDraft()`),
+so a refused save's payload stays in it. That is
 harmless, since the page can only render it if the server already holds it.
 A restored copy hands its list to the page, so a save still on the wire
 through one reload stays in the list for the next.
@@ -178,8 +186,10 @@ its saves equals the blank or scaffold page the server renders after it.
 
 The page decides this itself, by comparing what it sent with what the server
 rendered, rather than the server deciding. It works only when the server
-renders back exactly what it received, and these answers don't round-trip,
-so they still fall back to the old loss:
+renders back exactly what it received. The comparison covers the whole
+payload, every section and rating, so one field that doesn't round-trip
+makes every save of the session miss, and the edits behind it fall back to
+the old loss, however many other sections round-trip. These answers don't:
 
 - text `UserText.normalize` changes: NFC normalization, or stripped
   zero-width, bidi, tag and control characters

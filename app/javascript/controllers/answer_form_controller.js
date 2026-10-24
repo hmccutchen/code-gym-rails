@@ -100,7 +100,7 @@ export default class extends Controller {
   storeDraft() {
     if (this.formTarget.inert) return
     const { answers, section_ratings } = this.payload().response
-    this.draftKept = draftStore.write({ token: this.draftToken, scope: this.draftScopeValue, sent: this.sharedUnconfirmedSaves(draftStore.read()),
+    this.draftKept = draftStore.write({ token: this.draftToken, scope: this.draftScopeValue, sent: this.unconfirmedSaves,
                                         answers: answers, ratings: section_ratings })
   }
 
@@ -134,10 +134,8 @@ export default class extends Controller {
   }
 
   sharedUnconfirmedSaves(stored) {
-    const ownCopy = stored?.token === this.draftToken && stored.scope === this.draftScopeValue && Array.isArray(stored.sent)
-    const latest = this.unconfirmedSaves.at(-1)
-    const earlier = new Set([ ...(ownCopy ? stored.sent : []), ...this.unconfirmedSaves ].filter((save) => save !== latest))
-    return [ ...earlier, ...(latest ? [ latest ] : []) ].slice(-UNCONFIRMED_SAVES_KEPT)
+    const otherTabs = Array.isArray(stored.sent) ? stored.sent.filter((save) => !this.unconfirmedSaves.includes(save)) : []
+    return [ ...otherTabs, ...this.unconfirmedSaves ].slice(-UNCONFIRMED_SAVES_KEPT)
   }
 
   isAnswered(textarea) {
