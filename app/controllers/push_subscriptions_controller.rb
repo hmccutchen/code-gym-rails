@@ -35,9 +35,7 @@ class PushSubscriptionsController < ApplicationController
   # PATCH /push_subscription — JSON for the switch, HTML for the no-script form; only moves an enrolled user between levels.
   def update
     return head :not_found unless WebPushCredentials.configured?
-    return refuse_nudges unless current_user.push_reminders_enabled?
-
-    current_user.update!(reminder_level: nudges_wanted? ? :ready_and_nudges : :ready)
+    return refuse_nudges unless saved_nudges?
 
     respond_to do |format|
       format.html { redirect_to account_path, notice: t("flash.push_subscriptions.settings_saved") }
@@ -61,6 +59,15 @@ class PushSubscriptionsController < ApplicationController
     respond_to do |format|
       format.html { redirect_to account_path }
       format.json { render_json_error(t("accounts.push_reminders.nudges_unavailable"), status: :conflict) }
+    end
+  end
+
+  # Under the row lock, so a Turn off that committed after this request loaded the user wins.
+  def saved_nudges?
+    current_user.with_lock do
+      next false unless current_user.push_reminders_enabled?
+
+      current_user.update!(reminder_level: nudges_wanted? ? :ready_and_nudges : :ready)
     end
   end
 
