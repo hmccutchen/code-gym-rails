@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "with_push_credentials", type: :request do
+RSpec.describe "with_push_credentials and without_push_credentials", type: :request do
   around do |example|
     original = ENV.slice(WebPushCredentials::PUBLIC_KEY_VAR, WebPushCredentials::PRIVATE_KEY_VAR)
     example.run
@@ -54,19 +54,24 @@ RSpec.describe "with_push_credentials", type: :request do
     ENV[WebPushCredentials::PUBLIC_KEY_VAR] = "earlier-public"
     ENV[WebPushCredentials::PRIVATE_KEY_VAR] = "earlier-private"
 
-    expect { without_push_credentials { raise "boom" } }.to raise_error("boom")
+    expect do
+      without_push_credentials do
+        expect(WebPushCredentials).not_to be_configured
+        raise "boom"
+      end
+    end.to raise_error("boom")
 
     expect(ENV[WebPushCredentials::PUBLIC_KEY_VAR]).to eq("earlier-public")
     expect(ENV[WebPushCredentials::PRIVATE_KEY_VAR]).to eq("earlier-private")
   end
 
-  it "leaves absent variables absent after without_push_credentials" do
-    ENV.delete(WebPushCredentials::PUBLIC_KEY_VAR)
+  it "restores a half-set keypair after without_push_credentials, leaving the absent half absent" do
+    ENV[WebPushCredentials::PUBLIC_KEY_VAR] = "earlier-public"
     ENV.delete(WebPushCredentials::PRIVATE_KEY_VAR)
 
-    without_push_credentials { nil }
+    without_push_credentials { expect(ENV).not_to have_key(WebPushCredentials::PUBLIC_KEY_VAR) }
 
-    expect(ENV).not_to have_key(WebPushCredentials::PUBLIC_KEY_VAR)
+    expect(ENV[WebPushCredentials::PUBLIC_KEY_VAR]).to eq("earlier-public")
     expect(ENV).not_to have_key(WebPushCredentials::PRIVATE_KEY_VAR)
   end
 
@@ -75,7 +80,7 @@ RSpec.describe "with_push_credentials", type: :request do
   end
 end
 
-RSpec.describe "with_push_credentials in a job spec", type: :job do
+RSpec.describe "the push credential helpers in a job spec", type: :job do
   it "is available" do
     expect(self).to respond_to(:with_push_credentials)
     expect(self).to respond_to(:without_push_credentials)
