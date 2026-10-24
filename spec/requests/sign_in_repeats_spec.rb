@@ -79,6 +79,23 @@ RSpec.describe "A repeated sign-in post", type: :request do
     expect(session[:user_id]).to eq(user.id)
   end
 
+  it "accepts the repeat after another browser signed in to the same account in between" do
+    code = request_code
+    cookie_before = cookies[session_cookie]
+    post verify_login_code_path, params: { code: code }
+
+    other = open_session
+    other.post login_path, params: { email: user.email }
+    other.post verify_login_code_path, params: { code: user.generate_login_code! }
+    expect(other.response).to redirect_to(root_path)
+
+    cookies[session_cookie] = cookie_before
+    post verify_login_code_path, params: { code: code }
+
+    expect(response).to redirect_to(root_path)
+    expect(session[:user_id]).to eq(user.id)
+  end
+
   it "counts repeats from many addresses against one account once a late code ended the pending sign-in" do
     post login_path, params: { email: user.email }
     code = travel(3.minutes) { user.generate_login_code! }
@@ -131,6 +148,16 @@ RSpec.describe "A repeated sign-in post", type: :request do
       expect(first).to redirect_to(root_path)
       expect(response).to redirect_to(root_path)
       expect(session[:user_id]).to eq(user.id)
+    end
+
+    it "keeps the recovery-code notice on the second post of a recovery code" do
+      post login_path, params: { email: user.email }
+      post verify_login_code_path, params: { code: user.generate_login_code! }
+
+      post_twice(second_factor_challenge_path, { otp_code: enrollment.last.first })
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:notice]).to eq("You signed in with a recovery code. You have 9 recovery codes left.")
     end
 
     it "signs in a duplicate that passed the open-challenge check before the first post closed it" do

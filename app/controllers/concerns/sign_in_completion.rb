@@ -6,24 +6,24 @@ module SignInCompletion
   private
 
   # A double tap posts twice with the pre-sign-in cookie; the proof holds that browser's own pending stamp and its code.
-  def remember_sign_in(user, proof, checked_at, challenge_at: nil)
-    remembered = { "digest" => sign_in_repeat_digest(proof), "checked_at" => User.session_stamp(checked_at),
-                   "challenge_at" => challenge_at && User.session_stamp(challenge_at) }
-    Rails.cache.write(sign_in_repeat_key(user), remembered, expires_in: REPEAT_WINDOW)
+  def remember_sign_in(user, proof, checked_at, challenge_at: nil, notice: nil)
+    remembered = { "checked_at" => User.session_stamp(checked_at),
+                   "challenge_at" => challenge_at && User.session_stamp(challenge_at), "notice" => notice }
+    Rails.cache.write(sign_in_repeat_key(user, proof), remembered, expires_in: REPEAT_WINDOW)
   end
 
   def recent_sign_in(user, proof)
     return if user.nil? || proof.any?(&:blank?)
 
-    remembered = Rails.cache.read(sign_in_repeat_key(user))
+    remembered = Rails.cache.read(sign_in_repeat_key(user, proof))
     return unless remembered.is_a?(Hash)
-    return unless ActiveSupport::SecurityUtils.secure_compare(remembered["digest"].to_s, sign_in_repeat_digest(proof))
     return unless user.session_signed_in_valid?(remembered["checked_at"])
 
-    { checked_at: User.session_time(remembered["checked_at"]), challenge_at: User.session_time(remembered["challenge_at"]) }
+    { checked_at: User.session_time(remembered["checked_at"]), challenge_at: User.session_time(remembered["challenge_at"]),
+      notice: remembered["notice"] }
   end
 
-  def sign_in_repeat_key(user) = "sign_in_repeat/#{user.id}"
+  def sign_in_repeat_key(user, proof) = "sign_in_repeat/#{user.id}/#{sign_in_repeat_digest(proof)}"
 
   def sign_in_repeat_digest(proof)
     OpenSSL::HMAC.hexdigest("SHA256", Rails.application.secret_key_base, proof.map(&:to_s).join("\n"))
