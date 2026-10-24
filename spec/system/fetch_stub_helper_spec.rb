@@ -84,6 +84,8 @@ RSpec.describe "The shared fetch stub", type: :system do
   end
 
   it "breaks every request when the whole network is down" do
+    expect(send_request("GET", dashboard_status_path)).to include("ok" => true, "status" => 200)
+
     break_the_network
 
     expect(rename("No network")).to include("status" => 0, "message" => "Fallback.")
