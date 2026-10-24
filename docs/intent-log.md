@@ -223,3 +223,4 @@ data.*
 - stop automatic push registration undoing Turn off `#523`
   **I decided:** Claude implements; the foreman does the final reviews.
   Each issue gets its own PR, Copilot review and a green-CI merge.
+- share the VAPID test credentials across request, job and system specs `#525`
