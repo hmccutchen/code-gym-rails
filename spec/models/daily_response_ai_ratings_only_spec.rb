@@ -40,6 +40,15 @@ RSpec.describe DailyResponse, ".with_ai_ratings_only" do
     stored.each_key { |section| expect(rating_or_error(projected(response), section)).to eq(rating_or_error(response, section)) }
   end
 
+  it "answers whether the day and each section were reviewed as the stored review does" do
+    response = respond(2, { "code_review" => full_review, "design_comparison" => full_review.except("rating"), "parsons_problem" => "flattened" })
+    sections = %w[code_review design_comparison parsons_problem pattern]
+
+    expect(projected(response).reviewed?).to eq(response.reviewed?)
+    expect(sections.map { |section| projected(response).section_reviewed?(section) })
+      .to eq(sections.map { |section| response.section_reviewed?(section) })
+  end
+
   it "keeps a missing, empty or malformed review as it was stored" do
     [ nil, {}, "flattened", [ "listed" ], 3 ].each_with_index do |stored, index|
       response = respond(2 + index, stored)
