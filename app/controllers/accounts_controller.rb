@@ -4,8 +4,9 @@ class AccountsController < ApplicationController
 
   # GET /account
   def show
-    @usage_since = Time.current.in_time_zone(current_user.effective_time_zone).beginning_of_month
-    @usage_totals = ApiUsage.own_key_totals(current_user, since: @usage_since)
+    now = Time.current.in_time_zone(current_user.effective_time_zone)
+    @usage_since = now.beginning_of_month
+    @usage = MonthlySpend.new(totals: ApiUsage.own_key_totals(current_user, since: @usage_since), today: now.to_date, paused: current_user.paused_generation_at?)
   end
 
   # DELETE /account

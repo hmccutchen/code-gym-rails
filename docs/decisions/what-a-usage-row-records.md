@@ -70,3 +70,9 @@ fails when a Claude route has no price, or a zero input or output rate, so
 routing to a new Claude model means pricing it first. The
 figure is a list-price estimate: a free tier, credits or a discount on the
 key is invisible to the app.
+
+The Account page reads these costs back. `ApiUsage.own_key_totals` sums
+`cost_usd` per provider for the month's own-key rows and counts rows with a
+null cost as unpriced, so a Gemini or OpenAI row shows as unpriced instead of
+as zero. The weekday projection is not computed there: `MonthlySpend` decides
+the month's total and the projection (`docs/code-notes/app/models/monthly_spend.md`).

@@ -2,7 +2,7 @@
 paths:
   - "app/clients/{ai_service,claude_service,gemini_service,openai_service,fake_service,lazy_cache_store}.rb"
   - "app/prompts/{duck_prompt,follow_up_prompt}.rb"
-  - "app/models/{ai_provider,call_profiles,api_usage,provider_credential,provider_error,provider_failure,provider_failure_text,reset_clock,concept_reference_failures,user}.rb"
+  - "app/models/{ai_provider,call_profiles,api_usage,monthly_spend,provider_credential,provider_error,provider_failure,provider_failure_text,reset_clock,concept_reference_failures,user}.rb"
   - "app/controllers/concerns/{provider_call_limits,provider_failure_rendering,json_errors}.rb"
   - "app/controllers/{application,api_keys,responses,concept_references,daily_exercises}_controller.rb"
   - "app/helpers/generation_failure_helper.rb"
@@ -83,6 +83,7 @@ read it before changing that area.
   keys only (`prices_usage?`); null means unknown, Gemini and OpenAI rows stay
   null, and older rows stay null (no backfill). `model_routing_spec` fails on
   a Claude route with no price.
+  The Account page sums `cost_usd` per provider through `ApiUsage.own_key_totals`, counts null rows as unpriced, and leaves the projection to `MonthlySpend`.
 - **How a cut-off reply is recognized**
   (`docs/decisions/how-a-cut-off-reply-is-recognized.md`): Providers report
   truncation as data and `AiService#call_and_log` decides it is fatal after
