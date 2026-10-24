@@ -136,7 +136,10 @@ RSpec.describe "A repeated sign-in post", type: :request do
     end
 
     it "gives both posts of a repeated emailed code the same authenticator challenge" do
-      code = request_code
+      stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+      _invite, invite_code = mint_trial_code
+      post start_trial_path, params: { email: user.email, invite_code: invite_code, provider: "fake", consent: "1" }
+      code = user.generate_login_code!
       cookie_before = cookies[session_cookie]
       post verify_login_code_path, params: { code: code }
       first_marker = session[:pending_second_factor]
