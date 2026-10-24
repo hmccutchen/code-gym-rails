@@ -11,7 +11,7 @@ global pick had to be reachable from every teammate's slice.
 **The pick rule is `FeaturedConceptPick`, pure over plain values.** The
 candidates are the concepts in the user's slice (`ConceptBucket.slice_for`
 and each bucket's vocabulary) that at least one submitted set has shown,
-counted by `User#concept_exposure_count`, the same count as Learn's "in your
+counted by `ConceptExposureIndex#count`, the same count as Learn's "in your
 sets" marker. `RungLedger` sorts them the way the Progress page does: a
 concept with `developing_toward` is preferred; next, one met with no ledger
 evidence yet (only skipped, eased or unreviewed sections); a held concept
@@ -65,7 +65,7 @@ reference row at all, still links to the ordinary `LearnController#show`
 page, which offers the on-demand "Write this up" control.
 
 **What the callout shows.** The concept's name, its bucket and "seen in N
-of your sets" from `User#concept_exposure_count`. The reference's tagline
+of your sets" from `ConceptExposureIndex#count`. The reference's tagline
 can describe what a section asks the engineer to find, so
 `FeaturedConceptHelper#featured_tagline_shown?` holds it back on the
 dashboard until the day is submitted; the Learn page, and a dashboard with

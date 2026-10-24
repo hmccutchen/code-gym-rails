@@ -45,7 +45,7 @@ class FeaturedConcept < ApplicationRecord
   def self.met_concepts(user, today)
     ConceptBucket.slice_for(user.language).flat_map do |bucket|
       ConceptBucket.vocabulary_for(bucket).filter_map do |concept|
-        [ concept, bucket ] if user.concept_exposure_count(concept, bucket, on_or_before: today).positive?
+        [ concept, bucket ] if user.concept_exposures.count(concept, bucket, on_or_before: today).positive?
       end
     end
   end
@@ -58,7 +58,7 @@ class FeaturedConcept < ApplicationRecord
 
   # Start over can destroy a submitted, unreviewed day, taking the only exposure to this concept with it.
   def still_met_by?(user, today)
-    fits?(user.language) && user.concept_exposure_count(concept, bucket, on_or_before: today).positive?
+    fits?(user.language) && user.concept_exposures.count(concept, bucket, on_or_before: today).positive?
   end
 
   def fits?(language)

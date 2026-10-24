@@ -1323,55 +1323,6 @@ RSpec.describe User, type: :model do
     end
   end
 
-  describe "#concept_exposure_count" do
-    let(:user) { User.create!(email: "ex@example.com", name: "Ex") }
-
-    def submit(concept:, date:, language: "ruby_rails", section: "code_review")
-      exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: language,
-        problem_set: { section => { "concept" => concept } })
-      user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
-        answers: { section => "x" * 20 }, concept_tags: { section => concept })
-    end
-
-    it "counts occurrences within the same language bucket, on or before the given date" do
-      submit(concept: "n_plus_one", date: Date.current - 5)
-      submit(concept: "n_plus_one", date: Date.current - 2)
-
-      expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: Date.current - 5)).to eq(1)
-      expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: Date.current)).to eq(2)
-    end
-
-    it "does not count occurrences from a different language bucket" do
-      submit(concept: "closures", date: Date.current - 1, language: "javascript")
-      expect(user.concept_exposure_count("closures", "ruby_rails", on_or_before: Date.current)).to eq(0)
-      expect(user.concept_exposure_count("closures", "javascript", on_or_before: Date.current)).to eq(1)
-    end
-
-    it "counts a concept tagged on two sections of the same day as one exposure" do
-      date = Date.current
-      exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
-        problem_set: {
-          "code_review" => { "concept" => "n_plus_one" },
-          "pattern"     => { "concept" => "n_plus_one" }
-        })
-      user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
-        answers: { "code_review" => "x" * 20, "pattern" => "x" * 20 },
-        concept_tags: { "code_review" => "n_plus_one", "pattern" => "n_plus_one" })
-
-      expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: date)).to eq(1)
-    end
-
-    it "counts a submitted response's skipped section as an exposure" do
-      date = Date.current
-      exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
-        problem_set: { "code_review" => { "concept" => "n_plus_one" } })
-      user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
-        answers: { "code_review" => "" }, concept_tags: { "code_review" => "n_plus_one" })
-
-      expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: date)).to eq(1)
-    end
-  end
-
   describe "exposure index query budget" do
     def count_queries
       count = 0

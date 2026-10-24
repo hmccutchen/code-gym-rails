@@ -144,6 +144,6 @@ class LearnController < ApplicationController
   end
 
   def encountered?(concept, bucket)
-    current_user.concept_exposure_count(concept, bucket, on_or_before: Date.current).positive?
+    current_user.concept_exposures.count(concept, bucket, on_or_before: Date.current).positive?
   end
 end
