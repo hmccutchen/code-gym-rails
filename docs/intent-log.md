@@ -232,7 +232,7 @@ data.*
 - make push-disabled tests ignore exported VAPID values `#536`
 - move draft-copy bookkeeping out of the answer-form controller `#537 open`
 - share fetch stubs across system specs `#538`
-- keep Settings styles with the partials that render them `#539 open`
+- keep Settings styles with the partials that render them `#539`
 - preserve exported push credentials after service specs `#540 open`
 - keep controller sessions out of models `#541 open`
 - keep authenticator deletion fields with the authenticator `#542 open`
