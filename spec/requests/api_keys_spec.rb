@@ -257,6 +257,14 @@ RSpec.describe "ApiKeys", type: :request do
       expect(card_titles.first(2)).to eq([ "Connection", "Your day" ])
     end
 
+    it "orders the cards Connection, Your day, Exercise mix, Display" do
+      [ create_user_with_key(email: "with-key@example.com"), user, create_trial_user ].each do |each_user|
+        login_as(each_user)
+        get setup_path
+        expect(card_titles).to eq([ "Connection", "Your day", "Exercise mix", "Display" ])
+      end
+    end
+
     it "tags Connection with Tap Save to apply, outside its heading" do
       login_as(create_user_with_key)
       get setup_path

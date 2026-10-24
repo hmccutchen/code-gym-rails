@@ -1,15 +1,17 @@
-<%= tag.div id: "level-suggestions-switch", class: "mix-note",
+<%= tag.div id: "level-suggestions-switch",
       data: { controller: "save-switch",
               save_switch_url_value: profile_path,
               save_switch_key_value: "level_suggestions",
               save_switch_field_value: "level_suggestions",
               save_switch_scope_value: "user",
-              save_switch_focus_value: (true if show_level_suggestions?) } do %>
-  <label for="level-suggestions">
-    <input type="checkbox" id="level-suggestions" <%= "checked" if current_user.level_suggestions? %>
+              save_switch_focus_value: (true if show_level_suggestions?),
+              save_switch_saved_text_value: t("switches.saved") } do %>
+  <label class="switch-row" for="level-suggestions">
+    <%= t("level_suggestion.setup.label") %>
+    <input type="checkbox" id="level-suggestions" class="switch" role="switch" <%= "checked" if current_user.level_suggestions? %>
            aria-describedby="level-suggestions-hint"
            data-save-switch-target="checkbox" data-action="change->save-switch#toggle">
-    <%= t("level_suggestion.setup.label") %>
   </label>
-  <p class="hint" id="level-suggestions-hint"><%= t("level_suggestion.setup.hint") %></p>
+  <p class="card-note" id="level-suggestions-hint"><%= t("level_suggestion.setup.hint") %></p>
+  <p class="card-note switch-status" role="status" data-save-switch-target="status"></p>
 <% end %>

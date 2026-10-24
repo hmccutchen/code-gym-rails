@@ -112,6 +112,15 @@ RSpec.describe "Focus ring", type: :system do
     end
   end
 
+  it "rings the level-suggestions switch" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    tab_to("#level-suggestions")
+    expect(outline_of_focused).to eq([ "solid", "2px", ring_color, "2px" ])
+  end
+
   # Login follows the device, so each palette's ring is checked under the scheme that selects it.
   it "rings the login fields in the dark palette" do
     page.driver.with_playwright_page { |pw| pw.emulate_media(colorScheme: "dark") }

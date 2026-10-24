@@ -536,7 +536,7 @@ RSpec.describe "Small screen layout", type: :system do
           apply_text_spacing if prefs.any?
 
           expect(page_width).to eq(width)
-          card_edges(count: 2).each { |edges| expect(edges).to all(be_within(0.5).of(16)) }
+          card_edges(count: 4).each { |edges| expect(edges).to all(be_within(0.5).of(16)) }
           expect(card_paddings).to all(eq("16px"))
           expect(card_gaps).to all(be_within(0.5).of(16))
           expect(heights(".value-row").size).to eq(3)
@@ -545,6 +545,44 @@ RSpec.describe "Small screen layout", type: :system do
           expect(visible_heights(".btn-block")).to all(be >= 48)
           button_and_card_content_widths.each { |button, content| expect(button).to be_within(1).of(content) }
           expect(clipped_button_labels).to eq([])
+          expect(heights("details.card > summary").size).to eq(2)
+          expect(heights("details.card > summary")).to all(be >= 48)
+          expect(heights("#level-suggestions-switch .switch-row")).to all(be >= 48)
+          expect(heights("#level-suggestions-switch .switch-row").size).to eq(1)
+        end
+
+        it "keeps the switch's note and empty status line at their card spacing" do
+          user = create_fake_provider_user
+          user.update!(display_preferences: prefs)
+          resize(width)
+          visit_settings_open(user)
+
+          status, hint_margin = page.evaluate_script(<<~JS)
+            (() => {
+              const status = document.querySelector("#level-suggestions-switch .switch-status");
+              const style = getComputedStyle(status);
+              return [[status.getBoundingClientRect().height, style.marginTop, style.marginBottom],
+                      parseFloat(getComputedStyle(document.getElementById("level-suggestions-hint")).marginBottom)];
+            })()
+          JS
+          expect(status).to eq([ 0, "0px", "0px" ])
+          expect(hint_margin).to be_within(0.5).of(rem(0.75))
+        end
+
+        it "keeps the Exercise mix's hidden notes out of the layout" do
+          user = create_fake_provider_user
+          user.update!(display_preferences: prefs)
+          resize(width)
+          visit_settings_open(user)
+
+          checked = [ "#mix-ladder-preparation", ".mix-last-note" ].select { |selector| page.has_css?(selector, visible: :all, wait: 0) }
+          checked.each do |selector|
+            facts = hidden_facts(selector)
+            next unless facts["hidden"]
+
+            expect(facts).to include("visible" => false, "display" => "none", "size" => [ 0, 0 ])
+          end
+          expect(checked).not_to be_empty
         end
 
         it "shows the detect option for an unlisted time zone" do
@@ -658,6 +696,16 @@ RSpec.describe "Small screen layout", type: :system do
         visit account_path
         click_button "Log out"
       end
+    end
+
+    it "toggles level suggestions from a tap on the switch row's text" do
+      user = create_fake_provider_user
+      resize(390)
+      visit_settings_open(user)
+
+      find("#level-suggestions-switch .switch-row").click(x: 4, y: 4)
+
+      wait_for { user.reload.level_suggestions == false }
     end
 
     it "applies a provider chosen on its segment when Save key is pressed" do

@@ -1,7 +1,7 @@
 <%# Makes the layout link the display stylesheets here even with nothing stored, so a choice applies before it saves. %>
 <% content_for :display_controls, "1" %>
 <% preferences = DisplayPreferences.for(current_user) %>
-<details class="form-field" id="display-preferences" data-controller="display-preferences"
+<details class="card settings-fields" id="display-preferences" data-controller="display-preferences"
          data-display-preferences-url-value="<%= profile_path %>"
          data-display-preferences-defaults-value="<%= DisplayPreferences::OPTIONS.transform_values(&:first).to_json %>"
          data-display-preferences-palette-value="<%= DisplayPreferences::LIGHT_PALETTE_MEDIA.to_json %>"
