@@ -59,7 +59,7 @@ second response, which said the spent code was wrong, or signed the user out
 before they saw their recovery codes. Disabling the button after the first
 submit stops the second post. A tap that lands before the controller connects
 still posts twice on the sign-in forms, so the server accepts that repeat:
-`SignInCompletion#recent_sign_in_checked_at` signs in a second post that
+`SignInCompletion#recent_sign_in` signs in a second post that
 carries the same pending stamp and code within `REPEAT_WINDOW`. That keeps
 sign-in working without JavaScript. Every form gets its wiring from
 `LoadingFormHelper#loading_form_data`, and `sign_in_form_guards_spec` checks

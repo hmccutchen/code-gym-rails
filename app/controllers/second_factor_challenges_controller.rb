@@ -3,7 +3,6 @@ class SecondFactorChallengesController < ApplicationController
 
   skip_before_action :require_login
   skip_before_action :require_provider
-  before_action :require_open_challenge
 
   RATE_LIMIT_STORE = LazyCacheStore.new
 
@@ -19,6 +18,8 @@ class SecondFactorChallengesController < ApplicationController
              store: RATE_LIMIT_STORE,
              name:  "second_factor_attempts",
              only:  :create
+
+  before_action :require_open_challenge
 
   # GET /login/second-factor
   def new
@@ -54,7 +55,7 @@ class SecondFactorChallengesController < ApplicationController
   def second_factor_proof = [ pending_second_factor["user_id"], pending_second_factor["at"], params[:otp_code].to_s ]
 
   def complete_repeated_sign_in
-    checked_at = recent_sign_in_checked_at(@user, second_factor_proof) or return false
+    checked_at = recent_sign_in(@user, second_factor_proof)&.dig(:checked_at) or return false
 
     PendingTrial.forget(session)
     complete_sign_in(@user, checked_at: checked_at, factor: :authenticator)

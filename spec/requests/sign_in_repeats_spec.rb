@@ -135,6 +135,51 @@ RSpec.describe "A repeated sign-in post", type: :request do
       expect(session[:user_id]).to eq(user.id)
     end
 
+    it "gives both posts of a repeated emailed code the same authenticator challenge" do
+      code = request_code
+      cookie_before = cookies[session_cookie]
+      post verify_login_code_path, params: { code: code }
+      first_marker = session[:pending_second_factor]
+      cookies[session_cookie] = cookie_before
+
+      post verify_login_code_path, params: { code: code }
+
+      expect(response).to redirect_to(second_factor_challenge_path)
+      expect(session[:pending_second_factor]).to eq(first_marker)
+      expect(user.reload.second_factor_challenge_open?(first_marker["at"])).to be(true)
+    end
+
+    it "keeps a pending trial when a repeated emailed code still needs the authenticator step" do
+      stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+      trial_user = User.create!(email: "trial@example.com", name: "Trial", track_chosen_at: Time.current)
+      trial_secret, _codes = enroll_second_factor(trial_user)
+      invite, invite_code = mint_trial_code
+      post start_trial_path, params: { email: trial_user.email, invite_code: invite_code, provider: "fake", consent: "1" }
+
+      post_twice(verify_login_code_path, { code: trial_user.generate_login_code! })
+      post second_factor_challenge_path, params: { otp_code: current_totp(trial_secret) }
+
+      expect(flash[:notice]).to eq("Your trial has started.")
+      expect(trial_user.reload.invite_code).to eq(invite)
+    end
+
+    it "counts replayed authenticator guesses against the rate limits" do
+      post login_path, params: { email: user.email }
+      post verify_login_code_path, params: { code: user.generate_login_code! }
+      cookie_before = cookies[session_cookie]
+      post second_factor_challenge_path, params: { otp_code: current_totp(secret) }
+      wrong = wrong_code_for(current_totp(secret))
+
+      statuses = Array.new(10) do
+        cookies[session_cookie] = cookie_before
+        post second_factor_challenge_path, params: { otp_code: wrong }
+        response.status
+      end
+
+      expect(statuses.last).to eq(429)
+      expect(session[:user_id]).to be_nil
+    end
+
     it "refuses a different authenticator code sent with the cookie from before the sign-in" do
       post login_path, params: { email: user.email }
       post verify_login_code_path, params: { code: user.generate_login_code! }
