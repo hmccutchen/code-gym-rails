@@ -90,13 +90,12 @@ RSpec.describe SendPushReminderJob, type: :job do
   end
 
   it "does nothing when no VAPID keypair is configured" do
-    ENV.delete("VAPID_PUBLIC_KEY")
     create_exercise
     subscribe
 
     expect(PushDelivery).not_to receive(:deliver)
 
-    described_class.new.perform(user_id: user.id)
+    without_push_credentials { described_class.new.perform(user_id: user.id) }
   end
 
   describe "the unfinished-set nudge" do

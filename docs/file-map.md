@@ -184,7 +184,7 @@ What each listed file does.
 - `app/clients/fake_service.rb` — deterministic, zero-cost AiService provider for tests (`provider: "fake"`); overrides only `#call`/`#build_connection`, and `#call` answers by the request's purpose from its `REPLIES` table, so every other AiService code path runs for real against its canned output. `AiService.for` refuses it outside a local environment.
 - `spec/support/fake_replies.rb` — `FakeReplies::SYSTEM_PROMPT_MARKERS` and `purpose_for`: the purpose behind a system prompt, for specs that stub a provider's HTTP and use `FakeService` as the reply oracle, since the posted body carries no purpose
 - `spec/support/provider_call_helpers.rb` — `call_provider`: sends a provider a request built with `AiService::Request.build` and its defaults, for the provider specs
-- `spec/support/push_credentials.rb` — `with_push_credentials` sets a VAPID keypair for the block and `without_push_credentials` removes it, each restoring whatever was set before, for system, request and job specs; `spec/support/push_api_stubs.rb` holds the browser push stubs
+- `spec/support/push_credentials.rb` — `with_push_credentials` sets a VAPID keypair for the block and `without_push_credentials` removes it, each restoring whatever was set before, for system, request, job and service specs; `spec/support/push_api_stubs.rb` holds the browser push stubs
 - `app/controllers/learn_controller.rb` — the `/learn` library: lists every
   concept in the user's slice (assigned or not), the per-concept detail page,
   and three generation triggers: a one-concept `#prepare_concept`, a
