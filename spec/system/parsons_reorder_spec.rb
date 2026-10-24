@@ -262,8 +262,11 @@ RSpec.describe "Parsons reorder controls", type: :system do
 
       visit root_path
       expect(page).to have_css("ol[data-parsons-blocks][data-parsons-wired]")
+      wait_for_js
 
-      wait_for_js_condition("(JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.sent || []).includes('a save still on the wire')")
+      wait_for_js_condition(<<~JS.squish)
+        ((sent) => sent.length === 2 && sent[0] === 'a save still on the wire')(JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.sent || [])
+      JS
     ensure
       gate[:open] = true
     end
