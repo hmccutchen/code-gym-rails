@@ -284,9 +284,9 @@ class DailyResponse < ApplicationRecord
 
     concept = concept_tags[section.to_s]
     return true if concept.blank? || concept == "other"
-    # Must match User#concept_exposure_index's keys, or plan_review's revised plan never becomes visible.
+    # Must match ConceptExposureIndex's keys, or plan_review's revised plan never becomes visible.
     bucket = ConceptBucket.for(section, daily_exercise.language)
-    user.concept_exposure_count(concept, bucket, on_or_before: date) >= 2
+    user.concept_exposures.count(concept, bucket, on_or_before: date) >= 2
   end
 
   private

@@ -13,6 +13,6 @@ module ConceptReferencesHelper
   # The exposure index counts submitted responses only, so today's in-progress response never counts.
   def first_exposure?(concept, bucket, date)
     return false if concept.blank? || concept == "other"
-    current_user.concept_exposure_count(concept, bucket, on_or_before: date).zero?
+    current_user.concept_exposures.count(concept, bucket, on_or_before: date).zero?
   end
 end

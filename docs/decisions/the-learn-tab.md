@@ -91,7 +91,7 @@ last one went stale the first time a vocabulary grew. The rate is an estimate
 from prompt shape rather than a measurement, and both it and the slice's size
 are checkable against `ApiUsage` rows under
 `purpose: "generate_concept_reference"`. The "seen in your sets" marker
-derives from `User#concept_exposure_count` (submitted responses only), never
+derives from `ConceptExposureIndex#count` (submitted responses only), never
 from `ConceptMastery`: tier is kept invisible everywhere by design, and a
 marker sourced from it would be exactly the readout the post-hoc difficulty
 rating went to lengths to avoid becoming.

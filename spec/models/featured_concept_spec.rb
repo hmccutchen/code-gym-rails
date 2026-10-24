@@ -8,7 +8,7 @@ RSpec.describe FeaturedConcept, type: :model do
     submit_set_showing(owner, concept, date: date, **section)
   end
 
-  # A fresh row each call, as each request loads one: User memoizes its exposure index.
+  # A fresh row each call, as each request loads one: User memoizes its ConceptExposureIndex.
   def featured(on, owner: user) = described_class.for(User.find(owner.id), today: on)
 
   def pair(row) = row && [ row.concept, row.bucket ]

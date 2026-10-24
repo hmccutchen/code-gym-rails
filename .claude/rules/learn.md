@@ -2,7 +2,7 @@
 paths:
   - "app/controllers/{learn,learn_lessons,concept_references,concept_drills,progress}_controller.rb"
   - "app/controllers/concerns/learn_scope.rb"
-  - "app/models/{concept_reference,concept_lesson,concept_group,concept_book_sources,learn_lessons,glossary,hand_written_learn_text,section_kind_guide,recognition_guide,featured_concept,rung_ledger,concept_hosts,worked_example,ladder_coverage}.rb"
+  - "app/models/{concept_reference,concept_lesson,concept_group,concept_book_sources,learn_lessons,glossary,hand_written_learn_text,section_kind_guide,recognition_guide,featured_concept,rung_ledger,concept_hosts,worked_example,ladder_coverage,concept_exposure_index}.rb"
   - "app/models/featured_concept_pick.rb"
   - "app/prompts/{concept_reference_prompt,recognition_guide_prompt,explain_differently_prompt}.rb"
   - "app/jobs/{generate_concept_reference_job,generate_recognition_guide_job}.rb"
@@ -37,7 +37,7 @@ read it before changing that area.
   no `user_id`. Guide, ladder and `lesson` come from the same
   `#generate_concept_reference` call, outside its required fields;
   `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
-  out, and "seen" reads `concept_exposure_count`, never `ConceptMastery`.
+  out, and "seen" reads `ConceptExposureIndex#count`, never `ConceptMastery`.
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
   `ConceptGroup` or language-independent bucket gets one shared
   `RecognitionGuide` on how to look for that kind of problem. It teaches a

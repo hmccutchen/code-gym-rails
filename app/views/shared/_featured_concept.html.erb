@@ -7,7 +7,7 @@
                 learn_concept_path(bucket: featured.bucket, concept: featured.concept) %>
   </h2>
   <p class="featured-bucket"><%= t("learn.buckets.#{featured.bucket}") %> · <%= t("learn.featured.seen",
-        count: current_user.concept_exposure_count(featured.concept, featured.bucket, on_or_before: Date.current)) %></p>
+        count: current_user.concept_exposures.count(featured.concept, featured.bucket, on_or_before: Date.current)) %></p>
   <% if featured_tagline_shown?(local_assigns[:day_response]) && reference&.tagline.present? %>
     <p class="featured-tagline"><%= reference.tagline %></p>
   <% end %>

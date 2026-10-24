@@ -20,7 +20,7 @@ state, and every other reader ignores a row with no evidence. A group drill
 is one row per concept labelled with the group, not a group flag: clearing
 stays per concept, and the label is what lets the cap count a half-cleared
 group as one drill. Drilled concepts beyond today's capacity rotate
-never-seen first, then least recently seen, read from the exposure index —
+never-seen first, then least recently seen, read from `ConceptExposureIndex` —
 which drill was offered is never recorded, like every other offer.
 
 **A drill clears on the existing mastery signal and nothing else.** The
