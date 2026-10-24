@@ -206,3 +206,9 @@ data.*
   **I decided:** system specs stay in CI
 - edits typed behind a save survive a reload `#509`
   **I decided:** the copy keeps unconfirmed saves
+
+## Sat Oct 24
+
+- find where the app has got slow and make those pages faster `#517`
+  **I decided:** the work goes in its own worktree, off main, so it stays
+  clear of the two branches I had open
