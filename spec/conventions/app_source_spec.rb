@@ -87,6 +87,74 @@ RSpec.describe "Conventions held over app/ source" do
     expect(provider_class_references("# AiService::MAX_GENERATED_CODE_LENGTH\nlabel = \"AiService\"")).to be_empty
   end
 
+  SESSION_CALLS = %i[session reset_session].freeze
+  SESSION_PARAMETERS = [ Prism::RequiredParameterNode, Prism::OptionalParameterNode, Prism::RequiredKeywordParameterNode,
+                         Prism::OptionalKeywordParameterNode, Prism::RestParameterNode, Prism::KeywordRestParameterNode,
+                         Prism::BlockParameterNode ].freeze
+
+  def session_reach?(node)
+    (node.is_a?(Prism::CallNode) && SESSION_CALLS.include?(node.name)) ||
+      (SESSION_PARAMETERS.any? { |type| node.is_a?(type) } && node.name == :session)
+  end
+
+  def session_reaches(source)
+    found = []
+    visit = lambda do |node|
+      found << node.location.start_line if session_reach?(node)
+      node.compact_child_nodes.each(&visit)
+    end
+    visit.call(Prism.parse(source).value)
+    found.uniq
+  end
+
+  it "keeps models off the controller session, which a controller concern reads and hands them as plain values" do
+    offenders = Dir[Rails.root.join("app/models/**/*.rb")].sort.flat_map do |path|
+      session_reaches(File.read(path)).map { |line| "#{relative(path)}:#{line}" }
+    end
+
+    expect(offenders).to be_empty, "Models reaching a controller session: #{offenders.join(', ')}"
+  end
+
+  it "finds a session read or a session parameter, and not a session stamp or a word in a comment or string" do
+    expect(session_reaches("session[:user_id]")).to eq([ 1 ])
+    expect(session_reaches("x = request.session.delete(:pending_trial)")).to eq([ 1 ])
+    expect(session_reaches("reset_session")).to eq([ 1 ])
+    expect(session_reaches("def self.stash(session, email:) = nil")).to eq([ 1 ])
+    expect(session_reaches("def stash(email:, session: nil) = nil")).to eq([ 1 ])
+    expect(session_reaches("each { |session| session }")).to eq([ 1 ])
+    expect(session_reaches(<<~RUBY)).to be_empty
+      # session[:user_id]
+      label = "session"
+      User.session_time(stamp)
+      user.session_signed_in_valid?(signed_in_at)
+      update!(sessions_valid_after: now)
+      record_review!(response, sections: [], apply_session_countdown: true)
+      def self.signed_in_through(user_id:, signed_in_at:) = nil
+    RUBY
+  end
+
+  it "fails the model that took the session as an argument before #531, whatever its methods are called" do
+    renamed_pending_trial = <<~RUBY
+      class PendingTrial
+        KEY = :pending_trial
+
+        def self.stash(session, email:, invite:, provider:, consented_at:)
+          session[KEY] = { "email" => email, "invite_code_id" => invite.id,
+                           "provider" => provider, "consented_at" => consented_at.iso8601 }
+        end
+
+        def self.discard(session) = session.delete(KEY)
+
+        def self.claim(session)
+          data = session.delete(KEY)
+          new(data) if data.is_a?(Hash)
+        end
+      end
+    RUBY
+
+    expect(session_reaches(renamed_pending_trial)).to eq([ 4, 9, 11 ])
+  end
+
   LEVEL_FIELDS = %i[skill_level section_kind_levels].freeze
   LEVEL_UPDATES = %i[update update! update_columns update_column update_attribute assign_attributes].freeze
   LEVEL_WRITE_EXEMPT = {

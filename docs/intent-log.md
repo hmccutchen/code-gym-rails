@@ -234,6 +234,6 @@ data.*
 - share fetch stubs across system specs `#538`
 - keep Settings styles with the partials that render them `#539`
 - preserve exported push credentials after service specs `#540 open`
-- keep controller sessions out of models `#541 open`
+- keep controller sessions out of models `#541`
 - keep authenticator deletion fields with the authenticator `#542 open`
 - read the pull-refresh test key from its production owner `#543`
