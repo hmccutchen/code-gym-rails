@@ -71,7 +71,7 @@ RSpec.describe "Submit guards on the sign-in and authenticator forms", type: :re
       post second_factor_challenge_path, params: { otp_code: current_totp(secret) }
       get account_path
 
-      button = Nokogiri::HTML(response.body).at_css(%(form[action="#{account_recovery_codes_path}"] input[type="submit"]))
+      button = Nokogiri::HTML(response.body).at_css(%(form[action="#{account_recovery_codes_path}"] [type="submit"]))
       expect(button["disabled"]).not_to be_nil
     end
   end

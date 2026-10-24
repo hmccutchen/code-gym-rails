@@ -299,6 +299,21 @@ RSpec.describe "Small screen layout", type: :system do
       JS
     end
 
+    def clipped_button_labels
+      page.evaluate_script(<<~JS)
+        (() => {
+          const context = document.createElement("canvas").getContext("2d");
+          return Array.from(document.querySelectorAll(".btn-block")).filter(el => el.checkVisibility()).filter(el => {
+            const style = getComputedStyle(el);
+            const room = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+            if (el.tagName !== "INPUT") return el.scrollWidth > el.clientWidth;
+            context.font = style.font;
+            return context.measureText(el.value).width > room + 0.5;
+          }).map(el => el.value || el.textContent.trim());
+        })()
+      JS
+    end
+
     def card_gaps
       page.evaluate_script(<<~JS)
         (() => {
@@ -338,6 +353,7 @@ RSpec.describe "Small screen layout", type: :system do
         expect(visible_heights(".btn-block").size).to eq(7)
         expect(visible_heights(".btn-block")).to all(be >= 48)
         button_and_card_widths.each { |button, card| expect(button).to be_within(1).of(card - 34) }
+        expect(clipped_button_labels).to eq([])
         expect(heights(".switch-row").size).to eq(1)
         expect(heights(".switch-row")).to all(be >= 48)
         expect(card_paddings).to all(eq("16px"))

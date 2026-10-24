@@ -15,7 +15,7 @@
 .card .card-note { margin-bottom: .75rem; }
 .card > :where(form, .btn-block) + :where(form, .btn-block), .switch-row + .btn-block { margin-top: .5rem; }
 
-.btn.btn-block { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; }
+.btn.btn-block { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; text-align: center; }
 
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 48px; cursor: pointer; }
 .switch { appearance: none; flex: none; width: 44px; height: 26px; border-radius: 999px; background: var(--muted); position: relative; cursor: pointer; }
