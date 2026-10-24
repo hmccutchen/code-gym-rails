@@ -3,24 +3,20 @@ pre-commit:
   parallel: true
   jobs:
     - name: rubocop
-      glob: "{*.rb,*.rake,*.ru,Gemfile,Rakefile}"
-      exclude:
-        - ".claude/**"
-        - "vendor/**"
-        - "**/node_modules/**"
       run: bin/rubocop --force-exclusion {staged_files}
 
     - name: comment-check
-      glob: "*.{erb,js,mjs,css,yml,yaml,py}"
-      exclude:
-        - ".claude/**"
-        - "vendor/**"
-        - "**/node_modules/**"
       run: bin/comment-check {staged_files}
 
 pre-push:
   parallel: true
   jobs:
+    - name: rubocop
+      run: bin/rubocop
+
+    - name: comment-check
+      run: bin/comment-check
+
     - name: archspec
       run: bundle exec archspec check
 

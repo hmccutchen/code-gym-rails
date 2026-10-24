@@ -15,8 +15,11 @@ FileUtils.chdir APP_ROOT do
   puts "== Installing dependencies =="
   system("bundle check") || system!("bundle install")
 
+  puts "\n== Installing Prettier for CodeFormat =="
+  system("npm --prefix vendor/prettier ci") || warn("Prettier didn't install, so CodeFormat's specs will fail until it does.")
+
   puts "\n== Installing git hooks =="
-  system! "bundle exec lefthook install"
+  system("bundle exec lefthook install") || warn("The git hooks didn't install; see docs/code-notes/lefthook.md.")
 
   # puts "\n== Copying sample files =="
   # unless File.exist?("config/database.yml")

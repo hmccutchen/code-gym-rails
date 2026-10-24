@@ -5,7 +5,13 @@ module CommentCheck
   MAX_PER_FILE = 5
   Offense = Struct.new(:path, :line, :message)
 
+  SKIPPED_FOLDERS = %w[vendor/ .claude/].freeze
+
   module_function
+
+  def checked_path?(path)
+    !path.start_with?(*SKIPPED_FOLDERS) && !path.include?("node_modules/") && !Scanners.for(path).nil?
+  end
 
   def offenses_for(path, text)
     scanner = Scanners.for(path) or return []
