@@ -329,8 +329,9 @@ bin/jobs              # optional: Solid Queue and the recurring schedule
 
 `bin/setup` also installs Prettier for `CodeFormat` and the git hooks in
 `lefthook.yml`, which run CI's checks before a commit and before a push.
-`docs/code-notes/lefthook.md` says which run when and how to skip them. On an
-older checkout, run `bundle exec lefthook install` once.
+`docs/code-notes/lefthook.md` says which run when and how to skip them.
+Prettier needs Node and npm. On an older checkout, run
+`npm --prefix vendor/prettier ci` and `bundle exec lefthook install` once.
 
 Development needs no environment variables. `config/database.yml` points at
 a local PostgreSQL through its default socket, Rails generates the

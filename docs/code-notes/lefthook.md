@@ -23,7 +23,7 @@ Neither checks `.claude/`. The skills vendored under `.claude/skills/` keep the 
 
 The system specs stay in CI. They need Playwright's Chromium and take several more minutes, and the unit suite catches most breaks first. CLAUDE.md still asks you to run `spec/system` once before opening a PR.
 
-The unit suite needs Prettier's packages, because `CodeFormat`'s specs run Prettier for real. `bin/setup` installs them with `npm --prefix vendor/prettier ci`, as CI does.
+The unit suite needs Prettier's packages, because `CodeFormat`'s specs run Prettier for real; without them, two examples in `spec/models/code_format_spec.rb` fail and block the push. Installing them needs Node and npm. `bin/setup` runs `npm --prefix vendor/prettier ci`, as CI does. On a checkout that predates that step, run it once yourself.
 
 ## Skipping and running by hand
 
