@@ -224,6 +224,6 @@ data.*
   **I decided:** Claude implements; the foreman does the final reviews.
   Each issue gets its own PR, Copilot review and a green-CI merge.
 - share the VAPID test credentials across request, job and system specs `#525`
-- share the draft key and settled-save waits across system specs `#529 open`
+- share the draft key and settled-save waits across system specs `#529`
 - keep Account styles with the partials that render them `#530`
 - keep pending-trial session access in a controller concern `#531 open`
