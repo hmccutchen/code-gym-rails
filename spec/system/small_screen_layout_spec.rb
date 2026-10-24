@@ -623,14 +623,16 @@ RSpec.describe "Small screen layout", type: :system do
           expect(checked).not_to be_empty
         end
 
-        it "shows the detect option for an unlisted time zone" do
+        it "shows and preserves the saved unlisted time zone" do
           user = create_fake_provider_user(time_zone: "Europe/London")
           user.update!(display_preferences: prefs)
           resize(width)
           visit_settings_open(user)
 
           expect(find("#tz-select", visible: :all).ancestor(".value-row").find(".value-row-value", visible: :all).text(:all))
-            .to eq(I18n.t("api_keys.edit.time_zone_detect"))
+            .to eq("Europe/London")
+          expect(find("#tz-select", visible: :all).value).to eq("Europe/London")
+          expect(user.reload.time_zone).to eq("Europe/London")
         end
 
         {

@@ -677,14 +677,15 @@
     <h2>Your day</h2>
     <div class="value-row" data-controller="value-row">
       <label for="tz-select">Time zone</label>
-      <span class="value-row-value" aria-hidden="true" data-value-row-target="value">— detect automatically —</span>
+      <span class="value-row-value" aria-hidden="true" data-value-row-target="value">UTC</span>
       <select name="tz_select" id="tz-select" data-profile-preferences-target="timeZone" data-action="change-&gt;profile-preferences#saveTimeZone change-&gt;value-row#show"><option value="">— detect automatically —</option><option value="America/New_York">Eastern</option>
 <option value="America/Chicago">Central</option>
 <option value="America/Denver">Mountain</option>
 <option value="America/Phoenix">Mountain (Arizona, no DST)</option>
 <option value="America/Los_Angeles">Pacific</option>
 <option value="America/Anchorage">Alaska</option>
-<option value="Pacific/Honolulu">Hawaii</option></select>
+<option value="Pacific/Honolulu">Hawaii</option>
+<option selected="selected" value="UTC">UTC</option></select>
     </div>
     <p class="card-note">Sets when your day rolls over and when your 8am exercise set is generated. Leave on &quot;detect automatically&quot; to use your browser&#39;s zone.</p>
 

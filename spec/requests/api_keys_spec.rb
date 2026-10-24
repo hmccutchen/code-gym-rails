@@ -314,6 +314,39 @@ RSpec.describe "ApiKeys", type: :request do
       get setup_path
       expect(Nokogiri::HTML(response.body).at_css("#tz-select").ancestors(".value-row").first.at_css(".value-row-value").text)
         .to eq(I18n.t("api_keys.edit.time_zone_detect"))
+      select = Nokogiri::HTML(response.body).at_css("#tz-select")
+      expect(select.at_css("option")["value"]).to eq("")
+      expect(select.at_css("option").text).to eq(I18n.t("api_keys.edit.time_zone_detect"))
+      expect(select.css("option[selected]")).to be_empty
+    end
+
+    {
+      "America/New_York" => "eastern", "America/Chicago" => "central", "America/Denver" => "mountain",
+      "America/Phoenix" => "arizona", "America/Los_Angeles" => "pacific",
+      "America/Anchorage" => "alaska", "Pacific/Honolulu" => "hawaii"
+    }.each do |zone, label|
+      it "keeps the existing label and single option for #{zone}" do
+        login_as(create_user_with_key(time_zone: zone))
+        get setup_path
+        select = Nokogiri::HTML(response.body).at_css("#tz-select")
+        expect(select.css("option").map { |option| option["value"] }.count(zone)).to eq(1)
+        expect(select.at_css("option[selected]").text).to eq(I18n.t("api_keys.edit.time_zones.#{label}"))
+        expect(select.ancestors(".value-row").first.at_css(".value-row-value").text)
+          .to eq(I18n.t("api_keys.edit.time_zones.#{label}"))
+      end
+    end
+
+    [ "Europe/London", "London" ].each do |zone|
+      it "shows the saved unlisted zone #{zone} in the select and value row" do
+        saved_user = create_user_with_key(time_zone: zone)
+        login_as(saved_user)
+        get setup_path
+        select = Nokogiri::HTML(response.body).at_css("#tz-select")
+        expect(select.css("option[selected]").map { |option| [ option["value"], option.text ] }).to eq([ [ zone, zone ] ])
+        expect(select.ancestors(".value-row").first.at_css(".value-row-value").text).to eq(zone)
+        expect(select.css("option").last["value"]).to eq(zone)
+        expect(saved_user.reload.effective_time_zone).to eq(zone)
+      end
     end
 
     it "shows one provider segment for one saved key and none without a key" do

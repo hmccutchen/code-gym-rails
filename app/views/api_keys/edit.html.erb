@@ -90,6 +90,9 @@
                              [ t("api_keys.edit.time_zones.pacific"), "America/Los_Angeles" ],
                              [ t("api_keys.edit.time_zones.alaska"), "America/Anchorage" ],
                              [ t("api_keys.edit.time_zones.hawaii"), "Pacific/Honolulu" ] ] %>
+    <% if current_user.time_zone.present? && !time_zone_options.rassoc(current_user.time_zone) %>
+      <% time_zone_options << [ current_user.time_zone, current_user.time_zone ] %>
+    <% end %>
     <div class="value-row" data-controller="value-row">
       <label for="tz-select"><%= t("api_keys.edit.time_zone_label") %></label>
       <span class="value-row-value" aria-hidden="true" data-value-row-target="value"><%= time_zone_options.rassoc(current_user.time_zone)&.first || t("api_keys.edit.time_zone_detect") %></span>
