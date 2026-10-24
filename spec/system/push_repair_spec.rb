@@ -3,37 +3,7 @@ require "rails_helper"
 RSpec.describe "Allowing notifications on a device after reminders are already on", type: :system do
   let(:user) { create_fake_provider_user.tap { |user| user.update!(reminder_level: "ready_and_nudges") } }
   let(:old_endpoint) { "https://web.push.apple.com/removed-install" }
-  let(:new_endpoint) { "https://web.push.apple.com/reinstalled" }
-
-  # Like iOS, subscribe() fails until permission is granted, which only a click on the page can ask for.
-  def stub_push_apis(permission:, answer: "granted")
-    script = <<~JS
-      window.pushPermission = #{permission.to_json};
-      const subscription = {
-        endpoint: #{new_endpoint.to_json},
-        toJSON() { return { endpoint: this.endpoint, keys: { p256dh: "p256dh-key", auth: "auth-key" } }; }
-      };
-      const pushManager = {
-        subscribe: async () => {
-          if (window.pushPermission !== "granted") throw new DOMException("Not allowed", "NotAllowedError");
-          return subscription;
-        },
-        getSubscription: async () => null
-      };
-      Object.defineProperty(navigator, "serviceWorker", {
-        configurable: true,
-        value: { register: async () => ({ pushManager }), ready: Promise.resolve({ pushManager }) }
-      });
-      window.PushManager = function PushManager() {};
-      Object.defineProperty(Notification, "permission", { configurable: true, get: () => window.pushPermission });
-      Notification.requestPermission = () => {
-        sessionStorage.setItem("permissionRequests", String(Number(sessionStorage.getItem("permissionRequests")) + 1));
-        window.pushPermission = #{answer.to_json};
-        return Promise.resolve(window.pushPermission);
-      };
-    JS
-    page.driver.with_playwright_page { |pw| pw.add_init_script(script: script) }
-  end
+  let(:new_endpoint) { PushApiStubs::REINSTALLED_ENDPOINT }
 
   around do |example|
     ENV["VAPID_PUBLIC_KEY"] = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U"

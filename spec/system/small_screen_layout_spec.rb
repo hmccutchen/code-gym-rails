@@ -2,8 +2,8 @@ require "rails_helper"
 
 # Reflow (WCAG 1.4.10) and target size only show up in a real layout.
 RSpec.describe "Small screen layout", type: :system do
-  def resize(width)
-    page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: width, height: 844) }
+  def resize(width, height: 844)
+    page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: width, height: height) }
   end
 
   def page_width
@@ -37,6 +37,22 @@ RSpec.describe "Small screen layout", type: :system do
 
   def heights(selector)
     page.evaluate_script("Array.from(document.querySelectorAll(#{selector.to_json})).map(el => el.getBoundingClientRect().height)")
+  end
+
+  def set_safe_area(left:, right:)
+    page.driver.with_playwright_page do |pw|
+      pw.context.new_cdp_session(pw).send_message("Emulation.setSafeAreaInsetsOverride", params: { insets: { left: left, right: right } })
+    end
+  end
+
+  def card_edges
+    edges = page.evaluate_script("Array.from(document.querySelectorAll('main .phone-page > .card')).map(el => { const r = el.getBoundingClientRect(); return [r.left, window.innerWidth - r.right]; })")
+    expect(edges.size).to eq(7)
+    edges
+  end
+
+  def visible_heights(selector)
+    page.evaluate_script("Array.from(document.querySelectorAll(#{selector.to_json})).filter(el => el.checkVisibility()).map(el => el.getBoundingClientRect().height)")
   end
 
   it "keeps the menu button on screen at 320px, at the default and the largest text size" do
@@ -254,5 +270,135 @@ RSpec.describe "Small screen layout", type: :system do
 
     page.driver.with_playwright_page { |pw| pw.keyboard.press("Enter") }
     expect(page.evaluate_script("document.activeElement.id")).to eq("main-content")
+  end
+
+  describe "Account's phone layout" do
+    let(:user) { create_fake_provider_user.tap { |user| user.update!(reminder_level: "ready_and_nudges") } }
+
+    around do |example|
+      ENV["VAPID_PUBLIC_KEY"] = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U"
+      ENV["VAPID_PRIVATE_KEY"] = "private"
+      example.run
+    ensure
+      ENV.delete("VAPID_PUBLIC_KEY")
+      ENV.delete("VAPID_PRIVATE_KEY")
+    end
+
+    before do
+      user.push_subscriptions.create!(endpoint: "https://web.push.apple.com/installed", p256dh_key: "p256dh", auth_key: "auth")
+      stub_push_apis(permission: "granted")
+    end
+
+    def visit_account_with_every_card
+      secret, = enroll_second_factor(user)
+      visit_as(user)
+      fill_in "Code from your authenticator app, or a recovery code", with: current_totp(secret)
+      click_button "Verify"
+      visit account_path
+      wait_for_js
+    end
+
+    def button_and_card_widths
+      page.evaluate_script(<<~JS)
+        Array.from(document.querySelectorAll(".btn-block")).filter(el => el.checkVisibility()).map(el => [el.getBoundingClientRect().width, el.closest(".card").getBoundingClientRect().width])
+      JS
+    end
+
+    def card_gaps
+      page.evaluate_script(<<~JS)
+        (() => {
+          const cards = Array.from(document.querySelectorAll("main .phone-page > .card")).map(el => el.getBoundingClientRect());
+          return cards.slice(1).map((card, index) => card.top - cards[index].bottom);
+        })()
+      JS
+    end
+
+    def card_paddings
+      page.evaluate_script("Array.from(document.querySelectorAll('main .phone-page > .card')).map(el => getComputedStyle(el).paddingLeft)")
+    end
+
+    def card_widths
+      page.evaluate_script("Array.from(document.querySelectorAll('main .phone-page > .card')).map(el => el.getBoundingClientRect().width)")
+    end
+
+    def hidden_facts(selector)
+      page.evaluate_script(<<~JS)
+        (() => {
+          const el = document.querySelector(#{selector.to_json});
+          const box = el.getBoundingClientRect();
+          return { hidden: el.hasAttribute("hidden"), visible: el.checkVisibility(), display: getComputedStyle(el).display, size: [box.width, box.height] };
+        })()
+      JS
+    end
+
+    [ [ 390, {} ], [ 320, LARGEST ] ].each do |width, prefs|
+      it "lays Account out in 16px-margined cards with 48px buttons at #{width}px#{' with the largest text' if prefs.any?}" do
+        user.update!(display_preferences: prefs)
+        resize(width)
+        visit_account_with_every_card
+        apply_text_spacing if prefs.any?
+
+        expect(page_width).to eq(width)
+        card_edges.each { |edges| expect(edges).to all(be_within(0.5).of(16)) }
+        expect(visible_heights(".btn-block").size).to eq(7)
+        expect(visible_heights(".btn-block")).to all(be >= 48)
+        button_and_card_widths.each { |button, card| expect(button).to be_within(1).of(card - 34) }
+        expect(heights(".switch-row")).to all(be >= 48)
+        expect(card_paddings).to all(eq("16px"))
+        expect(card_gaps).to all(be_within(0.5).of(16))
+      end
+    end
+
+    it "keeps the repair button hidden and out of the layout when nothing needs repair" do
+      resize(390)
+      visit_account_with_every_card
+
+      %w[#push-repair #push-repair-status].each do |selector|
+        expect(hidden_facts(selector)).to eq("hidden" => true, "visible" => false, "display" => "none", "size" => [ 0, 0 ])
+      end
+    end
+
+    it "keeps Account's cards clear of a 44px notch in portrait" do
+      resize(390)
+      set_safe_area(left: 44, right: 44)
+      visit_account_with_every_card
+
+      card_edges.each { |edges| expect(edges).to all(be_within(0.5).of(44)) }
+      expect(page_width).to eq(390)
+    end
+
+    it "puts Account's cards at a 20px inset, not at 16px" do
+      resize(390)
+      set_safe_area(left: 20, right: 0)
+      visit_account_with_every_card
+
+      card_edges.each do |left, right|
+        expect(left).to be_within(0.5).of(20)
+        expect(right).to be_within(0.5).of(16)
+      end
+    end
+
+    it "centers Account's cards clear of the notch in landscape" do
+      resize(844, height: 390)
+      set_safe_area(left: 47, right: 47)
+      visit_account_with_every_card
+
+      expect(card_widths).to all(be_within(0.5).of(480))
+      card_edges.each do |left, right|
+        expect(left).to be >= 47
+        expect(right).to be >= 47
+        expect(left).to be_within(1).of(right)
+      end
+    end
+
+    it "toggles the nudges switch from a tap on its text" do
+      resize(390)
+      visit_account_with_every_card
+      was_checked = find("input.switch").checked?
+
+      find(".switch-row").click(x: 4, y: 4)
+
+      expect(find("input.switch").checked?).to eq(!was_checked)
+    end
   end
 end
