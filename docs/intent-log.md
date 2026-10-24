@@ -237,3 +237,4 @@ data.*
 - keep controller sessions out of models `#541`
 - keep authenticator deletion fields with the authenticator `#542`
 - read the pull-refresh test key from its production owner `#543`
+- speed up Progress's history reads `#544`
