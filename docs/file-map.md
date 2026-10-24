@@ -240,6 +240,7 @@ What each listed file does.
   and only caught here.
 - `config/initializers/content_security_policy.rb` — the policy that makes the Stimulus convention enforceable: `script-src` is this origin, the mermaid and SortableJS package directories on `cdn.jsdelivr.net`, and a per-request nonce, and `style-src` keeps `'unsafe-inline'`, since the views still carry `style=` attributes
 - `spec/conventions/app_views_spec.rb` — fails on an inline `<script>`, `on*` handler or `javascript:` URL in any view, so the convention breaks a build rather than a page
+- `spec/views/account_styles_spec.rb` — Account views only: fails when one under `app/views/accounts` styles a class its own markup never uses, so each Account partial carries its own `<style>` and the page keeps only its own rules. A style-only `_styles` partial, as other folders use, would fail it
 - `spec/conventions/app_source_spec.rb` — parses `app/` with Prism and fails on `Thread.new` outside `CallerZoneThread` (or a named exemption with its reason and exact thread count) and on `send(:...)`
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
