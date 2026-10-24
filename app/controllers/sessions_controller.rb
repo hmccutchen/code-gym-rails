@@ -47,7 +47,7 @@ class SessionsController < ApplicationController
     user = redeem_login_code(checked_at)
     user, checked_at = repeated_login unless user
     return reject_login_code(pending_login_email) unless user
-    return start_second_factor_challenge(user) if user.two_factor_enabled?
+    return start_second_factor_challenge(user, issued_at: @challenge_at) if user.two_factor_enabled?
 
     complete_sign_in(user, checked_at: checked_at)
   end
@@ -64,7 +64,10 @@ class SessionsController < ApplicationController
     email = pending_login_email
     return if email.blank?
 
-    User.authenticate_login_code(email: email, code: params[:code].to_s) { |user| remember_sign_in(user, login_code_proof, checked_at) }
+    User.authenticate_login_code(email: email, code: params[:code].to_s) do |user|
+      @challenge_at = user.issue_second_factor_challenge! if user.two_factor_enabled?
+      remember_sign_in(user, login_code_proof, checked_at, challenge_at: @challenge_at)
+    end
   end
 
   def login_code_proof = [ session[:pending_login_email], session[:pending_login_at], params[:code].to_s ]
@@ -72,10 +75,11 @@ class SessionsController < ApplicationController
   # Reads the session's address directly: the first post cleared the code, which can end the pending sign-in's life.
   def repeated_login
     user = session[:pending_login_email].present? ? User.active.find_by(email: session[:pending_login_email]) : nil
-    checked_at = recent_sign_in_checked_at(user, login_code_proof) or return
+    recent = recent_sign_in(user, login_code_proof) or return
 
-    PendingTrial.forget(session)
-    [ user, checked_at ]
+    @challenge_at = recent[:challenge_at]
+    PendingTrial.forget(session) unless user.two_factor_enabled?
+    [ user, recent[:checked_at] ]
   end
 
   def reject_login_code(email)

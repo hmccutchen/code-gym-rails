@@ -6,19 +6,21 @@ module SignInCompletion
   private
 
   # A double tap posts twice with the pre-sign-in cookie; the proof holds that browser's own pending stamp and its code.
-  def remember_sign_in(user, proof, checked_at)
-    Rails.cache.write(sign_in_repeat_key(user), { "digest" => sign_in_repeat_digest(proof), "checked_at" => User.session_stamp(checked_at) },
-                      expires_in: REPEAT_WINDOW)
+  def remember_sign_in(user, proof, checked_at, challenge_at: nil)
+    remembered = { "digest" => sign_in_repeat_digest(proof), "checked_at" => User.session_stamp(checked_at),
+                   "challenge_at" => challenge_at && User.session_stamp(challenge_at) }
+    Rails.cache.write(sign_in_repeat_key(user), remembered, expires_in: REPEAT_WINDOW)
   end
 
-  # The repeat keeps the first post's check time, so sessions ended since then stay ended.
-  def recent_sign_in_checked_at(user, proof)
+  def recent_sign_in(user, proof)
     return if user.nil? || proof.any?(&:blank?)
 
     remembered = Rails.cache.read(sign_in_repeat_key(user))
-    return unless remembered.is_a?(Hash) && ActiveSupport::SecurityUtils.secure_compare(remembered["digest"].to_s, sign_in_repeat_digest(proof))
+    return unless remembered.is_a?(Hash)
+    return unless ActiveSupport::SecurityUtils.secure_compare(remembered["digest"].to_s, sign_in_repeat_digest(proof))
+    return unless user.session_signed_in_valid?(remembered["checked_at"])
 
-    User.session_time(remembered["checked_at"]) if user.session_signed_in_valid?(remembered["checked_at"])
+    { checked_at: User.session_time(remembered["checked_at"]), challenge_at: User.session_time(remembered["challenge_at"]) }
   end
 
   def sign_in_repeat_key(user) = "sign_in_repeat/#{user.id}"
@@ -35,11 +37,12 @@ module SignInCompletion
     redirect_to destination || root_path, notice: t("sessions.welcome_back", name: user.name)
   end
 
-  def start_second_factor_challenge(user)
+  def start_second_factor_challenge(user, issued_at: nil)
+    issued_at ||= user.issue_second_factor_challenge!
     session.delete(:pending_login_email)
     session.delete(:pending_login_at)
     session[PENDING_SECOND_FACTOR] = { "user_id" => user.id,
-                                       "at" => User.session_stamp(user.issue_second_factor_challenge!) }
+                                       "at" => User.session_stamp(issued_at) }
     redirect_to second_factor_challenge_path
   end
 
