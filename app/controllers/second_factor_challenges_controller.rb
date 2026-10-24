@@ -51,7 +51,9 @@ class SecondFactorChallengesController < ApplicationController
     end_challenge(t("second_factor_challenges.expired"))
   end
 
-  def second_factor_proof = [ pending_second_factor["user_id"], pending_second_factor["at"], params[:otp_code].to_s ]
+  def second_factor_proof
+    pending_second_factor.values_at("user_id", "at", "browser") << params[:otp_code].to_s
+  end
 
   def complete_repeated_sign_in
     recent = recent_sign_in(@user, second_factor_proof) or return false

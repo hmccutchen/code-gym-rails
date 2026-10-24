@@ -46,8 +46,8 @@ module SignInCompletion
   def start_second_factor_challenge(user, issued_at: nil)
     issued_at ||= user.issue_second_factor_challenge!
     forget_pending_login
-    session[PENDING_SECOND_FACTOR] = { "user_id" => user.id,
-                                       "at" => User.session_stamp(issued_at) }
+    session[PENDING_SECOND_FACTOR] = { "user_id" => user.id, "at" => User.session_stamp(issued_at),
+                                       "browser" => SecureRandom.hex(16) }
     redirect_to second_factor_challenge_path
   end
 

@@ -87,7 +87,7 @@ RSpec.describe "A repeated sign-in post", type: :request do
     other = open_session
     other.post login_path, params: { email: user.email }
     other.post verify_login_code_path, params: { code: user.generate_login_code! }
-    expect(other.response).to redirect_to(root_path)
+    expect(other.response.location).to eq(root_url)
 
     cookies[session_cookie] = cookie_before
     post verify_login_code_path, params: { code: code }
@@ -157,6 +157,20 @@ RSpec.describe "A repeated sign-in post", type: :request do
       expect(session[:user_id]).to eq(user.id)
     end
 
+    it "refuses an accepted authenticator code from another browser that shares the challenge" do
+      mine, other = open_session, open_session
+      mine.post login_path, params: { email: user.email }
+      other.post login_path, params: { email: user.email }
+      otp = current_totp(secret)
+      mine.post second_factor_challenge_path, params: { otp_code: otp }
+      expect(mine.session[:user_id]).to eq(user.id)
+
+      other.post second_factor_challenge_path, params: { otp_code: otp }
+
+      expect(other.response.location).to eq(login_url)
+      expect(other.session[:user_id]).to be_nil
+    end
+
     it "signs in on the second post of an authenticator code the first post just accepted" do
       post login_path, params: { email: user.email }
       post verify_login_code_path, params: { code: user.generate_login_code! }
@@ -206,7 +220,7 @@ RSpec.describe "A repeated sign-in post", type: :request do
       post verify_login_code_path, params: { code: code }
 
       expect(response).to redirect_to(second_factor_challenge_path)
-      expect(session[:pending_second_factor]).to eq(first_marker)
+      expect(session[:pending_second_factor].slice("user_id", "at")).to eq(first_marker.slice("user_id", "at"))
       expect(user.reload.second_factor_challenge_open?(first_marker["at"])).to be(true)
     end
 
