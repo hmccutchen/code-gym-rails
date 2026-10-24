@@ -221,7 +221,7 @@ data.*
 - move authenticator rules off User `#534`
 - move concept exposure reads into their own model `#535`
 - make push-disabled tests ignore exported VAPID values `#536`
-- move draft-copy bookkeeping out of the answer-form controller `#537 open`
+- move draft-copy bookkeeping out of the answer-form controller `#537`
 - share fetch stubs across system specs `#538`
 - keep Settings styles with the partials that render them `#539`
 - preserve exported push credentials after service specs `#540`
