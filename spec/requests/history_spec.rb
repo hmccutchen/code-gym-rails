@@ -705,4 +705,47 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include('class="pagination"')
     end
   end
+
+  describe "concept reference lookups" do
+    it "reads a repeated concept once for the page rather than once per section" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "t",
+                               explanation: "e", code_example: "x", senior_lens: "s")
+      10.times do |i|
+        date = (i + 1).days.ago.to_date
+        exercise = DailyExercise.create!(
+          user: user, date: date, generated_at: Time.current,
+          problem_set: {
+            "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+            "pattern"     => { "title" => "P", "question" => "pq", "concept" => "n_plus_one" },
+            "challenge"   => { "question" => "cq", "concept" => "n_plus_one" }
+          }
+        )
+        DailyResponse.create!(
+          user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
+          answers: { "code_review" => "Answer with plenty of substance" }
+        )
+      end
+      login_as(user)
+
+      lookups = 0
+      round_trips = 0
+      instantiations = 0
+      sql = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        next unless payload[:sql].include?('FROM "concept_references"')
+        lookups += 1
+        round_trips += 1 unless payload[:cached]
+      end
+      built = ActiveSupport::Notifications.subscribe("instantiation.active_record") do |*, payload|
+        instantiations += payload[:record_count] if payload[:class_name] == "ConceptReference"
+      end
+      get history_path
+      ActiveSupport::Notifications.unsubscribe(sql)
+      ActiveSupport::Notifications.unsubscribe(built)
+
+      expect(response.body).to include("N plus one")
+      expect(lookups).to eq(1)
+      expect(round_trips).to eq(1)
+      expect(instantiations).to eq(1)
+    end
+  end
 end

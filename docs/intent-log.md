@@ -213,4 +213,6 @@ data.*
   **I decided:** two tabs with identical answers may lose one unconfirmed save
 - a separate agent reviews each review-comment fix before it's pushed
 - a save queued behind a submit, already fixed; pinned with a spec `#521`
-- stop rebuilding the same rows per section and exposure `#517 open`
+- find where the app has got slow and make those pages faster `#517`
+  **I decided:** the work goes in its own worktree, off main, so it stays
+  clear of the two branches I had open

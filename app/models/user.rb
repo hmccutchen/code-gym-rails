@@ -340,7 +340,7 @@ class User < ApplicationRecord
   private :drilled_reinforcement
 
   def drill_order(cm)
-    seen = concept_exposure_index.fetch([ cm.concept, cm.language ], []).max
+    seen = concept_exposure_index.fetch([ cm.concept, cm.language ], Set.new).max
     [ seen ? 1 : 0, seen || Date.new, cm.drilled_at ]
   end
   private :drill_order
@@ -362,14 +362,14 @@ class User < ApplicationRecord
 
   def concept_exposure_index
     @concept_exposure_index ||= begin
-      index = Hash.new { |hash, key| hash[key] = [] }
+      index = Hash.new { |hash, key| hash[key] = Set.new }
       daily_responses.where.not(submitted_at: nil).joins(:daily_exercise)
                      .pluck(:date, :concept_tags, "daily_exercises.language")
                      .each do |date, tags, language|
         (tags || {}).each do |section, concept|
           next if concept.blank? || concept == "other"
           bucket = ConceptBucket.for(section, language)
-          index[[ concept, bucket ]] |= [ date ]
+          index[[ concept, bucket ]] << date
         end
       end
       index
@@ -377,7 +377,7 @@ class User < ApplicationRecord
   end
 
   def concept_exposure_count(concept, bucket, on_or_before:)
-    concept_exposure_index.fetch([ concept, bucket ], []).count { |d| d <= on_or_before }
+    concept_exposure_index.fetch([ concept, bucket ], Set.new).count { |d| d <= on_or_before }
   end
 
   def language_for_today

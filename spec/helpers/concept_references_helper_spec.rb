@@ -21,6 +21,17 @@ RSpec.describe ConceptReferencesHelper, type: :helper do
       expect(helper.concept_reference_for(nil, "ruby_rails")).to be_nil
       expect(helper.concept_reference_for("", "ruby_rails")).to be_nil
     end
+
+    it "reads a concept with no reference once, rather than on every call" do
+      lookups = 0
+      counter = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        lookups += 1 if payload[:sql].include?('FROM "concept_references"')
+      end
+      2.times { expect(helper.concept_reference_for("n_plus_one", "ruby_rails")).to be_nil }
+      ActiveSupport::Notifications.unsubscribe(counter)
+
+      expect(lookups).to eq(1)
+    end
   end
 
   describe "#first_exposure?" do
