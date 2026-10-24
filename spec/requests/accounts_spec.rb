@@ -15,6 +15,15 @@ RSpec.describe "Accounts", type: :request do
       expect(response.body).to include("Log out")
     end
 
+    it "links the shared phone stylesheet" do
+      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+
+      get account_path
+
+      expect(Nokogiri::HTML(response.body).css("head link[rel=stylesheet]").map { |link| link["href"] })
+        .to include(a_string_matching(%r{/assets/phone_cards(-\h+)?\.css}))
+    end
+
     it "reaches Settings from the nav, not from the Account page itself" do
       login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
 
@@ -132,6 +141,7 @@ RSpec.describe "Accounts", type: :request do
         expect(card.at_css(".api-usage-unpriced").text.strip).to eq("2 requests aren't priced.")
         expect(card.at_css(".api-usage-note").text.strip).to eq("Estimated from list prices. Your provider's console shows the exact bill.")
         expect(card.css("table")).to be_empty
+        expect(card.css("p:not(.api-usage-total)").map { |p| p["class"].split }).to all(include("card-note"))
       end
     end
 
@@ -211,6 +221,57 @@ RSpec.describe "Accounts", type: :request do
 
       expect(card.text).to include("No requests")
       expect(card.css(".api-usage-row")).to be_empty
+    end
+  end
+
+  describe "card order" do
+    def configure_vapid
+      ENV["VAPID_PUBLIC_KEY"] = "public"
+      ENV["VAPID_PRIVATE_KEY"] = "private"
+    end
+
+    def card_headings
+      Nokogiri::HTML(response.body).css("main .phone-page > .card").map { |card| card.at_css("h2")&.text&.strip }
+    end
+
+    after do
+      ENV.delete("VAPID_PUBLIC_KEY")
+      ENV.delete("VAPID_PRIVATE_KEY")
+    end
+
+    it "orders the cards identity, practice, reminders, security, usage, session, danger" do
+      configure_vapid
+      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+
+      get account_path
+
+      expect(card_headings).to eq([ nil, "Daily practice", "Reminders", "Authenticator app", "AI usage", "Session", "Danger zone" ])
+    end
+
+    it "leaves the Reminders card out when push isn't configured" do
+      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+
+      get account_path
+
+      expect(card_headings).to eq([ nil, "Daily practice", "Authenticator app", "AI usage", "Session", "Danger zone" ])
+    end
+
+    it "styles the reminders offer's status line as a card note" do
+      configure_vapid
+      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+
+      get account_path
+
+      expect(Nokogiri::HTML(response.body).at_css("#push-status")["class"].split).to include("card-note")
+    end
+
+    it "puts Log out in the Session card as a full-width button" do
+      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+
+      get account_path
+
+      session_card = Nokogiri::HTML(response.body).css("main .card").find { |card| card.at_css("h2")&.text == "Session" }
+      expect(session_card.at_css("form[action='#{logout_path}'] button.btn-block").text).to eq("Log out")
     end
   end
 

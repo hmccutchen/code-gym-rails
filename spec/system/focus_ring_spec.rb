@@ -74,6 +74,19 @@ RSpec.describe "Focus ring", type: :system do
     expect(ring_pixels_around_focused_slider).to be > 20
   end
 
+  it "rings the reminder nudges switch" do
+    with_push_credentials do
+      user.update!(reminder_level: "ready_and_nudges")
+      user.push_subscriptions.create!(endpoint: "https://web.push.apple.com/installed", p256dh_key: "p256dh", auth_key: "auth")
+      stub_push_apis(permission: "granted")
+      visit_as(user)
+      visit account_path
+
+      tab_to("input.switch")
+      expect(outline_of_focused).to eq([ "solid", "2px", ring_color, "2px" ])
+    end
+  end
+
   # Login follows the device, so each palette's ring is checked under the scheme that selects it.
   it "rings the login fields in the dark palette" do
     page.driver.with_playwright_page { |pw| pw.emulate_media(colorScheme: "dark") }
