@@ -70,6 +70,15 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
 
   def answer_form_connected? = page.evaluate_script(connected_js("answer-form"))
 
+  # A reload while the reason or rating is still saving drops it, and the draft copy can't restore it once a reply was lost.
+  def wait_for_comparison_and_rating_to_settle(reason)
+    wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null && !window.CodeGymSaveStatus.pending()")
+    wait_for do
+      saved = user.daily_responses.reload.first
+      saved&.answers&.dig("design_comparison") == "pick:a\n#{reason}" && saved.section_ratings["design_comparison"].present?
+    end
+  end
+
   # Pull-to-refresh reloads once pending() is false, so a typed answer must count before the modules arrive.
   it "counts an answer typed while the modules are still loading as pending, then saves it" do
     answer = "An answer typed before the modules finished loading, long enough to count."
@@ -106,7 +115,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       expect(page).to have_css(%([data-comparison-answer="design_comparison"]))
       fill_in_answer("design_comparison", reason)
       rate_section("design_comparison")
-      wait_for { user.daily_responses.reload.first&.answers&.dig("design_comparison").to_s.start_with?("pick:a") }
+      wait_for_comparison_and_rating_to_settle(reason)
 
       url = page.current_url
       stalled[:held] = "comparison_answer_controller"
@@ -139,7 +148,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       expect(page).to have_css(%([data-comparison-answer="design_comparison"]))
       fill_in_answer("design_comparison", reason)
       rate_section("design_comparison")
-      wait_for { user.daily_responses.reload.first&.answers&.dig("design_comparison").to_s.start_with?("pick:a") }
+      wait_for_comparison_and_rating_to_settle(reason)
 
       stalled[:missing] = "comparison_answer_controller"
       visit current_path
