@@ -10,16 +10,16 @@ module SignInCompletion
 
   # A double tap posts twice with the pre-sign-in cookie; the proof holds that browser's own pending stamp and its code.
   def remember_sign_in(user, proof, checked_at)
-    Rails.cache.write(sign_in_repeat_key(user), { "digest" => sign_in_repeat_digest(proof), "checked_at" => User.session_stamp(checked_at) },
-                      expires_in: REPEAT_WINDOW)
+    remembered = { "digest" => sign_in_repeat_digest(proof), "checked_at" => User.session_stamp(checked_at) }
+    Rails.cache.write(sign_in_repeat_key(user), remembered, expires_in: REPEAT_WINDOW)
   end
 
-  # The repeat keeps the first post's check time, so sessions ended since then stay ended.
   def recent_sign_in_checked_at(user, proof)
     return if user.nil? || proof.any?(&:blank?)
 
     remembered = Rails.cache.read(sign_in_repeat_key(user))
-    return unless remembered.is_a?(Hash) && ActiveSupport::SecurityUtils.secure_compare(remembered["digest"].to_s, sign_in_repeat_digest(proof))
+    return unless remembered.is_a?(Hash)
+    return unless ActiveSupport::SecurityUtils.secure_compare(remembered["digest"].to_s, sign_in_repeat_digest(proof))
 
     User.session_time(remembered["checked_at"]) if user.session_signed_in_valid?(remembered["checked_at"])
   end
@@ -30,9 +30,9 @@ module SignInCompletion
     OpenSSL::HMAC.hexdigest("SHA256", Rails.application.secret_key_base, proof.map(&:to_s).join("\n"))
   end
 
-# The last check before a session exists, so no sign-in path can finish an authenticator account on the emailed code.
-def complete_sign_in(user, checked_at:, factor:)
-  raise WrongFactor, "#{factor} can't finish user #{user.id}'s sign-in" unless finishes_sign_in?(user, factor)
+  # The last check before a session exists, so no sign-in path can finish an authenticator account on the emailed code.
+  def complete_sign_in(user, checked_at:, factor:)
+    raise WrongFactor, "#{factor} can't finish user #{user.id}'s sign-in" unless finishes_sign_in?(user, factor)
 
     trial = PendingTrial.take(session)
     destination = start_new_session_for(user, checked_at)
@@ -41,15 +41,15 @@ def complete_sign_in(user, checked_at:, factor:)
     redirect_to destination || root_path, notice: t("sessions.welcome_back", name: user.name)
   end
 
-def finishes_sign_in?(user, factor)
-  case factor
-  when :emailed_code  then user.emailed_code_signs_in?
-  when :authenticator then user.two_factor_enabled?
-  else false
+  def finishes_sign_in?(user, factor)
+    case factor
+    when :emailed_code  then user.emailed_code_signs_in?
+    when :authenticator then user.two_factor_enabled?
+    else false
+    end
   end
-end
 
-def start_second_factor_challenge(user)
+  def start_second_factor_challenge(user)
     forget_pending_login
     session[PENDING_SECOND_FACTOR] = { "user_id" => user.id,
                                        "at" => User.session_stamp(user.issue_second_factor_challenge!) }

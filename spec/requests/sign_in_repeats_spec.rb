@@ -69,39 +69,43 @@ RSpec.describe "A repeated sign-in post", type: :request do
     expect(other.session[:user_id]).to be_nil
   end
 
-it "accepts the repeat when the code was mailed late, though the first post ended the pending sign-in's life" do
-  post login_path, params: { email: user.email }
-  code = travel(3.minutes) { user.generate_login_code! }
+  it "accepts the repeat when the code was mailed late, though the first post ended the pending sign-in's life" do
+    post login_path, params: { email: user.email }
+    code = travel(3.minutes) { user.generate_login_code! }
 
-  travel(12.minutes) { post_twice(verify_login_code_path, { code: code }) }
+    travel(12.minutes) { post_twice(verify_login_code_path, { code: code }) }
 
-  expect(response).to redirect_to(root_path)
-  expect(session[:user_id]).to eq(user.id)
-end
+    expect(response).to redirect_to(root_path)
+    expect(session[:user_id]).to eq(user.id)
+  end
 
-it "refuses the repeat once the account's sessions were ended after the first post" do
-  code = request_code
-  cookie_before = cookies[session_cookie]
-  post verify_login_code_path, params: { code: code }
-  cookies[session_cookie] = cookie_before
-  travel(1.second) { user.update!(sessions_valid_after: Time.current.floor(6)) }
+  it "refuses the repeat once the account's sessions were ended after the first post" do
+    code = request_code
+    cookie_before = cookies[session_cookie]
+    post verify_login_code_path, params: { code: code }
+    cookies[session_cookie] = cookie_before
+    travel(1.second) { user.update!(sessions_valid_after: Time.current.floor(6)) }
 
-  travel(2.seconds) { post verify_login_code_path, params: { code: code } }
+    travel(2.seconds) { post verify_login_code_path, params: { code: code } }
 
-  expect(response).to have_http_status(:unprocessable_content)
-  expect(session[:user_id]).to be_nil
-end
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(session[:user_id]).to be_nil
+  end
 
-context "with the authenticator on" do
+  context "with the authenticator on" do
     let!(:enrollment) { enroll_second_factor(user) }
     let(:secret) { enrollment.first }
 
-    it "never signs the account in on an emailed code, even posted twice" do
-      code = request_code
+    it "sends both posts of an emailed code from the trial form to the authenticator step, never past it" do
+      stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+      _invite, invite_code = mint_trial_code
+      post start_trial_path, params: { email: user.email, invite_code: invite_code, provider: "fake", consent: "1" }
+      code = user.generate_login_code!
 
-      post_twice(verify_login_code_path, { code: code })
+      first = post_twice(verify_login_code_path, { code: code })
 
-      expect(response).not_to redirect_to(root_path)
+      expect(first).to redirect_to(second_factor_challenge_path)
+      expect(response).to redirect_to(second_factor_challenge_path)
       expect(session[:user_id]).to be_nil
     end
 
@@ -116,22 +120,22 @@ context "with the authenticator on" do
       expect(session[:user_id]).to eq(user.id)
     end
 
-it "signs in a duplicate that passed the open-challenge check before the first post closed it" do
-  post login_path, params: { email: user.email }
-  post verify_login_code_path, params: { code: user.generate_login_code! }
-  otp = current_totp(secret)
-  cookie_before = cookies[session_cookie]
-  post second_factor_challenge_path, params: { otp_code: otp }
-  cookies[session_cookie] = cookie_before
-  allow_any_instance_of(User).to receive(:second_factor_challenge_open?).and_return(true, false)
+    it "signs in a duplicate that passed the open-challenge check before the first post closed it" do
+      post login_path, params: { email: user.email }
+      post verify_login_code_path, params: { code: user.generate_login_code! }
+      otp = current_totp(secret)
+      cookie_before = cookies[session_cookie]
+      post second_factor_challenge_path, params: { otp_code: otp }
+      cookies[session_cookie] = cookie_before
+      allow_any_instance_of(User).to receive(:second_factor_challenge_open?).and_return(true, false)
 
-  post second_factor_challenge_path, params: { otp_code: otp }
+      post second_factor_challenge_path, params: { otp_code: otp }
 
-  expect(response).to redirect_to(root_path)
-  expect(session[:user_id]).to eq(user.id)
-end
+      expect(response).to redirect_to(root_path)
+      expect(session[:user_id]).to eq(user.id)
+    end
 
-it "refuses a different authenticator code sent with the cookie from before the sign-in" do
+    it "refuses a different authenticator code sent with the cookie from before the sign-in" do
       post login_path, params: { email: user.email }
       post verify_login_code_path, params: { code: user.generate_login_code! }
       cookie_before = cookies[session_cookie]
