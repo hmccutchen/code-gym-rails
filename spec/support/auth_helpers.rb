@@ -41,13 +41,14 @@ module AuthHelpers
   # The code is minted after the POST because #authenticate_login_code reads the current digest.
   def login_as(user)
     post login_path, params: { email: user.email }
-    post verify_login_code_path, params: { code: user.generate_login_code! }
+    post verify_login_code_path, params: { code: user.generate_login_code! } unless user.reload.two_factor_enabled?
   end
 
   def visit_as(user)
     visit login_path
     fill_in "Work email *", with: user.email
     click_button "Send code"
+    return if user.reload.two_factor_enabled?
 
     fill_in "6-digit code from the email", with: user.generate_login_code!
     click_button "Verify code"

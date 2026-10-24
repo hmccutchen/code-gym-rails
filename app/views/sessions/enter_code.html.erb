@@ -1,0 +1,11 @@
+<%# Design notes: docs/code-notes/app/views/sessions/enter_code.html.md %>
+<% page_title t("sessions.enter_code.page_title") %>
+<%= render "sessions/login_styles" %>
+
+<div class="login-wrap">
+  <h1><%= t("app_name") %></h1>
+  <%= render "sessions/pending" %>
+
+  <p class="pending-divider"><%= t("sessions.enter_code.start_over_prompt") %></p>
+  <%= button_to t("sessions.enter_code.start_over"), login_code_path, method: :delete, class: "btn btn-ghost" %>
+</div>

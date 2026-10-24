@@ -24,7 +24,7 @@ This matters for cost. A bcrypt comparison takes about 0.25 seconds at productio
 
 ## The sign-in challenge
 
-`issue_second_factor_challenge!` stamps `second_factor_challenge_at` and zeroes `second_factor_challenge_failures`. `answer_second_factor_challenge!` checks, under the same lock as the code check, that the browser's marker names that exact time and that it is under `SECOND_FACTOR_CHALLENGE_LIFETIME` old. A right code, the fifth wrong code (`SECOND_FACTOR_CHALLENGE_FAILURES`) or the daily cap clears the challenge, so every copy of the cookie stops working at once.
+`issue_second_factor_challenge!` stamps `second_factor_challenge_at` and zeroes `second_factor_challenge_failures`, unless the open challenge is under `DOUBLE_TAP_WINDOW` old. Then it returns that challenge's time and keeps its count. A double tap's two posts both carry the cookie from before either, so issuing twice would leave the browser holding whichever response arrived last, which may name the challenge that lost. Keeping the count also means re-sending the address can't reset it. `answer_second_factor_challenge!` checks, under the same lock as the code check, that the browser's marker names that exact time and that it is under `SECOND_FACTOR_CHALLENGE_LIFETIME` old. A right code, the fifth wrong code (`SECOND_FACTOR_CHALLENGE_FAILURES`) or the daily cap clears the challenge, so every copy of the cookie stops working at once.
 
 ## Ending other sessions
 
