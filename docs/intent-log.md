@@ -168,13 +168,11 @@ data.*
 
 - back to passwordless sign-in: take Devise out, the emailed code the only
   first factor `#491`
-  **why:** I want no password column ever, with an authenticator app as an
-  optional second factor later
-  **I decided:** open sign-up exactly as before, with the account created when
-  a code is requested; drop the Devise columns in the same PR, since mine is
-  the only account; a 10-minute code with the rate-limit windows kept at 15;
-  trusted proxies, with a spoofed-header test, split out and required before I
-  post publicly
+  **why:** no password column ever, and an authenticator app later
+  **I decided:** open sign-up, the account created when a code is requested;
+  drop the Devise columns in the same PR, since mine is the only account; a
+  10-minute code with the rate-limit windows kept at 15; trusted proxies, with
+  a spoofed-header test, split out and required before I post publicly
 - from my layered review: the login code out of the job queue, and one
   signed-in lookup
 - an optional authenticator app as a second sign-in factor `#493`
@@ -184,7 +182,7 @@ data.*
   turning it on or off ends every other session; recovery codes compared only
   for recovery-shaped input; a copy fallback that selects the text; the phone
   check split into the local network before merge and production after
-- from the review of the authenticator PR: each session gets its own setup key
+- from review: each session gets its own setup key
   **I decided:** the key stays in the session until a code verifies; the model
   takes session values; spec and plan docs dropped; extraction is an issue
 - every PR gets a critical and a layered-design review, each by a separate
@@ -199,8 +197,11 @@ data.*
   accepts a repeat of a sign-in this browser just completed
 - the cost of each API call on its usage row, Anthropic keys only `#472`
   **I decided:** Gemini and OpenAI costs stay null; prices stay on the
-  providers; the design doc dropped; a timeout costs null
+  providers; a timeout costs null
 - the Account usage card in dollars `#497`
 - the authenticator in place of the emailed code `#496`, onto main `#502`
   **I decided:** a double-tapped address gets its challenge back for 30 seconds
 - the system spec that flaked on CI `#499`
+- the Account page as cards for the phone `#504 open`
+- lefthook git hooks: lint on commit, CI's checks on push `#508`
+  **I decided:** system specs stay in CI
