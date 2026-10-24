@@ -244,7 +244,7 @@ What each listed file does.
 - `spec/conventions/app_views_spec.rb` — fails on an inline `<script>`, `on*` handler or `javascript:` URL in any view, so the convention breaks a build rather than a page
 - `spec/views/own_styles_spec.rb` — Account and Settings views only: fails when one under `app/views/accounts` or `app/views/api_keys` styles a class its own markup never carries, read from `class` attributes and helpers' `class:` literals (`ViewStyles.markup_classes`), so each partial carries its own `<style>` and the page keeps only its own rules. A class named only inside `:not()` is one the rule leaves alone, so it doesn't count. A style-only `_styles` partial, as other folders use, would fail it
 - `spec/system/settings_partial_styles_spec.rb` — measures the computed styles the Settings partials' own `<style>` blocks give the difficulty controls, the Display groups and the key guide, at phone and desktop widths
-- `spec/conventions/app_source_spec.rb` — parses `app/` with Prism and fails on `Thread.new` outside `CallerZoneThread` (or a named exemption with its reason and exact thread count) and on `send(:...)`
+- `spec/conventions/app_source_spec.rb` — parses `app/` with Prism and fails on `Thread.new` outside `CallerZoneThread` (or a named exemption with its reason and exact thread count) and on `send(:...)`, and fails a model that reads the controller session or takes it as an argument
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway

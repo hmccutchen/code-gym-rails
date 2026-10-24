@@ -50,7 +50,8 @@ read it before changing that area.
   or after `users.sessions_valid_after`. `current_user` and the cable
   connection both resolve the user through `User.signed_in_through`, never a
   lookup of their own, and pass it the two session values rather than the
-  session. `User.session_time` is the one reader of a stamp. A new sign-in path that skips the stamp signs its
+  session. No model reads the session or takes it as an argument
+  (`app_source_spec`). `User.session_time` is the one reader of a stamp. A new sign-in path that skips the stamp signs its
   users out on their next request.
 - **Second factor** (`docs/decisions/passwordless-sign-in.md`): an optional
   authenticator app (`User::Authenticator`). Every read-then-write of its columns
