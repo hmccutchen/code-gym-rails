@@ -242,6 +242,36 @@ RSpec.describe "Parsons reorder controls", type: :system do
     end
   end
 
+  it "takes over the restored copy's unconfirmed saves though the block order isn't restored" do
+    gate = { open: false }
+    allow_any_instance_of(ResponsesController).to receive(:create).and_wrap_original do |original, *args|
+      wait_for(60) { gate[:open] }
+      original.call(*args)
+    end
+
+    travel_to(weekday) do
+      visit_seeded_dashboard(cdn: :loaded)
+      page.execute_script(<<~JS)
+        const rendered = {}
+        document.querySelectorAll("textarea[data-field]").forEach((area) => rendered[area.dataset.field] = area.defaultValue)
+        const form = document.querySelector("[data-answer-form-draft-token-value]").dataset
+        localStorage.setItem("code-gym-answer-draft", JSON.stringify({ token: form.answerFormDraftTokenValue,
+          scope: form.answerFormDraftScopeValue, sent: [ "a save still on the wire" ],
+          answers: { ...rendered, code_review: "Prose typed behind that save.", parsons_problem: "order:another-arrangement" }, ratings: {} }))
+      JS
+
+      visit root_path
+      expect(page).to have_css("ol[data-parsons-blocks][data-parsons-wired]")
+      wait_for_js
+
+      wait_for_js_condition(<<~JS.squish)
+        ((sent) => sent.length === 2 && sent[0] === 'a save still on the wire')(JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.sent || [])
+      JS
+    ensure
+      gate[:open] = true
+    end
+  end
+
   it "moves focus between blocks with a bare arrow key" do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)

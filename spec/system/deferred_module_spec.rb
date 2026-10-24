@@ -140,6 +140,59 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     end
   end
 
+  it "doesn't take over another tab's unconfirmed saves when it keeps an edit typed before the form connected" do
+    other_tab_landed = "Another tab's answer, which reached the server without a reply."
+    other_tab_later = "Another tab's later answer, kept in its copy."
+    early = "An answer typed in another section before the answer form connected."
+    many = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
+    gate = { open: false }
+    allow_any_instance_of(ResponsesController).to receive(:create).and_wrap_original do |original, *args|
+      wait_for(60) { gate[:open] }
+      original.call(*args)
+    end
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(many)
+      expect(page).to have_content(/Code Review/i)
+      url = page.current_url
+      stalled[:held] = "answer_form_controller"
+      early_field = nil
+
+      page.driver.with_playwright_page do |pw|
+        pw.goto(url, waitUntil: "commit")
+        pw.wait_for_load_state(state: "domcontentloaded")
+        early_field = pw.evaluate(<<~JS)
+          (() => {
+            const byKey = ([ a ], [ b ]) => (a < b ? -1 : a > b ? 1 : 0)
+            const rendered = {}
+            document.querySelectorAll("textarea[data-field]").forEach((area) => rendered[area.dataset.field] = area.defaultValue)
+            const form = document.querySelector("[data-answer-form-draft-token-value]").dataset
+            const landed = { ...rendered, code_review: #{other_tab_landed.to_json} }
+            localStorage.setItem("code-gym-answer-draft", JSON.stringify({ token: form.answerFormDraftTokenValue,
+              scope: form.answerFormDraftScopeValue, sent: [ JSON.stringify([ Object.entries(landed).sort(byKey), [] ]) ],
+              answers: { ...rendered, code_review: #{other_tab_later.to_json} }, ratings: {} }))
+            const box = [ ...document.querySelectorAll("textarea[data-field]") ].find((area) => area.dataset.field !== "code_review" && area.dataset.draftRestore !== "off" && getComputedStyle(area).display !== "none")
+            box.value = #{early.to_json}
+            box.dispatchEvent(new Event("input", { bubbles: true }))
+            return box.dataset.field
+          })()
+        JS
+      end
+      stalled[:held] = nil
+      wait_for { answer_form_connected? }
+      wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.[#{early_field.to_json}] === #{early.to_json}")
+      exercise = many.daily_exercises.sole
+      many.daily_responses.create!(daily_exercise: exercise, date: exercise.date, answers: { "code_review" => other_tab_landed })
+
+      visit url
+      wait_for { answer_form_connected? }
+
+      expect(find('textarea[data-field="code_review"]').value).to eq(other_tab_landed)
+    ensure
+      gate[:open] = true
+    end
+  end
+
   it "refuses to submit while a controller inside the form never connected" do
     reason = "Piece A keeps the retry bounded, which the stated requirement asks for here."
 

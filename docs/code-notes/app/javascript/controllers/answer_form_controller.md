@@ -124,12 +124,17 @@ lists which paths use the gate and which deliberately don't.
 ## The copy on the device
 
 Every edit writes the answers and ratings to `code_gym/draft_store` with the
-draft token the copy was built on: the one the server rendered, or the one the
-last save reply carried. On connect, `restoreDraft()` puts a copy back only
-when its token equals the page's token, meaning the server's saved answers are
-still exactly the ones the copy started from. Anything else (another day, a
-regenerated set, a Start over, a save from another tab or device) deletes it.
-The token is a digest of the saved answers and ratings, not `updated_at`,
+draft token the copy was built on (the one the server rendered, or the one the
+last save reply carried), the draft scope, and this tab's unconfirmed saves.
+All tabs share one copy, and the last tab to edit owns it: an edit replaces the
+whole copy, its list included, so a copy is always one tab's complete view.
+
+On connect, `restoreDraft()` puts a copy back when its token equals the
+page's token, meaning the server's saved answers are still exactly the ones
+the copy started from, or in the one case described below, when a save landed
+but its reply didn't. Anything else (another day, a regenerated set, a Start
+over, or a save from another tab or device that isn't in the copy's list)
+deletes it. The token is a digest of the saved answers and ratings, not `updated_at`,
 because a pseudocode round writes the same row without touching the answers.
 
 A restored field is skipped when its value already differs from what the
@@ -148,10 +153,60 @@ edits stay kept. `nextSave()` records what each attempt sent, because the
 queue reads the body again on every retry. A submit, a stale refusal and a
 reload into the submitted page all clear it.
 
-When a save reaches the server but its reply is lost, and the page is killed
-before a retry, the next load renders a token the copy does not have. The copy
-is dropped and the server's draft shows. That draft holds the save that got
-through, so what is lost is limited to the edits made after it.
+When a save reaches the server but its reply never arrives, because the page
+reloaded, closed or was killed in between, the next load renders a token the
+copy does not have. That happens online too, whenever a reload lands in a
+save's round trip, and the edits typed behind that save are the ones at risk.
+So the copy also holds the draft scope and `sent`: what each save sent since
+the last confirmed reply, as `canonicalDraft` strings. `nextSave()` adds one
+on every attempt, retries included, since a retry carries newer text and
+either attempt may be the one that landed. It keeps the five most recent
+(`UNCONFIRMED_SAVES_KEPT`), so a long run of retries can't fill localStorage;
+an older one that landed falls back to the old loss. An attempt, unlike an
+edit, writes only that list, through `recordUnconfirmedSaves()`, and only into
+a copy with this tab's token and scope and exactly the answers it sends;
+otherwise a retry from a stale tab would overwrite a newer copy another tab
+wrote meanwhile. Only an ok reply clears the list (`settleDraft()`), so a
+refused save's payload stays in it. That is harmless, since the page can only
+render it if the server already holds it.
+
+The list only ever holds the saves of the tab whose answers the copy holds.
+Nothing merges two tabs' lists: each merge rule tried here let one tab's
+answers be restored over a save another tab had committed. The cost is that
+two tabs showing identical answers can lose one tab's unconfirmed save, as
+before. A restored copy hands its list to the page
+(`takeOverUnconfirmedSaves()`), so a save still on the wire through one
+reload stays in the list for the next. The exception is a restore that kept
+an edit typed before the controller connected: a field whose value differs
+from both what the server rendered and the copy. The screen is then this
+tab's own, so the page starts with an empty list. A field restore never
+touches, such as Parsons, doesn't count, since the copy's list is still the
+saves of the answers it restored.
+
+`rendersUnconfirmedSave()` then restores a copy whose token is out of date
+when its scope is the page's and the answers and ratings the server rendered
+equal one of those saves. The server holds that save, so the copy's later
+edits go back on top of it. Any other mismatch still deletes the copy. The
+scope check keeps another day's copy out even when both days' answers happen
+to match. Start over keeps the scope, so a copy survives it only when one of
+its saves equals the blank or scaffold page the server renders after it.
+
+The page decides this itself, by comparing what it sent with what the server
+rendered, rather than the server deciding. It works only when the server
+renders back exactly what it received. The comparison covers the whole
+payload, every section and rating, so one field that doesn't round-trip
+makes every save of the session miss, and the edits behind it fall back to
+the old loss, however many other sections round-trip. These answers don't:
+
+- text `UserText.normalize` changes: NFC normalization, or stripped
+  zero-width, bidi, tag and control characters
+- an answer starting with a newline, which `_textarea.html.erb`'s markup
+  drops on render
+- a whitespace-only or non-substantive answer, stored as `""`
+- an answer over the server's 12,000-character clamp
+
+A save id the server stores and renders back would remove these misses. It
+needs a column, so it waits until a lost edit with pasted text turns up.
 
 ## Submitting offline
 
