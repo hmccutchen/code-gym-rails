@@ -14,11 +14,11 @@ paths:
   - "app/jobs/send_push_reminder_job.rb"
   - "app/helpers/{display_preferences,syntax_highlighting,public_file,navigation,push}_helper.rb"
   - "app/assets/**"
-  - "app/javascript/controllers/{pull_to_refresh,push_enable,push_launch,display_preferences,code_lines,nav_menu}_controller.js"
+  - "app/javascript/controllers/{pull_to_refresh,push_enable,push_launch,display_preferences,code_lines,nav_menu,save_switch}_controller.js"
   - "app/javascript/code_gym/push.js"
   - "public/**"
   - "script/generate_icons.py"
-  - "spec/**/*{pwa,push,display,palette,pull_to_refresh,history,highlight,icon,nav,focus_ring}*"
+  - "spec/**/*{pwa,push,nudges,display,palette,pull_to_refresh,history,highlight,icon,nav,focus_ring}*"
   - "app/jobs/generate_daily_exercises_job.rb"
   - "spec/**/*save_status*"
 ---

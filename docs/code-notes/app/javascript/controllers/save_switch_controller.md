@@ -20,7 +20,7 @@ was generalized so Account's reminder nudges switch could share it (#507).
 | `field` | the body's key | `"level_suggestions"` | `"nudges"` |
 | `scope` | optional wrapper key | `"user"` | none |
 | `focus` | optional | set by the server when the card's link is followed | none |
-| `savedText` | optional, the status line's text | none | `t("switches.saved")` |
+| `savedText` | optional, the status line's text | `t("switches.saved")` | `t("switches.saved")` |
 
 The body is `{ [scope]: { [field]: checked } }` with a scope, or
 `{ [field]: checked }` without one.

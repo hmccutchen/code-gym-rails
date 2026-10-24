@@ -61,11 +61,20 @@ RSpec.describe "Account's reminder nudges switch", type: :system do
   end
 
   it "ends two quick taps on the second state and says Saved once" do
+    page.execute_script(<<~JS)
+      window.savedWhileQueued = false;
+      const line = document.querySelector(".switch-status");
+      new MutationObserver(() => {
+        if (line.textContent === "Saved" && window.CodeGymSaveStatus.queued("nudges")) window.savedWhileQueued = true;
+      }).observe(line, { childList: true, characterData: true, subtree: true });
+    JS
+    reply_to("/push_subscription", "new Promise(resolve => setTimeout(resolve, 300)).then(() => originalFetch(url, options))")
     switch.click
     switch.click
     expect(status_line).to have_text("Saved", exact: true)
+    wait_for { user.reload.reminders_ready? }
+    expect(page.evaluate_script("window.savedWhileQueued")).to be(false)
     expect(switch).not_to be_checked
-    expect(user.reload.reminders_ready?).to be(true)
   end
 
   it "ignores Enter on the switch" do
