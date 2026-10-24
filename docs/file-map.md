@@ -165,7 +165,7 @@ What each listed file does.
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
 - `app/javascript/code_gym/request.js` — the one way a page script sends a request, and what it may show when one fails; loaded through importmap from the layout's `javascript_importmap_tags`
 - `app/javascript/code_gym/save_status.js` / `app/views/shared/_save_status_banner.html.erb` — the save banner's failures by control, the per-control save queue (in order, or collapsing to the latest, and retrying a save that got no reply when the caller opts in), and `pending()`; the banner markup sits in `<body>`
-- `app/javascript/code_gym/draft_store.js` — the dashboard's one copy of unsent answers on the device; cleared on every signed-out page and on a submitted dashboard
+- `app/javascript/code_gym/draft_store.js` — the dashboard's one copy of unsent answers on the device: its key, its shape and `DraftCopy`, the rules for restoring, rewriting and clearing it; cleared on every signed-out page and on a submitted dashboard
 - `app/controllers/concerns/json_errors.rb` — `render_json_error`: the one shape of a JSON error reply
 - `app/views/shared/_push_script.html.erb` — mounts the `push-launch` controller, which re-subscribes on launch through `app/javascript/code_gym/push.js`; rendered from the layout for a signed-in user when push is configured
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives. The nudges switch saves on change through `save-switch` and keeps a `<noscript>` Save

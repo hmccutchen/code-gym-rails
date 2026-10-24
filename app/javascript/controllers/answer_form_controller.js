@@ -2,18 +2,9 @@
 import { Controller } from "@hotwired/stimulus"
 import request from "code_gym/request"
 import saveStatus from "code_gym/save_status"
-import draftStore from "code_gym/draft_store"
+import DraftCopy from "code_gym/draft_store"
 
 const AUTOSAVE_DELAY_MS = 800
-const UNCONFIRMED_SAVES_KEPT = 5
-
-function sortedEntries(object) {
-  return Object.entries(object || {}).sort(([ a ], [ b ]) => (a < b ? -1 : a > b ? 1 : 0))
-}
-
-function canonicalDraft(answers, ratings) {
-  return JSON.stringify([ sortedEntries(answers), sortedEntries(ratings) ])
-}
 
 export default class extends Controller {
   static targets = ["form", "progressFill", "progressLabel", "submitButton", "nudge"]
@@ -45,14 +36,13 @@ export default class extends Controller {
     this.blocker = this.submitBlockerValue || null
     this.saveTimer = null
     this.reviewRequested = false
-    this.unconfirmedSaves = []
 
     this.ratings = {}
     this.formTarget.querySelectorAll("button.rating-btn.active").forEach((button) => {
       this.ratings[button.dataset.ratingFor] = button.dataset.rating
     })
 
-    this.draftToken = this.draftTokenValue
+    this.draft = new DraftCopy(this.draftTokenValue, this.draftScopeValue)
     this.offlineSubmit = false
     const restored = this.restoreDraft()
 
@@ -74,11 +64,8 @@ export default class extends Controller {
   }
 
   restoreDraft() {
-    const draft = draftStore.read()
-    if (!draft || (draft.token !== this.draftToken && !this.rendersUnconfirmedSave(draft))) {
-      draftStore.clear()
-      return false
-    }
+    const draft = this.draft.restorable(this.rendered())
+    if (!draft) return false
     let keptEarlyEdit = false
     this.textareas.filter((area) => area.dataset.draftRestore !== "off").forEach((area) => {
       const saved = draft.answers?.[area.dataset.field]
@@ -91,56 +78,34 @@ export default class extends Controller {
       area.dispatchEvent(new CustomEvent("answer-form:restored", { bubbles: true }))
     })
     Object.entries(draft.ratings || {}).forEach(([section, rating]) => this.showRating(section, rating))
-    if (!keptEarlyEdit) this.takeOverUnconfirmedSaves(draft)
+    if (!keptEarlyEdit) this.draft.takeOverUnconfirmedSaves(draft)
     return true
   }
 
-  takeOverUnconfirmedSaves(draft) {
-    if (draft.scope !== this.draftScopeValue || !Array.isArray(draft.sent)) return
-    this.unconfirmedSaves = draft.sent.slice(-UNCONFIRMED_SAVES_KEPT)
+  rendered() {
+    const answers = {}
+    this.textareas.forEach((area) => answers[area.dataset.field] = area.defaultValue)
+    return { answers: answers, ratings: this.ratings }
   }
 
-  rendersUnconfirmedSave(draft) {
-    if (draft.scope !== this.draftScopeValue || !Array.isArray(draft.sent)) return false
-    const rendered = {}
-    this.textareas.forEach((area) => rendered[area.dataset.field] = area.defaultValue)
-    return draft.sent.includes(canonicalDraft(rendered, this.ratings))
+  onScreen(save = this.payload()) {
+    return { answers: save.response.answers, ratings: save.response.section_ratings }
   }
 
   storeDraft() {
     if (this.formTarget.inert) return
-    const { answers, section_ratings } = this.payload().response
-    this.draftKept = draftStore.write({ token: this.draftToken, scope: this.draftScopeValue, sent: this.unconfirmedSaves,
-                                        answers: answers, ratings: section_ratings })
+    this.draft.store(this.onScreen())
   }
 
   settleDraft(data) {
-    this.unconfirmedSaves = []
-    if (typeof data?.draft_token === "string") this.draftToken = data.draft_token
-    const sent = canonicalDraft(this.lastSent.response.answers, this.lastSent.response.section_ratings)
-    const { answers, section_ratings } = this.payload().response
-    if (sent !== canonicalDraft(answers, section_ratings)) return this.storeDraft()
-    draftStore.clearIf((stored) => canonicalDraft(stored.answers, stored.ratings) === sent)
-  }
-
-  clearOwnDraft() {
-    draftStore.clearIf((stored) => stored.token === this.draftToken)
+    if (this.draft.settle(data?.draft_token, this.onScreen())) this.storeDraft()
   }
 
   nextSave() {
     if (this.formTarget.inert) return null
-    this.lastSent = this.payload()
-    const sent = canonicalDraft(this.lastSent.response.answers, this.lastSent.response.section_ratings)
-    this.unconfirmedSaves = [ ...this.unconfirmedSaves.filter((earlier) => earlier !== sent), sent ].slice(-UNCONFIRMED_SAVES_KEPT)
-    this.recordUnconfirmedSaves(sent)
-    return this.lastSent
-  }
-
-  recordUnconfirmedSaves(sent) {
-    const stored = draftStore.read()
-    if (stored?.token !== this.draftToken || stored.scope !== this.draftScopeValue) return
-    if (canonicalDraft(stored.answers, stored.ratings) !== sent) return
-    this.draftKept = draftStore.write({ ...stored, sent: this.unconfirmedSaves })
+    const save = this.payload()
+    this.draft.recordSend(this.onScreen(save))
+    return save
   }
 
   isAnswered(textarea) {
@@ -201,12 +166,12 @@ export default class extends Controller {
         if (ok) this.settleSubmitFailure()
         if (ok) this.settleDraft(data)
         if (!ok && status === 409 && data?.status === "stale") {
-          this.clearOwnDraft()
+          this.draft.clearOwn()
           saveStatus.carry("answers", this.staleReloadedValue)
           return this.reloadWhenOtherSavesLand()
         }
         if (ok && data?.submitted && !this.formTarget.inert && !this.reviewRequested) {
-          draftStore.clear()
+          this.draft.discard()
           return this.reloadWhenOtherSavesLand()
         }
         if (ok && this.saveTimer === null && !saveStatus.queued("answers") && !this.formTarget.inert) this.applyServerState(data)
@@ -303,7 +268,7 @@ export default class extends Controller {
 
     const result = await request.send("POST", this.formTarget.action, this.payload({ submit: "1" }), { fallback: this.submitFailedValue })
     if (result.ok) saveStatus.clear("submit")
-    if (result.ok) draftStore.clear()
+    if (result.ok) this.draft.discard()
     const stale = result.status === 409
     if (result.ok || stale) return this.leaveWhenOtherSavesLand(() => this.leaveAfterSubmit(result, stale), "submit")
 
@@ -313,14 +278,14 @@ export default class extends Controller {
       this.applyServerState(result.data)
     } else {
       this.offlineSubmit = result.status === 0
-      saveStatus.report("submit", (this.offlineSubmit && this.draftKept) ? this.submitOfflineValue : result.message)
+      saveStatus.report("submit", (this.offlineSubmit && this.draft.kept) ? this.submitOfflineValue : result.message)
     }
     this.unlock()
     if (refused) this.nudgeTarget.focus()
   }
 
   offlineSentence() {
-    if (!this.draftKept) return null
+    if (!this.draft.kept) return null
     return this.offlineSubmit ? this.submitOfflineValue : this.savingOfflineValue
   }
 
@@ -361,7 +326,7 @@ export default class extends Controller {
   // Stays inert behind the reload: restoring the form would queue an autosave of the refused payload.
   reloadAfterSubmit(result, stale) {
     if (!result.ok && !stale) return false
-    this.clearOwnDraft()
+    this.draft.clearOwn()
     saveStatus.carry("answers", result.ok ? this.reviewStartFailedValue : this.staleReloadedValue)
     window.location.reload()
     return true

@@ -23,8 +23,8 @@ server has what the copy's later edits were typed on top of (#500). This
 happens online too, whenever a reload lands in a save's round trip. It needs
 the server to render back exactly what it received, so an answer the server
 normalizes still loses the later edits, and since the whole payload is
-compared, one such field makes every save of the session miss; the answer
-form's code note lists those cases. Every tab shares the copy, and the last
+compared, one such field makes every save of the session miss; the draft
+store's code note (`docs/code-notes/app/javascript/code_gym/draft_store.md`) lists those cases. Every tab shares the copy, and the last
 tab to edit owns all of it, its list of saves included. Submit stays manual: offline, it
 says the answers were not submitted and are kept, and stays enabled.
 Parsons answers are not restored, and opening the app offline still shows
