@@ -54,7 +54,7 @@ class AuthenticatorsController < ApplicationController
 
   # Per session, so a key read in one session, an intruder's included, is never the key another session enrolls.
   def pending_secret
-    session[PENDING_SECRET] ||= User.new_second_factor_secret
+    session[PENDING_SECRET] ||= User::Authenticator.new_secret
   end
 
   def enabled(recovery_codes)

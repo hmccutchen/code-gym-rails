@@ -3,7 +3,8 @@ paths:
   - "app/controllers/{sessions,trials,accounts,application,second_factor_challenges,authenticators,recovery_codes}_controller.rb"
   - "app/controllers/concerns/{login_code_requests,preview_auto_login,sign_in_completion,authenticator_changes,pending_trial_session}.rb"
   - "app/models/{invite_code,pending_trial,provider_credential,trial_allowance,trial_mode,trial_status,house_keys,user}.rb"
-  - "app/models/concerns/{signed_in_sessions,second_factor}.rb"
+  - "app/models/concerns/signed_in_sessions.rb"
+  - "app/models/user/authenticator.rb"
   - "app/channels/application_cable/connection.rb"
   - "app/clients/{preview_environment,preview_mail,lazy_cache_store}.rb"
   - "app/services/preview_seed.rb"
@@ -52,10 +53,10 @@ read it before changing that area.
   session. `User.session_time` is the one reader of a stamp. A new sign-in path that skips the stamp signs its
   users out on their next request.
 - **Second factor** (`docs/decisions/passwordless-sign-in.md`): an optional
-  authenticator app (`SecondFactor`). Every read-then-write of its columns
+  authenticator app (`User::Authenticator`). Every read-then-write of its columns
   runs under the user row lock. Every count of wrong codes lives on the row,
   never in the session, and a challenge asked for again within
-  `User::DOUBLE_TAP_WINDOW` comes back with its count kept. Recovery-shaped input is compared only against the
+  `User::Authenticator::DOUBLE_TAP_WINDOW` comes back with its count kept. Recovery-shaped input is compared only against the
   bcrypt digests and anything else only as a TOTP. Turning it on needs a
   sign-in from the last 15 minutes and a code for the setup key, which lives
   only in that browser's session until the code verifies, so no other session

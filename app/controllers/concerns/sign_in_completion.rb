@@ -4,7 +4,7 @@ module SignInCompletion
   include PendingTrialSession
 
   PENDING_SECOND_FACTOR = :pending_second_factor
-  REPEAT_WINDOW = User::DOUBLE_TAP_WINDOW
+  REPEAT_WINDOW = User::Authenticator::DOUBLE_TAP_WINDOW
   WrongFactor = Class.new(StandardError)
 
   private

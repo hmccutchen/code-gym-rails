@@ -199,7 +199,7 @@ RSpec.describe "A repeated sign-in post", type: :request do
       cookie_before = cookies[session_cookie]
       post second_factor_challenge_path, params: { otp_code: otp }
       cookies[session_cookie] = cookie_before
-      allow_any_instance_of(User).to receive(:second_factor_challenge_open?).and_return(true, false)
+      allow_any_instance_of(User).to receive(:second_factor_challenge_open?).and_return(true)
 
       post second_factor_challenge_path, params: { otp_code: otp }
 

@@ -70,7 +70,7 @@ RSpec.describe "Authenticator app", type: :system do
     expect(page).to have_text("This is the only time they are shown")
 
     sign_out
-    sign_in_through_second_step(current_totp(secret, at: User::TOTP_INTERVAL.seconds.from_now))
+    sign_in_through_second_step(current_totp(secret, at: User::Authenticator::TOTP_INTERVAL.seconds.from_now))
     expect(page).to have_current_path(root_path)
 
     sign_out

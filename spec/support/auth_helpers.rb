@@ -55,8 +55,8 @@ module AuthHelpers
   end
 
   def enroll_second_factor(user)
-    secret = User.new_second_factor_secret
-    previous_step_code_leaving_the_current_one_unused = current_totp(secret, at: User::TOTP_INTERVAL.seconds.ago)
+    secret = User::Authenticator.new_secret
+    previous_step_code_leaving_the_current_one_unused = current_totp(secret, at: User::Authenticator::TOTP_INTERVAL.seconds.ago)
     outcome = user.enable_second_factor!(previous_step_code_leaving_the_current_one_unused, secret: secret)
     [ secret, outcome.recovery_codes ]
   end

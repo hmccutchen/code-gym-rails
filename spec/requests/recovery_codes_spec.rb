@@ -20,7 +20,7 @@ RSpec.describe "Recovery codes", type: :request do
 
   it "shows a new set once, without caching, and voids the old set" do
     sign_in_with_both_factors
-    travel User::TOTP_INTERVAL.seconds
+    travel User::Authenticator::TOTP_INTERVAL.seconds
 
     post account_recovery_codes_path, params: { otp_code: current_totp(secret) }
 
@@ -29,8 +29,8 @@ RSpec.describe "Recovery codes", type: :request do
     new_codes = codes_on_page
     expect(new_codes.size).to eq(10)
     expect(new_codes & old_codes).to be_empty
-    expect(user.reload.verify_second_factor!(old_codes.second).status).to eq(:rejected)
-    expect(user.verify_second_factor!(new_codes.first).status).to eq(:recovery_code)
+    expect(user.reload.authenticator.verify!(old_codes.second).status).to eq(:rejected)
+    expect(user.authenticator.verify!(new_codes.first).status).to eq(:recovery_code)
   end
 
   it "refuses the emailed code" do
@@ -59,7 +59,7 @@ RSpec.describe "Recovery codes", type: :request do
 
   it "mails one notice with none of the codes in it" do
     sign_in_with_both_factors
-    travel User::TOTP_INTERVAL.seconds
+    travel User::Authenticator::TOTP_INTERVAL.seconds
 
     perform_enqueued_jobs do
       post account_recovery_codes_path, params: { otp_code: current_totp(secret) }
@@ -74,8 +74,8 @@ RSpec.describe "Recovery codes", type: :request do
 
   it "shows the daily cap message once the cap is reached" do
     sign_in_with_both_factors
-    user.update!(second_factor_failures: User::SECOND_FACTOR_DAILY_FAILURES, second_factor_failures_since: 1.hour.ago)
-    travel User::TOTP_INTERVAL.seconds
+    user.update!(second_factor_failures: User::Authenticator::DAILY_FAILURES, second_factor_failures_since: 1.hour.ago)
+    travel User::Authenticator::TOTP_INTERVAL.seconds
 
     post account_recovery_codes_path, params: { otp_code: current_totp(secret) }
 
@@ -88,7 +88,7 @@ RSpec.describe "Recovery codes", type: :request do
     it "shares its count with turning the authenticator off" do
       sign_in_with_both_factors
       10.times { delete account_authenticator_path, params: { otp_code: "AAAAA-AAAAA" } }
-      travel User::TOTP_INTERVAL.seconds
+      travel User::Authenticator::TOTP_INTERVAL.seconds
 
       post account_recovery_codes_path, params: { otp_code: current_totp(secret) }
 
