@@ -166,16 +166,20 @@ an older one that landed falls back to the old loss. An attempt, unlike an
 edit, writes only that list, through `recordUnconfirmedSaves()`, and only into
 a copy with this tab's token and scope and exactly the answers it sends;
 otherwise a retry from a stale tab would overwrite a newer copy another tab
-wrote meanwhile. When those match, two tabs show the same answers, so it
-merges the stored list with its own (`sharedUnconfirmedSaves()`), this tab's
-saves last, rather than dropping the other tab's: restoring those answers over
-either tab's landed save restores that tab's later state. An edit never
-merges, since its answers are this tab's alone and the other tab's saves
-weren't typed under them. Only an ok reply clears the list (`settleDraft()`),
-so a refused save's payload stays in it. That is
-harmless, since the page can only render it if the server already holds it.
-A restored copy hands its list to the page, so a save still on the wire
-through one reload stays in the list for the next.
+wrote meanwhile. Only an ok reply clears the list (`settleDraft()`), so a
+refused save's payload stays in it. That is harmless, since the page can only
+render it if the server already holds it.
+
+The list only ever holds the saves of the tab whose answers the copy holds.
+Nothing merges two tabs' lists: each merge rule tried here let one tab's
+answers be restored over a save another tab had committed. The cost is that
+two tabs showing identical answers can lose one tab's unconfirmed save, as
+before. A restored copy hands its list to the page
+(`takeOverUnconfirmedSaves()`) only when the restored screen equals the
+copy exactly, so a save still on the wire through one reload stays in the
+list for the next. If an edit typed before the controller connected was
+kept, the screen is no longer the copy's, so the page starts with an empty
+list.
 
 `rendersUnconfirmedSave()` then restores a copy whose token is out of date
 when its scope is the page's and the answers and ratings the server rendered

@@ -295,41 +295,6 @@ RSpec.describe "Answers through a lost connection", type: :system do
     end
   end
 
-  it "keeps another tab's unconfirmed save in the shared list when this tab retries the same answers" do
-    other_tab_answer = "Another tab's answer, which reached the server without a reply."
-    travel_to(a_weekday) do
-      open_dashboard
-      page.execute_script(<<~JS)
-        const originalFetch = window.fetch
-        window.saveAttempts = 0
-        window.fetch = (url, options) => {
-          if (new URL(url, location.href).pathname !== "/responses") return originalFetch(url, options)
-          window.saveAttempts += 1
-          return Promise.reject(new TypeError("offline"))
-        }
-      JS
-      fill_in_answer("code_review", answer)
-      wait_for_js_condition("window.saveAttempts === 1")
-      page.execute_script(<<~JS)
-        const byKey = ([ a ], [ b ]) => (a < b ? -1 : a > b ? 1 : 0)
-        const landed = {}
-        document.querySelectorAll("textarea[data-field]").forEach((area) => landed[area.dataset.field] = area.defaultValue)
-        landed.code_review = #{other_tab_answer.to_json}
-        const copy = JSON.parse(localStorage.getItem("code-gym-answer-draft"))
-        copy.sent = [ JSON.stringify([ Object.entries(landed).sort(byKey), [] ]), ...copy.sent ]
-        localStorage.setItem("code-gym-answer-draft", JSON.stringify(copy))
-      JS
-
-      page.execute_script("window.dispatchEvent(new Event('online'))")
-      wait_for_js_condition("window.saveAttempts >= 2")
-      exercise = user.daily_exercises.sole
-      user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, answers: { "code_review" => other_tab_answer })
-      reopen_dashboard
-
-      expect(find(code_review_field).value).to eq(answer)
-    end
-  end
-
   it "restores an edit typed behind a save whose reply was lost, after a retry with newer text also got none" do
     later = "#{answer} Then more, sent only by the retry."
     travel_to(a_weekday) do
