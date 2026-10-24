@@ -130,6 +130,25 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe ".authenticate_login_code with a block" do
+    it "yields the account inside the row lock, so a waiting duplicate sees what the block wrote" do
+      user = create_user
+      code = user.generate_login_code!
+      in_transaction = nil
+
+      User.authenticate_login_code(email: user.email, code: code) { in_transaction = User.connection.transaction_open? }
+
+      expect(in_transaction).to be(true)
+    end
+
+    it "doesn't yield for a wrong code" do
+      user = create_user
+      code = user.generate_login_code!
+
+      expect { |block| User.authenticate_login_code(email: user.email, code: wrong_code_for(code), &block) }.not_to yield_control
+    end
+  end
+
   describe "login codes" do
     it "generates a code digest, with attempts reset to zero" do
       user = create_user

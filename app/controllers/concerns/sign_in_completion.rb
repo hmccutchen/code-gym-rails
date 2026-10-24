@@ -1,8 +1,33 @@
 # Design notes: docs/code-notes/app/controllers/concerns/sign_in_completion.md
 module SignInCompletion
   PENDING_SECOND_FACTOR = :pending_second_factor
+  REPEAT_WINDOW = 30.seconds
 
   private
+
+  # A double tap posts twice with the pre-sign-in cookie; the proof holds that browser's own pending stamp and its code.
+  def remember_sign_in(user, proof, checked_at, challenge_at: nil, notice: nil)
+    remembered = { "checked_at" => User.session_stamp(checked_at),
+                   "challenge_at" => challenge_at && User.session_stamp(challenge_at), "notice" => notice }
+    Rails.cache.write(sign_in_repeat_key(user, proof), remembered, expires_in: REPEAT_WINDOW)
+  end
+
+  def recent_sign_in(user, proof)
+    return if user.nil? || proof.any?(&:blank?)
+
+    remembered = Rails.cache.read(sign_in_repeat_key(user, proof))
+    return unless remembered.is_a?(Hash)
+    return unless user.session_signed_in_valid?(remembered["checked_at"])
+
+    { checked_at: User.session_time(remembered["checked_at"]), challenge_at: User.session_time(remembered["challenge_at"]),
+      notice: remembered["notice"] }
+  end
+
+  def sign_in_repeat_key(user, proof) = "sign_in_repeat/#{user.id}/#{sign_in_repeat_digest(proof)}"
+
+  def sign_in_repeat_digest(proof)
+    OpenSSL::HMAC.hexdigest("SHA256", Rails.application.secret_key_base, proof.map(&:to_s).join("\n"))
+  end
 
   def complete_sign_in(user, checked_at:)
     trial = PendingTrial.take(session)
@@ -12,11 +37,12 @@ module SignInCompletion
     redirect_to destination || root_path, notice: t("sessions.welcome_back", name: user.name)
   end
 
-  def start_second_factor_challenge(user)
+  def start_second_factor_challenge(user, issued_at: nil)
+    issued_at ||= user.issue_second_factor_challenge!
     session.delete(:pending_login_email)
     session.delete(:pending_login_at)
     session[PENDING_SECOND_FACTOR] = { "user_id" => user.id,
-                                       "at" => User.session_stamp(user.issue_second_factor_challenge!) }
+                                       "at" => User.session_stamp(issued_at) }
     redirect_to second_factor_challenge_path
   end
 

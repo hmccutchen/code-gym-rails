@@ -138,6 +138,18 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
+  describe "GET /login/code" do
+    it "sends a reload of a rejected code page back to the login page, keeping the pending sign-in" do
+      post login_path, params: { email: "dev@example.com" }
+
+      get "/login/code"
+
+      expect(response).to redirect_to(login_path)
+      follow_redirect!
+      expect(response.body).to include("6-digit code from the email")
+    end
+  end
+
   describe "POST /login/code" do
     include ActiveJob::TestHelper
 

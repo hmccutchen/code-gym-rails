@@ -18,7 +18,7 @@ class SessionsController < ApplicationController
              only:  :verify_code
 
   rate_limit to: 10, within: 1.hour,
-             by:    -> { pending_login_email || request.remote_ip },
+             by:    -> { session[:pending_login_email].presence || request.remote_ip },
              with:  -> { rate_limited(t("sessions.rate_limited.code_attempts")) },
              store: RATE_LIMIT_STORE,
              name:  "code_attempts_for_address",
@@ -44,10 +44,10 @@ class SessionsController < ApplicationController
   # POST /login/code — the email comes from this browser's session, never a form field.
   def verify_code
     checked_at = Time.current
-    email = pending_login_email
-    user  = email.present? ? User.authenticate_login_code(email: email, code: params[:code].to_s) : nil
-    return reject_login_code(email) unless user
-    return start_second_factor_challenge(user) if user.two_factor_enabled?
+    user = redeem_login_code(checked_at)
+    user, checked_at = repeated_login unless user
+    return reject_login_code(pending_login_email) unless user
+    return start_second_factor_challenge(user, issued_at: @challenge_at) if user.two_factor_enabled?
 
     complete_sign_in(user, checked_at: checked_at)
   end
@@ -58,6 +58,29 @@ class SessionsController < ApplicationController
   end
 
   private
+
+  # The proof is recorded inside the redemption's row lock, so a duplicate waiting on that lock always finds it.
+  def redeem_login_code(checked_at)
+    email = pending_login_email
+    return if email.blank?
+
+    User.authenticate_login_code(email: email, code: params[:code].to_s) do |user|
+      @challenge_at = user.issue_second_factor_challenge! if user.two_factor_enabled?
+      remember_sign_in(user, login_code_proof, checked_at, challenge_at: @challenge_at)
+    end
+  end
+
+  def login_code_proof = [ session[:pending_login_email], session[:pending_login_at], params[:code].to_s ]
+
+  # Reads the session's address directly: the first post cleared the code, which can end the pending sign-in's life.
+  def repeated_login
+    user = session[:pending_login_email].present? ? User.active.find_by(email: session[:pending_login_email]) : nil
+    recent = recent_sign_in(user, login_code_proof) or return
+
+    @challenge_at = recent[:challenge_at]
+    PendingTrial.forget(session) unless user.two_factor_enabled?
+    [ user, recent[:checked_at] ]
+  end
 
   def reject_login_code(email)
     @code_rejected = true

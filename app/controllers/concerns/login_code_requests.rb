@@ -33,7 +33,7 @@ module LoginCodeRequests
     UserMailer.login_code(user).deliver_later
 
     session[:pending_login_email] = email
-    session[:pending_login_at]    = Time.current.iso8601
+    session[:pending_login_at]    = User.session_stamp
     user
   end
 end

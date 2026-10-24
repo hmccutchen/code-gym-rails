@@ -177,7 +177,7 @@ data.*
 - from my layered review: the login code out of the job queue, and one
   signed-in lookup
 - an optional authenticator app as a second sign-in factor, spec and plan
-  first, stacked on the passwordless PR `#493 open`
+  first, stacked on the passwordless PR `#493`
   **why:** possession of a phone is the second factor worth having, and the
   inbox alone is all that protects an account today
   **I decided:** a daily cap of 20 wrong codes; every wrong-code count kept on
@@ -187,15 +187,18 @@ data.*
   check split into the local network before merge and production after
 - from the review of the authenticator PR: each session gets its own setup key
   **I decided:** the key stays in the session until a code verifies; the model
-  takes session values, not the session; the spec and plan docs leave the PR;
-  extracting the concern from `User` is a follow-up issue
+  takes session values; spec and plan docs dropped; extraction is an issue
 - every PR gets a critical and a layered-design review, each by a separate
   agent `#492`
-  **I decided:** another fresh agent checks each finding against the code
-  before anything is changed
+  **I decided:** a fresh agent checks each finding before anything changes
 - the test rules say CI runs on Postgres 18
+- locked out after turning on the authenticator: stop a double tap posting
+  the sign-in forms twice `#495`
+  **why:** I was signed out right after turning it on, every emailed code then
+  said it was wrong, and the home-screen app ended on a 404
+  **I decided:** Turn on and New recovery codes start disabled; the server
+  accepts a repeat of a sign-in this browser just completed
 - the cost of each API call on its usage row, for Anthropic keys only for now
-  `#472 open`
-  **I decided:** Gemini and OpenAI rows store a null cost until those providers
-  are priced on purpose; prices stay on the provider classes beside the routes;
-  the design doc leaves the PR; a timed-out call stores a null cost
+  `#472`
+  **I decided:** Gemini and OpenAI costs stay null; prices stay on the
+  providers; the design doc dropped; a timeout costs null

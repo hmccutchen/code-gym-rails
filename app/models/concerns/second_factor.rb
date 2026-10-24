@@ -75,7 +75,7 @@ module SecondFactor
     with_lock do
       next Outcome.new(status: :expired) unless second_factor_challenge_open?(issued_at)
 
-      settle_second_factor_challenge(verify_under_lock(code))
+      settle_second_factor_challenge(verify_under_lock(code)).tap { |outcome| yield outcome if block_given? && outcome.accepted? }
     end
   end
 
