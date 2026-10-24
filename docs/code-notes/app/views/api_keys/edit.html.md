@@ -55,6 +55,15 @@ rules but not the guide.
 - Save key, the provider choice and the language redirect with a flash
   notice, because they go through a full form post.
 
+## Saved time zones
+
+The time zone select keeps its existing US choices and appends the saved zone
+under its own name when it is absent from that list. `User` already validates
+saved zones against Rails, including browser-detected IANA names. Both the
+select and its visible value row read the same options, so a saved
+`Europe/London` appears as itself rather than "Detect automatically". A blank
+saved zone still shows the automatic choice; timezone resolution is unchanged.
+
 ## Label minimum height
 
 A tap on an exclude, lock or difficulty label toggles its
