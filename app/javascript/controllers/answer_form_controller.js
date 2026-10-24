@@ -5,6 +5,7 @@ import saveStatus from "code_gym/save_status"
 import draftStore from "code_gym/draft_store"
 
 const AUTOSAVE_DELAY_MS = 800
+const UNCONFIRMED_SAVES_KEPT = 5
 
 function sortedEntries(object) {
   return Object.entries(object || {}).sort(([ a ], [ b ]) => (a < b ? -1 : a > b ? 1 : 0))
@@ -44,6 +45,7 @@ export default class extends Controller {
     this.blocker = this.submitBlockerValue || null
     this.saveTimer = null
     this.reviewRequested = false
+    this.unconfirmedSaves = []
 
     this.ratings = {}
     this.formTarget.querySelectorAll("button.rating-btn.active").forEach((button) => {
@@ -73,7 +75,7 @@ export default class extends Controller {
 
   restoreDraft() {
     const draft = draftStore.read()
-    if (!draft || (draft.token !== this.draftToken && !this.renderedLandedSave(draft))) {
+    if (!draft || (draft.token !== this.draftToken && !this.rendersUnconfirmedSave(draft))) {
       draftStore.clear()
       return false
     }
@@ -87,22 +89,22 @@ export default class extends Controller {
     return true
   }
 
-  renderedLandedSave(draft) {
-    if (draft.scope !== this.draftScopeValue || typeof draft.sent !== "string") return false
+  rendersUnconfirmedSave(draft) {
+    if (draft.scope !== this.draftScopeValue || !Array.isArray(draft.sent)) return false
     const rendered = {}
     this.textareas.forEach((area) => rendered[area.dataset.field] = area.defaultValue)
-    return draft.sent === canonicalDraft(rendered, this.ratings)
+    return draft.sent.includes(canonicalDraft(rendered, this.ratings))
   }
 
   storeDraft() {
     if (this.formTarget.inert) return
     const { answers, section_ratings } = this.payload().response
-    this.draftKept = draftStore.write({ token: this.draftToken, scope: this.draftScopeValue, sent: this.inFlight ?? null,
+    this.draftKept = draftStore.write({ token: this.draftToken, scope: this.draftScopeValue, sent: this.unconfirmedSaves,
                                         answers: answers, ratings: section_ratings })
   }
 
   settleDraft(data) {
-    this.inFlight = null
+    this.unconfirmedSaves = []
     if (typeof data?.draft_token === "string") this.draftToken = data.draft_token
     const sent = canonicalDraft(this.lastSent.response.answers, this.lastSent.response.section_ratings)
     const { answers, section_ratings } = this.payload().response
@@ -117,7 +119,8 @@ export default class extends Controller {
   nextSave() {
     if (this.formTarget.inert) return null
     this.lastSent = this.payload()
-    this.inFlight = canonicalDraft(this.lastSent.response.answers, this.lastSent.response.section_ratings)
+    const sent = canonicalDraft(this.lastSent.response.answers, this.lastSent.response.section_ratings)
+    this.unconfirmedSaves = [ ...this.unconfirmedSaves.filter((earlier) => earlier !== sent), sent ].slice(-UNCONFIRMED_SAVES_KEPT)
     this.storeDraft()
     return this.lastSent
   }

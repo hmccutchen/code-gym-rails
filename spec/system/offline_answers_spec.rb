@@ -176,21 +176,65 @@ RSpec.describe "Answers through a lost connection", type: :system do
     end
   end
 
-  it "does not restore a copy from another day's set whose in-flight save matches this page" do
+  def plant_copy_of_a_save_this_page_shows(scope:, answer:)
+    page.execute_script(<<~JS)
+      const byKey = ([ a ], [ b ]) => (a < b ? -1 : a > b ? 1 : 0)
+      const rendered = {}
+      document.querySelectorAll("textarea[data-field]").forEach((area) => rendered[area.dataset.field] = area.defaultValue)
+      const ratings = {}
+      document.querySelectorAll("button.rating-btn.active").forEach((button) => ratings[button.dataset.ratingFor] = button.dataset.rating)
+      const sent = JSON.stringify([ Object.entries(rendered).sort(byKey), Object.entries(ratings).sort(byKey) ])
+      const pageScope = document.querySelector("[data-answer-form-draft-scope-value]").dataset.answerFormDraftScopeValue
+      localStorage.setItem("code-gym-answer-draft", JSON.stringify({ token: "an-older-token", scope: #{scope.to_json} ?? pageScope,
+        sent: [ sent ], answers: { ...rendered, code_review: #{answer.to_json} }, ratings: ratings }))
+    JS
+  end
+
+  it "restores a copy whose save on the wire is what this page shows" do
     travel_to(a_weekday) do
       open_dashboard
-      empty = page.evaluate_script(<<~JS)
-        JSON.stringify([ [], [] ])
-      JS
-      page.execute_script(<<~JS)
-        localStorage.setItem("code-gym-answer-draft", JSON.stringify({ token: "other-day:1:0", scope: "other-day",
-          sent: #{empty.to_json}, answers: { code_review: "Yesterday's unsent answer." }, ratings: {} }))
-      JS
+      plant_copy_of_a_save_this_page_shows(scope: nil, answer: answer)
 
       reopen_dashboard
 
-      expect(find(code_review_field).value).not_to eq("Yesterday's unsent answer.")
+      expect(find(code_review_field).value).to eq(answer)
+    end
+  end
+
+  it "does not restore a copy from another day's set, even when its save on the wire is what this page shows" do
+    travel_to(a_weekday) do
+      open_dashboard
+      plant_copy_of_a_save_this_page_shows(scope: "another-day", answer: answer)
+
+      reopen_dashboard
+
+      expect(find(code_review_field).value).not_to eq(answer)
       expect(stored_draft).to be_nil
+    end
+  end
+
+  it "restores an edit typed behind a save whose reply was lost, after a retry with newer text also got none" do
+    later = "#{answer} Then more, sent only by the retry."
+    travel_to(a_weekday) do
+      open_dashboard
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch
+        window.fetch = (url, options) => {
+          if (new URL(url, location.href).pathname !== "/responses") return originalFetch(url, options)
+          if (window.firstSaveSent) return Promise.reject(new TypeError("offline"))
+          window.firstSaveSent = true
+          return originalFetch(url, options).then(() => Promise.reject(new TypeError("reply lost")))
+        }
+      JS
+      fill_in_answer("code_review", answer)
+      wait_for { user.daily_responses.first&.answers&.dig("code_review") == answer }
+      find(code_review_field).fill_in(with: later)
+      page.execute_script("window.dispatchEvent(new Event('online'))")
+      wait_for_js_condition("(JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.sent || []).some((sent) => sent.includes(#{later.to_json}))")
+
+      reopen_dashboard
+
+      expect(find(code_review_field).value).to eq(later)
     end
   end
 

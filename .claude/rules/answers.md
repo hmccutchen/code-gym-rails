@@ -40,8 +40,8 @@ read it before changing that area.
 - **Offline answer saving** (`docs/decisions/offline-answer-saving.md`): The
   dashboard keeps unsent answers in `code_gym/draft_store` and restores them
   only when the stored `DailyResponse#draft_token` matches the rendered one,
-  or when the copy's draft scope matches and the rendered answers are exactly
-  the save it had on the wire.
+  or when the copy's draft scope matches and the rendered answers equal one
+  of the saves it sent since the last confirmed reply.
   The answers queue retries only saves that got no reply, never a refusal or
   5xx. Confirmed saves, submits, submitted dashboards and every signed-out
   page clear the copy, and submit always stays manual.

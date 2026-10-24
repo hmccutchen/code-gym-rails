@@ -12,8 +12,10 @@ it once the server has the same answers. Design and tradeoffs:
 
 localStorage, because iOS drops a home-screen app's sessionStorage when the
 app is killed, and a killed app is the case this exists for. One key, because
-only one day's form is ever open: a copy from any other day, set or response
-fails the restore check and is deleted on the next dashboard load.
+only one day's form is ever open: a copy from any other day or set fails the
+restore check and is deleted on the next dashboard load. Within the same set,
+the answer form also restores a copy whose save landed without a reply; its
+code note says when.
 
 ## Cleared on every signed-out page
 

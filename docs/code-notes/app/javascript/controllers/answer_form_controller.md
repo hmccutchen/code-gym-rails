@@ -153,14 +153,37 @@ When a save reaches the server but its reply never arrives, because the page
 reloaded, closed or was killed in between, the next load renders a token the
 copy does not have. That happens online too, whenever a reload lands in a
 save's round trip, and the edits typed behind that save are the ones at risk.
-So `nextSave()` records in the copy what the save on the wire sent (`sent`)
-and the draft scope, and `settleDraft()` clears `sent` once a reply arrives.
-`renderedLandedSave()` then restores a copy whose token is out of date when its
-scope is the page's and the answers and ratings the server rendered are
-exactly `sent`, compared the same sorted way. The server holds the save, so
-the copy's later edits go back on top of it. Any other mismatch still deletes
-the copy. The scope check keeps another day's copy out even when both days'
-answers happen to match, such as both empty.
+So the copy also holds the draft scope and `sent`: what each save sent since
+the last confirmed reply, as `canonicalDraft` strings. `nextSave()` adds one
+on every attempt, retries included, since a retry carries newer text and
+either attempt may be the one that landed. It keeps the five most recent
+(`UNCONFIRMED_SAVES_KEPT`), so a long run of retries can't fill localStorage;
+an older one that landed falls back to the old loss. Only an ok reply clears
+the list (`settleDraft()`), so a refused save's payload stays in it. That is
+harmless, since the page can only render it if the server already holds it.
+
+`rendersUnconfirmedSave()` then restores a copy whose token is out of date
+when its scope is the page's and the answers and ratings the server rendered
+equal one of those saves. The server holds that save, so the copy's later
+edits go back on top of it. Any other mismatch still deletes the copy. The
+scope check keeps another day's copy out even when both days' answers happen
+to match. Start over keeps the scope, so a copy survives it only when one of
+its saves equals the blank or scaffold page the server renders after it.
+
+The page decides this itself, by comparing what it sent with what the server
+rendered, rather than the server deciding. It works only when the server
+renders back exactly what it received, and these answers don't round-trip,
+so they still fall back to the old loss:
+
+- text `UserText.normalize` changes: NFC normalization, or stripped
+  zero-width, bidi, tag and control characters
+- an answer starting with a newline, which `_textarea.html.erb`'s markup
+  drops on render
+- a whitespace-only or non-substantive answer, stored as `""`
+- an answer over the server's 12,000-character clamp
+
+A save id the server stores and renders back would remove these misses. It
+needs a column, so it waits until a lost edit with pasted text turns up.
 
 ## Submitting offline
 

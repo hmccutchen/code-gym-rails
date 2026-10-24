@@ -7,7 +7,8 @@ one copy of the unsent answers and ratings in localStorage, written on every
 edit. The page restores it only when its `DailyResponse#draft_token` equals
 the one the server rendered: the set's draft scope, the response id, and a
 digest of the saved answers and ratings, so another day, a regenerate, a
-Start over or a save from elsewhere deletes it instead. The answers queue
+Start over or a save from elsewhere deletes it instead, with the one exception
+below. The answers queue
 retries a save that got no reply on the `online` event or a 5 to 30 second
 timer, never a refusal, a 5xx or the signed-out redirect. A confirmed save,
 a submit, a submitted dashboard and every signed-out page clear the copy,
@@ -15,11 +16,14 @@ the last because this app runs on shared devices; a save reply or a stale refusa
 the stored copy is the one that tab sent or owns, since every tab shares it,
 and the "kept on this device" wording shows only when the write succeeded. If a save reaches the server and the page reloads,
 closes or is killed before its reply arrives, the copy's token is out of date,
-so the copy also records what the save on the wire sent and the draft scope.
-The page then restores the copy when the scope matches and the answers and
-ratings the server rendered are exactly that save: the server has what the
-copy's later edits were typed on top of, so nothing is lost (#500). This
-happens online too, whenever a reload lands in a save's round trip. Submit stays manual: offline, it
+so the copy also records the draft scope and the last few saves sent since a
+confirmed reply. The page then restores the copy when the scope matches and
+the answers and ratings the server rendered equal one of those saves: the
+server has what the copy's later edits were typed on top of (#500). This
+happens online too, whenever a reload lands in a save's round trip. It needs
+the server to render back exactly what it received, so an answer the server
+normalizes still loses the later edits; the answer form's code note lists
+those cases. Submit stays manual: offline, it
 says the answers were not submitted and are kept, and stays enabled.
 Parsons answers are not restored, and opening the app offline still shows
 the browser's offline page, since nothing caches the dashboard.
