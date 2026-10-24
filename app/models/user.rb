@@ -1,7 +1,6 @@
 # Design notes: docs/code-notes/app/models/user.md
 class User < ApplicationRecord
   include SignedInSessions
-  include SecondFactor
 
   has_many :daily_exercises, dependent: :destroy
   has_many :daily_responses, dependent: :destroy, inverse_of: :user
@@ -18,6 +17,7 @@ class User < ApplicationRecord
 
   serialize :api_keys, coder: JSON
   encrypts :api_keys
+  encrypts :otp_secret
 
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
   SKILL_LEVELS = KindDifficulty::LEVELS
@@ -111,6 +111,25 @@ class User < ApplicationRecord
       login_code_attempts: 0
     )
   end
+
+  def authenticator = Authenticator.new(self)
+
+  delegate :sign_in_factor, :emailed_code_signs_in?, :recovery_codes_remaining, :regenerate_recovery_codes!,
+           to: :authenticator
+
+  def two_factor_enabled? = authenticator.enabled?
+
+  def authenticator_uri(secret) = authenticator.provisioning_uri(secret)
+
+  def enable_second_factor!(code, secret:) = authenticator.enable!(code, secret: secret)
+
+  def disable_second_factor!(code) = authenticator.disable!(code)
+
+  def issue_second_factor_challenge! = authenticator.issue_challenge!
+
+  def second_factor_challenge_open?(issued_at) = authenticator.challenge_open?(issued_at)
+
+  def answer_second_factor_challenge!(code, issued_at:, &) = authenticator.answer_challenge!(code, issued_at: issued_at, &)
 
   def anonymized?
     anonymized_at.present?

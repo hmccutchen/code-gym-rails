@@ -964,6 +964,55 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "the authenticator" do
+    it "leaves the authenticator's constants and outcome type to User::Authenticator" do
+      on_user = %i[Outcome SECOND_FACTOR_DAILY_FAILURES SECOND_FACTOR_FAILURE_WINDOW SECOND_FACTOR_CHALLENGE_FAILURES
+                   SECOND_FACTOR_CHALLENGE_LIFETIME DOUBLE_TAP_WINDOW RECOVERY_CODE_COUNT RECOVERY_CODE_LENGTH
+                   RECOVERY_CODE_ALPHABET RECOVERY_CODE_SHAPE TOTP_ISSUER TOTP_INTERVAL]
+
+      expect(on_user.select { |name| User.const_defined?(name) }).to be_empty
+      expect(User::Authenticator.constants(false)).to include(:Outcome, :DAILY_FAILURES, :FAILURE_WINDOW, :CHALLENGE_FAILURES,
+                                                              :CHALLENGE_LIFETIME, :DOUBLE_TAP_WINDOW, :RECOVERY_CODE_COUNT,
+                                                              :RECOVERY_CODE_LENGTH, :RECOVERY_CODE_ALPHABET,
+                                                              :RECOVERY_CODE_SHAPE, :TOTP_ISSUER, :TOTP_INTERVAL)
+    end
+
+    it "works on this same record, so a change shows on it without a reload" do
+      user = create_user
+      secret = User::Authenticator.new_secret
+
+      user.authenticator.enable!(current_totp(secret), secret: secret)
+
+      expect(user.two_factor_enabled?).to be(true)
+    end
+
+    it "hands each sign-in and account call to the authenticator unchanged" do
+      user = create_user
+      authenticator = instance_double(User::Authenticator)
+      allow(user).to receive(:authenticator).and_return(authenticator)
+      block = proc { }
+      calls = {
+        two_factor_enabled?: [ :enabled?, [], {} ], sign_in_factor: [ :sign_in_factor, [], {} ],
+        emailed_code_signs_in?: [ :emailed_code_signs_in?, [], {} ],
+        recovery_codes_remaining: [ :recovery_codes_remaining, [], {} ],
+        authenticator_uri: [ :provisioning_uri, [ "SECRET" ], {} ],
+        enable_second_factor!: [ :enable!, [ "123456" ], { secret: "SECRET" } ],
+        disable_second_factor!: [ :disable!, [ "123456" ], {} ],
+        regenerate_recovery_codes!: [ :regenerate_recovery_codes!, [ "123456" ], {} ],
+        issue_second_factor_challenge!: [ :issue_challenge!, [], {} ],
+        second_factor_challenge_open?: [ :challenge_open?, [ "stamp" ], {} ]
+      }
+
+      calls.each do |user_method, (authenticator_method, args, kwargs)|
+        expected = args.empty? && kwargs.empty? ? [ no_args ] : [ *args, **kwargs ]
+        allow(authenticator).to receive(authenticator_method).with(*expected).and_return(user_method)
+        expect(user.public_send(user_method, *args, **kwargs)).to eq(user_method)
+      end
+      allow(authenticator).to receive(:answer_challenge!).with("123456", issued_at: "stamp") { |*, &given| given }
+      expect(user.answer_second_factor_challenge!("123456", issued_at: "stamp", &block)).to be(block)
+    end
+  end
+
   describe "#anonymize!" do
     it "replaces or clears every identifying field" do
       user = create_user(email: "real@example.com", name: "Real Person")

@@ -161,7 +161,7 @@ RSpec.describe "Authenticator setup", type: :request do
 
     it "turns it off with a current code" do
       sign_in_with_both_factors(user, secret)
-      travel User::TOTP_INTERVAL.seconds
+      travel User::Authenticator::TOTP_INTERVAL.seconds
 
       delete account_authenticator_path, params: { otp_code: current_totp(secret) }
 
@@ -190,8 +190,8 @@ RSpec.describe "Authenticator setup", type: :request do
 
     it "shows the daily cap message once the cap is reached" do
       sign_in_with_both_factors(user, secret)
-      user.update!(second_factor_failures: User::SECOND_FACTOR_DAILY_FAILURES, second_factor_failures_since: 1.hour.ago)
-      travel User::TOTP_INTERVAL.seconds
+      user.update!(second_factor_failures: User::Authenticator::DAILY_FAILURES, second_factor_failures_since: 1.hour.ago)
+      travel User::Authenticator::TOTP_INTERVAL.seconds
 
       delete account_authenticator_path, params: { otp_code: current_totp(secret) }
 
@@ -264,7 +264,7 @@ RSpec.describe "Authenticator setup", type: :request do
     it "mails one notice when the authenticator is turned off" do
       secret, _codes = enroll_second_factor(user)
       sign_in_with_both_factors(user, secret)
-      travel User::TOTP_INTERVAL.seconds
+      travel User::Authenticator::TOTP_INTERVAL.seconds
       code = current_totp(secret)
 
       perform_enqueued_jobs do
@@ -286,7 +286,7 @@ RSpec.describe "Authenticator setup", type: :request do
       sign_in_with_both_factors(user, secret)
       5.times { delete account_authenticator_path, params: { otp_code: "AAAAA-AAAAA" } }
       5.times { post account_recovery_codes_path, params: { otp_code: "AAAAA-AAAAA" } }
-      travel User::TOTP_INTERVAL.seconds
+      travel User::Authenticator::TOTP_INTERVAL.seconds
 
       delete account_authenticator_path, params: { otp_code: current_totp(secret) }
 

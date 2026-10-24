@@ -12,7 +12,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
   end
 
   def wrong_totp
-    valid = (-1..1).map { |offset| current_totp(secret, at: Time.current + (offset * User::TOTP_INTERVAL).seconds) }
+    valid = (-1..1).map { |offset| current_totp(secret, at: Time.current + (offset * User::Authenticator::TOTP_INTERVAL).seconds) }
     (0..3).map { |n| format("%06d", n) }.find { |candidate| valid.exclude?(candidate) }
   end
 
@@ -99,7 +99,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
   it "sends an expired challenge back to the login page" do
     enter_email
 
-    travel User::SECOND_FACTOR_CHALLENGE_LIFETIME + 1.second do
+    travel User::Authenticator::CHALLENGE_LIFETIME + 1.second do
       answer(current_totp(secret))
     end
 
@@ -139,7 +139,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
   end
 
   it "shows when to try again once the daily cap is reached" do
-    user.update!(second_factor_failures: User::SECOND_FACTOR_DAILY_FAILURES, second_factor_failures_since: 1.hour.ago)
+    user.update!(second_factor_failures: User::Authenticator::DAILY_FAILURES, second_factor_failures_since: 1.hour.ago)
     enter_email
 
     answer(current_totp(secret))
@@ -167,7 +167,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
     def wrong_answers_across_challenges(count)
       count.times do |n|
         if (n % 4).zero?
-          travel User::DOUBLE_TAP_WINDOW + 1.second if n.positive?
+          travel User::Authenticator::DOUBLE_TAP_WINDOW + 1.second if n.positive?
           enter_email
         end
         answer(wrong_totp)
