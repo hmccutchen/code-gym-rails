@@ -96,3 +96,17 @@ helper names, builds a one-expression path stub, rejects every request with a
 one-line `window.fetch`, or writes a redirected reply. The reply is wrapped in
 parentheses with any closing semicolon dropped, so a reply written as a
 statement still parses inside the stub's conditional.
+
+## The pull-refresh note key comes from `code_gym_bootstrap.js`
+
+`JavascriptReadyHelper::PULL_NOTE_KEY` is read the same way as the draft key,
+from the `var PULL_NOTE = "..."` line in
+`app/assets/javascripts/code_gym_bootstrap.js`,
+which owns the `sessionStorage` note a pull-to-refresh leaves for the reloaded
+page. That line may be indented, since it sits inside the bootstrap's wrapper
+function. Specs leave the note with `leave_pull_note` and check it was cleared
+with `pull_note_absent_js`; a spec that watches the write compares against
+`pull_note_key_js`. A copied key would seed a note the page no longer reads and
+keep the "note was cleared" checks passing after a rename (#527). The
+convention spec fails on the key, or on a `sessionStorage` call keyed with a
+`codegym:` string, in a system spec.

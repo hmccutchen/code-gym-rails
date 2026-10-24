@@ -80,16 +80,26 @@ module JavascriptReadyHelper
 
   DRAFT_STORE_PATH = Rails.root.join("app/javascript/code_gym/draft_store.js")
 
-  def self.draft_key_in(source)
-    source[/^const KEY = "([^"\\]+)"$/, 1] or
-      raise "Found no `const KEY = \"...\"` line in #{DRAFT_STORE_PATH}; JavascriptReadyHelper reads the draft key from it"
+  BOOTSTRAP_PATH = Rails.root.join("app/assets/javascripts/code_gym_bootstrap.js")
+
+  def self.quoted_value_in(source, declaration, path:, indented: false)
+    source[/^#{"[ \t]*" if indented}#{Regexp.escape(declaration)} = "([^"\\]+)"$/, 1] or
+      raise "Found no `#{declaration} = \"...\"` line in #{path}; JavascriptReadyHelper reads the key from it"
   end
+  private_class_method :quoted_value_in
+
+  def self.draft_key_in(source) = quoted_value_in(source, "const KEY", path: DRAFT_STORE_PATH)
+
+  def self.pull_note_key_in(source) = quoted_value_in(source, "var PULL_NOTE", path: BOOTSTRAP_PATH, indented: true)
 
   DRAFT_KEY = draft_key_in(DRAFT_STORE_PATH.read).freeze
   DRAFT_KEY_JS = DRAFT_KEY.to_json.freeze
   STORED_DRAFT = "JSON.parse(localStorage.getItem(#{DRAFT_KEY_JS}) || 'null')".freeze
   DRAFT_ABSENT = "localStorage.getItem(#{DRAFT_KEY_JS}) === null".freeze
   ANSWERS_SETTLED = "#{DRAFT_ABSENT} && !window.CodeGymSaveStatus.pending()".freeze
+  PULL_NOTE_KEY = pull_note_key_in(BOOTSTRAP_PATH.read).freeze
+  PULL_NOTE_KEY_JS = PULL_NOTE_KEY.to_json.freeze
+  PULL_NOTE_ABSENT = "sessionStorage.getItem(#{PULL_NOTE_KEY_JS}) === null".freeze
 
   def wait_for_js
     expect(page).to have_css("html[data-js-ready]", visible: :all)
@@ -108,6 +118,14 @@ module JavascriptReadyHelper
 
   def wait_for_answers_settled
     wait_for_js_condition(ANSWERS_SETTLED)
+  end
+
+  def pull_note_key_js = PULL_NOTE_KEY_JS
+
+  def pull_note_absent_js = PULL_NOTE_ABSENT
+
+  def leave_pull_note
+    page.execute_script("sessionStorage.setItem(#{PULL_NOTE_KEY_JS}, '1')")
   end
 
   NAVIGATED_AWAY = /Execution context was destroyed|Cannot find context/

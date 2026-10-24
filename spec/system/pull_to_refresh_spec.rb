@@ -298,7 +298,7 @@ RSpec.describe "Pull to refresh", type: :system do
     visit_as(user)
     visit learn_path
     expect(page).to have_css("#pull-refresh", visible: :all)
-    page.execute_script("sessionStorage.setItem('codegym:pull-refreshed', '1')")
+    leave_pull_note
 
     visit learn_path
 
@@ -307,7 +307,7 @@ RSpec.describe "Pull to refresh", type: :system do
     expect(page).to have_no_css("#pull-refresh.is-refreshing", visible: :all)
     expect(indicator("style.transform")).to eq("")
     expect(content("style.transform")).to eq("")
-    expect(page.evaluate_script("sessionStorage.getItem('codegym:pull-refreshed') === null")).to be(true)
+    expect(page.evaluate_script(pull_note_absent_js)).to be(true)
   end
 
   it "draws the reloaded page's first frame with the content already held down" do
@@ -316,7 +316,7 @@ RSpec.describe "Pull to refresh", type: :system do
     visit_as(user)
     visit learn_path
     expect(page).to have_css("#pull-refresh", visible: :all)
-    page.execute_script("sessionStorage.setItem('codegym:pull-refreshed', '1')")
+    leave_pull_note
 
     visit learn_path
 
@@ -332,7 +332,7 @@ RSpec.describe "Pull to refresh", type: :system do
     page.driver.with_playwright_page do |pw|
       pw.route("**/controllers/pull_to_refresh_controller-*.js", ->(route, _request) { route.abort })
     end
-    page.execute_script("sessionStorage.setItem('codegym:pull-refreshed', '1')")
+    leave_pull_note
 
     visit learn_path
 
@@ -346,13 +346,13 @@ RSpec.describe "Pull to refresh", type: :system do
   it "drops the hold without a spinner in a browser tab" do
     visit_as(user)
     visit learn_path
-    page.execute_script("sessionStorage.setItem('codegym:pull-refreshed', '1')")
+    leave_pull_note
 
     visit learn_path
 
     expect(page).to have_css("html:not(.pull-resuming)", visible: :all)
     expect(page.evaluate_script("getComputedStyle(document.querySelector('[data-pull-content]')).transform")).to eq("none")
-    expect(page.evaluate_script("sessionStorage.getItem('codegym:pull-refreshed') === null")).to be(true)
+    expect(page.evaluate_script(pull_note_absent_js)).to be(true)
   end
 
   it "leaves the note for the reloaded page when a pull reloads" do
@@ -363,7 +363,7 @@ RSpec.describe "Pull to refresh", type: :system do
     page.execute_script(<<~JS)
       const setItem = Storage.prototype.setItem;
       Storage.prototype.setItem = function (key, value) {
-        if (key === "codegym:pull-refreshed") window.name = "noted";
+        if (key === #{pull_note_key_js}) window.name = "noted";
         return setItem.call(this, key, value);
       };
     JS

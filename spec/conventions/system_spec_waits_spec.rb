@@ -62,7 +62,34 @@ RSpec.describe "Conventions held over system spec waits" do
     MESSAGE
   end
 
+  it "names the pull-refresh note's key only through JavascriptReadyHelper" do
+    key_shapes = [ /#{Regexp.escape(JavascriptReadyHelper::PULL_NOTE_KEY)}/, /sessionStorage\.(?:get|set|remove)Item\(\s*["']codegym:/ ]
+    offenders = offending_lines(Regexp.union(key_shapes))
+
+    expect(offenders).to be_empty, <<~MESSAGE
+      Pull-refresh note key written out in a system spec: #{offenders.join(', ')}.
+      Use pull_note_key_js, pull_note_absent_js or leave_pull_note from
+      JavascriptReadyHelper, which read the key from
+      app/assets/javascripts/code_gym_bootstrap.js (#527).
+    MESSAGE
+  end
+
   describe JavascriptReadyHelper do
+    it "reads the pull-refresh note key from code_gym_bootstrap.js" do
+      source = JavascriptReadyHelper::BOOTSTRAP_PATH.read
+
+      expect(source).to match(/^ *var PULL_NOTE = #{Regexp.escape(JavascriptReadyHelper::PULL_NOTE_KEY_JS)}$/)
+      expect(described_class.pull_note_key_in(%(  var PULL_NOTE = "a-renamed-note"\n))).to eq("a-renamed-note")
+      expect(described_class.pull_note_key_in(%(    var PULL_NOTE = "re-indented"\n))).to eq("re-indented")
+      expect(JavascriptReadyHelper::PULL_NOTE_ABSENT).to eq("sessionStorage.getItem(#{JavascriptReadyHelper::PULL_NOTE_KEY_JS}) === null")
+    end
+
+    it "raises when code_gym_bootstrap.js no longer declares its note key the way the helper reads it" do
+      [ "", %(  var PULL_NOTE = 'single-quoted'\n), %(  const PULL_NOTE = "renamed-binding"\n), %(  var PULL_REFRESH_NOTE = "renamed"\n) ].each do |source|
+        expect { described_class.pull_note_key_in(source) }.to raise_error(RuntimeError, /Found no `var PULL_NOTE = "\.\.\."` line/)
+      end
+    end
+
     it "reads the draft key from draft_store.js" do
       source = JavascriptReadyHelper::DRAFT_STORE_PATH.read
 
