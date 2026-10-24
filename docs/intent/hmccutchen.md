@@ -211,3 +211,6 @@ data.*
 - show a saved time zone in Settings even outside its existing choices `#522`
   **why:** Europe/London showed Detect automatically despite being a valid
   saved zone
+- stop automatic push registration undoing Turn off `#523`
+  **I decided:** Claude implements; the foreman does the final reviews.
+  Each issue gets its own PR, Copilot review and a green-CI merge.

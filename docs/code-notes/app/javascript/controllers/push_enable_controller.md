@@ -46,4 +46,6 @@ turning them off and on. `offerRepair` reveals the button only for `default`,
 names the device setting for `denied`, and stays silent for `granted`, where
 the launch re-subscribe in `push-launch` already registers the endpoint. The
 button runs the same `enable`, so the permission request is still its first
-statement; enrolment leaves a level that is already on unchanged.
+statement. Repair sends `enroll: false`, so it fixes this device's transport
+only: a level already on stays unchanged, and if another tab turned reminders
+off meanwhile, the server refuses with a sentence this controller shows.

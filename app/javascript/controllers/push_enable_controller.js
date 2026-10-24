@@ -84,7 +84,8 @@ export default class extends Controller {
       vapidKey: this.vapidKeyValue,
       registerPath: this.registerPathValue,
       knownEndpoints: this.knownEndpointsValue,
-      registerFailedText: this.registerFailedTextValue
+      registerFailedText: this.registerFailedTextValue,
+      enroll: !this.repairValue
     }
   }
 }

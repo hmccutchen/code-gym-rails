@@ -69,14 +69,27 @@ browser already granted. Turning reminders off clears both; anonymizing an
 account clears both, since a home-screen install keeps its browser-side
 subscription after the account is gone.
 
+**Only Turn on enrolls the account.** Its registration sends `enroll: true`;
+page-load registration and "Allow notifications on this device" only repair
+transport. Registration and Turn off both hold the user-row lock, so repair
+checks the latest intent before writing an endpoint. If Turn off committed
+first, repair returns 409 without changing anything; if registration ran
+first, Turn off removes its endpoint. Nudges keep their current level.
+Missing enrollment flags mean repair, including requests from an older open
+page. An old Turn on page therefore needs a reload; treating its unmarked
+request as enrollment would reopen the page-load race. An explicit Turn on
+can enroll again after Turn off; this does not add a version to arbitrate
+competing explicit choices across tabs.
+
 **The setting is one per account; permission is per install.** Removing the
 iOS Home Screen app and adding it again (which #373's new icons asked for)
 leaves `reminder_level` on but gives the new install no permission, and the
 launch re-subscribe cannot ask for one outside a tap, so it fails silently.
 The Account page therefore checks this device's `Notification.permission`
 while the account is on: `default` shows "Allow notifications on this
-device", the same permission request and enrolment as Turn on, which leaves
-the level as it was; `denied` names the device setting; `granted` shows
+device", the same permission request as Turn on, but it registers only this
+device (`enroll: false`), so it never changes the level and is refused once
+reminders are off; `denied` names the device setting; `granted` shows
 nothing, since the launch re-subscribe already registers the endpoint. The
 old install's endpoint keeps receiving until Apple refuses it and
 `PushDelivery` prunes it.

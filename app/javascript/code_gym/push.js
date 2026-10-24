@@ -32,12 +32,13 @@ async function subscribeReplacingAnotherKey(pushManager, key) {
 }
 
 // A 4xx and an expired session's redirect to /login must both reject, or a failed enrolment looks saved.
-async function register(subscription, { registerPath, registerFailedText }) {
+async function register(subscription, { registerPath, registerFailedText, enroll }) {
   const json = subscription.toJSON()
   const result = await request.send("POST", registerPath, {
     endpoint: json.endpoint,
     p256dh: json.keys.p256dh,
-    auth: json.keys.auth
+    auth: json.keys.auth,
+    enroll
   }, { fallback: registerFailedText })
   if (!result.ok) throw failure(result.message)
 
@@ -45,13 +46,13 @@ async function register(subscription, { registerPath, registerFailedText }) {
 }
 
 // subscribe() returns the existing subscription for the same key, so this doubles as "get the current endpoint".
-export async function subscribeAndRegister({ vapidKey, registerPath, knownEndpoints, registerFailedText }) {
+export async function subscribeAndRegister({ vapidKey, registerPath, knownEndpoints, registerFailedText, enroll = false }) {
   await navigator.serviceWorker.register("/service-worker.js")
   const registration = await navigator.serviceWorker.ready
   const subscription = await subscribeReplacingAnotherKey(registration.pushManager, applicationServerKey(vapidKey))
   if (knownEndpoints.indexOf(subscription.endpoint) !== -1) return null
 
-  return register(subscription, { registerPath, registerFailedText })
+  return register(subscription, { registerPath, registerFailedText, enroll })
 }
 
 export default { supported, failure, subscribeAndRegister }

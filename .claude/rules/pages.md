@@ -76,3 +76,5 @@ read it before changing that area.
   `WebPushCredentials` decides whether push exists, endpoints stay on
   `ALLOWED_ENDPOINT_HOSTS`, and `Notification.requestPermission()` must be the
   click handler's first synchronous call. The nudges switch saves on change.
+  Only Turn on posts `enroll: true`; launch and device repair never turn a
+  level on, and registration and Turn off share the user-row lock.

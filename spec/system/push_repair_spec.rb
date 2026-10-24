@@ -39,6 +39,38 @@ RSpec.describe "Allowing notifications on a device after reminders are already o
     expect(user.push_subscriptions.reload.pluck(:endpoint)).to eq([ old_endpoint ])
   end
 
+  it "does not undo Turn off from another tab while device permission was pending" do
+    stub_push_apis(permission: "default")
+    visit_as(user)
+    visit account_path
+    wait_for_js
+    user.with_lock do
+      user.push_subscriptions.destroy_all
+      user.update!(reminder_level: :none)
+    end
+
+    click_button I18n.t("accounts.push_reminders.repair_button")
+
+    expect(page).to have_text(I18n.t("accounts.push_reminders.registration_unavailable"))
+    expect(user.reload.reminders_none?).to be(true)
+    expect(user.push_subscriptions).to be_empty
+  end
+
+  it "turns reminders on from the explicit enrollment button" do
+    user.update!(reminder_level: :none)
+    user.push_subscriptions.destroy_all
+    stub_push_apis(permission: "default")
+    visit_as(user)
+    visit account_path
+    wait_for_js
+
+    click_button I18n.t("accounts.push_reminders.turn_on")
+
+    expect(page).to have_text(I18n.t("accounts.push_reminders.enabled"))
+    expect(user.reload.reminders_ready?).to be(true)
+    expect(user.push_subscriptions.reload.pluck(:endpoint)).to eq([ new_endpoint ])
+  end
+
   it "offers nothing on a device that already allowed notifications" do
     stub_push_apis(permission: "granted")
     visit_as(user)
