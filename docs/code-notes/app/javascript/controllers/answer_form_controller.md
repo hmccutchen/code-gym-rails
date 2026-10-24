@@ -127,13 +127,14 @@ Every edit writes the answers and ratings to `code_gym/draft_store` with the
 draft token the copy was built on (the one the server rendered, or the one the
 last save reply carried), the draft scope, and this tab's unconfirmed saves.
 All tabs share one copy, and the last tab to edit owns it: an edit replaces the
-whole copy, its list included, so a copy is always one tab's complete view. On connect, `restoreDraft()` puts a copy back when its
-token equals the page's token, meaning the server's saved answers are still
-exactly the ones the copy started from, or in the one case described below,
-when a save landed but its reply didn't. Anything else (another day, a
-regenerated set, a Start over, or a save from another tab or device that isn't
-in the copy's list) deletes it.
-The token is a digest of the saved answers and ratings, not `updated_at`,
+whole copy, its list included, so a copy is always one tab's complete view.
+
+On connect, `restoreDraft()` puts a copy back when its token equals the
+page's token, meaning the server's saved answers are still exactly the ones
+the copy started from, or in the one case described below, when a save landed
+but its reply didn't. Anything else (another day, a regenerated set, a Start
+over, or a save from another tab or device that isn't in the copy's list)
+deletes it. The token is a digest of the saved answers and ratings, not `updated_at`,
 because a pseudocode round writes the same row without touching the answers.
 
 A restored field is skipped when its value already differs from what the
