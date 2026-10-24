@@ -18,6 +18,15 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".key" do
+    it "derives each kind's key once and hands back the same frozen string, since every answer check looks kinds up by it" do
+      described_class.all.each do |kind|
+        expect(kind.key).to equal(kind.key)
+        expect(kind.key).to be_frozen
+      end
+    end
+  end
+
   describe ".find" do
     it "resolves a key to its section kind" do
       expect(described_class.find("architecture")).to eq(ExerciseSection::Architecture)

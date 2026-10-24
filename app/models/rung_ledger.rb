@@ -4,7 +4,7 @@ class RungLedger
 
   # Exercises load whole because their problem_set holds the rungs.
   def self.for(user)
-    new(user.daily_responses.submitted.select(*RESPONSE_COLUMNS).preload(:daily_exercise).order(date: :desc))
+    new(user.daily_responses.submitted.with_ai_ratings_only(*RESPONSE_COLUMNS).preload(:daily_exercise).order(date: :desc))
   end
 
   def initialize(responses)

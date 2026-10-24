@@ -107,7 +107,7 @@ class ExerciseSection
 
   class << self
     def key
-      name.demodulize.underscore
+      @key ||= name.demodulize.underscore.freeze
     end
 
     def fourth?

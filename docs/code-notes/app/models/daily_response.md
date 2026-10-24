@@ -120,3 +120,16 @@ takes an Arel node for the section key and tests
 `jsonb_typeof(ai_review -> section) = 'object'`, which is what
 `#section_reviewed?`'s `is_a?(Hash)` reads. `JudgeSolve.readable` uses it, and
 `judge_solve_spec` compares the two across response states.
+
+## `.with_ai_ratings_only`
+
+Loads the given columns with `ai_review` cut down to each
+section's `AI_RATING_FIELD`, the one field `#ai_rating_for` reads. A caller
+that reads any other part of the review can't use it: difficulty, prose and
+rubric checks come back missing. `#reviewed?` and `#section_reviewed?` still
+answer as they would on the stored review, since an object section stays an
+object, even when it had no rating. A review or section that isn't an object
+passes through as stored, so the error it raised before still raises. The
+rows are read-only, so a trimmed review is never saved over the stored one.
+`RungLedger.for` uses it (#518), and `daily_response_ai_ratings_only_spec`
+compares it with the stored column across those shapes.
