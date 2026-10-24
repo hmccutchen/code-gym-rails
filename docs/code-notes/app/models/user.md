@@ -167,3 +167,19 @@ it returns true.
 
 It skips an account with no keys map, since anonymized and trial accounts can
 name a provider while holding no keys.
+
+## `#concept_exposure_index`
+
+Each key holds a `Set` of dates rather than an array built with
+`array |= [date]`. The union form rescans the whole array for every concept
+tag, so the cost grows with the square of the account's age — the same
+concept is re-tagged for reinforcement, drills and retention checks, so one
+key really does collect a date per submitted day. On 500 submitted days the
+build measured 47ms, of which 33ms was that rescan; the `Set` form measured
+4.6ms. Every page that asks `#first_exposure?` or shows the featured
+concept's "seen N times" pays this, so it is on the dashboard, `/history`
+and `/learn`.
+
+The dates stay unique because one day can tag a concept on two sections.
+`#concept_exposure_count` counts that day once, which
+`spec/models/user_spec.rb` pins; a plain array with `<<` would break it.
