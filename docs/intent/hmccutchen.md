@@ -157,8 +157,8 @@ data.*
 
 ## Fri Oct 23
 
-- back to passwordless sign-in: take Devise out and restore the emailed code as
-  the only first factor, spec first `#491`
+- back to passwordless sign-in: take Devise out, the emailed code the only
+  first factor `#491`
   **why:** I want no password column ever, with an authenticator app as an
   optional second factor later
   **I decided:** open sign-up exactly as before, with the account created when
@@ -168,8 +168,7 @@ data.*
   post publicly
 - from my layered review: the login code out of the job queue, and one
   signed-in lookup
-- an optional authenticator app as a second sign-in factor, spec and plan
-  first, stacked on the passwordless PR `#493`
+- an optional authenticator app as a second sign-in factor `#493`
   **why:** possession of a phone is the second factor worth having, and the
   inbox alone is all that protects an account today
   **I decided:** a daily cap of 20 wrong codes; every wrong-code count kept on
@@ -182,7 +181,7 @@ data.*
   takes session values; spec and plan docs dropped; extraction is an issue
 - every PR gets a critical and a layered-design review, each by a separate
   agent `#492`
-  **I decided:** a fresh agent checks each finding before anything changes
+  **I decided:** a fresh agent checks findings before anything changes
 - the test rules say CI runs on Postgres 18
 - locked out after turning on the authenticator: stop a double tap posting
   the sign-in forms twice `#495`
@@ -190,8 +189,9 @@ data.*
   said it was wrong, and the home-screen app ended on a 404
   **I decided:** Turn on and New recovery codes start disabled; the server
   accepts a repeat of a sign-in this browser just completed
-- the cost of each API call on its usage row, for Anthropic keys only for now
-  `#472`
+- the cost of each API call on its usage row, Anthropic keys only `#472`
   **I decided:** Gemini and OpenAI costs stay null; prices stay on the
   providers; the design doc dropped; a timeout costs null
 - the Account usage card in dollars `#497`
+- the authenticator in place of the emailed code `#496`, not on main yet
+- the system spec that flaked on CI `#499`
