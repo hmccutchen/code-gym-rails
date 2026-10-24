@@ -127,11 +127,40 @@ RSpec.describe "Accounts", type: :request do
 
         expect(card.at_css(".api-usage-label").text.strip).to eq("Spent in October")
         expect(card.at_css(".api-usage-total").text.strip).to eq("$2.40")
-        expect(card.at_css(".api-usage-projected").text.strip).to eq("On pace for about $4.40 this month")
+        expect(card.at_css(".api-usage-projected")).to be_nil
         expect(rows).to eq([ [ "Claude", "$2.40" ], [ "Gemini", "1 request · not priced" ] ])
-        expect(card.at_css(".api-usage-unpriced").text.strip).to eq("2 requests have no price yet.")
+        expect(card.at_css(".api-usage-unpriced").text.strip).to eq("2 requests aren't priced.")
         expect(card.at_css(".api-usage-note").text.strip).to eq("Estimated from list prices. Your provider's console shows the exact bill.")
         expect(card.css("table")).to be_empty
+      end
+    end
+
+    it "shows the projection when every provider has priced spend" do
+      travel_to Time.utc(2026, 10, 18, 12) do
+        user = create_user_with_key(time_zone: "America/New_York")
+        usage(user, cost_usd: "1.50")
+        usage(user, cost_usd: "0.90")
+        usage(user, failure: "timeout")
+        login_as(user)
+
+        get account_path
+
+        expect(card.at_css(".api-usage-projected").text.strip).to eq("On pace for about $4.40 this month")
+        expect(card.at_css(".api-usage-unpriced").text.strip).to eq("1 request isn't priced.")
+      end
+    end
+
+    it "holds the projection back while generation is paused" do
+      travel_to Time.utc(2026, 10, 18, 12) do
+        user = create_user_with_key(time_zone: "America/New_York")
+        user.update!(paused_generation_at: Time.current)
+        usage(user, cost_usd: "1.50")
+        login_as(user)
+
+        get account_path
+
+        expect(card.at_css(".api-usage-total").text.strip).to eq("$1.50")
+        expect(card.at_css(".api-usage-projected")).to be_nil
       end
     end
 

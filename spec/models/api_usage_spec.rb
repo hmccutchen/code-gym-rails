@@ -61,6 +61,11 @@ RSpec.describe ApiUsage, type: :model do
       ])
     end
 
+    it "calls a total priced when it has a cost, even $0, and not when the cost is nil" do
+      expect(ApiUsage::ProviderTotal.new(provider: "anthropic", requests: 1, cost_usd: BigDecimal("0"), unpriced_requests: 0).priced?).to be(true)
+      expect(ApiUsage::ProviderTotal.new(provider: "gemini", requests: 1, cost_usd: nil, unpriced_requests: 1).priced?).to be(false)
+    end
+
     it "counts a timeout's null cost as unpriced and a network error's zero cost as priced" do
       usage(failure: "timeout", cost_usd: nil)
       usage(failure: "network", cost_usd: 0)

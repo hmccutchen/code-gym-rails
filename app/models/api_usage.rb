@@ -12,7 +12,9 @@ class ApiUsage < ApplicationRecord
 
   scope :failed, -> { where.not(failure: nil) }
 
-  ProviderTotal = Data.define(:provider, :requests, :cost_usd, :unpriced_requests)
+  ProviderTotal = Data.define(:provider, :requests, :cost_usd, :unpriced_requests) do
+    def priced? = !cost_usd.nil?
+  end
 
   # House-key rows are left out: a trial's calls were not billed to the account's own key.
   def self.own_key_totals(user, since:)

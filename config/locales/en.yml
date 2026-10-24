@@ -849,8 +849,8 @@ en:
         one: "1 request · not priced"
         other: "%{count} requests · not priced"
       unpriced_note:
-        one: "1 request has no price yet."
-        other: "%{count} requests have no price yet."
+        one: "1 request isn't priced."
+        other: "%{count} requests aren't priced."
       note: "Estimated from list prices. Your provider's console shows the exact bill."
     push_reminders:
       enabled: "Daily reminders are on. You'll get a notification when each weekday's set is ready."

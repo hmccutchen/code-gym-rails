@@ -1,11 +1,15 @@
 require "rails_helper"
 
 RSpec.describe MonthlySpend do
-  let(:total_class) { Data.define(:provider, :requests, :cost_usd, :unpriced_requests) }
+  let(:total_class) do
+    Data.define(:provider, :requests, :cost_usd, :unpriced_requests) do
+      def priced? = !cost_usd.nil?
+    end
+  end
 
   def priced(cost, provider: "anthropic", unpriced: 0) = total_class.new(provider:, requests: 1 + unpriced, cost_usd: BigDecimal(cost.to_s), unpriced_requests: unpriced)
   def unpriced(count, provider: "gemini") = total_class.new(provider:, requests: count, cost_usd: nil, unpriced_requests: count)
-  def spend(*totals, on: Date.new(2026, 10, 23)) = described_class.new(totals: totals, today: on)
+  def spend(*totals, on: Date.new(2026, 10, 23), paused: false) = described_class.new(totals: totals, today: on, paused: paused)
 
   it "sums the priced providers and skips unpriced ones" do
     result = spend(priced("4.00"), unpriced(2), priced("0.12", provider: "openai"))
@@ -31,6 +35,24 @@ RSpec.describe MonthlySpend do
 
   it "projects by weekdays: spend ÷ weekdays elapsed × weekdays in the month" do
     expect(spend(priced("4.12")).projected.round(2)).to eq(BigDecimal("5.33"))
+  end
+
+  it "hides the projection while generation is paused" do
+    result = described_class.new(totals: [ priced("4.12") ], today: Date.new(2026, 10, 23), paused: true)
+
+    expect(result.projected).to be_nil
+    expect(result.total).to eq(BigDecimal("4.12"))
+  end
+
+  it "hides the projection when any provider has no priced rows" do
+    result = spend(priced("1.20"), unpriced(3))
+
+    expect(result.projected).to be_nil
+    expect(result.total).to eq(BigDecimal("1.20"))
+  end
+
+  it "still projects a partly priced provider" do
+    expect(spend(priced("4.12", unpriced: 2)).projected.round(2)).to eq(BigDecimal("5.33"))
   end
 
   it "hides the projection on the 1st to the 3rd" do

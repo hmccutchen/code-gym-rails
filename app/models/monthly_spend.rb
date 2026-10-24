@@ -3,23 +3,24 @@ class MonthlySpend
 
   attr_reader :providers
 
-  def initialize(totals:, today:)
+  def initialize(totals:, today:, paused: false)
     @providers = totals
     @today = today
+    @paused = paused
   end
 
   def priced?
-    providers.any?(&:cost_usd)
+    providers.any?(&:priced?)
   end
 
   def total
     return unless priced?
 
-    providers.filter_map(&:cost_usd).sum
+    providers.select(&:priced?).sum(&:cost_usd)
   end
 
   def projected
-    return unless priced? && @today.day > HIDDEN_DAYS
+    return unless projectable?
 
     total / weekdays(@today.beginning_of_month..@today) * weekdays(@today.all_month)
   end
@@ -33,6 +34,10 @@ class MonthlySpend
   end
 
   private
+
+  def projectable?
+    !@paused && priced? && providers.all?(&:priced?) && @today.day > HIDDEN_DAYS
+  end
 
   def weekdays(range)
     range.count(&:on_weekday?)
