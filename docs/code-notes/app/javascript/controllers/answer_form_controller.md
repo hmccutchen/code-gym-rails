@@ -175,11 +175,13 @@ Nothing merges two tabs' lists: each merge rule tried here let one tab's
 answers be restored over a save another tab had committed. The cost is that
 two tabs showing identical answers can lose one tab's unconfirmed save, as
 before. A restored copy hands its list to the page
-(`takeOverUnconfirmedSaves()`) only when the restored screen equals the
-copy exactly, so a save still on the wire through one reload stays in the
-list for the next. If an edit typed before the controller connected was
-kept, the screen is no longer the copy's, so the page starts with an empty
-list.
+(`takeOverUnconfirmedSaves()`), so a save still on the wire through one
+reload stays in the list for the next. The exception is a restore that kept
+an edit typed before the controller connected: a field whose value differs
+from both what the server rendered and the copy. The screen is then this
+tab's own, so the page starts with an empty list. A field restore never
+touches, such as Parsons, doesn't count, since the copy's list is still the
+saves of the answers it restored.
 
 `rendersUnconfirmedSave()` then restores a copy whose token is out of date
 when its scope is the page's and the answers and ratings the server rendered

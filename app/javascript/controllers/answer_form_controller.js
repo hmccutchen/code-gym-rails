@@ -79,21 +79,24 @@ export default class extends Controller {
       draftStore.clear()
       return false
     }
+    let keptEarlyEdit = false
     this.textareas.filter((area) => area.dataset.draftRestore !== "off").forEach((area) => {
       const saved = draft.answers?.[area.dataset.field]
-      if (typeof saved !== "string" || area.value !== area.defaultValue) return
+      if (typeof saved !== "string") return
+      if (area.value !== area.defaultValue) {
+        if (area.value !== saved) keptEarlyEdit = true
+        return
+      }
       area.value = saved
       area.dispatchEvent(new CustomEvent("answer-form:restored", { bubbles: true }))
     })
     Object.entries(draft.ratings || {}).forEach(([section, rating]) => this.showRating(section, rating))
-    this.takeOverUnconfirmedSaves(draft)
+    if (!keptEarlyEdit) this.takeOverUnconfirmedSaves(draft)
     return true
   }
 
   takeOverUnconfirmedSaves(draft) {
     if (draft.scope !== this.draftScopeValue || !Array.isArray(draft.sent)) return
-    const { answers, section_ratings } = this.payload().response
-    if (canonicalDraft(answers, section_ratings) !== canonicalDraft(draft.answers, draft.ratings)) return
     this.unconfirmedSaves = draft.sent.slice(-UNCONFIRMED_SAVES_KEPT)
   }
 
