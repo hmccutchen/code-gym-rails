@@ -57,10 +57,10 @@ unconfirmed saves. All tabs share one copy, and the last tab to edit owns it:
 an edit replaces the whole copy, its list included, so a copy is always one
 tab's complete view.
 
-On connect, `restorable()` returns the stored copy when its token equals the
-page's token, meaning the server's saved answers are still exactly the ones
-the copy started from, or in the one case described below, when a save landed
-but its reply didn't. Anything else (another day, a regenerated set, a Start
+On connect, `restorable()` returns the stored answers and ratings, and only
+those, when the copy's token equals the page's token, meaning the server's
+saved answers are still exactly the ones the copy started from, or in the one
+case described below, when a save landed but its reply didn't. Anything else (another day, a regenerated set, a Start
 over, or a save from another tab or device that isn't in the copy's list)
 deletes it. The token is a digest of the saved answers and ratings, not
 `updated_at`, because a pseudocode round writes the same row without touching
@@ -99,12 +99,13 @@ The list only ever holds the saves of the tab whose answers the copy holds.
 Nothing merges two tabs' lists: each merge rule tried here let one tab's
 answers be restored over a save another tab had committed. The cost is that
 two tabs showing identical answers can lose one tab's unconfirmed save, as
-before. A restored copy hands its list on (`takeOverUnconfirmedSaves()`), so
-a save still on the wire through one reload stays in the list for the next.
+before. After a restore, `takeOverUnconfirmedSaves()` adopts the restored
+copy's list, so a save still on the wire through one reload stays in the list
+for the next.
 The answer form skips that hand-over when the restore kept an edit typed
 before it connected; its code note says why.
 
-`rendersUnconfirmedSave()` then lets `restorable()` return a copy whose token
+`rendersUnconfirmedSave()` then lets `restorable()` restore a copy whose token
 is out of date when its scope is the page's and the answers and ratings the
 server rendered equal one of those saves. The server holds that save, so the
 copy's later edits go back on top of it. Any other mismatch still deletes the

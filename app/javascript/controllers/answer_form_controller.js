@@ -78,7 +78,7 @@ export default class extends Controller {
       area.dispatchEvent(new CustomEvent("answer-form:restored", { bubbles: true }))
     })
     Object.entries(draft.ratings || {}).forEach(([section, rating]) => this.showRating(section, rating))
-    if (!keptEarlyEdit) this.draft.takeOverUnconfirmedSaves(draft)
+    if (!keptEarlyEdit) this.draft.takeOverUnconfirmedSaves()
     return true
   }
 

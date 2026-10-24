@@ -131,8 +131,8 @@ ratings on screen (`onScreen()`) on every edit and every save attempt, and
 the ones the server rendered (`rendered()`, the textareas' `defaultValue`)
 when it connects. The controller keeps the parts that touch the page.
 
-`restoreDraft()` asks the copy for a restorable stored copy and puts it into
-the fields. A restored field is skipped when its value already differs from
+`restoreDraft()` asks the copy for the stored answers and ratings it may
+restore and puts them into the fields. A restored field is skipped when its value already differs from
 what the server rendered, since that is text typed before the controller
 connected. A field marked `data-draft-restore="off"` is never restored, so a
 kind opts out in its own answer partial rather than here. Parsons does: its
@@ -174,10 +174,10 @@ when the last write to `draft_store` succeeded (the copy's `kept`). With storage
 blocked or full, the retry shows the generic failure and an offline submit
 the generic submit failure.
 
-## Clearing another tab's copy
+## Clearing the copy
 
-Every tab on the dashboard shares one stored copy, so a save reply and a stale
-refusal clear it only through the copy's own checks (`settle` and
-`clearOwn`), which leave a newer tab's copy alone. A successful submit, and a
-reply saying the day is already submitted, clear it whoever wrote it
-(`discard`), since the day is finished.
+A stale refusal clears the copy only if this tab owns it (`clearOwn`), and an
+ok save reply clears it inside `settle`; `draft_store.md` says why both leave
+a newer tab's copy alone. A successful submit, and a reply saying the day is
+already submitted, clear it whoever wrote it (`discard`), since the day is
+finished.

@@ -42,6 +42,7 @@ export default class DraftCopy {
     this.scope = scope
     this.unconfirmedSaves = []
     this.lastSent = null
+    this.restored = null
     this.kept = false
   }
 
@@ -51,7 +52,8 @@ export default class DraftCopy {
       clear()
       return null
     }
-    return draft
+    this.restored = draft
+    return { answers: draft.answers, ratings: draft.ratings }
   }
 
   rendersUnconfirmedSave(draft, rendered) {
@@ -59,8 +61,9 @@ export default class DraftCopy {
     return draft.sent.includes(canonicalDraft(rendered))
   }
 
-  takeOverUnconfirmedSaves(draft) {
-    if (draft.scope !== this.scope || !Array.isArray(draft.sent)) return
+  takeOverUnconfirmedSaves() {
+    const draft = this.restored
+    if (draft?.scope !== this.scope || !Array.isArray(draft.sent)) return
     this.unconfirmedSaves = draft.sent.slice(-UNCONFIRMED_SAVES_KEPT)
   }
 
