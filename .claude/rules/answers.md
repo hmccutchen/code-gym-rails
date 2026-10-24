@@ -1,7 +1,7 @@
 ---
 paths:
   - "app/controllers/{responses,dashboard,daily_exercises}_controller.rb"
-  - "app/models/{daily_response,daily_exercise}.rb"
+  - "app/models/{daily_response,daily_exercise,concept_exposure_index}.rb"
   - "app/models/exercise_section/**"
   - "app/helpers/{answer_scaffolds,section_status}_helper.rb"
   - "app/views/responses/**"

@@ -3,7 +3,7 @@ paths:
   - "app/models/{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,reviewed_section_results,weighted_roll,generation_ladders}.rb"
   - "app/models/competency_gate/**"
   - "app/models/coverage_exception/**"
-  - "app/models/{concept_mastery,kind_preferences,kind_difficulty,concept_drills,concept_hosts,ladder_coverage,exercise_history_entry,user,daily_exercise}.rb"
+  - "app/models/{concept_mastery,kind_preferences,kind_difficulty,concept_drills,concept_hosts,ladder_coverage,exercise_history_entry,user,daily_exercise,concept_exposure_index}.rb"
   - "app/controllers/{concept_drills,accounts,profile,api_keys}_controller.rb"
   - "app/forms/profile_update.rb"
   - "app/controllers/concerns/exercise_mix_ladders.rb"

@@ -1,3 +1,4 @@
+# Design notes: docs/code-notes/app/models/concept_exposure_index.md
 class ConceptExposureIndex
   def self.for(user)
     dates = Hash.new { |hash, key| hash[key] = Set.new }
