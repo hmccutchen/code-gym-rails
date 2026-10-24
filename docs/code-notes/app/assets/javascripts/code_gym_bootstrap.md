@@ -189,3 +189,8 @@ The same spec types an answer on the dashboard in that window and expects it
 counted as pending and then saved, which is the early-edit recorder's job. It
 also clicks Submit in that window and expects nothing to be posted, since the
 button is not a submit button until `answer_form_controller` connects.
+
+System specs read the pull-refresh note key from the two-space-indented
+`var PULL_NOTE = "..."` line (`JavascriptReadyHelper.pull_note_key_in`), and the suite refuses to load
+if that line changes shape, so a rename or restyle of it updates the helper
+too (#527).
