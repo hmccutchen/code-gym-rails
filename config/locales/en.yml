@@ -905,6 +905,9 @@ en:
     edit:
       title: "Settings"
       heading: "Add your API key"
+      connection_heading: "Connection"
+      your_day_heading: "Your day"
+      connection_save_tag: "Tap Save to apply"
       intro: "Your key is encrypted at rest and only used to generate your personal exercise sets and reviews. Usage is tracked per-user for transparency."
       trial_note:
         title: "You're on a trial"

@@ -319,7 +319,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     watch_page_errors
     visit_as(user)
     visit setup_path
-    expect(page).to have_css("#skill-level")
+    expect(page).to have_css("#skill-level", visible: :all)
 
     reload_with_modules_stalled do |pw|
       pw.evaluate(<<~JS)

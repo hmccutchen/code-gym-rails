@@ -55,7 +55,7 @@ RSpec.describe "Exercise mix", type: :system do
     find("#exercise-mix summary").click
 
     heights = page.evaluate_script(<<~JS)
-      Array.from(document.querySelectorAll(".mix-exclude, .mix-lock, .mix-difficulty label, .daily-sections label"))
+      Array.from(document.querySelectorAll(".mix-exclude, .mix-lock, .mix-difficulty label, #daily-sections .segment"))
         .map(label => label.getBoundingClientRect().height)
     JS
 
@@ -110,7 +110,7 @@ RSpec.describe "Exercise mix", type: :system do
     wait_for { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
     user.update!(daily_section_kinds: %w[code_review challenge])
     level = (User::SKILL_LEVELS - [ user.skill_level ]).first
-    find("#skill-level").select(I18n.t("exercise_mix.levels.#{level}"))
+    find("#skill-level", visible: :all).select(I18n.t("exercise_mix.levels.#{level}"), visible: :all)
     page.execute_script("window.releaseMixSave()")
 
     expect(page).to have_no_css("#weight-challenge")
@@ -138,12 +138,12 @@ RSpec.describe "Exercise mix", type: :system do
     user.update!(daily_section_kinds: %w[code_review challenge])
     stored = user.skill_level
     level = (User::SKILL_LEVELS - [ stored ]).first
-    find("#skill-level").select(I18n.t("exercise_mix.levels.#{level}"))
+    find("#skill-level", visible: :all).select(I18n.t("exercise_mix.levels.#{level}"), visible: :all)
     page.execute_script("window.releaseMixSave()")
 
     expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))
     expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
-    expect(find("#skill-level").value).to eq(level)
+    expect(find("#skill-level", visible: :all).value).to eq(level)
     expect(user.reload.skill_level).to eq(stored)
 
     page.execute_script("window.releaseMixSave = null; window.CodeGymSaveStatus.clear('exercise_mix')")
@@ -153,7 +153,7 @@ RSpec.describe "Exercise mix", type: :system do
 
     expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))
     expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
-    expect(find("#skill-level").value).to eq(level)
+    expect(find("#skill-level", visible: :all).value).to eq(level)
   end
 
   it "keeps the page when another control's save failed before the swapped-layout reply arrived" do
@@ -170,14 +170,14 @@ RSpec.describe "Exercise mix", type: :system do
       };
     JS
 
-    find("#tz-select").select(I18n.t("api_keys.edit.time_zones.hawaii"))
+    find("#tz-select", visible: :all).select(I18n.t("api_keys.edit.time_zones.hawaii"), visible: :all)
     expect(page).to have_css("#save-status:not([hidden])")
     user.update!(daily_section_kinds: %w[code_review challenge])
     find("#weight-architecture").set(0)
 
     expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))
     expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
-    expect(find("#tz-select").value).to eq("Pacific/Honolulu")
+    expect(find("#tz-select", visible: :all).value).to eq("Pacific/Honolulu")
   end
 
   it "leaves the reload to the user when a save queued behind the swapped-layout reply never finishes" do
@@ -200,7 +200,7 @@ RSpec.describe "Exercise mix", type: :system do
     find("#weight-architecture").set(0)
     wait_for { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
     user.update!(daily_section_kinds: %w[code_review challenge])
-    find("#skill-level").select(I18n.t("exercise_mix.levels.#{(User::SKILL_LEVELS - [ user.skill_level ]).first}"))
+    find("#skill-level", visible: :all).select(I18n.t("exercise_mix.levels.#{(User::SKILL_LEVELS - [ user.skill_level ]).first}"), visible: :all)
     page.execute_script("window.releaseMixSave()")
 
     expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))

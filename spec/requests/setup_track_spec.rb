@@ -31,7 +31,7 @@ RSpec.describe "Setup's track control", type: :request do
       expect(link["target"]).to eq("_blank")
       expect(link["rel"]).to eq("noopener")
     end
-    expect(page_html.css(".setup-wrap .key-guide, .setup-wrap form").first).to eq(guide)
+    expect(page_html.css(".phone-page .key-guide, .phone-page form").first).to eq(guide)
   end
 
   it "hides the guide from an account with a key of its own, and from one with a set" do

@@ -21,7 +21,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     find("#exercise-mix summary").click
     page.execute_script("window.sameDocument = true")
 
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
 
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
     expect(find('[data-profile-preferences-target="keptOwnLevel"]').text).to include("Senior", "Junior, locked")
@@ -45,7 +45,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     find("#exercise-mix summary").click
 
     find(".mix-difficulty[data-kind='code_review'] input[value='senior']").click
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
 
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
     wait_for { user.reload.section_kind_levels["code_review"] == "senior" }
@@ -61,7 +61,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     find("#exercise-mix summary").click
 
     find(".mix-difficulty[data-kind='security_review'] .mix-lock-box").click
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
 
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Security")
     wait_for { user.reload.locked_section_kinds.include?("security_review") }
@@ -80,7 +80,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       slider.value = 0;
       slider.dispatchEvent(new Event("input", { bubbles: true }));
     JS
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
 
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
     wait_for { user.reload.section_kind_weights == { "security_review" => 0.25 } }
@@ -94,7 +94,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     visit_as(user)
     visit setup_path(suggested: [ "code_review" ], suggested_level: "mid_level")
 
-    find("#skill-level").select("Senior")
+    find("#skill-level", visible: :all).select("Senior", visible: :all)
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Challenge")
     find(".mix-difficulty[data-kind='code_review'] input[value='mid_level']").click
 
@@ -124,7 +124,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
 
     find(".mix-difficulty[data-kind='code_review'] input[value='senior']").click
     sleep 0.6
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
 
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
     expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all)
@@ -149,7 +149,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
 
     find(".mix-difficulty[data-kind='code_review'] input[value='senior']").click
     sleep 0.6
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
 
     expect(page).to have_css("#save-status", text: /couldn't save/i)
     wait_for { user.reload.section_kind_levels["code_review"] == "senior" }
@@ -173,7 +173,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       };
     JS
 
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
 
     expect(page).to have_css("#mix-ladder-preparation button[disabled]", visible: :all)
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
@@ -195,7 +195,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       };
     JS
 
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
     sleep 0.3
     find(".mix-difficulty[data-kind='security_review'] .mix-lock-box").click
 
@@ -232,7 +232,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       slider.value = 0;
       slider.dispatchEvent(new Event("input", { bubbles: true }));
     JS
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
     find(".mix-difficulty[data-kind='design_comparison'] input[value='mid_level']").click
 
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
@@ -269,7 +269,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       slider.dispatchEvent(new Event("input", { bubbles: true }));
     JS
     sleep 0.6
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
     find(".mix-difficulty[data-kind='design_comparison'] input[value='mid_level']").click
 
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
@@ -296,15 +296,15 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       };
     JS
 
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
     sleep 0.2
     page.execute_script(<<~JS)
       const slider = document.querySelector("#weight-security_review");
       slider.value = 0;
       slider.dispatchEvent(new Event("input", { bubbles: true }));
     JS
-    expect(page).to have_css("#skill-level:not([disabled])")
-    find("#skill-level").select("Senior")
+    expect(page).to have_css("#skill-level:not([disabled])", visible: :all)
+    find("#skill-level", visible: :all).select("Senior", visible: :all)
 
     wait_for { user.reload.skill_level == "senior" && user.section_kind_weights.present? }
     sleep 1
@@ -341,7 +341,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     page.execute_script(%(moveSlider("0")))
     sleep 0.6
     page.execute_script(%(moveSlider("default")))
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
 
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
     wait_for { user.reload.skill_level == "mid_level" }
@@ -377,7 +377,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     sleep 0.6
     find(".mix-difficulty[data-kind='design_comparison'] input[value='senior']").click
     sleep 0.6
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
 
     expect(page).to have_css('[data-profile-preferences-target="keptOwnLevel"]', text: "Pattern")
     wait_for { user.reload.skill_level == "mid_level" }
@@ -411,10 +411,10 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
     page.execute_script(%(moveSlider("0")))
     sleep 0.6
     page.execute_script(%(moveSlider("1")))
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
     page.execute_script(%(moveSlider("0")))
-    expect(page).to have_css("#skill-level:not([disabled])")
-    find("#skill-level").select("Senior")
+    expect(page).to have_css("#skill-level:not([disabled])", visible: :all)
+    find("#skill-level", visible: :all).select("Senior", visible: :all)
 
     wait_for { user.reload.skill_level == "senior" }
     sleep 1.5
@@ -443,8 +443,8 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       select.dispatchEvent(new Event("change", { bubbles: true }));
     JS
 
-    expect(page).to have_css("#skill-level[disabled]")
-    expect(page).to have_css("#skill-level:not([disabled])")
+    expect(page).to have_css("#skill-level[disabled]", visible: :all)
+    expect(page).to have_css("#skill-level:not([disabled])", visible: :all)
     expect(page.evaluate_script(%(document.activeElement.id))).to eq("skill-level")
     expect(user.reload.skill_level).to eq("mid_level")
   end
@@ -469,7 +469,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       document.getElementById("weight-security_review").focus();
     JS
 
-    expect(page).to have_css("#skill-level:not([disabled])")
+    expect(page).to have_css("#skill-level:not([disabled])", visible: :all)
     expect(page.evaluate_script(%(document.activeElement.id))).to eq("weight-security_review")
   end
 
@@ -485,10 +485,10 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       };
     JS
 
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
 
     expect(page).to have_css("#save-status", text: /couldn't save/i)
-    expect(page).to have_css("#skill-level:not([disabled])")
+    expect(page).to have_css("#skill-level:not([disabled])", visible: :all)
     expect(user.reload.skill_level).to eq("junior")
   end
 
@@ -507,7 +507,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
       };
     JS
 
-    find("#skill-level").select("Mid-level")
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
     find(".mix-difficulty[data-kind='security_review'] input[value='senior']").click
     find(".mix-difficulty[data-kind='security_review'] input[value='junior']").click
 

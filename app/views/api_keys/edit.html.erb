@@ -1,17 +1,16 @@
 <%# Design notes: docs/code-notes/app/views/api_keys/edit.html.md %>
 <% page_title t("api_keys.edit.title") %>
 <style>
-  .setup-wrap { max-width: 480px; margin: 5rem auto; }
-  .setup-wrap h1 { margin-bottom: .5rem; }
-  .setup-wrap p  { color: var(--muted); margin-bottom: 2rem; }
+  :where(#exercise-mix, #display-preferences) p:not(.card-note) { color: var(--muted); margin-bottom: 2rem; }
   .form-field { margin-bottom: 1rem; }
   .form-field label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
   .form-field input:not([type="checkbox"], [type="radio"]) { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); font-family: monospace; }
   .form-field input:not([type="checkbox"], [type="radio"]):focus { border-color: var(--accent); }
   .form-field input[type="checkbox"], .form-field input[type="radio"] { width: auto; margin-right: .4rem; vertical-align: middle; }
-  .form-field select { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); }
-  .form-field select:focus { border-color: var(--accent); }
   .hint { font-size: .8rem; color: var(--muted); margin-top: .4rem; }
+  .key-guide > * + * { margin-top: .5rem; }
+  .key-guide :is(ol, ul) { padding-left: 1.25rem; }
+  .value-row + .card-note, .segmented + .card-note { margin-top: .4rem; }
   .mix-group { border: 1px solid var(--border); border-radius: 6px; padding: .75rem; margin-bottom: .75rem; }
   .mix-group legend { font-size: .8rem; color: var(--muted); padding: 0 .35rem; }
   .mix-row { display: grid; grid-template-columns: 1fr auto; gap: .25rem .5rem; align-items: center; margin-bottom: .6rem; }
@@ -20,7 +19,7 @@
   .mix-row output { font-size: .8rem; color: var(--muted); }
   .mix-row input[type="range"]:disabled { opacity: .4; }
   .mix-exclude { font-size: .8rem; color: var(--muted); }
-  .mix-exclude, .mix-lock, .mix-difficulty label, .daily-sections label { min-height: 24px; }
+  .mix-exclude, .mix-lock, .mix-difficulty label { min-height: 24px; }
   .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
   .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; font-size: .8rem; }
   .mix-difficulty legend { font-size: .8rem; color: var(--muted); padding: 0; }
@@ -33,94 +32,102 @@
   .display-hint { flex-basis: 100%; margin-top: 0; }
 </style>
 
-<div class="setup-wrap" data-controller="profile-preferences"
+<div class="phone-page" data-controller="profile-preferences"
      data-profile-preferences-url-value="<%= profile_path %>"
      data-profile-preferences-label-template-value="<%= t("exercise_mix.level_default", skill_level: "__LEVEL__") %>">
   <h1><%= t("api_keys.edit.heading") %></h1>
-  <p><%= t("api_keys.edit.intro") %></p>
-  <% if current_user.on_trial? && current_user.trial_active? %>
-    <%= render "api_keys/trial_note" %>
-  <% elsif current_user.trial_ended? || (!current_user.api_key_present? && !current_user.daily_exercises.exists?) %>
-    <%= render "api_keys/key_guide" %>
-  <% end %>
 
-  <%= form_with url: setup_path, method: :patch do |f| %>
-    <div class="form-field">
-      <%= f.label :api_key, t("api_keys.edit.api_key_label") %>
-      <%= f.password_field :api_key, placeholder: t("api_keys.edit.api_key_placeholder"), autocomplete: "off" %>
-      <p class="hint"><%= t("api_keys.edit.api_key_hint_html") %></p>
-      <% if current_user.stored_providers.any? %>
-        <p class="hint"><%= t("api_keys.edit.saved_keys_hint") %></p>
-      <% end %>
+  <section class="card">
+    <div class="card-heading">
+      <h2><%= t("api_keys.edit.connection_heading") %></h2>
+      <span class="card-tag"><%= t("api_keys.edit.connection_save_tag") %></span>
     </div>
-    <% if current_user.stored_providers.any? %>
-      <div class="form-field">
-        <fieldset class="display-group" id="provider-choice">
-          <legend><%= t("api_keys.edit.provider_legend") %></legend>
-          <% current_user.stored_providers.each do |provider| %>
-            <label><%= f.radio_button :provider, provider, checked: current_user.provider == provider %><%= AiProvider.label(provider) %></label>
-          <% end %>
-          <p class="hint display-hint"><%= t("api_keys.edit.provider_hint") %></p>
-        </fieldset>
-      </div>
+    <p class="card-note"><%= t("api_keys.edit.intro") %></p>
+    <% if current_user.on_trial? && current_user.trial_active? %>
+      <%= render "api_keys/trial_note" %>
+    <% elsif current_user.trial_ended? || (!current_user.api_key_present? && !current_user.daily_exercises.exists?) %>
+      <%= render "api_keys/key_guide" %>
     <% end %>
-    <div class="form-field">
-      <%= f.label :language, t("api_keys.edit.language_label") %>
-      <%= f.select :language,
-            User::LANGUAGES.map { |language| [ t("api_keys.edit.language_options.#{language}"), language ] },
-            selected: current_user.language %>
-      <p class="hint"><%= t("api_keys.edit.language_hint") %></p>
+
+    <%= form_with url: setup_path, method: :patch do |f| %>
+      <div class="form-field">
+        <%= f.label :api_key, t("api_keys.edit.api_key_label") %>
+        <%= f.password_field :api_key, placeholder: t("api_keys.edit.api_key_placeholder"), autocomplete: "off" %>
+        <p class="card-note"><%= t("api_keys.edit.api_key_hint_html") %></p>
+        <% if current_user.stored_providers.any? %>
+          <p class="card-note"><%= t("api_keys.edit.saved_keys_hint") %></p>
+        <% end %>
+      </div>
+      <% if current_user.stored_providers.any? %>
+        <fieldset class="field-group" id="provider-choice">
+          <legend><%= t("api_keys.edit.provider_legend") %></legend>
+          <div class="segmented">
+            <% current_user.stored_providers.each do |provider| %>
+              <label class="segment"><%= f.radio_button :provider, provider, checked: current_user.provider == provider %><%= AiProvider.label(provider) %></label>
+            <% end %>
+          </div>
+          <p class="card-note"><%= t("api_keys.edit.provider_hint") %></p>
+        </fieldset>
+      <% end %>
+      <div class="value-row" data-controller="value-row">
+        <%= f.label :language, t("api_keys.edit.language_label") %>
+        <span class="value-row-value" aria-hidden="true" data-value-row-target="value"></span>
+        <%= f.select :language,
+              User::LANGUAGES.map { |language| [ t("api_keys.edit.language_options.#{language}"), language ] },
+              { selected: current_user.language },
+              data: { action: "change->value-row#show" } %>
+      </div>
+      <p class="card-note"><%= t("api_keys.edit.language_hint") %></p>
+      <%= f.button t("api_keys.edit.save_key"), type: "submit", name: "commit", value: t("api_keys.edit.save_key"), class: "btn btn-primary btn-block" %>
+    <% end %>
+  </section>
+
+  <section class="card">
+    <h2><%= t("api_keys.edit.your_day_heading") %></h2>
+    <div class="value-row" data-controller="value-row">
+      <label for="tz-select"><%= t("api_keys.edit.time_zone_label") %></label>
+      <span class="value-row-value" aria-hidden="true" data-value-row-target="value"></span>
+      <%= select_tag "tz_select",
+            options_for_select(
+              [ [ t("api_keys.edit.time_zones.eastern"), "America/New_York" ],
+                [ t("api_keys.edit.time_zones.central"), "America/Chicago" ],
+                [ t("api_keys.edit.time_zones.mountain"), "America/Denver" ],
+                [ t("api_keys.edit.time_zones.arizona"), "America/Phoenix" ],
+                [ t("api_keys.edit.time_zones.pacific"), "America/Los_Angeles" ],
+                [ t("api_keys.edit.time_zones.alaska"), "America/Anchorage" ],
+                [ t("api_keys.edit.time_zones.hawaii"), "Pacific/Honolulu" ] ],
+              current_user.time_zone),
+            include_blank: t("api_keys.edit.time_zone_detect"),
+            id: "tz-select",
+            data: { profile_preferences_target: "timeZone", action: "change->profile-preferences#saveTimeZone change->value-row#show" } %>
     </div>
-    <%= f.submit t("api_keys.edit.save_key"), class: "btn btn-primary" %>
-  <% end %>
+    <p class="card-note"><%= t("api_keys.edit.time_zone_hint") %></p>
 
-  <div class="form-field">
-    <label for="tz-select"><%= t("api_keys.edit.time_zone_label") %></label>
-    <%= select_tag "tz_select",
-          options_for_select(
-            [ [ t("api_keys.edit.time_zones.eastern"), "America/New_York" ],
-              [ t("api_keys.edit.time_zones.central"), "America/Chicago" ],
-              [ t("api_keys.edit.time_zones.mountain"), "America/Denver" ],
-              [ t("api_keys.edit.time_zones.arizona"), "America/Phoenix" ],
-              [ t("api_keys.edit.time_zones.pacific"), "America/Los_Angeles" ],
-              [ t("api_keys.edit.time_zones.alaska"), "America/Anchorage" ],
-              [ t("api_keys.edit.time_zones.hawaii"), "Pacific/Honolulu" ] ],
-            current_user.time_zone),
-          include_blank: t("api_keys.edit.time_zone_detect"),
-          id: "tz-select",
-          data: { profile_preferences_target: "timeZone", action: "change->profile-preferences#saveTimeZone" } %>
-    <p class="hint"><%= t("api_keys.edit.time_zone_hint") %></p>
-  </div>
-
-  <div class="form-field">
-    <fieldset class="display-group daily-sections" id="daily-sections"
+    <fieldset class="field-group" id="daily-sections"
               data-profile-preferences-target="dailySections" data-action="change->profile-preferences#saveDailySections">
       <legend><%= t("daily_sections.legend") %></legend>
-      <label>
-        <input type="radio" name="daily_section_count" value="<%= User::AUTOMATIC_SECTION_COUNT %>" <%= "checked" if current_user.daily_section_count.nil? %>>
-        <%= t("daily_sections.automatic") %>
-      </label>
-      <% User::DAILY_SECTION_COUNTS.each do |count| %>
-        <label>
-          <input type="radio" name="daily_section_count" value="<%= count %>" <%= "checked" if current_user.daily_section_count == count %>>
-          <%= count %>
-        </label>
-      <% end %>
-      <p class="hint display-hint"><%= t("daily_sections.hint",
-                            lowest: User::DAILY_SECTION_COUNTS.first,
-                            fixed_sections: DailyKinds.for(current_user).map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
+      <div class="segmented">
+        <label class="segment"><input type="radio" name="daily_section_count" value="<%= User::AUTOMATIC_SECTION_COUNT %>" <%= "checked" if current_user.daily_section_count.nil? %>><%= t("daily_sections.automatic") %></label>
+        <% User::DAILY_SECTION_COUNTS.each do |count| %>
+          <label class="segment"><input type="radio" name="daily_section_count" value="<%= count %>" <%= "checked" if current_user.daily_section_count == count %>><%= count %></label>
+        <% end %>
+      </div>
+      <p class="card-note"><%= t("daily_sections.hint",
+                                lowest: User::DAILY_SECTION_COUNTS.first,
+                                fixed_sections: DailyKinds.for(current_user).map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
     </fieldset>
-  </div>
 
-  <div class="form-field">
-    <label for="skill-level"><%= t("api_keys.edit.skill_level_label") %></label>
-    <%= select_tag "skill_level",
-          options_for_select(User::SKILL_LEVELS.map { |level| [ t("exercise_mix.levels.#{level}"), level ] }, current_user.skill_level),
-          id: "skill-level", autocomplete: "off",
-          data: { profile_preferences_target: "skillLevel", action: "change->profile-preferences#saveSkillLevel" } %>
-    <p class="hint"><%= t("api_keys.edit.skill_level_hint") %></p>
-    <p class="hint" role="status" data-profile-preferences-target="keptOwnLevel"></p>
-  </div>
+    <div class="value-row" data-controller="value-row">
+      <label for="skill-level"><%= t("api_keys.edit.skill_level_label") %></label>
+      <span class="value-row-value" aria-hidden="true" data-value-row-target="value"></span>
+      <%= select_tag "skill_level",
+            options_for_select(User::SKILL_LEVELS.map { |level| [ t("exercise_mix.levels.#{level}"), level ] }, current_user.skill_level),
+            id: "skill-level", autocomplete: "off",
+            data: { profile_preferences_target: "skillLevel", action: "change->profile-preferences#saveSkillLevel change->value-row#show" } %>
+    </div>
+    <p class="card-note"><%= t("api_keys.edit.skill_level_hint") %></p>
+    <p class="card-note" role="status" data-profile-preferences-target="keptOwnLevel"></p>
+  </section>
 
   <details class="form-field" id="exercise-mix"<%= " open" if suggested_kinds.any? || show_level_suggestions? %>
            data-controller="exercise-mix"

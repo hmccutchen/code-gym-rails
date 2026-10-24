@@ -242,6 +242,60 @@ RSpec.describe "ApiKeys", type: :request do
     end
   end
 
+  describe "cards" do
+    def card_titles
+      Nokogiri::HTML(response.body).css("main .phone-page > .card").map { |c| c.at_xpath("./h2 | ./div[contains(@class, 'card-heading')]/h2 | ./summary")&.text&.strip }
+    end
+
+    def first_cards
+      Nokogiri::HTML(response.body).css("main .phone-page > .card").first(2)
+    end
+
+    it "opens with Connection and Your day" do
+      login_as(create_user_with_key)
+      get setup_path
+      expect(card_titles.first(2)).to eq([ "Connection", "Your day" ])
+    end
+
+    it "tags Connection with Tap Save to apply, outside its heading" do
+      login_as(create_user_with_key)
+      get setup_path
+      heading = Nokogiri::HTML(response.body).at_css("main .phone-page > .card:first-of-type > .card-heading")
+      expect(heading.at_css("h2").text.strip).to eq("Connection")
+      expect(heading.at_css(".card-tag").text.strip).to eq("Tap Save to apply")
+    end
+
+    it "puts the key guide inside Connection for a user with no key and no exercises" do
+      login_as(user)
+      get setup_path
+      expect(first_cards.first.at_css(".key-guide")).to be_present
+    end
+
+    it "puts the trial note inside Connection while a trial runs" do
+      login_as(create_trial_user)
+      get setup_path
+      expect(first_cards.first.text).to include(I18n.t("api_keys.edit.trial_note.title"))
+    end
+
+    it "marks the Connection and Your day notes as card notes" do
+      login_as(create_user_with_key)
+      get setup_path
+      expect(first_cards.size).to eq(2)
+      first_cards.each { |card| expect(card.css(".hint")).to be_empty }
+      expect(first_cards.sum { |card| card.css(".card-note").size }).to be >= 7
+    end
+
+    it "shows one provider segment for one saved key and none without a key" do
+      login_as(create_user_with_key(email: "one-key@example.com"))
+      get setup_path
+      expect(Nokogiri::HTML(response.body).css("#provider-choice .segment").size).to eq(1)
+
+      login_as(user)
+      get setup_path
+      expect(Nokogiri::HTML(response.body).at_css("#provider-choice")).to be_nil
+    end
+  end
+
   describe "GET /setup exercise mix difficulty" do
     let(:user) { create_user_with_key }
 
