@@ -18,15 +18,8 @@ class PushSubscriptionsController < ApplicationController
     return head :not_found unless WebPushCredentials.configured?
     return head :unprocessable_content unless valid_subscription?
 
-    User.transaction do
-      PushSubscription.register!(
-        user:       current_user,
-        endpoint:   params[:endpoint],
-        p256dh_key: params[:p256dh],
-        auth_key:   params[:auth]
-      )
-      # Enrolment must not walk a ready_and_nudges user back to ready; the layout re-subscribes on every page load.
-      current_user.update!(reminder_level: :ready) if current_user.reminders_none?
+    unless saved_subscription?
+      return render_json_error(t("accounts.push_reminders.registration_unavailable"), status: :conflict)
     end
 
     head :created
@@ -45,7 +38,7 @@ class PushSubscriptionsController < ApplicationController
 
   # DELETE /push_subscription
   def destroy
-    User.transaction do
+    current_user.with_lock do
       current_user.push_subscriptions.destroy_all
       current_user.update!(reminder_level: :none)
     end
@@ -54,6 +47,26 @@ class PushSubscriptionsController < ApplicationController
   end
 
   private
+
+  def saved_subscription?
+    current_user.with_lock do
+      next false unless current_user.push_reminders_enabled? || explicit_enrollment?
+
+      PushSubscription.register!(
+        user:       current_user,
+        endpoint:   params[:endpoint],
+        p256dh_key: params[:p256dh],
+        auth_key:   params[:auth]
+      )
+      # Enrolment must not walk a ready_and_nudges user back to ready; the layout re-subscribes on every page load.
+      current_user.update!(reminder_level: :ready) if current_user.reminders_none?
+      true
+    end
+  end
+
+  def explicit_enrollment?
+    params[:enroll].in?([ true, "true" ])
+  end
 
   def refuse_nudges
     respond_to do |format|

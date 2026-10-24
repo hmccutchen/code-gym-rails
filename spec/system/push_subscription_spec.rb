@@ -5,7 +5,7 @@ RSpec.describe "Re-subscribing to push reminders on launch", type: :system do
   let(:endpoint) { "https://fcm.googleapis.com/fcm/send/launch-endpoint" }
 
   # Headless Chromium cannot grant push, so the browser's push APIs are replaced before any page script runs.
-  def stub_installed_push_apis
+  def stub_installed_push_apis(hold_registration: false)
     script = <<~JS
       window.pushPosts = [];
       window.pushSubscribed = false;
@@ -26,9 +26,13 @@ RSpec.describe "Re-subscribing to push reminders on launch", type: :system do
       window.PushManager = function PushManager() {};
       Object.defineProperty(Notification, "permission", { configurable: true, get: () => "granted" });
       const originalFetch = window.fetch;
-      window.fetch = (url, options) => {
-        if (String(url).includes("/push_subscription")) window.pushPosts.push(JSON.parse(options.body));
-        return originalFetch(url, options);
+      window.fetch = async (url, options) => {
+        if (!String(url).includes("/push_subscription")) return originalFetch(url, options);
+        window.pushPosts.push(JSON.parse(options.body));
+        if (#{hold_registration}) await new Promise(resolve => { window.releaseRegistration = resolve; });
+        const response = await originalFetch(url, options);
+        window.registrationStatus = response.status;
+        return response;
       };
     JS
     page.driver.with_playwright_page { |pw| pw.add_init_script(script: script) }
@@ -47,8 +51,27 @@ RSpec.describe "Re-subscribing to push reminders on launch", type: :system do
     wait_until_subscribed
 
     wait_for { user.push_subscriptions.reload.any? }
-    expect(page.evaluate_script("window.pushPosts")).to eq([ { "endpoint" => endpoint, "p256dh" => "p256dh-key", "auth" => "auth-key" } ])
+    expect(page.evaluate_script("window.pushPosts")).to eq([ { "endpoint" => endpoint, "p256dh" => "p256dh-key", "auth" => "auth-key", "enroll" => false } ])
     expect(user.push_subscriptions.reload.pluck(:endpoint, :p256dh_key, :auth_key)).to eq([ [ endpoint, "p256dh-key", "auth-key" ] ])
+  end
+
+  it "silently refuses an in-flight launch registration after Turn off" do
+    stub_installed_push_apis(hold_registration: true)
+    visit_as(user)
+    wait_for_js
+    wait_for { page.evaluate_script("typeof window.releaseRegistration === 'function'") }
+    user.with_lock do
+      user.push_subscriptions.destroy_all
+      user.update!(reminder_level: :none)
+    end
+
+    page.execute_script("window.releaseRegistration()")
+
+    wait_for { page.evaluate_script("window.registrationStatus") }
+    expect(page.evaluate_script("window.registrationStatus")).to eq(409)
+    expect(user.reload.reminders_none?).to be(true)
+    expect(user.push_subscriptions).to be_empty
+    expect(page).to have_no_text(I18n.t("accounts.push_reminders.registration_unavailable"))
   end
 
   def stub_push_apis_subscribed_under_another_key

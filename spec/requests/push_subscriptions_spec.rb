@@ -14,7 +14,7 @@ RSpec.describe "Push subscriptions", type: :request do
   end
 
   def valid_params
-    { endpoint: "https://fcm.googleapis.com/fcm/send/abc", p256dh: "p256", auth: "auth" }
+    { endpoint: "https://fcm.googleapis.com/fcm/send/abc", p256dh: "p256", auth: "auth", enroll: true }
   end
 
   describe "POST /push_subscription" do
@@ -27,6 +27,76 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(response).to have_http_status(:created)
       expect(user.reload.reminders_ready?).to be(true)
       expect(user.push_subscriptions.sole.endpoint).to eq("https://fcm.googleapis.com/fcm/send/abc")
+    end
+
+    it "refuses a page-load registration after Turn off" do
+      configure_vapid
+      login_as(user)
+      post push_subscription_path, params: valid_params
+      delete push_subscription_path
+
+      post push_subscription_path, params: valid_params.merge(enroll: false), as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body).to include("status" => "error", "error" => I18n.t("accounts.push_reminders.registration_unavailable"))
+      expect(user.reload.reminders_none?).to be(true)
+      expect(user.push_subscriptions).to be_empty
+    end
+
+    it "reloads intent when Turn off commits after registration loaded the user" do
+      configure_vapid
+      login_as(user)
+      user.update!(reminder_level: :ready_and_nudges)
+      allow(User).to receive(:signed_in_through).and_wrap_original do |original, **kwargs|
+        original.call(**kwargs).tap { |loaded| loaded && User.where(id: loaded.id).update_all(reminder_level: User.reminder_levels[:none]) }
+      end
+
+      post push_subscription_path, params: valid_params.merge(enroll: false), as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(user.reload.reminders_none?).to be(true)
+      expect(user.push_subscriptions).to be_empty
+    end
+
+    [ nil, "unexpected", false ].each do |enroll|
+      it "does not treat #{enroll.inspect} as explicit enrollment" do
+        configure_vapid
+        login_as(user)
+        params = valid_params.except(:enroll)
+        params[:enroll] = enroll unless enroll.nil?
+
+        post push_subscription_path, params: params, as: :json
+
+        expect(response).to have_http_status(:conflict)
+        expect(user.reload.reminders_none?).to be(true)
+        expect(user.push_subscriptions).to be_empty
+      end
+    end
+
+    it "allows an explicit Turn on after Turn off" do
+      configure_vapid
+      login_as(user)
+      post push_subscription_path, params: valid_params
+      delete push_subscription_path
+
+      post push_subscription_path, params: valid_params, as: :json
+
+      expect(response).to have_http_status(:created)
+      expect(user.reload.reminders_ready?).to be(true)
+      expect(user.push_subscriptions.count).to eq(1)
+    end
+
+    it "preserves nudges enabled after the request loaded its user" do
+      configure_vapid
+      login_as(user)
+      allow(User).to receive(:signed_in_through).and_wrap_original do |original, **kwargs|
+        original.call(**kwargs).tap { |loaded| loaded && User.where(id: loaded.id).update_all(reminder_level: User.reminder_levels[:ready_and_nudges]) }
+      end
+
+      post push_subscription_path, params: valid_params, as: :json
+
+      expect(response).to have_http_status(:created)
+      expect(user.reload.reminders_ready_and_nudges?).to be(true)
     end
 
     # Held at the boundary so PushDelivery can assume an endpoint it can sign for.
@@ -238,6 +308,27 @@ RSpec.describe "Push subscriptions", type: :request do
   end
 
   describe "DELETE /push_subscription" do
+    it "locks the user before registering or removing endpoints" do
+      configure_vapid
+      login_as(user)
+      statements = []
+      record = ->(*, payload) { statements << payload[:sql] }
+
+      ActiveSupport::Notifications.subscribed(record, "sql.active_record") do
+        post push_subscription_path, params: valid_params
+        delete push_subscription_path
+      end
+
+      writes = statements.select { |sql| sql.match?(/FOR UPDATE|INSERT INTO "push_subscriptions"|DELETE FROM "push_subscriptions"/) }
+      expect(writes.size).to eq(4)
+      expect(writes[0]).to match(/FROM "users".*FOR UPDATE/)
+      expect(writes[1]).to include('INSERT INTO "push_subscriptions"')
+      expect(writes[2]).to match(/FROM "users".*FOR UPDATE/)
+      expect(writes[3]).to include('DELETE FROM "push_subscriptions"')
+      expect(user.reload.reminders_none?).to be(true)
+      expect(user.push_subscriptions).to be_empty
+    end
+
     # Rows left behind would keep the job pushing to a browser whose owner asked it to stop.
     it "drops the endpoints as well as the intent" do
       configure_vapid

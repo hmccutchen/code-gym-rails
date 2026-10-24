@@ -19,6 +19,15 @@ of them needs no write, so the function returns `null` and the caller sends
 nothing. That is what keeps the every-launch re-subscribe from being a write on
 every page load.
 
+## Only the Turn on click changes account intent
+
+`subscribeAndRegister` defaults `enroll` to false. The launch controller and
+the device-permission repair path register transport only; `push-enable`
+sends true only for Turn on. The server checks the current reminder level
+under the user lock, so a delayed repair cannot undo Turn off. A refused
+repair stays silent on launch and uses the server's message on the Account
+page.
+
 ## A subscription made with another key is replaced
 
 A browser subscription keeps the VAPID public key it was made with, and `subscribe()` rejects a different key while that subscription exists (`InvalidStateError`). After a key rotation, every device that had reminders on would fail to resubscribe, on launch and from the Account page, until its site data was cleared. `subscribeReplacingAnotherKey` catches that one error, unsubscribes the existing subscription and subscribes once more. It reacts to the browser's refusal rather than comparing keys, so it works where a subscription does not expose `options.applicationServerKey`, and a same-key subscribe never unsubscribes.
