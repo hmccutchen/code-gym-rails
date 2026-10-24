@@ -15,6 +15,15 @@ RSpec.describe "Accounts", type: :request do
       expect(response.body).to include("Log out")
     end
 
+    it "links the shared phone stylesheet" do
+      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+
+      get account_path
+
+      expect(Nokogiri::HTML(response.body).css("head link[rel=stylesheet]").map { |link| link["href"] })
+        .to include(a_string_matching(%r{/assets/phone_cards(-\h+)?\.css}))
+    end
+
     it "reaches Settings from the nav, not from the Account page itself" do
       login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
 

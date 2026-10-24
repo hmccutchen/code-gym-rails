@@ -60,6 +60,9 @@ read it before changing that area.
   `#light_palette_media` drives the palette, logo and theme-color together. The reading font and spacing apply to prose, never
   code; `palette_contrast_spec` holds both palettes to WCAG AA; the nav
   collapses on one `@container` rule that `mobile_nav_menu_spec` guards.
+- **Phone card styles**: `phone_cards.css` holds the card, full-width button
+  and switch styles for the settings pages, Account first; it loads on every
+  page, so a new rule in it stays scoped to its own class.
 - **Push reminders** (`docs/decisions/push-reminders.md`): Optional weekday
   ready and afternoon nudge notifications. Intent (`User#reminder_level`) and
   transport (`PushSubscription`) are separate: an endpoint can die without
