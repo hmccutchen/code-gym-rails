@@ -3,10 +3,9 @@
   .phone-page { max-width: 480px; margin-inline: auto; }
 }
 @media (max-width: 599.98px) {
-  /* The subtracted max(1.5rem, ...) is .container's side padding in the layout and must change with it. */
   .phone-page {
-    margin-left: calc(max(16px, env(safe-area-inset-left)) - max(1.5rem, env(safe-area-inset-left)));
-    margin-right: calc(max(16px, env(safe-area-inset-right)) - max(1.5rem, env(safe-area-inset-right)));
+    margin-left: calc(max(16px, env(safe-area-inset-left)) - var(--container-pad-left));
+    margin-right: calc(max(16px, env(safe-area-inset-right)) - var(--container-pad-right));
   }
 }
 
@@ -16,7 +15,7 @@
 .card .card-note { margin-bottom: .75rem; }
 .card > :where(form, .btn-block) + :where(form, .btn-block), .switch-row + .btn-block { margin-top: .5rem; }
 
-.btn-block { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; }
+.btn.btn-block { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; }
 
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 48px; cursor: pointer; }
 .switch { appearance: none; flex: none; width: 44px; height: 26px; border-radius: 999px; background: var(--muted); position: relative; cursor: pointer; }
@@ -33,5 +32,5 @@
   .switch::before { content: none; }
 }
 
-/* A display set in this file beats the browser's [hidden] rule, so each class that can be hidden restores it. */
-.btn-block[hidden], .switch-row[hidden], .card[hidden] { display: none; }
+/* Any author display beats the browser's [hidden] rule, so this restores it for every element on the page. */
+.phone-page [hidden] { display: none; }

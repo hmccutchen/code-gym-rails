@@ -111,6 +111,11 @@ insets, because `viewport-fit=cover` lets a landscape phone draw the column
 under its notch. A portrait phone reports no side inset, so the `-1.5rem`
 coupling still matches.
 
+The padding is built from `--container-pad-left` and `--container-pad-right`,
+and this rule sets them again rather than the padding. `phone_cards.css`
+subtracts the same properties to put a card page's edge where it wants, so a
+change to them moves it too.
+
 ## `nav .inner`
 
 It is wider than the page column, so on a desktop the brand sits apart from the
