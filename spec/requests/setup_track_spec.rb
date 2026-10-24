@@ -32,12 +32,14 @@ RSpec.describe "Setup's track control", type: :request do
       expect(link["rel"]).to eq("noopener")
     end
     expect(page_html.css(".phone-page .key-guide, .phone-page form").first).to eq(guide)
+    expect(page_html.css("style").map(&:text).join).to include(".key-guide > * + *")
   end
 
   it "hides the guide from an account with a key of its own, and from one with a set" do
     login_as(user)
     get setup_path
     expect(page_html.at_css(".key-guide")).to be_nil
+    expect(response.body).not_to include(".key-guide > * + *")
 
     DailyExercise.create!(user: keyless, date: Date.yesterday, generated_at: 1.day.ago,
                           problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } })

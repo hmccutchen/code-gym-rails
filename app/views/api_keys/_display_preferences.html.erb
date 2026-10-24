@@ -1,6 +1,12 @@
 <%# Makes the layout link the display stylesheets here even with nothing stored, so a choice applies before it saves. %>
 <% content_for :display_controls, "1" %>
 <% preferences = DisplayPreferences.for(current_user) %>
+<style>
+  .display-group { border: 0; padding: .6rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .9rem; font-size: .85rem; }
+  .display-group legend { font-size: .8rem; color: var(--muted); padding: 0; margin-bottom: .35rem; }
+  .display-group label { margin-bottom: 0; color: var(--text); }
+  .display-hint { flex-basis: 100%; margin-top: 0; }
+</style>
 <details class="card settings-fields" id="display-preferences" data-controller="display-preferences"
          data-display-preferences-url-value="<%= profile_path %>"
          data-display-preferences-defaults-value="<%= DisplayPreferences::OPTIONS.transform_values(&:first).to_json %>"

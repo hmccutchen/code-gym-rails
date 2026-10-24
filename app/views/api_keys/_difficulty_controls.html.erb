@@ -1,4 +1,18 @@
-<%# Required locals: kind (an ExerciseSection class), excluded (Boolean). %>
+<%# Required locals: kind (an ExerciseSection class), excluded (Boolean). Notes: docs/code-notes/app/views/api_keys/_difficulty_controls.html.md %>
+<% unless content_for?(:difficulty_controls_styles) %>
+  <% content_for :difficulty_controls_styles, "1" %>
+  <style>
+    .mix-lock, .mix-difficulty label { min-height: 24px; }
+    .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; font-size: .8rem; }
+    .mix-difficulty legend { font-size: .8rem; color: var(--muted); padding: 0; }
+    .mix-difficulty label { margin-bottom: 0; }
+    .mix-lock { flex-basis: 100%; color: var(--text); font-weight: 600; }
+    .mix-coverage { flex-basis: 100%; margin-top: 0; }
+  </style>
+  <% if suggested_kinds.any? %>
+    <style>.mix-difficulty.mix-suggested { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }</style>
+  <% end %>
+<% end %>
 <% difficulty = KindDifficulty.for(current_user) %>
 <% level      = difficulty.level_for(kind) %>
 <fieldset class="mix-difficulty<%= " mix-suggested" if suggested_kinds.include?(kind.key) %>" data-kind="<%= kind.key %>"
