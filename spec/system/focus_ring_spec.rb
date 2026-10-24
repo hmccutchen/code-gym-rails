@@ -74,6 +74,31 @@ RSpec.describe "Focus ring", type: :system do
     expect(ring_pixels_around_focused_slider).to be > 20
   end
 
+  def outline_of(selector)
+    page.evaluate_script(<<~JS)
+      (() => {
+        const style = getComputedStyle(document.activeElement.closest(#{selector.to_json}));
+        return [style.outlineStyle, style.outlineWidth];
+      })()
+    JS
+  end
+
+  it "rings a value row when its select has focus" do
+    visit_as(user)
+    visit setup_path
+
+    tab_to("#tz-select")
+    expect(outline_of(".value-row")).to eq([ "solid", "2px" ])
+  end
+
+  it "rings the focused Daily sections segment" do
+    visit_as(user)
+    visit setup_path
+
+    tab_to("#daily-sections input:checked")
+    expect(outline_of(".segment")).to eq([ "solid", "2px" ])
+  end
+
   it "rings the reminder nudges switch" do
     with_push_credentials do
       user.update!(reminder_level: "ready_and_nudges")
@@ -85,6 +110,15 @@ RSpec.describe "Focus ring", type: :system do
       tab_to("input.switch")
       expect(outline_of_focused).to eq([ "solid", "2px", ring_color, "2px" ])
     end
+  end
+
+  it "rings the level-suggestions switch" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    tab_to("#level-suggestions")
+    expect(outline_of_focused).to eq([ "solid", "2px", ring_color, "2px" ])
   end
 
   # Login follows the device, so each palette's ring is checked under the scheme that selects it.

@@ -151,7 +151,7 @@ RSpec.describe "Save status", type: :system do
     exclude_every_fourth_kind
     expect(page).to have_css("#save-status")
 
-    find("#tz-select").select("Pacific")
+    find("#tz-select", visible: :all).select("Pacific", visible: :all)
 
     # Waits on the write, not the DOM: the fetch resolves independently of Capybara.
     wait_for { user.reload.time_zone == "America/Los_Angeles" }

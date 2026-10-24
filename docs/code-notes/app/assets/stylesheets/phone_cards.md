@@ -1,6 +1,6 @@
 # phone_cards.css
 
-The card, full-width button and switch styles for the settings pages. The Account page uses them first. Settings moves onto them in a later PR.
+The card, full-width button, switch, value row, segmented control and card heading styles. The Account and Settings pages use them.
 
 ## What each class is for
 
@@ -10,6 +10,14 @@ The card, full-width button and switch styles for the settings pages. The Accoun
 - `.btn-block`: a modifier on `.btn` that makes the button full width and at least 48px tall. `.btn` itself does not change. The rule is written `.btn.btn-block` so it outranks `.btn`'s `inline-block` on its own, rather than by loading after the layout's styles.
 - `.switch-row`: a `<label>` holding text and a checkbox. The whole row, at least 48px tall, is the tap target.
 - `.switch`: the checkbox inside a switch row, drawn as a 44px track and a thumb. It has a disabled state and its own focus ring, because the layout's focus rule skips checkboxes. The off track uses `--muted` and the thumb uses `--surface`. With reduced motion the thumb stops sliding, and in forced-colors mode the switch falls back to a native checkbox.
+- `.card-heading` and `.card-tag`: a heading row with a short muted tag beside it, such as "Tap Save to apply" on Settings' Connection card. The row wraps, so the tag drops under the heading on a narrow screen.
+- `.value-row`: a label on the left and the chosen value on the right, with a chevron. The real `<select>` is laid over the whole row with zero opacity, so a tap opens the phone's own picker, and the visible text comes from `.value-row-value`, which the server fills with the selected option's text and `value_row_controller` updates on change. The row's bottom line is a 1px border, because forced-colors mode removes box-shadows; the select reaches 1px past the padding box (`inset: 0 0 -1px`) so a tap on the line still opens the picker. The right padding leaves room for the chevron and is not the container's gutter, so it stays a different value (`container_gutter_spec` fails if `phone_cards.css` holds that gutter's number). Focus shows as a ring on the row, through `:has(select:focus-visible)`.
+- `.field-group`: a bare `fieldset` with a muted legend, for a group of choices on a card.
+- `.segmented` and `.segment`: a pill of radio choices. Each radio is stretched over its segment with zero opacity, so the whole segment is the 44px tap target, and `:has(:checked)` fills the chosen one. In forced-colors mode the chosen segment gets a `Highlight` outline, since background fills are dropped.
+- `details.card > summary`: a collapsible card's summary, at least 48px tall, so a disclosure is as easy to tap as a switch row.
+- `.card :is(.value-row, .segmented, input:not([type="hidden"])) + .card-note`: a note right under a value row, a segmented control or a text input sits `.4rem` below it, so a hint never touches the control it explains. A hidden input, such as a form's token, takes no space, so a note after one keeps its normal spacing.
+- `.card .card-note:empty`: an empty note takes no margin, so a status line that has nothing to say leaves no gap.
+- `.switch-status:not(:empty)`: the "Saved" line under a switch gets a small top margin only while it holds text.
 
 ## Side margins and the safe area
 

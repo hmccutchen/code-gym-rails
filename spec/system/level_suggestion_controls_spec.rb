@@ -152,6 +152,7 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     wait_for_saves
 
     expect(page).to have_checked_field("Suggest level changes")
+    expect(find("#level-suggestions-switch .switch-status", visible: :all).text(:all)).to eq("")
     expect(user.reload.level_suggestions).to be(true)
   end
 
@@ -185,10 +186,12 @@ RSpec.describe "Learning track suggestion controls", type: :system do
 
     uncheck "Suggest level changes"
     wait_for_saves
+    expect(find("#level-suggestions-switch .switch-status")).to have_text("Saved")
     expect(user.reload.level_suggestions).to be(false)
 
     check "Suggest level changes"
     wait_for_saves
+    expect(find("#level-suggestions-switch .switch-status")).to have_text("Saved")
     expect(user.reload.level_suggestions).to be(true)
   end
 

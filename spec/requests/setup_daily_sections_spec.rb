@@ -28,7 +28,7 @@ RSpec.describe "Setup Daily sections control", type: :request do
 
     get setup_path
 
-    hint = page_html.at_css("#daily-sections .hint").text
+    hint = page_html.at_css("#daily-sections .card-note").text
     expect(hint).to include("#{User::DAILY_SECTION_COUNTS.first} gives you only #{fixed_section_names.to_sentence}")
     expect(hint).not_to include("every day")
   end
@@ -38,7 +38,7 @@ RSpec.describe "Setup Daily sections control", type: :request do
 
     get setup_path
 
-    hint = page_html.at_css("#daily-sections .hint").text
+    hint = page_html.at_css("#daily-sections .card-note").text
     expect(hint).to include("Automatic gives you shorter sets after days you don't finish, " \
                             "and longer ones once you finish more and your reviewed answers go well.")
   end

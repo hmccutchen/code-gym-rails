@@ -34,7 +34,7 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
       get setup_path
 
       expect(response.body).to include("You&#39;re on a trial", "See how your trial is going.")
-      expect(response.body).not_to include("key-guide")
+      expect(Nokogiri::HTML(response.body).at_css(".key-guide")).to be_nil
     end
   end
 
@@ -144,7 +144,7 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
     it "shows Setup without the trial note or the key guide, and sends the trial page to Setup" do
       get setup_path
       expect(response.body).not_to include("See how your trial is going.")
-      expect(response.body).not_to include("key-guide")
+      expect(Nokogiri::HTML(response.body).at_css(".key-guide")).to be_nil
 
       get trial_path
       expect(response).to redirect_to(setup_path)
