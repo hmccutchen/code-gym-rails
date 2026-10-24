@@ -82,14 +82,15 @@ module JavascriptReadyHelper
 
   BOOTSTRAP_PATH = Rails.root.join("app/assets/javascripts/code_gym_bootstrap.js")
 
-  def self.quoted_value_in(source, declaration, path:, indent: "")
-    source[/^#{indent}#{Regexp.escape(declaration)} = "([^"\\]+)"$/, 1] or
+  def self.quoted_value_in(source, declaration, path:, indented: false)
+    source[/^#{"[ \t]*" if indented}#{Regexp.escape(declaration)} = "([^"\\]+)"$/, 1] or
       raise "Found no `#{declaration} = \"...\"` line in #{path}; JavascriptReadyHelper reads the key from it"
   end
+  private_class_method :quoted_value_in
 
   def self.draft_key_in(source) = quoted_value_in(source, "const KEY", path: DRAFT_STORE_PATH)
 
-  def self.pull_note_key_in(source) = quoted_value_in(source, "var PULL_NOTE", path: BOOTSTRAP_PATH, indent: "  ")
+  def self.pull_note_key_in(source) = quoted_value_in(source, "var PULL_NOTE", path: BOOTSTRAP_PATH, indented: true)
 
   DRAFT_KEY = draft_key_in(DRAFT_STORE_PATH.read).freeze
   DRAFT_KEY_JS = DRAFT_KEY.to_json.freeze

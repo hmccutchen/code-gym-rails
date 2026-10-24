@@ -78,8 +78,9 @@ RSpec.describe "Conventions held over system spec waits" do
     it "reads the pull-refresh note key from code_gym_bootstrap.js" do
       source = JavascriptReadyHelper::BOOTSTRAP_PATH.read
 
-      expect(source).to include(%(  var PULL_NOTE = #{JavascriptReadyHelper::PULL_NOTE_KEY_JS}\n))
+      expect(source).to match(/^ *var PULL_NOTE = #{Regexp.escape(JavascriptReadyHelper::PULL_NOTE_KEY_JS)}$/)
       expect(described_class.pull_note_key_in(%(  var PULL_NOTE = "a-renamed-note"\n))).to eq("a-renamed-note")
+      expect(described_class.pull_note_key_in(%(    var PULL_NOTE = "re-indented"\n))).to eq("re-indented")
       expect(JavascriptReadyHelper::PULL_NOTE_ABSENT).to eq("sessionStorage.getItem(#{JavascriptReadyHelper::PULL_NOTE_KEY_JS}) === null")
     end
 
