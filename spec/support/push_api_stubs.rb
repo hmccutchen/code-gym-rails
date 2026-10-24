@@ -1,15 +1,6 @@
 module PushApiStubs
   REINSTALLED_ENDPOINT = "https://web.push.apple.com/reinstalled".freeze
 
-  def with_push_credentials
-    ENV["VAPID_PUBLIC_KEY"] = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U"
-    ENV["VAPID_PRIVATE_KEY"] = "private"
-    yield
-  ensure
-    ENV.delete("VAPID_PUBLIC_KEY")
-    ENV.delete("VAPID_PRIVATE_KEY")
-  end
-
   # Like iOS, subscribe() fails until permission is granted, which only a click on the page can ask for.
   def stub_push_apis(permission:, answer: "granted")
     script = <<~JS

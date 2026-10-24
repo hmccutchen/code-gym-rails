@@ -89,16 +89,9 @@ RSpec.describe "Cross-user access", type: :request do
       owner.push_subscriptions.create!(endpoint: "https://fcm.googleapis.com/fcm/send/owner", p256dh_key: "p", auth_key: "a")
     end
 
-    before do
-      ENV["VAPID_PUBLIC_KEY"] = "public"
-      ENV["VAPID_PRIVATE_KEY"] = "private"
-      owner.update!(reminder_level: :ready_and_nudges)
-    end
+    around { |example| with_push_credentials { example.run } }
 
-    after do
-      ENV.delete("VAPID_PUBLIC_KEY")
-      ENV.delete("VAPID_PRIVATE_KEY")
-    end
+    before { owner.update!(reminder_level: :ready_and_nudges) }
 
     it "turning reminders off removes only the logged-in user's endpoints" do
       delete push_subscription_path

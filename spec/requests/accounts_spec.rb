@@ -225,27 +225,18 @@ RSpec.describe "Accounts", type: :request do
   end
 
   describe "card order" do
-    def configure_vapid
-      ENV["VAPID_PUBLIC_KEY"] = "public"
-      ENV["VAPID_PRIVATE_KEY"] = "private"
-    end
-
     def card_headings
       Nokogiri::HTML(response.body).css("main .phone-page > .card").map { |card| card.at_css("h2")&.text&.strip }
     end
 
-    after do
-      ENV.delete("VAPID_PUBLIC_KEY")
-      ENV.delete("VAPID_PRIVATE_KEY")
-    end
-
     it "orders the cards identity, practice, reminders, security, usage, session, danger" do
-      configure_vapid
-      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+      with_push_credentials do
+        login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
 
-      get account_path
+        get account_path
 
-      expect(card_headings).to eq([ nil, "Daily practice", "Reminders", "Authenticator app", "AI usage", "Session", "Danger zone" ])
+        expect(card_headings).to eq([ nil, "Daily practice", "Reminders", "Authenticator app", "AI usage", "Session", "Danger zone" ])
+      end
     end
 
     it "leaves the Reminders card out when push isn't configured" do
@@ -257,27 +248,29 @@ RSpec.describe "Accounts", type: :request do
     end
 
     it "styles the reminders offer's status line as a card note" do
-      configure_vapid
-      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+      with_push_credentials do
+        login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
 
-      get account_path
+        get account_path
 
-      expect(Nokogiri::HTML(response.body).at_css("#push-status")["class"].split).to include("card-note")
+        expect(Nokogiri::HTML(response.body).at_css("#push-status")["class"].split).to include("card-note")
+      end
     end
 
     it "renders the nudges switch with no Save button except inside noscript" do
-      configure_vapid
-      user = create_user_with_key.tap { |u| u.update!(reminder_level: :ready) }
-      login_as(user)
-      get account_path
+      with_push_credentials do
+        user = create_user_with_key.tap { |u| u.update!(reminder_level: :ready) }
+        login_as(user)
+        get account_path
 
-      form = Nokogiri::HTML(response.body).at_css("form[data-controller='save-switch']")
-      expect(form["data-save-switch-url-value"]).to eq(push_subscription_path)
-      expect(form["data-save-switch-key-value"]).to eq("nudges")
-      expect(form["data-save-switch-field-value"]).to eq("nudges")
-      expect(form.css("button[type=submit]").reject { |b| b.ancestors("noscript").any? }).to be_empty
-      expect(form.at_css("noscript")).to be_present
-      expect(form.at_css("p.switch-status[role=status]").text).to eq("")
+        form = Nokogiri::HTML(response.body).at_css("form[data-controller='save-switch']")
+        expect(form["data-save-switch-url-value"]).to eq(push_subscription_path)
+        expect(form["data-save-switch-key-value"]).to eq("nudges")
+        expect(form["data-save-switch-field-value"]).to eq("nudges")
+        expect(form.css("button[type=submit]").reject { |b| b.ancestors("noscript").any? }).to be_empty
+        expect(form.at_css("noscript")).to be_present
+        expect(form.at_css("p.switch-status[role=status]").text).to eq("")
+      end
     end
 
     it "puts Log out in the Session card as a full-width button" do

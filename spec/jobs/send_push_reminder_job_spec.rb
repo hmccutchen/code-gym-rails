@@ -1,18 +1,11 @@
 require "rails_helper"
 
-RSpec.describe SendPushReminderJob do
+RSpec.describe SendPushReminderJob, type: :job do
   let(:user) do
     User.create!(email: "remind@example.com", name: "Remind", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "UTC", reminder_level: :ready)
   end
 
-  around do |example|
-    ENV["VAPID_PUBLIC_KEY"] = "public"
-    ENV["VAPID_PRIVATE_KEY"] = "private"
-    example.run
-  ensure
-    ENV.delete("VAPID_PUBLIC_KEY")
-    ENV.delete("VAPID_PRIVATE_KEY")
-  end
+  around { |example| with_push_credentials { example.run } }
 
   def create_exercise(for_user: user, date: Date.current)
     DailyExercise.create!(
