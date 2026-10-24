@@ -223,6 +223,48 @@ RSpec.describe "Accounts", type: :request do
     end
   end
 
+  describe "card order" do
+    def configure_vapid
+      ENV["VAPID_PUBLIC_KEY"] = "public"
+      ENV["VAPID_PRIVATE_KEY"] = "private"
+    end
+
+    def card_headings
+      Nokogiri::HTML(response.body).css("main .phone-page > .card").map { |card| card.at_css("h2")&.text&.strip }
+    end
+
+    after do
+      ENV.delete("VAPID_PUBLIC_KEY")
+      ENV.delete("VAPID_PRIVATE_KEY")
+    end
+
+    it "orders the cards identity, practice, reminders, security, usage, session, danger" do
+      configure_vapid
+      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+
+      get account_path
+
+      expect(card_headings).to eq([ nil, "Daily practice", "Reminders", "Authenticator app", "AI usage", "Session", "Danger zone" ])
+    end
+
+    it "leaves the Reminders card out when push isn't configured" do
+      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+
+      get account_path
+
+      expect(card_headings).to eq([ nil, "Daily practice", "Authenticator app", "AI usage", "Session", "Danger zone" ])
+    end
+
+    it "puts Log out in the Session card as a full-width button" do
+      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+
+      get account_path
+
+      session_card = Nokogiri::HTML(response.body).css("main .card").find { |card| card.at_css("h2")&.text == "Session" }
+      expect(session_card.at_css("form[action='#{logout_path}'] button.btn-block").text).to eq("Log out")
+    end
+  end
+
   describe "the danger zone" do
     it "renders the delete control and the confirmation copy" do
       login_as(create_user_with_key)

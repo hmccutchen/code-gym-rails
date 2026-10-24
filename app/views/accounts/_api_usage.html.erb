@@ -1,5 +1,5 @@
 <%# Required locals: usage (a MonthlySpend), since (the period's first moment). %>
-<section class="api-usage" aria-labelledby="api-usage-heading">
+<section class="card api-usage" aria-labelledby="api-usage-heading">
   <h2 id="api-usage-heading"><%= t("accounts.api_usage.heading") %></h2>
   <% if usage.providers.empty? %>
     <p><%= t("accounts.api_usage.empty", since: since.strftime("%B %-d")) %></p>

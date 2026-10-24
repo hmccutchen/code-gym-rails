@@ -1,6 +1,7 @@
-<div class="reminder-toggle">
+<section class="card">
+  <h2><%= t("accounts.show.reminders_heading") %></h2>
   <% if current_user.push_reminders_enabled? %>
-    <p><%= t("accounts.push_reminders.enabled") %></p>
+    <p class="card-note"><%= t("accounts.push_reminders.enabled") %></p>
 
     <div data-controller="push-enable"
          <%= tag.attributes(data: push_settings_data("push_enable")) %>
@@ -8,30 +9,29 @@
                push_enable_repair_value: true,
                push_enable_repair_text_value: t("accounts.push_reminders.repair"))) %>>
       <p class="reminder-status" id="push-repair-status" hidden data-push-enable-target="status"></p>
-      <button type="button" id="push-repair" class="btn btn-ghost" hidden disabled
+      <button type="button" id="push-repair" class="btn btn-ghost btn-block" hidden disabled
               data-push-enable-target="button" data-action="push-enable#enable"><%= t("accounts.push_reminders.repair_button") %></button>
     </div>
 
     <%= form_with url: push_subscription_path, method: :patch, class: "reminder-nudges" do |form| %>
-      <label>
-        <%= form.check_box :nudges, checked: current_user.reminders_ready_and_nudges?,
-                                    checked_value: "1", unchecked_value: "0" %>
+      <label class="switch-row card-note">
         <%= t("accounts.push_reminders.nudges_label", window: PushNudgePlan.window_description) %>
+        <%= form.check_box :nudges, { class: "switch", role: "switch", checked: current_user.reminders_ready_and_nudges? }, "1", "0" %>
       </label>
-      <%= form.submit t("accounts.push_reminders.save"), class: "btn btn-ghost" %>
+      <%= form.submit t("accounts.push_reminders.save"), class: "btn btn-ghost btn-block" %>
     <% end %>
 
-    <%= button_to t("accounts.push_reminders.turn_off"), push_subscription_path, method: :delete, class: "btn btn-ghost" %>
+    <%= button_to t("accounts.push_reminders.turn_off"), push_subscription_path, method: :delete, class: "btn btn-ghost btn-block" %>
   <% else %>
-    <p><%= t("accounts.push_reminders.offer") %></p>
+    <p class="card-note"><%= t("accounts.push_reminders.offer") %></p>
     <div data-controller="push-enable"
          <%= tag.attributes(data: push_settings_data("push_enable")) %>
          <%= tag.attributes(data: push_enable_outcome_texts.merge(
                push_enable_home_screen_only_text_value: t("accounts.push_reminders.home_screen_only", app_name: t("app_name")),
                push_enable_unsupported_text_value: t("accounts.push_reminders.unsupported"))) %>>
-      <button type="button" id="push-enable" class="btn btn-ghost" disabled
+      <button type="button" id="push-enable" class="btn btn-ghost btn-block" disabled
               data-push-enable-target="button" data-action="push-enable#enable"><%= t("accounts.push_reminders.turn_on") %></button>
       <p class="reminder-status" id="push-status" hidden data-push-enable-target="status"></p>
     </div>
   <% end %>
-</div>
+</section>
