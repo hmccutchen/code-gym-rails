@@ -94,6 +94,7 @@ class User < ApplicationRecord
 
       if BCrypt::Password.new(user.login_code_digest) == code.to_s.strip
         user.clear_login_code!
+        yield user if block_given?
         return user
       end
 

@@ -33,6 +33,22 @@ RSpec.describe "Authenticator app", type: :system do
     page.evaluate_script("window.getSelection().toString()")
   end
 
+  it "shows the recovery codes and stays signed in on a double tap of Turn on" do
+    visit_as(user)
+    visit account_authenticator_path
+    fill_in "Enter the 6-digit code your app shows", with: current_totp(setup_key)
+    wait_for_js
+    page.execute_script(<<~JS)
+      const button = [...document.querySelectorAll("input[type=submit]")].find((b) => b.value === "Turn on");
+      button.click();
+      setTimeout(() => button.click(), 20);
+    JS
+
+    expect(page).to have_css(".recovery-code-list li", count: 10)
+    visit account_path
+    expect(page).to have_current_path(account_path)
+  end
+
   it "turns on, signs in through the second step with each kind of code, and turns off" do
     visit_as(user)
     secret, codes = turn_on_authenticator

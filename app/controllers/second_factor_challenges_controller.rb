@@ -3,7 +3,6 @@ class SecondFactorChallengesController < ApplicationController
 
   skip_before_action :require_login
   skip_before_action :require_provider
-  before_action :require_open_challenge
 
   RATE_LIMIT_STORE = LazyCacheStore.new
 
@@ -20,6 +19,8 @@ class SecondFactorChallengesController < ApplicationController
              name:  "second_factor_attempts",
              only:  :create
 
+  before_action :require_open_challenge
+
   # GET /login/second-factor
   def new
   end
@@ -27,14 +28,15 @@ class SecondFactorChallengesController < ApplicationController
   # POST /login/second-factor
   def create
     checked_at = Time.current
-    outcome = @user.answer_second_factor_challenge!(params[:otp_code], issued_at: pending_second_factor["at"])
+    outcome = @user.answer_second_factor_challenge!(params[:otp_code], issued_at: pending_second_factor["at"]) do |accepted|
+      remember_sign_in(@user, second_factor_proof, checked_at, notice: sign_in_notice(accepted))
+    end
     case outcome.status
-    when :totp            then complete_sign_in(@user, checked_at: checked_at)
-    when :recovery_code   then complete_sign_in_with_recovery_code(outcome.remaining, checked_at)
+    when :totp, :recovery_code then complete_sign_in_with_notice(sign_in_notice(outcome), checked_at)
     when :rejected        then render_new(t("second_factor_challenges.rejected"), :unprocessable_content)
     when :locked          then lock_out(outcome.retry_at)
     when :challenge_ended then end_challenge(t("second_factor_challenges.too_many_wrong_codes"))
-    when :expired         then end_challenge(t("second_factor_challenges.expired"))
+    when :expired         then complete_repeated_sign_in || end_challenge(t("second_factor_challenges.expired"))
     else raise ArgumentError, "unhandled second-factor outcome: #{outcome.status}"
     end
   end
@@ -44,13 +46,28 @@ class SecondFactorChallengesController < ApplicationController
   def require_open_challenge
     @user = User.active.find_by(id: pending_second_factor["user_id"])
     return if @user&.second_factor_challenge_open?(pending_second_factor["at"])
+    return if request.post? && complete_repeated_sign_in
 
     end_challenge(t("second_factor_challenges.expired"))
   end
 
-  def complete_sign_in_with_recovery_code(remaining, checked_at)
+  def second_factor_proof = [ pending_second_factor["user_id"], pending_second_factor["at"], params[:otp_code].to_s ]
+
+  def complete_repeated_sign_in
+    recent = recent_sign_in(@user, second_factor_proof) or return false
+
+    PendingTrial.forget(session)
+    complete_sign_in_with_notice(recent[:notice], recent[:checked_at])
+    true
+  end
+
+  def sign_in_notice(outcome)
+    t("second_factor_challenges.recovery_code_used", count: outcome.remaining) if outcome.status == :recovery_code
+  end
+
+  def complete_sign_in_with_notice(notice, checked_at)
     complete_sign_in(@user, checked_at: checked_at)
-    flash[:notice] = t("second_factor_challenges.recovery_code_used", count: remaining)
+    flash[:notice] = notice if notice
   end
 
   def lock_out(retry_at)

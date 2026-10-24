@@ -16,8 +16,7 @@
     </p>
     <%# #prepare enqueues from missing rows, so a second press would enqueue jobs still in flight again. %>
     <%= button_to t("learn.prepare_button"), prepare_learn_path, class: "btn btn-sm",
-                  form: { id: "learn-prepare-form", data: { controller: "loading-form",
-                          action: "submit->loading-form#submit pageshow@window->loading-form#restore" } } %>
+                  form: { id: "learn-prepare-form", data: loading_form_data } %>
   </div>
 <% end %>
 
