@@ -6,12 +6,7 @@ RSpec.describe "Allowing notifications on a device after reminders are already o
   let(:new_endpoint) { PushApiStubs::REINSTALLED_ENDPOINT }
 
   around do |example|
-    ENV["VAPID_PUBLIC_KEY"] = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U"
-    ENV["VAPID_PRIVATE_KEY"] = "private"
-    example.run
-  ensure
-    ENV.delete("VAPID_PUBLIC_KEY")
-    ENV.delete("VAPID_PRIVATE_KEY")
+    with_push_credentials { example.run }
   end
 
   before { user.push_subscriptions.create!(endpoint: old_endpoint, p256dh_key: "old-p256dh", auth_key: "old-auth") }

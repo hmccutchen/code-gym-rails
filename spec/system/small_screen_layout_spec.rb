@@ -276,12 +276,7 @@ RSpec.describe "Small screen layout", type: :system do
     let(:user) { create_fake_provider_user.tap { |user| user.update!(reminder_level: "ready_and_nudges") } }
 
     around do |example|
-      ENV["VAPID_PUBLIC_KEY"] = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U"
-      ENV["VAPID_PRIVATE_KEY"] = "private"
-      example.run
-    ensure
-      ENV.delete("VAPID_PUBLIC_KEY")
-      ENV.delete("VAPID_PRIVATE_KEY")
+      with_push_credentials { example.run }
     end
 
     before do
@@ -343,6 +338,7 @@ RSpec.describe "Small screen layout", type: :system do
         expect(visible_heights(".btn-block").size).to eq(7)
         expect(visible_heights(".btn-block")).to all(be >= 48)
         button_and_card_widths.each { |button, card| expect(button).to be_within(1).of(card - 34) }
+        expect(heights(".switch-row").size).to eq(1)
         expect(heights(".switch-row")).to all(be >= 48)
         expect(card_paddings).to all(eq("16px"))
         expect(card_gaps).to all(be_within(0.5).of(16))
