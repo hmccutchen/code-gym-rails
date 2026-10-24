@@ -61,7 +61,8 @@ read it before changing that area.
   code; `palette_contrast_spec` holds both palettes to WCAG AA; the nav
   collapses on one `@container` rule that `mobile_nav_menu_spec` guards.
 - **Phone card styles**: `phone_cards.css` holds the card, full-width button
-  and switch styles for the settings pages, Account first; it loads on every
+  and switch styles, plus the value row, segmented control, card tag and
+  collapsible card, for the Account and Settings pages; it loads on every
   page, so a new rule in it stays scoped to its own class.
 - **Push reminders** (`docs/decisions/push-reminders.md`): Optional weekday
   ready and afternoon nudge notifications. Intent (`User#reminder_level`) and
@@ -70,7 +71,7 @@ read it before changing that area.
   both. Only submission stops the day's nudges; `PushNudgePlan` owns the
   window and `QUIET_PERIOD`, which must cover a full production tick
   (`push_nudge_plan_spec`), and `DailyResponse#submit_blocker` gates the copy.
-  Both kinds are enqueued from `GenerateDailyExercisesJob`'s cron branch, with
+  The nudges switch saves on change. Both kinds are enqueued from `GenerateDailyExercisesJob`'s cron branch, with
   no cron entry of their own and none from the on-demand branch.
   `WebPushCredentials` decides whether push exists, endpoints stay on
   `ALLOWED_ENDPOINT_HOSTS`, and `Notification.requestPermission()` must be the

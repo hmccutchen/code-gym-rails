@@ -155,7 +155,7 @@ What each listed file does.
 - `app/models/push_subscription.rb` — one browser install's endpoint. `.register!` upserts by endpoint, because the client re-subscribes on every launch
 - `app/jobs/send_push_reminder_job.rb` — both reminder kinds, fanned out over one user's endpoints: `:ready` on the tick that generates the set, `:nudge` on later ticks of the same hourly cron, each enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately. Owns the nudge's copy, which varies with how far through the day is — untouched, partway, answered but unrated, or ready to submit
 - `app/models/push_nudge_plan.rb` — the one authority for whether an hourly tick nudges: level, window, the not-submitted stopping rule, and the quiet period that keeps a half-finished day from being nudged while it is still being worked on. Pure, so its specs need no database
-- `app/controllers/push_subscriptions_controller.rb` — enrol (JSON, since only script can call it) and un-enrol (an ordinary form post, so turning it off never depends on the machinery that turns it on)
+- `app/controllers/push_subscriptions_controller.rb` — enrol (JSON, since only script can call it) and un-enrol (an ordinary form post, so turning it off never depends on the machinery that turns it on); `update` saves the nudges switch, answering JSON for the switch and HTML for the no-script form
 - `app/models/display_preferences.rb` — `DisplayPreferences`: the closed lists of display choices, and what the layout renders for them (`<html>` attributes, the light palette's media, status bar and theme color)
 - `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
 - `app/assets/stylesheets/phone_cards.css` — the card, full-width button and switch styles for the settings pages, Account first. Linked on every page, each rule scoped to its own class
@@ -166,7 +166,9 @@ What each listed file does.
 - `app/javascript/code_gym/draft_store.js` — the dashboard's one copy of unsent answers on the device; cleared on every signed-out page and on a submitted dashboard
 - `app/controllers/concerns/json_errors.rb` — `render_json_error`: the one shape of a JSON error reply
 - `app/views/shared/_push_script.html.erb` — mounts the `push-launch` controller, which re-subscribes on launch through `app/javascript/code_gym/push.js`; rendered from the layout for a signed-in user when push is configured
-- `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
+- `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives. The nudges switch saves on change through `save-switch` and keeps a `<noscript>` Save
+- `app/javascript/controllers/save_switch_controller.js` — the `save-switch` controller: a checkbox that saves the moment it changes (level suggestions, reminder nudges), with an optional inline status line and a revert when the save fails
+- `app/javascript/controllers/value_row_controller.js` — the `value-row` controller: copies a select's chosen option text into the visible span of a value row
 - `app/views/accounts/_api_usage.html.erb` — the Account page's card of this month's own-key spend, projection and per-provider dollars, from `ApiUsage.own_key_totals` and `MonthlySpend`
 - `app/views/accounts/_authenticator.html.erb` — the Account section for the authenticator app: a link to add it, or when it's on, the date, codes left, and the forms for new codes and turning it off
 - `app/views/pwa/service-worker.js.erb` — shows the notification, with the versioned icon. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing
