@@ -707,7 +707,7 @@ RSpec.describe "History", type: :request do
   end
 
   describe "concept reference lookups" do
-    it "looks each concept up once for the whole page rather than once per section" do
+    it "reads a repeated concept once for the page rather than once per section" do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "t",
                                explanation: "e", code_example: "x", senior_lens: "s")
       10.times do |i|
@@ -726,17 +726,26 @@ RSpec.describe "History", type: :request do
         )
       end
       login_as(user)
-      get history_path
 
       lookups = 0
-      counter = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
-        lookups += 1 if payload[:sql].include?('FROM "concept_references"')
+      round_trips = 0
+      instantiations = 0
+      sql = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        next unless payload[:sql].include?('FROM "concept_references"')
+        lookups += 1
+        round_trips += 1 unless payload[:cached]
+      end
+      built = ActiveSupport::Notifications.subscribe("instantiation.active_record") do |*, payload|
+        instantiations += payload[:record_count] if payload[:class_name] == "ConceptReference"
       end
       get history_path
-      ActiveSupport::Notifications.unsubscribe(counter)
+      ActiveSupport::Notifications.unsubscribe(sql)
+      ActiveSupport::Notifications.unsubscribe(built)
 
       expect(response.body).to include("N plus one")
       expect(lookups).to eq(1)
+      expect(round_trips).to eq(1)
+      expect(instantiations).to eq(1)
     end
   end
 end

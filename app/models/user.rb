@@ -340,7 +340,7 @@ class User < ApplicationRecord
   private :drilled_reinforcement
 
   def drill_order(cm)
-    seen = concept_exposure_index.fetch([ cm.concept, cm.language ], []).max
+    seen = concept_exposure_index.fetch([ cm.concept, cm.language ], Set.new).max
     [ seen ? 1 : 0, seen || Date.new, cm.drilled_at ]
   end
   private :drill_order
@@ -377,7 +377,7 @@ class User < ApplicationRecord
   end
 
   def concept_exposure_count(concept, bucket, on_or_before:)
-    concept_exposure_index.fetch([ concept, bucket ], []).count { |d| d <= on_or_before }
+    concept_exposure_index.fetch([ concept, bucket ], Set.new).count { |d| d <= on_or_before }
   end
 
   def language_for_today

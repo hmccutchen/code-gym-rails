@@ -3,7 +3,7 @@ module ConceptReferencesHelper
   def concept_reference_for(concept, language)
     return nil if concept.blank?
 
-    # Memoized per request: history renders every section of ten days, which repeats concepts.
+    # Memoized per request: one page repeats a concept across its sections and days.
     @concept_references ||= {}
     @concept_references.fetch([ concept, language ]) do |key|
       @concept_references[key] = ConceptReference.find_by(concept: concept, language: language)
