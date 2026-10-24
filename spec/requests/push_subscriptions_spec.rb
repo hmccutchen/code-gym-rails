@@ -307,7 +307,7 @@ RSpec.describe "Push subscriptions", type: :request do
     end
   end
 
-  describe "DELETE /push_subscription" do
+  describe "registration and Turn off" do
     it "locks the user before registering or removing endpoints" do
       configure_vapid
       login_as(user)
@@ -328,7 +328,9 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(user.reload.reminders_none?).to be(true)
       expect(user.push_subscriptions).to be_empty
     end
+  end
 
+  describe "DELETE /push_subscription" do
     # Rows left behind would keep the job pushing to a browser whose owner asked it to stop.
     it "drops the endpoints as well as the intent" do
       configure_vapid

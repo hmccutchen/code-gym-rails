@@ -87,8 +87,9 @@ leaves `reminder_level` on but gives the new install no permission, and the
 launch re-subscribe cannot ask for one outside a tap, so it fails silently.
 The Account page therefore checks this device's `Notification.permission`
 while the account is on: `default` shows "Allow notifications on this
-device", the same permission request and enrolment as Turn on, which leaves
-the level as it was; `denied` names the device setting; `granted` shows
+device", the same permission request as Turn on, but it registers only this
+device (`enroll: false`), so it never changes the level and is refused once
+reminders are off; `denied` names the device setting; `granted` shows
 nothing, since the launch re-subscribe already registers the endpoint. The
 old install's endpoint keeps receiving until Apple refuses it and
 `PushDelivery` prunes it.
