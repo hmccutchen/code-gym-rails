@@ -152,6 +152,40 @@ RSpec.describe "Small screen layout", type: :system do
     end
   end
 
+  [ [ 390, {} ], [ 320, LARGEST ] ].each do |width, prefs|
+    it "keeps History inside a #{width}px screen#{' with the largest text' if prefs.any?} when a review or an answer holds a long path" do
+      travel_to(a_weekday) do
+        user = create_fake_provider_user
+        user.update!(display_preferences: prefs)
+        long_path = "app/controllers/push_subscriptions_controller_with_a_longer_name.rb"
+        response = reviewed_day_for(user)
+        response.update!(answers: response.answers.transform_values { "See #{long_path} here." },
+                         ai_review: response.ai_review.transform_values { |review| review.merge("correct" => "Check #{long_path} first.") })
+        resize(width)
+        visit_as(user)
+        visit history_path
+
+        expect(page).to have_css(".review-block")
+        expect(page_width).to eq(width)
+        open_every_disclosure
+        expect(page_width).to eq(width)
+      end
+    end
+  end
+
+  it "keeps the submitted dashboard inside a 390px screen when its review holds a long path" do
+    travel_to(a_weekday) do
+      user = create_fake_provider_user
+      response = reviewed_day_for(user)
+      response.update!(ai_review: response.ai_review.transform_values { |review| review.merge("correct" => "Check app/controllers/push_subscriptions_controller_with_a_longer_name.rb first.") })
+      resize(390)
+      visit_as(user)
+
+      expect(page).to have_css(".review-block")
+      expect(page_width).to eq(390)
+    end
+  end
+
   it "keeps the duck's field inside the page at 320px with the largest text" do
     travel_to(a_weekday) do
       user = create_fake_provider_user

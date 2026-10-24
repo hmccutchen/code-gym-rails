@@ -263,6 +263,16 @@ shifts the nav.
 The main region is focused only as the skip link's target, and a ring around
 the whole page would read as an error.
 
+## `.review-block` wraps long words
+
+A review often names a file path or a chained method, one unbroken word that
+can be wider than a phone's text column. Without `overflow-wrap: anywhere`, a
+single path in the newest review made History 517px wide on a 390px phone as
+soon as it loaded, since that review opens by default. The dashboard's
+submitted state renders the same partial and had the same problem.
+`small_screen_layout_spec` holds both pages at 390px, and History at 320px
+with the largest text.
+
 ## Shared submission-rendering styles
 
 These are used by `responses/_section` (and the per-kind partials it renders),
