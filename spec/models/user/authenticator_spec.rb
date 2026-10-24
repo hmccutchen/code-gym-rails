@@ -330,6 +330,33 @@ RSpec.describe User::Authenticator, type: :model do
 
       expect(authenticator.disable!(code_at(secret, 1)).status).to eq(:already_off)
     end
+
+    it "keeps the challenge and the daily cap's count, which account deletion erases" do
+      challenged_at = Time.current.floor(6)
+      user.update!(second_factor_challenge_at: challenged_at, second_factor_challenge_failures: 2,
+                   second_factor_failures: 3, second_factor_failures_since: 1.hour.ago.floor(6))
+      cap_started_at = user.second_factor_failures_since
+
+      expect(authenticator.disable!(code_at(secret, 0)).status).to eq(:disabled)
+
+      expect(user.reload).to have_attributes(second_factor_challenge_at: challenged_at, second_factor_challenge_failures: 2,
+                                             second_factor_failures: 3, second_factor_failures_since: cap_started_at)
+    end
+  end
+
+  describe "ERASED_ON_ACCOUNT_DELETION" do
+    let(:erased) { described_class::ERASED_ON_ACCOUNT_DELETION }
+
+    it "names every users column this class reads or writes, apart from the two other code owns" do
+      source = Rails.root.join("app/models/user/authenticator.rb").read
+      touched = source.scan(/\buser\.(\w+)|\b(\w+):(?!:)/).flatten.compact.uniq & User.column_names
+
+      expect(touched - %w[email sessions_valid_after]).to match_array(erased.keys.map(&:to_s))
+    end
+
+    it "puts each column back to a new account's value" do
+      expect(erased.transform_keys(&:to_s)).to eq(User.column_defaults.slice(*erased.keys.map(&:to_s)))
+    end
   end
 
   it "stores otp_secret encrypted" do

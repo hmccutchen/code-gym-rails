@@ -55,6 +55,13 @@ every dashboard load while the user is paused.
 `with_lock` makes the method idempotent: a second call sees `anonymized?` and
 returns without overwriting `anonymized_at`.
 
+The authenticator's columns come from
+`User::Authenticator::ERASED_ON_ACCOUNT_DELETION`, spread into the same
+`update!`, so the class that owns those columns also says how deletion erases
+them. `sessions_valid_after` stays listed here because `SignedInSessions` owns
+it. `disable!` isn't used: turning the authenticator off keeps the sign-in
+challenge and the daily cap's count, which deletion erases.
+
 ## `#stored_providers`
 
 The list follows registry order, so Setup lists providers the same way every
