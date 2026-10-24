@@ -22,5 +22,5 @@ module PushCredentials
 end
 
 RSpec.configure do |config|
-  %i[system request job].each { |type| config.include PushCredentials, type: type }
+  %i[system request job service].each { |type| config.include PushCredentials, type: type }
 end

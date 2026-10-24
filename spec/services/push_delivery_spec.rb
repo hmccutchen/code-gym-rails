@@ -1,19 +1,12 @@
 require "rails_helper"
 
-RSpec.describe PushDelivery do
+RSpec.describe PushDelivery, type: :service do
   let(:user) { User.create!(email: "push@example.com", name: "Push") }
   let(:subscription) do
     PushSubscription.register!(user: user, endpoint: "https://push.example.com/abc", p256dh_key: "p256", auth_key: "auth")
   end
 
-  around do |example|
-    ENV["VAPID_PUBLIC_KEY"] = "public"
-    ENV["VAPID_PRIVATE_KEY"] = "private"
-    example.run
-  ensure
-    ENV.delete("VAPID_PUBLIC_KEY")
-    ENV.delete("VAPID_PRIVATE_KEY")
-  end
+  around { |example| with_push_credentials { example.run } }
 
   def deliver
     described_class.deliver(subscription, title: "Ready", body: "3 sections waiting.", path: "/")
@@ -22,7 +15,7 @@ RSpec.describe PushDelivery do
   it "sends a payload the service worker can read, signed with the VAPID pair" do
     expect(WebPush).to receive(:payload_send) do |args|
       expect(args[:endpoint]).to eq("https://push.example.com/abc")
-      expect(args[:vapid]).to include(public_key: "public", private_key: "private")
+      expect(args[:vapid]).to include(public_key: PushCredentials::PUBLIC_KEY, private_key: PushCredentials::PRIVATE_KEY)
       expect(JSON.parse(args[:message])).to eq(
         "title" => "Ready",
         "options" => { "body" => "3 sections waiting.", "data" => { "path" => "/" } }
@@ -69,9 +62,10 @@ RSpec.describe PushDelivery do
   end
 
   it "does not contact a push service when no keypair is configured" do
-    ENV.delete("VAPID_PUBLIC_KEY")
-    expect(WebPush).not_to receive(:payload_send)
+    without_push_credentials do
+      expect(WebPush).not_to receive(:payload_send)
 
-    expect(deliver).to be(false)
+      expect(deliver).to be(false)
+    end
   end
 end

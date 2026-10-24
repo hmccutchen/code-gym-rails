@@ -86,3 +86,10 @@ RSpec.describe "the push credential helpers in a job spec", type: :job do
     expect(self).to respond_to(:without_push_credentials)
   end
 end
+
+RSpec.describe "the push credential helpers in a service spec", type: :service do
+  it "is available" do
+    expect(self).to respond_to(:with_push_credentials)
+    expect(self).to respond_to(:without_push_credentials)
+  end
+end
