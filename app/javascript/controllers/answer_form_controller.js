@@ -79,6 +79,7 @@ export default class extends Controller {
       draftStore.clear()
       return false
     }
+    if (draft.scope === this.draftScopeValue && Array.isArray(draft.sent)) this.unconfirmedSaves = draft.sent.slice(-UNCONFIRMED_SAVES_KEPT)
     this.textareas.filter((area) => area.dataset.draftRestore !== "off").forEach((area) => {
       const saved = draft.answers?.[area.dataset.field]
       if (typeof saved !== "string" || area.value !== area.defaultValue) return

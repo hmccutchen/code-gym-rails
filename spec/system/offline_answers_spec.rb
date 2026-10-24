@@ -213,6 +213,35 @@ RSpec.describe "Answers through a lost connection", type: :system do
     end
   end
 
+  it "keeps the unconfirmed saves through a restore, so a second reload after the first save lands still restores" do
+    later = "#{answer} Then more, typed before either reload."
+    gate = { first_save: :held, later_save: :held }
+    allow_any_instance_of(ResponsesController).to receive(:create).and_wrap_original do |original, *args|
+      key = original.receiver.params.dig(:response, :answers, :code_review) == later ? :later_save : :first_save
+      wait_for(60) { gate[key] == :open }
+      original.call(*args)
+    end
+
+    travel_to(a_weekday) do
+      open_dashboard
+      fill_in_answer("code_review", answer)
+      wait_for_js_condition("(JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.sent || []).length === 1")
+      find(code_review_field).fill_in(with: later)
+      wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.code_review === #{later.to_json}")
+
+      reopen_dashboard
+      expect(find(code_review_field).value).to eq(later)
+      gate[:first_save] = :open
+      wait_for { user.daily_responses.first&.answers&.dig("code_review") == answer }
+
+      reopen_dashboard
+
+      expect(find(code_review_field).value).to eq(later)
+    ensure
+      gate[:later_save] = :open
+    end
+  end
+
   it "restores an edit typed behind a save whose reply was lost, after a retry with newer text also got none" do
     later = "#{answer} Then more, sent only by the retry."
     travel_to(a_weekday) do

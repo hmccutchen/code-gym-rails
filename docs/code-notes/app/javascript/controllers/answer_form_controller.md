@@ -161,6 +161,8 @@ either attempt may be the one that landed. It keeps the five most recent
 an older one that landed falls back to the old loss. Only an ok reply clears
 the list (`settleDraft()`), so a refused save's payload stays in it. That is
 harmless, since the page can only render it if the server already holds it.
+A restored copy hands its list to the page, so a save still on the wire
+through one reload stays in the list for the next.
 
 `rendersUnconfirmedSave()` then restores a copy whose token is out of date
 when its scope is the page's and the answers and ratings the server rendered
