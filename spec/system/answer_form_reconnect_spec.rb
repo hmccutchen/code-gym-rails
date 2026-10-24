@@ -14,14 +14,15 @@ RSpec.describe "Answer form reconnecting on the same controller", type: :system 
     page.execute_script(<<~JS)
       const originalFetch = window.fetch
       window.heldSaves = []
+      window.savesSent = 0
       window.releaseEverySave = () => {
         window.fetch = originalFetch
-        window.heldSaves.forEach((save) => save.release())
+        window.heldSaves.filter((save) => !save.released).forEach((save) => save.release())
       }
       window.fetch = (url, options) => {
         if (new URL(url, location.href).pathname !== "/responses") return originalFetch(url, options)
         return new Promise((resolve, reject) => window.heldSaves.push({
-          release: () => resolve(originalFetch(url, options)),
+          release() { this.released = true; window.savesSent += 1; resolve(originalFetch(url, options)) },
           lose: () => reject(new TypeError("Failed to fetch"))
         }))
       }
@@ -59,6 +60,7 @@ RSpec.describe "Answer form reconnecting on the same controller", type: :system 
       expect(stored_draft).to be_nil
       page.execute_script("window.releaseEverySave()")
       wait_for_answers_settled
+      expect(page.evaluate_script("window.savesSent")).to eq(page.evaluate_script("window.heldSaves.length"))
     end
   end
 
