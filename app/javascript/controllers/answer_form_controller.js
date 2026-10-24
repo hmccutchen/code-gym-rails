@@ -5,6 +5,7 @@ import saveStatus from "code_gym/save_status"
 import draftStore from "code_gym/draft_store"
 
 const AUTOSAVE_DELAY_MS = 800
+const UNCONFIRMED_SAVES_KEPT = 5
 
 function sortedEntries(object) {
   return Object.entries(object || {}).sort(([ a ], [ b ]) => (a < b ? -1 : a > b ? 1 : 0))
@@ -44,6 +45,7 @@ export default class extends Controller {
     this.blocker = this.submitBlockerValue || null
     this.saveTimer = null
     this.reviewRequested = false
+    this.unconfirmedSaves = []
 
     this.ratings = {}
     this.formTarget.querySelectorAll("button.rating-btn.active").forEach((button) => {
@@ -73,27 +75,47 @@ export default class extends Controller {
 
   restoreDraft() {
     const draft = draftStore.read()
-    if (!draft || draft.token !== this.draftToken) {
+    if (!draft || (draft.token !== this.draftToken && !this.rendersUnconfirmedSave(draft))) {
       draftStore.clear()
       return false
     }
+    let keptEarlyEdit = false
     this.textareas.filter((area) => area.dataset.draftRestore !== "off").forEach((area) => {
       const saved = draft.answers?.[area.dataset.field]
-      if (typeof saved !== "string" || area.value !== area.defaultValue) return
+      if (typeof saved !== "string") return
+      if (area.value !== area.defaultValue) {
+        if (area.value !== saved) keptEarlyEdit = true
+        return
+      }
       area.value = saved
       area.dispatchEvent(new CustomEvent("answer-form:restored", { bubbles: true }))
     })
     Object.entries(draft.ratings || {}).forEach(([section, rating]) => this.showRating(section, rating))
+    if (!keptEarlyEdit) this.takeOverUnconfirmedSaves(draft)
     return true
+  }
+
+  takeOverUnconfirmedSaves(draft) {
+    if (draft.scope !== this.draftScopeValue || !Array.isArray(draft.sent)) return
+    this.unconfirmedSaves = draft.sent.slice(-UNCONFIRMED_SAVES_KEPT)
+  }
+
+  rendersUnconfirmedSave(draft) {
+    if (draft.scope !== this.draftScopeValue || !Array.isArray(draft.sent)) return false
+    const rendered = {}
+    this.textareas.forEach((area) => rendered[area.dataset.field] = area.defaultValue)
+    return draft.sent.includes(canonicalDraft(rendered, this.ratings))
   }
 
   storeDraft() {
     if (this.formTarget.inert) return
     const { answers, section_ratings } = this.payload().response
-    this.draftKept = draftStore.write({ token: this.draftToken, answers: answers, ratings: section_ratings })
+    this.draftKept = draftStore.write({ token: this.draftToken, scope: this.draftScopeValue, sent: this.unconfirmedSaves,
+                                        answers: answers, ratings: section_ratings })
   }
 
   settleDraft(data) {
+    this.unconfirmedSaves = []
     if (typeof data?.draft_token === "string") this.draftToken = data.draft_token
     const sent = canonicalDraft(this.lastSent.response.answers, this.lastSent.response.section_ratings)
     const { answers, section_ratings } = this.payload().response
@@ -108,7 +130,17 @@ export default class extends Controller {
   nextSave() {
     if (this.formTarget.inert) return null
     this.lastSent = this.payload()
+    const sent = canonicalDraft(this.lastSent.response.answers, this.lastSent.response.section_ratings)
+    this.unconfirmedSaves = [ ...this.unconfirmedSaves.filter((earlier) => earlier !== sent), sent ].slice(-UNCONFIRMED_SAVES_KEPT)
+    this.recordUnconfirmedSaves(sent)
     return this.lastSent
+  }
+
+  recordUnconfirmedSaves(sent) {
+    const stored = draftStore.read()
+    if (stored?.token !== this.draftToken || stored.scope !== this.draftScopeValue) return
+    if (canonicalDraft(stored.answers, stored.ratings) !== sent) return
+    this.draftKept = draftStore.write({ ...stored, sent: this.unconfirmedSaves })
   }
 
   isAnswered(textarea) {

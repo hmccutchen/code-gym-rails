@@ -105,6 +105,8 @@ which stubs only the mode's weights. A `WeightedRoll.pick` stub without
 
 CI runs the suite against Postgres 18, the major version production runs, on every PR (see `.github/workflows/ci.yml`).
 
+Every CI job pins `runs-on: ubuntu-24.04` rather than `ubuntu-latest`. When `ubuntu-latest` moved to Ubuntu 26.04 on 2026-10-24, `ruby/setup-ruby` had no build of the Ruby in `.ruby-version` (3.3.6) for it, and every job failed at "Set up Ruby". Move the runner when the Ruby version moves, and check that `setup-ruby` has that version for the new image.
+
 When a scoped run is enough and when it isn't — the shared authorities that
 always pull in the full suite — is stated once, in
 `.github/copilot-instructions.md` under "Reviewing the pull request itself".

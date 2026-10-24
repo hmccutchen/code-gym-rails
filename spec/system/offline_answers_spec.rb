@@ -151,6 +151,175 @@ RSpec.describe "Answers through a lost connection", type: :system do
     end
   end
 
+  it "restores an edit typed behind a save the server committed but whose reply the reload cut off" do
+    later = "#{answer} Then a second sentence, typed while that save was on the wire."
+    reply = { held: false }
+    allow_any_instance_of(ResponsesController).to receive(:create).and_wrap_original do |original, *args|
+      original.call(*args).tap { wait_for { !reply[:held] } }
+    end
+
+    travel_to(a_weekday) do
+      open_dashboard
+      reply[:held] = true
+      fill_in_answer("code_review", answer)
+      wait_for { user.daily_responses.first&.answers&.dig("code_review") == answer }
+      find(code_review_field).fill_in(with: later)
+      wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.code_review === #{later.to_json}")
+
+      visit root_path
+      reply[:held] = false
+      expect(page).to have_content(/Code Review/i)
+      wait_for_js
+
+      expect(find(code_review_field).value).to eq(later)
+      wait_for { user.daily_responses.reload.sole.answers["code_review"] == later }
+    end
+  end
+
+  def plant_copy_of_a_save_this_page_shows(scope:, answer:)
+    page.execute_script(<<~JS)
+      const byKey = ([ a ], [ b ]) => (a < b ? -1 : a > b ? 1 : 0)
+      const rendered = {}
+      document.querySelectorAll("textarea[data-field]").forEach((area) => rendered[area.dataset.field] = area.defaultValue)
+      const ratings = {}
+      document.querySelectorAll("button.rating-btn.active").forEach((button) => ratings[button.dataset.ratingFor] = button.dataset.rating)
+      const sent = JSON.stringify([ Object.entries(rendered).sort(byKey), Object.entries(ratings).sort(byKey) ])
+      const pageScope = document.querySelector("[data-answer-form-draft-scope-value]").dataset.answerFormDraftScopeValue
+      localStorage.setItem("code-gym-answer-draft", JSON.stringify({ token: "an-older-token", scope: #{scope.to_json} ?? pageScope,
+        sent: [ sent ], answers: { ...rendered, code_review: #{answer.to_json} }, ratings: ratings }))
+    JS
+  end
+
+  it "restores a copy whose save on the wire is what this page shows" do
+    travel_to(a_weekday) do
+      open_dashboard
+      plant_copy_of_a_save_this_page_shows(scope: nil, answer: answer)
+
+      reopen_dashboard
+
+      expect(find(code_review_field).value).to eq(answer)
+    end
+  end
+
+  it "does not restore a copy from another day's set, even when its save on the wire is what this page shows" do
+    travel_to(a_weekday) do
+      open_dashboard
+      plant_copy_of_a_save_this_page_shows(scope: "another-day", answer: answer)
+
+      reopen_dashboard
+
+      expect(find(code_review_field).value).not_to eq(answer)
+      expect(stored_draft).to be_nil
+    end
+  end
+
+  it "keeps the unconfirmed saves through a restore, so a second reload after the first save lands still restores" do
+    later = "#{answer} Then more, typed before either reload."
+    gate = { first_save: :held, later_save: :held }
+    allow_any_instance_of(ResponsesController).to receive(:create).and_wrap_original do |original, *args|
+      key = original.receiver.params.dig(:response, :answers, :code_review) == later ? :later_save : :first_save
+      wait_for(60) { gate[key] == :open }
+      original.call(*args)
+    end
+
+    travel_to(a_weekday) do
+      open_dashboard
+      fill_in_answer("code_review", answer)
+      wait_for_js_condition("(JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.sent || []).length === 1")
+      find(code_review_field).fill_in(with: later)
+      wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.code_review === #{later.to_json}")
+
+      reopen_dashboard
+      expect(find(code_review_field).value).to eq(later)
+      gate[:first_save] = :open
+      wait_for { user.daily_responses.first&.answers&.dig("code_review") == answer }
+
+      reopen_dashboard
+
+      expect(find(code_review_field).value).to eq(later)
+    ensure
+      gate[:later_save] = :open
+    end
+  end
+
+  it "leaves another tab's newer copy alone when this tab retries a save" do
+    travel_to(a_weekday) do
+      open_dashboard
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch
+        window.saveAttempts = 0
+        window.fetch = (url, options) => {
+          if (new URL(url, location.href).pathname !== "/responses") return originalFetch(url, options)
+          window.saveAttempts += 1
+          return Promise.reject(new TypeError("offline"))
+        }
+      JS
+      fill_in_answer("code_review", answer)
+      wait_for_js_condition("window.saveAttempts === 1")
+      other_tab_copy = { "token" => "a-regenerated-set:9:0", "scope" => "a-regenerated-set", "sent" => [],
+                         "answers" => { "code_review" => "Another tab's newer answer." }, "ratings" => {} }
+      page.execute_script("localStorage.setItem('code-gym-answer-draft', #{other_tab_copy.to_json.to_json})")
+
+      page.execute_script("window.dispatchEvent(new Event('online'))")
+      wait_for_js_condition("window.saveAttempts >= 2")
+
+      expect(stored_draft).to eq(other_tab_copy)
+    end
+  end
+
+  it "doesn't carry another tab's unconfirmed save into this tab's edited copy" do
+    other_tab_answer = "Another tab's answer, which reached the server without a reply."
+    travel_to(a_weekday) do
+      open_dashboard
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch
+        window.fetch = (url, options) => new URL(url, location.href).pathname === "/responses" ? Promise.reject(new TypeError("offline")) : originalFetch(url, options)
+        const byKey = ([ a ], [ b ]) => (a < b ? -1 : a > b ? 1 : 0)
+        const rendered = {}
+        document.querySelectorAll("textarea[data-field]").forEach((area) => rendered[area.dataset.field] = area.defaultValue)
+        const landed = { ...rendered, code_review: #{other_tab_answer.to_json} }
+        const form = document.querySelector("[data-answer-form-draft-token-value]").dataset
+        localStorage.setItem("code-gym-answer-draft", JSON.stringify({ token: form.answerFormDraftTokenValue, scope: form.answerFormDraftScopeValue,
+          sent: [ JSON.stringify([ Object.entries(landed).sort(byKey), [] ]) ], answers: landed, ratings: {} }))
+      JS
+      other_field = all("textarea[data-field]").map { _1["data-field"] }.find { _1 != "code_review" && find(%(textarea[data-field="#{_1}"]), visible: :all).visible? }
+      find(%(textarea[data-field="#{other_field}"])).fill_in(with: answer)
+      wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.[#{other_field.to_json}] === #{answer.to_json}")
+      exercise = user.daily_exercises.sole
+      user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, answers: { "code_review" => other_tab_answer })
+
+      reopen_dashboard
+
+      expect(find(code_review_field).value).to eq(other_tab_answer)
+      expect(stored_draft).to be_nil
+    end
+  end
+
+  it "restores an edit typed behind a save whose reply was lost, after a retry with newer text also got none" do
+    later = "#{answer} Then more, sent only by the retry."
+    travel_to(a_weekday) do
+      open_dashboard
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch
+        window.fetch = (url, options) => {
+          if (new URL(url, location.href).pathname !== "/responses") return originalFetch(url, options)
+          if (window.firstSaveSent) return Promise.reject(new TypeError("offline"))
+          window.firstSaveSent = true
+          return originalFetch(url, options).then(() => Promise.reject(new TypeError("reply lost")))
+        }
+      JS
+      fill_in_answer("code_review", answer)
+      wait_for { user.daily_responses.first&.answers&.dig("code_review") == answer }
+      find(code_review_field).fill_in(with: later)
+      page.execute_script("window.dispatchEvent(new Event('online'))")
+      wait_for_js_condition("(JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.sent || []).some((sent) => sent.includes(#{later.to_json}))")
+
+      reopen_dashboard
+
+      expect(find(code_review_field).value).to eq(later)
+    end
+  end
+
   it "keeps a rating changed while an earlier save was on the wire" do
     travel_to(a_weekday) do
       open_dashboard
