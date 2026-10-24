@@ -99,8 +99,9 @@ statement still parses inside the stub's conditional.
 
 ## The pull-refresh note key comes from `code_gym_bootstrap.js`
 
-`JavascriptReadyHelper::PULL_NOTE_KEY` is read the same way from the
-`var PULL_NOTE = "..."` line in `app/assets/javascripts/code_gym_bootstrap.js`,
+`JavascriptReadyHelper::PULL_NOTE_KEY` is read the same way as the draft key,
+from the `var PULL_NOTE = "..."` line in
+`app/assets/javascripts/code_gym_bootstrap.js`,
 which owns the `sessionStorage` note a pull-to-refresh leaves for the reloaded
 page. That line may be indented, since it sits inside the bootstrap's wrapper
 function. Specs leave the note with `leave_pull_note` and check it was cleared
