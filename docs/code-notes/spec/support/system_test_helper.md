@@ -48,3 +48,20 @@ clicked straight away raced the modules, and on a loaded run it lost.
 `application.js` also sets the marker when it gives up after ten seconds with
 a controller still missing, so the marker alone would let an example run
 against a page whose controller never arrived.
+
+## The draft key comes from `draft_store.js`
+
+`JavascriptReadyHelper::DRAFT_KEY` is read from the `const KEY = "..."` line
+in `app/javascript/code_gym/draft_store.js`, the key's one owner, and loading
+the spec support raises if that line changes shape. Specs reach the stored
+copy through `draft_key_js`, `stored_draft_js`, `draft_absent_js`,
+`wait_for_draft_cleared` and `wait_for_answers_settled` instead of writing
+the key out. A copied key would keep every wait for the copy to be `null`
+passing at once after a rename, so those waits would stop guarding anything
+(#501).
+
+`wait_for_draft_cleared` and `wait_for_answers_settled` are different waits.
+The first holds once no copy is kept on the device; the second also needs
+`CodeGymSaveStatus` to have no save queued or on the wire, since a queued
+save can still write a copy back. `spec/conventions/system_spec_waits_spec.rb`
+fails on the key or a string-keyed `localStorage` call in a system spec.

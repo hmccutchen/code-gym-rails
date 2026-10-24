@@ -78,9 +78,36 @@ module JavascriptReadyHelper
         window.Stimulus.getControllerForElementAndIdentifier(element, identifier)))
   JS
 
+  DRAFT_STORE_PATH = Rails.root.join("app/javascript/code_gym/draft_store.js")
+
+  def self.draft_key_in(source)
+    source[/^const KEY = "([^"\\]+)"$/, 1] or
+      raise "Found no `const KEY = \"...\"` line in #{DRAFT_STORE_PATH}; JavascriptReadyHelper reads the draft key from it"
+  end
+
+  DRAFT_KEY = draft_key_in(DRAFT_STORE_PATH.read).freeze
+  DRAFT_KEY_JS = DRAFT_KEY.to_json.freeze
+  STORED_DRAFT = "JSON.parse(localStorage.getItem(#{DRAFT_KEY_JS}) || 'null')".freeze
+  DRAFT_ABSENT = "localStorage.getItem(#{DRAFT_KEY_JS}) === null".freeze
+  ANSWERS_SETTLED = "#{DRAFT_ABSENT} && !window.CodeGymSaveStatus.pending()".freeze
+
   def wait_for_js
     expect(page).to have_css("html[data-js-ready]", visible: :all)
     wait_for_js_condition(EVERY_CONTROLLER_CONNECTED)
+  end
+
+  def draft_key_js = DRAFT_KEY_JS
+
+  def stored_draft_js = STORED_DRAFT
+
+  def draft_absent_js = DRAFT_ABSENT
+
+  def wait_for_draft_cleared
+    wait_for_js_condition(DRAFT_ABSENT)
+  end
+
+  def wait_for_answers_settled
+    wait_for_js_condition(ANSWERS_SETTLED)
   end
 
   NAVIGATED_AWAY = /Execution context was destroyed|Cannot find context/

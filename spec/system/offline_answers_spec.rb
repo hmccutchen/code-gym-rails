@@ -14,7 +14,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
   end
 
   def stored_draft
-    raw = page.evaluate_script("localStorage.getItem('code-gym-answer-draft') ?? ''")
+    raw = page.evaluate_script("localStorage.getItem(#{draft_key_js}) ?? ''")
     raw.empty? ? nil : JSON.parse(raw)
   end
 
@@ -26,7 +26,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
   def keep_an_unsent_answer
     break_the_network
     find(code_review_field).fill_in(with: answer)
-    wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.code_review === #{answer.to_json}")
+    wait_for_js_condition("#{stored_draft_js}?.answers?.code_review === #{answer.to_json}")
   end
 
   def reopen_dashboard
@@ -51,7 +51,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
 
       expect(page).to have_no_css("#save-status", visible: true)
       expect(user.daily_responses.sole.answers["code_review"]).to eq(answer)
-      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null")
+      wait_for_draft_cleared
     end
   end
 
@@ -63,7 +63,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       reopen_dashboard
 
       expect(find(code_review_field).value).to eq(answer)
-      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null")
+      wait_for_draft_cleared
       expect(user.daily_responses.sole.answers["code_review"]).to eq(answer)
     end
   end
@@ -75,14 +75,14 @@ RSpec.describe "Answers through a lost connection", type: :system do
       comparison = find(%([data-comparison-answer="design_comparison"]))
       comparison.choose("Piece B")
       comparison.find("textarea[data-comparison-reason]").fill_in(with: "Piece B keeps the retry policy in one place.")
-      wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.design_comparison?.includes('retry policy')")
+      wait_for_js_condition("#{stored_draft_js}?.answers?.design_comparison?.includes('retry policy')")
 
       reopen_dashboard
 
       comparison = find(%([data-comparison-answer="design_comparison"]))
       expect(comparison.find_field("Piece B", visible: :all)).to be_checked
       expect(comparison.find("textarea[data-comparison-reason]").value).to eq("Piece B keeps the retry policy in one place.")
-      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null")
+      wait_for_draft_cleared
       expect(user.daily_responses.sole.answers["design_comparison"]).to eq("pick:b\nPiece B keeps the retry policy in one place.")
     end
   end
@@ -104,7 +104,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
     travel_to(a_weekday) do
       open_dashboard
       find(code_review_field).fill_in(with: "An answer that reached the server first.")
-      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null && document.querySelector('.section-status[data-status-for=\"code_review\"]')?.textContent.trim() !== ''")
+      wait_for_js_condition("#{draft_absent_js} && document.querySelector('.section-status[data-status-for=\"code_review\"]')?.textContent.trim() !== ''")
       keep_an_unsent_answer
       user.daily_responses.sole.destroy
 
@@ -164,7 +164,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       fill_in_answer("code_review", answer)
       wait_for { user.daily_responses.first&.answers&.dig("code_review") == answer }
       find(code_review_field).fill_in(with: later)
-      wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.code_review === #{later.to_json}")
+      wait_for_js_condition("#{stored_draft_js}?.answers?.code_review === #{later.to_json}")
 
       visit root_path
       reply[:held] = false
@@ -185,7 +185,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       document.querySelectorAll("button.rating-btn.active").forEach((button) => ratings[button.dataset.ratingFor] = button.dataset.rating)
       const sent = JSON.stringify([ Object.entries(rendered).sort(byKey), Object.entries(ratings).sort(byKey) ])
       const pageScope = document.querySelector("[data-answer-form-draft-scope-value]").dataset.answerFormDraftScopeValue
-      localStorage.setItem("code-gym-answer-draft", JSON.stringify({ token: "an-older-token", scope: #{scope.to_json} ?? pageScope,
+      localStorage.setItem(#{draft_key_js}, JSON.stringify({ token: "an-older-token", scope: #{scope.to_json} ?? pageScope,
         sent: [ sent ], answers: { ...rendered, code_review: #{answer.to_json} }, ratings: ratings }))
     JS
   end
@@ -225,9 +225,9 @@ RSpec.describe "Answers through a lost connection", type: :system do
     travel_to(a_weekday) do
       open_dashboard
       fill_in_answer("code_review", answer)
-      wait_for_js_condition("(JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.sent || []).length === 1")
+      wait_for_js_condition("(#{stored_draft_js}?.sent || []).length === 1")
       find(code_review_field).fill_in(with: later)
-      wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.code_review === #{later.to_json}")
+      wait_for_js_condition("#{stored_draft_js}?.answers?.code_review === #{later.to_json}")
 
       reopen_dashboard
       expect(find(code_review_field).value).to eq(later)
@@ -258,7 +258,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       wait_for_js_condition("window.saveAttempts === 1")
       other_tab_copy = { "token" => "a-regenerated-set:9:0", "scope" => "a-regenerated-set", "sent" => [],
                          "answers" => { "code_review" => "Another tab's newer answer." }, "ratings" => {} }
-      page.execute_script("localStorage.setItem('code-gym-answer-draft', #{other_tab_copy.to_json.to_json})")
+      page.execute_script("localStorage.setItem(#{draft_key_js}, #{other_tab_copy.to_json.to_json})")
 
       page.execute_script("window.dispatchEvent(new Event('online'))")
       wait_for_js_condition("window.saveAttempts >= 2")
@@ -279,12 +279,12 @@ RSpec.describe "Answers through a lost connection", type: :system do
         document.querySelectorAll("textarea[data-field]").forEach((area) => rendered[area.dataset.field] = area.defaultValue)
         const landed = { ...rendered, code_review: #{other_tab_answer.to_json} }
         const form = document.querySelector("[data-answer-form-draft-token-value]").dataset
-        localStorage.setItem("code-gym-answer-draft", JSON.stringify({ token: form.answerFormDraftTokenValue, scope: form.answerFormDraftScopeValue,
+        localStorage.setItem(#{draft_key_js}, JSON.stringify({ token: form.answerFormDraftTokenValue, scope: form.answerFormDraftScopeValue,
           sent: [ JSON.stringify([ Object.entries(landed).sort(byKey), [] ]) ], answers: landed, ratings: {} }))
       JS
       other_field = all("textarea[data-field]").map { _1["data-field"] }.find { _1 != "code_review" && find(%(textarea[data-field="#{_1}"]), visible: :all).visible? }
       find(%(textarea[data-field="#{other_field}"])).fill_in(with: answer)
-      wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.[#{other_field.to_json}] === #{answer.to_json}")
+      wait_for_js_condition("#{stored_draft_js}?.answers?.[#{other_field.to_json}] === #{answer.to_json}")
       exercise = user.daily_exercises.sole
       user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, answers: { "code_review" => other_tab_answer })
 
@@ -312,7 +312,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       wait_for { user.daily_responses.first&.answers&.dig("code_review") == answer }
       find(code_review_field).fill_in(with: later)
       page.execute_script("window.dispatchEvent(new Event('online'))")
-      wait_for_js_condition("(JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.sent || []).some((sent) => sent.includes(#{later.to_json}))")
+      wait_for_js_condition("(#{stored_draft_js}?.sent || []).some((sent) => sent.includes(#{later.to_json}))")
 
       reopen_dashboard
 
@@ -324,7 +324,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
     travel_to(a_weekday) do
       open_dashboard
       fill_in_answer("code_review", answer)
-      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null && !window.CodeGymSaveStatus.pending()")
+      wait_for_answers_settled
       page.execute_script(<<~JS)
         const originalFetch = window.fetch
         window.fetch = (url, options) => {
@@ -356,7 +356,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       JS
       find(code_review_field).fill_in(with: "Text from the stale tab.")
       wait_for_js_condition("typeof window.releaseSave === 'function'")
-      page.execute_script("localStorage.setItem('code-gym-answer-draft', #{{ token: newer_token, answers: { code_review: "Text from the newer tab." }, ratings: {} }.to_json.to_json})")
+      page.execute_script("localStorage.setItem(#{draft_key_js}, #{{ token: newer_token, answers: { code_review: "Text from the newer tab." }, ratings: {} }.to_json.to_json})")
 
       page.execute_script("window.releaseSave()")
 
@@ -375,7 +375,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       find(code_review_field).fill_in(with: answer)
       wait_for_js_condition("typeof window.releaseSave === 'function'")
       other_tab = stored_draft.merge("answers" => stored_draft["answers"].merge("code_review" => "Written in another tab."))
-      page.execute_script("localStorage.setItem('code-gym-answer-draft', #{other_tab.to_json.to_json})")
+      page.execute_script("localStorage.setItem(#{draft_key_js}, #{other_tab.to_json.to_json})")
 
       page.execute_script("window.releaseSave()")
       wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
@@ -394,11 +394,11 @@ RSpec.describe "Answers through a lost connection", type: :system do
       find(code_review_field).fill_in(with: answer)
       wait_for_js_condition("typeof window.releaseSave === 'function'")
       reordered = stored_draft.merge("answers" => stored_draft["answers"].to_a.reverse.to_h)
-      page.execute_script("localStorage.setItem('code-gym-answer-draft', #{reordered.to_json.to_json})")
+      page.execute_script("localStorage.setItem(#{draft_key_js}, #{reordered.to_json.to_json})")
 
       page.execute_script("window.releaseSave()")
 
-      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null && !window.CodeGymSaveStatus.pending()")
+      wait_for_answers_settled
     end
   end
 
@@ -413,7 +413,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       visit root_path
       expect(page).to have_no_css("#gym-form")
 
-      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null")
+      wait_for_draft_cleared
     end
   end
 
@@ -436,7 +436,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
 
       find(code_review_field).fill_in(with: answer)
 
-      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null && !window.CodeGymSaveStatus.pending()")
+      wait_for_answers_settled
       expect(user.daily_responses.sole.answers["code_review"]).to eq(answer)
     end
   end
@@ -450,7 +450,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
       click_button I18n.t("accounts.show.log_out")
 
       expect(page).to have_current_path(login_path)
-      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null")
+      wait_for_draft_cleared
     end
   end
 

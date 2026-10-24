@@ -61,7 +61,11 @@ A system spec waits through Capybara's matchers or `wait_for`
 loop or `Timeout.timeout`, and passes no `wait:` beyond a deliberately short
 negative check: every wait follows `Capybara.default_max_wait_time`, and
 `wait_for` raises on timeout instead of returning silently (#456).
-`spec/conventions/system_spec_waits_spec.rb` fails on either.
+A system spec reaches the answer draft copy through `JavascriptReadyHelper`
+(`draft_key_js`, `stored_draft_js`, `wait_for_draft_cleared`,
+`wait_for_answers_settled`), which reads the key from `draft_store.js`, never
+by writing the key or a string-keyed `localStorage` call itself (#501).
+`spec/conventions/system_spec_waits_spec.rb` fails on any of these.
 
 A system spec that needs today's set calls `visit_with_todays_set(user)`,
 which generates it before the first page load, since visiting first would wait
