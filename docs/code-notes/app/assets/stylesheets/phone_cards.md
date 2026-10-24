@@ -9,7 +9,7 @@ The card, full-width button and switch styles for the settings pages. The Accoun
 - `.card-note`: muted `.85rem` text inside a card.
 - `.btn-block`: a modifier on `.btn` that makes the button full width and at least 48px tall. `.btn` itself does not change.
 - `.switch-row`: a `<label>` holding text and a checkbox. The whole row, at least 48px tall, is the tap target.
-- `.switch`: the checkbox inside a switch row, drawn as a 44px track and a thumb. It has a disabled state and its own focus ring, because the layout's focus rule skips checkboxes.
+- `.switch`: the checkbox inside a switch row, drawn as a 44px track and a thumb. It has a disabled state and its own focus ring, because the layout's focus rule skips checkboxes. The off track uses `--muted` and the thumb uses `--surface`. With reduced motion the thumb stops sliding, and in forced-colors mode the switch falls back to a native checkbox.
 
 ## Side margins and the safe area
 
