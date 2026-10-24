@@ -34,19 +34,18 @@ this one.
   **why:** the name people see should match the domain I'm about to show
   developers
   **I decided:** the session cookie, storage keys and code names keep the old
-  name, since renaming the cookie signs everyone out; the README and
-  CONTEXT.md get renamed because the repo is public; the generation prompts go
-  in their own PR straight after, because rewriting the prompt snapshots is a
-  generation change, and nothing that freezes a day for public viewing lands
-  before it
+  name, since renaming the cookie signs everyone out; the README and CONTEXT.md
+  get renamed because the repo is public; the generation prompts go in their
+  own PR straight after, because rewriting the prompt snapshots is a generation
+  change, and nothing that freezes a day for public viewing lands before it
 - provider error classes moved off `AiService` into a `ProviderError` family
   `#441`
   **why:** the layered review found models depending on the provider client
   **I decided:** `ProviderError` as the home, no aliases, field lists in a
   second PR, `LANGUAGE_PROMPTS` left alone
 - setup problems recorded as their own kind, not as provider failures `#444`
-  **I decided:** changed my mind: record them as setup, since failing
-  unrescued left pages spinning
+  **I decided:** changed my mind: record them as setup, since failing unrescued
+  left pages spinning
 - the rest of `AiService`'s domain data moved onto the models `#445`
 - generation logging moved into `GenerationDiagnostics` `#448`
   **I decided:** diagnostics before prompts
@@ -55,8 +54,8 @@ this one.
 
 ## Tue Oct 20
 
-- the follow-up and alternate caps moved into `DailyResponse`, from the
-  layered review's issue `#449`
+- the follow-up and alternate caps moved into `DailyResponse`, from the layered
+  review's issue `#449`
   **I decided:** ran the critical review against what had merged since, and
   took its fixes in this PR: the review page reads the caps from the model too,
   and a spec now fails if the lock goes
@@ -74,20 +73,20 @@ this one.
   **why:** Railway builds were having problems, so I asked for it stacked on
   the review PR, to merge in order once they recover
 - the generation system prompt into `GenerationPrompt.system_prompt` `#466`
-- landed the generation system prompt move on main, since it merged into
-  its stacked base `#467`
+- landed the generation system prompt move on main, since it merged into its
+  stacked base `#467`
 - language wording and scenario pools into `LanguagePrompts` and
   `ScenarioPools` `#468`
-- landed the domain modules move on main, since it merged into its
-  stacked base too `#469`
-- ladder loading into `GenerationLadders`, the first of two PRs for
-  issue 431's orchestration step `#470`
-  **why:** I kept drafting out of `JudgedGeneration`, since unjudged days
-  draft too; each step is its own PR from main, as the issue says
-- drafting into `ExerciseDraft`, the second PR for issue 431's
-  orchestration step `#471`
-  **why:** I had the draft carry its user and language so the retry takes
-  only the draft, kind and concept
+- landed the domain modules move on main, since it merged into its stacked base
+  too `#469`
+- ladder loading into `GenerationLadders`, the first of two PRs for issue 431's
+  orchestration step `#470`
+  **why:** I kept drafting out of `JudgedGeneration`, since unjudged days draft
+  too; each step is its own PR from main, as the issue says
+- drafting into `ExerciseDraft`, the second PR for issue 431's orchestration
+  step `#471`
+  **why:** I had the draft carry its user and language so the retry takes only
+  the draft, kind and concept
 
 ## Wed Oct 21
 
@@ -126,25 +125,27 @@ this one.
   consequences of past answers, report only
   **why:** every exercise is a fresh start today, and I want a wrong answer on
   day 12 to be the real cause of a slow page on day 40, never a flattering one
-- spec for keeping the judge's blind design-comparison solves and settling
-  key disagreements `#483`
+- spec for keeping the judge's blind design-comparison solves and settling key
+  disagreements `#483`
   **why:** a true consequence needs a trustworthy answer key, and nobody can
   read why the judge and the key disagree, since the pick is logged and lost
   **I decided:** `both_defensible` is a call of its own, because ambiguous
   scenarios are what I most need to count; replayed and generated solves stay
   apart from live ones and never pick the fix; matched records get hand
-  spot-checks, since drafter and judge are one model family and can agree
-  while both wrong
+  spot-checks, since drafter and judge are one model family and can agree while
+  both wrong
   **I decided:** the fix is chosen by a rule written before the data, and I
   apply it by hand from plain counts; stage 1 merges on the OpenAI check and
   user 7's provider, and stage 2 is its own PR
 - replay first against a local dump of `daily_exercises`, then production
-  **why:** the real mismatch rate the night stage 1 merges, for under a
-  dollar, tells me whether there's enough signal to continue
+  **why:** the real mismatch rate the night stage 1 merges, for under a dollar,
+  tells me whether there's enough signal to continue
 - stage 1: a table and model to keep the judge's blind solves `#484`
-- stage 1: send OpenAI the judge's reply schema, with a tool to measure it `#485`
+- stage 1: send OpenAI the judge's reply schema, with a tool to measure it
+  `#485`
 - stage 1: record each live blind judge solve with the set `#486`
-- stage 1: a script that replays every stored design comparison through the judge `#487`
+- stage 1: a script that replays every stored design comparison through the
+  judge `#487`
 - stage 1: an admin page to read the judge solves and make the calls `#488`
 
 *Postponed: the recurring systems themselves, until I've read real mismatch
@@ -152,11 +153,11 @@ data.*
 
 ## Thu Oct 22
 
-- moved production onto a fresh Railway Postgres, then deleted the old
-  database and the copy job `#489`
+- moved production onto a fresh Railway Postgres, then deleted the old database
+  and the copy job `#489`
   **I decided:** a fresh database rather than rotating the old one's password
-- sign-in through Devise: a password plus an authenticator code, replacing
-  the emailed code `#490`
+- sign-in through Devise: a password plus an authenticator code, replacing the
+  emailed code `#490`
   **why:** after the breach I wanted the security-critical parts from
   maintained libraries rather than our own code
   **I decided:** backup codes for a lost phone, open sign-up with email
@@ -165,40 +166,41 @@ data.*
 
 ## Fri Oct 23
 
-- back to passwordless sign-in: take Devise out and restore the emailed code
-  as the only first factor, spec first `#491`
+- back to passwordless sign-in: take Devise out and restore the emailed code as
+  the only first factor, spec first `#491`
   **why:** I want no password column ever, with an authenticator app as an
   optional second factor later
-  **I decided:** open sign-up as before; the Devise columns dropped in the same
-  PR, mine being the only account; a 10-minute code, 15-minute limits; trusted
-  proxies split out, required before going public
+  **I decided:** open sign-up exactly as before, with the account created when
+  a code is requested; drop the Devise columns in the same PR, since mine is
+  the only account; a 10-minute code with the rate-limit windows kept at 15;
+  trusted proxies, with a spoofed-header test, split out and required before I
+  post publicly
 - from my layered review: the login code out of the job queue, and one
   signed-in lookup
 - an optional authenticator app as a second sign-in factor, spec and plan
   first, stacked on the passwordless PR `#493`
   **why:** possession of a phone is the second factor worth having, and the
   inbox alone is all that protects an account today
-  **I decided:** 20 wrong codes a day; wrong-code counts on the row; no-store
-  on secret pages; turning it on or off ends other sessions; recovery codes
-  matched by shape; a copy fallback; phone checks local first, production after
-- from its review: each session gets its own setup key, and the spec and plan
-  docs leave the PR
-  **I decided:** the model takes session values; extraction is an issue
+  **I decided:** a daily cap of 20 wrong codes; every wrong-code count kept on
+  the user row, not the cookie; no-store on pages with the key or codes;
+  turning it on or off ends every other session; recovery codes compared only
+  for recovery-shaped input; a copy fallback that selects the text; the phone
+  check split into the local network before merge and production after
+- from the review of the authenticator PR: each session gets its own setup key
+  **I decided:** the key stays in the session until a code verifies; the model
+  takes session values; spec and plan docs dropped; extraction is an issue
 - every PR gets a critical and a layered-design review, each by a separate
   agent `#492`
   **I decided:** a fresh agent checks each finding before anything changes
+- the test rules say CI runs on Postgres 18
 - locked out after turning on the authenticator: stop a double tap posting
   the sign-in forms twice `#495`
   **why:** I was signed out right after turning it on, every emailed code then
   said it was wrong, and the home-screen app ended on a 404
   **I decided:** Turn on and New recovery codes start disabled; the server
   accepts a repeat of a sign-in this browser just completed
-- with the authenticator on, sign in with the address and its code, no emailed
-  code `#496`
-  **why:** asking for the emailed code and then the authenticator felt
-  redundant, and the email form under the code field was confusing
-  **I decided:** a recovery code is the only way past a lost phone; I accept
-  the address-only lockout, the visible authenticator flag and the guessing
-  risk; the emailed code gets its own page; a factor check where sign-in ends
-- each API call's cost on its usage row, Anthropic keys only `#472`
-  **I decided:** prices stay on the providers; a timeout costs null
+- the cost of each API call on its usage row, for Anthropic keys only for now
+  `#472`
+  **I decided:** Gemini and OpenAI costs stay null; prices stay on the
+  providers; the design doc dropped; a timeout costs null
+- the Account usage card in dollars `#497`

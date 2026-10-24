@@ -34,10 +34,7 @@ read it before changing that area.
   never read trial state (`trial_isolation_spec`); trial branches render only
   for `User#on_trial?`. Trials are paused: the login page carries no trial
   link, while the routes and gates stay in place.
-- **Account usage table**: `/account` shows this calendar month's own-key
-  requests and tokens per provider from `ApiUsage.own_key_totals`, in the
-  user's zone. House-key rows stay out, since the account's key did not pay
-  for them. Input counts cache reads and writes; no cost is shown.
+- **Account usage card**: `/account` shows this calendar month's own-key spend in dollars, a weekday projection held until the 4th, while generation is paused, and whenever a provider has no priced rows, and per-provider dollars from `ApiUsage.own_key_totals` and `MonthlySpend`, in the user's zone. House-key rows stay out, since the account's key did not pay for them, and rows with no price are counted as unpriced (`docs/code-notes/app/models/monthly_spend.md`).
 - **Passwordless sign-in** (`docs/decisions/passwordless-sign-in.md`): an
   account signs in with its address and then the emailed code, or the
   authenticator in place of that code once it is on; no password column is
