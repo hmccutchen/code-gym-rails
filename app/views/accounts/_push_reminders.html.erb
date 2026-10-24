@@ -13,7 +13,7 @@
               data-push-enable-target="button" data-action="push-enable#enable"><%= t("accounts.push_reminders.repair_button") %></button>
     </div>
 
-    <%= form_with url: push_subscription_path, method: :patch, class: "reminder-nudges" do |form| %>
+    <%= form_with url: push_subscription_path, method: :patch do |form| %>
       <label class="switch-row card-note">
         <%= t("accounts.push_reminders.nudges_label", window: PushNudgePlan.window_description) %>
         <%= form.check_box :nudges, { class: "switch", role: "switch", checked: current_user.reminders_ready_and_nudges? }, "1", "0" %>

@@ -1,11 +1,8 @@
 <% page_title t("accounts.show.title") %>
 <style>
-  .account-id { color: var(--muted); font-size: .9rem; margin: 0; }
+  .account-id { color: var(--muted); font-size: .9rem; }
   .account-id .email { color: var(--text); font-family: monospace; display: block; margin-bottom: .2rem; overflow-wrap: anywhere; }
-  .card .card-note { margin-bottom: .75rem; }
-  .card > :where(form, .btn-block) + :where(form, .btn-block), .switch-row + .btn-block { margin-top: .5rem; }
   .reminder-status { margin-top: .75rem; margin-bottom: 0; }
-  .api-usage h2 { font-size: 1rem; margin-bottom: .4rem; }
   .api-usage p { color: var(--muted); font-size: .85rem; }
   .api-usage .api-usage-total { color: var(--text); font-size: 2rem; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
   .api-usage-providers { margin: .75rem 0; }
@@ -16,7 +13,7 @@
   .authenticator-form { margin-top: 1.25rem; display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; }
   .authenticator-form label { color: var(--muted); font-size: .85rem; }
   .authenticator-form input[type="text"] { width: 100%; padding: .55rem .8rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); }
-  .danger-zone h2 { font-size: 1rem; color: var(--red); margin-bottom: .4rem; }
+  .danger-zone h2 { color: var(--red); }
   .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
   .btn-danger:hover { background: var(--red); color: var(--bg); }
 </style>

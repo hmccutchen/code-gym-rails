@@ -13,6 +13,8 @@
 .card { padding: 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
 .card h2 { font-size: 1rem; margin-bottom: .4rem; }
 .card-note { color: var(--muted); font-size: .85rem; }
+.card .card-note { margin-bottom: .75rem; }
+.card > :where(form, .btn-block) + :where(form, .btn-block), .switch-row + .btn-block { margin-top: .5rem; }
 
 .btn-block { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; }
 
