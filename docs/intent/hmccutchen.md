@@ -28,19 +28,18 @@
   **why:** the name people see should match the domain I'm about to show
   developers
   **I decided:** the session cookie, storage keys and code names keep the old
-  name, since renaming the cookie signs everyone out; the README and
-  CONTEXT.md get renamed because the repo is public; the generation prompts go
-  in their own PR straight after, because rewriting the prompt snapshots is a
-  generation change, and nothing that freezes a day for public viewing lands
-  before it
+  name, since renaming the cookie signs everyone out; the README and CONTEXT.md
+  get renamed because the repo is public; the generation prompts go in their
+  own PR straight after, because rewriting the prompt snapshots is a generation
+  change, and nothing that freezes a day for public viewing lands before it
 - provider error classes moved off `AiService` into a `ProviderError` family
   `#441`
   **why:** the layered review found models depending on the provider client
   **I decided:** `ProviderError` as the home, no aliases, field lists in a
   second PR, `LANGUAGE_PROMPTS` left alone
 - setup problems recorded as their own kind, not as provider failures `#444`
-  **I decided:** changed my mind: record them as setup, since failing
-  unrescued left pages spinning
+  **I decided:** changed my mind: record them as setup, since failing unrescued
+  left pages spinning
 - the rest of `AiService`'s domain data moved onto the models `#445`
 - generation logging moved into `GenerationDiagnostics` `#448`
   **I decided:** diagnostics before prompts
@@ -49,8 +48,8 @@
 
 ## Tue Oct 20
 
-- the follow-up and alternate caps moved into `DailyResponse`, from the
-  layered review's issue `#449`
+- the follow-up and alternate caps moved into `DailyResponse`, from the layered
+  review's issue `#449`
   **I decided:** ran the critical review against what had merged since, and
   took its fixes in this PR: the review page reads the caps from the model too,
   and a spec now fails if the lock goes
@@ -68,20 +67,20 @@
   **why:** Railway builds were having problems, so I asked for it stacked on
   the review PR, to merge in order once they recover
 - the generation system prompt into `GenerationPrompt.system_prompt` `#466`
-- landed the generation system prompt move on main, since it merged into
-  its stacked base `#467`
+- landed the generation system prompt move on main, since it merged into its
+  stacked base `#467`
 - language wording and scenario pools into `LanguagePrompts` and
   `ScenarioPools` `#468`
-- landed the domain modules move on main, since it merged into its
-  stacked base too `#469`
-- ladder loading into `GenerationLadders`, the first of two PRs for
-  issue 431's orchestration step `#470`
-  **why:** I kept drafting out of `JudgedGeneration`, since unjudged days
-  draft too; each step is its own PR from main, as the issue says
-- drafting into `ExerciseDraft`, the second PR for issue 431's
-  orchestration step `#471`
-  **why:** I had the draft carry its user and language so the retry takes
-  only the draft, kind and concept
+- landed the domain modules move on main, since it merged into its stacked base
+  too `#469`
+- ladder loading into `GenerationLadders`, the first of two PRs for issue 431's
+  orchestration step `#470`
+  **why:** I kept drafting out of `JudgedGeneration`, since unjudged days draft
+  too; each step is its own PR from main, as the issue says
+- drafting into `ExerciseDraft`, the second PR for issue 431's orchestration
+  step `#471`
+  **why:** I had the draft carry its user and language so the retry takes only
+  the draft, kind and concept
 
 ## Wed Oct 21
 - the pseudocode critique claim onto `DailyResponse`, with a token so a
@@ -117,25 +116,27 @@
   consequences of past answers, report only
   **why:** every exercise is a fresh start today, and I want a wrong answer on
   day 12 to be the real cause of a slow page on day 40, never a flattering one
-- spec for keeping the judge's blind design-comparison solves and settling
-  key disagreements `#483`
+- spec for keeping the judge's blind design-comparison solves and settling key
+  disagreements `#483`
   **why:** a true consequence needs a trustworthy answer key, and nobody can
   read why the judge and the key disagree, since the pick is logged and lost
   **I decided:** `both_defensible` is a call of its own, because ambiguous
   scenarios are what I most need to count; replayed and generated solves stay
   apart from live ones and never pick the fix; matched records get hand
-  spot-checks, since drafter and judge are one model family and can agree
-  while both wrong
+  spot-checks, since drafter and judge are one model family and can agree while
+  both wrong
   **I decided:** the fix is chosen by a rule written before the data, and I
   apply it by hand from plain counts; stage 1 merges on the OpenAI check and
   user 7's provider, and stage 2 is its own PR
 - replay first against a local dump of `daily_exercises`, then production
-  **why:** the real mismatch rate the night stage 1 merges, for under a
-  dollar, tells me whether there's enough signal to continue
+  **why:** the real mismatch rate the night stage 1 merges, for under a dollar,
+  tells me whether there's enough signal to continue
 - stage 1: a table and model to keep the judge's blind solves `#484`
-- stage 1: send OpenAI the judge's reply schema, with a tool to measure it `#485`
+- stage 1: send OpenAI the judge's reply schema, with a tool to measure it
+  `#485`
 - stage 1: record each live blind judge solve with the set `#486`
-- stage 1: a script that replays every stored design comparison through the judge `#487`
+- stage 1: a script that replays every stored design comparison through the
+  judge `#487`
 - stage 1: an admin page to read the judge solves and make the calls `#488`
 
 *Postponed: the recurring systems themselves, until I've read real mismatch
@@ -143,11 +144,11 @@ data.*
 
 ## Thu Oct 22
 
-- moved production onto a fresh Railway Postgres, then deleted the old
-  database and the copy job `#489`
+- moved production onto a fresh Railway Postgres, then deleted the old database
+  and the copy job `#489`
   **I decided:** a fresh database rather than rotating the old one's password
-- sign-in through Devise: a password plus an authenticator code, replacing
-  the emailed code `#490`
+- sign-in through Devise: a password plus an authenticator code, replacing the
+  emailed code `#490`
   **why:** after the breach I wanted the security-critical parts from
   maintained libraries rather than our own code
   **I decided:** backup codes for a lost phone, open sign-up with email
@@ -156,8 +157,8 @@ data.*
 
 ## Fri Oct 23
 
-- back to passwordless sign-in: take Devise out and restore the emailed code
-  as the only first factor, spec first `#491`
+- back to passwordless sign-in: take Devise out and restore the emailed code as
+  the only first factor, spec first `#491`
   **why:** I want no password column ever, with an authenticator app as an
   optional second factor later
   **I decided:** open sign-up exactly as before, with the account created when
@@ -168,7 +169,7 @@ data.*
 - from my layered review: the login code out of the job queue, and one
   signed-in lookup
 - an optional authenticator app as a second sign-in factor, spec and plan
-  first, stacked on the passwordless PR `#493 open`
+  first, stacked on the passwordless PR `#493`
   **why:** possession of a phone is the second factor worth having, and the
   inbox alone is all that protects an account today
   **I decided:** a daily cap of 20 wrong codes; every wrong-code count kept on
@@ -186,7 +187,10 @@ data.*
   before anything is changed
 - the test rules say CI runs on Postgres 18
 - the cost of each API call on its usage row, for Anthropic keys only for now
-  `#472 open`
+  `#472`
   **I decided:** Gemini and OpenAI rows store a null cost until those providers
   are priced on purpose; prices stay on the provider classes beside the routes;
   the design doc leaves the PR; a timed-out call stores a null cost
+- the Account usage card in dollars, first of the phone rework `#497`
+  **I decided:** a weekday projection, no tokens; from review, none while
+  paused or partly unpriced
