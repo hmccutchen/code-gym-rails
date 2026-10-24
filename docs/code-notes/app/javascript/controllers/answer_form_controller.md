@@ -158,7 +158,11 @@ the last confirmed reply, as `canonicalDraft` strings. `nextSave()` adds one
 on every attempt, retries included, since a retry carries newer text and
 either attempt may be the one that landed. It keeps the five most recent
 (`UNCONFIRMED_SAVES_KEPT`), so a long run of retries can't fill localStorage;
-an older one that landed falls back to the old loss. Only an ok reply clears
+an older one that landed falls back to the old loss. An attempt writes only
+that list, through `recordUnconfirmedSaves()`, and only into a copy that is
+still this tab's: the same token and scope, and exactly the answers it sends.
+All tabs share one copy, so a retry would otherwise overwrite a newer one
+another tab wrote meanwhile. Only an ok reply clears
 the list (`settleDraft()`), so a refused save's payload stays in it. That is
 harmless, since the page can only render it if the server already holds it.
 A restored copy hands its list to the page, so a save still on the wire

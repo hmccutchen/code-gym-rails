@@ -122,8 +122,15 @@ export default class extends Controller {
     this.lastSent = this.payload()
     const sent = canonicalDraft(this.lastSent.response.answers, this.lastSent.response.section_ratings)
     this.unconfirmedSaves = [ ...this.unconfirmedSaves.filter((earlier) => earlier !== sent), sent ].slice(-UNCONFIRMED_SAVES_KEPT)
-    this.storeDraft()
+    this.recordUnconfirmedSaves(sent)
     return this.lastSent
+  }
+
+  recordUnconfirmedSaves(sent) {
+    const stored = draftStore.read()
+    if (stored?.token !== this.draftToken || stored.scope !== this.draftScopeValue) return
+    if (canonicalDraft(stored.answers, stored.ratings) !== sent) return
+    this.draftKept = draftStore.write({ ...stored, sent: this.unconfirmedSaves })
   }
 
   isAnswered(textarea) {

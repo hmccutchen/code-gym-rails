@@ -242,6 +242,31 @@ RSpec.describe "Answers through a lost connection", type: :system do
     end
   end
 
+  it "leaves another tab's newer copy alone when this tab retries a save" do
+    travel_to(a_weekday) do
+      open_dashboard
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch
+        window.saveAttempts = 0
+        window.fetch = (url, options) => {
+          if (new URL(url, location.href).pathname !== "/responses") return originalFetch(url, options)
+          window.saveAttempts += 1
+          return Promise.reject(new TypeError("offline"))
+        }
+      JS
+      fill_in_answer("code_review", answer)
+      wait_for_js_condition("window.saveAttempts === 1")
+      other_tab_copy = { "token" => "a-regenerated-set:9:0", "scope" => "a-regenerated-set", "sent" => [],
+                         "answers" => { "code_review" => "Another tab's newer answer." }, "ratings" => {} }
+      page.execute_script("localStorage.setItem('code-gym-answer-draft', #{other_tab_copy.to_json.to_json})")
+
+      page.execute_script("window.dispatchEvent(new Event('online'))")
+      wait_for_js_condition("window.saveAttempts >= 2")
+
+      expect(stored_draft).to eq(other_tab_copy)
+    end
+  end
+
   it "restores an edit typed behind a save whose reply was lost, after a retry with newer text also got none" do
     later = "#{answer} Then more, sent only by the retry."
     travel_to(a_weekday) do
