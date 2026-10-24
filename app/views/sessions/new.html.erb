@@ -3,14 +3,7 @@
 
 <div class="login-wrap">
   <h1><%= t("app_name") %></h1>
-  <% if pending_login_email.present? %>
-    <%= render "sessions/pending" %>
-
-    <%# Keep the form below the pending banner: see docs/code-notes/app/views/sessions/new.html.md %>
-    <p class="pending-divider"><%= t("sessions.new.resend_prompt") %></p>
-  <% else %>
-    <p><%= t("sessions.new.intro_html") %></p>
-  <% end %>
+  <p><%= t("sessions.new.intro_html") %></p>
 
   <%= form_with url: login_path, method: :post, data: loading_form_data do |f| %>
     <div class="form-field">

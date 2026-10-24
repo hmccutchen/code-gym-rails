@@ -33,6 +33,21 @@ RSpec.describe "Authenticator app", type: :system do
     page.evaluate_script("window.getSelection().toString()")
   end
 
+  it "signs an account with the authenticator on in with its email and an authenticator code, and no emailed code" do
+    secret, _codes = enroll_second_factor(user)
+
+    visit login_path
+    fill_in "Work email *", with: user.email
+    click_button "Send code"
+
+    expect(page).to have_current_path(second_factor_challenge_path)
+    expect(page).to have_no_field("6-digit code from the email")
+    fill_in "Code from your authenticator app, or a recovery code", with: current_totp(secret)
+    click_button "Verify"
+
+    expect(page).to have_current_path(root_path)
+  end
+
   it "shows the recovery codes and stays signed in on a double tap of Turn on" do
     visit_as(user)
     visit account_authenticator_path

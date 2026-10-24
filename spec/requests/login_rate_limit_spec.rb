@@ -6,6 +6,22 @@ RSpec.describe "Login rate limits", type: :request do
     allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
   end
 
+  it "shows the email form, not a code field, when the attempt limit trips with no sign-in pending" do
+    11.times { post verify_login_code_path, params: { code: "123456" } }
+
+    expect(response).to have_http_status(:too_many_requests)
+    expect(response.body).to include(%(name="email"))
+    expect(response.body).not_to include(%(name="code"))
+  end
+
+  it "words the request limit as sign-in requests, since an authenticator account is sent no code" do
+    user = create_user_with_key(email: "dev@example.com")
+    enroll_second_factor(user)
+    6.times { post login_path, params: { email: user.email } }
+
+    expect(response.body).to include("Too many sign-in requests for that address.")
+  end
+
   describe "requesting codes" do
     it "stops a sixth request for the same address inside the window" do
       5.times { post login_path, params: { email: "dev@example.com" } }
@@ -30,7 +46,7 @@ RSpec.describe "Login rate limits", type: :request do
       expect(response).to have_http_status(:too_many_requests)
     end
 
-    it "keeps the refused request's message off the pending code field" do
+    it "shows a refused request on the email form, with no code field for its message to reach" do
       5.times do
         post login_path, params: { email: "dev@example.com" }
         follow_redirect!
@@ -38,9 +54,9 @@ RSpec.describe "Login rate limits", type: :request do
       post login_path, params: { email: "dev@example.com" }
 
       expect(response).to have_http_status(:too_many_requests)
-      field = Nokogiri::HTML(response.body).at_css("input[name=code]")
-      expect(field["aria-describedby"].split).to eq(%w[pending-message])
-      expect(field["aria-invalid"]).to be_nil
+      expect(Nokogiri::HTML(response.body).at_css("#flash-alert")).to be_present
+      expect(Nokogiri::HTML(response.body).at_css("input[name=code]")).to be_nil
+      expect(response.body).to include('name="email"')
     end
 
     it "counts requests for one address across separate sessions" do
@@ -157,7 +173,8 @@ RSpec.describe "Login rate limits", type: :request do
 
       expect(flash[:alert]).to match(/too many/i)
       expect(response).to have_http_status(:too_many_requests)
-      expect(response.body).to include('name="email"')
+      expect(response.body).to include('name="code"')
+      expect(response.body).not_to include('name="email"')
     end
 
     it "describes the code field by the refusal without marking the code invalid, since nothing was checked" do

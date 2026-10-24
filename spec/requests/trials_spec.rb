@@ -41,7 +41,7 @@ RSpec.describe "Trials", type: :request do
 
       travel_to(Time.utc(2026, 10, 7, 14)) do
         expect { perform_enqueued_jobs { start(code: code.downcase) } }.to change(User, :count).by(1)
-        expect(response).to redirect_to(login_path)
+        expect(response).to redirect_to(login_code_path)
         expect(flash[:notice]).to include("Your trial starts when you enter it.")
         expect(invite.reload.redeemed_count).to eq(0)
 
@@ -152,7 +152,7 @@ RSpec.describe "Trials", type: :request do
       start(code: code)
 
       expect(response).to have_http_status(:too_many_requests)
-      expect(response.body).to include("Too many code requests for that address.")
+      expect(response.body).to include("Too many sign-in requests for that address.")
     end
 
     it "says trials are not available under the kill switch" do

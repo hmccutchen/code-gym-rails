@@ -13,7 +13,7 @@ paths:
 
 
 ```
-User logs in (emailed 6-digit code)
+User logs in (address, then an emailed 6-digit code or, once it is on, an authenticator code)
   └→ enters their own Anthropic, Gemini or OpenAI API key (stored encrypted per-user;
      the key's prefix determines user.provider)
 

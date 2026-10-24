@@ -178,8 +178,7 @@ data.*
 - from my layered review: the login code out of the job queue, and one
   signed-in lookup
 - an optional authenticator app as a second sign-in factor `#493`
-  **why:** possession of a phone is the second factor worth having, and the
-  inbox alone is all that protects an account today
+  **why:** the inbox alone protects an account today
   **I decided:** a daily cap of 20 wrong codes; every wrong-code count kept on
   the user row, not the cookie; no-store on pages with the key or codes;
   turning it on or off ends every other session; recovery codes compared only
@@ -194,13 +193,14 @@ data.*
 - the test rules say CI runs on Postgres 18
 - locked out after turning on the authenticator: stop a double tap posting
   the sign-in forms twice `#495`
-  **why:** I was signed out right after turning it on, every emailed code then
-  said it was wrong, and the home-screen app ended on a 404
+  **why:** after turning it on, every emailed code said it was wrong, and the
+  home-screen app ended on a 404
   **I decided:** Turn on and New recovery codes start disabled; the server
   accepts a repeat of a sign-in this browser just completed
 - the cost of each API call on its usage row, Anthropic keys only `#472`
   **I decided:** Gemini and OpenAI costs stay null; prices stay on the
   providers; the design doc dropped; a timeout costs null
 - the Account usage card in dollars `#497`
-- the authenticator in place of the emailed code `#496`, not on main yet
+- the authenticator in place of the emailed code `#496`, onto main `#502`
+  **I decided:** a double-tapped address gets its challenge back for 30 seconds
 - the system spec that flaked on CI `#499`

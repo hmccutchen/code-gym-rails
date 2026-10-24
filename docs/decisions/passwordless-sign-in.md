@@ -1,6 +1,6 @@
 # Passwordless sign-in
 
-Sign-in is an emailed 6-digit code, and that code is the only first factor. There is no password column, and there won't be one. An authenticator app is an optional second factor, which each account can turn on from its Account page.
+Sign-in starts with an email address. Without an authenticator, an emailed 6-digit code signs the account in. An account can turn on an authenticator app from its Account page, and from then on the app replaces the emailed code: the address, then a code from the app or a recovery code. There is no password column, and there won't be one.
 
 ## What happened
 
@@ -10,19 +10,22 @@ The owner decided to keep sign-in passwordless:
 - a password adds a secret to leak and a reset flow to secure;
 - the emailed code already proves the inbox, which a password reset would rely on anyway.
 
-The second factor worth having is possession of a phone. That came as an optional authenticator in the PR after #491 (#493), not as a password. The section below holds its decisions.
+The extra factor worth having is possession of a phone. That came as an optional authenticator in the PR after #491 (#493), not as a password. The section below holds its decisions.
+
+#493 asked for the emailed code and then the authenticator code. The owner found that redundant, and decided that once the authenticator is on it replaces the emailed code. The trade-offs are under "Stated plainly".
 
 ## How it works now
 
-- **Requesting a code.** `POST /login` with an email address creates the account when the address is new. Then it queues the email and records the pending sign-in in this browser's session (`LoginCodeRequests#mail_login_code`). The mailer mints the code while it builds the email, so the job carries only the account: a code passed in as an argument would sit in plain text in `solid_queue_jobs` and in the enqueue log line. This is open sign-up as it worked before #490: the account exists from the request, and the code proves the address.
+- **Requesting a code.** `POST /login` with an email address creates the account when the address is new. Then it queues the email and records the pending sign-in in this browser's session (`LoginCodeRequests#mail_login_code`). The mailer mints the code while it builds the email, so the job carries only the account: a code passed in as an argument would sit in plain text in `solid_queue_jobs` and in the enqueue log line. This is open sign-up as it worked before #490: the account exists from the request, and the code proves the address. An account with the authenticator on gets no email: `SessionsController#create` sends it straight to the second step.
+- **The code page.** After the request, the code field is on `GET /login/code`, and `GET /login` redirects there while the sign-in is pending. Start again (`DELETE /login/code`) forgets the pending sign-in and shows the email form.
 - **The code.**
   - It comes from `SecureRandom`, and only its BCrypt digest is stored.
   - It lives 10 minutes (`User::LOGIN_CODE_EXPIRY`) and dies after five wrong guesses.
   - It is redeemed under the user row lock, so it can be used only once.
   - It works only in the browser that asked for it, because `SessionsController#verify_code` reads the address from the session.
-- **Signing in.** A valid code, and the authenticator code when that is on, runs `reset_session` before `session[:user_id]` is set (`SignInCompletion#start_new_session_for`). That gives a new session id and a new CSRF token, and it discards everything written before sign-in. `return_to` and a pending trial are read first, so they survive. A second post of the same code from the same browser within 30 seconds, as a double tap sends, signs in too, rather than saying the spent code was wrong (`SignInCompletion#recent_sign_in`). The repeat keeps the first post's check time, so a session ended since then stays ended.
+- **Signing in.** A valid code, and the authenticator code when that is on, runs `reset_session` before `session[:user_id]` is set (`SignInCompletion#start_new_session_for`). That gives a new session id and a new CSRF token, and it discards everything written before sign-in. `return_to` and a pending trial are read first, so they survive. A second post of the same code from the same browser within 30 seconds, as a double tap sends, signs in too, rather than saying the spent code was wrong (`SignInCompletion#recent_sign_in`). The repeat keeps the first post's check time, so a session ended since then stays ended. `SignInCompletion#complete_sign_in` names the factor that passed and raises `WrongFactor` for the emailed code on an authenticator account, so no sign-in path can finish one on the inbox alone.
 - **The sign-in stamp.** Sign-in also writes `session[:signed_in_at]`. A session counts only while that stamp is at or after `users.sessions_valid_after` (`SignedInSessions`). Pages and the cable connection both check it through `User.signed_in_through`.
-- **Signed-out requests.** `require_login` redirects every signed-out request to `/login`. `request.js` reads that redirect as "signed out". The return address is saved only for a page navigation: a GET whose `Accept` names `text/html`. An expired dashboard poll therefore never becomes the page you land on after signing in. Reloading the page a rejected code renders, a `POST /login/code`, sends a `GET` there, which redirects to `/login` rather than a 404.
+- **Signed-out requests.** `require_login` redirects every signed-out request to `/login`. `request.js` reads that redirect as "signed out". The return address is saved only for a page navigation: a GET whose `Accept` names `text/html`. An expired dashboard poll therefore never becomes the page you land on after signing in. Reloading the page a rejected code renders, a `POST /login/code`, sends a `GET` there, which shows the code page again.
 - **Limits.** `docs/decisions/login-rate-limits.md` has them. Their windows are 15 minutes (`User::LOGIN_RATE_LIMIT_WINDOW`), longer than a code lives.
 
 ## The authenticator app
@@ -32,11 +35,11 @@ The second factor worth having is possession of a phone. That came as an optiona
 1. **Start clean.** The migration cleared `otp_secret`, `consumed_timestep` and `otp_backup_codes` for every account. They might have held a secret from the #490 enrollment, which the authenticator app may no longer show.
 2. **`two_factor_enabled_at` replaced `otp_required_for_login`.** It's a nullable datetime: set when the authenticator is turned on, nil when it's off. The Account page shows it as "On since".
 3. **Turning it on needs a recent sign-in:** `session[:signed_in_at]` within the last 15 minutes (`User::RECENT_SIGN_IN`), plus a valid code from the new authenticator. A stolen session therefore can't turn on an authenticator the owner doesn't have, which would lock the owner out. An older session is asked to sign in again first.
-   - **The setup key belongs to one session.** The setup page makes a key and keeps it in that browser's encrypted session (`AuthenticatorsController#pending_secret`). The key reaches `users.otp_secret` only when a code for it turns the authenticator on (`User#enable_second_factor!`), so viewing the page writes nothing. Two sessions see two different keys. Without this, an inbox-only session could read the key, the owner could later enroll that same key, and the intruder would then pass both factors. A reload in the same session keeps its key; signing in again shows a new one.
-4. **Turning it off, and making new recovery codes, need an authenticator code or a recovery code.** The emailed code is refused, since the inbox is the factor this one backs up.
+   - **The setup key belongs to one session.** The setup page makes a key and keeps it in that browser's encrypted session (`AuthenticatorsController#pending_secret`). The key reaches `users.otp_secret` only when a code for it turns the authenticator on (`User#enable_second_factor!`), so viewing the page writes nothing. Two sessions see two different keys. Without this, an inbox-only session could read the key, the owner could later enroll that same key, and the intruder would then sign in with the address and a code from that key, which is all an authenticator account asks for. A reload in the same session keeps its key; signing in again shows a new one.
+4. **Turning it off, and making new recovery codes, need an authenticator code or a recovery code.** The emailed code is refused, since the inbox is the factor the authenticator replaces.
 5. **Every change mails the account a notice:** turning it on, turning it off, and making new recovery codes. The notice says what changed and when, never the key or a code.
 6. **Ten recovery codes,** shown once. Each is 10 characters from a 32-letter alphabet with no `0`, `O`, `1` or `I`, written as two groups of five, for 50 bits. Each is stored as a bcrypt digest and works once.
-7. **No "remember this device".** Every sign-in asks for the second factor once it's on.
+7. **No "remember this device".** Every sign-in asks for the authenticator once it's on.
 8. **A daily cap of 20 wrong codes per account in 24 hours.** Only failures count. It covers the sign-in step, turning the authenticator off, and making new codes. Once it's reached, those three refuse every code, recovery codes included, until 24 hours after the first failure in the window.
 9. **Every count of wrong codes lives on the user row,** never in the session cookie. A copied cookie replayed later therefore can't bring back a zero count. The row, rather than the cache, keeps the counts through a cache eviction or a deploy.
 10. **Secrets stay out of caches and logs.** The setup page and every page showing recovery codes send `Cache-Control: no-store`. Every code field is named `otp_code`, which the existing `:otp` filter hides, and nothing writes the setup key or the `otpauth://` link to the log. `spec/requests/second_factor_logging_spec.rb` pins this.
@@ -51,18 +54,22 @@ With one step of clock drift either way, three TOTP codes are valid at any momen
 
 ### The sign-in step
 
-When the emailed code is right and the authenticator is on, `SessionsController#verify_code` doesn't sign in. It issues a challenge on the user row and stores `session[:pending_second_factor]`, then sends the browser to `/login/second-factor`.
+When the address belongs to an account with the authenticator on, `SessionsController#create` mails nothing. It issues a challenge on the user row and stores `session[:pending_second_factor]`, then sends the browser to `/login/second-factor`. `#verify_code` does the same if an emailed code arrives for such an account, for example from the trial form, so an emailed code never signs it in alone.
 
 - The challenge lasts 5 minutes and ends after 5 wrong codes, counted on the row.
-- A right code, the daily cap, or expiry also ends it. Each sends the user back to `/login` for a new emailed code, except a right code, which signs in.
+- A right code, the daily cap, or expiry also ends it. Each sends the user back to `/login` to enter the address again, except a right code, which signs in.
 - The pending marker sets no `user_id`, so every page and the cable connection treat the browser as signed out until the second step passes.
 
 ## Stated plainly
 
 - **Without the authenticator, an account is protected by its inbox alone.** That includes the admin page, `/admin/judge_solves`, which shows answer keys. Turning the authenticator on is the owner's choice.
-- **Someone holding the inbox can lock the owner out for a day.** With the emailed code they reach the second step, and 20 wrong codes there use up the daily cap. They still can't sign in. The owner waits out the window or clears the cap from the console.
+- **Anyone who knows the address can lock the owner out for a day.** Once the authenticator is on, the address alone reaches the second step, and 20 wrong codes there use up the daily cap. They still can't sign in. The owner waits out the window or clears the cap from the console. The owner accepted this for a small team app.
+- **The login page tells whether an address has the authenticator on.** It goes to the second step instead of the code page.
+- **A new request ends the open challenge.** A `POST /login` for the address more than `User::DOUBLE_TAP_WINDOW` (30 seconds) after the last challenge issues a fresh one, so someone sending the address while the owner is on the second step sends the owner back to the start. The per-address request limit bounds how often. Within those 30 seconds, a request gets the open challenge back with its wrong codes kept, so a double tap on the address form names one challenge whichever response the browser keeps.
+- **With the authenticator on, the inbox alone can't sign in.** Neither the emailed code nor anything else in the inbox opens the account.
+- **With the authenticator on, one 6-digit code is the whole credential.** Anyone who knows the address can open challenges, and the daily cap is the only limit that binds: the per-challenge, per-account and per-address limits allow far more. At 20 guesses a day, a persistent attacker has about a 2% chance in a year of guessing a code (see "Why 20 a day"). Before this change the same guesses also needed the inbox.
 - **Deploying the sign-in stamp signed everyone out once.** No session from before it had `signed_in_at`, so each counted as signed out.
-- **Someone holding the inbox can turn the authenticator on with their own phone.** A fresh sign-in through the emailed code is all decision 3 asks for, and the recovery codes go to them. The owner then can't sign in until the console reset under "Lost phone and codes" below, and the change notice goes to the same inbox. The authenticator guards against a stolen session or a guessed code, not against someone who already reads the inbox.
+- **Someone holding the inbox can turn the authenticator on with their own phone.** A fresh sign-in through the emailed code is all decision 3 asks for, and the recovery codes go to them. The owner then can't sign in until the console reset under "Lost phone and codes" below, and the change notice goes to the same inbox. The authenticator guards against a stolen session or a guessed code, not against someone who already reads the inbox before it is turned on.
 - **Recovery codes are the only way past a lost phone** short of the console.
 - **Rolling back to code from before the authenticator turns it off silently.** That code never reads `two_factor_enabled_at`, so an enrolled account signs in with the emailed code alone, and `sessions_valid_after` stops ending sessions. The columns survive, so redeploying this code turns enrollments back on. Tell the account owners before such a rollback.
 
@@ -76,7 +83,7 @@ User.find_by!(email: "<address>").generate_login_code!
 ```
 Request a code at `/login` first, so this browser has a pending sign-in, then enter the minted code. Minting replaces the emailed code.
 
-**Lost phone, codes kept.** Sign in with the emailed code and then a recovery code. Turn the authenticator off and add it again on the new phone.
+**Lost phone, codes kept.** Enter the address, then a recovery code. Turn the authenticator off and add it again on the new phone.
 
 **Lost phone and codes.** Turn the authenticator off from the console, then sign in with the emailed code:
 ```ruby
@@ -88,7 +95,7 @@ User.find_by!(email: "<address>").update!(two_factor_enabled_at: nil, otp_secret
 User.find_by!(email: "<address>").update!(second_factor_failures: 0, second_factor_failures_since: nil)
 ```
 
-The emailed code never removes the second factor. Only an authenticator code, a recovery code, or the console can.
+The emailed code never signs in an account with the authenticator on, and never removes it. Only an authenticator code, a recovery code, or the console can.
 
 ## The Devise columns
 

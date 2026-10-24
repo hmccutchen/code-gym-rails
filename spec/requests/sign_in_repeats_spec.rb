@@ -87,7 +87,7 @@ RSpec.describe "A repeated sign-in post", type: :request do
     other = open_session
     other.post login_path, params: { email: user.email }
     other.post verify_login_code_path, params: { code: user.generate_login_code! }
-    expect(other.response).to redirect_to(root_path)
+    expect(other.response.location).to eq(root_url)
 
     cookies[session_cookie] = cookie_before
     post verify_login_code_path, params: { code: code }
@@ -130,13 +130,45 @@ RSpec.describe "A repeated sign-in post", type: :request do
     let!(:enrollment) { enroll_second_factor(user) }
     let(:secret) { enrollment.first }
 
-    it "sends a repeated emailed code to the authenticator step, never past it" do
-      code = request_code
+    it "sends both posts of an emailed code from the trial form to the authenticator step, never past it" do
+      stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+      _invite, invite_code = mint_trial_code
+      post start_trial_path, params: { email: user.email, invite_code: invite_code, provider: "fake", consent: "1" }
+      code = user.generate_login_code!
 
-      post_twice(verify_login_code_path, { code: code })
+      first = post_twice(verify_login_code_path, { code: code })
 
+      expect(first).to redirect_to(second_factor_challenge_path)
       expect(response).to redirect_to(second_factor_challenge_path)
       expect(session[:user_id]).to be_nil
+    end
+
+    it "gives both posts of a double-tapped address the challenge the first response names" do
+      cookie_before = cookies[session_cookie]
+      post login_path, params: { email: user.email }
+      first_cookie = cookies[session_cookie]
+      cookies[session_cookie] = cookie_before
+      post login_path, params: { email: user.email }
+      cookies[session_cookie] = first_cookie
+
+      post second_factor_challenge_path, params: { otp_code: current_totp(secret) }
+
+      expect(response).to redirect_to(root_path)
+      expect(session[:user_id]).to eq(user.id)
+    end
+
+    it "refuses an accepted authenticator code from another browser that shares the challenge" do
+      mine, other = open_session, open_session
+      mine.post login_path, params: { email: user.email }
+      other.post login_path, params: { email: user.email }
+      otp = current_totp(secret)
+      mine.post second_factor_challenge_path, params: { otp_code: otp }
+      expect(mine.session[:user_id]).to eq(user.id)
+
+      other.post second_factor_challenge_path, params: { otp_code: otp }
+
+      expect(other.response.location).to eq(login_url)
+      expect(other.session[:user_id]).to be_nil
     end
 
     it "signs in on the second post of an authenticator code the first post just accepted" do
@@ -176,7 +208,10 @@ RSpec.describe "A repeated sign-in post", type: :request do
     end
 
     it "gives both posts of a repeated emailed code the same authenticator challenge" do
-      code = request_code
+      stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+      _invite, invite_code = mint_trial_code
+      post start_trial_path, params: { email: user.email, invite_code: invite_code, provider: "fake", consent: "1" }
+      code = user.generate_login_code!
       cookie_before = cookies[session_cookie]
       post verify_login_code_path, params: { code: code }
       first_marker = session[:pending_second_factor]
@@ -185,7 +220,7 @@ RSpec.describe "A repeated sign-in post", type: :request do
       post verify_login_code_path, params: { code: code }
 
       expect(response).to redirect_to(second_factor_challenge_path)
-      expect(session[:pending_second_factor]).to eq(first_marker)
+      expect(session[:pending_second_factor].slice("user_id", "at")).to eq(first_marker.slice("user_id", "at"))
       expect(user.reload.second_factor_challenge_open?(first_marker["at"])).to be(true)
     end
 
