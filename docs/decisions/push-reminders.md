@@ -2,7 +2,8 @@
 
 an optional notification each weekday when the day's set
 is ready, and an optional afternoon nudge on days it is left unfinished,
-turned on and off on the Account page. The nudges switch saves as soon as it changes, with a `<noscript>` form as the fallback.
+turned on and off on the Account page. The nudges switch saves as soon as it
+changes, with a `<noscript>` form as the fallback.
 The nudge window is `PushNudgePlan::NUDGE_HOURS` (13-17 local, inclusive), so
 an unfinished day sends at most five on the hourly cron — a bound that belongs
 to the schedule, not to the plan object, which holds no dedupe.

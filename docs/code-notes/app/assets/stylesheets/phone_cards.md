@@ -1,6 +1,6 @@
 # phone_cards.css
 
-The card, full-width button and switch styles for the settings pages. The Account page uses them first. Settings moves onto them in a later PR.
+The card, full-width button, switch, value row, segmented control and card heading styles. The Account and Settings pages use them.
 
 ## What each class is for
 

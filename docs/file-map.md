@@ -158,7 +158,7 @@ What each listed file does.
 - `app/controllers/push_subscriptions_controller.rb` — enrol (JSON, since only script can call it) and un-enrol (an ordinary form post, so turning it off never depends on the machinery that turns it on); `update` saves the nudges switch, answering JSON for the switch and HTML for the no-script form
 - `app/models/display_preferences.rb` — `DisplayPreferences`: the closed lists of display choices, and what the layout renders for them (`<html>` attributes, the light palette's media, status bar and theme color)
 - `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
-- `app/assets/stylesheets/phone_cards.css` — the card, full-width button and switch styles for the settings pages, Account first. Linked on every page, each rule scoped to its own class
+- `app/assets/stylesheets/phone_cards.css` — cards and collapsible cards, the full-width button, the switch and its status line, value rows, segmented controls and the card heading tag, used by Account and Settings. Linked on every page, each rule scoped to its own class
 - `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
 - `app/javascript/code_gym/request.js` — the one way a page script sends a request, and what it may show when one fails; loaded through importmap from the layout's `javascript_importmap_tags`

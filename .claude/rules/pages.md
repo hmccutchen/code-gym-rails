@@ -71,8 +71,8 @@ read it before changing that area.
   both. Only submission stops the day's nudges; `PushNudgePlan` owns the
   window and `QUIET_PERIOD`, which must cover a full production tick
   (`push_nudge_plan_spec`), and `DailyResponse#submit_blocker` gates the copy.
-  The nudges switch saves on change. Both kinds are enqueued from `GenerateDailyExercisesJob`'s cron branch, with
+  Both kinds are enqueued from `GenerateDailyExercisesJob`'s cron branch, with
   no cron entry of their own and none from the on-demand branch.
   `WebPushCredentials` decides whether push exists, endpoints stay on
   `ALLOWED_ENDPOINT_HOSTS`, and `Notification.requestPermission()` must be the
-  click handler's first synchronous call.
+  click handler's first synchronous call. The nudges switch saves on change.

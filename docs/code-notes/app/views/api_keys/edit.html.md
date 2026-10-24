@@ -14,10 +14,15 @@ page that waits for a tap, and the controls below it save by themselves.
 The disclosures still hold paragraphs written as bare `<p>` that need the old
 muted colour and bottom margin. The page rule that gives them that is
 `:where(#exercise-mix, #display-preferences) p:not(.card-note)`. `:where()`
-makes the ids count for nothing, so the rule has the specificity of one
-element plus one pseudo-class and loses to any class rule. A `.hint`,
-`.mix-note` or `.display-hint` inside a disclosure therefore keeps its own
-margin, and a `.card-note` is left to `phone_cards.css`.
+makes the two ids add no weight, so the rule counts as one class (the
+`:not()` takes its argument's weight) plus one element: (0,1,1). That is
+exactly the weight of the `.setup-wrap p` rule it replaced, and it sits in
+the same place in the page style. A `.card-note` paragraph is excluded and is
+left to `phone_cards.css`. Because the weight and the position match, every
+paragraph the rule matches resolves as it did before the change. That
+includes the `.mix-note` shorthand `margin: .5rem 0 1rem`, which gives up its
+bottom margin to the rule's 2rem as it always did. A computed-style dump of
+both disclosures confirmed it.
 
 ## `settings-fields`
 
