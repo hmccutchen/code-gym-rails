@@ -1,33 +1,27 @@
-<%# Required locals: totals (ApiUsage.own_key_totals rows), since (the period's first moment). %>
-<div class="api-usage">
-  <h2><%= t("accounts.api_usage.heading") %></h2>
-  <% since_day = since.strftime("%B %-d") %>
-  <% if totals.empty? %>
-    <p><%= t("accounts.api_usage.empty", since: since_day) %></p>
+<%# Required locals: usage (a MonthlySpend), since (the period's first moment). %>
+<section class="api-usage" aria-labelledby="api-usage-heading">
+  <h2 id="api-usage-heading"><%= t("accounts.api_usage.heading") %></h2>
+  <% if usage.providers.empty? %>
+    <p><%= t("accounts.api_usage.empty", since: since.strftime("%B %-d")) %></p>
   <% else %>
-    <p><%= t("accounts.api_usage.intro", since: since_day) %></p>
-    <div class="api-usage-scroll" tabindex="0" role="region" aria-label="<%= t("accounts.api_usage.heading") %>">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col"><%= t("accounts.api_usage.provider") %></th>
-            <th scope="col"><%= t("accounts.api_usage.requests") %></th>
-            <th scope="col"><%= t("accounts.api_usage.input_tokens") %></th>
-            <th scope="col"><%= t("accounts.api_usage.output_tokens") %></th>
-          </tr>
-        </thead>
-        <tbody>
-          <% totals.each do |total| %>
-            <tr>
-              <td><%= AiProvider.label(total.provider) %></td>
-              <td><%= number_with_delimiter(total.requests) %></td>
-              <td><%= number_with_delimiter(total.input_tokens) %></td>
-              <td><%= number_with_delimiter(total.output_tokens) %></td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
-    <p><%= t("accounts.api_usage.note") %></p>
+    <% if usage.priced? %>
+      <p class="api-usage-label"><%= t("accounts.api_usage.spent_label", month: since.strftime("%B")) %></p>
+      <p class="api-usage-total"><%= usage_dollars(usage.total) %></p>
+    <% end %>
+    <% if usage.projected %>
+      <p class="api-usage-projected"><%= t("accounts.api_usage.projected", amount: usage_dollars(usage.projected)) %></p>
+    <% end %>
+    <dl class="api-usage-providers">
+      <% usage.providers.each do |total| %>
+        <div class="api-usage-row<%= " api-usage-row-unpriced" if total.cost_usd.nil? %>">
+          <dt><%= AiProvider.label(total.provider) %></dt>
+          <dd><%= total.cost_usd ? usage_dollars(total.cost_usd) : t("accounts.api_usage.unpriced_row", count: total.requests) %></dd>
+        </div>
+      <% end %>
+    </dl>
+    <% if usage.show_unpriced_note? %>
+      <p class="api-usage-unpriced"><%= t("accounts.api_usage.unpriced_note", count: usage.unpriced_requests) %></p>
+    <% end %>
+    <p class="api-usage-note"><%= t("accounts.api_usage.note") %></p>
   <% end %>
-</div>
+</section>

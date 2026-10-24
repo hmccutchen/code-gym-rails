@@ -101,24 +101,77 @@ RSpec.describe "Accounts", type: :request do
   describe "API usage" do
     def usage(user, **attrs)
       ApiUsage.create!({ user: user, purpose: "review_response", date: Date.current, provider: "anthropic",
-                         tokens_in: 0, tokens_out: 0 }.merge(attrs))
+                         tokens_in: 0, tokens_out: 0, cost_usd: nil }.merge(attrs))
     end
 
-    it "totals this month's own-key requests and tokens per provider in the user's zone" do
+    def card
+      Nokogiri::HTML(response.body).at_css(".api-usage")
+    end
+
+    def rows
+      card.css(".api-usage-row").map { |r| [ r.at_css("dt").text.strip, r.at_css("dd").text.strip ] }
+    end
+
+    it "shows this month's own-key spend, projection and rows in the user's zone" do
       travel_to Time.utc(2026, 10, 18, 12) do
         user = create_user_with_key(time_zone: "America/New_York")
-        usage(user, tokens_in: 1_200, cache_read_tokens: 800, tokens_out: 3_456)
-        usage(user, tokens_in: 1_000, tokens_out: 1)
-        usage(user, provider: "gemini", tokens_in: 5, tokens_out: 6, created_at: Time.utc(2026, 10, 1, 4, 30))
-        usage(user, tokens_in: 999_999, created_at: Time.utc(2026, 10, 1, 3, 59))
-        usage(user, tokens_in: 999_999, house_key: true)
+        usage(user, cost_usd: "1.50")
+        usage(user, cost_usd: "0.90")
+        usage(user, failure: "timeout")
+        usage(user, provider: "gemini", created_at: Time.utc(2026, 10, 1, 4, 30))
+        usage(user, cost_usd: "99", created_at: Time.utc(2026, 10, 1, 3, 59))
+        usage(user, cost_usd: "99", house_key: true)
         login_as(user)
 
         get account_path
 
-        rows = Nokogiri::HTML(response.body).css(".api-usage tbody tr").map { |row| row.css("td").map(&:text) }
-        expect(rows).to eq([ [ "Claude", "2", "3,000", "3,457" ], [ "Gemini", "1", "5", "6" ] ])
-        expect(response.body).to include("since October 1")
+        expect(card.at_css(".api-usage-label").text.strip).to eq("Spent in October")
+        expect(card.at_css(".api-usage-total").text.strip).to eq("$2.40")
+        expect(card.at_css(".api-usage-projected").text.strip).to eq("On pace for about $4.40 this month")
+        expect(rows).to eq([ [ "Claude", "$2.40" ], [ "Gemini", "1 request · not priced" ] ])
+        expect(card.at_css(".api-usage-unpriced").text.strip).to eq("2 requests have no price yet.")
+        expect(card.at_css(".api-usage-note").text.strip).to eq("Estimated from list prices. Your provider's console shows the exact bill.")
+        expect(card.css("table")).to be_empty
+      end
+    end
+
+    it "shows only counts when nothing this month is priced" do
+      user = create_user_with_key
+      2.times { usage(user, provider: "gemini") }
+      login_as(user)
+
+      get account_path
+
+      expect(card.at_css(".api-usage-total")).to be_nil
+      expect(card.at_css(".api-usage-projected")).to be_nil
+      expect(card.at_css(".api-usage-unpriced")).to be_nil
+      expect(rows).to eq([ [ "Gemini", "2 requests · not priced" ] ])
+      expect(card.at_css(".api-usage-note")).to be_present
+    end
+
+    it "holds the projection back on the first three days" do
+      travel_to Time.utc(2026, 10, 2, 16) do
+        user = create_user_with_key
+        usage(user, cost_usd: "0.30")
+        login_as(user)
+
+        get account_path
+
+        expect(card.at_css(".api-usage-total").text.strip).to eq("$0.30")
+        expect(card.at_css(".api-usage-projected")).to be_nil
+      end
+    end
+
+    it "keeps the last evening of the month in that month for a zone behind UTC" do
+      travel_to Time.utc(2026, 11, 1, 9, 30) do
+        user = create_user_with_key(time_zone: "Pacific/Honolulu")
+        usage(user, cost_usd: "1.00")
+        login_as(user)
+
+        get account_path
+
+        expect(card.at_css(".api-usage-label").text.strip).to eq("Spent in October")
+        expect(card.at_css(".api-usage-projected").text.strip).to eq("On pace for about $1.00 this month")
       end
     end
 
@@ -127,9 +180,8 @@ RSpec.describe "Accounts", type: :request do
 
       get account_path
 
-      page = Nokogiri::HTML(response.body)
-      expect(page.css(".api-usage table")).to be_empty
-      expect(page.at_css(".api-usage").text).to include("No requests")
+      expect(card.text).to include("No requests")
+      expect(card.css(".api-usage-row")).to be_empty
     end
   end
 

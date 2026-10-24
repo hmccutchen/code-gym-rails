@@ -841,14 +841,17 @@ en:
       delete: "Delete my account"
       delete_confirm: "Delete your account? This permanently removes your name and email and logs you out. It cannot be undone."
     api_usage:
-      heading: "API usage this month"
-      intro: "Requests Coding Gym sent with your API key since %{since}. Your provider's console shows the exact bill."
+      heading: "AI usage"
+      spent_label: "Spent in %{month}"
+      projected: "On pace for about %{amount} this month"
       empty: "No requests sent with your API key since %{since}."
-      provider: "Provider"
-      requests: "Requests"
-      input_tokens: "Input tokens"
-      output_tokens: "Output tokens"
-      note: "Requests include ones that failed. Input includes tokens your provider read from or wrote to its prompt cache, which it bills at different rates. Output includes the model's thinking tokens."
+      unpriced_row:
+        one: "1 request · not priced"
+        other: "%{count} requests · not priced"
+      unpriced_note:
+        one: "1 request has no price yet."
+        other: "%{count} requests have no price yet."
+      note: "Estimated from list prices. Your provider's console shows the exact bill."
     push_reminders:
       enabled: "Daily reminders are on. You'll get a notification when each weekday's set is ready."
       nudges_label: "Also remind me during the day if today's set isn't finished (hourly, %{window})"

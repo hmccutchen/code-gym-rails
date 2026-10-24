@@ -49,15 +49,34 @@ RSpec.describe ApiUsage, type: :model do
                                 provider: "anthropic", created_at: Time.utc(2026, 10, 5) }.merge(attrs))
     end
 
-    it "totals requests, input with cache reads and writes, and output per provider" do
-      usage(tokens_in: 100, tokens_out: 40, cache_read_tokens: 300, cache_write_tokens: 50)
-      usage(tokens_in: 10, tokens_out: 5, cache_read_tokens: nil, cache_write_tokens: nil)
-      usage(provider: "gemini", tokens_in: 7, tokens_out: 3)
+    it "totals requests, cost and unpriced requests per provider" do
+      usage(cost_usd: "0.5")
+      usage(cost_usd: "0.25")
+      usage(cost_usd: nil)
+      usage(provider: "gemini", cost_usd: nil)
 
       expect(described_class.own_key_totals(user, since: since)).to eq([
-        ApiUsage::ProviderTotal.new(provider: "anthropic", requests: 2, input_tokens: 460, output_tokens: 45),
-        ApiUsage::ProviderTotal.new(provider: "gemini", requests: 1, input_tokens: 7, output_tokens: 3)
+        ApiUsage::ProviderTotal.new(provider: "anthropic", requests: 3, cost_usd: BigDecimal("0.75"), unpriced_requests: 1),
+        ApiUsage::ProviderTotal.new(provider: "gemini", requests: 1, cost_usd: nil, unpriced_requests: 1)
       ])
+    end
+
+    it "counts a timeout's null cost as unpriced and a network error's zero cost as priced" do
+      usage(failure: "timeout", cost_usd: nil)
+      usage(failure: "network", cost_usd: 0)
+
+      total = described_class.own_key_totals(user, since: since).first
+      expect(total.cost_usd).to eq(0)
+      expect(total.unpriced_requests).to eq(1)
+    end
+
+    it "returns providers in key order, with a row that has no provider last" do
+      usage(provider: nil)
+      usage(provider: "openai")
+      usage(provider: "gemini")
+      usage(provider: "anthropic")
+
+      expect(described_class.own_key_totals(user, since: since).map(&:provider)).to eq([ "anthropic", "gemini", "openai", nil ])
     end
 
     it "counts failed requests, which wrote zero tokens" do
