@@ -217,4 +217,4 @@ data.*
 - share the VAPID test credentials across request, job and system specs `#525`
 - share the draft key and settled-save waits across system specs `#529 open`
 - keep Account styles with the partials that render them `#530`
-- keep pending-trial session access in a controller concern `#531 open`
+- keep pending-trial session access in a controller concern `#531`
