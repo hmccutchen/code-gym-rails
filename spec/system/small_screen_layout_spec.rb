@@ -45,10 +45,62 @@ RSpec.describe "Small screen layout", type: :system do
     end
   end
 
-  def card_edges
+  def card_edges(count:)
     edges = page.evaluate_script("Array.from(document.querySelectorAll('main .phone-page > .card')).map(el => { const r = el.getBoundingClientRect(); return [r.left, window.innerWidth - r.right]; })")
-    expect(edges.size).to eq(7)
+    expect(edges.size).to eq(count)
     edges
+  end
+
+  def button_and_card_content_widths
+    page.evaluate_script(<<~JS)
+      Array.from(document.querySelectorAll(".btn-block")).filter(el => el.checkVisibility()).map(el => {
+        const card = el.closest(".card");
+        const style = getComputedStyle(card);
+        return [el.getBoundingClientRect().width, card.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)];
+      })
+    JS
+  end
+
+  def clipped_button_labels
+    page.evaluate_script(<<~JS)
+      (() => {
+        const context = document.createElement("canvas").getContext("2d");
+        return Array.from(document.querySelectorAll(".btn-block")).filter(el => el.checkVisibility()).filter(el => {
+          const style = getComputedStyle(el);
+          const room = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+          if (el.tagName !== "INPUT") return el.scrollWidth > el.clientWidth;
+          context.font = style.font;
+          return context.measureText(el.value).width > room + 0.5;
+        }).map(el => el.value || el.textContent.trim());
+      })()
+    JS
+  end
+
+  def card_gaps
+    page.evaluate_script(<<~JS)
+      (() => {
+        const cards = Array.from(document.querySelectorAll("main .phone-page > .card")).map(el => el.getBoundingClientRect());
+        return cards.slice(1).map((card, index) => card.top - cards[index].bottom);
+      })()
+    JS
+  end
+
+  def card_paddings
+    page.evaluate_script("Array.from(document.querySelectorAll('main .phone-page > .card')).map(el => getComputedStyle(el).paddingLeft)")
+  end
+
+  def card_widths
+    page.evaluate_script("Array.from(document.querySelectorAll('main .phone-page > .card')).map(el => el.getBoundingClientRect().width)")
+  end
+
+  def hidden_facts(selector)
+    page.evaluate_script(<<~JS)
+      (() => {
+        const el = document.querySelector(#{selector.to_json});
+        const box = el.getBoundingClientRect();
+        return { hidden: el.hasAttribute("hidden"), visible: el.checkVisibility(), display: getComputedStyle(el).display, size: [box.width, box.height] };
+      })()
+    JS
   end
 
   def visible_heights(selector)
@@ -293,54 +345,6 @@ RSpec.describe "Small screen layout", type: :system do
       wait_for_js
     end
 
-    def button_and_card_widths
-      page.evaluate_script(<<~JS)
-        Array.from(document.querySelectorAll(".btn-block")).filter(el => el.checkVisibility()).map(el => [el.getBoundingClientRect().width, el.closest(".card").getBoundingClientRect().width])
-      JS
-    end
-
-    def clipped_button_labels
-      page.evaluate_script(<<~JS)
-        (() => {
-          const context = document.createElement("canvas").getContext("2d");
-          return Array.from(document.querySelectorAll(".btn-block")).filter(el => el.checkVisibility()).filter(el => {
-            const style = getComputedStyle(el);
-            const room = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-            if (el.tagName !== "INPUT") return el.scrollWidth > el.clientWidth;
-            context.font = style.font;
-            return context.measureText(el.value).width > room + 0.5;
-          }).map(el => el.value || el.textContent.trim());
-        })()
-      JS
-    end
-
-    def card_gaps
-      page.evaluate_script(<<~JS)
-        (() => {
-          const cards = Array.from(document.querySelectorAll("main .phone-page > .card")).map(el => el.getBoundingClientRect());
-          return cards.slice(1).map((card, index) => card.top - cards[index].bottom);
-        })()
-      JS
-    end
-
-    def card_paddings
-      page.evaluate_script("Array.from(document.querySelectorAll('main .phone-page > .card')).map(el => getComputedStyle(el).paddingLeft)")
-    end
-
-    def card_widths
-      page.evaluate_script("Array.from(document.querySelectorAll('main .phone-page > .card')).map(el => el.getBoundingClientRect().width)")
-    end
-
-    def hidden_facts(selector)
-      page.evaluate_script(<<~JS)
-        (() => {
-          const el = document.querySelector(#{selector.to_json});
-          const box = el.getBoundingClientRect();
-          return { hidden: el.hasAttribute("hidden"), visible: el.checkVisibility(), display: getComputedStyle(el).display, size: [box.width, box.height] };
-        })()
-      JS
-    end
-
     [ [ 390, {} ], [ 320, LARGEST ] ].each do |width, prefs|
       it "lays Account out in 16px-margined cards with 48px buttons at #{width}px#{' with the largest text' if prefs.any?}" do
         user.update!(display_preferences: prefs)
@@ -349,10 +353,10 @@ RSpec.describe "Small screen layout", type: :system do
         apply_text_spacing if prefs.any?
 
         expect(page_width).to eq(width)
-        card_edges.each { |edges| expect(edges).to all(be_within(0.5).of(16)) }
+        card_edges(count: 7).each { |edges| expect(edges).to all(be_within(0.5).of(16)) }
         expect(visible_heights(".btn-block").size).to eq(7)
         expect(visible_heights(".btn-block")).to all(be >= 48)
-        button_and_card_widths.each { |button, card| expect(button).to be_within(1).of(card - 34) }
+        button_and_card_content_widths.each { |button, content| expect(button).to be_within(1).of(content) }
         expect(clipped_button_labels).to eq([])
         expect(heights(".switch-row").size).to eq(1)
         expect(heights(".switch-row")).to all(be >= 48)
@@ -392,7 +396,7 @@ RSpec.describe "Small screen layout", type: :system do
       set_safe_area(left: 44, right: 44)
       visit_account_with_every_card
 
-      card_edges.each { |edges| expect(edges).to all(be_within(0.5).of(44)) }
+      card_edges(count: 7).each { |edges| expect(edges).to all(be_within(0.5).of(44)) }
       expect(page_width).to eq(390)
     end
 
@@ -401,7 +405,7 @@ RSpec.describe "Small screen layout", type: :system do
       set_safe_area(left: 20, right: 0)
       visit_account_with_every_card
 
-      card_edges.each do |left, right|
+      card_edges(count: 7).each do |left, right|
         expect(left).to be_within(0.5).of(20)
         expect(right).to be_within(0.5).of(16)
       end
@@ -413,7 +417,7 @@ RSpec.describe "Small screen layout", type: :system do
       visit_account_with_every_card
 
       expect(card_widths).to all(be_within(0.5).of(480))
-      card_edges.each { |left, right| expect(left).to be_within(1).of(right) }
+      card_edges(count: 7).each { |left, right| expect(left).to be_within(1).of(right) }
     end
 
     it "toggles the nudges switch from a tap on its text" do
