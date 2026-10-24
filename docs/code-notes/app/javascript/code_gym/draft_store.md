@@ -11,9 +11,21 @@ it once the server has the same answers. Design and tradeoffs:
 The module owns the copy whole: the key, the stored shape
 `{token, scope, sent, answers, ratings}`, and every rule for when it is
 restored, rewritten or cleared. Its default export, `DraftCopy`, is what the
-answer form holds, one per connection. It takes plain data, the answers and
-ratings as `{answers, ratings}`, and never reads the page; the answer form's
-code note says which page values it hands over.
+answer form holds, one for the controller's whole life. It takes plain data,
+the answers and ratings as `{answers, ratings}`, and never reads the page; the
+answer form's code note says which page values it hands over.
+
+## Reconnecting
+
+Stimulus can disconnect and reconnect the same controller, for example when
+its element is removed and put back. No page does that to the answer form
+today, but the copy keeps the behavior the controller had before the copy
+moved here (#510). `reconnect(token, scope)` takes the rendered token and
+draft scope again, drops the unconfirmed saves and the record of the last
+restore, and keeps `lastSent` and `kept`. A save sent before the reconnect
+still settles against the send it recorded: a matching copy is cleared, and an
+unreached save on an inert form still says the answers are kept.
+`spec/system/answer_form_reconnect_spec.rb` forces the reconnect to pin this.
 
 ## localStorage, one key
 

@@ -42,7 +42,8 @@ export default class extends Controller {
       this.ratings[button.dataset.ratingFor] = button.dataset.rating
     })
 
-    this.draft = new DraftCopy(this.draftTokenValue, this.draftScopeValue)
+    if (this.draft) this.draft.reconnect(this.draftTokenValue, this.draftScopeValue)
+    else this.draft = new DraftCopy(this.draftTokenValue, this.draftScopeValue)
     this.offlineSubmit = false
     const restored = this.restoreDraft()
 

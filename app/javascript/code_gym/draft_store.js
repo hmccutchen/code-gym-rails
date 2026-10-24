@@ -38,12 +38,16 @@ function canonicalDraft({ answers, ratings }) {
 
 export default class DraftCopy {
   constructor(token, scope) {
+    this.lastSent = null
+    this.kept = false
+    this.reconnect(token, scope)
+  }
+
+  reconnect(token, scope) {
     this.token = token
     this.scope = scope
     this.unconfirmedSaves = []
-    this.lastSent = null
     this.restored = null
-    this.kept = false
   }
 
   restorable(rendered) {

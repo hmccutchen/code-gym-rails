@@ -125,7 +125,8 @@ lists which paths use the gate and which deliberately don't.
 
 The copy of the unsent answers, and every rule about when it is restored,
 rewritten or cleared, live in `code_gym/draft_store`'s `DraftCopy`; its code
-note has them. The controller keeps one per connection, built on the token and
+note has them. The controller builds one on its first connect and calls
+`reconnect()` on it on every later connect, each time with the token and
 draft scope the server rendered, and hands it plain data: the answers and
 ratings on screen (`onScreen()`) on every edit and every save attempt, and
 the ones the server rendered (`rendered()`, the textareas' `defaultValue`)
