@@ -240,11 +240,13 @@ RSpec.describe "Accounts", type: :request do
     end
 
     it "leaves the Reminders card out when push isn't configured" do
-      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+      without_push_credentials do
+        login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
 
-      get account_path
+        get account_path
 
-      expect(card_headings).to eq([ nil, "Daily practice", "Authenticator app", "AI usage", "Session", "Danger zone" ])
+        expect(card_headings).to eq([ nil, "Daily practice", "Authenticator app", "AI usage", "Session", "Danger zone" ])
+      end
     end
 
     it "styles the reminders offer's status line as a card note" do

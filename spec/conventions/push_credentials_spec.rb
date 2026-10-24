@@ -39,6 +39,37 @@ RSpec.describe "with_push_credentials", type: :request do
     expect(ENV[WebPushCredentials::PRIVATE_KEY_VAR]).to eq("earlier-private")
   end
 
+  it "leaves web push unconfigured inside without_push_credentials, whatever was set before" do
+    ENV[WebPushCredentials::PUBLIC_KEY_VAR] = "earlier-public"
+    ENV[WebPushCredentials::PRIVATE_KEY_VAR] = "earlier-private"
+
+    without_push_credentials do
+      expect(WebPushCredentials).not_to be_configured
+      expect(ENV).not_to have_key(WebPushCredentials::PUBLIC_KEY_VAR)
+      expect(ENV).not_to have_key(WebPushCredentials::PRIVATE_KEY_VAR)
+    end
+  end
+
+  it "restores the values without_push_credentials removed, even when the block raises" do
+    ENV[WebPushCredentials::PUBLIC_KEY_VAR] = "earlier-public"
+    ENV[WebPushCredentials::PRIVATE_KEY_VAR] = "earlier-private"
+
+    expect { without_push_credentials { raise "boom" } }.to raise_error("boom")
+
+    expect(ENV[WebPushCredentials::PUBLIC_KEY_VAR]).to eq("earlier-public")
+    expect(ENV[WebPushCredentials::PRIVATE_KEY_VAR]).to eq("earlier-private")
+  end
+
+  it "leaves absent variables absent after without_push_credentials" do
+    ENV.delete(WebPushCredentials::PUBLIC_KEY_VAR)
+    ENV.delete(WebPushCredentials::PRIVATE_KEY_VAR)
+
+    without_push_credentials { nil }
+
+    expect(ENV).not_to have_key(WebPushCredentials::PUBLIC_KEY_VAR)
+    expect(ENV).not_to have_key(WebPushCredentials::PRIVATE_KEY_VAR)
+  end
+
   it "is no longer defined beside the browser stubs" do
     expect(PushApiStubs.instance_methods).not_to include(:with_push_credentials)
   end
@@ -47,5 +78,6 @@ end
 RSpec.describe "with_push_credentials in a job spec", type: :job do
   it "is available" do
     expect(self).to respond_to(:with_push_credentials)
+    expect(self).to respond_to(:without_push_credentials)
   end
 end
