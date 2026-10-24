@@ -94,8 +94,10 @@ RSpec.describe "Pages for an account that predates the learning track", type: :r
   end
 
   it "renders the account page unchanged" do
-    get account_path
-    expect_snapshot("account")
+    without_push_credentials do
+      get account_path
+      expect_snapshot("account")
+    end
   end
 
   it "renders history unchanged" do

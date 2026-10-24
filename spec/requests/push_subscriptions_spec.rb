@@ -178,12 +178,14 @@ RSpec.describe "Push subscriptions", type: :request do
     end
 
     it "refuses when no VAPID keypair is configured" do
-      login_as(user)
+      without_push_credentials do
+        login_as(user)
 
-      post push_subscription_path, params: valid_params
+        post push_subscription_path, params: valid_params
 
-      expect(response).to have_http_status(:not_found)
-      expect(user.reload.reminders_none?).to be(true)
+        expect(response).to have_http_status(:not_found)
+        expect(user.reload.reminders_none?).to be(true)
+      end
     end
 
     it "requires a logged-in user" do
@@ -248,11 +250,13 @@ RSpec.describe "Push subscriptions", type: :request do
     end
 
     it "refuses when no VAPID keypair is configured" do
-      login_as(user)
+      without_push_credentials do
+        login_as(user)
 
-      patch push_subscription_path, params: { nudges: "1" }
+        patch push_subscription_path, params: { nudges: "1" }
 
-      expect(response).to have_http_status(:not_found)
+        expect(response).to have_http_status(:not_found)
+      end
     end
 
     it "turns nudges on from the switch and answers JSON" do
@@ -308,11 +312,13 @@ RSpec.describe "Push subscriptions", type: :request do
     end
 
     it "answers 404 to the switch when no VAPID keypair is configured" do
-      login_as(user)
+      without_push_credentials do
+        login_as(user)
 
-      patch push_subscription_path, params: { nudges: true }, as: :json
+        patch push_subscription_path, params: { nudges: true }, as: :json
 
-      expect(response).to have_http_status(:not_found)
+        expect(response).to have_http_status(:not_found)
+      end
     end
   end
 
@@ -368,11 +374,13 @@ RSpec.describe "Push subscriptions", type: :request do
     end
 
     it "says nothing about reminders where none is configured" do
-      login_as(user)
+      without_push_credentials do
+        login_as(user)
 
-      get account_path
+        get account_path
 
-      expect(response.body).not_to include("Turn on daily reminders")
+        expect(response.body).not_to include("Turn on daily reminders")
+      end
     end
 
     it "embeds the VAPID public key rather than leaving the click to fetch it" do
