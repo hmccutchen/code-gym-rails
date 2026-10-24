@@ -63,10 +63,9 @@ RSpec.describe "Account's reminder nudges switch", type: :system do
   it "ends two quick taps on the second state and says Saved once" do
     switch.click
     switch.click
-    wait_for { !page.evaluate_script("window.CodeGymSaveStatus.queued('nudges')") }
+    expect(status_line).to have_text("Saved", exact: true)
     expect(switch).not_to be_checked
     expect(user.reload.reminders_ready?).to be(true)
-    expect(status_line).to have_text("Saved", exact: true)
   end
 
   it "ignores Enter on the switch" do
