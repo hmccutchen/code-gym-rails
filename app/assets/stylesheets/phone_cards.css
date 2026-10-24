@@ -1,0 +1,36 @@
+.phone-page { display: flex; flex-direction: column; gap: 16px; padding-bottom: 16px; }
+@media (min-width: 600px) {
+  .phone-page { max-width: 480px; margin-inline: auto; }
+}
+@media (max-width: 599.98px) {
+  .phone-page {
+    margin-left: calc(max(16px, env(safe-area-inset-left)) - var(--container-pad-left));
+    margin-right: calc(max(16px, env(safe-area-inset-right)) - var(--container-pad-right));
+  }
+}
+
+.card { padding: 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
+.card h2 { font-size: 1rem; margin-bottom: .4rem; }
+.card-note { color: var(--muted); font-size: .85rem; }
+.card .card-note { margin-bottom: .75rem; }
+.card > :where(form, .btn-block) + :where(form, .btn-block), .switch-row + .btn-block { margin-top: .5rem; }
+
+.btn.btn-block { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; text-align: center; }
+
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 48px; cursor: pointer; }
+.switch { appearance: none; flex: none; width: 44px; height: 26px; border-radius: 999px; background: var(--muted); position: relative; cursor: pointer; }
+.switch::before { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); transition: transform .15s; }
+.switch:checked { background: var(--accent); }
+.switch:checked::before { transform: translateX(18px); }
+.switch:disabled { opacity: .4; cursor: not-allowed; }
+.switch:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+@media (prefers-reduced-motion: reduce) {
+  .switch::before { transition: none; }
+}
+@media (forced-colors: active) {
+  .switch { appearance: auto; }
+  .switch::before { content: none; }
+}
+
+/* Any author display beats the browser's [hidden] rule, so this restores it for every element on the page. */
+.phone-page [hidden] { display: none; }

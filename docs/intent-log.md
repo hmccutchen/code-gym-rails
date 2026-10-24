@@ -168,11 +168,10 @@ data.*
 
 - back to passwordless sign-in: take Devise out, the emailed code the only
   first factor `#491`
-  **why:** no password column ever, and an authenticator app later
-  **I decided:** open sign-up, the account created when a code is requested;
-  drop the Devise columns in the same PR, since mine is the only account; a
-  10-minute code with the rate-limit windows kept at 15; trusted proxies, with
-  a spoofed-header test, split out and required before I post publicly
+  **why:** no password column ever, and an optional authenticator app later
+  **I decided:** sign-up unchanged; the Devise columns dropped in the same PR;
+  a 10-minute code with the rate-limit windows kept at 15; trusted proxies,
+  with a spoofed-header test, split out and required before I post publicly
 - from my layered review: the login code out of the job queue, and one
   signed-in lookup
 - an optional authenticator app as a second sign-in factor `#493`
@@ -180,21 +179,19 @@ data.*
   **I decided:** a daily cap of 20 wrong codes; every wrong-code count kept on
   the user row, not the cookie; no-store on pages with the key or codes;
   turning it on or off ends every other session; recovery codes compared only
-  for recovery-shaped input; a copy fallback that selects the text; the phone
-  check split into the local network before merge and production after
+  for recovery-shaped input; a phone check before and after merge
 - from review: each session gets its own setup key
   **I decided:** the key stays in the session until a code verifies; the model
   takes session values; spec and plan docs dropped; extraction is an issue
-- every PR gets a critical and a layered-design review, each by a separate
-  agent `#492`
+- two reviews per PR, critical and layered, each by its own agent `#492`
   **I decided:** a fresh agent checks findings before anything changes
 - the test rules say CI runs on Postgres 18
 - locked out after turning on the authenticator: stop a double tap posting
   the sign-in forms twice `#495`
-  **why:** after turning it on, every emailed code said it was wrong, and the
-  home-screen app ended on a 404
+  **why:** every emailed code said it was wrong, and the home-screen app ended
+  on a 404
   **I decided:** Turn on and New recovery codes start disabled; the server
-  accepts a repeat of a sign-in this browser just completed
+  accepts a repeat of a sign-in it just completed
 - the cost of each API call on its usage row, Anthropic keys only `#472`
   **I decided:** Gemini and OpenAI costs stay null; prices stay on the
   providers; a timeout costs null
@@ -202,6 +199,9 @@ data.*
 - the authenticator in place of the emailed code `#496`, onto main `#502`
   **I decided:** a double-tapped address gets its challenge back for 30 seconds
 - the system spec that flaked on CI `#499`
-- the Account page as cards for the phone `#504 open`
+- the Account page as phone cards, second of five redesign PRs `#504`
+  **I decided:** the card styles load everywhere; Reminders keeps Save;
+  cards clear a landscape notch; the page column's padding named once; one
+  rule hides anything hidden on a card page
 - lefthook git hooks: lint on commit, CI's checks on push `#508`
   **I decided:** system specs stay in CI

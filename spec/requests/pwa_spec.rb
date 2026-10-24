@@ -130,8 +130,8 @@ RSpec.describe "PWA", type: :request do
 
     it "keeps the page column clear of a landscape notch, which viewport-fit=cover lets content reach" do
       ViewStyles.rules(layout).select { |rule| rule.selectors == [ ".container" ] }.each do |rule|
-        padding = [ rule.declaration("padding"), rule.declaration("padding-inline") ].compact.join(" ")
-        expect(padding).to include("env(safe-area-inset-left)").and include("env(safe-area-inset-right)")
+        expect(rule.declaration("--container-pad-left")).to include("env(safe-area-inset-left)")
+        expect(rule.declaration("--container-pad-right")).to include("env(safe-area-inset-right)")
       end
     end
   end

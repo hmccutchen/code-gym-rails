@@ -1,15 +1,15 @@
 <%# Required locals: usage (a MonthlySpend), since (the period's first moment). %>
-<section class="api-usage" aria-labelledby="api-usage-heading">
+<section class="card api-usage" aria-labelledby="api-usage-heading">
   <h2 id="api-usage-heading"><%= t("accounts.api_usage.heading") %></h2>
   <% if usage.providers.empty? %>
-    <p><%= t("accounts.api_usage.empty", since: since.strftime("%B %-d")) %></p>
+    <p class="card-note"><%= t("accounts.api_usage.empty", since: since.strftime("%B %-d")) %></p>
   <% else %>
     <% if usage.priced? %>
-      <p class="api-usage-label"><%= t("accounts.api_usage.spent_label", month: since.strftime("%B")) %></p>
+      <p class="card-note api-usage-label"><%= t("accounts.api_usage.spent_label", month: since.strftime("%B")) %></p>
       <p class="api-usage-total"><%= usage_dollars(usage.total) %></p>
     <% end %>
     <% if usage.projected %>
-      <p class="api-usage-projected"><%= t("accounts.api_usage.projected", amount: usage_dollars(usage.projected)) %></p>
+      <p class="card-note api-usage-projected"><%= t("accounts.api_usage.projected", amount: usage_dollars(usage.projected)) %></p>
     <% end %>
     <dl class="api-usage-providers">
       <% usage.providers.each do |total| %>
@@ -20,8 +20,8 @@
       <% end %>
     </dl>
     <% if usage.show_unpriced_note? %>
-      <p class="api-usage-unpriced"><%= t("accounts.api_usage.unpriced_note", count: usage.unpriced_requests) %></p>
+      <p class="card-note api-usage-unpriced"><%= t("accounts.api_usage.unpriced_note", count: usage.unpriced_requests) %></p>
     <% end %>
-    <p class="api-usage-note"><%= t("accounts.api_usage.note") %></p>
+    <p class="card-note api-usage-note"><%= t("accounts.api_usage.note") %></p>
   <% end %>
 </section>

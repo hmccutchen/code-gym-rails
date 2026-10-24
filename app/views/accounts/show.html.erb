@@ -1,60 +1,42 @@
 <% page_title t("accounts.show.title") %>
 <style>
-  .account-wrap { max-width: 480px; margin: 5rem auto; }
-  .account-wrap h1 { margin-bottom: .5rem; }
-  .account-id { color: var(--muted); font-size: .9rem; margin-bottom: 2rem; }
+  .account-id { color: var(--muted); font-size: .9rem; }
   .account-id .email { color: var(--text); font-family: monospace; display: block; margin-bottom: .2rem; overflow-wrap: anywhere; }
-  .account-actions { display: flex; align-items: center; gap: 1.25rem; }
-  .generation-toggle { margin-top: 2.5rem; }
-  .generation-toggle p { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
-  .reminder-toggle { margin-top: 2rem; }
-  .reminder-toggle p { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
-  .reminder-status { margin-top: .75rem; margin-bottom: 0; }
-  .reminder-nudges label { display: flex; align-items: flex-start; gap: .5rem;
-                           color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
-  .reminder-nudges input[type="checkbox"] { margin-top: .2rem; flex: none; }
-  .api-usage { margin-top: 2.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
-  .api-usage h2 { font-size: 1rem; margin-bottom: .4rem; }
-  .api-usage p { color: var(--muted); font-size: .85rem; }
-  .api-usage .api-usage-total { color: var(--text); font-size: 2rem; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .card .reminder-status { margin-top: .75rem; margin-bottom: 0; }
+  .api-usage .card-note, .authenticator-form label.card-note { margin-bottom: 0; }
+  .api-usage-total { font-size: 2rem; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
   .api-usage-providers { margin: .75rem 0; }
   .api-usage-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .25rem .75rem; min-height: 48px; border-top: 1px solid var(--border); }
   .api-usage-row dd { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; }
   .api-usage-row-unpriced dd { color: var(--muted); }
-  .authenticator-settings { margin-top: 2.5rem; }
-  .authenticator-settings h2 { font-size: 1rem; margin-bottom: .4rem; }
   .authenticator-settings h3 { font-size: .9rem; margin-bottom: .4rem; }
-  .authenticator-settings p { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
   .authenticator-form { margin-top: 1.25rem; display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; }
-  .authenticator-form label { color: var(--muted); font-size: .85rem; }
   .authenticator-form input[type="text"] { width: 100%; padding: .55rem .8rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); }
-  .danger-zone { margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 2rem; }
-  .danger-zone h2 { font-size: 1rem; color: var(--red); margin-bottom: .4rem; }
-  .danger-zone p { color: var(--muted); font-size: .85rem; margin-bottom: 1rem; }
+  .danger-zone h2 { color: var(--red); }
   .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
   .btn-danger:hover { background: var(--red); color: var(--bg); }
 </style>
 
-<div class="account-wrap">
+<div class="phone-page">
   <h1><%= t("accounts.show.title") %></h1>
-  <p class="account-id">
-    <span class="email"><%= current_user.email %></span>
-    <%= current_user.provider_label %> · <%= t("languages.#{current_user.language}") %>
-  </p>
 
-  <div class="account-actions">
-    <%= button_to t("accounts.show.log_out"), logout_path, method: :delete, class: "btn btn-ghost" %>
-  </div>
+  <section class="card">
+    <p class="account-id">
+      <span class="email"><%= current_user.email %></span>
+      <%= current_user.provider_label %> · <%= t("languages.#{current_user.language}") %>
+    </p>
+  </section>
 
-  <div class="generation-toggle">
+  <section class="card">
+    <h2><%= t("accounts.show.practice_heading") %></h2>
     <% if current_user.paused_generation_at? %>
-      <p><%= t("accounts.show.paused", date: current_user.paused_generation_at.to_date.strftime("%B %-d")) %></p>
-      <%= button_to t("accounts.show.resume"), toggle_generation_account_path, method: :patch, params: { paused: "0" }, class: "btn btn-ghost" %>
+      <p class="card-note"><%= t("accounts.show.paused", date: current_user.paused_generation_at.to_date.strftime("%B %-d")) %></p>
+      <%= button_to t("accounts.show.resume"), toggle_generation_account_path, method: :patch, params: { paused: "0" }, class: "btn btn-ghost btn-block" %>
     <% else %>
-      <p><%= t("accounts.show.active") %></p>
-      <%= button_to t("accounts.show.pause"), toggle_generation_account_path, method: :patch, params: { paused: "1" }, class: "btn btn-ghost" %>
+      <p class="card-note"><%= t("accounts.show.active") %></p>
+      <%= button_to t("accounts.show.pause"), toggle_generation_account_path, method: :patch, params: { paused: "1" }, class: "btn btn-ghost btn-block" %>
     <% end %>
-  </div>
+  </section>
 
   <%= render "accounts/push_reminders" if WebPushCredentials.configured? %>
 
@@ -62,11 +44,16 @@
 
   <%= render "accounts/api_usage", usage: @usage, since: @usage_since %>
 
-  <div class="danger-zone">
+  <section class="card">
+    <h2><%= t("accounts.show.session_heading") %></h2>
+    <%= button_to t("accounts.show.log_out"), logout_path, method: :delete, class: "btn btn-ghost btn-block" %>
+  </section>
+
+  <section class="card danger-zone">
     <h2><%= t("accounts.show.danger_heading") %></h2>
-    <p><%= t("accounts.show.danger_body") %></p>
+    <p class="card-note"><%= t("accounts.show.danger_body") %></p>
     <%= button_to t("accounts.show.delete"), account_path, method: :delete,
-          class: "btn btn-danger", disabled: true,
+          class: "btn btn-danger btn-block", disabled: true,
           form: { id: "delete-account-form", data: loading_form_data(confirm_message: t("accounts.show.delete_confirm")) } %>
-  </div>
+  </section>
 </div>
