@@ -233,7 +233,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
       rendered = find(field, visible: :all).value
       token = find("[data-controller~='answer-form']")["data-answer-form-draft-token-value"]
       copy = { token: token, answers: { parsons_problem: "order:not-a-real-arrangement" }, ratings: {} }
-      page.execute_script("localStorage.setItem('code-gym-answer-draft', #{copy.to_json.to_json})")
+      page.execute_script("localStorage.setItem(#{draft_key_js}, #{copy.to_json.to_json})")
 
       visit root_path
       expect(page).to have_css("ol[data-parsons-blocks][data-parsons-wired]")
@@ -255,7 +255,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
         const rendered = {}
         document.querySelectorAll("textarea[data-field]").forEach((area) => rendered[area.dataset.field] = area.defaultValue)
         const form = document.querySelector("[data-answer-form-draft-token-value]").dataset
-        localStorage.setItem("code-gym-answer-draft", JSON.stringify({ token: form.answerFormDraftTokenValue,
+        localStorage.setItem(#{draft_key_js}, JSON.stringify({ token: form.answerFormDraftTokenValue,
           scope: form.answerFormDraftScopeValue, sent: [ "a save still on the wire" ],
           answers: { ...rendered, code_review: "Prose typed behind that save.", parsons_problem: "order:another-arrangement" }, ratings: {} }))
       JS
@@ -265,7 +265,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
       wait_for_js
 
       wait_for_js_condition(<<~JS.squish)
-        ((sent) => sent.length === 2 && sent[0] === 'a save still on the wire')(JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.sent || [])
+        ((sent) => sent.length === 2 && sent[0] === 'a save still on the wire')(#{stored_draft_js}?.sent || [])
       JS
     ensure
       gate[:open] = true

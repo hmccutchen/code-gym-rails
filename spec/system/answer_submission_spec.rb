@@ -347,7 +347,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       fill_in_answer("code_review", "The substantive answer that gets submitted.")
       rate_section("code_review")
       wait_for_saved_answer(user, "code_review", "The substantive answer that gets submitted.")
-      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null && !window.CodeGymSaveStatus.pending()")
+      wait_for_answers_settled
       page.execute_script(<<~JS)
         const originalFetch = window.fetch
         const held = []
@@ -369,7 +369,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
         }
         const originalSetItem = Storage.prototype.setItem
         Storage.prototype.setItem = function (key, value) {
-          if (this === localStorage && key === "code-gym-answer-draft" && sessionStorage.getItem("submitSucceeded")) {
+          if (this === localStorage && key === #{draft_key_js} && sessionStorage.getItem("submitSucceeded")) {
             sessionStorage.setItem("copyWritesAfterSubmit", String(Number(sessionStorage.getItem("copyWritesAfterSubmit") || 0) + 1))
           }
           return originalSetItem.call(this, key, value)

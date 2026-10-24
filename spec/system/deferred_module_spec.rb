@@ -72,7 +72,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
 
   # A reload while the reason or rating is still saving drops it, and the draft copy can't restore it once a reply was lost.
   def wait_for_comparison_and_rating_to_settle(reason)
-    wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null && !window.CodeGymSaveStatus.pending()")
+    wait_for_answers_settled
     wait_for do
       saved = user.daily_responses.reload.first
       saved&.answers&.dig("design_comparison") == "pick:a\n#{reason}" && saved.section_ratings["design_comparison"].present?
@@ -168,7 +168,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
             document.querySelectorAll("textarea[data-field]").forEach((area) => rendered[area.dataset.field] = area.defaultValue)
             const form = document.querySelector("[data-answer-form-draft-token-value]").dataset
             const landed = { ...rendered, code_review: #{other_tab_landed.to_json} }
-            localStorage.setItem("code-gym-answer-draft", JSON.stringify({ token: form.answerFormDraftTokenValue,
+            localStorage.setItem(#{draft_key_js}, JSON.stringify({ token: form.answerFormDraftTokenValue,
               scope: form.answerFormDraftScopeValue, sent: [ JSON.stringify([ Object.entries(landed).sort(byKey), [] ]) ],
               answers: { ...rendered, code_review: #{other_tab_later.to_json} }, ratings: {} }))
             const box = [ ...document.querySelectorAll("textarea[data-field]") ].find((area) => area.dataset.field !== "code_review" && area.dataset.draftRestore !== "off" && getComputedStyle(area).display !== "none")
@@ -180,7 +180,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       end
       stalled[:held] = nil
       wait_for { answer_form_connected? }
-      wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.[#{early_field.to_json}] === #{early.to_json}")
+      wait_for_js_condition("#{stored_draft_js}?.answers?.[#{early_field.to_json}] === #{early.to_json}")
       exercise = many.daily_exercises.sole
       many.daily_responses.create!(daily_exercise: exercise, date: exercise.date, answers: { "code_review" => other_tab_landed })
 

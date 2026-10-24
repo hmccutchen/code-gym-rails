@@ -36,6 +36,39 @@ RSpec.describe "Conventions held over system spec waits" do
     MESSAGE
   end
 
+  it "names the draft store's key only through JavascriptReadyHelper" do
+    key_shapes = [ /#{Regexp.escape(JavascriptReadyHelper::DRAFT_KEY)}/, /localStorage\.(?:get|set|remove)Item\(\s*["']/ ]
+    offenders = offending_lines(Regexp.union(key_shapes))
+
+    expect(offenders).to be_empty, <<~MESSAGE
+      Draft key written out in a system spec: #{offenders.join(', ')}.
+      Use draft_key_js, stored_draft_js, draft_absent_js, wait_for_draft_cleared
+      or wait_for_answers_settled from JavascriptReadyHelper, which read the key
+      from app/javascript/code_gym/draft_store.js (#501).
+    MESSAGE
+  end
+
+  describe JavascriptReadyHelper do
+    it "reads the draft key from draft_store.js" do
+      source = JavascriptReadyHelper::DRAFT_STORE_PATH.read
+
+      expect(source).to include(%(const KEY = #{JavascriptReadyHelper::DRAFT_KEY_JS}\n))
+      expect(described_class.draft_key_in(%(const KEY = "a-key"\n))).to eq("a-key")
+    end
+
+    it "raises when draft_store.js no longer declares its key the way the helper reads it" do
+      [ "", %(const KEY = 'single-quoted'\n), %(let KEY = "renamed-binding"\n), %(const DRAFT_KEY = "renamed"\n) ].each do |source|
+        expect { described_class.draft_key_in(source) }.to raise_error(RuntimeError, /Found no `const KEY = "\.\.\."` line/)
+      end
+    end
+
+    it "builds the settled wait from the draft-absent check and the save queue" do
+      expect(JavascriptReadyHelper::ANSWERS_SETTLED)
+        .to eq("#{JavascriptReadyHelper::DRAFT_ABSENT} && !window.CodeGymSaveStatus.pending()")
+      expect(JavascriptReadyHelper::DRAFT_ABSENT).to eq("localStorage.getItem(#{JavascriptReadyHelper::DRAFT_KEY_JS}) === null")
+    end
+  end
+
   describe PollingHelper do
     let(:waiter) { Object.new.extend(described_class) }
 

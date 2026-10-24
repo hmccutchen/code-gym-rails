@@ -17,6 +17,10 @@ restore check and is deleted on the next dashboard load. Within the same set,
 the answer form also restores a copy whose save landed without a reply; its
 code note says when.
 
+System specs read the key from the `const KEY = "..."` line
+(`JavascriptReadyHelper.draft_key_in`), and the suite refuses to load if that
+line changes shape, so a rename or restyle of it updates the helper too.
+
 ## Cleared on every signed-out page
 
 The app runs on shared devices. Logging out lands on the login page, and the
