@@ -229,4 +229,4 @@ data.*
 - keep pending-trial session access in a controller concern `#531`
 - move authenticator rules off User `#534 open`
 - move concept exposure reads into their own model `#535`
-- make push-disabled tests ignore exported VAPID values `#536 open`
+- make push-disabled tests ignore exported VAPID values `#536`
