@@ -14,7 +14,7 @@ RSpec.describe DailyResponse, ".with_ai_ratings_only" do
     user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current, ai_review: ai_review)
   end
 
-  def projected(response) = described_class.where(id: response.id).with_ai_ratings_only.take!
+  def projected(response) = described_class.where(id: response.id).with_ai_ratings_only(*described_class.column_names).take!
 
   def rating_or_error(response, section)
     response.ai_rating_for(section)
@@ -61,7 +61,7 @@ RSpec.describe DailyResponse, ".with_ai_ratings_only" do
   it "loads none of the review prose" do
     respond(2, { "code_review" => full_review, "pattern" => full_review })
 
-    expect(described_class.with_ai_ratings_only.take!.ai_review.to_json).not_to include("line item")
+    expect(described_class.with_ai_ratings_only(:ai_review).take!.ai_review.to_json).not_to include("line item")
   end
 
   it "returns read-only rows, so a projected review is never saved over the stored one" do
@@ -75,7 +75,7 @@ RSpec.describe DailyResponse, ".with_ai_ratings_only" do
 
   it "selects the stored review column only through the projection" do
     respond(2, { "code_review" => full_review })
-    result = described_class.connection.select_all(described_class.with_ai_ratings_only.to_sql)
+    result = described_class.connection.select_all(described_class.with_ai_ratings_only(*described_class.column_names).to_sql)
 
     expect(result.columns.tally).to eq(described_class.column_names.tally)
     expect(result.first["ai_review"]).not_to include("line item")
@@ -89,6 +89,10 @@ RSpec.describe DailyResponse, ".with_ai_ratings_only" do
     expect(row.ai_review).to eq("code_review" => { "rating" => "solid" })
   end
 
+  it "asks for the columns to load" do
+    expect { described_class.with_ai_ratings_only }.to raise_error(ArgumentError)
+  end
+
   it "refuses a column the table does not have" do
     expect { described_class.with_ai_ratings_only(:id, :not_a_column) }.to raise_error(ArgumentError, /not_a_column/)
   end
@@ -100,6 +104,6 @@ RSpec.describe DailyResponse, ".with_ai_ratings_only" do
     other.daily_responses.create!(daily_exercise: other_exercise, date: mine.date, submitted_at: Time.current, ai_review: {})
     newer = respond(3, {})
 
-    expect(user.daily_responses.order(date: :desc).with_ai_ratings_only.map(&:id)).to eq([ newer.id, mine.id ])
+    expect(user.daily_responses.order(date: :desc).with_ai_ratings_only(:id).map(&:id)).to eq([ newer.id, mine.id ])
   end
 end

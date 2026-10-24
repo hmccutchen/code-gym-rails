@@ -123,7 +123,7 @@ takes an Arel node for the section key and tests
 
 ## `.with_ai_ratings_only`
 
-Loads the given columns, or every column, with `ai_review` cut down to each
+Loads the given columns with `ai_review` cut down to each
 section's `AI_RATING_FIELD`, the one field `#ai_rating_for` reads. A caller
 that reads any other part of the review can't use it: difficulty, prose and
 rubric checks come back missing. `#reviewed?` and `#section_reviewed?` still

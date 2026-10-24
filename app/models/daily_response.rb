@@ -47,8 +47,8 @@ class DailyResponse < ApplicationRecord
              .distinct.pluck(Arel.sql("jsonb_object_keys(section_ratings)")).to_set
   end
 
-  def self.with_ai_ratings_only(*columns)
-    names = columns.empty? ? column_names : columns.map(&:to_s)
+  def self.with_ai_ratings_only(column, *columns)
+    names = [ column, *columns ].map(&:to_s)
     unknown = names - column_names
     raise ArgumentError, "Unknown DailyResponse columns: #{unknown.join(", ")}" if unknown.any?
 

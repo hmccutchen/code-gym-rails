@@ -60,7 +60,7 @@ hits, record instantiations and allocated objects, and timed the median of 25
 runs on local Postgres while other test runs shared the machine.
 
 Most of the Ruby time was `ExerciseSection.key` rebuilding the kind's name
-with `underscore` on every call, about ten times per `ExerciseSection.find`,
+with `underscore` on every call, up to ten times per `ExerciseSection.find`,
 and `find` runs for every section of every day's answer check. The key is now
 built once per kind and frozen.
 
@@ -79,7 +79,8 @@ between the two.
 
 ### The ratings-only review
 
-Measured with the same harness, at four synthetic review sizes and one built
+Measured with a later version of that harness, so its counts don't compare
+with the table above. It used four synthetic review sizes and one built
 from the repository's `spec/fixtures/review_judge` examples. Each build ran
 twice, alternating, at 15 runs each, with a load average of 3.4-4.5 from
 other work. Every build gave the same ledger as one built from fully loaded
