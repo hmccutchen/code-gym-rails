@@ -1,6 +1,7 @@
 # /trial/start serves a signed-out visitor; /trial serves a signed-in account with no key.
 class TrialsController < ApplicationController
   include LoginCodeRequests
+  include PendingTrialSession
 
   skip_before_action :require_login, only: %i[new start show]
   skip_before_action :require_provider
@@ -36,7 +37,7 @@ class TrialsController < ApplicationController
 
     email = normalized_email
     mail_login_code(email)
-    PendingTrial.remember(session, email: email, invite: invite, provider: params[:provider], consented_at: Time.current)
+    remember_pending_trial(email: email, invite: invite, provider: params[:provider], consented_at: Time.current)
     redirect_to login_code_path, notice: t("trials.code_sent", expiry: User.login_code_expiry_in_words)
   rescue ActiveRecord::RecordInvalid
     refuse_start(t("sessions.email_not_accepted"))

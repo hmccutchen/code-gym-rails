@@ -31,7 +31,7 @@ class SessionsController < ApplicationController
 
   # POST /login — an account with an authenticator skips the email; the pending state makes a code redeemable here.
   def create
-    PendingTrial.forget(session)
+    forget_pending_trial
     user = User.active.find_by(email: normalized_email)
     return start_second_factor_challenge(user) if user&.sign_in_factor == :authenticator
 
@@ -93,7 +93,7 @@ class SessionsController < ApplicationController
     recent = recent_sign_in(user, login_code_proof) or return
 
     @challenge_at = recent[:challenge_at]
-    PendingTrial.forget(session) if user.emailed_code_signs_in?
+    forget_pending_trial if user.emailed_code_signs_in?
     [ user, recent[:checked_at] ]
   end
 

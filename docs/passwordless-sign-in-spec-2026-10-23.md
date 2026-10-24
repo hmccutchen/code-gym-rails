@@ -101,7 +101,7 @@ More details for this step:
 
 **A full session reset at sign-in.** The sign-in audit found that #490 dropped `reset_session` before the session is assigned. The full `reset_session` in `start_new_session_for` (`app/controllers/sessions_controller.rb:101-106` at `c7a500c0^`) restores it. Warden only changed the session id and kept the old data.
 
-**Read before reset.** `PendingTrial.take` and `return_to` are read before the reset, as the old code did.
+**Read before reset.** `take_pending_trial` and `return_to` are read before the reset, as the old code did.
 
 ### 5. Code expiry
 
