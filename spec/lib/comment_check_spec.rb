@@ -5,6 +5,12 @@ RSpec.describe CommentCheck do
     described_class.offenses_for(path, text).map { |offense| [ offense.line, offense.message ] }
   end
 
+  it "checks only file types it can scan, outside vendored and dependency folders" do
+    expect(%w[config/a.yml app/views/a.html.erb app/javascript/a.js lefthook.yml].map { described_class.checked_path?(_1) }).to all(be(true))
+    expect(%w[app/models/a.rb README.md vendor/prettier/a.yml spec/playwright/node_modules/a.js .claude/skills/a/b.py]
+      .map { described_class.checked_path?(_1) }).to all(be(false))
+  end
+
   it "accepts a one-line YAML comment above its key" do
     expect(messages("config/a.yml", "# Hourly in production.\nschedule: every hour\n")).to be_empty
   end

@@ -170,9 +170,8 @@ data.*
   **I decided:** a daily cap of 20 wrong codes; every wrong-code count kept on
   the user row, not the cookie; no-store on pages with the key or codes;
   turning it on or off ends every other session; recovery codes compared only
-  for recovery-shaped input; a copy fallback that selects the text; a phone
-  check before and after merge
-- from the review of the authenticator PR: each session gets its own setup key
+  for recovery-shaped input; a phone check before and after merge
+- from review: each session gets its own setup key
   **I decided:** the key stays in the session until a code verifies; the model
   takes session values; spec and plan docs dropped; extraction is an issue
 - two reviews per PR, critical and layered, each by its own agent `#492`
@@ -180,13 +179,13 @@ data.*
 - the test rules say CI runs on Postgres 18
 - locked out after turning on the authenticator: stop a double tap posting
   the sign-in forms twice `#495`
-  **why:** after turning it on, every emailed code said it was wrong, and the
-  home-screen app ended on a 404
+  **why:** every emailed code said it was wrong, and the home-screen app ended
+  on a 404
   **I decided:** Turn on and New recovery codes start disabled; the server
   accepts a repeat of a sign-in it just completed
 - the cost of each API call on its usage row, Anthropic keys only `#472`
   **I decided:** Gemini and OpenAI costs stay null; prices stay on the
-  providers; the design doc dropped; a timeout costs null
+  providers; a timeout costs null
 - the Account usage card in dollars `#497`
 - the authenticator in place of the emailed code `#496`, onto main `#502`
   **I decided:** a double-tapped address gets its challenge back for 30 seconds
@@ -195,3 +194,5 @@ data.*
   **I decided:** the card styles load everywhere; Reminders keeps Save;
   cards clear a landscape notch; the page column's padding named once; one
   rule hides anything hidden on a card page
+- lefthook git hooks: lint on commit, CI's checks on push `#508`
+  **I decided:** system specs stay in CI

@@ -8,6 +8,10 @@ A team Rails app for daily personalized coding exercises. Each engineer logs in 
 
 All changes are made on a feature/dev branch, never directly on `main`. Create (or switch to) a branch before touching any files, and open a PR into `main` when the work is ready for review.
 
+A push runs the unit suite through the pre-push hook (`lefthook.yml`), so give
+`git push` a timeout of at least five minutes, and don't push while another
+spec run on this machine is using the test database.
+
 **Every PR gets an intent log entry before it merges.** Use the `intent-log`
 skill (`.claude/skills/intent-log/SKILL.md`): once the PR is open, append the
 day's entry to your own `docs/intent/<github-login>.md`, tag it with the PR
@@ -252,7 +256,9 @@ rather than only catching it afterward:
 **What CI does and doesn't tell you.** The workflow runs RSpec, system specs,
 RuboCop, `bin/comment-check`, `archspec check`, Brakeman, and `importmap audit`. It does *not* run a Ruby dependency
 CVE audit (`bundle-audit` is not installed) or any complexity check, and this
-repository has no branch protection — so no check gates a merge. CI is
+repository has no branch protection — so no check gates a merge. The local
+hooks (`lefthook.yml`) run the same checks, except the system specs, before a
+push, but anyone can skip them. CI is
 advisory signal; it is not evidence that anything was verified.
 
 ## Stack
@@ -320,6 +326,12 @@ bin/rails db:prepare  # creates the database and loads the schema
 bin/dev               # starts the web server only
 bin/jobs              # optional: Solid Queue and the recurring schedule
 ```
+
+`bin/setup` also installs Prettier for `CodeFormat` and the git hooks in
+`lefthook.yml`, which run CI's checks before a commit and before a push.
+`docs/code-notes/lefthook.md` says which run when and how to skip them.
+Prettier needs Node and npm. On an older checkout, run
+`npm --prefix vendor/prettier ci` and `bundle exec lefthook install` once.
 
 Development needs no environment variables. `config/database.yml` points at
 a local PostgreSQL through its default socket, Rails generates the
