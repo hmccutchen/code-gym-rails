@@ -12,13 +12,17 @@ RSpec.describe "The intent-log skill's scripts" do
   end
 
   before do
-    system("git", "init", "-q", "-b", "mine", repo, exception: true)
-    system("git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false",
+    system(without_hook_git, "git", "init", "-q", "-b", "mine", repo, exception: true)
+    system(without_hook_git, "git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false",
            "commit", "-q", "--allow-empty", "-m", "start", exception: true)
     write("docs/intent/_since", "2026-10-20\n")
   end
 
   after { FileUtils.remove_entry(repo) }
+
+  def without_hook_git
+    ENV.keys.grep(/\AGIT_/).to_h { [ _1, nil ] }
+  end
 
   def pr(number, author:, state: "MERGED", created: "2026-10-20T15:00:00Z", branch: "work-#{number}", bot: false)
     { "number" => number, "state" => state, "title" => "PR #{number}", "createdAt" => created,
@@ -38,7 +42,7 @@ RSpec.describe "The intent-log skill's scripts" do
     write(".bin/gh", "#!/usr/bin/env ruby\nputs(ARGV.first(2) == %w[api user] ? \"me\" : File.read(#{File.join(repo, "prs.json").inspect}))\n")
     File.chmod(0o755, File.join(repo, ".bin/gh"))
     write("prs.json", JSON.generate(prs))
-    Open3.capture2e({ "PATH" => "#{File.join(repo, ".bin")}:#{ENV["PATH"]}" }.merge(env),
+    Open3.capture2e(without_hook_git.merge("PATH" => "#{File.join(repo, ".bin")}:#{ENV["PATH"]}", **env),
                     "ruby", File.join(skill, script), *args, chdir: repo, stdin_data: stdin)
   end
 
@@ -224,6 +228,30 @@ RSpec.describe "The intent-log skill's scripts" do
 
       run("extract.rb", "sources", "--repo", odd, env: { "HOME" => File.join(repo, "home") })
       expect(File.exist?(File.join(repo, "injected"))).to be(false)
+    end
+  end
+
+  describe "inside a git hook, where git has exported GIT_DIR" do
+    let(:hook_repo) { Dir.mktmpdir }
+
+    around do |example|
+      outer_git_dir = ENV["GIT_DIR"]
+      system(without_hook_git, "git", "init", "-q", hook_repo, exception: true)
+      ENV["GIT_DIR"] = File.join(hook_repo, ".git")
+      example.run
+    ensure
+      ENV["GIT_DIR"] = outer_git_dir
+      FileUtils.remove_entry(hook_repo)
+    end
+
+    it "leaves the hook's repository untouched" do
+      prs.push(pr(2, author: "me", state: "OPEN", branch: "mine"))
+      entry("me", "second thing `#2`")
+
+      output, status = check
+      expect(status).to be_success, output
+      expect(Open3.capture2(without_hook_git, "git", "-C", hook_repo, "config", "core.bare").first.strip).to eq("false")
+      expect(Open3.capture2e(without_hook_git, "git", "-C", hook_repo, "rev-parse", "--verify", "-q", "HEAD").last).not_to be_success
     end
   end
 

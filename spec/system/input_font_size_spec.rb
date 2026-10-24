@@ -106,7 +106,7 @@ RSpec.describe "Focusable controls are large enough not to trigger iOS zoom", ty
                               track_chosen_at: Time.current)
     visit_as(setup_user)
     visit setup_path
-    expect(page).to have_css("#tz-select")
+    expect(page).to have_css("#tz-select", visible: :all)
 
     expect_no_undersized_controls(minimum_controls: 1)
   end

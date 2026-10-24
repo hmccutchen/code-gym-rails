@@ -38,7 +38,6 @@
     "controllers": "/assets/controllers/index-DIGEST.js",
     "controllers/learn_filter_controller": "/assets/controllers/learn_filter_controller-DIGEST.js",
     "controllers/level_suggestion_controller": "/assets/controllers/level_suggestion_controller-DIGEST.js",
-    "controllers/level_suggestions_switch_controller": "/assets/controllers/level_suggestions_switch_controller-DIGEST.js",
     "controllers/loading_form_controller": "/assets/controllers/loading_form_controller-DIGEST.js",
     "controllers/mermaid_controller": "/assets/controllers/mermaid_controller-DIGEST.js",
     "controllers/name_editor_controller": "/assets/controllers/name_editor_controller-DIGEST.js",
@@ -51,7 +50,9 @@
     "controllers/push_launch_controller": "/assets/controllers/push_launch_controller-DIGEST.js",
     "controllers/review_alternates_controller": "/assets/controllers/review_alternates_controller-DIGEST.js",
     "controllers/review_button_controller": "/assets/controllers/review_button_controller-DIGEST.js",
+    "controllers/save_switch_controller": "/assets/controllers/save_switch_controller-DIGEST.js",
     "controllers/time_zone_controller": "/assets/controllers/time_zone_controller-DIGEST.js",
+    "controllers/value_row_controller": "/assets/controllers/value_row_controller-DIGEST.js",
     "controllers/welcome_controller": "/assets/controllers/welcome_controller-DIGEST.js",
     "controllers/write_up_control_controller": "/assets/controllers/write_up_control_controller-DIGEST.js",
     "code_gym/draft_store": "/assets/code_gym/draft_store-DIGEST.js",
@@ -80,7 +81,6 @@
 <link rel="modulepreload" href="/assets/controllers/index-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/learn_filter_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/level_suggestion_controller-DIGEST.js" nonce="NONCE">
-<link rel="modulepreload" href="/assets/controllers/level_suggestions_switch_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/loading_form_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/mermaid_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/name_editor_controller-DIGEST.js" nonce="NONCE">
@@ -93,7 +93,9 @@
 <link rel="modulepreload" href="/assets/controllers/push_launch_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/review_alternates_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/review_button_controller-DIGEST.js" nonce="NONCE">
+<link rel="modulepreload" href="/assets/controllers/save_switch_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/time_zone_controller-DIGEST.js" nonce="NONCE">
+<link rel="modulepreload" href="/assets/controllers/value_row_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/welcome_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/write_up_control_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/code_gym/draft_store-DIGEST.js" nonce="NONCE">
@@ -269,7 +271,7 @@
     code.highlight :is(.m, .mb, .mf, .mh, .mi, .il, .mo, .mx, .kc) { color: var(--yellow); }
     code.highlight :is(.ss, .na, .vi, .vc, .vg) { color: var(--code-symbol); }
     code.highlight :is(.nb, .bp, .no, .nt) { color: var(--code-builtin); }
-    .review-block { background: rgba(124,106,247,.06); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem; margin-top: .75rem; }
+    .review-block { background: rgba(124,106,247,.06); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem; margin-top: .75rem; overflow-wrap: anywhere; }
     .review-block h3 { color: var(--slot-accent, var(--accent-text)); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
     .review-rating { display: inline-block; background: rgba(124,106,247,.15); border-radius: 4px; padding: .1rem .5rem; font-size: .75rem; margin-left: .5rem; text-transform: none; letter-spacing: 0; }
     .difficulty-note { font-size: .8rem; line-height: 1.6; color: var(--muted); margin-top: .3rem; }
@@ -325,8 +327,8 @@
     .featured-marker { display: inline-block; font-size: .7rem; letter-spacing: .04em; text-transform: none; color: var(--accent-text); border: 1px solid var(--accent); border-radius: 999px; padding: .05rem .5rem; }
     .section-status { font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); margin-left: auto; }
     .section h2 { font-size: 1.1rem; margin-bottom: .75rem; }
-    .section-scenario { font-size: .95rem; color: var(--muted); margin-bottom: .75rem; }
-    .question { font-size: 1rem; line-height: 1.7; margin-bottom: 1.25rem; }
+    .section-scenario { font-size: .95rem; color: var(--muted); margin-bottom: .75rem; overflow-wrap: anywhere; }
+    .question { font-size: 1rem; line-height: 1.7; margin-bottom: 1.25rem; overflow-wrap: anywhere; }
     .why-box { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; color: var(--muted); border-radius: 0 6px 6px 0; margin-bottom: 1rem; }
     .arch-options { margin: 0 0 1.25rem 1.25rem; font-size: .95rem; line-height: 1.8; }
 
@@ -604,17 +606,15 @@
       <div class="flash notice" id="flash-notice">Welcome back, Existing!</div>
 
     <style>
-  .setup-wrap { max-width: 480px; margin: 5rem auto; }
-  .setup-wrap h1 { margin-bottom: .5rem; }
-  .setup-wrap p  { color: var(--muted); margin-bottom: 2rem; }
+  :where(#exercise-mix, #display-preferences) p:not(.card-note) { color: var(--muted); margin-bottom: 2rem; }
   .form-field { margin-bottom: 1rem; }
-  .form-field label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
-  .form-field input:not([type="checkbox"], [type="radio"]) { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); font-family: monospace; }
-  .form-field input:not([type="checkbox"], [type="radio"]):focus { border-color: var(--accent); }
-  .form-field input[type="checkbox"], .form-field input[type="radio"] { width: auto; margin-right: .4rem; vertical-align: middle; }
-  .form-field select { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); }
-  .form-field select:focus { border-color: var(--accent); }
+  :is(.form-field, .settings-fields) label:not(:where(.switch-row)) { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
+  :is(.form-field, .settings-fields) input:not([type="checkbox"], [type="radio"]) { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); font-family: monospace; }
+  :is(.form-field, .settings-fields) input:not([type="checkbox"], [type="radio"]):focus { border-color: var(--accent); }
+  :is(.form-field, .settings-fields) input:is([type="checkbox"], [type="radio"]):not(:where(.switch)) { width: auto; margin-right: .4rem; vertical-align: middle; }
   .hint { font-size: .8rem; color: var(--muted); margin-top: .4rem; }
+  .key-guide > * + * { margin-top: .5rem; }
+  .key-guide :is(ol, ul) { padding-left: 1.25rem; }
   .mix-group { border: 1px solid var(--border); border-radius: 6px; padding: .75rem; margin-bottom: .75rem; }
   .mix-group legend { font-size: .8rem; color: var(--muted); padding: 0 .35rem; }
   .mix-row { display: grid; grid-template-columns: 1fr auto; gap: .25rem .5rem; align-items: center; margin-bottom: .6rem; }
@@ -623,7 +623,7 @@
   .mix-row output { font-size: .8rem; color: var(--muted); }
   .mix-row input[type="range"]:disabled { opacity: .4; }
   .mix-exclude { font-size: .8rem; color: var(--muted); }
-  .mix-exclude, .mix-lock, .mix-difficulty label, .daily-sections label { min-height: 24px; }
+  .mix-exclude, .mix-lock, .mix-difficulty label { min-height: 24px; }
   .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
   .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; font-size: .8rem; }
   .mix-difficulty legend { font-size: .8rem; color: var(--muted); padding: 0; }
@@ -636,82 +636,83 @@
   .display-hint { flex-basis: 100%; margin-top: 0; }
 </style>
 
-<div class="setup-wrap" data-controller="profile-preferences"
+<div class="phone-page" data-controller="profile-preferences"
      data-profile-preferences-url-value="/profile"
      data-profile-preferences-label-template-value="Your track (__LEVEL__)">
   <h1>Add your API key</h1>
-  <p>Your key is encrypted at rest and only used to generate your personal exercise sets and reviews. Usage is tracked per-user for transparency.</p>
 
-  <form action="/setup" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="patch" autocomplete="off" />
-    <div class="form-field">
-      <label for="api_key">API key</label>
-      <input placeholder="sk-ant-..., AQ...., AIza... or sk-proj-..." autocomplete="off" type="password" name="api_key" id="api_key" />
-      <p class="hint">Paste an Anthropic key (<a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>, starts with <code>sk-ant-</code>), a Google Gemini key (<a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>, starts with <code>AQ.</code> or the older <code>AIza</code>), or an OpenAI key (<a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>, starts with <code>sk-proj-</code>).</p>
-        <p class="hint">A key replaces the one saved for its provider and switches to it. Keys for other providers stay saved.</p>
+  <section class="card">
+    <div class="card-heading">
+      <h2>Connection</h2>
+      <span class="card-tag">Tap Save to apply</span>
     </div>
+    <p class="card-note">Your key is encrypted at rest and only used to generate your personal exercise sets and reviews. Usage is tracked per-user for transparency.</p>
+
+    <form action="/setup" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="patch" autocomplete="off" />
       <div class="form-field">
-        <fieldset class="display-group" id="provider-choice">
-          <legend>Provider in use</legend>
-            <label><input type="radio" value="anthropic" checked="checked" name="provider" id="provider_anthropic" />Claude</label>
-          <p class="hint display-hint">Switch between the keys you&#39;ve saved. To add another provider, paste its key above.</p>
-        </fieldset>
+        <label for="api_key">API key</label>
+        <input placeholder="sk-ant-..., AQ...., AIza... or sk-proj-..." autocomplete="off" type="password" name="api_key" id="api_key" />
+        <p class="card-note">Paste an Anthropic key (<a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>, starts with <code>sk-ant-</code>), a Google Gemini key (<a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>, starts with <code>AQ.</code> or the older <code>AIza</code>), or an OpenAI key (<a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>, starts with <code>sk-proj-</code>).</p>
+          <p class="card-note">A key replaces the one saved for its provider and switches to it. Keys for other providers stay saved.</p>
       </div>
-    <div class="form-field">
-      <label for="language">Exercise language</label>
-      <select name="language" id="language"><option selected="selected" value="ruby_rails">Ruby / Rails (default)</option>
+        <fieldset class="field-group" id="provider-choice">
+          <legend>Provider in use</legend>
+          <div class="segmented">
+              <label class="segment"><input type="radio" value="anthropic" checked="checked" name="provider" id="provider_anthropic" />Claude</label>
+          </div>
+          <p class="card-note">Switch between the keys you&#39;ve saved. To add another provider, paste its key above.</p>
+        </fieldset>
+      <div class="value-row" data-controller="value-row">
+        <label for="language">Exercise language</label>
+        <span class="value-row-value" aria-hidden="true" data-value-row-target="value">Ruby / Rails (default)</span>
+        <select data-action="change-&gt;value-row#show" name="language" id="language"><option selected="selected" value="ruby_rails">Ruby / Rails (default)</option>
 <option value="javascript">JavaScript (vanilla + React)</option>
 <option value="mixed">Mixed (alternates daily)</option></select>
-      <p class="hint">Choose the language your daily exercise sets are generated in. &quot;Mixed&quot; alternates between Ruby/Rails and JavaScript one full day at a time.</p>
-    </div>
-    <input type="submit" name="commit" value="Save key" class="btn btn-primary" data-disable-with="Save key" />
-</form>
-  <div class="form-field">
-    <label for="tz-select">Time zone</label>
-    <select name="tz_select" id="tz-select" data-profile-preferences-target="timeZone" data-action="change-&gt;profile-preferences#saveTimeZone"><option value="">— detect automatically —</option><option value="America/New_York">Eastern</option>
+      </div>
+      <p class="card-note">Choose the language your daily exercise sets are generated in. &quot;Mixed&quot; alternates between Ruby/Rails and JavaScript one full day at a time.</p>
+      <button name="commit" type="submit" value="Save key" class="btn btn-primary btn-block">Save key</button>
+</form>  </section>
+
+  <section class="card">
+    <h2>Your day</h2>
+    <div class="value-row" data-controller="value-row">
+      <label for="tz-select">Time zone</label>
+      <span class="value-row-value" aria-hidden="true" data-value-row-target="value">— detect automatically —</span>
+      <select name="tz_select" id="tz-select" data-profile-preferences-target="timeZone" data-action="change-&gt;profile-preferences#saveTimeZone change-&gt;value-row#show"><option value="">— detect automatically —</option><option value="America/New_York">Eastern</option>
 <option value="America/Chicago">Central</option>
 <option value="America/Denver">Mountain</option>
 <option value="America/Phoenix">Mountain (Arizona, no DST)</option>
 <option value="America/Los_Angeles">Pacific</option>
 <option value="America/Anchorage">Alaska</option>
 <option value="Pacific/Honolulu">Hawaii</option></select>
-    <p class="hint">Sets when your day rolls over and when your 8am exercise set is generated. Leave on &quot;detect automatically&quot; to use your browser&#39;s zone.</p>
-  </div>
+    </div>
+    <p class="card-note">Sets when your day rolls over and when your 8am exercise set is generated. Leave on &quot;detect automatically&quot; to use your browser&#39;s zone.</p>
 
-  <div class="form-field">
-    <fieldset class="display-group daily-sections" id="daily-sections"
+    <fieldset class="field-group" id="daily-sections"
               data-profile-preferences-target="dailySections" data-action="change->profile-preferences#saveDailySections">
       <legend>Daily sections</legend>
-      <label>
-        <input type="radio" name="daily_section_count" value="automatic" checked>
-        Automatic
-      </label>
-        <label>
-          <input type="radio" name="daily_section_count" value="2" >
-          2
-        </label>
-        <label>
-          <input type="radio" name="daily_section_count" value="3" >
-          3
-        </label>
-        <label>
-          <input type="radio" name="daily_section_count" value="4" >
-          4
-        </label>
-      <p class="hint display-hint">Automatic gives you shorter sets after days you don&#39;t finish, and longer ones once you finish more and your reviewed answers go well. A number sets how many sections each day is planned with, though a section that fails a quality check can still be left out. 2 gives you only Code Review and Design Comparison.</p>
+      <div class="segmented">
+        <label class="segment"><input type="radio" name="daily_section_count" value="automatic" checked>Automatic</label>
+          <label class="segment"><input type="radio" name="daily_section_count" value="2" >2</label>
+          <label class="segment"><input type="radio" name="daily_section_count" value="3" >3</label>
+          <label class="segment"><input type="radio" name="daily_section_count" value="4" >4</label>
+      </div>
+      <p class="card-note">Automatic gives you shorter sets after days you don&#39;t finish, and longer ones once you finish more and your reviewed answers go well. A number sets how many sections each day is planned with, though a section that fails a quality check can still be left out. 2 gives you only Code Review and Design Comparison.</p>
     </fieldset>
-  </div>
 
-  <div class="form-field">
-    <label for="skill-level">Track</label>
-    <select name="skill_level" id="skill-level" autocomplete="off" data-profile-preferences-target="skillLevel" data-action="change-&gt;profile-preferences#saveSkillLevel"><option selected="selected" value="junior">Junior</option>
+    <div class="value-row" data-controller="value-row">
+      <label for="skill-level">Track</label>
+      <span class="value-row-value" aria-hidden="true" data-value-row-target="value">Junior</span>
+      <select name="skill_level" id="skill-level" autocomplete="off" data-profile-preferences-target="skillLevel" data-action="change-&gt;profile-preferences#saveSkillLevel change-&gt;value-row#show"><option selected="selected" value="junior">Junior</option>
 <option value="mid_level">Mid-level</option>
 <option value="senior">Senior</option>
 <option value="principal_engineer">Principal engineer</option></select>
-    <p class="hint">The level every section uses unless you set one for it in the Exercise mix below. Your ratings nudge each day&#39;s set around it. Changing your track also moves any section set to your old or new level, unless it is locked. When your reviewed answers show a section is ready to move, Coding Gym suggests a level for that section, and you decide. Principal engineer is set only here; Coding Gym never suggests it.</p>
-    <p class="hint" role="status" data-profile-preferences-target="keptOwnLevel"></p>
-  </div>
+    </div>
+    <p class="card-note">The level every section uses unless you set one for it in the Exercise mix below. Your ratings nudge each day&#39;s set around it. Changing your track also moves any section set to your old or new level, unless it is locked. When your reviewed answers show a section is ready to move, Coding Gym suggests a level for that section, and you decide. Principal engineer is set only here; Coding Gym never suggests it.</p>
+    <p class="card-note" role="status" data-profile-preferences-target="keptOwnLevel"></p>
+  </section>
 
-  <details class="form-field" id="exercise-mix"
+  <details class="card settings-fields" id="exercise-mix"
            data-controller="exercise-mix"
            data-action="profile-preferences:trackSaving@document->exercise-mix#holdForTrackSave profile-preferences:trackSaved@document->exercise-mix#adoptTrackChange profile-preferences:trackFailed@document->exercise-mix#settlePrepareButton"
            data-exercise-mix-url-value="/profile"
@@ -722,14 +723,15 @@
            data-exercise-mix-labels-value="[&quot;Much less&quot;,&quot;Less&quot;,&quot;Default&quot;,&quot;More&quot;,&quot;Much more&quot;]"
            data-exercise-mix-version-value="0">
     <summary>Exercise mix</summary>
-    <div id="level-suggestions-switch" class="mix-note" data-controller="level-suggestions-switch" data-level-suggestions-switch-url-value="/profile">
-  <label for="level-suggestions">
-    <input type="checkbox" id="level-suggestions" checked
-           aria-describedby="level-suggestions-hint"
-           data-level-suggestions-switch-target="checkbox" data-action="change->level-suggestions-switch#toggle">
+    <div id="level-suggestions-switch" data-controller="save-switch" data-save-switch-url-value="/profile" data-save-switch-key-value="level_suggestions" data-save-switch-field-value="level_suggestions" data-save-switch-scope-value="user" data-save-switch-saved-text-value="Saved">
+  <label class="switch-row" for="level-suggestions">
     Suggest level changes
+    <input type="checkbox" id="level-suggestions" class="switch" role="switch" checked
+           aria-describedby="level-suggestions-hint"
+           data-save-switch-target="checkbox" data-action="change->save-switch#toggle">
   </label>
-  <p class="hint" id="level-suggestions-hint">When this is off, the dashboard stops suggesting level changes. You can still change levels yourself below, and turn this back on at any time.</p>
+  <p class="card-note" id="level-suggestions-hint">When this is off, the dashboard stops suggesting level changes. You can still change levels yourself below, and turn this back on at any time.</p>
+  <p class="card-note switch-status" role="status" data-save-switch-target="status"></p>
 </div>
     <p class="hint">Bias how often each rotating section appears, and set how hard any section is pitched. Neither changes how many sections a day holds — that&#39;s the setting above. Changes save automatically.</p>
 
@@ -1343,7 +1345,7 @@
     </div>
   </details>
 
-  <details class="form-field" id="display-preferences" data-controller="display-preferences"
+  <details class="card settings-fields" id="display-preferences" data-controller="display-preferences"
          data-display-preferences-url-value="/profile"
          data-display-preferences-defaults-value="{&quot;theme&quot;:&quot;dark&quot;,&quot;text_size&quot;:&quot;100&quot;,&quot;line_spacing&quot;:&quot;default&quot;,&quot;font&quot;:&quot;default&quot;,&quot;background_pattern&quot;:&quot;on&quot;}"
          data-display-preferences-palette-value="{&quot;light&quot;:&quot;all&quot;,&quot;device&quot;:&quot;(prefers-color-scheme: light)&quot;}"

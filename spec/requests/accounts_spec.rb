@@ -265,6 +265,21 @@ RSpec.describe "Accounts", type: :request do
       expect(Nokogiri::HTML(response.body).at_css("#push-status")["class"].split).to include("card-note")
     end
 
+    it "renders the nudges switch with no Save button except inside noscript" do
+      configure_vapid
+      user = create_user_with_key.tap { |u| u.update!(reminder_level: :ready) }
+      login_as(user)
+      get account_path
+
+      form = Nokogiri::HTML(response.body).at_css("form[data-controller='save-switch']")
+      expect(form["data-save-switch-url-value"]).to eq(push_subscription_path)
+      expect(form["data-save-switch-key-value"]).to eq("nudges")
+      expect(form["data-save-switch-field-value"]).to eq("nudges")
+      expect(form.css("button[type=submit]").reject { |b| b.ancestors("noscript").any? }).to be_empty
+      expect(form.at_css("noscript")).to be_present
+      expect(form.at_css("p.switch-status[role=status]").text).to eq("")
+    end
+
     it "puts Log out in the Session card as a full-width button" do
       login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
 

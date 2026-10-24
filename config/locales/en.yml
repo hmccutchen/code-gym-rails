@@ -475,6 +475,8 @@ en:
       not_offered: "not offered"
     not_offered_note: "Not offered: every section that could show this concept is excluded in your exercise mix, so it is your choice rather than a gap."
     setup_link: "Change the mix"
+  switches:
+    saved: "Saved"
   save_status:
     generic: "Couldn't save your last change. It hasn't reached the server — check your connection and try again."
   daily_kinds:
@@ -861,6 +863,7 @@ en:
     push_reminders:
       enabled: "Daily reminders are on. You'll get a notification when each weekday's set is ready."
       nudges_label: "Also remind me during the day if today's set isn't finished (hourly, %{window})"
+      nudges_unavailable: "Reminders are off on this account, so this setting can't change. Reload the page to see the current settings."
       save: "Save"
       turn_off: "Turn off daily reminders"
       repair: "This device hasn't allowed notifications yet, so reminders won't reach it."
@@ -902,6 +905,9 @@ en:
     edit:
       title: "Settings"
       heading: "Add your API key"
+      connection_heading: "Connection"
+      your_day_heading: "Your day"
+      connection_save_tag: "Tap Save to apply"
       intro: "Your key is encrypted at rest and only used to generate your personal exercise sets and reviews. Usage is tracked per-user for transparency."
       trial_note:
         title: "You're on a trial"

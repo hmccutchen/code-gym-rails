@@ -165,7 +165,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
 
       expect(page_html.at_css("#exercise-mix #level-suggestions")["checked"]).not_to be_nil
       expect(page_html.at_css("#exercise-mix")["open"]).to be_nil
-      expect(page_html.at_css("#level-suggestions-switch")["data-level-suggestions-switch-focus-value"]).to be_nil
+      expect(page_html.at_css("#level-suggestions-switch")["data-save-switch-focus-value"]).to be_nil
     end
 
     it "opens the Exercise mix and asks for the switch to take focus when the card's link names it" do
@@ -174,7 +174,8 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       get setup_path(show: "level_suggestions")
 
       expect(page_html.at_css("#exercise-mix")["open"]).not_to be_nil
-      expect(page_html.at_css("#level-suggestions-switch")["data-level-suggestions-switch-focus-value"]).to eq("true")
+      expect(page_html.at_css("#level-suggestions-switch")["data-save-switch-focus-value"]).to eq("true")
+      expect(page_html.at_css("#level-suggestions-switch")["data-controller"]).to eq("save-switch")
     end
 
     it "ignores any other show value" do
@@ -183,7 +184,7 @@ RSpec.describe "Learning track suggestion controls", type: :request do
       get setup_path(show: "everything")
 
       expect(page_html.at_css("#exercise-mix")["open"]).to be_nil
-      expect(page_html.at_css("#level-suggestions-switch")["data-level-suggestions-switch-focus-value"]).to be_nil
+      expect(page_html.at_css("#level-suggestions-switch")["data-save-switch-focus-value"]).to be_nil
     end
 
     it "opens the Exercise mix and marks the suggested kinds" do

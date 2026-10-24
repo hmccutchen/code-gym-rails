@@ -169,22 +169,20 @@ data.*
 - passwordless again: Devise out, the emailed code the only first factor
   `#491`
   **why:** no password column ever, and an optional authenticator app later
-  **I decided:** sign-up unchanged; the Devise columns dropped in the same PR;
-  a 10-minute code with the rate-limit windows kept at 15; trusted proxies,
-  with a spoofed-header test, split out and required before I post publicly
+  **I decided:** sign-up unchanged; Devise columns dropped in the same PR; a
+  10-minute code; trusted proxies split out, required before I post publicly
 - from my layered review: the login code off the job queue; one signed-in
   lookup
 - an optional authenticator app as a second sign-in factor `#493`
   **why:** the inbox alone protects an account today
-  **I decided:** a daily cap of 20 wrong codes; every wrong-code count kept on
-  the user row, not the cookie; no-store on pages with the key or codes;
-  turning it on or off ends every other session; recovery codes compared only
-  for recovery-shaped input; a phone check before and after merge
+  **I decided:** a daily cap of 20 wrong codes, counted on the user row;
+  no-store on pages with the key or codes; turning it on or off ends every
+  other session; a phone check before and after merge
 - from review: each session gets its own setup key
   **I decided:** the key stays in the session until a code verifies; the model
   takes session values; spec and plan docs dropped; extraction is an issue
 - two reviews per PR, critical and layered, each by its own agent `#492`
-  **I decided:** a fresh agent checks findings before anything changes
+  **I decided:** a fresh agent checks findings before any change
 - the test rules say CI runs on Postgres 18
 - stop a double tap posting the sign-in forms twice `#495`
   **why:** every emailed code said it was wrong, and the home-screen app ended
@@ -197,15 +195,18 @@ data.*
 - the Account usage card in dollars `#497`
 - the authenticator in place of the emailed code `#496`, onto main `#502`
   **I decided:** a double-tapped address gets its challenge back for 30 seconds
-- the system spec that flaked on CI `#499`
-- Account `#504` and Settings `#512 open` as phone cards, of five redesign PRs
+- a flaky system spec `#499`
+- the Account page as phone cards, second of five redesign PRs `#504`
   **I decided:** the card styles load everywhere; Reminders keeps Save;
-  cards clear a landscape notch; the page column's padding named once; one
-  rule hides anything hidden on a card page
+  cards clear a landscape notch
 - lefthook: lint on commit, CI's checks on push `#508`
   **I decided:** system specs stay in CI
 - edits typed behind a save survive a reload `#509`
   **I decided:** the copy keeps unconfirmed saves
+- the Settings page as phone cards, with the Account nudges switch `#512`
+  **I decided:** the nudges switch saves on change; Connection gets a "Tap
+  Save to apply" tag; value rows keep the invisible select
+- History scrolled sideways in the home-screen app; fixed there too
 
 ## Sat Oct 24
 

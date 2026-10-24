@@ -263,6 +263,19 @@ shifts the nav.
 The main region is focused only as the skip link's target, and a ring around
 the whole page would read as an error.
 
+## Reviews, questions and scenarios wrap long words
+
+A review often names a file path or a chained method, one unbroken word that
+can be wider than a phone's text column. Without `overflow-wrap: anywhere`, a
+single path in the newest review made History 517px wide on a 390px phone as
+soon as it loaded, since that review opens by default. The dashboard's
+submitted state renders the same partial and had the same problem.
+A question or a scenario can hold the same kind of word, so `.question` and
+`.section-scenario` wrap the same way. `small_screen_layout_spec` holds both
+pages at 390px, and History at 320px with the largest text. The why box and the
+duck's replies have no rule, because a long path in either did not widen the
+page in that spec.
+
 ## Shared submission-rendering styles
 
 These are used by `responses/_section` (and the per-kind partials it renders),

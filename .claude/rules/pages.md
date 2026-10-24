@@ -14,11 +14,11 @@ paths:
   - "app/jobs/send_push_reminder_job.rb"
   - "app/helpers/{display_preferences,syntax_highlighting,public_file,navigation,push}_helper.rb"
   - "app/assets/**"
-  - "app/javascript/controllers/{pull_to_refresh,push_enable,push_launch,display_preferences,code_lines,nav_menu}_controller.js"
+  - "app/javascript/controllers/{pull_to_refresh,push_enable,push_launch,display_preferences,code_lines,nav_menu,save_switch}_controller.js"
   - "app/javascript/code_gym/push.js"
   - "public/**"
   - "script/generate_icons.py"
-  - "spec/**/*{pwa,push,display,palette,pull_to_refresh,history,highlight,icon,nav,focus_ring}*"
+  - "spec/**/*{pwa,push,nudges,display,palette,pull_to_refresh,history,highlight,icon,nav,focus_ring}*"
   - "app/jobs/generate_daily_exercises_job.rb"
   - "spec/**/*save_status*"
 ---
@@ -61,7 +61,8 @@ read it before changing that area.
   code; `palette_contrast_spec` holds both palettes to WCAG AA; the nav
   collapses on one `@container` rule that `mobile_nav_menu_spec` guards.
 - **Phone card styles**: `phone_cards.css` holds the card, full-width button
-  and switch styles for the settings pages, Account first; it loads on every
+  and switch styles, plus the value row, segmented control, card tag and
+  collapsible card, for the Account and Settings pages; it loads on every
   page, so a new rule in it stays scoped to its own class.
 - **Push reminders** (`docs/decisions/push-reminders.md`): Optional weekday
   ready and afternoon nudge notifications. Intent (`User#reminder_level`) and
@@ -74,4 +75,4 @@ read it before changing that area.
   no cron entry of their own and none from the on-demand branch.
   `WebPushCredentials` decides whether push exists, endpoints stay on
   `ALLOWED_ENDPOINT_HOSTS`, and `Notification.requestPermission()` must be the
-  click handler's first synchronous call.
+  click handler's first synchronous call. The nudges switch saves on change.

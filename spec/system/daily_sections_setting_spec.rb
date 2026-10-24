@@ -15,8 +15,8 @@ RSpec.describe "Daily sections setting", type: :system do
     visit setup_path
 
     within("#daily-sections") do
-      expect(find_field("Automatic")).to be_checked
-      choose "2"
+      expect(find_field("Automatic", visible: :all)).to be_checked
+      choose "2", allow_label_click: true
     end
 
     expect(count_after_save(2)).to eq(2)
@@ -24,14 +24,23 @@ RSpec.describe "Daily sections setting", type: :system do
     visit setup_path
 
     within("#daily-sections") do
-      expect(find_field("2")).to be_checked
-      choose "Automatic"
+      expect(find_field("2", visible: :all)).to be_checked
+      choose "Automatic", allow_label_click: true
     end
 
     expect(count_after_save(nil)).to be_nil
 
     visit setup_path
 
-    expect(within("#daily-sections") { find_field("Automatic") }).to be_checked
+    expect(within("#daily-sections") { find_field("Automatic", visible: :all) }).to be_checked
+  end
+
+  it "saves a count from a tap on its segment" do
+    visit_as(user)
+    visit setup_path
+
+    find("#daily-sections .segment", text: "3").click
+
+    expect(count_after_save(3)).to eq(3)
   end
 end
