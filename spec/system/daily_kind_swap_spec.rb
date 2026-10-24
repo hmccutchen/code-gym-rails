@@ -155,11 +155,8 @@ RSpec.describe "Swapping a daily section kind", type: :system do
   it "shows a refusal in the sheet and the banner, and keeps the sheet open with focus on the primary" do
     open_sheet(0)
     find("#daily-kind-0-challenge").click
-    page.execute_script(<<~JS)
-      const originalFetch = window.fetch;
-      window.fetch = (url, options) => url.includes("/daily_kinds/")
-        ? Promise.resolve(new Response(JSON.stringify({ status: "invalid", error: "That swap couldn't be saved." }), { status: 422, headers: { "Content-Type": "application/json" } }))
-        : originalFetch(url, options);
+    stub_fetch("/daily_kinds/", <<~JS, prefix: true)
+      Promise.resolve(new Response(JSON.stringify({ status: "invalid", error: "That swap couldn't be saved." }), { status: 422, headers: { "Content-Type": "application/json" } }))
     JS
     primary(0).click
 
@@ -351,12 +348,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
   end
 
   def fail_every_swap
-    page.execute_script(<<~JS)
-      const originalFetch = window.fetch;
-      window.fetch = (url, options) => url.includes("/daily_kinds/")
-        ? Promise.resolve(new Response("unavailable", { status: 503 }))
-        : originalFetch(url, options);
-    JS
+    stub_fetch("/daily_kinds/", %(Promise.resolve(new Response("unavailable", { status: 503 }))), prefix: true)
   end
 
   it "keeps answers read-only while a submit is held, so no edit is silently dropped" do

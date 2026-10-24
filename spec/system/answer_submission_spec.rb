@@ -293,12 +293,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       wait_for_saved_answer(user, "code_review", "An answer long enough for the server to count it.")
       status = find('.section-status[data-status-for="code_review"]')
       expect(status).to have_text(I18n.t("responses.section_status.in_progress"))
-      page.execute_script(<<~JS)
-        const originalFetch = window.fetch;
-        window.fetch = (url, options) => new URL(url, location.href).pathname === "/responses"
-          ? Promise.resolve(new Response("{}", { status: 500, headers: { "Content-Type": "application/json" } }))
-          : originalFetch(url, options);
-      JS
+      stub_fetch(responses_path, %(Promise.resolve(new Response("{}", { status: 500, headers: { "Content-Type": "application/json" } }))))
 
       rate_section("code_review")
       wait_for_js_condition("!window.CodeGymSaveStatus.pending()")

@@ -65,3 +65,31 @@ The first holds once no copy is kept on the device; the second also needs
 `CodeGymSaveStatus` to have no save queued or on the wire, since a queued
 save can still write a copy back. `spec/conventions/system_spec_waits_spec.rb`
 fails on the key or a string-keyed `localStorage` call in a system spec.
+
+## `FetchStubHelper` stubs one path
+
+`stub_fetch(path, reply)` replaces `window.fetch` so a request whose path is
+`path` gets `reply`, a JavaScript expression evaluated on every matching
+request, and every other request goes to the fetch that was in place before.
+The reply can use `url`, `options` and `passThrough`, the fetch it replaced, so
+a slow reply is `"new Promise(...).then(() => passThrough(url, options))"`.
+The path is compared with the request's resolved pathname, so an absolute URL
+or a query string still matches, and `/profile` doesn't match `/profiles`.
+`prefix: true` matches every path under it, for a route with a parameter such
+as `/daily_kinds/:place`. Stubbing a second path wraps the first stub, so both
+stay in place.
+
+The wrappers cover the common replies: `fail_requests_to` (a 500 with the
+app's error JSON), `drop_requests_to` (the request rejects the way a lost
+connection does) and `redirect_requests_to_login` (a reply that was
+redirected, the way an expired session answers). `break_the_network` rejects
+every request, for a spec about the whole device being offline.
+
+Before this, about twenty specs built their own replacement, and three copies
+of `fail_requests_to` already differed in which URLs they matched (#514).
+Specs whose stub holds a reply until released, counts calls, matches on the
+request body or method, or swaps fetch inside one evaluated script keep their
+own: their timing and matching are what they test, and the helper covers only
+"this path answers like this".
+`spec/conventions/system_spec_waits_spec.rb` fails on a spec that redefines the
+helper names, builds a one-expression path stub, or writes a redirected reply.

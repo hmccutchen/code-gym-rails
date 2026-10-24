@@ -3,20 +3,18 @@ require "rails_helper"
 # The three replies that used to leak: the browser's dropped-connection text, Rails' status phrase, an HTML error page.
 RSpec.describe "Failed requests on the page", type: :system, with_csrf: true do
   FAILED_REPLIES = {
-    "a dropped connection" => <<~JS,
-      window.fetch = () => Promise.reject(new TypeError("Failed to fetch"));
-    JS
+    "a dropped connection" => FetchStubHelper::OFFLINE_REPLY,
     "Rails' reply to an unhandled exception" => <<~JS,
-      window.fetch = () => Promise.resolve(new Response(
+      Promise.resolve(new Response(
         JSON.stringify({ status: 500, error: "Internal Server Error" }),
         { status: 500, headers: { "Content-Type": "application/json" } }
-      ));
+      ))
     JS
     "an HTML error page" => <<~JS
-      window.fetch = () => Promise.resolve(new Response(
+      Promise.resolve(new Response(
         "<!DOCTYPE html><html><body>We're sorry, but something went wrong.</body></html>",
         { status: 500, headers: { "Content-Type": "text/html" } }
-      ));
+      ))
     JS
   }.freeze
 
@@ -30,13 +28,13 @@ RSpec.describe "Failed requests on the page", type: :system, with_csrf: true do
     duck
   end
 
-  FAILED_REPLIES.each do |name, stub|
+  FAILED_REPLIES.each do |name, reply|
     it "shows the thinking partner's own wording after #{name}" do
       user = create_fake_provider_user
 
       travel_to(a_weekday) do
         duck = open_duck(user)
-        page.execute_script(stub)
+        stub_fetch(duck_thread_responses_path, reply)
         duck.find(".duck-input").fill_in(with: "Why does this loop twice?")
         duck.find(".duck-send").click
 
@@ -52,11 +50,11 @@ RSpec.describe "Failed requests on the page", type: :system, with_csrf: true do
 
     travel_to(a_weekday) do
       duck = open_duck(user)
-      page.execute_script(<<~JS)
-        window.fetch = () => Promise.resolve(new Response(
+      stub_fetch(duck_thread_responses_path, <<~JS)
+        Promise.resolve(new Response(
           JSON.stringify({ status: "error", error: "Gemini's daily limit is used up, so the thinking partner didn't answer." }),
           { status: 503, headers: { "Content-Type": "application/json" } }
-        ));
+        ))
       JS
       duck.find(".duck-input").fill_in(with: "Why does this loop twice?")
       duck.find(".duck-send").click
@@ -70,12 +68,7 @@ RSpec.describe "Failed requests on the page", type: :system, with_csrf: true do
 
     travel_to(a_weekday) do
       duck = open_duck(user)
-      page.execute_script(<<~JS)
-        window.fetch = () => Promise.resolve(Object.defineProperty(
-          new Response("<html><body>Log in</body></html>", { status: 200, headers: { "Content-Type": "text/html" } }),
-          "redirected", { value: true }
-        ));
-      JS
+      redirect_requests_to_login(duck_thread_responses_path)
       duck.find(".duck-input").fill_in(with: "Why does this loop twice?")
       duck.find(".duck-send").click
 

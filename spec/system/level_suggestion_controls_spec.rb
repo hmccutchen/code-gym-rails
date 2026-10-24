@@ -81,29 +81,15 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     expect(user.level_suggestion_events.order(:id).last).to have_attributes(source: "setup_edit", to_level: "senior")
   end
 
-  def fail_requests_to(path)
-    page.execute_script(<<~JS)
-      const originalFetch = window.fetch;
-      window.fetch = (url, options) => url.endsWith(#{path.to_json})
-        ? Promise.resolve(new Response(JSON.stringify({ status: "error", error: "nope" }), { status: 500, headers: { "Content-Type": "application/json" } }))
-        : originalFetch(url, options);
-    JS
-  end
-
   {
-    "network failure" => "Promise.reject(new Error('offline'))",
+    "network failure" => FetchStubHelper::OFFLINE_REPLY,
     "server refusal" => "Promise.resolve(new Response(JSON.stringify({ status: 'error', error: 'Counter write failed' }), { status: 500 }))",
-    "session redirect" => "Promise.resolve({ redirected: true })"
+    "session redirect" => FetchStubHelper::SIGNED_OUT_REPLY
   }.each do |failure, reply|
     [ "Apply", "Not now" ].each do |action|
       it "preserves the saved #{action} result when its counter request has a #{failure}" do
         own_proposal(answered: 0)
-        page.execute_script(<<~JS)
-          const originalFetch = window.fetch;
-          window.fetch = (url, options) => url.endsWith(#{level_suggestion_answer_path.to_json})
-            ? #{reply}
-            : originalFetch(url, options);
-        JS
+        stub_fetch(level_suggestion_answer_path, reply)
 
         within("#level-suggestion") { click_button action }
         wait_for_saves
@@ -161,14 +147,11 @@ RSpec.describe "Learning track suggestion controls", type: :system do
     visit_as(user)
     visit setup_path(show: "level_suggestions")
     page.execute_script(<<~JS)
-      const originalFetch = window.fetch;
-      const held = [];
+      const held = window.heldProfileSaves = [];
       const failure = () => new Response(JSON.stringify({ status: "error", error: "nope" }), { status: 500, headers: { "Content-Type": "application/json" } });
       window.releaseFailures = () => { window.fetch = () => Promise.resolve(failure()); held.forEach((resolve) => resolve(failure())); };
-      window.fetch = (url, options) => url.endsWith(#{profile_path.to_json})
-        ? new Promise((resolve) => held.push(resolve))
-        : originalFetch(url, options);
     JS
+    stub_fetch(profile_path, "new Promise((resolve) => window.heldProfileSaves.push(resolve))")
 
     uncheck "Suggest level changes"
     check "Suggest level changes"

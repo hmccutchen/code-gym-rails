@@ -129,6 +129,42 @@ module JavascriptReadyHelper
   end
 end
 
+module FetchStubHelper
+  OFFLINE_REPLY = 'Promise.reject(new TypeError("Failed to fetch"))'.freeze
+  SERVER_ERROR_REPLY = <<~JS.squish.freeze
+    Promise.resolve(new Response(JSON.stringify({ status: "error", error: "nope" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }))
+  JS
+  SIGNED_OUT_REPLY = <<~JS.squish.freeze
+    Promise.resolve(Object.defineProperty(
+      new Response("<html><body>Log in</body></html>", { status: 200, headers: { "Content-Type": "text/html" } }),
+      "redirected", { value: true }))
+  JS
+
+  def stub_fetch(path, reply, prefix: false)
+    matches = prefix ? "pathname.startsWith(#{path.to_json})" : "pathname === #{path.to_json}"
+    page.execute_script(<<~JS)
+      (() => {
+        const passThrough = window.fetch;
+        window.fetch = (url, options) => {
+          const pathname = new URL(url instanceof Request ? url.url : String(url), location.href).pathname;
+          return #{matches} ? #{reply} : passThrough(url, options);
+        };
+      })();
+    JS
+  end
+
+  def fail_requests_to(path) = stub_fetch(path, SERVER_ERROR_REPLY)
+
+  def drop_requests_to(path) = stub_fetch(path, OFFLINE_REPLY)
+
+  def redirect_requests_to_login(path) = stub_fetch(path, SIGNED_OUT_REPLY)
+
+  def break_the_network
+    page.execute_script("window.fetch = () => #{OFFLINE_REPLY}")
+  end
+end
+
 module PollingHelper
   def wait_for(timeout = Capybara.default_max_wait_time)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
@@ -155,4 +191,5 @@ RSpec.configure do |config|
   config.include TodaysSetHelper, type: :system
   config.include JavascriptReadyHelper, type: :system
   config.include PollingHelper, type: :system
+  config.include FetchStubHelper, type: :system
 end

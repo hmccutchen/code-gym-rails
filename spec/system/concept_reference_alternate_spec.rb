@@ -71,13 +71,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
     travel_to(a_weekday) do
       box = open_reference(user)
 
-      page.execute_script(<<~JS)
-        window.fetch = () => Promise.resolve(Object.defineProperty(
-          new Response("<html><body>Please log in first.</body></html>",
-                       { status: 200, headers: { "Content-Type": "text/html" } }),
-          "redirected", { value: true }
-        ));
-      JS
+      redirect_requests_to_login(box["data-concept-alternates-url-value"])
 
       box.find(".explain-concept-differently").click
 

@@ -18,15 +18,6 @@ RSpec.describe "Account's reminder nudges switch", type: :system do
   def status_line = find(".switch-status", visible: :all)
   def banner = find("#save-status", visible: :all)
 
-  def reply_to(path, js_reply)
-    page.execute_script(<<~JS)
-      const originalFetch = window.fetch;
-      window.fetch = (url, options) => url.endsWith(#{path.to_json})
-        ? #{js_reply}
-        : originalFetch(url, options);
-    JS
-  end
-
   it "saves from a tap on the row's text and says Saved" do
     find(".switch-row").click(x: 4, y: 4)
     wait_for { user.reload.reminders_ready_and_nudges? }
@@ -36,7 +27,7 @@ RSpec.describe "Account's reminder nudges switch", type: :system do
   end
 
   it "goes back and reports a failed save" do
-    reply_to("/push_subscription", %(Promise.resolve(new Response("", { status: 500 }))))
+    stub_fetch(push_subscription_path, %(Promise.resolve(new Response("", { status: 500 }))))
     find(".switch-row").click(x: 4, y: 4)
     expect(banner).to have_text(I18n.t("save_status.generic"))
     expect(switch).not_to be_checked
@@ -53,7 +44,7 @@ RSpec.describe "Account's reminder nudges switch", type: :system do
   end
 
   it "goes back without Saved when the session has ended" do
-    reply_to("/push_subscription", "Promise.resolve({ redirected: true })")
+    redirect_requests_to_login(push_subscription_path)
     find(".switch-row").click(x: 4, y: 4)
     expect(banner).to be_visible
     expect(switch).not_to be_checked
@@ -68,7 +59,7 @@ RSpec.describe "Account's reminder nudges switch", type: :system do
         if (line.textContent === "Saved" && window.CodeGymSaveStatus.queued("nudges")) window.savedWhileQueued = true;
       }).observe(line, { childList: true, characterData: true, subtree: true });
     JS
-    reply_to("/push_subscription", "new Promise(resolve => setTimeout(resolve, 300)).then(() => originalFetch(url, options))")
+    stub_fetch(push_subscription_path, "new Promise(resolve => setTimeout(resolve, 300)).then(() => passThrough(url, options))")
     switch.click
     switch.click
     expect(status_line).to have_text("Saved", exact: true)

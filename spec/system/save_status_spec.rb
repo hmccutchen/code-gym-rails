@@ -3,10 +3,6 @@ require "rails_helper"
 RSpec.describe "Save status", type: :system do
   let(:user) { create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS) }
 
-  def break_the_network
-    page.execute_script("window.fetch = () => Promise.reject(new Error('offline'))")
-  end
-
   # Re-enabling the disabled checkbox reproduces a stale tab, the one case that can post a slot-emptying set.
   def exclude_every_fourth_kind
     ExerciseSection.fourths.each do |kind|

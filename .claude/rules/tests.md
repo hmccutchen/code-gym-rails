@@ -65,6 +65,11 @@ A system spec reaches the answer draft copy through `JavascriptReadyHelper`
 (`draft_key_js`, `stored_draft_js`, `wait_for_draft_cleared`,
 `wait_for_answers_settled`), which reads the key from `draft_store.js`, never
 by writing the key or a string-keyed `localStorage` call itself (#501).
+A system spec that makes one path's request fail, go unanswered or come back
+signed out uses `FetchStubHelper` (`stub_fetch`, `fail_requests_to`,
+`drop_requests_to`, `redirect_requests_to_login`, `break_the_network`), which
+passes every other request to the real fetch, instead of building its own
+`window.fetch` replacement for that (#514).
 `spec/conventions/system_spec_waits_spec.rb` fails on any of these.
 
 A system spec that needs today's set calls `visit_with_todays_set(user)`,
