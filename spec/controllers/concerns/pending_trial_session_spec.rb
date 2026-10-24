@@ -33,7 +33,7 @@ RSpec.describe PendingTrialSession do
     expect(host.take_pending_trial).to be_nil
   end
 
-  it "takes a pending trial written before the deploy" do
+  it "takes a pending trial from the string-keyed hash the session already holds" do
     host.session[:pending_trial] = { "email" => "new@example.com", "invite_code_id" => invite.id,
                                      "provider" => "fake", "consented_at" => "2026-10-07T14:00:00Z" }
 
