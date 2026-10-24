@@ -15,7 +15,7 @@ The card, full-width button, switch, value row, segmented control and card headi
 - `.field-group`: a bare `fieldset` with a muted legend, for a group of choices on a card.
 - `.segmented` and `.segment`: a pill of radio choices. Each radio is stretched over its segment with zero opacity, so the whole segment is the 44px tap target, and `:has(:checked)` fills the chosen one. In forced-colors mode the chosen segment gets a `Highlight` outline, since background fills are dropped.
 - `details.card > summary`: a collapsible card's summary, at least 48px tall, so a disclosure is as easy to tap as a switch row.
-- `.card :is(.value-row, .segmented, input) + .card-note`: a note right under a value row, a segmented control or a text input sits `.4rem` below it, so a hint never touches the control it explains.
+- `.card :is(.value-row, .segmented, input:not([type="hidden"])) + .card-note`: a note right under a value row, a segmented control or a text input sits `.4rem` below it, so a hint never touches the control it explains. A hidden input, such as a form's token, takes no space, so a note after one keeps its normal spacing.
 - `.card .card-note:empty`: an empty note takes no margin, so a status line that has nothing to say leaves no gap.
 - `.switch-status:not(:empty)`: the "Saved" line under a switch gets a small top margin only while it holds text.
 

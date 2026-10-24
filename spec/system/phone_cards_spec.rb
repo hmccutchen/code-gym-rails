@@ -61,6 +61,11 @@ RSpec.describe "Phone card pieces", type: :system do
     expect(gaps).to all(be >= (0.4 * rem) - 0.5)
   end
 
+  it "adds no gap above a card note that follows a hidden input" do
+    inject(%(<input type="hidden" name="authenticity_token" value="x"><p class="card-note">first line</p>))
+    expect(find(".phone-page > .card:last-child > .card-note").evaluate_script("getComputedStyle(this).marginTop")).to eq("0px")
+  end
+
   it "draws segments at least 44px tall on one row" do
     inject(%(<fieldset class="field-group"><legend>Daily sections</legend><div class="segmented">#{%w[Automatic 2 3 4].map { |t| %(<label class="segment"><input type="radio" name="n">#{t}</label>) }.join}</div></fieldset>))
     tops = page.evaluate_script("Array.from(document.querySelectorAll('.segment')).map(el => [el.getBoundingClientRect().height, Math.round(el.getBoundingClientRect().top)])")

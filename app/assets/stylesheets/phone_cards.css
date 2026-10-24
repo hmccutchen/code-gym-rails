@@ -32,7 +32,7 @@
   .switch::before { content: none; }
 }
 
-.card :is(.value-row, .segmented, input) + .card-note { margin-top: .4rem; }
+.card :is(.value-row, .segmented, input:not([type="hidden"])) + .card-note { margin-top: .4rem; }
 .card .card-note:empty { margin: 0; }
 .switch-status:not(:empty) { margin-top: .25rem; }
 
