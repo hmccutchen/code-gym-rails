@@ -290,7 +290,30 @@ RSpec.describe "ApiKeys", type: :request do
       get setup_path
       expect(first_cards.size).to eq(2)
       first_cards.each { |card| expect(card.css(".hint")).to be_empty }
-      expect(first_cards.sum { |card| card.css(".card-note").size }).to be >= 7
+      expect(first_cards.sum { |card| card.css(".card-note").size }).to eq(9)
+    end
+
+    it "renders each value row's current choice before any script runs, hidden from screen readers" do
+      login_as(create_user_with_key(time_zone: "America/Phoenix").tap { |u| u.update!(language: "javascript", skill_level: "senior") })
+      get setup_path
+      rows = Nokogiri::HTML(response.body).css(".value-row")
+
+      values = rows.map { |row| row.at_css(".value-row-value").text }
+      selected = rows.map { |row| row.at_css("select option[selected]").text }
+      expect(values).to eq(selected)
+      expect(values).to eq([ I18n.t("api_keys.edit.language_options.javascript"), I18n.t("api_keys.edit.time_zones.arizona"),
+                             I18n.t("exercise_mix.levels.senior") ])
+      rows.each do |row|
+        expect(row.at_css(".value-row-value")["aria-hidden"]).to eq("true")
+        expect(row.at_css("label")["for"]).to eq(row.at_css("select")["id"])
+      end
+    end
+
+    it "shows the detect-automatically choice in the time zone row when no zone is saved" do
+      login_as(create_user_with_key(time_zone: nil))
+      get setup_path
+      expect(Nokogiri::HTML(response.body).at_css("#tz-select").ancestors(".value-row").first.at_css(".value-row-value").text)
+        .to eq(I18n.t("api_keys.edit.time_zone_detect"))
     end
 
     it "shows one provider segment for one saved key and none without a key" do

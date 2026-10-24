@@ -10,7 +10,6 @@
   .hint { font-size: .8rem; color: var(--muted); margin-top: .4rem; }
   .key-guide > * + * { margin-top: .5rem; }
   .key-guide :is(ol, ul) { padding-left: 1.25rem; }
-  .value-row + .card-note, .segmented + .card-note { margin-top: .4rem; }
   .mix-group { border: 1px solid var(--border); border-radius: 6px; padding: .75rem; margin-bottom: .75rem; }
   .mix-group legend { font-size: .8rem; color: var(--muted); padding: 0 .35rem; }
   .mix-row { display: grid; grid-template-columns: 1fr auto; gap: .25rem .5rem; align-items: center; margin-bottom: .6rem; }
@@ -69,11 +68,11 @@
           <p class="card-note"><%= t("api_keys.edit.provider_hint") %></p>
         </fieldset>
       <% end %>
+      <% language_options = User::LANGUAGES.map { |language| [ t("api_keys.edit.language_options.#{language}"), language ] } %>
       <div class="value-row" data-controller="value-row">
         <%= f.label :language, t("api_keys.edit.language_label") %>
-        <span class="value-row-value" aria-hidden="true" data-value-row-target="value"></span>
-        <%= f.select :language,
-              User::LANGUAGES.map { |language| [ t("api_keys.edit.language_options.#{language}"), language ] },
+        <span class="value-row-value" aria-hidden="true" data-value-row-target="value"><%= language_options.rassoc(current_user.language)&.first %></span>
+        <%= f.select :language, language_options,
               { selected: current_user.language },
               data: { action: "change->value-row#show" } %>
       </div>
@@ -84,19 +83,18 @@
 
   <section class="card">
     <h2><%= t("api_keys.edit.your_day_heading") %></h2>
+    <% time_zone_options = [ [ t("api_keys.edit.time_zones.eastern"), "America/New_York" ],
+                             [ t("api_keys.edit.time_zones.central"), "America/Chicago" ],
+                             [ t("api_keys.edit.time_zones.mountain"), "America/Denver" ],
+                             [ t("api_keys.edit.time_zones.arizona"), "America/Phoenix" ],
+                             [ t("api_keys.edit.time_zones.pacific"), "America/Los_Angeles" ],
+                             [ t("api_keys.edit.time_zones.alaska"), "America/Anchorage" ],
+                             [ t("api_keys.edit.time_zones.hawaii"), "Pacific/Honolulu" ] ] %>
     <div class="value-row" data-controller="value-row">
       <label for="tz-select"><%= t("api_keys.edit.time_zone_label") %></label>
-      <span class="value-row-value" aria-hidden="true" data-value-row-target="value"></span>
+      <span class="value-row-value" aria-hidden="true" data-value-row-target="value"><%= time_zone_options.rassoc(current_user.time_zone)&.first || t("api_keys.edit.time_zone_detect") %></span>
       <%= select_tag "tz_select",
-            options_for_select(
-              [ [ t("api_keys.edit.time_zones.eastern"), "America/New_York" ],
-                [ t("api_keys.edit.time_zones.central"), "America/Chicago" ],
-                [ t("api_keys.edit.time_zones.mountain"), "America/Denver" ],
-                [ t("api_keys.edit.time_zones.arizona"), "America/Phoenix" ],
-                [ t("api_keys.edit.time_zones.pacific"), "America/Los_Angeles" ],
-                [ t("api_keys.edit.time_zones.alaska"), "America/Anchorage" ],
-                [ t("api_keys.edit.time_zones.hawaii"), "Pacific/Honolulu" ] ],
-              current_user.time_zone),
+            options_for_select(time_zone_options, current_user.time_zone),
             include_blank: t("api_keys.edit.time_zone_detect"),
             id: "tz-select",
             data: { profile_preferences_target: "timeZone", action: "change->profile-preferences#saveTimeZone change->value-row#show" } %>
@@ -117,11 +115,12 @@
                                 fixed_sections: DailyKinds.for(current_user).map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
     </fieldset>
 
+    <% skill_level_options = User::SKILL_LEVELS.map { |level| [ t("exercise_mix.levels.#{level}"), level ] } %>
     <div class="value-row" data-controller="value-row">
       <label for="skill-level"><%= t("api_keys.edit.skill_level_label") %></label>
-      <span class="value-row-value" aria-hidden="true" data-value-row-target="value"></span>
+      <span class="value-row-value" aria-hidden="true" data-value-row-target="value"><%= skill_level_options.rassoc(current_user.skill_level)&.first %></span>
       <%= select_tag "skill_level",
-            options_for_select(User::SKILL_LEVELS.map { |level| [ t("exercise_mix.levels.#{level}"), level ] }, current_user.skill_level),
+            options_for_select(skill_level_options, current_user.skill_level),
             id: "skill-level", autocomplete: "off",
             data: { profile_preferences_target: "skillLevel", action: "change->profile-preferences#saveSkillLevel change->value-row#show" } %>
     </div>

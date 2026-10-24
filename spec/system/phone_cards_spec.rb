@@ -28,6 +28,39 @@ RSpec.describe "Phone card pieces", type: :system do
     expect(page_width).to eq(390)
   end
 
+  it "draws a value row's divider as a border, which forced colors keep" do
+    inject(%(<div class="value-row"><label for="x">Track</label><span class="value-row-value" aria-hidden="true">Senior</span><select id="x"><option>Senior</option></select></div>))
+    style = page.evaluate_script("(s => [s.borderBottomWidth, s.boxShadow])(getComputedStyle(document.querySelector('.value-row')))")
+    expect(style).to eq([ "1px", "none" ])
+  end
+
+  it "lets a tap on a value row's name or value reach its select" do
+    inject(%(<div class="value-row"><label for="x">Track</label><span class="value-row-value" aria-hidden="true">Senior</span><select id="x"><option>Senior</option></select></div>))
+    page.execute_script("document.querySelector('.value-row').scrollIntoView({ block: 'center' })")
+    hits = page.evaluate_script(<<~JS)
+      [".value-row", ".value-row > label", ".value-row-value"].map(selector => {
+        const box = document.querySelector(selector).getBoundingClientRect();
+        return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2).tagName;
+      })
+    JS
+    expect(hits).to eq(%w[SELECT SELECT SELECT])
+  end
+
+  it "spaces a card note under a value row, a segmented control or a text input" do
+    inject(<<~HTML)
+      <div class="value-row"><label for="x">Track</label><span class="value-row-value" aria-hidden="true">Senior</span><select id="x"><option>Senior</option></select></div><p class="card-note">after a row</p>
+      <div class="segmented"><label class="segment"><input type="radio" name="n">2</label></div><p class="card-note">after segments</p>
+      <input type="password" aria-label="Key"><p class="card-note">after an input</p>
+    HTML
+    gaps = page.evaluate_script(<<~JS)
+      Array.from(document.querySelectorAll(".phone-page > .card:last-child > .card-note"))
+        .map(note => note.getBoundingClientRect().top - note.previousElementSibling.getBoundingClientRect().bottom)
+    JS
+    rem = page.evaluate_script("parseFloat(getComputedStyle(document.documentElement).fontSize)")
+    expect(gaps.size).to eq(3)
+    expect(gaps).to all(be >= (0.4 * rem) - 0.5)
+  end
+
   it "draws segments at least 44px tall on one row" do
     inject(%(<fieldset class="field-group"><legend>Daily sections</legend><div class="segmented">#{%w[Automatic 2 3 4].map { |t| %(<label class="segment"><input type="radio" name="n">#{t}</label>) }.join}</div></fieldset>))
     tops = page.evaluate_script("Array.from(document.querySelectorAll('.segment')).map(el => [el.getBoundingClientRect().height, Math.round(el.getBoundingClientRect().top)])")
