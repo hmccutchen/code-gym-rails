@@ -1,17 +1,10 @@
 # The seat is taken only once the emailed code proves the address, so nobody spends one on an address they can't read.
 class PendingTrial
-  KEY = :pending_trial
-
-  def self.remember(session, email:, invite:, provider:, consented_at:)
-    session[KEY] = { "email" => email, "invite_code_id" => invite.id,
-                     "provider" => provider, "consented_at" => consented_at.iso8601 }
+  def self.dump(email:, invite:, provider:, consented_at:)
+    { "email" => email, "invite_code_id" => invite.id, "provider" => provider, "consented_at" => consented_at.iso8601 }
   end
 
-  def self.forget(session) = session.delete(KEY)
-
-  # Read once: a login takes it, whatever happens to the trial.
-  def self.take(session)
-    data = session.delete(KEY)
+  def self.load(data)
     new(data) if data.is_a?(Hash)
   end
 

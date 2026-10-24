@@ -58,7 +58,7 @@ class SecondFactorChallengesController < ApplicationController
   def complete_repeated_sign_in
     recent = recent_sign_in(@user, second_factor_proof) or return false
 
-    PendingTrial.forget(session)
+    forget_pending_trial
     complete_sign_in_with_notice(recent[:notice], recent[:checked_at])
     true
   end

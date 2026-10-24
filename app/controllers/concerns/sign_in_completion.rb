@@ -1,6 +1,7 @@
 # Design notes: docs/code-notes/app/controllers/concerns/sign_in_completion.md
 module SignInCompletion
   include PendingLogin
+  include PendingTrialSession
 
   PENDING_SECOND_FACTOR = :pending_second_factor
   REPEAT_WINDOW = User::DOUBLE_TAP_WINDOW
@@ -36,7 +37,7 @@ module SignInCompletion
   def complete_sign_in(user, checked_at:, factor:)
     raise WrongFactor, "#{factor} can't finish user #{user.id}'s sign-in" unless factor == user.sign_in_factor
 
-    trial = PendingTrial.take(session)
+    trial = take_pending_trial
     destination = start_new_session_for(user, checked_at)
     return finish_pending_trial(user, trial) if trial
 

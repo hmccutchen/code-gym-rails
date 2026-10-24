@@ -1,7 +1,7 @@
 ---
 paths:
   - "app/controllers/{sessions,trials,accounts,application,second_factor_challenges,authenticators,recovery_codes}_controller.rb"
-  - "app/controllers/concerns/{login_code_requests,preview_auto_login,sign_in_completion,authenticator_changes}.rb"
+  - "app/controllers/concerns/{login_code_requests,preview_auto_login,sign_in_completion,authenticator_changes,pending_trial_session}.rb"
   - "app/models/{invite_code,pending_trial,provider_credential,trial_allowance,trial_mode,trial_status,house_keys,user}.rb"
   - "app/models/concerns/{signed_in_sessions,second_factor}.rb"
   - "app/channels/application_cable/connection.rb"

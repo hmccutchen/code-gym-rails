@@ -55,7 +55,8 @@ What each listed file does.
 - `app/models/day_hosts.rb` — `DayHosts`: which kinds can tag a concept today, bucket and strict no-rung vocabulary; pure
 - `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class
 - `app/models/invite_code.rb` — `InviteCode`: a code's digest, seats, deadline and trial terms; `.mint` prints the code once, `#redeem!` takes a seat atomically
-- `app/models/pending_trial.rb` — `PendingTrial`: a trial asked for on the public trial page, kept in the session until the emailed code is entered
+- `app/models/pending_trial.rb` — `PendingTrial`: a trial asked for on the public trial page, the stored shape the session keeps until the emailed code is entered, and whether that code's account may start it
+- `app/controllers/concerns/pending_trial_session.rb` — `PendingTrialSession`: the one owner of the pending-trial session key, which the trial form writes, a sign-in takes and a plain login code request drops
 - `app/controllers/concerns/login_code_requests.rb` — `LoginCodeRequests`: mailing a login code and the limits on asking, shared by the login form and the trial form
 - `app/controllers/concerns/pending_login.rb` — `PendingLogin`: the one owner of the pending-login session keys, which the login and trial forms write and a sign-in clears
 - `app/models/provider_credential.rb` — `ProviderCredential.for(user)`: own key, no key, or the house key for an active trial; raises for an ended one
