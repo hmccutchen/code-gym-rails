@@ -51,12 +51,24 @@ RSpec.describe ConceptExposureIndex do
       expect(index.count("n_plus_one", "ruby_rails", on_or_before: date)).to eq(1)
     end
 
-    it "ignores unsubmitted responses and blank or other tags" do
+    it "ignores unsubmitted responses and the \"other\" tag" do
       submit(concept: "n_plus_one", date: Date.current - 1, submitted_at: nil)
       submit(concept: "other", date: Date.current - 2)
 
       expect(index.count("n_plus_one", "ruby_rails", on_or_before: Date.current)).to eq(0)
       expect(index.count("other", "ruby_rails", on_or_before: Date.current)).to eq(0)
+    end
+
+    it "ignores a section whose stored tag is blank or nil, while counting the day's other sections" do
+      exercise = user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => {}, "pattern" => {}, "design_comparison" => { "concept" => "n_plus_one" } })
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current - 1, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20 },
+        concept_tags: { "code_review" => "", "pattern" => nil, "design_comparison" => "n_plus_one" })
+
+      expect(index.count("", "ruby_rails", on_or_before: Date.current)).to eq(0)
+      expect(index.count(nil, "ruby_rails", on_or_before: Date.current)).to eq(0)
+      expect(index.count("n_plus_one", "ruby_rails", on_or_before: Date.current)).to eq(1)
     end
 
     it "records a language-independent kind under its own bucket" do
