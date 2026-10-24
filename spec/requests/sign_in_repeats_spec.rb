@@ -79,6 +79,23 @@ RSpec.describe "A repeated sign-in post", type: :request do
     expect(session[:user_id]).to eq(user.id)
   end
 
+  it "counts repeats from many addresses against one account once a late code ended the pending sign-in" do
+    post login_path, params: { email: user.email }
+    code = travel(3.minutes) { user.generate_login_code! }
+    cookie_before = cookies[session_cookie]
+
+    statuses = travel(12.minutes) do
+      post verify_login_code_path, params: { code: code }
+      Array.new(10) do |n|
+        cookies[session_cookie] = cookie_before
+        post verify_login_code_path, params: { code: wrong_code_for(code) }, env: { "REMOTE_ADDR" => "203.0.113.#{n + 1}" }
+        response.status
+      end
+    end
+
+    expect(statuses.last).to eq(429)
+  end
+
   it "refuses the repeat once the account's sessions were ended after the first post" do
     code = request_code
     cookie_before = cookies[session_cookie]

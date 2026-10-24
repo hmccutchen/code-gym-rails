@@ -18,7 +18,7 @@ class SessionsController < ApplicationController
              only:  :verify_code
 
   rate_limit to: 10, within: 1.hour,
-             by:    -> { pending_login_email || request.remote_ip },
+             by:    -> { session[:pending_login_email].presence || request.remote_ip },
              with:  -> { rate_limited(t("sessions.rate_limited.code_attempts")) },
              store: RATE_LIMIT_STORE,
              name:  "code_attempts_for_address",
