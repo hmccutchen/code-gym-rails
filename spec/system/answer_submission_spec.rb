@@ -338,6 +338,58 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     end
   end
 
+  it "doesn't write the draft copy back from a save that was queued behind a successful submit" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_content(/Code Review/i)
+      fill_in_answer("code_review", "The substantive answer that gets submitted.")
+      rate_section("code_review")
+      wait_for_saved_answer(user, "code_review", "The substantive answer that gets submitted.")
+      wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null && !window.CodeGymSaveStatus.pending()")
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch
+        const held = []
+        window.holdAutosaves = true
+        window.releaseAutosaves = () => { window.holdAutosaves = false; held.splice(0).forEach((send) => send()) }
+        window.fetch = (url, options) => {
+          if (new URL(url, location.href).pathname !== "/responses") return originalFetch(url, options)
+          if (JSON.parse(options.body).response.submit === "1") {
+            return originalFetch(url, options).then((response) => {
+              if (response.ok) sessionStorage.setItem("submitSucceeded", "1")
+              return response
+            })
+          }
+          if (!window.holdAutosaves) {
+            sessionStorage.setItem("savesSentAfterRelease", String(Number(sessionStorage.getItem("savesSentAfterRelease") || 0) + 1))
+            return originalFetch(url, options)
+          }
+          return new Promise((resolve) => { held.push(() => originalFetch(url, options).then(resolve)); window.heldAutosaves = held.length })
+        }
+        const originalSetItem = Storage.prototype.setItem
+        Storage.prototype.setItem = function (key, value) {
+          if (this === localStorage && key === "code-gym-answer-draft" && sessionStorage.getItem("submitSucceeded")) {
+            sessionStorage.setItem("copyWritesAfterSubmit", String(Number(sessionStorage.getItem("copyWritesAfterSubmit") || 0) + 1))
+          }
+          return originalSetItem.call(this, key, value)
+        }
+      JS
+
+      find('textarea[data-field="code_review"]').send_keys(" A first addition.")
+      wait_for_js_condition("window.heldAutosaves === 1")
+      find('textarea[data-field="code_review"]').send_keys(" A second addition, queued behind it.")
+      wait_for_js_condition("window.CodeGymSaveStatus.queued('answers')")
+      click_button "Submit answers"
+      wait_for_js_condition("sessionStorage.getItem('submitSucceeded') === '1' && !document.querySelector('#gym-form').inert")
+      page.execute_script("window.releaseAutosaves()")
+
+      expect(page).to have_content("Review ready!")
+      expect(page.evaluate_script("sessionStorage.getItem('savesSentAfterRelease')")).to eq("1")
+      expect(page.evaluate_script("sessionStorage.getItem('copyWritesAfterSubmit')")).to be_nil
+    end
+  end
+
   def expect_blocked(nudge)
     expect(page).to have_selector("#rating-nudge", text: nudge)
   end
