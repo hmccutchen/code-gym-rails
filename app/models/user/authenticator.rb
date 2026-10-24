@@ -11,6 +11,9 @@ class User::Authenticator
   RECOVERY_CODE_SHAPE = /\A[#{RECOVERY_CODE_ALPHABET}]{#{RECOVERY_CODE_LENGTH}}\z/
   TOTP_ISSUER = "Coding Gym".freeze
   TOTP_INTERVAL = 30
+  ERASED_ON_ACCOUNT_DELETION = { otp_secret: nil, consumed_timestep: nil, otp_backup_codes: nil, two_factor_enabled_at: nil,
+                                 second_factor_challenge_at: nil, second_factor_challenge_failures: 0,
+                                 second_factor_failures: 0, second_factor_failures_since: nil }.freeze
 
   Outcome = Data.define(:status, :recovery_codes, :changed_at, :remaining, :retry_at) do
     def initialize(status:, recovery_codes: [], changed_at: nil, remaining: nil, retry_at: nil) = super

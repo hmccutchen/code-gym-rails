@@ -1044,6 +1044,7 @@ RSpec.describe User, type: :model do
                                               "sessions_valid_after", "second_factor_challenge_at",
                                               "second_factor_failures_since")).to all(be_nil)
       expect(user.attributes.values_at("second_factor_challenge_failures", "second_factor_failures")).to eq([ 0, 0 ])
+      expect(user).to have_attributes(User::Authenticator::ERASED_ON_ACCOUNT_DELETION)
     end
 
     it "stops push reminders and drops the endpoints they would reach" do

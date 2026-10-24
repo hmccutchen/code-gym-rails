@@ -29,3 +29,7 @@ This matters for cost. A bcrypt comparison takes about 0.25 seconds at productio
 ## Ending other sessions
 
 `enable!` and `disable!` set `sessions_valid_after` to the same time they return as `changed_at`. The controller writes that time into the current session, so only the other sessions end (`SignedInSessions`). The time is floored to microseconds so it compares equal to the stored column and to the session stamp.
+
+## Account deletion
+
+`ERASED_ON_ACCOUNT_DELETION` holds every column this class owns with a new account's value, and `User#anonymize!` spreads it into its one locked update. It is wider than what `disable!` clears: turning the authenticator off keeps the challenge and the daily cap's count, and only the cap's own window ends that count (decision 8 in `docs/decisions/passwordless-sign-in.md`). An anonymized account never signs in again, since every sign-in lookup is scoped to `User.active`. A spec fails when this file starts reading or writing a `users` column the hash leaves out, other than `email` and `sessions_valid_after`, and another when a `users` column with a second-factor prefix (`otp_`, `two_factor_`, `second_factor_`, `consumed_`) is missing from it.
