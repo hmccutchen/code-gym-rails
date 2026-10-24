@@ -208,3 +208,6 @@ data.*
 - find where the app has got slow and make those pages faster `#517`
   **I decided:** the work goes in its own worktree, off main, so it stays
   clear of the two branches I had open
+- show a saved time zone in Settings even outside its existing choices `#522`
+  **why:** Europe/London showed Detect automatically despite being a valid
+  saved zone
