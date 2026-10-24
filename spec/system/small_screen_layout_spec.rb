@@ -149,6 +149,24 @@ RSpec.describe "Small screen layout", type: :system do
     expect(page_width).to eq(320)
   end
 
+  it "fits the usage card at 320px with the largest text, with every provider row at least 48px" do
+    user = create_fake_provider_user
+    user.update!(display_preferences: LARGEST)
+    { "anthropic" => "1234.56", "gemini" => nil }.each do |provider, cost|
+      ApiUsage.create!(user: user, purpose: "review_response", date: Date.current, created_at: Time.current,
+                       provider: provider, cost_usd: cost, tokens_in: 0, tokens_out: 0)
+    end
+    resize(320)
+    visit_as(user)
+    visit account_path
+    apply_text_spacing
+
+    expect(page).to have_text("$1,234.56")
+    expect(page_width).to eq(320)
+    expect(heights(".api-usage-row").size).to eq(2)
+    expect(heights(".api-usage-row")).to all(be >= 48)
+  end
+
   it "fits the authenticator setup, recovery code and second sign-in pages at 320px with the largest text" do
     user = create_fake_provider_user
     user.update!(display_preferences: LARGEST)

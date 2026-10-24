@@ -142,6 +142,8 @@ What each listed file does.
 - `app/helpers/authenticator_setups_helper.rb` — the setup page's inline QR code SVG and the setup key in groups of four
 - `app/javascript/controllers/copy_text_controller.js` — the Copy buttons on the setup key and recovery codes, selecting the text instead when the clipboard is missing or refuses
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
+- `app/models/monthly_spend.rb` — `MonthlySpend`: decides the month's own-key total and the weekday projection, which stays hidden until the 4th in the user's zone; see `docs/code-notes/app/models/monthly_spend.md`
+- `app/helpers/usage_helper.rb` — `usage_dollars`: formats a cost as dollars, showing anything under a cent as `< $0.01`
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
 - `app/controllers/concept_references_controller.rb` — one action: the same concept explained another way, on demand from inside its own disclosure. Persists nothing; owns the cap, since there is no model data for it to live on
 - `app/javascript/controllers/daily_kind_swap_controller.js` — the `daily-kind-swap` controller on each daily card: opens and dismisses the swap sheet with `showModal()`, shows the server-rendered example and consequence block for the checked kind and copies its label onto the primary button, queues each swap on one `CodeGymSaveStatus.queue` line with the page's exercise id and `draft_scope`, and swaps in every card's fresh panel from the reply
@@ -162,7 +164,7 @@ What each listed file does.
 - `app/controllers/concerns/json_errors.rb` — `render_json_error`: the one shape of a JSON error reply
 - `app/views/shared/_push_script.html.erb` — mounts the `push-launch` controller, which re-subscribes on launch through `app/javascript/code_gym/push.js`; rendered from the layout for a signed-in user when push is configured
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
-- `app/views/accounts/_api_usage.html.erb` — the Account page's table of this month's own-key requests and tokens per provider, from `ApiUsage.own_key_totals`
+- `app/views/accounts/_api_usage.html.erb` — the Account page's card of this month's own-key spend, projection and per-provider dollars, from `ApiUsage.own_key_totals` and `MonthlySpend`
 - `app/views/accounts/_authenticator.html.erb` — the Account section for the authenticator app: a link to add it, or when it's on, the date, codes left, and the forms for new codes and turning it off
 - `app/views/pwa/service-worker.js.erb` — shows the notification, with the versioned icon. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing
 - `app/clients/schema_wait.rb` — blocks the worker's Railway pre-deploy step until the schema the Solid Queue supervisor boots against exists; waits rather than migrating, so migrations keep exactly one owner
