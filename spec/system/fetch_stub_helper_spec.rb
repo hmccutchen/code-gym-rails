@@ -10,10 +10,11 @@ RSpec.describe "The shared fetch stub", type: :system do
   end
 
   def send_request(method, url, body = nil)
+    body_js = body.nil? ? "undefined" : body.to_json
     page.driver.with_playwright_page do |browser|
       browser.evaluate(<<~JS)
         async () => {
-          const result = await CodeGymRequest.send(#{method.to_json}, #{url.to_json}, #{body.to_json}, { fallback: "Fallback." });
+          const result = await CodeGymRequest.send(#{method.to_json}, #{url.to_json}, #{body_js}, { fallback: "Fallback." });
           return { ok: result.ok, status: result.status, message: result.message, signedOut: result.signedOut };
         }
       JS
