@@ -166,7 +166,10 @@ RSpec.describe "Second-factor sign-in", type: :request do
 
     def wrong_answers_across_challenges(count)
       count.times do |n|
-        enter_email if (n % 4).zero?
+        if (n % 4).zero?
+          travel User::DOUBLE_TAP_WINDOW + 1.second if n.positive?
+          enter_email
+        end
         answer(wrong_totp)
       end
     end

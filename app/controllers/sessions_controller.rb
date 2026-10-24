@@ -5,8 +5,6 @@ class SessionsController < ApplicationController
   skip_before_action :require_login
   skip_before_action :require_provider
 
-  helper_method :pending_login_email
-
   RATE_LIMIT_STORE = LazyCacheStore.new
 
   limit_login_code_requests only: :create
@@ -35,7 +33,7 @@ class SessionsController < ApplicationController
   def create
     PendingTrial.forget(session)
     user = User.active.find_by(email: normalized_email)
-    return start_second_factor_challenge(user) if user && !user.emailed_code_signs_in?
+    return start_second_factor_challenge(user) if user&.sign_in_factor == :authenticator
 
     mail_login_code(normalized_email, user)
     redirect_to login_code_path,

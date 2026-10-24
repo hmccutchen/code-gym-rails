@@ -54,7 +54,8 @@ read it before changing that area.
 - **Second factor** (`docs/decisions/passwordless-sign-in.md`): an optional
   authenticator app (`SecondFactor`). Every read-then-write of its columns
   runs under the user row lock. Every count of wrong codes lives on the row,
-  never in the session. Recovery-shaped input is compared only against the
+  never in the session, and a challenge asked for again within
+  `User::DOUBLE_TAP_WINDOW` comes back with its count kept. Recovery-shaped input is compared only against the
   bcrypt digests and anything else only as a TOTP. Turning it on needs a
   sign-in from the last 15 minutes and a code for the setup key, which lives
   only in that browser's session until the code verifies, so no other session

@@ -6,6 +6,7 @@ module SecondFactor
   SECOND_FACTOR_FAILURE_WINDOW = 24.hours
   SECOND_FACTOR_CHALLENGE_FAILURES = 5
   SECOND_FACTOR_CHALLENGE_LIFETIME = 5.minutes
+  DOUBLE_TAP_WINDOW = 30.seconds
   RECOVERY_CODE_COUNT = 10
   RECOVERY_CODE_LENGTH = 10
   RECOVERY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".freeze
@@ -31,7 +32,9 @@ module SecondFactor
     two_factor_enabled_at.present?
   end
 
-  def emailed_code_signs_in? = !two_factor_enabled?
+  def sign_in_factor = two_factor_enabled? ? :authenticator : :emailed_code
+
+  def emailed_code_signs_in? = sign_in_factor == :emailed_code
 
   def recovery_codes_remaining
     otp_backup_codes.to_a.size
@@ -61,10 +64,15 @@ module SecondFactor
     with_lock { verify_under_lock(code) }
   end
 
+  # A double tap's two posts both carry the cookie from before either, so both must name the same open challenge.
   def issue_second_factor_challenge!
     now = Time.current.floor(6)
-    with_lock { update!(second_factor_challenge_at: now, second_factor_challenge_failures: 0) }
-    now
+    with_lock do
+      next second_factor_challenge_at if second_factor_challenge_at&.>(now - DOUBLE_TAP_WINDOW)
+
+      update!(second_factor_challenge_at: now, second_factor_challenge_failures: 0)
+      now
+    end
   end
 
   def second_factor_challenge_open?(issued_at)

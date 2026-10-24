@@ -28,6 +28,18 @@ RSpec.describe SecondFactor, type: :model do
     end
   end
 
+  describe "#sign_in_factor" do
+    it "is the emailed code until the authenticator is on, and the authenticator after" do
+      expect(user.sign_in_factor).to eq(:emailed_code)
+      expect(user.emailed_code_signs_in?).to be(true)
+
+      enroll_second_factor(user)
+
+      expect(user.reload.sign_in_factor).to eq(:authenticator)
+      expect(user.emailed_code_signs_in?).to be(false)
+    end
+  end
+
   describe "#enable_second_factor!" do
     let(:secret) { User.new_second_factor_secret }
 
@@ -195,6 +207,31 @@ RSpec.describe SecondFactor, type: :model do
     let!(:enrollment) { enroll_second_factor(user) }
     let(:secret) { enrollment.first }
     let!(:issued_at) { User.session_stamp(user.issue_second_factor_challenge!) }
+
+    it "hands back the open challenge, wrong codes kept, when asked again within a double tap" do
+      user.answer_second_factor_challenge!(wrong_totp(secret), issued_at: issued_at)
+
+      travel User::DOUBLE_TAP_WINDOW - 1.second
+      expect(User.session_stamp(user.issue_second_factor_challenge!)).to eq(issued_at)
+
+      expect(user.reload.second_factor_challenge_failures).to eq(1)
+    end
+
+    it "issues a fresh challenge once a double tap's window has passed" do
+      user.answer_second_factor_challenge!(wrong_totp(secret), issued_at: issued_at)
+
+      travel User::DOUBLE_TAP_WINDOW + 1.second
+      expect(User.session_stamp(user.issue_second_factor_challenge!)).not_to eq(issued_at)
+
+      expect(user.reload.second_factor_challenge_failures).to eq(0)
+    end
+
+    it "issues a fresh challenge when the last one was ended" do
+      User::SECOND_FACTOR_CHALLENGE_FAILURES.times { user.answer_second_factor_challenge!(wrong_totp(secret), issued_at: issued_at) }
+
+      travel 1.second
+      expect(User.session_stamp(user.issue_second_factor_challenge!)).not_to eq(issued_at)
+    end
 
     it "is open only for the time it was issued, and only for its lifetime" do
       expect(user.second_factor_challenge_open?(issued_at)).to be(true)

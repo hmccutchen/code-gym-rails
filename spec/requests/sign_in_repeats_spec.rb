@@ -143,6 +143,20 @@ RSpec.describe "A repeated sign-in post", type: :request do
       expect(session[:user_id]).to be_nil
     end
 
+    it "gives both posts of a double-tapped address the challenge the first response names" do
+      cookie_before = cookies[session_cookie]
+      post login_path, params: { email: user.email }
+      first_cookie = cookies[session_cookie]
+      cookies[session_cookie] = cookie_before
+      post login_path, params: { email: user.email }
+      cookies[session_cookie] = first_cookie
+
+      post second_factor_challenge_path, params: { otp_code: current_totp(secret) }
+
+      expect(response).to redirect_to(root_path)
+      expect(session[:user_id]).to eq(user.id)
+    end
+
     it "signs in on the second post of an authenticator code the first post just accepted" do
       post login_path, params: { email: user.email }
       post verify_login_code_path, params: { code: user.generate_login_code! }
