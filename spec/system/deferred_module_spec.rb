@@ -71,7 +71,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
   def answer_form_connected? = page.evaluate_script(connected_js("answer-form"))
 
   # A reload while the reason or rating is still saving drops it, and the draft copy can't restore it once a reply was lost.
-  def wait_for_comparison_saved(reason)
+  def wait_for_comparison_and_rating_to_settle(reason)
     wait_for_js_condition("localStorage.getItem('code-gym-answer-draft') === null && !window.CodeGymSaveStatus.pending()")
     wait_for do
       saved = user.daily_responses.reload.first
@@ -115,7 +115,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       expect(page).to have_css(%([data-comparison-answer="design_comparison"]))
       fill_in_answer("design_comparison", reason)
       rate_section("design_comparison")
-      wait_for_comparison_saved(reason)
+      wait_for_comparison_and_rating_to_settle(reason)
 
       url = page.current_url
       stalled[:held] = "comparison_answer_controller"
@@ -148,7 +148,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       expect(page).to have_css(%([data-comparison-answer="design_comparison"]))
       fill_in_answer("design_comparison", reason)
       rate_section("design_comparison")
-      wait_for_comparison_saved(reason)
+      wait_for_comparison_and_rating_to_settle(reason)
 
       stalled[:missing] = "comparison_answer_controller"
       visit current_path
