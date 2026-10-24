@@ -475,6 +475,8 @@ en:
       not_offered: "not offered"
     not_offered_note: "Not offered: every section that could show this concept is excluded in your exercise mix, so it is your choice rather than a gap."
     setup_link: "Change the mix"
+  switches:
+    saved: "Saved"
   save_status:
     generic: "Couldn't save your last change. It hasn't reached the server — check your connection and try again."
   daily_kinds:

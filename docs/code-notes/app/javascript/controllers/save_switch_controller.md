@@ -20,9 +20,19 @@ was generalized so Account's reminder nudges switch could share it (#507).
 | `field` | the body's key | `"level_suggestions"` | `"nudges"` |
 | `scope` | optional wrapper key | `"user"` | none |
 | `focus` | optional | set by the server when the card's link is followed | none |
+| `savedText` | optional, the status line's text | none | `t("switches.saved")` |
 
 The body is `{ [scope]: { [field]: checked } }` with a scope, or
 `{ [field]: checked }` without one.
+
+## The status line
+
+The optional `status` target is a `p.switch-status[role=status]` rendered
+empty under the switch row. `toggle()` clears it when a change starts and sets
+it to `savedText` once a save succeeds with nothing else queued under the key,
+so two quick taps say Saved once, after the second. A failed save leaves it
+empty and the banner reports the failure. The text comes from the server, so
+the script holds no copy.
 
 ## The checkbox is reverted, not optimistic
 

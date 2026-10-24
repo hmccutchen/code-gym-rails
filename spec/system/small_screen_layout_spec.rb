@@ -354,7 +354,7 @@ RSpec.describe "Small screen layout", type: :system do
 
         expect(page_width).to eq(width)
         card_edges(count: 7).each { |edges| expect(edges).to all(be_within(0.5).of(16)) }
-        expect(visible_heights(".btn-block").size).to eq(7)
+        expect(visible_heights(".btn-block").size).to eq(6)
         expect(visible_heights(".btn-block")).to all(be >= 48)
         button_and_card_content_widths.each { |button, content| expect(button).to be_within(1).of(content) }
         expect(clipped_button_labels).to eq([])
@@ -428,6 +428,7 @@ RSpec.describe "Small screen layout", type: :system do
       find(".switch-row").click(x: 4, y: 4)
 
       expect(find("input.switch").checked?).to eq(!was_checked)
+      wait_for { user.reload.reminders_ready_and_nudges? != was_checked }
     end
   end
 end

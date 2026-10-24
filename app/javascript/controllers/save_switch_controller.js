@@ -3,14 +3,15 @@ import { Controller } from "@hotwired/stimulus"
 import saveStatus from "code_gym/save_status"
 
 export default class extends Controller {
-  static targets = ["checkbox"]
+  static targets = ["checkbox", "status"]
 
   static values = {
     url: String,
     key: String,
     field: String,
     scope: String,
-    focus: Boolean
+    focus: Boolean,
+    savedText: String
   }
 
   connect() {
@@ -26,8 +27,10 @@ export default class extends Controller {
 
   async toggle() {
     const wanted = this.checkboxTarget.checked
+    if (this.hasStatusTarget) this.statusTarget.textContent = ""
     const result = await saveStatus.queue(this.keyValue, "PATCH", this.urlValue, this.body(wanted))
     if (result.ok) this.saved = wanted
+    if (result.ok && !saveStatus.queued(this.keyValue) && this.hasStatusTarget) this.statusTarget.textContent = this.savedTextValue
     if (!saveStatus.queued(this.keyValue)) this.checkboxTarget.checked = this.saved
   }
 

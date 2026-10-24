@@ -357,6 +357,24 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(errors).to be_empty
   end
 
+  it "saves a nudges tap made before the switch controller loads" do
+    with_push_credentials do
+      user.update!(reminder_level: :ready)
+      user.push_subscriptions.create!(endpoint: "https://web.push.apple.com/installed", p256dh_key: "p256dh", auth_key: "auth")
+      stub_push_apis(permission: "granted")
+      visit_as(user)
+      visit account_path
+      url = page.current_url
+      stalled[:held] = "save_switch_controller"
+      page.driver.with_playwright_page do |pw|
+        pw.goto(url, waitUntil: "commit")
+        pw.locator(".switch-row").click(position: { x: 4, y: 4 })
+      end
+      stalled[:held] = nil
+      wait_for { user.reload.reminders_ready_and_nudges? }
+    end
+  end
+
   it "keeps the reminder button disabled until its controller can make the permission request" do
     ENV["VAPID_PUBLIC_KEY"] = "public"
     ENV["VAPID_PRIVATE_KEY"] = "private"
