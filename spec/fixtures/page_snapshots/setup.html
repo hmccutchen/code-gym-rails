@@ -419,6 +419,7 @@
     details.kind-about { margin-bottom: .9rem; }
     details.kind-about summary { cursor: pointer; font-size: .85rem; color: var(--muted); padding: .4rem 0; min-height: 24px; list-style: none; }
     details.kind-about summary::-webkit-details-marker { display: none; }
+    .mix-row .kind-about { grid-column: 1 / -1; margin-bottom: 0; }
     .kind-about-body { font-size: .9rem; line-height: 1.6; margin-top: .3rem; }
     .kind-about-body p { margin: 0 0 .5rem; }
     .hint-locked { font-size: .85rem; color: var(--muted); padding: .4rem 0; margin-bottom: 1rem; }
@@ -613,27 +614,15 @@
   :is(.form-field, .settings-fields) input:not([type="checkbox"], [type="radio"]):focus { border-color: var(--accent); }
   :is(.form-field, .settings-fields) input:is([type="checkbox"], [type="radio"]):not(:where(.switch)) { width: auto; margin-right: .4rem; vertical-align: middle; }
   .hint { font-size: .8rem; color: var(--muted); margin-top: .4rem; }
-  .key-guide > * + * { margin-top: .5rem; }
-  .key-guide :is(ol, ul) { padding-left: 1.25rem; }
   .mix-group { border: 1px solid var(--border); border-radius: 6px; padding: .75rem; margin-bottom: .75rem; }
   .mix-group legend { font-size: .8rem; color: var(--muted); padding: 0 .35rem; }
   .mix-row { display: grid; grid-template-columns: 1fr auto; gap: .25rem .5rem; align-items: center; margin-bottom: .6rem; }
   .mix-row input[type="range"] { grid-column: 1 / -1; width: 100%; }
-  .mix-row .kind-about { grid-column: 1 / -1; margin-bottom: 0; }
   .mix-row output { font-size: .8rem; color: var(--muted); }
   .mix-row input[type="range"]:disabled { opacity: .4; }
   .mix-exclude { font-size: .8rem; color: var(--muted); }
-  .mix-exclude, .mix-lock, .mix-difficulty label { min-height: 24px; }
+  .mix-exclude { min-height: 24px; }
   .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
-  .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; font-size: .8rem; }
-  .mix-difficulty legend { font-size: .8rem; color: var(--muted); padding: 0; }
-  .mix-difficulty label { margin-bottom: 0; }
-  .mix-lock { flex-basis: 100%; color: var(--text); font-weight: 600; }
-  .mix-coverage { flex-basis: 100%; margin-top: 0; }
-  .display-group { border: 0; padding: .6rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .9rem; font-size: .85rem; }
-  .display-group legend { font-size: .8rem; color: var(--muted); padding: 0; margin-bottom: .35rem; }
-  .display-group label { margin-bottom: 0; color: var(--text); }
-  .display-hint { flex-basis: 100%; margin-top: 0; }
 </style>
 
 <div class="phone-page" data-controller="profile-preferences"
@@ -752,7 +741,15 @@
       <legend>In every set</legend>
         <div class="mix-row mix-row-fixed">
           <span>Code Review</span>
-          <fieldset class="mix-difficulty" data-kind="code_review"
+            <style>
+    .mix-lock, .mix-difficulty label { min-height: 24px; }
+    .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; font-size: .8rem; }
+    .mix-difficulty legend { font-size: .8rem; color: var(--muted); padding: 0; }
+    .mix-difficulty label { margin-bottom: 0; }
+    .mix-lock { flex-basis: 100%; color: var(--text); font-weight: 600; }
+    .mix-coverage { flex-basis: 100%; margin-top: 0; }
+  </style>
+<fieldset class="mix-difficulty" data-kind="code_review"
           data-exercise-mix-target="difficulty">
   <legend>Difficulty target</legend>
   <label>
@@ -1346,7 +1343,13 @@
     </div>
   </details>
 
-  <details class="card settings-fields" id="display-preferences" data-controller="display-preferences"
+  <style>
+  .display-group { border: 0; padding: .6rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .9rem; font-size: .85rem; }
+  .display-group legend { font-size: .8rem; color: var(--muted); padding: 0; margin-bottom: .35rem; }
+  .display-group label { margin-bottom: 0; color: var(--text); }
+  .display-hint { flex-basis: 100%; margin-top: 0; }
+</style>
+<details class="card settings-fields" id="display-preferences" data-controller="display-preferences"
          data-display-preferences-url-value="/profile"
          data-display-preferences-defaults-value="{&quot;theme&quot;:&quot;dark&quot;,&quot;text_size&quot;:&quot;100&quot;,&quot;line_spacing&quot;:&quot;default&quot;,&quot;font&quot;:&quot;default&quot;,&quot;background_pattern&quot;:&quot;on&quot;}"
          data-display-preferences-palette-value="{&quot;light&quot;:&quot;all&quot;,&quot;device&quot;:&quot;(prefers-color-scheme: light)&quot;}"

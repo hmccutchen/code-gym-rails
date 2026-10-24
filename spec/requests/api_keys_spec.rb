@@ -374,6 +374,23 @@ RSpec.describe "ApiKeys", type: :request do
       expect(response.body).not_to include(%(id="exclude-code_review"))
     end
 
+    it "carries the difficulty controls' styles once, however many kinds render them" do
+      get setup_path
+
+      page = Nokogiri::HTML(response.body)
+      expect(page.css("fieldset.mix-difficulty").size).to be > 1
+      expect(page.css("style").count { |style| style.text.include?(".mix-difficulty {") }).to eq(1)
+      expect(response.body).not_to include(".mix-difficulty.mix-suggested {")
+    end
+
+    it "adds the suggestion outline's style only when the page marks a suggested kind" do
+      get setup_path(suggested: %w[code_review pattern], suggested_level: "junior")
+
+      page = Nokogiri::HTML(response.body)
+      expect(page.css("fieldset.mix-difficulty.mix-suggested").size).to eq(2)
+      expect(page.css("style").count { |style| style.text.include?(".mix-difficulty.mix-suggested {") }).to eq(1)
+    end
+
     it "hides the bulk button from a trial account" do
       login_as(create_trial_user)
 

@@ -16,6 +16,29 @@ module ViewStyles
     source.gsub(%r{<style>.*?</style>}m, "")
   end
 
+  ERB_TAG = /<%.*?%>/m
+  STRING_LITERAL = /"([^"]*)"|'([^']*)'/
+  CLASS_ATTRIBUTE = /(?<![\w-])class=(?:"((?:<%.*?%>|[^"])*?)"|'((?:<%.*?%>|[^'])*?)')/m
+  HELPER_CLASS = /(?<![\w])class:\s*(?:"([^"]*)"|'([^']*)')/
+
+  # A name joined to Ruby, like slot-<%= n %>, yields only its static pieces, so a rule on the joined name fails.
+  def markup_classes(source)
+    markup = outside_style_blocks(source)
+    attribute_values = markup.scan(CLASS_ATTRIBUTE).map(&:compact).flatten.map do |value|
+      value.gsub(ERB_TAG) { |tag| " #{tag.scan(STRING_LITERAL).flatten.compact.join(' ')} " }
+    end
+    helper_values = markup.scan(ERB_TAG).flat_map { |tag| tag.scan(HELPER_CLASS).flatten.compact }
+    (attribute_values + helper_values).flat_map { |value| value.gsub(/#\{[^}]*\}/, " ").split }.uniq
+  end
+
+  def selected_classes(rules)
+    rules.flat_map(&:selectors).flat_map { |selector| without_negations(selector).scan(/\.([a-z][\w-]*)/) }.flatten.uniq
+  end
+
+  def without_negations(selector)
+    selector.gsub(/:not(\((?:[^()]|\g<1>)*\))/, "")
+  end
+
   def rules(source)
     style_blocks(source).flat_map { |css| rules_in(css.gsub(%r{/\*.*?\*/}m, "")) }
   end

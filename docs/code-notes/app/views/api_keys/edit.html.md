@@ -34,16 +34,34 @@ onto `.card` took `form-field` off them, so each rule is now
 equals the old class selector's, so every rule keeps the specificity it had
 and the disclosures look as they did. The switch row and the switch are
 excluded with `:not(:where(...))`, which adds no specificity, so the level
-suggestions switch is not styled as a field label or input. This stays until
+suggestions switch is not styled as a field label or input. Those rules style
+this page's fields and only leave the switch alone, so they stay here; the
+style guard (`spec/views/own_styles_spec.rb`) reads a class named only inside
+`:not()` the same way. This stays until
 the later PR that moves the disclosures' fields onto the card styles, when
 `settings-fields` goes.
 
-## Key guide spacing
+## Partials' styles
 
-`.key-guide > * + *` spaces the guide's blocks `.5rem` apart, and
-`.key-guide :is(ol, ul)` indents its lists by `1.25rem`. Neither shows for an
-account that already has a key, which is why the page snapshot carries the
-rules but not the guide.
+Each partial the page renders carries the rules for its own classes:
+`api_keys/_key_guide` its spacing, `api_keys/_display_preferences` its
+groups and hints, and `api_keys/_difficulty_controls` its fieldset, lock,
+coverage line and suggestion outline. The difficulty partial renders once per
+kind, so it emits its `<style>` only on its first render, flagged with
+`content_for :difficulty_controls_styles`; the suggestion outline keeps its
+`suggested_kinds.any?` condition. `.mix-row .kind-about`, which places the
+shared `responses/_kind_about` disclosure across a mix row, sits in the
+layout beside the other `details.kind-about` rules, since that partial also
+renders on the answer form.
+
+Every partial's `<style>` comes after this page's own block, so a moved rule
+still wins a tie in specificity it won before: `.mix-difficulty label` and
+`.display-group label` over the settings label rule, `.mix-difficulty legend`
+over `.mix-group legend`, and `.key-guide > * + *` and `.mix-coverage` over
+`.hint`. `spec/system/settings_partial_styles_spec.rb` measures each result.
+The key guide shows only to an account with no key and no sets, so the page
+snapshot, taken for an account with a key, carries neither the guide nor its
+rules.
 
 ## Where save feedback appears
 
@@ -67,7 +85,9 @@ saved zone still shows the automatic choice; timezone resolution is unchanged.
 ## Label minimum height
 
 A tap on an exclude, lock or difficulty label toggles its
-box, so the label is the tap target. The Daily sections labels are
+box, so the label is the tap target. The exclude label's 24px is in this
+page's style, and the lock and difficulty labels' 24px is in
+`api_keys/_difficulty_controls`. The Daily sections labels are
 `.segment`s, which carry their own 44px height. 24px is the WCAG 2.5.8 minimum for it.
 
 ## Daily and single-kind groups
