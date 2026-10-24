@@ -51,7 +51,7 @@ RSpec.describe "Conventions held over system spec waits" do
   it "stubs one path's fetch, or a signed-out reply, only through FetchStubHelper" do
     stub_shapes = [ /\bdef (?:stub_fetch|fail_requests_to|drop_requests_to|redirect_requests_to_login|break_the_network|reply_to)\b/,
                     /window\.fetch = \(url, options\) => (?:url\.(?:endsWith|includes)\(|new URL\(url, location\.href\)\.pathname ===)/,
-                    /\bredirected\b/ ]
+                    /window\.fetch = \(\) => Promise\.reject\(/, /["']redirected["']|\bredirected:\s*true\b/ ]
     offenders = offending_lines(Regexp.union(stub_shapes))
 
     expect(offenders).to be_empty, <<~MESSAGE

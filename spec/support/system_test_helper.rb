@@ -147,8 +147,8 @@ module FetchStubHelper
       (() => {
         const passThrough = window.fetch;
         window.fetch = (url, options) => {
-          const pathname = new URL(url instanceof Request ? url.url : String(url), location.href).pathname;
-          return #{matches} ? #{reply} : passThrough(url, options);
+          const pathname = new URL(String(url), location.href).pathname;
+          return #{matches} ? (#{reply.strip.delete_suffix(";")}) : passThrough(url, options);
         };
       })();
     JS

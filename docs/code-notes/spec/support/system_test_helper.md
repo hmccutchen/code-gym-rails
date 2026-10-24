@@ -92,4 +92,7 @@ request body or method, or swaps fetch inside one evaluated script keep their
 own: their timing and matching are what they test, and the helper covers only
 "this path answers like this".
 `spec/conventions/system_spec_waits_spec.rb` fails on a spec that redefines the
-helper names, builds a one-expression path stub, or writes a redirected reply.
+helper names, builds a one-expression path stub, rejects every request with a
+one-line `window.fetch`, or writes a redirected reply. The reply is wrapped in
+parentheses with any closing semicolon dropped, so a reply written as a
+statement still parses inside the stub's conditional.

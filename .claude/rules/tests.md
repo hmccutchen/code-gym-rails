@@ -69,8 +69,11 @@ A system spec that makes one path's request fail, go unanswered or come back
 signed out uses `FetchStubHelper` (`stub_fetch`, `fail_requests_to`,
 `drop_requests_to`, `redirect_requests_to_login`, `break_the_network`), which
 passes every other request to the real fetch, instead of building its own
-`window.fetch` replacement for that (#514).
-`spec/conventions/system_spec_waits_spec.rb` fails on any of these.
+`window.fetch` replacement for that (#514). A stub that holds a reply, counts
+calls or matches on the request body keeps its own.
+`spec/conventions/system_spec_waits_spec.rb` fails on the hand-written waits,
+the draft key, a one-expression path stub, a whole-network rejection and a
+hand-built redirected reply.
 
 A system spec that needs today's set calls `visit_with_todays_set(user)`,
 which generates it before the first page load, since visiting first would wait

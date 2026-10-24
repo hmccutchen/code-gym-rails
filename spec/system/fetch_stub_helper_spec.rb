@@ -55,6 +55,12 @@ RSpec.describe "The shared fetch stub", type: :system do
     expect(user.reload.name).to eq("Longer path")
   end
 
+  it "takes a reply written as a statement, with its closing semicolon" do
+    stub_fetch(profile_path, "#{FetchStubHelper::SERVER_ERROR_REPLY};\n")
+
+    expect(rename("Semicolon")["status"]).to eq(500)
+  end
+
   it "keeps an earlier stub in place when another path is stubbed after it" do
     fail_requests_to(level_suggestion_answer_path)
     drop_requests_to(profile_path)

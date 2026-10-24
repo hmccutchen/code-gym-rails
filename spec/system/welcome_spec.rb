@@ -21,7 +21,8 @@ RSpec.describe "Welcome choices", type: :system do
   it "reports a failed save, returns focus to the pressed button and lets the user retry" do
     visit_as(user)
     wait_for_js
-    page.execute_script("window.originalFetch = window.fetch; window.fetch = () => Promise.reject(new Error('offline'))")
+    page.execute_script("window.originalFetch = window.fetch")
+    break_the_network
 
     page.execute_script("document.querySelector('[data-level=\"mid_level\"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))")
 
