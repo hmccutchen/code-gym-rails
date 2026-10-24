@@ -46,10 +46,8 @@ the later PR that moves the disclosures' fields onto the card styles, when
 Each partial the page renders carries the rules for its own classes:
 `api_keys/_key_guide` its spacing, `api_keys/_display_preferences` its
 groups and hints, and `api_keys/_difficulty_controls` its fieldset, lock,
-coverage line and suggestion outline. The difficulty partial renders once per
-kind, so it emits its `<style>` only on its first render, flagged with
-`content_for :difficulty_controls_styles`; the suggestion outline keeps its
-`suggested_kinds.any?` condition. `.mix-row .kind-about`, which places the
+coverage line and suggestion outline, once per page (its own note says how).
+`.mix-row .kind-about`, which places the
 shared `responses/_kind_about` disclosure across a mix row, sits in the
 layout beside the other `details.kind-about` rules, since that partial also
 renders on the answer form.
