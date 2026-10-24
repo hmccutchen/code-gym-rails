@@ -91,5 +91,7 @@ RSpec.describe "Allowing notifications on a device after reminders are already o
     expect(page).to have_text(I18n.t("accounts.push_reminders.blocked", app_name: I18n.t("app_name")))
     expect(page).to have_no_button(I18n.t("accounts.push_reminders.repair_button"))
     expect(page).to have_css("#push-repair-status.card-note")
+    margins = page.evaluate_script(%(["marginTop", "marginBottom"].map(side => getComputedStyle(document.getElementById("push-repair-status"))[side])))
+    expect(margins).to eq(%w[12px 0px])
   end
 end
