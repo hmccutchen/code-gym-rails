@@ -8,12 +8,7 @@ RSpec.describe "Learn write-up after the session expired", type: :system, with_c
     visit_as(user)
     visit learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
 
-    page.execute_script(<<~JS)
-      window.fetch = () => Promise.resolve(Object.defineProperty(
-        new Response("<html><body>Log in</body></html>", { status: 200, headers: { "Content-Type": "text/html" } }),
-        "redirected", { value: true }
-      ));
-    JS
+    redirect_requests_to_login(prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one"))
     click_button I18n.t("learn.write_guide")
 
     expect(page).to have_css(".learn-status", text: I18n.t("request.signed_out"))

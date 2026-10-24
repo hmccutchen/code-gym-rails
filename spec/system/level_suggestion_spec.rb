@@ -90,7 +90,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
   end
 
   it "reports a failed Apply and lets the user retry without navigating" do
-    page.execute_script("window.fetch = () => Promise.reject(new Error('offline'))")
+    break_the_network
 
     within("#level-suggestion") { click_button "Apply" }
 
@@ -103,7 +103,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
   it "keeps Apply disabled after removing every step even when Not now fails" do
     all("#level-suggestion [data-remove-step]").each(&:click)
     expect(page).to have_button("Apply", disabled: true)
-    page.execute_script("window.fetch = () => Promise.reject(new Error('offline'))")
+    break_the_network
 
     within("#level-suggestion") { click_button "Not now" }
 

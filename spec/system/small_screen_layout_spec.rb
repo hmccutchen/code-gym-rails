@@ -482,15 +482,6 @@ RSpec.describe "Small screen layout", type: :system do
       multiple * page.evaluate_script("parseFloat(getComputedStyle(document.documentElement).fontSize)")
     end
 
-    def fail_requests_to(path)
-      page.execute_script(<<~JS)
-        const originalFetch = window.fetch;
-        window.fetch = (url, options) => url.endsWith(#{path.to_json})
-          ? Promise.resolve(new Response(JSON.stringify({ status: "error", error: "nope" }), { status: 500, headers: { "Content-Type": "application/json" } }))
-          : originalFetch(url, options);
-      JS
-    end
-
     def value_row_facts
       page.evaluate_script(<<~JS)
         (() => {

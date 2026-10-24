@@ -48,6 +48,20 @@ RSpec.describe "Conventions held over system spec waits" do
     MESSAGE
   end
 
+  it "stubs one path's fetch, or a signed-out reply, only through FetchStubHelper" do
+    stub_shapes = [ /\bdef (?:stub_fetch|fail_requests_to|drop_requests_to|redirect_requests_to_login|break_the_network|reply_to)\b/,
+                    /window\.fetch = \(url, options\) => (?:url\.(?:endsWith|includes)\(|new URL\(url, location\.href\)\.pathname ===)/,
+                    /window\.fetch = \(\) => Promise\.reject\(/, /["']redirected["']|\bredirected:\s*true\b/ ]
+    offenders = offending_lines(Regexp.union(stub_shapes))
+
+    expect(offenders).to be_empty, <<~MESSAGE
+      Hand-built fetch stub in a system spec: #{offenders.join(', ')}.
+      Use stub_fetch, fail_requests_to, drop_requests_to,
+      redirect_requests_to_login or break_the_network from FetchStubHelper in
+      spec/support/system_test_helper.rb (#514).
+    MESSAGE
+  end
+
   describe JavascriptReadyHelper do
     it "reads the draft key from draft_store.js" do
       source = JavascriptReadyHelper::DRAFT_STORE_PATH.read

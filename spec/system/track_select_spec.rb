@@ -45,7 +45,7 @@ RSpec.describe "Track select on Setup", type: :system do
   end
 
   it "reports a failed save and keeps the labels naming the stored level" do
-    page.execute_script("window.fetch = () => Promise.reject(new Error('offline'))")
+    break_the_network
 
     select "Principal engineer", from: "Track", visible: :all
 
@@ -66,12 +66,7 @@ RSpec.describe "Track select on Setup", type: :system do
   end
 
   it "keeps the Track row's shown value matching its select after a failed save" do
-    page.execute_script(<<~JS)
-      const originalFetch = window.fetch;
-      window.fetch = (url, options) => url.endsWith(#{profile_path.to_json})
-        ? Promise.resolve(new Response(JSON.stringify({ status: "error", error: "nope" }), { status: 500, headers: { "Content-Type": "application/json" } }))
-        : originalFetch(url, options);
-    JS
+    fail_requests_to(profile_path)
 
     select "Principal engineer", from: "Track", visible: :all
 

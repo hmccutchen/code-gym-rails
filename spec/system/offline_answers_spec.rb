@@ -9,10 +9,6 @@ RSpec.describe "Answers through a lost connection", type: :system do
     page.driver.with_playwright_page { |pw| pw.context.set_offline(offline) }
   end
 
-  def break_the_network
-    page.execute_script("window.fetch = () => Promise.reject(new Error('offline'))")
-  end
-
   def stored_draft
     raw = page.evaluate_script("localStorage.getItem(#{draft_key_js}) ?? ''")
     raw.empty? ? nil : JSON.parse(raw)
@@ -271,9 +267,8 @@ RSpec.describe "Answers through a lost connection", type: :system do
     other_tab_answer = "Another tab's answer, which reached the server without a reply."
     travel_to(a_weekday) do
       open_dashboard
+      drop_requests_to(responses_path)
       page.execute_script(<<~JS)
-        const originalFetch = window.fetch
-        window.fetch = (url, options) => new URL(url, location.href).pathname === "/responses" ? Promise.reject(new TypeError("offline")) : originalFetch(url, options)
         const byKey = ([ a ], [ b ]) => (a < b ? -1 : a > b ? 1 : 0)
         const rendered = {}
         document.querySelectorAll("textarea[data-field]").forEach((area) => rendered[area.dataset.field] = area.defaultValue)
