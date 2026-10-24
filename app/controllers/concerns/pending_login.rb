@@ -14,10 +14,12 @@ module PendingLogin
 
   def pending_login_stamp = session[:pending_login_at]
 
+  def pending_login_address = session[:pending_login_email].presence
+
   def pending_login_email
     return nil if pending_login_expired?
 
-    session[:pending_login_email].presence
+    pending_login_address
   end
 
   # An unreadable stamp counts as pending, so a deploy never turns a live code away; Start again clears it.

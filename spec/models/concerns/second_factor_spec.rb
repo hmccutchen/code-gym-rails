@@ -204,7 +204,16 @@ RSpec.describe SecondFactor, type: :model do
       expect(user.second_factor_challenge_open?(issued_at)).to be(false)
     end
 
-    it "closes once a code is accepted" do
+it "yields an accepted outcome inside the row lock, and nothing for a wrong code" do
+  in_transaction = nil
+  expect { |block| user.answer_second_factor_challenge!(wrong_totp(secret), issued_at: issued_at, &block) }.not_to yield_control
+
+  user.answer_second_factor_challenge!(code_at(secret, 0), issued_at: issued_at) { in_transaction = User.connection.transaction_open? }
+
+  expect(in_transaction).to be(true)
+end
+
+it "closes once a code is accepted" do
       expect(user.answer_second_factor_challenge!(code_at(secret, 0), issued_at: issued_at).status).to eq(:totp)
       expect(user.reload.second_factor_challenge_at).to be_nil
     end

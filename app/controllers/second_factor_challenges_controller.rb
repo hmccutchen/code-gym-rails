@@ -27,15 +27,16 @@ class SecondFactorChallengesController < ApplicationController
   # POST /login/second-factor
   def create
     checked_at = Time.current
-    outcome = @user.answer_second_factor_challenge!(params[:otp_code], issued_at: pending_second_factor["at"])
-    remember_sign_in(@user, second_factor_proof) if outcome.accepted?
+    outcome = @user.answer_second_factor_challenge!(params[:otp_code], issued_at: pending_second_factor["at"]) do
+      remember_sign_in(@user, second_factor_proof, checked_at)
+    end
     case outcome.status
     when :totp            then complete_sign_in(@user, checked_at: checked_at, factor: :authenticator)
     when :recovery_code   then complete_sign_in_with_recovery_code(outcome.remaining, checked_at)
     when :rejected        then render_new(t("second_factor_challenges.rejected"), :unprocessable_content)
     when :locked          then lock_out(outcome.retry_at)
     when :challenge_ended then end_challenge(t("second_factor_challenges.too_many_wrong_codes"))
-    when :expired         then end_challenge(t("second_factor_challenges.expired"))
+    when :expired         then complete_repeated_sign_in || end_challenge(t("second_factor_challenges.expired"))
     else raise ArgumentError, "unhandled second-factor outcome: #{outcome.status}"
     end
   end
@@ -45,7 +46,7 @@ class SecondFactorChallengesController < ApplicationController
   def require_open_challenge
     @user = User.active.find_by(id: pending_second_factor["user_id"])
     return if @user&.second_factor_challenge_open?(pending_second_factor["at"])
-    return complete_repeated_sign_in if request.post? && repeat_of_recent_sign_in?(@user, second_factor_proof)
+    return if request.post? && complete_repeated_sign_in
 
     end_challenge(t("second_factor_challenges.expired"))
   end
@@ -53,8 +54,11 @@ class SecondFactorChallengesController < ApplicationController
   def second_factor_proof = [ pending_second_factor["user_id"], pending_second_factor["at"], params[:otp_code].to_s ]
 
   def complete_repeated_sign_in
+    checked_at = recent_sign_in_checked_at(@user, second_factor_proof) or return false
+
     PendingTrial.forget(session)
-    complete_sign_in(@user, checked_at: Time.current, factor: :authenticator)
+    complete_sign_in(@user, checked_at: checked_at, factor: :authenticator)
+    true
   end
 
   def complete_sign_in_with_recovery_code(remaining, checked_at)

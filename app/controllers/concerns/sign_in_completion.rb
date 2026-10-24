@@ -9,15 +9,19 @@ module SignInCompletion
   private
 
   # A double tap posts twice with the pre-sign-in cookie; the proof holds that browser's own pending stamp and its code.
-  def remember_sign_in(user, proof)
-    Rails.cache.write(sign_in_repeat_key(user), sign_in_repeat_digest(proof), expires_in: REPEAT_WINDOW)
+  def remember_sign_in(user, proof, checked_at)
+    Rails.cache.write(sign_in_repeat_key(user), { "digest" => sign_in_repeat_digest(proof), "checked_at" => User.session_stamp(checked_at) },
+                      expires_in: REPEAT_WINDOW)
   end
 
-  def repeat_of_recent_sign_in?(user, proof)
-    return false if user.nil? || proof.any?(&:blank?)
+  # The repeat keeps the first post's check time, so sessions ended since then stay ended.
+  def recent_sign_in_checked_at(user, proof)
+    return if user.nil? || proof.any?(&:blank?)
 
     remembered = Rails.cache.read(sign_in_repeat_key(user))
-    remembered.present? && ActiveSupport::SecurityUtils.secure_compare(remembered, sign_in_repeat_digest(proof))
+    return unless remembered.is_a?(Hash) && ActiveSupport::SecurityUtils.secure_compare(remembered["digest"].to_s, sign_in_repeat_digest(proof))
+
+    User.session_time(remembered["checked_at"]) if user.session_signed_in_valid?(remembered["checked_at"])
   end
 
   def sign_in_repeat_key(user) = "sign_in_repeat/#{user.id}"
