@@ -151,6 +151,49 @@ RSpec.describe "Answers through a lost connection", type: :system do
     end
   end
 
+  it "restores an edit typed behind a save the server committed but whose reply the reload cut off" do
+    later = "#{answer} Then a second sentence, typed while that save was on the wire."
+    reply = { held: false }
+    allow_any_instance_of(ResponsesController).to receive(:create).and_wrap_original do |original, *args|
+      original.call(*args).tap { wait_for { !reply[:held] } }
+    end
+
+    travel_to(a_weekday) do
+      open_dashboard
+      reply[:held] = true
+      fill_in_answer("code_review", answer)
+      wait_for { user.daily_responses.first&.answers&.dig("code_review") == answer }
+      find(code_review_field).fill_in(with: later)
+      wait_for_js_condition("JSON.parse(localStorage.getItem('code-gym-answer-draft') || 'null')?.answers?.code_review === #{later.to_json}")
+
+      visit root_path
+      reply[:held] = false
+      expect(page).to have_content(/Code Review/i)
+      wait_for_js
+
+      expect(find(code_review_field).value).to eq(later)
+      wait_for { user.daily_responses.reload.sole.answers["code_review"] == later }
+    end
+  end
+
+  it "does not restore a copy from another day's set whose in-flight save matches this page" do
+    travel_to(a_weekday) do
+      open_dashboard
+      empty = page.evaluate_script(<<~JS)
+        JSON.stringify([ [], [] ])
+      JS
+      page.execute_script(<<~JS)
+        localStorage.setItem("code-gym-answer-draft", JSON.stringify({ token: "other-day:1:0", scope: "other-day",
+          sent: #{empty.to_json}, answers: { code_review: "Yesterday's unsent answer." }, ratings: {} }))
+      JS
+
+      reopen_dashboard
+
+      expect(find(code_review_field).value).not_to eq("Yesterday's unsent answer.")
+      expect(stored_draft).to be_nil
+    end
+  end
+
   it "keeps a rating changed while an earlier save was on the wire" do
     travel_to(a_weekday) do
       open_dashboard

@@ -125,9 +125,10 @@ lists which paths use the gate and which deliberately don't.
 
 Every edit writes the answers and ratings to `code_gym/draft_store` with the
 draft token the copy was built on: the one the server rendered, or the one the
-last save reply carried. On connect, `restoreDraft()` puts a copy back only
-when its token equals the page's token, meaning the server's saved answers are
-still exactly the ones the copy started from. Anything else (another day, a
+last save reply carried. On connect, `restoreDraft()` puts a copy back when its
+token equals the page's token, meaning the server's saved answers are still
+exactly the ones the copy started from, or in the one case described below,
+when a save landed but its reply didn't. Anything else (another day, a
 regenerated set, a Start over, a save from another tab or device) deletes it.
 The token is a digest of the saved answers and ratings, not `updated_at`,
 because a pseudocode round writes the same row without touching the answers.
@@ -148,10 +149,18 @@ edits stay kept. `nextSave()` records what each attempt sent, because the
 queue reads the body again on every retry. A submit, a stale refusal and a
 reload into the submitted page all clear it.
 
-When a save reaches the server but its reply is lost, and the page is killed
-before a retry, the next load renders a token the copy does not have. The copy
-is dropped and the server's draft shows. That draft holds the save that got
-through, so what is lost is limited to the edits made after it.
+When a save reaches the server but its reply never arrives, because the page
+reloaded, closed or was killed in between, the next load renders a token the
+copy does not have. That happens online too, whenever a reload lands in a
+save's round trip, and the edits typed behind that save are the ones at risk.
+So `nextSave()` records in the copy what the save on the wire sent (`sent`)
+and the draft scope, and `settleDraft()` clears `sent` once a reply arrives.
+`renderedLandedSave()` then restores a copy whose token is out of date when its
+scope is the page's and the answers and ratings the server rendered are
+exactly `sent`, compared the same sorted way. The server holds the save, so
+the copy's later edits go back on top of it. Any other mismatch still deletes
+the copy. The scope check keeps another day's copy out even when both days'
+answers happen to match, such as both empty.
 
 ## Submitting offline
 

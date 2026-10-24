@@ -13,10 +13,13 @@ timer, never a refusal, a 5xx or the signed-out redirect. A confirmed save,
 a submit, a submitted dashboard and every signed-out page clear the copy,
 the last because this app runs on shared devices; a save reply or a stale refusal clears it only when
 the stored copy is the one that tab sent or owns, since every tab shares it,
-and the "kept on this device" wording shows only when the write succeeded. If a save reaches the server, its reply is lost and
-the page is killed before a retry, the copy no longer matches and the
-server's draft shows; that draft holds the save that got through, so the
-loss is limited to edits made after it. Submit stays manual: offline, it
+and the "kept on this device" wording shows only when the write succeeded. If a save reaches the server and the page reloads,
+closes or is killed before its reply arrives, the copy's token is out of date,
+so the copy also records what the save on the wire sent and the draft scope.
+The page then restores the copy when the scope matches and the answers and
+ratings the server rendered are exactly that save: the server has what the
+copy's later edits were typed on top of, so nothing is lost (#500). This
+happens online too, whenever a reload lands in a save's round trip. Submit stays manual: offline, it
 says the answers were not submitted and are kept, and stays enabled.
 Parsons answers are not restored, and opening the app offline still shows
 the browser's offline page, since nothing caches the dashboard.
