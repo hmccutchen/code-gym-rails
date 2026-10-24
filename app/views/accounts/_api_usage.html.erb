@@ -1,4 +1,12 @@
 <%# Required locals: usage (a MonthlySpend), since (the period's first moment). %>
+<style>
+  .api-usage .card-note { margin-bottom: 0; }
+  .api-usage-total { font-size: 2rem; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .api-usage-providers { margin: .75rem 0; }
+  .api-usage-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .25rem .75rem; min-height: 48px; border-top: 1px solid var(--border); }
+  .api-usage-row dd { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; }
+  .api-usage-row-unpriced dd { color: var(--muted); }
+</style>
 <section class="card api-usage" aria-labelledby="api-usage-heading">
   <h2 id="api-usage-heading"><%= t("accounts.api_usage.heading") %></h2>
   <% if usage.providers.empty? %>
