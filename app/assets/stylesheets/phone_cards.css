@@ -62,9 +62,6 @@
 
 details.card > summary { min-height: 48px; display: list-item; padding-block: .75rem; cursor: pointer; font-weight: 600; }
 
-:where(.phone-page .mix-note) .hint { font-size: .8rem; color: var(--muted); margin-top: .4rem; }
-#exercise-mix .kind-about > summary { min-height: 44px; display: flex; align-items: center; }
-
 /* Any author display beats the browser's [hidden] rule, so this restores it for every element on the page. */
 .phone-page [hidden] { display: none; }
 

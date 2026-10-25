@@ -403,6 +403,17 @@ win. The light palette's `media` attribute is
 `DisplayPreferences#light_palette_media`, the same value the brand logo's
 `<source>` and the light `theme-color` carry.
 
+## Settings rules for classes the partials carry
+
+Two rules sit here, beside the `details.kind-about` rules, though only
+Settings uses them: `#exercise-mix .kind-about > summary` (a 44px About
+summary) and `:where(.phone-page .mix-note) .hint` (the guide text's size,
+colour and top margin). Their classes come from partials (`responses/_kind_about`,
+`api_keys/_key_guide` and `_trial_note`), and `spec/views/own_styles_spec.rb`
+refuses a rule in the Settings page for a class its own markup lacks. The
+`:where()` keeps the hint rule at one class of weight, so `.key-guide > * + *`
+still wins the guide's spacing.
+
 ## Page behavior
 
 Every behavior this layout used to carry as an inline script is now a
