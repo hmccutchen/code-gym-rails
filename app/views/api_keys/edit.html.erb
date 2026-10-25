@@ -155,7 +155,7 @@
       <legend><%= t("exercise_mix.fixed_group") %></legend>
       <% DailyKinds.for(current_user).each do |kind| %>
         <div class="mix-row mix-row-fixed">
-          <span><%= t("sections.#{kind.key}.name") %></span>
+          <span id="mix-name-<%= kind.key %>"><%= t("sections.#{kind.key}.name") %></span>
           <%= render "api_keys/difficulty_controls", kind: kind, excluded: false %>
           <%= render "responses/kind_about", key: kind.key %>
         </div>
@@ -165,7 +165,7 @@
       <fieldset class="mix-group">
         <legend><%= t("exercise_mix.#{slot}_group") %></legend>
         <div class="mix-row mix-row-fixed">
-          <span><%= t("sections.#{kind.key}.name") %></span>
+          <span id="mix-name-<%= kind.key %>"><%= t("sections.#{kind.key}.name") %></span>
           <%= render "api_keys/difficulty_controls", kind: kind, excluded: false %>
           <%= render "responses/kind_about", key: kind.key %>
         </div>

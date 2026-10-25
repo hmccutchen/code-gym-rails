@@ -407,6 +407,59 @@ RSpec.describe "ApiKeys", type: :request do
       expect(text).not_to include("Excluding")
     end
 
+    it "names each difficulty group and lock for its kind" do
+      get setup_path
+
+      page = Nokogiri::HTML(response.body)
+      resolve = ->(node) { node["aria-labelledby"].split.map { |id| page.at_css("##{id}").text.strip }.join(" ") }
+      fieldset = page.at_css("fieldset.mix-difficulty[data-kind='code_review']")
+      lock = page.at_css("#lock-code_review")
+      expect(fieldset["aria-labelledby"]).to eq("mix-name-code_review mix-level-legend-code_review")
+      expect(page.at_css("#mix-name-code_review").text.strip).to eq(I18n.t("sections.code_review.name"))
+      expect(page.at_css("#mix-level-legend-code_review").text.strip).to eq("Difficulty target")
+      expect(lock["role"]).to eq("switch")
+      expect(lock["class"].split).to include("switch", "mix-lock-box")
+      expect(lock["aria-labelledby"]).to eq("mix-name-code_review lock-text-code_review")
+      expect(resolve.call(lock)).to eq("#{I18n.t("sections.code_review.name")} Lock at this level")
+      names = page.css(".mix-lock-box").map(&resolve)
+      groups = page.css("fieldset.mix-difficulty").map(&resolve)
+      expect(names.size).to be > 1
+      expect(names.uniq).to eq(names)
+      expect(groups.uniq).to eq(groups)
+    end
+
+    it "disables an excluded kind's radios and lock in the markup" do
+      user.update!(excluded_section_kinds: %w[challenge])
+
+      get setup_path
+
+      page = Nokogiri::HTML(response.body)
+      challenge = page.css('input[name="level-challenge"]') + page.css("#lock-challenge")
+      expect(challenge).not_to be_empty
+      expect(challenge.map { |input| input.has_attribute?("disabled") }).to all(be(true))
+      expect(page.css('input[name="level-code_review"]').map { |input| input.has_attribute?("disabled") }).to all(be(false))
+    end
+
+    it "wraps each difficulty option in a row with its text in a span" do
+      get setup_path
+
+      rows = Nokogiri::HTML(response.body).css(".mix-difficulty[data-kind='challenge'] label.mix-level")
+      expect(rows.size).to eq(KindDifficulty::LEVELS.size + 1)
+      rows.each do |row|
+        expect(row.css("input[type=radio]").size).to eq(1)
+        expect(row.css("span").size).to eq(1)
+      end
+      expect(rows.first.at_css("span").has_attribute?("data-skill-level-label")).to be(true)
+    end
+
+    it "renders no hint in Exercise mix" do
+      get setup_path
+
+      page = Nokogiri::HTML(response.body)
+      expect(page.css("#exercise-mix .mix-difficulty .hint")).to be_empty
+      expect(page.css("#exercise-mix .mix-coverage").map { |note| note["class"].split }).to all(include("card-note"))
+    end
+
     it "carries the difficulty controls' styles once, however many kinds render them" do
       get setup_path
 
