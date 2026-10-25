@@ -31,15 +31,39 @@ input, checkbox and radio) were scoped to that class. Moving the disclosures
 onto `.card` took `form-field` off them, so each rule is now
 `:is(.form-field, .settings-fields) ...`, and both disclosures carry
 `settings-fields`. `:is()` takes its argument's highest specificity, which
-equals the old class selector's, so every rule keeps the specificity it had
-and the disclosures look as they did. The switch row and the switch are
-excluded with `:not(:where(...))`, which adds no specificity, so the level
-suggestions switch is not styled as a field label or input. Those rules style
-this page's fields and only leave the switch alone, so they stay here; the
-style guard (`spec/views/own_styles_spec.rb`) reads a class named only inside
-`:not()` the same way. This stays until
-the later PR that moves the disclosures' fields onto the card styles, when
-`settings-fields` goes.
+equals the old class selector's, so every rule keeps the specificity it had.
+Four things are excluded, each in its own `:not(:where(...))` so it adds no
+specificity (the style guard splits a selector at every comma, so a list
+inside one `:not()` would read as two selectors): the switch row and the switch, so the level suggestions switch
+is not styled as a field label or input; `.mix-level` and the radios inside
+it, so a difficulty row keeps the layout `_difficulty_controls` gives it
+instead of the block label and the auto-width radio margin; and
+`[type="range"]`, so the slider takes its size from `phone_cards.css` instead
+of the text-input box (full width, padding, border, monospace). The style
+guard (`spec/views/own_styles_spec.rb`) reads a class named only inside
+`:not()` the same way.
+
+The class stays after the exclusions. The label rule still styles Display's
+legends and groups, and the text-input rule still styles every other input in
+the disclosures, so removing `settings-fields` would change them. It goes
+only when those fields move onto the card styles.
+
+## Notes and groups
+
+A note under a control is `.card-note`, which `phone_cards.css` owns. The old
+page-wide `.hint` rule is now `:where(.phone-page .mix-note) .hint`, so only
+the guide text inside a `.mix-note` keeps that size and colour. It moved to
+`phone_cards.css` because the trial note and the key guide, which carry
+`.hint`, are separate partials and the page's style may not name a class its
+own markup lacks (`spec/views/own_styles_spec.rb`). Every other note takes its look from `.card-note`
+and sets only its spacing, so two rules no longer give the same muted text.
+
+A `.mix-group` is a fieldset with no box. Boxes inside a card made every kind
+look like a card of its own, with three borders and two paddings between the
+card edge and a control, which cost width at 320px. A divider above each group
+after the first (`.mix-group + .mix-group`) separates the groups instead.
+`min-width: 0` overrides the browser's default fieldset width, which would
+otherwise stop a long label from wrapping.
 
 ## Partials' styles
 
@@ -80,13 +104,25 @@ select and its visible value row read the same options, so a saved
 `Europe/London` appears as itself rather than "Detect automatically". A blank
 saved zone still shows the automatic choice; timezone resolution is unchanged.
 
-## Label minimum height
+## Tap target sizes
 
-A tap on an exclude, lock or difficulty label toggles its
-box, so the label is the tap target. The exclude label's 24px is in this
-page's style, and the lock and difficulty labels' 24px is in
-`api_keys/_difficulty_controls`. The Daily sections labels are
-`.segment`s, which carry their own 44px height. 24px is the WCAG 2.5.8 minimum for it.
+The control a finger lands on is the label or the control itself, so each has
+a minimum height. The rules sit with the markup that needs them:
+
+- Difficulty options are `label.mix-level` rows, at least 48px tall, in
+  `api_keys/_difficulty_controls`.
+- The skip and lock switches are `.switch-row`s, at least 48px, in
+  `phone_cards.css`.
+- The weight slider is 44px tall with a 28px thumb, in `phone_cards.css`.
+- An About summary is 44px, in `phone_cards.css`
+  (`#exercise-mix .kind-about > summary`), because neither the page nor the
+  difficulty partial carries the `kind-about` class.
+- Display's option labels are 44px, in `api_keys/_display_preferences`.
+- The Daily sections labels are `.segment`s, which carry their own 44px height.
+
+48px is the size the other cards use for a row. The About summary and the
+slider sit at 44px because the thumb and the summary text already fill the
+width, and 44px is still above the WCAG 2.5.8 minimum of 24px.
 
 ## Daily and single-kind groups
 
