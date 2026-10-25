@@ -7,4 +7,12 @@ module ApplicationHelper
   def document_title
     content_for?(:title) ? safe_join([ content_for(:title), t("app_name") ], " – ") : t("app_name")
   end
+
+  def wide_page
+    content_for(:container_width, "wide", flush: true)
+  end
+
+  def container_class
+    content_for(:container_width) == "wide" ? "container container-wide" : "container"
+  end
 end

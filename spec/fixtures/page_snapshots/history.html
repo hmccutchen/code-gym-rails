@@ -560,6 +560,7 @@
     }
   </style>
   <link rel="stylesheet" href="/assets/phone_cards-DIGEST.css" />
+  <link rel="stylesheet" href="/assets/desktop-DIGEST.css" />
 </head>
 <body data-signed-out-text="Your session expired, so that didn&#39;t go through. Reload the page and sign in again." data-save-failed-text="Couldn&#39;t save your last change. It hasn&#39;t reached the server — check your connection and try again."
       data-controller="glossary code-lines mermaid"
@@ -601,38 +602,30 @@
     </div>
   </nav>
 
-  <div class="container" data-pull-content>
+  <div class="container container-wide" data-pull-content>
     <main id="main-content" tabindex="-1">
       <div class="flash notice" id="flash-notice">Welcome back, Existing!</div>
 
     <style>
-  .page-header { margin-bottom: 2rem; }
-  .page-header h1 { font-size: 1.5rem; }
-  .page-header .count { color: var(--muted); font-size: .9rem; }
+  .history-rail h1 { font-size: 1.5rem; }
+  .history-rail .count, .history-rail-page { color: var(--muted); font-size: .9rem; }
+  .history-rail-page { display: none; }
 
-  .history-entry { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; margin-bottom: 1.5rem; }
+  .history-entries { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .history-entry { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
   .history-entry h2 { font-size: 1.05rem; margin-bottom: .5rem; }
   .history-meta { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; font-size: .85rem; color: var(--muted); margin-bottom: .5rem; }
   .history-tag { border: 1px solid var(--accent); color: var(--accent-text); border-radius: 999px; padding: .15rem .5rem; font-size: .8rem; }
 
-  details.review summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); padding: .4rem 0; list-style: none; }
+  details.review summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); display: flex; align-items: center; min-height: 48px; list-style: none; }
   .no-review { font-size: .85rem; color: var(--muted); }
 
-  details.answers { margin: .75rem 0; }
-  details.answers summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); padding: .4rem 0; list-style: none; }
+  details.answers { margin: 0; }
+  details.answers summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); display: flex; align-items: center; min-height: 48px; list-style: none; }
   details.answers .section { margin-top: 1rem; }
 
-  /* Mirrors the layout's .section mobile rule; the values are coupled. */
+  /* The layout's 600px rule bleeds .section to the screen edge; inside an entry it stays inset. */
   @media (max-width: 600px) {
-    .history-entry {
-      margin-inline: -1.5rem;
-      padding: 1.25rem 1rem;
-      border-radius: 0;
-      border-left: none;
-      border-right: none;
-      box-shadow: none;
-    }
-    /* The entry already spans the viewport, so these cards stay inset instead of the shared .section break-out. */
     .history-entry .section {
       margin-inline: 0;
       border-radius: var(--radius);
@@ -640,16 +633,19 @@
       border-right: 1px solid var(--border);
     }
   }
-  .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 2rem 0 1rem; font-size: .9rem; }
-  .pagination a { color: var(--accent-text); text-decoration: none; border: 1px solid var(--border); border-radius: 6px; padding: .4rem .7rem; }
+  .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1rem; font-size: .9rem; }
+  .pagination a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 1rem; color: var(--accent-text); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; }
   .pagination a[aria-disabled="true"] { color: var(--muted); opacity: .5; pointer-events: none; }
   .pagination span { color: var(--muted); }
 </style>
 
-<div class="page-header">
+<div class="card-page history-page">
+<div class="history-rail">
   <h1>History</h1>
-  <div class="count">1 submitted session</div>
+  <p class="count">1 submitted session</p>
 </div>
+
+<div class="history-entries">
 
 
   <div class="history-entry" id="response-900001">
@@ -846,6 +842,8 @@
       </details>
   </div>
 
+</div>
+</div>
 
     </main>
   </div>

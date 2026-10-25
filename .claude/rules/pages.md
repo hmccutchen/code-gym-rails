@@ -64,7 +64,17 @@ read it before changing that area.
   and switch styles, plus the value row, segmented control, card tag,
   collapsible card, the range slider and the disabled switch row, for the
   Account and Settings pages; it loads on every
-  page, so a new rule in it stays scoped to its own class.
+  page, so a new rule in it stays scoped to its own class. `.card-page` is
+  the full-width card page (History), with the same phone gutter.
+- **Desktop layout** (`docs/decisions/desktop-layout.md`): at 900px and wider
+  a page that calls `wide_page` gets a centered column up to 1040px, built
+  from `.container`'s gutter properties; a page widens only that way, and
+  the `.container` rule itself is not edited. `desktop.css` holds nothing
+  outside its one `@media (min-width: 900px)` block (`desktop_stylesheet_spec`),
+  each rule scoped to a page class; a view's own `<style>` renders after it,
+  so a desktop rule beats one of the view's with a more specific selector.
+  A page's targets stay 44px at every width, with no `(pointer: fine)`
+  relaxation; the top nav's links are 34px until #550.
 - **Push reminders** (`docs/decisions/push-reminders.md`): Optional weekday
   ready and afternoon nudge notifications. Intent (`User#reminder_level`) and
   transport (`PushSubscription`) are separate: an endpoint can die without

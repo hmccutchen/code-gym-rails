@@ -4,10 +4,6 @@ require "rails_helper"
 RSpec.describe "Answering a design comparison on a phone", type: :system do
   let(:reason) { "A new carrier is added every month, so the registry means no edit to working code." }
 
-  def resize(width)
-    page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: width, height: 844) }
-  end
-
   def comparison
     find("[data-comparison-answer='design_comparison']")
   end

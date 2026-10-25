@@ -1,14 +1,6 @@
 require "rails_helper"
 
 RSpec.describe "Phone card pieces", type: :system do
-  def resize(width, height: 844)
-    page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: width, height: height) }
-  end
-
-  def page_width
-    page.evaluate_script("document.documentElement.scrollWidth")
-  end
-
   def inject(html)
     page.execute_script(%(document.querySelector("main .phone-page").insertAdjacentHTML("beforeend", #{%(<section class="card">#{html}</section>).to_json})))
   end

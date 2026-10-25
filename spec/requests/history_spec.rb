@@ -572,15 +572,61 @@ RSpec.describe "History", type: :request do
   end
 
   describe "mobile gutter" do
-    it "makes history entries full-bleed on phones without letting nested sections break out again" do
+    it "keeps history entries inset as cards on phones, and nested sections inset inside them" do
       login_as(user)
       create_session_for(user, date: Date.current)
 
       get history_path
 
-      # The layout's own mobile rule renders here too, so both declarations are pinned to their selectors.
-      expect(response.body).to match(/@media \(max-width: 600px\) \{\s*\.history-entry \{[^}]*margin-inline: -1\.5rem;/)
+      history_rules = ViewStyles.rules(Rails.root.join("app/views/history/index.html.erb").read)
+      expect(history_rules.select { |rule| rule.selectors.include?(".history-entry") }.filter_map { |rule| rule.declaration("margin-inline") }).to be_empty
       expect(response.body).to match(/\.history-entry \.section \{[^}]*margin-inline: 0;/)
+    end
+  end
+
+  describe "the rail" do
+    def page_html = Nokogiri::HTML(response.body)
+
+    it "holds the title and the session count, with every entry beside it in the entries column" do
+      create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+      create_session_for(user, date: 2.days.ago.to_date)
+      login_as(user)
+
+      get history_path
+
+      rail = page_html.at_css(".history-page > .history-rail")
+      expect(rail.at_css("h1").text).to eq("History")
+      expect(rail.text).to include("2 submitted sessions")
+      expect(page_html.css(".history-page > .history-entries > .history-entry").size).to eq(2)
+      expect(page_html.at_css("#main-content").ancestors(".container").first["class"]).to eq("container container-wide")
+    end
+
+    it "shows the page number in the rail and the pager when there is more than one page" do
+      (1..11).each { |i| create_session_for(user, date: i.days.ago.to_date) }
+      login_as(user)
+
+      get history_path
+
+      expect(page_html.at_css(".history-rail .history-rail-page").text).to eq("Page 1 of 2")
+      expect(page_html.at_css(".history-rail .history-rail-page")["aria-hidden"]).to eq("true")
+      expect(page_html.at_css(".history-entries > nav.pagination").text).to include("Page 1 of 2")
+    end
+
+    it "shows no page number in the rail when every session fits on one page" do
+      create_session_for(user, date: 1.day.ago.to_date)
+      login_as(user)
+
+      get history_path
+
+      expect(page_html.at_css(".history-rail-page")).to be_nil
+    end
+
+    it "puts the empty state in the entries column" do
+      login_as(user)
+
+      get history_path
+
+      expect(page_html.at_css(".history-entries > .history-entry").text).to include("No submitted sessions yet")
     end
   end
 
