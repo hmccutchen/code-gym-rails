@@ -25,6 +25,12 @@ RSpec.describe "Exercise mix", type: :system do
     find("#exercise-mix summary").click
   end
 
+  def set_forced_colors(value)
+    page.driver.with_playwright_page do |pw|
+      pw.context.new_cdp_session(pw).send_message("Emulation.setEmulatedMedia", params: { features: [ { name: "forced-colors", value: value } ] })
+    end
+  end
+
   def level_row(kind, value)
     "document.querySelector(\"input[name='level-#{kind}'][value='#{value}']\").closest('label')"
   end
@@ -584,5 +590,59 @@ RSpec.describe "Exercise mix", type: :system do
     expect(page.evaluate_script("window.mixResponses.length")).to eq(3)
     expect(user.reload.locked_section_kinds).to eq([ "code_review" ])
     expect(user.section_kind_weights).to eq("challenge" => 0.25)
+  end
+
+  it "gives the slider a 44px input, a 6px track and a 28px thumb" do
+    open_mix_at(390)
+
+    styles = page.evaluate_script(<<~JS)
+      (() => {
+        const el = document.querySelector("#weight-challenge");
+        const css = getComputedStyle(el);
+        return {
+          height: el.getBoundingClientRect().height,
+          track: parseFloat(getComputedStyle(el, "::-webkit-slider-runnable-track").height),
+          thumb: parseFloat(getComputedStyle(el, "::-webkit-slider-thumb").width),
+          paddingLeft: css.paddingLeft,
+          borderStyle: css.borderStyle
+        };
+      })()
+    JS
+
+    expect(styles["height"]).to be >= 44
+    expect(styles["track"]).to be >= 6
+    expect(styles["thumb"]).to be >= 28
+    expect(styles["paddingLeft"]).to eq("0px")
+    expect(styles["borderStyle"]).to eq("none")
+  end
+
+  it "falls back to the native slider in forced colors" do
+    open_mix_at(390)
+    set_forced_colors("active")
+
+    begin
+      expect(page.evaluate_script('matchMedia("(forced-colors: active)").matches')).to be(true)
+      result = page.evaluate_script(<<~JS)
+        (() => {
+          const probe = document.createElement("div");
+          probe.style.cssText = "border: 2px solid Highlight";
+          document.body.appendChild(probe);
+          const highlight = getComputedStyle(probe).borderTopColor;
+          probe.remove();
+          const checked = document.querySelector(".mix-level:has(input:checked)");
+          return {
+            appearance: getComputedStyle(document.querySelector("#weight-challenge")).appearance,
+            checked: getComputedStyle(checked).borderTopColor,
+            highlight: highlight
+          };
+        })()
+      JS
+
+      expect(result["appearance"]).to eq("auto")
+      expect(result["checked"]).to eq(result["highlight"])
+    ensure
+      set_forced_colors("none")
+    end
+    expect(page.evaluate_script('matchMedia("(forced-colors: active)").matches')).to be(false)
   end
 end

@@ -4,8 +4,8 @@
   :where(#exercise-mix, #display-preferences) p:not(.card-note) { color: var(--muted); margin-bottom: 2rem; }
   .form-field { margin-bottom: 1rem; }
   :is(.form-field, .settings-fields) label:not(:where(.switch-row, .mix-level)) { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
-  :is(.form-field, .settings-fields) input:not([type="checkbox"], [type="radio"]) { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); font-family: monospace; }
-  :is(.form-field, .settings-fields) input:not([type="checkbox"], [type="radio"]):focus { border-color: var(--accent); }
+  :is(.form-field, .settings-fields) input:not([type="checkbox"], [type="radio"], [type="range"]) { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); font-family: monospace; }
+  :is(.form-field, .settings-fields) input:not([type="checkbox"], [type="radio"], [type="range"]):focus { border-color: var(--accent); }
   :is(.form-field, .settings-fields) input:is([type="checkbox"], [type="radio"]):not(:where(.switch, .mix-level input)) { width: auto; margin-right: .4rem; vertical-align: middle; }
   .hint { font-size: .8rem; color: var(--muted); margin-top: .4rem; }
   .mix-group { border: 1px solid var(--border); border-radius: 6px; padding: .75rem; margin-bottom: .75rem; }
@@ -15,7 +15,6 @@
   .mix-row > output { grid-area: 1 / 2; text-align: end; font-size: .85rem; color: var(--muted); }
   .mix-row > input[type="range"] { grid-area: 2 / 1 / 3 / -1; width: 100%; }
   .mix-row > :is(.switch-row, .mix-difficulty) { grid-column: 1 / -1; }
-  .mix-row input[type="range"]:disabled { opacity: .4; }
   .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
 </style>
 
