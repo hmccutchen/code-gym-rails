@@ -105,9 +105,9 @@ RSpec.describe "Exercise mix", type: :system do
     lock = page.evaluate_script("(() => { const box = document.querySelector('#lock-challenge'); return [getComputedStyle(box.closest('.switch-row')).color, getComputedStyle(box).opacity]; })()")
 
     expect(rows).not_to be_empty
-    expect(rows.map(&:first)).to all(eq(muted_color))
+    expect(rows.map(&:first)).to all(eq(computed_color("--muted")))
     expect(rows.map(&:last)).to all(eq("1"))
-    expect(lock).to eq([ muted_color, "0.4" ])
+    expect(lock).to eq([ computed_color("--muted"), "0.4" ])
   end
 
   it "moves the checked level with the arrow keys and saves it" do
@@ -138,10 +138,6 @@ RSpec.describe "Exercise mix", type: :system do
     find("#weight-challenge").set(0)
 
     expect(page).to have_css('#weight-challenge[aria-valuetext="Much less"]')
-  end
-
-  def muted_color
-    page.evaluate_script("(() => { const p = document.createElement('span'); p.style.color = 'var(--muted)'; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; })()")
   end
 
   it "gives every skip switch row 48px and a 44px switch" do
@@ -368,7 +364,7 @@ RSpec.describe "Exercise mix", type: :system do
 
     expect(find("#exclude-#{last.key}")).to be_disabled
     row = page.evaluate_script("(() => { const s = getComputedStyle(document.querySelector('#exclude-#{last.key}').closest('.switch-row')); return [s.color, s.opacity]; })()")
-    expect(row).to eq([ muted_color, "1" ])
+    expect(row).to eq([ computed_color("--muted"), "1" ])
     expect(page).to have_text("At least one section in this group has to stay in rotation.")
     # lockLastInGroup runs whether or not the click saved, so without this the example passes with autosave deleted.
     expect(exclusions_after_save(excluded.map(&:key))).to contain_exactly(*excluded.map(&:key))

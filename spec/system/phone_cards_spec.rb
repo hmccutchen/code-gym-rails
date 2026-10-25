@@ -75,7 +75,7 @@ RSpec.describe "Phone card pieces", type: :system do
 
   it "mutes a disabled switch's row once" do
     inject(%(<label class="switch-row">Skip<input type="checkbox" class="switch" disabled></label>))
-    muted = page.evaluate_script("(() => { const p = document.createElement('span'); p.style.color = 'var(--muted)'; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; })()")
+    muted = computed_color("--muted")
     row = find(".switch-row:has(.switch:disabled)")
     expect(row.evaluate_script("[getComputedStyle(this).opacity, getComputedStyle(this).color]")).to eq([ "1", muted ])
     expect(find(".switch:disabled").evaluate_script("getComputedStyle(this).opacity")).to eq("0.4")

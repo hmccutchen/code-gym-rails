@@ -292,7 +292,9 @@ RSpec.describe "ApiKeys", type: :request do
     it "draws the explanations as notes without the accent border" do
       login_as(user)
       get setup_path
-      expect(Nokogiri::HTML(response.body).css("#exercise-mix .mix-note")).to be_empty
+      page = Nokogiri::HTML(response.body)
+      expect(page.css("#exercise-mix .mix-note")).to be_empty
+      expect(page.css("#exercise-mix .card-note strong").map(&:text)).to eq([ I18n.t("exercise_mix.exclude_heading"), I18n.t("exercise_mix.lock_heading") ])
     end
 
     it "puts the trial note inside Connection while a trial runs" do

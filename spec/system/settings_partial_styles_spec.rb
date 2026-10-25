@@ -22,17 +22,6 @@ RSpec.describe "Settings partials' styles", type: :system do
     page.execute_script("document.querySelectorAll('details.card').forEach(details => details.open = true)")
   end
 
-  def text_color
-    page.evaluate_script(<<~JS)
-      (() => {
-        const probe = document.body.appendChild(Object.assign(document.createElement("span"), { style: "color: var(--text)" }));
-        const color = getComputedStyle(probe).color;
-        probe.remove();
-        return color;
-      })()
-    JS
-  end
-
   [ 390, 1024 ].each do |width|
     context "at #{width}px" do
       before { resize(width) }
@@ -62,7 +51,7 @@ RSpec.describe "Settings partials' styles", type: :system do
         expect(styles(".display-group", "display", "rowGap", "columnGap", "fontSize", "paddingTop", "borderTopWidth"))
           .to eq([ "flex", rem(0.5), rem(0.9), rem(0.85), rem(0.6), "0px" ])
         expect(styles(".display-group legend", "paddingLeft", "marginBottom")).to eq([ "0px", rem(0.35) ])
-        expect(styles(".display-group label", "marginBottom", "color")).to eq([ "0px", text_color ])
+        expect(styles(".display-group label", "marginBottom", "color")).to eq([ "0px", computed_color("--text") ])
         expect(styles(".display-hint", "flexBasis", "marginTop")).to eq([ "100%", "0px" ])
       end
 

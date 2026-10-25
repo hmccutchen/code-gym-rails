@@ -36,8 +36,8 @@ reads.
 The lock is a `.switch-row` with a `.switch` checkbox, the same switch the
 rest of the page uses. It is disabled while the kind is skipped or follows the
 default (`level.nil?`), because there is nothing to hold in either case.
-`phone_cards.css` dims the row (`.switch-row:has(.switch:disabled)`), so the
-partial adds only a margin above it.
+`phone_cards.css` mutes the row's text (`.switch-row:has(.switch:disabled)`);
+the switch alone dims. The partial adds only a margin above it.
 
 ## Accessible names
 

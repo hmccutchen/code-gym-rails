@@ -42,6 +42,16 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     JS
     expect(heights).not_to be_empty
     expect(heights).to all(be >= 44)
+
+    gaps = page.evaluate_script(<<~JS)
+      [...document.querySelectorAll("#display-preferences .display-group label")].map((label) => {
+        const range = document.createRange();
+        range.selectNodeContents(label.querySelector("input").nextSibling);
+        return range.getBoundingClientRect().left - label.querySelector("input").getBoundingClientRect().right;
+      })
+    JS
+    rem = page.evaluate_script("parseFloat(getComputedStyle(document.documentElement).fontSize)")
+    expect(gaps).to all(be <= 0.4 * rem + 1)
   end
 
   it "removes the pattern immediately and can restore it from an initially off page" do

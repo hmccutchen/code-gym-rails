@@ -32,7 +32,7 @@ onto `.card` took `form-field` off them, so each rule is now
 `:is(.form-field, .settings-fields) ...`, and both disclosures carry
 `settings-fields`. `:is()` takes its argument's highest specificity, which
 equals the old class selector's, so every rule keeps the specificity it had.
-Four things are excluded from the label and input rules:
+Three things are excluded from the label and input rules:
 
 - The switch row and the switch, each in a `:not(:where(...))` that adds no
   specificity, so the level suggestions switch is not styled as a field label
@@ -65,8 +65,9 @@ guide's spacing. The rule lives in the layout's style, beside the
 `details.kind-about` rules, and not in this page's style: the trial note and
 the key guide carry `.hint` and are separate partials, only one of which
 renders at a time, and the own-styles guard refuses a class the page's own
-markup lacks. A copy in each partial would repeat the rule. Every other note takes its look from `.card-note`
-and sets only its spacing, so two rules no longer give the same muted text.
+markup lacks. A copy in each partial would repeat the rule. Every other note takes its look
+from `.card-note` and sets only its spacing, so two rules no longer give the
+same muted text.
 
 A `.mix-group` is a fieldset with no box. Boxes inside a card made every kind
 look like a card of its own, with three borders and two paddings between the
@@ -131,9 +132,9 @@ a minimum height. The rules sit with the markup that needs them:
 - Display's option labels are 44px, in `api_keys/_display_preferences`.
 - The Daily sections labels are `.segment`s, which carry their own 44px height.
 
-48px is the size the other cards use for a row. The spec chose 44px for the
-slider and the About summary, so they stay shorter than a switch row; 44px is
-still above the WCAG 2.5.8 minimum of 24px.
+48px is the size the other cards use for a row. The About summary and the
+slider are secondary controls, so they stay at 44px, shorter than a switch
+row; 44px is still above the WCAG 2.5.8 minimum of 24px.
 
 ## Daily and single-kind groups
 

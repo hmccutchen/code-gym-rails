@@ -42,7 +42,17 @@ RSpec.describe "Exercise mix request bodies", type: :system do
     find("#skill-level", visible: :all).select("Junior", visible: :all)
     settle
 
-    mix = ->(weights, excluded, levels, locked) { { "user" => { "section_kind_weights" => weights, "excluded_section_kinds" => excluded, "section_kind_levels" => levels, "locked_section_kinds" => locked }, "layout" => layout } }
+    mix = lambda do |weights, excluded, levels, locked|
+      {
+        "user" => {
+          "section_kind_weights" => weights,
+          "excluded_section_kinds" => excluded,
+          "section_kind_levels" => levels,
+          "locked_section_kinds" => locked
+        },
+        "layout" => layout
+      }
+    end
     expect(bodies_without_version).to eq([
       mix.({ "challenge" => 0.25 }, [], {}, []),
       mix.({ "challenge" => 0.25 }, %w[challenge], {}, []),
