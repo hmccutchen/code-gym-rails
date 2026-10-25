@@ -645,4 +645,19 @@ RSpec.describe "Exercise mix", type: :system do
     end
     expect(page.evaluate_script('matchMedia("(forced-colors: active)").matches')).to be(false)
   end
+
+  it "gives About summaries 44px in Exercise mix" do
+    open_mix_at(390)
+    heights = page.evaluate_script(<<~JS)
+      [...document.querySelectorAll("#exercise-mix .kind-about > summary")].map((s) => s.getBoundingClientRect().height)
+    JS
+    expect(heights).not_to be_empty
+    expect(heights).to all(be >= 44)
+  end
+
+  it "leaves the answer form's About summaries at the layout's height" do
+    visit_with_todays_set(user)
+    min_height = page.evaluate_script('getComputedStyle(document.querySelector(".kind-about > summary")).minHeight')
+    expect(min_height).to eq("24px")
+  end
 end

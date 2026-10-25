@@ -35,6 +35,15 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     user.reload.display_preferences
   end
 
+  it "gives every Display label 44px" do
+    open_display
+    heights = page.evaluate_script(<<~JS)
+      [...document.querySelectorAll("#display-preferences .display-group label")].map((l) => l.getBoundingClientRect().height)
+    JS
+    expect(heights).not_to be_empty
+    expect(heights).to all(be >= 44)
+  end
+
   it "removes the pattern immediately and can restore it from an initially off page" do
     open_display
     expect(page).to have_css("#background-pattern", visible: :all)

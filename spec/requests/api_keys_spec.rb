@@ -279,6 +279,22 @@ RSpec.describe "ApiKeys", type: :request do
       expect(first_cards.first.at_css(".key-guide")).to be_present
     end
 
+    it "keeps hint only inside the guides" do
+      login_as(user)
+      get setup_path
+      page = Nokogiri::HTML(response.body)
+      expect(page.css(".hint")).to be_present
+      expect(page.css(".hint").map { |hint| hint.ancestors(".mix-note").any? }).to all(be(true))
+      expect(page.css("#display-preferences .hint")).to be_empty
+      expect(page.css("#exercise-mix .hint")).to be_empty
+    end
+
+    it "draws the explanations as notes without the accent border" do
+      login_as(user)
+      get setup_path
+      expect(Nokogiri::HTML(response.body).css("#exercise-mix .mix-note")).to be_empty
+    end
+
     it "puts the trial note inside Connection while a trial runs" do
       login_as(create_trial_user)
       get setup_path
