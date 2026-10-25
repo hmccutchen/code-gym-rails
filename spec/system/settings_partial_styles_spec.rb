@@ -1,10 +1,6 @@
 require "rails_helper"
 
 RSpec.describe "Settings partials' styles", type: :system do
-  def resize(width)
-    page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: width, height: 844) }
-  end
-
   def styles(selector, *properties)
     page.evaluate_script(<<~JS)
       (() => {

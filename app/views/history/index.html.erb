@@ -38,7 +38,7 @@
   <h1><%= t("history.index.title") %></h1>
   <p class="count"><%= t("history.index.count", count: @pagy.count) %></p>
   <% if @pagy.last > 1 %>
-    <p class="history-rail-page"><%= t("history.index.page", page: @pagy.page, last: @pagy.last) %></p>
+    <p class="history-rail-page" aria-hidden="true"><%= t("history.index.page", page: @pagy.page, last: @pagy.last) %></p>
   <% end %>
 </div>
 

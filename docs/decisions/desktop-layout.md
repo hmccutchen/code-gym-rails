@@ -21,10 +21,12 @@ layout a touch layout too, and so is the next rule.
 
 ## Touch targets stay 44px at every width
 
-Every target is at least 44px tall on a desktop too, and nothing relaxes that
-under `(pointer: fine)`. An iPad in standalone mode is a desktop-width touch
-device, and a pointer query can't be trusted to tell it apart from a laptop
-with a touch screen.
+Every target on a page is at least 44px tall on a desktop too, and nothing
+relaxes that under `(pointer: fine)`. An iPad in standalone mode is a
+desktop-width touch device, and a pointer query can't be trusted to tell it
+apart from a laptop with a touch screen. The top nav is the one exception
+today: its links are 34px tall above the width where it collapses, which
+predates this layout and is #550.
 
 ## The desktop column is per page
 
@@ -35,20 +37,27 @@ concept pages, none of which have a desktop layout. The column is 1040px of
 content plus the container's own gutters, so it keeps clear of a notch in
 landscape. It is built from `--container-pad-left` and `--container-pad-right`
 rather than a copy of their values, and `container_gutter_spec` holds that.
-`wide_pages_spec` lists the pages that are not wide, so a page can't widen by
-accident.
+`container_class` gives the plain class unless a view calls `wide_page`, and
+that default is the guard; `wide_pages_spec` also checks that the main pages
+not yet moved stay plain. The nav keeps its own 1200px cap, so it does not
+line up with the 1040px column yet (#551).
 
 The `100vw` break-out was rejected: `100vw` includes a classic scrollbar's
 width, so it scrolls the page sideways on Windows and Linux.
 
 ## `desktop.css` holds only 900px rules
 
-Every rule in `desktop.css` sits inside one `@media (min-width: 900px)` block,
-so it can't change the phone layout, and `desktop_stylesheet_spec` fails on a
-rule outside it. Its rules are scoped to a page class (`.history-page`) or the
-wide container. The file loads after `phone_cards.css`, so it wins a tie with
-a phone card rule. A view's own `<style>` block renders in the body, after it,
-so a desktop rule that overrides a view's rule needs a more specific selector.
+Everything in `desktop.css` sits inside one `@media (min-width: 900px)` block,
+so it can't change the phone layout, and `desktop_stylesheet_spec` fails on
+anything outside it, an at-rule like `@font-face` included. Its rules are
+scoped to a page class (`.history-page`) or the wide container. The file loads
+after `phone_cards.css`, so it wins a tie with a phone card rule. A view's own
+`<style>` block renders in the body, after it, so a desktop rule that overrides
+a view's rule needs a more specific selector. History, Progress and Learn have
+no such block or a small one; Account, Settings and Today have several, so
+their PRs either prefix each desktop rule with the page class or move their
+900px rules into the view itself. That choice is open and gets made on the
+Account and Settings PR.
 
 ## What the boards had that the app doesn't
 

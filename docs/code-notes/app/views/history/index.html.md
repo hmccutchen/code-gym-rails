@@ -10,7 +10,8 @@ The page calls `wide_page`, so its desktop column is 1040px.
 
 `.history-rail` holds the title, the session count and, when there is more
 than one page, "Page X of Y". That line is hidden below 900px, because the
-pager under the entries already shows it there.
+pager under the entries already shows it there. It is `aria-hidden`, so a
+screen reader hears the page number once, from the pager.
 
 ## Why an entry isn't a `.card`
 

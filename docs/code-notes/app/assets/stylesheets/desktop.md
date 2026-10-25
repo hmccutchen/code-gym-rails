@@ -7,7 +7,9 @@ width and the per-page modifier is in `docs/decisions/desktop-layout.md`.
 
 Nothing in this file may reach a phone, so every rule is inside
 `@media (min-width: 900px)`. `desktop_stylesheet_spec` reads the file with
-`ViewStyles` and fails on a rule under any other condition. The link tag
+`ViewStyles` and fails on a rule under any other condition, and it also fails
+on any text outside the block, since `ViewStyles` skips an at-rule such as
+`@font-face` or `@property` at the top level. The link tag
 carries no `media` attribute, since a spec can't check one, and the file's own
 block is enough.
 

@@ -14,10 +14,6 @@ RSpec.describe "Exercise mix", type: :system do
     user.reload.excluded_section_kinds
   end
 
-  def resize(width, height: 844)
-    page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: width, height: height) }
-  end
-
   def open_mix_at(width)
     visit_as(user)
     visit setup_path

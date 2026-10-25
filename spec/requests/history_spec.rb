@@ -608,6 +608,7 @@ RSpec.describe "History", type: :request do
       get history_path
 
       expect(page_html.at_css(".history-rail .history-rail-page").text).to eq("Page 1 of 2")
+      expect(page_html.at_css(".history-rail .history-rail-page")["aria-hidden"]).to eq("true")
       expect(page_html.at_css(".history-entries > nav.pagination").text).to include("Page 1 of 2")
     end
 
