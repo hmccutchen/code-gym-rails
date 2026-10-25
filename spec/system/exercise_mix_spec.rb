@@ -591,14 +591,21 @@ RSpec.describe "Exercise mix", type: :system do
   it "gives the slider a 44px input, a 6px track and a 28px thumb" do
     open_mix_at(390)
 
+    # Chromium reports the input's own size for ::-webkit pseudo-elements, so read the declared rules
     styles = page.evaluate_script(<<~JS)
       (() => {
         const el = document.querySelector("#weight-challenge");
         const css = getComputedStyle(el);
+        const rules = (list) => Array.from(list).flatMap((rule) => [rule, ...(rule.cssRules ? rules(rule.cssRules) : [])]);
+        const all = Array.from(document.styleSheets).flatMap((sheet) => { try { return rules(sheet.cssRules); } catch (e) { return []; } });
+        const declared = (pseudo) => all.find((rule) => (rule.selectorText || "").includes('.card input[type="range"]::' + pseudo));
+        const track = declared("-webkit-slider-runnable-track");
+        const thumb = declared("-webkit-slider-thumb");
         return {
           height: el.getBoundingClientRect().height,
-          track: parseFloat(getComputedStyle(el, "::-webkit-slider-runnable-track").height),
-          thumb: parseFloat(getComputedStyle(el, "::-webkit-slider-thumb").width),
+          track: track && track.style.height,
+          trackBackground: track && track.style.background,
+          thumb: thumb && thumb.style.width,
           paddingLeft: css.paddingLeft,
           borderStyle: css.borderStyle
         };
@@ -606,8 +613,9 @@ RSpec.describe "Exercise mix", type: :system do
     JS
 
     expect(styles["height"]).to be >= 44
-    expect(styles["track"]).to be >= 6
-    expect(styles["thumb"]).to be >= 28
+    expect(styles["track"]).to eq("6px")
+    expect(styles["trackBackground"]).to include("var(--muted)")
+    expect(styles["thumb"]).to eq("28px")
     expect(styles["paddingLeft"]).to eq("0px")
     expect(styles["borderStyle"]).to eq("none")
   end
