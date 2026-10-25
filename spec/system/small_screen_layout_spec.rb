@@ -2,29 +2,6 @@ require "rails_helper"
 
 # Reflow (WCAG 1.4.10) and target size only show up in a real layout.
 RSpec.describe "Small screen layout", type: :system do
-  def resize(width, height: 844)
-    page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: width, height: height) }
-  end
-
-  def page_width
-    page.evaluate_script("document.documentElement.scrollWidth")
-  end
-
-  LARGEST = { "text_size" => "140", "line_spacing" => "loose", "font" => "atkinson" }.freeze
-
-  # The WCAG 1.4.12 text-spacing override, the harshest case these pages meet.
-  def apply_text_spacing
-    page.execute_script(<<~JS)
-      const style = document.createElement("style");
-      style.textContent = "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }";
-      document.head.appendChild(style);
-    JS
-  end
-
-  def open_every_disclosure
-    page.execute_script("document.querySelectorAll('details').forEach(d => { d.open = true; })")
-  end
-
   def reviewed_day_for(user)
     GenerateDailyExercisesJob.perform_now(user_id: user.id)
     exercise = DailyExercise.find_by!(user: user, date: Date.current)
@@ -37,12 +14,6 @@ RSpec.describe "Small screen layout", type: :system do
 
   def heights(selector)
     page.evaluate_script("Array.from(document.querySelectorAll(#{selector.to_json})).map(el => el.getBoundingClientRect().height)")
-  end
-
-  def set_safe_area(left:, right:)
-    page.driver.with_playwright_page do |pw|
-      pw.context.new_cdp_session(pw).send_message("Emulation.setSafeAreaInsetsOverride", params: { insets: { left: left, right: right } })
-    end
   end
 
   def card_edges(count:)
@@ -142,7 +113,7 @@ RSpec.describe "Small screen layout", type: :system do
   it "keeps the review's follow-up field inside the page at 320px with the largest text" do
     travel_to(a_weekday) do
       user = create_fake_provider_user
-      user.update!(display_preferences: LARGEST)
+      user.update!(display_preferences: LayoutHelpers::LARGEST_TEXT)
       reviewed_day_for(user)
       resize(320)
       visit_as(user)
@@ -152,7 +123,7 @@ RSpec.describe "Small screen layout", type: :system do
     end
   end
 
-  [ [ 390, {} ], [ 320, LARGEST ] ].each do |width, prefs|
+  [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
     it "keeps History inside a #{width}px screen#{' with the largest text' if prefs.any?} when a question, review or answer holds a long path" do
       travel_to(a_weekday) do
         user = create_fake_provider_user
@@ -193,7 +164,7 @@ RSpec.describe "Small screen layout", type: :system do
   it "keeps the duck's field inside the page at 320px with the largest text" do
     travel_to(a_weekday) do
       user = create_fake_provider_user
-      user.update!(display_preferences: LARGEST)
+      user.update!(display_preferences: LayoutHelpers::LARGEST_TEXT)
       resize(320)
       visit_with_todays_set(user)
       find(".duck-toggle", match: :first).click
@@ -213,7 +184,7 @@ RSpec.describe "Small screen layout", type: :system do
   end
 
   # A field sharing a row with its buttons must wrap them below rather than shrink to a sliver.
-  [ [ 390, {} ], [ 320, LARGEST ] ].each do |width, prefs|
+  [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
     it "keeps the duck's field wide enough to read at #{width}px#{' with the largest text' if prefs.any?}" do
       travel_to(a_weekday) do
         user = create_fake_provider_user
@@ -245,7 +216,7 @@ RSpec.describe "Small screen layout", type: :system do
 
   it "wraps a long email on Account at 320px with the largest text and the spacing override" do
     user = create_fake_provider_user
-    user.update!(email: "averyverylongengineeringaddress@example.com", display_preferences: LARGEST)
+    user.update!(email: "averyverylongengineeringaddress@example.com", display_preferences: LayoutHelpers::LARGEST_TEXT)
     resize(320)
     visit_as(user)
     visit account_path
@@ -257,7 +228,7 @@ RSpec.describe "Small screen layout", type: :system do
 
   it "fits the usage card at 320px with the largest text, with every provider row at least 48px" do
     user = create_fake_provider_user
-    user.update!(display_preferences: LARGEST)
+    user.update!(display_preferences: LayoutHelpers::LARGEST_TEXT)
     { "anthropic" => "1234.56", "gemini" => nil }.each do |provider, cost|
       ApiUsage.create!(user: user, purpose: "review_response", date: Date.current, created_at: Time.current,
                        provider: provider, cost_usd: cost, tokens_in: 0, tokens_out: 0)
@@ -275,7 +246,7 @@ RSpec.describe "Small screen layout", type: :system do
 
   it "fits the authenticator setup, recovery code and second sign-in pages at 320px with the largest text" do
     user = create_fake_provider_user
-    user.update!(display_preferences: LARGEST)
+    user.update!(display_preferences: LayoutHelpers::LARGEST_TEXT)
     resize(320)
     visit_as(user)
 
@@ -301,7 +272,7 @@ RSpec.describe "Small screen layout", type: :system do
 
   it "wraps Progress rows at 320px with the largest text and the spacing override" do
     user = create_fake_provider_user
-    user.update!(display_preferences: LARGEST)
+    user.update!(display_preferences: LayoutHelpers::LARGEST_TEXT)
     resize(320)
     visit_as(user)
     visit progress_path
@@ -383,7 +354,7 @@ RSpec.describe "Small screen layout", type: :system do
       wait_for_js
     end
 
-    [ [ 390, {} ], [ 320, LARGEST ] ].each do |width, prefs|
+    [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
       it "lays Account out in 16px-margined cards with 48px buttons at #{width}px#{' with the largest text' if prefs.any?}" do
         user.update!(display_preferences: prefs)
         resize(width)
@@ -571,7 +542,7 @@ RSpec.describe "Small screen layout", type: :system do
       end
     end
 
-    [ [ 390, {} ], [ 320, LARGEST ] ].each do |width, prefs|
+    [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
       describe "at #{width}px#{' with the largest text' if prefs.any?}" do
         it "lays Settings' first two cards out" do
           user = create_fake_provider_user
@@ -757,7 +728,7 @@ RSpec.describe "Small screen layout", type: :system do
     it "never clips a long value at 320px with the largest text and the spacing override" do
       [ "America/Phoenix", nil ].each do |zone|
         user = create_fake_provider_user(time_zone: zone)
-        user.update!(language: "javascript", skill_level: "principal_engineer", display_preferences: LARGEST)
+        user.update!(language: "javascript", skill_level: "principal_engineer", display_preferences: LayoutHelpers::LARGEST_TEXT)
         resize(320)
         visit_settings_open(user)
         apply_text_spacing

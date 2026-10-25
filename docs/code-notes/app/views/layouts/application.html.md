@@ -116,6 +116,14 @@ and this rule sets them again rather than the padding. `phone_cards.css`
 subtracts the same properties to put a card page's edge where it wants, so a
 change to them moves it too.
 
+## The page container's class
+
+The page's `.container` takes its class from `container_class`
+(`ApplicationHelper`). A view that calls `wide_page` gets
+`container container-wide`, and `desktop.css` widens that one to 1040px of
+content at 900px and wider. Every other page, and the nav's own `.container`,
+keep the plain class (`docs/decisions/desktop-layout.md`).
+
 ## `nav .inner`
 
 It is wider than the page column, so on a desktop the brand sits apart from the

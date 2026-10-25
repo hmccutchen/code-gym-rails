@@ -479,6 +479,7 @@
     }
   </style>
   <%= stylesheet_link_tag "phone_cards" %>
+  <%= stylesheet_link_tag "desktop" %>
   <% if display_stylesheets? %>
     <%= stylesheet_link_tag "display" %>
     <%= stylesheet_link_tag "display_light", media: display_preferences.light_palette_media, data: { light_palette_media: true } %>
@@ -529,7 +530,7 @@
   </nav>
   <% end %>
 
-  <div class="container" data-pull-content>
+  <div class="<%= container_class %>" data-pull-content>
     <main id="main-content" tabindex="-1">
     <% if flash[:notice] %>
       <div class="flash notice" id="flash-notice"><%= flash[:notice] %></div>
