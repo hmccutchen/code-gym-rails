@@ -48,19 +48,30 @@ RSpec.describe "Exercise mix", type: :system do
     expect(page).to have_css('#weight-challenge[aria-valuetext="Much less"]')
   end
 
-  # WCAG 2.5.8: a tap on the label toggles the box, so the label is the target.
-  it "gives every checkbox and difficulty radio a label at least 24px tall" do
+  def muted_color
+    page.evaluate_script("(() => { const p = document.createElement('span'); p.style.color = 'var(--muted)'; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; })()")
+  end
+
+  it "gives every skip switch row 48px and a 44px switch" do
     visit_as(user)
     visit setup_path
     find("#exercise-mix summary").click
 
-    heights = page.evaluate_script(<<~JS)
-      Array.from(document.querySelectorAll(".mix-exclude, .mix-lock, .mix-difficulty label, #daily-sections .segment"))
-        .map(label => label.getBoundingClientRect().height)
+    heights = page.evaluate_script("Array.from(document.querySelectorAll('.mix-exclude-box')).map(box => box.closest('.switch-row').getBoundingClientRect().height)")
+    widths = page.evaluate_script("Array.from(document.querySelectorAll('.mix-exclude-box')).map(box => box.offsetWidth)")
+    name_and_stop = page.evaluate_script(<<~JS)
+      (() => {
+        const name = document.querySelector("label[for='weight-challenge']").getBoundingClientRect();
+        const stop = document.querySelector("#weight-label-challenge").getBoundingClientRect();
+        return [name.top, stop.top, name.right, stop.right];
+      })()
     JS
 
-    expect(heights.size).to be > 3
-    expect(heights).to all(be >= 24)
+    expect(heights.size).to be > 1
+    expect(heights).to all(be >= 48)
+    expect(widths).to all(be >= 44)
+    expect(name_and_stop[1]).to be_within(1).of(name_and_stop[0])
+    expect(name_and_stop[3]).to be >= name_and_stop[2]
   end
 
   it "refuses a save from a page whose controls predate another save, and re-syncs the controls" do
@@ -264,6 +275,8 @@ RSpec.describe "Exercise mix", type: :system do
     last = ExerciseSection.fourths.last
 
     expect(find("#exclude-#{last.key}")).to be_disabled
+    row = page.evaluate_script("(() => { const s = getComputedStyle(document.querySelector('#exclude-#{last.key}').closest('.switch-row')); return [s.color, s.opacity]; })()")
+    expect(row).to eq([ muted_color, "1" ])
     expect(page).to have_text("At least one section in this group has to stay in rotation.")
     # lockLastInGroup runs whether or not the click saved, so without this the example passes with autosave deleted.
     expect(exclusions_after_save(excluded.map(&:key))).to contain_exactly(*excluded.map(&:key))

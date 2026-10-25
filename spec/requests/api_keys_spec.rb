@@ -374,6 +374,39 @@ RSpec.describe "ApiKeys", type: :request do
       expect(response.body).not_to include(%(id="exclude-code_review"))
     end
 
+    it "renders the skip control as a switch named for its kind" do
+      get setup_path
+
+      page = Nokogiri::HTML(response.body)
+      box = page.at_css("#exclude-challenge")
+      expect(box["role"]).to eq("switch")
+      expect(box["class"].split).to include("switch", "mix-exclude-box")
+      expect(box["data-action"]).to eq("change->exercise-mix#toggleExclude")
+      expect(box["aria-labelledby"]).to eq("mix-name-challenge exclude-text-challenge")
+      expect(page.at_css("#mix-name-challenge").text.strip).to eq(I18n.t("sections.challenge.name"))
+      expect(page.at_css("#exclude-text-challenge").text.strip).to eq("Skip this kind")
+    end
+
+    it "names the skip control differently for every kind" do
+      get setup_path
+
+      page = Nokogiri::HTML(response.body)
+      names = page.css(".mix-exclude-box").map do |box|
+        box["aria-labelledby"].split.map { |id| page.at_css("##{id}").text.strip }.join(" ")
+      end
+      expect(names.size).to be > 1
+      expect(names.uniq).to eq(names)
+    end
+
+    it "explains skipping in the same word as the switch" do
+      get setup_path
+
+      text = Nokogiri::HTML(response.body).at_css("#exercise-mix").text
+      expect(text).to include("Skipping is a stronger, different action than turning a slider down.", "Skip means never", "Skipping also makes")
+      expect(text).not_to include("Exclude")
+      expect(text).not_to include("Excluding")
+    end
+
     it "carries the difficulty controls' styles once, however many kinds render them" do
       get setup_path
 

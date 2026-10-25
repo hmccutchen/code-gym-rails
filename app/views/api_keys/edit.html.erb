@@ -3,18 +3,19 @@
 <style>
   :where(#exercise-mix, #display-preferences) p:not(.card-note) { color: var(--muted); margin-bottom: 2rem; }
   .form-field { margin-bottom: 1rem; }
-  :is(.form-field, .settings-fields) label:not(:where(.switch-row)) { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
+  :is(.form-field, .settings-fields) label:not(:where(.switch-row, .mix-level)) { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
   :is(.form-field, .settings-fields) input:not([type="checkbox"], [type="radio"]) { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); font-family: monospace; }
   :is(.form-field, .settings-fields) input:not([type="checkbox"], [type="radio"]):focus { border-color: var(--accent); }
-  :is(.form-field, .settings-fields) input:is([type="checkbox"], [type="radio"]):not(:where(.switch)) { width: auto; margin-right: .4rem; vertical-align: middle; }
+  :is(.form-field, .settings-fields) input:is([type="checkbox"], [type="radio"]):not(:where(.switch, .mix-level input)) { width: auto; margin-right: .4rem; vertical-align: middle; }
   .hint { font-size: .8rem; color: var(--muted); margin-top: .4rem; }
   .mix-group { border: 1px solid var(--border); border-radius: 6px; padding: .75rem; margin-bottom: .75rem; }
   .mix-group legend { font-size: .8rem; color: var(--muted); padding: 0 .35rem; }
   .mix-row { display: grid; grid-template-columns: 1fr auto; gap: .25rem .5rem; align-items: center; margin-bottom: .6rem; }
-  .mix-row input[type="range"] { grid-column: 1 / -1; width: 100%; }
-  .mix-row output { font-size: .8rem; color: var(--muted); }
+  .mix-row > label[for^="weight-"] { grid-area: 1 / 1; margin-bottom: 0; }
+  .mix-row > output { grid-area: 1 / 2; text-align: end; font-size: .85rem; color: var(--muted); }
+  .mix-row > input[type="range"] { grid-area: 2 / 1 / 3 / -1; width: 100%; }
+  .mix-row > :is(.switch-row, .mix-difficulty) { grid-column: 1 / -1; }
   .mix-row input[type="range"]:disabled { opacity: .4; }
-  .mix-exclude { font-size: .8rem; color: var(--muted); min-height: 24px; }
   .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
 </style>
 
@@ -182,16 +183,17 @@
             excluded = current_user.excluded_section_kinds.include?(kind.key)
           %>
           <div class="mix-row" data-kind="<%= kind.key %>" data-exercise-mix-target="row">
-            <label for="weight-<%= kind.key %>"><%= t("sections.#{kind.key}.name") %></label>
+            <label id="mix-name-<%= kind.key %>" for="weight-<%= kind.key %>"><%= t("sections.#{kind.key}.name") %></label>
             <input type="range" id="weight-<%= kind.key %>" min="0" max="<%= KindPreferences::MULTIPLIERS.size - 1 %>" step="1"
                    value="<%= index %>" <%= "disabled" if excluded %>
                    aria-valuetext="<%= t("exercise_mix.stops")[index] %>"
                    data-action="input->exercise-mix#slide">
             <output id="weight-label-<%= kind.key %>"><%= t("exercise_mix.stops")[index] %></output>
-            <label class="mix-exclude" for="exclude-<%= kind.key %>">
-              <input type="checkbox" id="exclude-<%= kind.key %>" class="mix-exclude-box" <%= "checked" if excluded %>
+            <label class="switch-row" for="exclude-<%= kind.key %>">
+              <span id="exclude-text-<%= kind.key %>"><%= t("exercise_mix.exclude_label") %></span>
+              <input type="checkbox" id="exclude-<%= kind.key %>" class="switch mix-exclude-box" role="switch"
+                     aria-labelledby="mix-name-<%= kind.key %> exclude-text-<%= kind.key %>" <%= "checked" if excluded %>
                      data-action="change->exercise-mix#toggleExclude">
-              <%= t("exercise_mix.exclude_label") %>
             </label>
             <%= render "api_keys/difficulty_controls", kind: kind, excluded: excluded %>
             <%= render "responses/kind_about", key: kind.key %>

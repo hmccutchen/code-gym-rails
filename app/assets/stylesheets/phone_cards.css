@@ -23,6 +23,7 @@
 .switch:checked { background: var(--accent); }
 .switch:checked::before { transform: translateX(18px); }
 .switch:disabled { opacity: .4; cursor: not-allowed; }
+.switch-row:has(.switch:disabled) { color: var(--muted); cursor: not-allowed; }
 .switch:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 @media (prefers-reduced-motion: reduce) {
   .switch::before { transition: none; }
