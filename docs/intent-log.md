@@ -249,3 +249,7 @@ data.*
 ## Sun Oct 25
 
 - PR 4 built task by task, a fresh agent per task and a reviewer after each
+- the Exercise mix note says "turn Skip off" beside the Skip switch `#547`
+  **why:** "turn it back on" read as turning the skip on
+  **I decided:** fix it from main after the Exercise mix PR merged, not inside
+  it; "turn Skip off" over "stop skipping it"
