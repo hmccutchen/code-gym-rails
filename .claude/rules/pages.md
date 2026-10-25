@@ -61,8 +61,9 @@ read it before changing that area.
   code; `palette_contrast_spec` holds both palettes to WCAG AA; the nav
   collapses on one `@container` rule that `mobile_nav_menu_spec` guards.
 - **Phone card styles**: `phone_cards.css` holds the card, full-width button
-  and switch styles, plus the value row, segmented control, card tag and
-  collapsible card, for the Account and Settings pages; it loads on every
+  and switch styles, plus the value row, segmented control, card tag,
+  collapsible card, the range slider and the disabled switch row, for the
+  Account and Settings pages; it loads on every
   page, so a new rule in it stays scoped to its own class.
 - **Push reminders** (`docs/decisions/push-reminders.md`): Optional weekday
   ready and afternoon nudge notifications. Intent (`User#reminder_level`) and

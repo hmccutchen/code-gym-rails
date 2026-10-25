@@ -91,6 +91,15 @@ RSpec.describe "Focus ring", type: :system do
     expect(outline_of(".value-row")).to eq([ "solid", "2px" ])
   end
 
+  it "rings a difficulty row when its radio has focus" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    tab_to(".mix-level input:not(:disabled)")
+    expect(outline_of(".mix-level")).to eq([ "solid", "2px" ])
+  end
+
   it "rings the focused Daily sections segment" do
     visit_as(user)
     visit setup_path

@@ -73,6 +73,14 @@ RSpec.describe "Phone card pieces", type: :system do
     expect(tops.map(&:last).uniq.size).to eq(1)
   end
 
+  it "mutes a disabled switch's row once" do
+    inject(%(<label class="switch-row">Skip<input type="checkbox" class="switch" disabled></label>))
+    muted = computed_color("--muted")
+    row = find(".switch-row:has(.switch:disabled)")
+    expect(row.evaluate_script("[getComputedStyle(this).opacity, getComputedStyle(this).color]")).to eq([ "1", muted ])
+    expect(find(".switch:disabled").evaluate_script("getComputedStyle(this).opacity")).to eq("0.4")
+  end
+
   it "gives a card's summary 48px" do
     page.execute_script(%(document.querySelector("main .phone-page").insertAdjacentHTML("beforeend", '<details class="card"><summary>Display</summary><p>x</p></details>')))
     expect(page.evaluate_script("document.querySelector('details.card > summary').getBoundingClientRect().height")).to be >= 48

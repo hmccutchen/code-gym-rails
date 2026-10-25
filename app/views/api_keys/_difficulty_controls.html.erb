@@ -2,12 +2,17 @@
 <% unless content_for?(:difficulty_controls_styles) %>
   <% content_for :difficulty_controls_styles, "1" %>
   <style>
-    .mix-lock, .mix-difficulty label { min-height: 24px; }
-    .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; font-size: .8rem; }
-    .mix-difficulty legend { font-size: .8rem; color: var(--muted); padding: 0; }
-    .mix-difficulty label { margin-bottom: 0; }
-    .mix-lock { flex-basis: 100%; color: var(--text); font-weight: 600; }
-    .mix-coverage { flex-basis: 100%; margin-top: 0; }
+    .mix-difficulty { grid-column: 1 / -1; border: 0; padding: 0; margin: .5rem 0 0; min-width: 0; }
+    .mix-difficulty legend { color: var(--muted); font-size: .85rem; margin-bottom: .4rem; padding: 0; }
+    .mix-difficulty .mix-level { display: flex; align-items: center; gap: .75rem; width: 100%; min-height: 48px; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; color: var(--text); font-size: .9rem; }
+    .mix-difficulty .mix-level + .mix-level { margin-top: .25rem; }
+    .mix-difficulty .mix-level input { width: 24px; height: 24px; flex: none; margin: 0; accent-color: var(--button-bg); }
+    .mix-difficulty .mix-level span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .mix-difficulty .mix-level:has(:checked) { border: 2px solid var(--accent); padding: calc(.5rem - 1px) calc(.75rem - 1px); font-weight: 600; }
+    .mix-difficulty .mix-level:has(:focus-visible) { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+    .mix-difficulty .mix-level:has(:disabled) { color: var(--muted); cursor: not-allowed; }
+    .mix-difficulty .switch-row { margin-top: .5rem; }
+    @media (forced-colors: active) { .mix-difficulty .mix-level:has(:checked) { border-color: Highlight; } }
   </style>
   <% if suggested_kinds.any? %>
     <style>.mix-difficulty.mix-suggested { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }</style>
@@ -16,27 +21,28 @@
 <% difficulty = KindDifficulty.for(current_user) %>
 <% level      = difficulty.level_for(kind) %>
 <fieldset class="mix-difficulty<%= " mix-suggested" if suggested_kinds.include?(kind.key) %>" data-kind="<%= kind.key %>"
-          data-exercise-mix-target="difficulty"<%= ' aria-describedby="mix-suggested-note"'.html_safe if suggested_kinds.include?(kind.key) %>>
-  <legend><%= t("exercise_mix.difficulty_legend") %></legend>
-  <label>
+          data-exercise-mix-target="difficulty" aria-labelledby="mix-name-<%= kind.key %> mix-level-legend-<%= kind.key %>"<%= ' aria-describedby="mix-suggested-note"'.html_safe if suggested_kinds.include?(kind.key) %>>
+  <legend id="mix-level-legend-<%= kind.key %>"><%= t("exercise_mix.difficulty_legend") %></legend>
+  <label class="mix-level">
     <input type="radio" name="level-<%= kind.key %>" value="" <%= "checked" if level.nil? %> <%= "disabled" if excluded %>
            data-action="change->exercise-mix#chooseLevel">
     <span data-skill-level-label><%= t("exercise_mix.level_default", skill_level: t("exercise_mix.levels.#{current_user.skill_level}")) %></span>
   </label>
   <% KindDifficulty::LEVELS.each do |option| %>
-    <label>
+    <label class="mix-level">
       <input type="radio" name="level-<%= kind.key %>" value="<%= option %>" <%= "checked" if level == option %> <%= "disabled" if excluded %>
              data-action="change->exercise-mix#chooseLevel">
-      <%= t("exercise_mix.levels.#{option}") %>
+      <span><%= t("exercise_mix.levels.#{option}") %></span>
     </label>
   <% end %>
-  <label class="mix-lock" for="lock-<%= kind.key %>">
-    <input type="checkbox" class="mix-lock-box" id="lock-<%= kind.key %>"
+  <label class="switch-row" for="lock-<%= kind.key %>">
+    <span id="lock-text-<%= kind.key %>"><%= t("exercise_mix.lock_label") %></span>
+    <input type="checkbox" class="switch mix-lock-box" id="lock-<%= kind.key %>" role="switch"
+           aria-labelledby="mix-name-<%= kind.key %> lock-text-<%= kind.key %>"
            <%= "checked" if difficulty.locked?(kind) %> <%= "disabled" if excluded || level.nil? %>
            data-action="change->exercise-mix#toggleLock">
-    <%= t("exercise_mix.lock_label") %>
   </label>
-  <p class="hint mix-coverage" <%= "hidden" if level.nil? %>>
+  <p class="card-note mix-coverage" <%= "hidden" if level.nil? %>>
     <%= ladder_coverage_label(kind) %>
   </p>
 </fieldset>

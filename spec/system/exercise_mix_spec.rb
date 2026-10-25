@@ -14,17 +14,109 @@ RSpec.describe "Exercise mix", type: :system do
     user.reload.excluded_section_kinds
   end
 
-  it "keeps each difficulty radio beside its text with the fieldset gap as the only spacing" do
+  def resize(width, height: 844)
+    page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: width, height: height) }
+  end
+
+  def open_mix_at(width)
     visit_as(user)
     visit setup_path
+    resize(width)
     find("#exercise-mix summary").click
+  end
 
-    radio_widths  = page.evaluate_script("Array.from(document.querySelectorAll('.mix-difficulty input[type=radio]')).map(r => r.offsetWidth)")
-    label_margins = page.evaluate_script("Array.from(document.querySelectorAll('.mix-difficulty label')).map(l => getComputedStyle(l).marginBottom)")
+  def set_forced_colors(value)
+    page.driver.with_playwright_page do |pw|
+      pw.context.new_cdp_session(pw).send_message("Emulation.setEmulatedMedia", params: { features: [ { name: "forced-colors", value: value } ] })
+    end
+  end
 
-    expect(radio_widths).not_to be_empty
-    expect(radio_widths).to all(be_between(1, 30))
-    expect(label_margins).to all(eq("0px"))
+  def level_row(kind, value)
+    "document.querySelector(\"input[name='level-#{kind}'][value='#{value}']\").closest('label')"
+  end
+
+  it "gives each difficulty row 48px, a 24px radio and a 48px lock row" do
+    open_mix_at(390)
+
+    rows = page.evaluate_script("Array.from(document.querySelectorAll('.mix-level')).map(r => r.getBoundingClientRect().height)")
+    radios = page.evaluate_script("Array.from(document.querySelectorAll('.mix-level input')).map(r => [r.offsetWidth, r.offsetHeight])")
+    locks = page.evaluate_script("Array.from(document.querySelectorAll('.mix-lock-box')).map(b => [b.closest('.switch-row').getBoundingClientRect().height, b.offsetWidth])")
+
+    expect(rows).not_to be_empty
+    expect(rows).to all(be >= 48)
+    expect(radios.flatten).to all(be >= 24)
+    expect(locks.map(&:first)).to all(be >= 48)
+    expect(locks.map(&:last)).to all(be >= 44)
+  end
+
+  it "checks a row's radio from a tap at its right edge" do
+    open_mix_at(390)
+
+    x, y = page.evaluate_script(<<~JS)
+      (() => {
+        const row = #{level_row("code_review", "senior")};
+        row.scrollIntoView({ block: "center" });
+        const box = row.getBoundingClientRect();
+        return [box.right - 4, box.top + box.height / 2];
+      })()
+    JS
+    inside = page.evaluate_script("document.elementFromPoint(#{x}, #{y}).closest('label') === #{level_row("code_review", "senior")}")
+    page.driver.with_playwright_page { |pw| pw.mouse.click(x, y) }
+
+    expect(inside).to be(true)
+    expect(page).to have_checked_field("level-code_review", with: "senior", visible: :all)
+    wait_for { user.reload.section_kind_levels["code_review"] == "senior" }
+  end
+
+  it "marks the chosen row by border and weight, not color alone" do
+    open_mix_at(390)
+
+    style = ->(value, property) { page.evaluate_script("getComputedStyle(#{level_row("code_review", value)})[#{property.to_json}]") }
+
+    expect(style.call("", "borderTopWidth")).to eq("2px")
+    expect(style.call("", "fontWeight")).to eq("600")
+    expect(style.call("junior", "borderTopWidth")).to eq("1px")
+    expect(style.call("junior", "fontWeight")).to eq("400")
+  end
+
+  it "wraps a long option label inside its row at 320px with the largest text" do
+    user.update!(display_preferences: { "text_size" => "140" })
+    open_mix_at(320)
+
+    geometry = page.evaluate_script(<<~JS)
+      (() => {
+        const row = #{level_row("code_review", "")}.getBoundingClientRect();
+        const text = #{level_row("code_review", "")}.querySelector("span").getBoundingClientRect();
+        return [row.height, text.right, row.right, document.documentElement.scrollWidth];
+      })()
+    JS
+
+    expect(geometry[0]).to be > 48
+    expect(geometry[1]).to be <= geometry[2]
+    expect(geometry[3]).to eq(320)
+  end
+
+  it "mutes an excluded kind's rows without stacking opacity" do
+    open_mix_at(390)
+    find("#exclude-challenge").click
+    wait_for { user.reload.excluded_section_kinds.include?("challenge") }
+
+    rows = page.evaluate_script("Array.from(document.querySelectorAll(\".mix-difficulty[data-kind='challenge'] .mix-level\")).map(r => [getComputedStyle(r).color, getComputedStyle(r).opacity])")
+    lock = page.evaluate_script("(() => { const box = document.querySelector('#lock-challenge'); return [getComputedStyle(box.closest('.switch-row')).color, getComputedStyle(box).opacity]; })()")
+
+    expect(rows).not_to be_empty
+    expect(rows.map(&:first)).to all(eq(computed_color("--muted")))
+    expect(rows.map(&:last)).to all(eq("1"))
+    expect(lock).to eq([ computed_color("--muted"), "0.4" ])
+  end
+
+  it "moves the checked level with the arrow keys and saves it" do
+    open_mix_at(390)
+    page.execute_script("document.querySelector(\"input[name='level-code_review'][value='']\").focus()")
+    page.driver.with_playwright_page { |pw| pw.keyboard.press("ArrowDown") }
+
+    expect(page).to have_checked_field("level-code_review", with: "junior", visible: :all)
+    wait_for { user.reload.section_kind_levels["code_review"] == "junior" }
   end
 
   it "saves a slider's stop and shows its label" do
@@ -48,19 +140,26 @@ RSpec.describe "Exercise mix", type: :system do
     expect(page).to have_css('#weight-challenge[aria-valuetext="Much less"]')
   end
 
-  # WCAG 2.5.8: a tap on the label toggles the box, so the label is the target.
-  it "gives every checkbox and difficulty radio a label at least 24px tall" do
+  it "gives every skip switch row 48px and a 44px switch" do
     visit_as(user)
     visit setup_path
     find("#exercise-mix summary").click
 
-    heights = page.evaluate_script(<<~JS)
-      Array.from(document.querySelectorAll(".mix-exclude, .mix-lock, .mix-difficulty label, #daily-sections .segment"))
-        .map(label => label.getBoundingClientRect().height)
+    heights = page.evaluate_script("Array.from(document.querySelectorAll('.mix-exclude-box')).map(box => box.closest('.switch-row').getBoundingClientRect().height)")
+    widths = page.evaluate_script("Array.from(document.querySelectorAll('.mix-exclude-box')).map(box => box.offsetWidth)")
+    name_and_stop = page.evaluate_script(<<~JS)
+      (() => {
+        const name = document.querySelector("label[for='weight-challenge']").getBoundingClientRect();
+        const stop = document.querySelector("#weight-label-challenge").getBoundingClientRect();
+        return [name.top, stop.top, name.right, stop.right];
+      })()
     JS
 
-    expect(heights.size).to be > 3
-    expect(heights).to all(be >= 24)
+    expect(heights.size).to be > 1
+    expect(heights).to all(be >= 48)
+    expect(widths).to all(be >= 44)
+    expect(name_and_stop[1]).to be_within(1).of(name_and_stop[0])
+    expect(name_and_stop[3]).to be >= name_and_stop[2]
   end
 
   it "refuses a save from a page whose controls predate another save, and re-syncs the controls" do
@@ -264,6 +363,8 @@ RSpec.describe "Exercise mix", type: :system do
     last = ExerciseSection.fourths.last
 
     expect(find("#exclude-#{last.key}")).to be_disabled
+    row = page.evaluate_script("(() => { const s = getComputedStyle(document.querySelector('#exclude-#{last.key}').closest('.switch-row')); return [s.color, s.opacity]; })()")
+    expect(row).to eq([ computed_color("--muted"), "1" ])
     expect(page).to have_text("At least one section in this group has to stay in rotation.")
     # lockLastInGroup runs whether or not the click saved, so without this the example passes with autosave deleted.
     expect(exclusions_after_save(excluded.map(&:key))).to contain_exactly(*excluded.map(&:key))
@@ -281,6 +382,7 @@ RSpec.describe "Exercise mix", type: :system do
 
     within(".mix-difficulty[data-kind='code_review']") do
       expect(page).to have_field("level-code_review", type: "radio", count: KindDifficulty::LEVELS.size + 1)
+      expect(page).to have_css("label.mix-level", count: KindDifficulty::LEVELS.size + 1)
     end
     expect(page).not_to have_css("#weight-code_review")
     expect(page).not_to have_css("#exclude-code_review")
@@ -484,5 +586,94 @@ RSpec.describe "Exercise mix", type: :system do
     expect(page.evaluate_script("window.mixResponses.length")).to eq(3)
     expect(user.reload.locked_section_kinds).to eq([ "code_review" ])
     expect(user.section_kind_weights).to eq("challenge" => 0.25)
+  end
+
+  it "gives the slider a 44px input, a 6px track and a 28px thumb" do
+    open_mix_at(390)
+
+    # Chromium reports the input's own size for ::-webkit pseudo-elements and drops ::-moz rules, so read the declared rules and the sheet text
+    styles = page.evaluate_script(<<~JS)
+      (() => {
+        const el = document.querySelector("#weight-challenge");
+        const css = getComputedStyle(el);
+        const rules = (list) => Array.from(list).flatMap((rule) => [rule, ...(rule.cssRules ? rules(rule.cssRules) : [])]);
+        const all = Array.from(document.styleSheets).flatMap((sheet) => { try { return rules(sheet.cssRules); } catch (e) { return []; } });
+        const declared = (pseudo) => all.find((rule) => (rule.selectorText || "").includes('.card input[type="range"]::' + pseudo));
+        const sheetText = Array.from(document.styleSheets).filter((sheet) => (sheet.href || "").includes("phone_cards")).map((sheet) => { const xhr = new XMLHttpRequest(); xhr.open("GET", sheet.href, false); xhr.send(); return xhr.responseText; }).join("");
+        const fromSource = (name) => {
+          const start = sheetText.indexOf("::" + name + " {");
+          const declarations = start < 0 ? [] : sheetText.slice(sheetText.indexOf("{", start) + 1, sheetText.indexOf("}", start)).split(";");
+          const read = (prop) => (declarations.map((d) => d.trim().split(": ")).find((pair) => pair[0] === prop) || [])[1];
+          return { height: read("height"), width: read("width"), background: read("background"), border: read("border") };
+        };
+        const pick = (name) => { const rule = declared(name); return rule ? { height: rule.style.height, width: rule.style.width, background: rule.style.background, border: rule.style.border } : {}; };
+        return {
+          height: el.getBoundingClientRect().height,
+          webkitTrack: pick("-webkit-slider-runnable-track"),
+          webkitThumb: pick("-webkit-slider-thumb"),
+          mozTrack: fromSource("-moz-range-track"),
+          mozThumb: fromSource("-moz-range-thumb"),
+          paddingLeft: css.paddingLeft,
+          borderStyle: css.borderStyle
+        };
+      })()
+    JS
+
+    expect(styles["height"]).to be >= 44
+    %w[webkitTrack mozTrack].each do |track|
+      expect(styles[track]["height"]).to eq("6px")
+      expect(styles[track]["background"]).to include("var(--muted)")
+    end
+    %w[webkitThumb mozThumb].each do |thumb|
+      expect(styles[thumb]["width"]).to eq("28px")
+      expect(styles[thumb]["border"]).to include("var(--surface)")
+    end
+    expect(styles["paddingLeft"]).to eq("0px")
+    expect(styles["borderStyle"]).to eq("none")
+  end
+
+  it "falls back to the native slider in forced colors" do
+    open_mix_at(390)
+    set_forced_colors("active")
+
+    begin
+      expect(page.evaluate_script('matchMedia("(forced-colors: active)").matches')).to be(true)
+      result = page.evaluate_script(<<~JS)
+        (() => {
+          const probe = document.createElement("div");
+          probe.style.cssText = "border: 2px solid Highlight";
+          document.body.appendChild(probe);
+          const highlight = getComputedStyle(probe).borderTopColor;
+          probe.remove();
+          const checked = document.querySelector(".mix-level:has(input:checked)");
+          return {
+            appearance: getComputedStyle(document.querySelector("#weight-challenge")).appearance,
+            checked: getComputedStyle(checked).borderTopColor,
+            highlight: highlight
+          };
+        })()
+      JS
+
+      expect(result["appearance"]).to eq("auto")
+      expect(result["checked"]).to eq(result["highlight"])
+    ensure
+      set_forced_colors("none")
+    end
+    expect(page.evaluate_script('matchMedia("(forced-colors: active)").matches')).to be(false)
+  end
+
+  it "gives About summaries 44px in Exercise mix" do
+    open_mix_at(390)
+    heights = page.evaluate_script(<<~JS)
+      [...document.querySelectorAll("#exercise-mix .kind-about > summary")].map((s) => s.getBoundingClientRect().height)
+    JS
+    expect(heights).not_to be_empty
+    expect(heights).to all(be >= 44)
+  end
+
+  it "leaves the answer form's About summaries at the layout's height" do
+    visit_with_todays_set(user)
+    min_height = page.evaluate_script('getComputedStyle(document.querySelector(".kind-about > summary")).minHeight')
+    expect(min_height).to eq("24px")
   end
 end

@@ -229,3 +229,14 @@ data.*
 - keep authenticator deletion fields with the authenticator `#542`
 - read the pull-refresh test key from its production owner `#543`
 - speed up Progress's history reads `#544`
+- Exercise mix controls sized for a phone, fourth redesign PR `#545`
+  **why:** the skip and lock boxes and the difficulty radios were desktop-sized
+  inside the new card
+  **I decided:** the switch reads "Skip this kind" and on still means skipped;
+  difficulty stays real radios, one 48px row each, so the controllers don't
+  change; the explanation says Skip too; the request bodies are pinned before
+  and after; the two Settings rules the page can't hold live in the layout
+
+## Sun Oct 25
+
+- PR 4 built task by task, a fresh agent per task and a reviewer after each

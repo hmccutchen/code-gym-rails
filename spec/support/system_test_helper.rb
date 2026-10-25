@@ -183,6 +183,19 @@ module FetchStubHelper
   end
 end
 
+module ComputedColorHelper
+  def computed_color(variable)
+    page.evaluate_script(<<~JS)
+      (() => {
+        const probe = document.body.appendChild(Object.assign(document.createElement("span"), { style: "color: var(#{variable})" }));
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+      })()
+    JS
+  end
+end
+
 module PollingHelper
   def wait_for(timeout = Capybara.default_max_wait_time)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
@@ -209,5 +222,6 @@ RSpec.configure do |config|
   config.include TodaysSetHelper, type: :system
   config.include JavascriptReadyHelper, type: :system
   config.include PollingHelper, type: :system
+  config.include ComputedColorHelper, type: :system
   config.include FetchStubHelper, type: :system
 end

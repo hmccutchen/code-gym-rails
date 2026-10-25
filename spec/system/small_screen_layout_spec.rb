@@ -527,6 +527,22 @@ RSpec.describe "Small screen layout", type: :system do
       JS
     end
 
+    def mix_control_facts
+      page.evaluate_script(<<~JS)
+        (() => {
+          const card = document.getElementById("exercise-mix");
+          const style = getComputedStyle(card);
+          const contentRight = card.getBoundingClientRect().left + card.clientLeft + card.clientWidth - parseFloat(style.paddingRight);
+          const controls = Array.from(card.querySelectorAll(".mix-level, .switch-row, input[type=range], .kind-about > summary, .mix-difficulty")).filter(el => el.checkVisibility());
+          return {
+            count: controls.length,
+            levels: Array.from(card.querySelectorAll(".mix-level")).filter(el => el.checkVisibility()).map(el => el.getBoundingClientRect().height),
+            past_edge: controls.filter(el => el.getBoundingClientRect().right > contentRight + 0.5).map(el => el.outerHTML.slice(0, 80))
+          };
+        })()
+      JS
+    end
+
     def heading_and_tag
       page.evaluate_script(<<~JS)
         (() => {
@@ -596,6 +612,35 @@ RSpec.describe "Small screen layout", type: :system do
           JS
           expect(status).to eq([ 0, "0px", "0px" ])
           expect(hint_margin).to be_within(0.5).of(rem(0.75))
+        end
+
+        it "keeps every Exercise mix control inside its card with the mix and every About open" do
+          user = create_fake_provider_user
+          user.update!(display_preferences: prefs)
+          resize(width)
+          visit_settings_open(user)
+          apply_text_spacing if prefs.any?
+
+          facts = mix_control_facts
+          expect(page_width).to eq(width)
+          expect(facts["count"]).to be > 0
+          expect(facts["levels"]).not_to be_empty
+          expect(facts["levels"]).to all(be >= 48)
+          expect(facts["past_edge"]).to eq([])
+        end
+
+        it "keeps the page inside the screen with a suggested kind" do
+          user = create_fake_provider_user
+          user.update!(display_preferences: prefs)
+          resize(width)
+          visit_as(user)
+          visit setup_path(suggested: %w[code_review], suggested_level: "junior")
+          wait_for_js
+          open_every_disclosure
+          apply_text_spacing if prefs.any?
+
+          expect(page).to have_css("#exercise-mix .mix-level", visible: :visible)
+          expect(page_width).to eq(width)
         end
 
         it "keeps the Exercise mix's hidden notes out of the layout" do
