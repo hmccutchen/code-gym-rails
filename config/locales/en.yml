@@ -519,7 +519,7 @@ en:
         shared_concept: "Your two daily sections will no longer look at the same idea from different sides on the same day."
         weight_more: "You set %{kind} to appear more often in Exercise mix. That setting does nothing while %{kind} is a daily section, and applies again if you swap it out."
         weight_less: "You set %{kind} to appear less often in Exercise mix. That setting does nothing while %{kind} is a daily section, and applies again if you swap it out."
-        excluded_incoming: "You skip %{kind} in Exercise mix. As a daily section it will be in every set anyway. Skip applies again if you swap it out."
+        excluded_incoming: "You skip %{kind} in Exercise mix. As a daily section it will be in every set anyway. The setting applies again if you swap it out."
         outgoing_one_fourth: "A set holds only one of %{outgoing} and %{kind}, so after this swap %{outgoing} won't appear at all. Swap it back to see it again."
         outgoing_excluded: "You skip %{outgoing} in Exercise mix, so after this swap it won't appear at all. Swap it back, or turn Skip off for it, to see it."
         outgoing_fixed_two: "Your Daily sections setting is 2, so after this swap %{outgoing} won't appear at all. Swap it back, or raise the setting in Setup, to see it again."
