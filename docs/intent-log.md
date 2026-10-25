@@ -245,6 +245,9 @@ data.*
   difficulty stays real radios, one 48px row each, so the controllers don't
   change; the explanation says Skip too; the request bodies are pinned before
   and after; the two Settings rules the page can't hold live in the layout
+- phone and desktop layouts for all six pages, from the design boards
+  **I decided:** the app wins where a board disagrees; desktop from 900px in a
+  1040px column; 44px targets everywhere; one PR per page, History first
 
 ## Sun Oct 25
 
@@ -253,3 +256,6 @@ data.*
   **why:** "turn it back on" read as turning the skip on
   **I decided:** fix it from main after the Exercise mix PR merged, not inside
   it; "turn Skip off" over "stop skipping it"
+- build the desktop foundation and History from the spec `#549`
+  **I decided:** the spec rides in the PR for review and comes out after the
+  critical review, before the merge
