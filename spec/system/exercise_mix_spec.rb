@@ -591,7 +591,7 @@ RSpec.describe "Exercise mix", type: :system do
   it "gives the slider a 44px input, a 6px track and a 28px thumb" do
     open_mix_at(390)
 
-    # Chromium reports the input's own size for ::-webkit pseudo-elements, so read the declared rules
+    # Chromium reports the input's own size for ::-webkit pseudo-elements and drops ::-moz rules, so read the declared rules and the sheet text
     styles = page.evaluate_script(<<~JS)
       (() => {
         const el = document.querySelector("#weight-challenge");
@@ -599,13 +599,20 @@ RSpec.describe "Exercise mix", type: :system do
         const rules = (list) => Array.from(list).flatMap((rule) => [rule, ...(rule.cssRules ? rules(rule.cssRules) : [])]);
         const all = Array.from(document.styleSheets).flatMap((sheet) => { try { return rules(sheet.cssRules); } catch (e) { return []; } });
         const declared = (pseudo) => all.find((rule) => (rule.selectorText || "").includes('.card input[type="range"]::' + pseudo));
-        const track = declared("-webkit-slider-runnable-track");
-        const thumb = declared("-webkit-slider-thumb");
+        const sheetText = Array.from(document.styleSheets).filter((sheet) => (sheet.href || "").includes("phone_cards")).map((sheet) => { const xhr = new XMLHttpRequest(); xhr.open("GET", sheet.href, false); xhr.send(); return xhr.responseText; }).join("");
+        const fromSource = (name) => {
+          const start = sheetText.indexOf("::" + name + " {");
+          const declarations = start < 0 ? [] : sheetText.slice(sheetText.indexOf("{", start) + 1, sheetText.indexOf("}", start)).split(";");
+          const read = (prop) => (declarations.map((d) => d.trim().split(": ")).find((pair) => pair[0] === prop) || [])[1];
+          return { height: read("height"), width: read("width"), background: read("background"), border: read("border") };
+        };
+        const pick = (name) => { const rule = declared(name); return rule ? { height: rule.style.height, width: rule.style.width, background: rule.style.background, border: rule.style.border } : {}; };
         return {
           height: el.getBoundingClientRect().height,
-          track: track && track.style.height,
-          trackBackground: track && track.style.background,
-          thumb: thumb && thumb.style.width,
+          webkitTrack: pick("-webkit-slider-runnable-track"),
+          webkitThumb: pick("-webkit-slider-thumb"),
+          mozTrack: fromSource("-moz-range-track"),
+          mozThumb: fromSource("-moz-range-thumb"),
           paddingLeft: css.paddingLeft,
           borderStyle: css.borderStyle
         };
@@ -613,9 +620,14 @@ RSpec.describe "Exercise mix", type: :system do
     JS
 
     expect(styles["height"]).to be >= 44
-    expect(styles["track"]).to eq("6px")
-    expect(styles["trackBackground"]).to include("var(--muted)")
-    expect(styles["thumb"]).to eq("28px")
+    %w[webkitTrack mozTrack].each do |track|
+      expect(styles[track]["height"]).to eq("6px")
+      expect(styles[track]["background"]).to include("var(--muted)")
+    end
+    %w[webkitThumb mozThumb].each do |thumb|
+      expect(styles[thumb]["width"]).to eq("28px")
+      expect(styles[thumb]["border"]).to include("var(--surface)")
+    end
     expect(styles["paddingLeft"]).to eq("0px")
     expect(styles["borderStyle"]).to eq("none")
   end
