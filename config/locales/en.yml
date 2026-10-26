@@ -458,6 +458,7 @@ en:
   progress:
     title: "Progress"
     intro: "Which rung you currently hold on each concept, from your reviewed answers. Nothing here is a target: it describes now, and it changes only when a new answer is reviewed."
+    legend_summary: "How standings work"
     note: "A rung is held when your latest reviewed answer to a section asked at that rung was rated just right or too easy by you and solid or strong by the review. Holding a higher rung covers the ones below it. Answers from before rungs were recorded, and sections the prompt was told to ease, are not counted. A section's rung is what was asked for: your difficulty ratings can still nudge an unlocked section, and only a lock makes the rung exact."
     legend:
       developing: "you have answered at a rung you don't hold yet, and that answer didn't hold it. It points to the next rung above the one you hold, or to junior when you hold none."

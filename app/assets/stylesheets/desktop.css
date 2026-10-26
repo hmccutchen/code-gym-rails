@@ -7,4 +7,9 @@
   .history-rail .history-rail-page { display: block; }
   .history-page .history-entry { padding: 20px; }
   .history-page details.review { max-width: 65ch; }
+
+  .progress-legend { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .progress-buckets, .progress-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .progress-bucket-grouped { grid-column: 1 / -1; }
+  .progress-page .progress-note { max-width: 65ch; }
 }

@@ -1,25 +1,35 @@
 <%# Design notes: docs/code-notes/app/views/progress/index.html.md %>
 <% page_title t("progress.title") %>
-<h1><%= t("progress.title") %></h1>
-<p class="learn-intro"><%= t("progress.intro") %></p>
+<% wide_page %>
 
-<dl class="progress-legend">
-  <% ProgressHelper::LEGEND.each do |standing| %>
-    <% if standing.is_a?(String) %>
-      <div><dt><%= standing_label(standing) %></dt><dd><%= KindDifficulty::LEVEL_DEFINITIONS.fetch(standing) %></dd></div>
-    <% else %>
-      <div><dt><%= t("progress.standings.#{standing}") %></dt><dd><%= t("progress.legend.#{standing}") %></dd></div>
+<div class="card-page progress-page">
+<div class="progress-head">
+  <h1><%= t("progress.title") %></h1>
+  <p class="learn-intro"><%= t("progress.intro") %></p>
+</div>
+
+<details class="card progress-legend-card">
+  <summary><%= t("progress.legend_summary") %></summary>
+  <dl class="progress-legend">
+    <% ProgressHelper::LEGEND.each do |standing| %>
+      <% if standing.is_a?(String) %>
+        <div><dt><%= standing_label(standing) %></dt><dd><%= KindDifficulty::LEVEL_DEFINITIONS.fetch(standing) %></dd></div>
+      <% else %>
+        <div><dt><%= t("progress.standings.#{standing}") %></dt><dd><%= t("progress.legend.#{standing}") %></dd></div>
+      <% end %>
     <% end %>
-  <% end %>
-</dl>
+  </dl>
+</details>
 <p class="progress-note"><%= t("progress.note") %></p>
 
+<div class="progress-buckets">
 <% @buckets.each do |bucket| %>
-  <section class="learn-bucket">
+  <% flat = bucket[:groups].size == 1 %>
+  <section class="progress-bucket<%= " progress-bucket-grouped" unless flat %>">
     <%# Learn renders a single-group bucket flat; here its one disclosure takes the bucket's name. %>
-    <% flat = bucket[:groups].size == 1 %>
     <% unless flat %><h2><%= t("learn.buckets.#{bucket[:key]}") %></h2><% end %>
 
+    <div class="progress-groups">
     <% bucket[:groups].each do |group| %>
       <details class="progress-group">
         <summary>
@@ -50,9 +60,12 @@
         </ul>
       </details>
     <% end %>
+    </div>
   </section>
 <% end %>
+</div>
 
 <% if @buckets.any? { |b| b[:groups].any? { |g| g[:counts].key?(:not_offered) } } %>
   <p class="progress-note"><%= t("progress.not_offered_note") %> <%= link_to t("progress.setup_link"), setup_path(anchor: "exercise-mix") %></p>
 <% end %>
+</div>

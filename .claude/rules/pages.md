@@ -65,7 +65,7 @@ read it before changing that area.
   collapsible card, the range slider and the disabled switch row, for the
   Account and Settings pages; it loads on every
   page, so a new rule in it stays scoped to its own class. `.card-page` is
-  the full-width card page (History), with the same phone gutter.
+  the full-width card page (History, Progress), with the same phone gutter.
 - **Desktop layout** (`docs/decisions/desktop-layout.md`): at 900px and wider
   a page that calls `wide_page` gets a centered column up to 1040px, built
   from `.container`'s gutter properties; a page widens only that way, and

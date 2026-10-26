@@ -55,3 +55,19 @@ cap wins. `desktop_stylesheet_spec` holds that order. `container_gutter_spec` ho
 - An entry's padding is 20px here and 16px on a phone.
 - The open review is held to `65ch`, a comfortable reading width. Answers and
   code keep the entry's full width.
+
+## Progress
+
+- The open legend is four across, so its 7 entries make a row of 4 and a row
+  of 3.
+- `.progress-groups` is a two-column grid, so a bucket's groups sit two
+  across. `.progress-buckets` is one too, and a bucket with more than one
+  group (`.progress-bucket-grouped`) spans both columns. The single-group
+  buckets then sit two to a row instead of each stretching across 1040px.
+- `align-items: start` keeps a group at its own height when the one beside
+  it opens.
+- Both grids use `minmax(0, 1fr)`, for the same reason as History's entries
+  column.
+- The note is held to `65ch`, the same reading width as History's review.
+- The Progress rules being overridden are in the layout's `<style>`, which
+  loads before this file, so these selectors need no extra specificity.

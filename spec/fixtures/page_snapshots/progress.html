@@ -487,12 +487,18 @@
     .learn-prepare { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; }
     .learn-prepare p { margin-bottom: .75rem; }
     .learn-drilling { font-size: .75rem; color: var(--accent-text); border: 1px solid var(--accent); border-radius: 999px; padding: 0 .5rem; }
-    .progress-legend { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; font-size: .85rem; color: var(--muted); margin: 1rem 0 1.5rem; }
-    .progress-legend dt { display: inline; font-weight: 600; color: var(--text); }
-    .progress-legend dd { display: inline; margin: 0 0 0 .3rem; }
-    .progress-note { font-size: .8rem; color: var(--muted); margin-bottom: 1.5rem; }
-    details.progress-group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .6rem .9rem; margin-bottom: .6rem; }
-    details.progress-group summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
+    .progress-head h1 { font-size: 1.5rem; }
+    .progress-legend { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px 24px; font-size: .85rem; color: var(--muted); margin-top: .25rem; }
+    @media (min-width: 600px) {
+      .progress-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .progress-legend dt { font-weight: 600; color: var(--text); }
+    .progress-legend dd { margin: 0; }
+    .progress-note { font-size: .8rem; color: var(--muted); }
+    .progress-buckets, .progress-groups { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+    .progress-bucket { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+    details.progress-group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 16px; }
+    details.progress-group summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; min-height: 48px; padding-block: 8px; }
     details.progress-group summary::-webkit-details-marker { display: none; }
     details.progress-group summary::before { color: var(--accent-text); margin-inline-end: 0; }
     .progress-group-name { font-weight: 600; min-width: 9rem; }
@@ -505,8 +511,9 @@
     .rung-bar span { display: block; height: 100%; background: var(--rung); }
     .rung-bar span[class^="rung-developing"] { background: repeating-linear-gradient(135deg, var(--rung) 0 3px, transparent 3px 6px); }
     .progress-counts { font-size: .8rem; color: var(--muted); }
-    .progress-list { list-style: none; margin: .8rem 0 .2rem; padding: 0; }
-    .progress-entry { display: flex; flex-wrap: wrap; align-items: baseline; gap: .6rem; padding: .25rem 0; }
+    .progress-list { list-style: none; margin: 0; padding: 0; }
+    .progress-entry { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; min-height: 48px; padding: 2px 0; border-top: 1px solid var(--border); }
+    .progress-entry a { display: flex; align-items: center; flex: 1 1 auto; min-height: 44px; }
     .progress-rungs { display: inline-flex; gap: .2rem; }
     .progress-rung { width: .5rem; height: .5rem; border-radius: 999px; border: 1px solid var(--muted); }
     .progress-rung.held { background: var(--rung); border-color: var(--rung); }
@@ -602,27 +609,36 @@
     </div>
   </nav>
 
-  <div class="container" data-pull-content>
+  <div class="container container-wide" data-pull-content>
     <main id="main-content" tabindex="-1">
       <div class="flash notice" id="flash-notice">Welcome back, Existing!</div>
 
-    <h1>Progress</h1>
-<p class="learn-intro">Which rung you currently hold on each concept, from your reviewed answers. Nothing here is a target: it describes now, and it changes only when a new answer is reviewed.</p>
+    
+<div class="card-page progress-page">
+<div class="progress-head">
+  <h1>Progress</h1>
+  <p class="learn-intro">Which rung you currently hold on each concept, from your reviewed answers. Nothing here is a target: it describes now, and it changes only when a new answer is reviewed.</p>
+</div>
 
-<dl class="progress-legend">
-      <div><dt>principal</dt><dd>the concept framed as a decision with costs on both sides at system scale.</dd></div>
-      <div><dt>senior</dt><dd>the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.</dd></div>
-      <div><dt>mid-level</dt><dd>one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.</dd></div>
-      <div><dt>junior</dt><dd>one clearly visible instance of the concept in a small scenario.</dd></div>
-      <div><dt>developing</dt><dd>you have answered at a rung you don&#39;t hold yet, and that answer didn&#39;t hold it. It points to the next rung above the one you hold, or to junior when you hold none.</dd></div>
-      <div><dt>not yet</dt><dd>no reviewed answer at any rung yet.</dd></div>
-      <div><dt>not offered</dt><dd>every section that could show it is excluded in your exercise mix.</dd></div>
-</dl>
+<details class="card progress-legend-card">
+  <summary>How standings work</summary>
+  <dl class="progress-legend">
+        <div><dt>principal</dt><dd>the concept framed as a decision with costs on both sides at system scale.</dd></div>
+        <div><dt>senior</dt><dd>the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.</dd></div>
+        <div><dt>mid-level</dt><dd>one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.</dd></div>
+        <div><dt>junior</dt><dd>one clearly visible instance of the concept in a small scenario.</dd></div>
+        <div><dt>developing</dt><dd>you have answered at a rung you don&#39;t hold yet, and that answer didn&#39;t hold it. It points to the next rung above the one you hold, or to junior when you hold none.</dd></div>
+        <div><dt>not yet</dt><dd>no reviewed answer at any rung yet.</dd></div>
+        <div><dt>not offered</dt><dd>every section that could show it is excluded in your exercise mix.</dd></div>
+  </dl>
+</details>
 <p class="progress-note">A rung is held when your latest reviewed answer to a section asked at that rung was rated just right or too easy by you and solid or strong by the review. Holding a higher rung covers the ones below it. Answers from before rungs were recorded, and sections the prompt was told to ease, are not counted. A section&#39;s rung is what was asked for: your difficulty ratings can still nudge an unlocked section, and only a lock makes the rung exact.</p>
 
-  <section class="learn-bucket">
+<div class="progress-buckets">
+  <section class="progress-bucket progress-bucket-grouped">
     <h2>Ruby/Rails</h2>
 
+    <div class="progress-groups">
       <details class="progress-group">
         <summary>
           <span class="progress-group-name">Core</span>
@@ -1231,10 +1247,12 @@
             </li>
         </ul>
       </details>
+    </div>
   </section>
-  <section class="learn-bucket">
+  <section class="progress-bucket">
     
 
+    <div class="progress-groups">
       <details class="progress-group">
         <summary>
           <span class="progress-group-name">Architecture</span>
@@ -1406,10 +1424,12 @@
             </li>
         </ul>
       </details>
+    </div>
   </section>
-  <section class="learn-bucket">
+  <section class="progress-bucket">
     
 
+    <div class="progress-groups">
       <details class="progress-group">
         <summary>
           <span class="progress-group-name">Plan review</span>
@@ -1471,10 +1491,12 @@
             </li>
         </ul>
       </details>
+    </div>
   </section>
-  <section class="learn-bucket">
+  <section class="progress-bucket">
     
 
+    <div class="progress-groups">
       <details class="progress-group">
         <summary>
           <span class="progress-group-name">Ambiguity hunting</span>
@@ -1546,10 +1568,12 @@
             </li>
         </ul>
       </details>
+    </div>
   </section>
-  <section class="learn-bucket">
+  <section class="progress-bucket">
     
 
+    <div class="progress-groups">
       <details class="progress-group">
         <summary>
           <span class="progress-group-name">Pseudocode to code</span>
@@ -1651,8 +1675,11 @@
             </li>
         </ul>
       </details>
+    </div>
   </section>
+</div>
 
+</div>
 
     </main>
   </div>

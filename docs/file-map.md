@@ -163,7 +163,7 @@ What each listed file does.
 - `app/models/display_preferences.rb` — `DisplayPreferences`: the closed lists of display choices, and what the layout renders for them (`<html>` attributes, the light palette's media, status bar and theme color)
 - `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
 - `app/assets/stylesheets/phone_cards.css` — cards and collapsible cards, the full-width button, the switch and its status line, value rows, segmented controls and the card heading tag, used by Account and Settings, and the `.phone-page` and `.card-page` wrappers. Linked on every page, each rule scoped to its own class
-- `app/assets/stylesheets/desktop.css` — the layout at 900px and wider: the wide container and History's rail. Every rule sits inside one `@media (min-width: 900px)` block (`docs/decisions/desktop-layout.md`)
+- `app/assets/stylesheets/desktop.css` — the layout at 900px and wider: the wide container, History's rail and Progress' two-column groups. Every rule sits inside one `@media (min-width: 900px)` block (`docs/decisions/desktop-layout.md`)
 - `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
 - `app/javascript/code_gym/request.js` — the one way a page script sends a request, and what it may show when one fails; loaded through importmap from the layout's `javascript_importmap_tags`
@@ -254,6 +254,7 @@ What each listed file does.
 - `spec/views/desktop_stylesheet_spec.rb` — fails on a rule in `desktop.css` outside its 900px block, and on the stylesheet loading before `phone_cards.css`
 - `spec/requests/wide_pages_spec.rb` — lists the pages whose container is not wide, so a page widens only by calling `wide_page`
 - `spec/system/history_layout_spec.rb` — History at every layout width: no sideways scroll, phone cards and safe-area edges, the full-width column from 600px, the desktop rail, and that `desktop.css` changes nothing below 900px
+- `spec/system/progress_layout_spec.rb` — Progress at every layout width: no sideways scroll, phone cards, 48px rows and 44px links, safe-area edges, the full-width column from 600px, the legend and groups on a desktop, and that `desktop.css` changes nothing below 900px
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway
