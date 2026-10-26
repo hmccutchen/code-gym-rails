@@ -43,6 +43,33 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
     end
   end
 
+  it "underlines glossary terms in a framing and still sends the plain text back as a prior framing" do
+    user = create_fake_provider_user
+    cache_reference
+
+    travel_to(a_weekday) do
+      box = open_reference(user)
+      page.execute_script(<<~JS)
+        window.alternateBodies = [];
+        const realFetch = window.fetch;
+        window.fetch = (url, options) => {
+          if (String(url).includes("explain_differently")) window.alternateBodies.push(JSON.parse(options.body));
+          return realFetch(url, options);
+        };
+      JS
+
+      box.find(".explain-concept-differently").click
+      term = box.find(".alternate-item .gloss-term", text: "eager loading")
+      term.click
+      expect(term[:class]).to include("gloss-open")
+
+      box.find(".explain-concept-differently").click
+      expect(box).to have_css(".alternate-item", count: ConceptReferencesController::MAX_ALTERNATES_PER_CONCEPT)
+      expect(page.evaluate_script("window.alternateBodies.map((body) => body.prior_alternates)"))
+        .to eq([ [], [ FakeService::CONCEPT_ALTERNATE_TEXT ] ])
+    end
+  end
+
   it "announces each framing and keeps focus in the page when the control goes" do
     user = create_fake_provider_user
     cache_reference

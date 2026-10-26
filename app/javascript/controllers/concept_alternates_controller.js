@@ -27,22 +27,22 @@ export default class extends Controller {
       { prior_alternates: this.priorFramings }, { fallback: this.failedTextValue })
     const data = result.data
 
-    if (result.ok && data?.status === "ok" && data.alternate) {
-      this.addFraming(data.alternate, data.remaining, buttons)
+    if (result.ok && data?.status === "ok" && data.alternate && typeof data.alternate_html === "string") {
+      this.addFraming(data.alternate, data.alternate_html, data.remaining, buttons)
     } else {
       this.statusTarget.textContent = result.message || this.failedTextValue
       if (this.priorFramings.length < this.maxValue) buttons.forEach((button) => (button.disabled = false))
     }
   }
 
-  addFraming(alternate, remaining, buttons) {
+  addFraming(alternate, alternateHtml, remaining, buttons) {
     framings.set(this.referenceIdValue, [ ...this.priorFramings, alternate ])
 
     let focused = null
     this.peerContainers.forEach((container) => {
       const paragraph = document.createElement("p")
       paragraph.className = "alternate-item"
-      paragraph.textContent = alternate
+      paragraph.innerHTML = alternateHtml
       paragraph.tabIndex = -1
       container.insertBefore(paragraph, container.querySelector(".explain-concept-differently"))
       if (container === this.element) focused = paragraph

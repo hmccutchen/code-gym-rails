@@ -25,3 +25,12 @@ The status line is set and never cleared: the framing itself lands outside the
 live region, so clearing the status would announce nothing. Focus moves to the
 new paragraph before the buttons are removed, because removing the focused
 button drops focus to the body.
+
+## The framing is inserted as HTML, and kept as plain text
+
+Each framing is inserted with `innerHTML` from the reply's `alternate_html`,
+which the server escapes and marks up with `glossary_wrap`, so its glossary
+terms work like any other: the layout's glossary controller listens on the
+page and finds a term by its class. The cap's `Map` keeps the plain
+`alternate`, which is what goes back as `prior_alternates`. A reply without a
+string `alternate_html` counts as a failure.
