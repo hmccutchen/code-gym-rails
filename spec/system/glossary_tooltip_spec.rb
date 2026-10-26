@@ -44,7 +44,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
 
       box = open_panel_and_measure
 
-      expect(box["found"]).to be(true), TERM_MISSING
+      expect(box["found"]).to be(true)
       expect(box["display"]).to eq("block")
       # Guards the fixture: a term at the left edge could not overflow, so the assertion below would test nothing.
       expect(box["termLeft"]).to be > phone_width * 0.25
@@ -131,7 +131,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
   end
 
   describe "on Learn and in a concept reference" do
-    TERM_MISSING = "no .gloss-term containing memoization was found".freeze
+    def term_missing = "no .gloss-term containing memoization was found"
 
     let(:learn_tagline) { "Memoization keeps repeated reads cheap." }
     let(:worked_example) { "Each read hits the database again, so caching the result avoids it, so memoization helps." }
@@ -190,6 +190,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
           const left = term.getBoundingClientRect().left + parseFloat(style.left);
           return {
             display: style.display,
+            left: left,
             right: left + parseFloat(style.width),
             width: parseFloat(style.width),
             scrollWidth: document.documentElement.scrollWidth
@@ -218,11 +219,13 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
       visit_learn_concept(user)
 
       [ 0, 1 ].each do |index|
-        expect(scroll_to_term(index)["found"]).to be(true), TERM_MISSING
+        expect(scroll_to_term(index)["found"]).to be(true), term_missing
         click_term_centre(index)
         box = panel_box(index)
 
         expect(box["display"]).to eq("block")
+        expect(box["width"]).to be > 0
+        expect(box["left"]).to be >= 0
         expect(box["right"]).to be <= phone_width
         expect(box["scrollWidth"]).to eq(phone_width)
       end
@@ -236,13 +239,14 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
         create_reference(tagline: learn_tagline)
         start_dashboard(user, question: "x")
         wait_for_js
-        page.execute_script('document.querySelector("details.ref").open = true')
+        expect(page).to have_css("details.ref[open]")
 
-        expect(scroll_to_term(0, scope: ".ref-body")["found"]).to be(true), TERM_MISSING
+        expect(scroll_to_term(0, scope: ".ref-body")["found"]).to be(true), term_missing
         click_term_centre(0, scope: ".ref-body")
         box = panel_box(0, scope: ".ref-body")
 
         expect(box["width"]).to be > 0
+        expect(box["left"]).to be >= 0
         expect(box["right"]).to be <= phone_width
       end
     end
@@ -252,7 +256,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
       page.current_window.resize_to(phone_width, 800)
       visit_learn_concept(user)
 
-      expect([ scroll_to_term(1)["found"], scroll_to_term(0)["found"] ]).to eq([ true, true ]), TERM_MISSING
+      expect([ scroll_to_term(1)["found"], scroll_to_term(0)["found"] ]).to eq([ true, true ]), term_missing
       focus_term(0)
       press("Enter")
       expect(term_open?(0)).to be(true)
@@ -263,18 +267,23 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
       focus_term(1)
       press("Enter")
       expect(open_term_count).to eq(1)
+      expect([ term_open?(0), term_open?(1) ]).to eq([ false, true ])
     end
 
     it "opens a Learn term on a desktop click" do
       user = create_fake_provider_user
       page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: 1024, height: 768) }
-      visit_learn_concept(user)
+      begin
+        visit_learn_concept(user)
 
-      expect(scroll_to_term(0)["found"]).to be(true), TERM_MISSING
-      click_term_centre(0)
+        expect(scroll_to_term(0)["found"]).to be(true), term_missing
+        click_term_centre(0)
 
-      expect(term_open?(0)).to be(true)
-      expect(panel_box(0)["display"]).to eq("block")
+        expect(term_open?(0)).to be(true)
+        expect(panel_box(0)["display"]).to eq("block")
+      ensure
+        page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: phone_width, height: 800) }
+      end
     end
   end
 end
