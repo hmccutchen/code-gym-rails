@@ -513,7 +513,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       connected = pw.evaluate(<<~JS)
         (() => {
           const input = document.getElementById("learn-filter-input");
-          input.value = "no such concept anywhere";
+          input.value = "memoizd";
           input.dispatchEvent(new Event("input", { bubbles: true }));
           return !!(window.Stimulus && window.Stimulus.getControllerForElementAndIdentifier(
             document.querySelector('[data-controller~="learn-filter"]'), "learn-filter"));
@@ -522,8 +522,9 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       expect(connected).to be(false)
     end
 
-    expect(page).to have_css("#learn-empty", visible: :visible)
-    expect(page).to have_no_css(".learn-entry", visible: :visible)
+    expect(page).to have_css(".learn-entry", visible: :visible, count: 1)
+    expect(page).to have_css('.learn-entry[data-concept="memoization"]', visible: :visible)
+    expect(page).to have_no_css("#learn-empty", visible: :visible)
     expect(errors).to be_empty
   end
 end

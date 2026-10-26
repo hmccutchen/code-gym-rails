@@ -314,6 +314,11 @@ module Glossary
     LOOKUP[text.downcase]
   end
 
+  def self.forms_for(text)
+    key = key_for(text)
+    key ? [ key, *FORMS.fetch(key, []) ] : []
+  end
+
   def self.definition_for(text)
     TERMS[key_for(text)]
   end
