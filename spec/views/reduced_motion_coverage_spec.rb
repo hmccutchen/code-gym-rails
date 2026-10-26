@@ -53,7 +53,7 @@ RSpec.describe "reduced motion coverage" do
   end
 
   # A stylesheet is read as if it were one <style> block in a view.
-  Rails.root.glob("{app/views/**/*.erb,app/assets/stylesheets/*.css}").each do |view|
+  Rails.root.glob("{app/views/**/*.erb,app/assets/stylesheets/**/*.css}").each do |view|
     source = view.extname == ".css" ? "<style>#{view.read}</style>" : view.read
     next unless source.match?(MOTION)
 

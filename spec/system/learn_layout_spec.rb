@@ -67,7 +67,7 @@ RSpec.describe "Learn layout", type: :system do
       it "changes nothing at #{width}px" do
         visit_learn(width: width)
         with_desktop = layout_facts
-        without = without_desktop_stylesheet { layout_facts }
+        without = without_desktop_rules { layout_facts }
         expect(without).to eq(with_desktop)
       end
     end
@@ -75,7 +75,7 @@ RSpec.describe "Learn layout", type: :system do
     it "takes effect at 900px" do
       visit_learn(width: 900)
       with_desktop = layout_facts
-      without = without_desktop_stylesheet { layout_facts }
+      without = without_desktop_rules { layout_facts }
       expect(without).not_to eq(with_desktop)
     end
   end

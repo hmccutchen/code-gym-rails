@@ -578,9 +578,9 @@ RSpec.describe "History", type: :request do
 
       get history_path
 
-      history_rules = ViewStyles.rules(Rails.root.join("app/views/history/index.html.erb").read)
+      history_rules = ViewStyles.stylesheet_rules(Rails.root.join("app/assets/stylesheets/pages/history.css"))
       expect(history_rules.select { |rule| rule.selectors.include?(".history-entry") }.filter_map { |rule| rule.declaration("margin-inline") }).to be_empty
-      expect(response.body).to match(/\.history-entry \.section \{[^}]*margin-inline: 0;/)
+      expect(history_rules.select { |rule| rule.selectors.include?(".history-entry .section") }.map { |rule| rule.declaration("margin-inline") }).to eq([ "0" ])
     end
   end
 

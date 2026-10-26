@@ -67,11 +67,22 @@ module LayoutHelpers
     JS
   end
 
-  def without_desktop_stylesheet
-    page.execute_script("document.querySelector('link[href*=\"/desktop\"]').sheet.disabled = true")
+  # Every sheet's 900px rules, wherever they live, switched off and then back on.
+  def without_desktop_rules
+    toggle_desktop_rules("(min-width: 900px)", "(min-width: 99999px)")
     yield
   ensure
-    page.execute_script("document.querySelector('link[href*=\"/desktop\"]').sheet.disabled = false")
+    toggle_desktop_rules("(min-width: 99999px)", "(min-width: 900px)")
+  end
+
+  def toggle_desktop_rules(from, to)
+    page.execute_script(<<~JS)
+      for (const sheet of document.styleSheets) {
+        for (const rule of sheet.cssRules) {
+          if (rule instanceof CSSMediaRule && rule.media.mediaText === #{from.to_json}) rule.media.mediaText = #{to.to_json};
+        }
+      }
+    JS
   end
 end
 
