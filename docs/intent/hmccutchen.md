@@ -256,6 +256,7 @@ data.*
   **I decided:** Claude implements and investigates; I decide the design. The
   nav gets the 1040px column on every page, its own PR after this one, and
   the doubled notch inset on landscape phones becomes its own issue
+- the nav lined up with the 1040px page column `#562`
 - called the phone redesign done at four PRs; the authenticator forms work
   fine for me, so no code screens
 - glossary terms on the reference dropdown and every Learn page `#556`
@@ -266,3 +267,19 @@ data.*
   before writing any term list; fix the three wrong-sense entries here and
   leave the backfill, the matcher and the technique terms to the next PR;
   pin the "None" lesson rows as they render today rather than fix them
+
+## Mon Oct 26
+
+- glossary backfill, batch one: the audit's 47-reference terms, inflections
+  and the five techniques as one-liners `#563`
+  **why:** the audit showed 730 undefined terms with no glossary match, and
+  "memoized" never found the memoization entry
+  **I decided:** lean short, start with the 47 and size a second batch from a
+  re-run of the audit after this deploys; no new concepts; inflections of a
+  key match but the whole-word rule stands otherwise; every noun key gets its
+  plural; one plain sentence per entry with a fact check by an agent that
+  didn't write it; a read-only export of the references and my own last 60
+  days of exercise text, with my yes on the export and a read of the listing
+  before the PR leaves draft; after deploy only the coverage script re-runs;
+  a 480-or-fewer bar that reports a miss and never blocks the merge; drop
+  `indexes`, `indexed`, `injected` and `inferred` after reading the listing
