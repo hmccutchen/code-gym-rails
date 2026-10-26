@@ -48,6 +48,8 @@ RSpec.describe Glossary do
     it "resolves a form to its key" do
       expect(Glossary.key_for("memoized")).to eq("memoization")
       expect(Glossary.key_for("Service Objects")).to eq("service object")
+      expect(Glossary.key_for("denormalizing")).to eq("denormalization")
+      expect(Glossary.key_for("god objects")).to eq("god object")
     end
 
     it "resolves a key to itself and an unknown word to nil" do

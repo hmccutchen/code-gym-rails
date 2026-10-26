@@ -202,7 +202,9 @@ module Glossary
   end
 
   FORMS = {
-    "memoization" => %w[memoized memoizing],
+    "memoization" => %w[memoized memoizing memoize memoised],
+    "god object" => [ "god objects" ],
+    "denormalization" => %w[denormalizing denormalized denormalize],
     "indexing" => %w[indexes indexed],
     "sharding" => %w[shards sharded],
     "webhook" => %w[webhooks],
