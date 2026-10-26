@@ -314,3 +314,5 @@ data.*
   and Settings desktop straight into their own sheets; a partial's styles go
   with the page it renders on, or a shared component sheet; Account's paired
   cards stretch to the same height
+- fuzzy Learn search, no library or endpoint `#570`
+  **I decided:** no typo under 5 letters
