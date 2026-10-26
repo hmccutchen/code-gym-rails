@@ -3,7 +3,9 @@
 Each page that has styles of its own keeps them in one file,
 `app/assets/stylesheets/pages/<page>.css`: its phone rules first, then its
 desktop rules in one `@media (min-width: 900px)` block at the end. History,
-Progress and the Learn index moved first; Account and Settings follow.
+Progress and the Learn index moved first, then Account and Settings, whose
+partials' `<style>` blocks joined their page's sheet in the order they
+rendered.
 
 ## Why a sheet per page
 
@@ -47,4 +49,6 @@ moved so far are held to that (`app_views_spec`).
 The move changed no pixel. A one-off script dumped every element's computed
 style and rect on History, Progress and Learn at 390, 768 and 1280px, at the
 default and the largest text, and at 390 and 1280px with the light theme,
-before and after; the 15,158 element records matched exactly.
+before and after; the 15,158 element records matched exactly. Account (with
+and without push reminders) and Settings (with a key and without, both
+disclosures open) were checked the same way: 10,236 records, no difference.

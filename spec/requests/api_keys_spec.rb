@@ -480,21 +480,21 @@ RSpec.describe "ApiKeys", type: :request do
       expect(page.css("#exercise-mix .mix-coverage").map { |note| note["class"].split }).to all(include("card-note"))
     end
 
-    it "carries the difficulty controls' styles once, however many kinds render them" do
+    it "styles the difficulty controls from the page's one sheet, however many kinds render them" do
       get setup_path
 
       page = Nokogiri::HTML(response.body)
       expect(page.css("fieldset.mix-difficulty").size).to be > 1
-      expect(page.css("style").count { |style| style.text.include?(".mix-difficulty {") }).to eq(1)
-      expect(response.body).not_to include(".mix-difficulty.mix-suggested {")
+      expect(page.css("style").select { |style| style.text.include?(".mix-difficulty") }).to be_empty
+      expect(page.css("head link[href*='/pages/settings-']").size).to eq(1)
+      expect(page.css("fieldset.mix-difficulty.mix-suggested")).to be_empty
     end
 
-    it "adds the suggestion outline's style only when the page marks a suggested kind" do
+    it "marks only the suggested kinds' controls for the outline" do
       get setup_path(suggested: %w[code_review pattern], suggested_level: "junior")
 
       page = Nokogiri::HTML(response.body)
-      expect(page.css("fieldset.mix-difficulty.mix-suggested").size).to eq(2)
-      expect(page.css("style").count { |style| style.text.include?(".mix-difficulty.mix-suggested {") }).to eq(1)
+      expect(page.css("fieldset.mix-difficulty.mix-suggested").map { |box| box["data-kind"] }).to match_array(%w[code_review pattern])
     end
 
     it "hides the bulk button from a trial account" do
