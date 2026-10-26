@@ -213,6 +213,15 @@ RSpec.describe "History layout", type: :system do
       end
     end
 
+    [ 1280, 1920 ].each do |width|
+      it "lines the nav's brand up with the page content's left edge at #{width}px" do
+        travel_to(a_weekday) do
+          visit_history(width: width)
+          expect(rect("nav .brand")["left"]).to be_within(1).of(container_content["left"])
+        end
+      end
+    end
+
     it "holds the open review to a reading width, and every target to 44px" do
       travel_to(a_weekday) do
         visit_history(width: 1280)

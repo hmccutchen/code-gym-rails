@@ -32,10 +32,12 @@ RSpec.describe "container gutter" do
     expect(margin_rules.first.media).to eq([ "@media (max-width: 599.98px)" ])
   end
 
-  it "widens a wide page to 1040px of content, built from the gutter properties" do
+  it "widens a wide page and the nav to 1040px of content in one rule, built from the gutter properties" do
     desktop = ViewStyles.stylesheet_rules(Rails.root.join("app/assets/stylesheets/desktop.css"))
-    wide = desktop.find { |rule| rule.selectors == [ ".container.container-wide" ] }
+    wide = desktop.select { |rule| rule.selectors.include?(".container.container-wide") }
 
-    expect(wide.declaration("max-width")).to eq("calc(1040px + var(--container-pad-left) + var(--container-pad-right))")
+    expect(wide.size).to eq(1)
+    expect(wide.first.selectors).to contain_exactly(".container.container-wide", "nav .inner")
+    expect(wide.first.declaration("max-width")).to eq("calc(1040px + var(--container-pad-left) + var(--container-pad-right))")
   end
 end

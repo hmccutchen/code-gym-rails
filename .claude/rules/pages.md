@@ -69,7 +69,9 @@ read it before changing that area.
 - **Desktop layout** (`docs/decisions/desktop-layout.md`): at 900px and wider
   a page that calls `wide_page` gets a centered column up to 1040px, built
   from `.container`'s gutter properties; a page widens only that way, and
-  the `.container` rule itself is not edited. `desktop.css` holds nothing
+  the `.container` rule itself is not edited. The nav's `.inner` takes the
+  same cap from the same rule on every page, so it never moves between
+  pages. `desktop.css` holds nothing
   outside its one `@media (min-width: 900px)` block (`desktop_stylesheet_spec`),
   each rule scoped to a page class; a view's own `<style>` renders after it,
   so a desktop rule beats one of the view's with a more specific selector.

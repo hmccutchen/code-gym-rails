@@ -41,8 +41,26 @@ landscape. It is built from `--container-pad-left` and `--container-pad-right`
 rather than a copy of their values, and `container_gutter_spec` holds that.
 `container_class` gives the plain class unless a view calls `wide_page`, and
 that default is the guard; `wide_pages_spec` also checks that the main pages
-not yet moved stay plain. The nav keeps its own 1200px cap, so it does not
-line up with the 1040px column yet (#551).
+not yet moved stay plain.
+
+## The nav uses the same column on every page
+
+At 900px and wider, the nav's `.inner` takes the same 1040px cap as a wide
+page, from the same rule in `desktop.css`, so the formula lives in one place.
+Before #551 it kept the layout's own 1200px cap, and above a 1104px window the
+brand sat 48px left of a wide page's content: at 1280px the brand was at
+x=72 and History's content at x=120. Below 1104px nothing changes, since the
+cap is wider than the window there.
+
+The nav doesn't follow the page. It uses the 1040px cap on every page, wide
+or not, because a nav that matched the page would jump 48px each time someone
+moved between a wide page and a plain one. Waiting until every page is wide
+was ruled out too: the sign-in, welcome, admin and concept pages stay plain
+by decision, so that day never comes. A plain page's content sits 92px inside
+the brand at 1280px, where it sat 140px inside before, and lines up once
+that page moves to `wide_page`. The collapse into the menu button is an
+`@container` query on `nav` itself, not on `.inner`, so the cap doesn't move
+it.
 
 The `100vw` break-out was rejected: `100vw` includes a classic scrollbar's
 width, so it scrolls the page sideways on Windows and Linux.
@@ -52,7 +70,7 @@ width, so it scrolls the page sideways on Windows and Linux.
 Everything in `desktop.css` sits inside one `@media (min-width: 900px)` block,
 so it can't change the phone layout, and `desktop_stylesheet_spec` fails on
 anything outside it, an at-rule like `@font-face` included. Its rules are
-scoped to a page class (`.history-page`) or the wide container. The file loads
+scoped to a page class (`.history-page`), the wide container or the nav. The file loads
 after `phone_cards.css`, so it wins a tie with a phone card rule. A view's own
 `<style>` block renders in the body, after it, so a desktop rule that overrides
 a view's rule needs a more specific selector. History, Progress and Learn have

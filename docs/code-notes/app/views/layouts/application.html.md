@@ -121,13 +121,17 @@ change to them moves it too.
 The page's `.container` takes its class from `container_class`
 (`ApplicationHelper`). A view that calls `wide_page` gets
 `container container-wide`, and `desktop.css` widens that one to 1040px of
-content at 900px and wider. Every other page, and the nav's own `.container`,
-keep the plain class (`docs/decisions/desktop-layout.md`).
+content at 900px and wider. Every other page keeps the plain class
+(`docs/decisions/desktop-layout.md`). The nav's own `.container` keeps the
+plain class too, and `desktop.css` gives `nav .inner` the same 1040px cap at
+900px and wider, on every page.
 
 ## `nav .inner`
 
-It is wider than the page column, so on a desktop the brand sits apart from the
-links instead of crowding them inside the same 800px.
+Its 1200px cap lifts it over `.container`'s 800px and 920px, so below 900px
+the brand sits apart from the links instead of crowding them inside the page
+column. From 900px `desktop.css` replaces the cap with the wide page's 1040px
+column, so the brand lines up with that column's left edge.
 
 ## `nav .brand`
 
