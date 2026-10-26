@@ -141,7 +141,7 @@ module Glossary
     "rate limiting" => "Capping how many requests a client can make in a given time window, to protect a system from overload or abuse.",
     "reading for intent" => "Reading code or a request for what it's trying to accomplish, not just what it literally does — the difference between spotting a bug and spotting a mismatch between the code and its actual goal.",
     "recursion" => "A function that calls itself to solve a smaller version of the same problem, until it reaches a base case.",
-    "reconciliation" => "React's algorithm for comparing a new virtual DOM tree to the previous one and updating only what actually changed in the real DOM.",
+    "reconciliation" => "Comparing two records or systems that should agree and repairing the differences. In React, it is the algorithm that compares a new virtual DOM tree to the previous one and updates only what changed in the real DOM.",
     "referential integrity" => "The database guarantee that a foreign key always points to a row that actually exists.",
     "replication" => "Keeping copies of a database on multiple servers, for redundancy and to spread out read load.",
     "retry logic" => "Automatically re-attempting a failed operation, usually with backoff, instead of surfacing the failure immediately.",
@@ -169,7 +169,7 @@ module Glossary
     "state management" => "The approach an app uses to store and update shared data (local component state, context, or a dedicated store).",
     "static site generation" => "Rendering pages to static HTML at build time rather than on every request, trading flexibility for speed and simplicity.",
     "strategy pattern" => "Encapsulating interchangeable algorithms behind a common interface, so the caller can swap which one runs without changing its own code.",
-    "strict mode" => "An opt-in JS mode that turns silent mistakes (like assigning to an undeclared variable) into thrown errors.",
+    "strict mode" => "An opt-in JS mode, switched on with `use strict`, that turns silent mistakes (like assigning to an undeclared variable) into thrown errors. React Strict Mode is a development-only wrapper that runs renders and effects twice to expose unsafe patterns.",
     "stub" => "A test double that returns a canned response when called, without asserting how it was called.",
     "sync vs async" => "Choosing between code that waits for an operation to finish before continuing (sync) and code that keeps running while the operation completes in the background (async).",
     "temporal dead zone" => "The span between entering a scope and a `let`/`const` variable's declaration line, during which referencing it throws instead of returning undefined.",
@@ -178,7 +178,7 @@ module Glossary
     "this binding" => "How JS determines what `this` refers to inside a function, which depends on how the function is called, not where it's defined (except for arrow functions).",
     "thread pool" => "A fixed set of reusable worker threads that pick up queued work, avoiding the cost of creating a new thread per task.",
     "thread safety" => "Code that behaves correctly when accessed by multiple threads at once, without needing external synchronization.",
-    "throttling" => "Limiting a function to run at most once per fixed interval, no matter how often it's triggered.",
+    "throttling" => "Holding something to a lower rate. A throttled function runs at most once per fixed interval, no matter how often it's triggered; CPU throttling is a processor held to a lower speed, by a limit or by heat.",
     "transaction" => "A group of database operations that all succeed together or all roll back together, so the database is never left half-updated.",
     "transaction isolation level" => "How much one in-progress transaction can see of another's uncommitted changes, trading consistency guarantees for concurrency.",
     "transaction safety" => "Making sure a multi-step database operation either fully applies or fully rolls back, so a failure partway through never leaves related records out of sync.",
@@ -207,7 +207,9 @@ module Glossary
   end
 
   # Longest term first, so the alternation prefers the longer of two overlapping terms at the same position.
-  TERM_PATTERN = Regexp.union(
-    TERMS.keys.sort_by { |term| -term.length }.map { |term| /\b#{Regexp.escape(term)}\b/i }
-  )
+  def self.pattern_for(terms)
+    Regexp.union(terms.keys.sort_by { |term| -term.length }.map { |term| /\b#{Regexp.escape(term)}\b/i })
+  end
+
+  TERM_PATTERN = pattern_for(TERMS)
 end

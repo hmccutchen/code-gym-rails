@@ -2,9 +2,9 @@
 <details class="learn-recognition"> <%# Design notes: docs/code-notes/app/views/learn/_recognition_guide.html.md %>
   <summary><%= t("learn.recognition.summary") %></summary>
   <p class="learn-recognition-label"><%= t("learn.recognition.questions") %></p>
-  <p><%= guide.questions %></p>
+  <p><%= glossary_wrap(guide.questions) %></p>
   <p class="learn-recognition-label"><%= t("learn.recognition.contrast") %></p>
-  <p class="learn-worked-example"><%= guide.contrast %></p>
+  <p class="learn-worked-example"><%= glossary_wrap(guide.contrast) %></p>
   <p class="learn-recognition-label"><%= t("learn.recognition.misfires") %></p>
-  <p><%= guide.misfires %></p>
+  <p><%= glossary_wrap(guide.misfires) %></p>
 </details>

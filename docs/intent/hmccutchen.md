@@ -256,3 +256,13 @@ data.*
   **I decided:** Claude implements and investigates; I decide the design. The
   nav gets the 1040px column on every page, its own PR after this one, and
   the doubled notch inset on landscape phones becomes its own issue
+- called the phone redesign done at four PRs; the authenticator forms work
+  fine for me, so no code screens
+- glossary terms on the reference dropdown and every Learn page `#556`
+  **why:** references use terms like partial index and sequential scan with
+  no definition, and the Learn pages never ran the glossary at all
+  **I decided:** wire it at render time so every existing reference gains it;
+  never inside code; first occurrence per field; audit production read-only
+  before writing any term list; fix the three wrong-sense entries here and
+  leave the backfill, the matcher and the technique terms to the next PR;
+  pin the "None" lesson rows as they render today rather than fix them
