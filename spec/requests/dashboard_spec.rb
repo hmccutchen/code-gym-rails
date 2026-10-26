@@ -446,6 +446,59 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  describe "glossary terms in the reference dropdown and the featured tagline" do
+    let(:twice) { "A closure holds scope, and a closure outlives its frame." }
+
+    def stub_glossary(terms)
+      stub_const("Glossary::TERMS", terms)
+      stub_const("Glossary::TERM_PATTERN",
+        Regexp.union(terms.keys.sort_by { |t| -t.length }.map { |t| /\b#{Regexp.escape(t)}\b/i }))
+    end
+
+    def page
+      get root_path
+      Nokogiri::HTML5(response.body)
+    end
+
+    before do
+      stub_glossary("closure" => "A function bundled with its surrounding variables.")
+      ps = base_problem_set
+      ps["code_review"]["concept"] = "n_plus_one"
+      @exercise = create_exercise(problem_set: ps)
+      @exercise.update!(language: "ruby_rails")
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: twice, explanation: twice,
+                               code_example: "closure = 1", senior_lens: twice)
+      submit_set_showing(user, "n_plus_one", date: Date.current - 3)
+      FeaturedConcept.for(user)
+    end
+
+    it "wraps each dropdown field once and leaves the code example alone" do
+      doc = page
+      body = doc.at_css("details.ref .ref-body")
+      prose = body.css("p").reject { |p| p.at_css("button") }
+
+      expect(prose.map { |p| p.css(".gloss-term").size }).to eq([ 1, 1, 1 ])
+      expect(body.css("pre.snippet .gloss-term")).to be_empty
+      expect(doc.css("details.ref > summary .gloss-term")).to be_empty
+    end
+
+    it "wraps the featured tagline once the day is submitted and renders nothing for it before" do
+      expect(page.css("p.featured-tagline")).to be_empty
+
+      create_response(@exercise)
+
+      expect(page.css("p.featured-tagline span.gloss-term").size).to eq(1)
+    end
+
+    it "puts no glossary term inside an interactive element on the dashboard" do
+      create_response(@exercise)
+      doc = page
+
+      expect(doc.css(".gloss-term")).not_to be_empty
+      expect(doc.css("a .gloss-term, button .gloss-term, summary .gloss-term, label .gloss-term, :not(body)[data-action*=click] .gloss-term")).to be_empty
+    end
+  end
+
   describe "regenerate button" do
     it "shows a light confirm when there are no answers yet" do
       create_exercise
