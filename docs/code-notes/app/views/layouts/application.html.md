@@ -161,9 +161,11 @@ the same raised pill as a hovered link.
 `align-items: center` keeps the text in the middle of the taller pill. The
 height comes from the minimum, not from more padding, so the links are no
 wider and the row collapses at the same width as before. The brand mark is
-already 44px tall, so the row, and the nav around it, are no taller at the
-default text size. In the open menu each link's `.75rem` padding already makes
-it taller than 44px, so the minimum changes nothing there.
+already 44px tall, so the row, and the nav around it, are no taller with the
+browser's default 16px font or larger, which covers every text size the app
+offers. In the open menu each link's `.75rem` padding already makes it taller
+than 44px under the same condition, so the minimum changes nothing there. With
+a browser default below 16px, the minimum lifts both to 44px.
 
 ## `nav .brand-mark`
 

@@ -26,7 +26,9 @@ relaxes that under `(pointer: fine)`. An iPad in standalone mode is a
 desktop-width touch device, and a pointer query can't be trusted to tell it
 apart from a laptop with a touch screen. The top nav's links follow it too:
 above the width where the nav collapses they are 44px tall
-(`nav_link_targets_spec`), where they were 34px before #550.
+(`nav_link_targets_spec`), where they were 34px before #550. The name field
+beside them is the one exception left: it is about 27px tall, and #555 gives
+it a 44px target.
 
 ## The desktop column is per page
 

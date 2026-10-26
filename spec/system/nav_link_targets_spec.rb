@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Nav link targets", type: :system do
-  [ 1024, 1280 ].each do |width|
+  [ 768, 1024, 1280 ].each do |width|
     it "makes every link in the row at least 44px tall at #{width}px" do
       user = create_fake_provider_user
 
