@@ -275,3 +275,4 @@ data.*
   before writing any term list; fix the three wrong-sense entries here and
   leave the backfill, the matcher and the technique terms to the next PR;
   pin the "None" lesson rows as they render today rather than fix them
+- the nav takes the page's 1040px column on every page at desktop widths `#562`
