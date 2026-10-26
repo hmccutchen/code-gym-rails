@@ -168,6 +168,20 @@ RSpec.describe "Today's phone layout", type: :system do
       expect(rect("#save-status")["bottom"]).to be <= bar["top"]
     end
 
+    it "keeps a failed save's message on screen while the field keeps focus in a window the keyboard has shrunk" do
+      set_safe_area(bottom: 34)
+      visit_today(prefs: LayoutHelpers::LARGEST_TEXT)
+      force_standalone
+      fail_requests_to("/responses")
+      find(%(textarea[data-field="code_review"])).fill_in(with: "It re-runs the query inside the loop.")
+      resize(390, height: 300)
+
+      expect(page).to have_css("#save-status", visible: true)
+      expect(page.evaluate_script("document.activeElement.matches('textarea')")).to be(true)
+      expect(rect("#save-status")["top"]).to be >= 0
+      expect(rect("#save-status")["bottom"]).to be <= window_height
+    end
+
     it "fits within the 10rem it reserves with a wrapped nudge at 320px with the largest text" do
       visit_today(width: 320, prefs: LayoutHelpers::LARGEST_TEXT)
       click_button "Submit answers"
