@@ -25,4 +25,18 @@ RSpec.describe Glossary do
 
     expect(missing).to be_empty
   end
+
+  describe "entries that reference pages read in two senses" do
+    it "defines strict mode for JavaScript and for React" do
+      expect(Glossary::TERMS["strict mode"]).to match(/use strict/).and match(/React/)
+    end
+
+    it "defines reconciliation as repairing differences and as React's render diff" do
+      expect(Glossary::TERMS["reconciliation"]).to match(/differ|repair/i).and match(/React/)
+    end
+
+    it "defines throttling for a function and for a processor" do
+      expect(Glossary::TERMS["throttling"]).to match(/interval/).and match(/CPU|processor/)
+    end
+  end
 end
