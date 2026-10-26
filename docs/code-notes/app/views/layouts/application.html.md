@@ -156,6 +156,17 @@ what can be acted on in the page instead of every word in the bar. The current
 page carries `aria-current="page"` (`NavigationHelper#nav_current?`) and gets
 the same raised pill as a hovered link.
 
+`min-height: 44px` gives each link the 44px target
+`docs/decisions/desktop-layout.md` asks for at every width; `inline-flex` with
+`align-items: center` keeps the text in the middle of the taller pill. The
+height comes from the minimum, not from more padding, so the links are no
+wider and the row collapses at the same width as before. The brand mark is
+already 44px tall, so the row, and the nav around it, are no taller with the
+browser's default 16px font or larger, which covers every text size the app
+offers. In the open menu each link's `.75rem` padding already makes it taller
+than 44px under the same condition, so the minimum changes nothing there. With
+a browser default below 16px, the minimum lifts both to 44px.
+
 ## `nav .brand-mark`
 
 The image's alt text names the link, which is why the wordmark beside it is
