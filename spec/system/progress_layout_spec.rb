@@ -57,7 +57,7 @@ RSpec.describe "Progress layout", type: :system do
         visit_progress(width: width)
         open_every_disclosure
         with_desktop = layout_facts
-        without = without_desktop_stylesheet { layout_facts }
+        without = without_desktop_rules { layout_facts }
         expect(without).to eq(with_desktop)
       end
     end
@@ -66,7 +66,7 @@ RSpec.describe "Progress layout", type: :system do
       visit_progress(width: 900)
       open_every_disclosure
       with_desktop = layout_facts
-      without = without_desktop_stylesheet { layout_facts }
+      without = without_desktop_rules { layout_facts }
       expect(without).not_to eq(with_desktop)
     end
   end
