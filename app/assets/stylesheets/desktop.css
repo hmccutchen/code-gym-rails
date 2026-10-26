@@ -12,4 +12,10 @@
   .progress-page .progress-buckets, .progress-page .progress-bucket-grouped .progress-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   .progress-page .progress-bucket-grouped { grid-column: 1 / -1; }
   .progress-page .progress-note { max-width: 65ch; }
+
+  .learn-page .learn-top { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .learn-page .learn-top > :only-child { grid-column: 1 / -1; }
+  .learn-page .learn-buckets, .learn-page .learn-bucket-grouped .learn-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+  .learn-page .learn-bucket-grouped { grid-column: 1 / -1; }
+  .learn-page .learn-prepare p, .learn-page .learn-drills p { max-width: 65ch; }
 }

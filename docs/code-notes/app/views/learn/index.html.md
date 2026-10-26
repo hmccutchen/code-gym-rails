@@ -1,9 +1,42 @@
 # app/views/learn/index.html.erb
 
+## Layout
+
+The page is a `.card-page` (`phone_cards.css`) and calls `wide_page`. On a
+phone every box and group is a card `max(16px, inset)` from the screen edge,
+16px apart. From 600 to 899px they take the container's full width. At 900px
+and wider `desktop.css` puts this week's concept beside the filter and the
+groups three across (`docs/code-notes/app/assets/stylesheets/desktop.md`).
+The page's rules live in the layout's `<style>`; the ones that would also
+reach the concept page or Today's featured card carry the `.learn-page`
+prefix.
+
+The order is this week's concept and the filter (`.learn-top`), the prepare
+box, the drills box, then the buckets. The filter sits beside this week's
+concept on a desktop, so it comes right after it in the page too, and the
+visual order and the tab order agree.
+
+`data-controller="learn-filter"` sits on the page wrapper, since its targets
+are now the filter in the top row and the buckets below the boxes.
+
+## The filter's `[hidden]`
+
+The filter hides entries, group blocks and buckets with the `hidden`
+attribute, and any author `display` rule beats the browser's own `[hidden]`
+rule. Two rules restore it here: the layout's `.learn-entry[hidden]` and
+`phone_cards.css`'s `:is(.phone-page, .card-page) [hidden]`, both at 0,2,0.
+The phone rules on those three classes stay at 0,1,0, under both.
+`desktop.css` loads after `phone_cards.css`, so a desktop rule at 0,2,0 that
+set `display` on one of them would win the tie and stop the filter on a
+desktop only. The grids therefore sit on `.learn-buckets` and `.learn-groups`,
+which the filter never hides, and `desktop_stylesheet_spec` fails on a
+desktop rule that sets `display` on a hidden class.
+
 ## Featured concept
 
 The featured concept renders above the filter and the list, so opening this tab
-and reading one thing takes no decision.
+and reading one thing takes no decision. The filter shares its row on a
+desktop.
 
 ## Prepare prompt
 
@@ -21,7 +54,8 @@ already makes mostly harmless.
 
 ## Group headings
 
-A bucket whose concepts all fall in one group renders flat. That covers every
+A bucket with more than one group carries `.learn-bucket-grouped`, which the
+desktop grid reads. A bucket whose concepts all fall in one group renders flat. That covers every
 language-independent bucket, where a heading over the only group would be
 noise. A group drill sits with the heading, so a bucket with no headings
 offers none; its core group is the whole bucket.
