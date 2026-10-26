@@ -256,7 +256,6 @@ data.*
   **I decided:** Claude implements and investigates; I decide the design. The
   nav gets the 1040px column on every page, its own PR after this one, and
   the doubled notch inset on landscape phones becomes its own issue
-- the nav lined up with the 1040px page column `#562`
 - called the phone redesign done at four PRs; the authenticator forms work
   fine for me, so no code screens
 - glossary terms on the reference dropdown and every Learn page `#556`
@@ -267,6 +266,7 @@ data.*
   before writing any term list; fix the three wrong-sense entries here and
   leave the backfill, the matcher and the technique terms to the next PR;
   pin the "None" lesson rows as they render today rather than fix them
+- the nav takes the page's 1040px column on every page at desktop widths `#562`
 
 ## Mon Oct 26
 
@@ -282,4 +282,7 @@ data.*
   days of exercise text, with my yes on the export and a read of the listing
   before the PR leaves draft; after deploy only the coverage script re-runs;
   a 480-or-fewer bar that reports a miss and never blocks the merge; drop
-  `indexes`, `indexed`, `injected` and `inferred` after reading the listing
+  `indexes`, `indexed`, `injected` and `inferred` after reading the listing;
+  then `normalize`, `normalized`, `injecting` and `lift it up` from the
+  critical review; the listing tool gets tracked; the pre-submission tooltip
+  question becomes an issue
