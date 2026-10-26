@@ -8,7 +8,7 @@ module GlossaryLengthRule
   ].freeze
   SENTENCE_END = /[.!?](?=\s+[A-Z])/
   MAX_CHARS = 180
-    CEILING_CHARS = 300
+  CEILING_CHARS = 300
 end
 
 RSpec.describe Glossary do
