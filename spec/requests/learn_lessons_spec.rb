@@ -59,6 +59,34 @@ RSpec.describe "Learn lessons", type: :request do
       expect(Nokogiri::HTML(response.body).at_css("a.learn-back")["href"]).to eq(learn_path)
     end
 
+    describe "glossary terms" do
+      let(:fixture) do
+        { group: "meta_skill", summary: "A closure summary",
+          sections: [
+            { heading: "The closure heading",
+              blocks: [ [ :paragraph, "A closure holds a closure." ], [ :steps, [ [ "Look", "A closure here" ] ] ], [ :code, "closure = 1" ] ] },
+            { heading: "Second", blocks: [ [ :paragraph, "Plain text." ] ] }
+          ] }
+      end
+
+      before do
+        stub_glossary("closure" => "A function that keeps its surroundings.")
+        allow(LearnLessons).to receive(:find).with("fixture").and_return(fixture)
+      end
+
+      it "wraps paragraphs and step text, never headings, labels, the summary or code" do
+        get learn_lesson_path(lesson: "fixture")
+
+        page = Nokogiri::HTML(response.body)
+        expect(page.css("p:not(:has(strong)) .gloss-term").size).to eq(1)
+        expect(page.css("li .gloss-term").size).to eq(1)
+        expect(page.css("li strong .gloss-term")).to be_empty
+        expect(page.css("h2 .gloss-term, p strong .gloss-term, pre .gloss-term")).to be_empty
+        expect(page.css(".gloss-term")).not_to be_empty
+        expect(page.css("a .gloss-term, button .gloss-term, summary .gloss-term, label .gloss-term, :not(body)[data-action*=click] .gloss-term")).to be_empty
+      end
+    end
+
     it "is a 404 for a lesson that does not exist" do
       get learn_lesson_path(lesson: "n_plus_one")
 

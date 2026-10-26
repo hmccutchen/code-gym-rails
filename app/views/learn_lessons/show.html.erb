@@ -9,11 +9,11 @@
   <% section[:blocks].each do |type, content| %>
     <% case type %>
     <% when :paragraph %>
-      <p><%= content %></p>
+      <p><%= glossary_wrap(content) %></p>
     <% when :steps %>
       <ol class="learn-lesson-steps">
         <% content.each do |label, text| %>
-          <li><strong><%= label %>.</strong> <%= text %></li>
+          <li><strong><%= label %>.</strong> <%= glossary_wrap(text) %></li>
         <% end %>
       </ol>
     <% when :code %>
