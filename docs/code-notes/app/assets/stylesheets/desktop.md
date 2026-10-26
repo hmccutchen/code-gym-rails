@@ -64,10 +64,13 @@ cap wins. `desktop_stylesheet_spec` holds that order. `container_gutter_spec` ho
 
 - The open legend is four across, so its 7 entries make a row of 4 and a row
   of 3.
-- `.progress-groups` is a two-column grid, so a bucket's groups sit two
-  across. `.progress-buckets` is one too, and a bucket with more than one
-  group (`.progress-bucket-grouped`) spans both columns. The single-group
-  buckets then sit two to a row instead of each stretching across 1040px.
+- A grouped bucket's `.progress-groups` is a two-column grid, so its groups
+  sit two across. `.progress-buckets` is one too, and a bucket with more than
+  one group (`.progress-bucket-grouped`) spans both columns. A single-group
+  bucket's `.progress-groups` stays a flex column, since it already sits in
+  one column of the outer grid and a second grid would halve its card again.
+  The single-group buckets then sit two to a row instead of each stretching
+  across 1040px.
 - `align-items: start` keeps a group at its own height when the one beside
   it opens.
 - Both grids use `minmax(0, 1fr)`, for the same reason as History's entries

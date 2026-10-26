@@ -9,7 +9,7 @@
   .history-page details.review { max-width: 65ch; }
 
   .progress-page .progress-legend { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .progress-page .progress-buckets, .progress-page .progress-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .progress-page .progress-buckets, .progress-page .progress-bucket-grouped .progress-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   .progress-page .progress-bucket-grouped { grid-column: 1 / -1; }
   .progress-page .progress-note { max-width: 65ch; }
 }

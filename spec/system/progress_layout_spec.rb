@@ -143,7 +143,8 @@ RSpec.describe "Progress layout", type: :system do
 
       flat_first, flat_second = flat_cards
       expect(flat_second["top"]).to be_within(0.5).of(flat_first["top"])
-      expect(flat_second["left"]).to be > flat_first["right"]
+      expect(flat_second["left"] - flat_first["right"]).to be_within(0.5).of(16)
+      [ first, second, flat_first, flat_second ].each { |card| expect(card["width"]).to be_within(0.5).of((1040 - 16) / 2.0) }
     end
 
     it "leaves the group beside an open one at its own height" do
