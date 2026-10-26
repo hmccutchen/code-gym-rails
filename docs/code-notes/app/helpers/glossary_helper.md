@@ -45,9 +45,12 @@ span inside a highlighted block would break the highlighter's markup. So the
 code example, the worked example's code and every `<code>` span stay as they
 are. Views call the wrapper only for prose fields.
 
-## Alternate framings stay plain
+## Alternate framings are wrapped in the request
 
-Alternate framings of a concept arrive after the page loads, as text that
-`concept_alternates_controller.js` inserts with `textContent`. No term in them
-is wrapped, since the helper only runs when the server renders a page. Issue
-#557 tracks wrapping them.
+Alternate framings of a concept arrive after the page loads, so no view wraps
+them. `ConceptReferencesController#explain_differently` runs the framing
+through this helper and returns the result as `alternate_html`, escaped again
+because the helper returns plain, unescaped text when no term matches and the
+page inserts the field with `innerHTML`.
+`docs/code-notes/app/controllers/concept_references_controller.md` has the
+detail. Framings of a reviewed section are still plain text.

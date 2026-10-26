@@ -108,6 +108,25 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
     end
   end
 
+  it "shows a framing from a server that sends no HTML as plain text, since the call was already paid for" do
+    user = create_fake_provider_user
+    cache_reference
+
+    travel_to(a_weekday) do
+      box = open_reference(user)
+      stub_fetch(box["data-concept-alternates-url-value"], <<~JS)
+        Promise.resolve(new Response(JSON.stringify({ status: "ok", alternate: "<b>Bold</b> eager loading", remaining: 1 }),
+          { status: 200, headers: { "Content-Type": "application/json" } }))
+      JS
+
+      box.find(".explain-concept-differently").click
+
+      expect(box.find(".alternate-item")).to have_text("<b>Bold</b> eager loading")
+      expect(box).to have_no_css(".alternate-item b, .alternate-item .gloss-term")
+      expect(box.find(".alternate-status")).to have_text("A different explanation was added above")
+    end
+  end
+
   it "takes no space on the page while the dropdown is collapsed" do
     user = create_fake_provider_user
     cache_reference

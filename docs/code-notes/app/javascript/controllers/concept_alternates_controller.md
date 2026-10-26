@@ -33,4 +33,6 @@ which the server escapes and marks up with `glossary_wrap`, so its glossary
 terms work like any other: the layout's glossary controller listens on the
 page and finds a term by its class. The cap's `Map` keeps the plain
 `alternate`, which is what goes back as `prior_alternates`. A reply without a
-string `alternate_html` counts as a failure.
+string `alternate_html` can only come from a server running the earlier code
+during a deploy; its framing was already generated and paid for, so the page
+shows the plain `alternate` with `textContent` rather than a failure.
