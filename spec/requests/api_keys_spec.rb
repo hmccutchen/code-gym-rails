@@ -177,6 +177,21 @@ RSpec.describe "ApiKeys", type: :request do
   end
 
   describe "GET /setup" do
+    it "marks the page and wraps each Exercise mix group's kinds for the desktop grid" do
+      login_as(user)
+
+      get setup_path
+
+      page = Nokogiri::HTML(response.body)
+      expect(page.at_css("main .phone-page.settings-page")).to be_present
+      groups = page.css("#exercise-mix fieldset.mix-group")
+      expect(groups).not_to be_empty
+      groups.each do |group|
+        expect(group.css(".mix-row").size).to eq(group.css("> .mix-kinds > .mix-row").size)
+        expect(group.css("> .mix-kinds .mix-last-note")).to be_empty
+      end
+    end
+
     it "offers a provider choice for each saved key only, with the one in use checked" do
       user.update!(provider: "openai", api_keys: { "anthropic" => "sk-ant-existing", "openai" => "sk-proj-kept" })
       login_as(user)
