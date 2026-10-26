@@ -91,6 +91,12 @@ RSpec.describe Glossary do
       expect(audit_keys - Glossary::TERMS.keys).to be_empty
     end
 
+    it "leaves the words the wrong-sense listing caught in another sense unmatched" do
+      %w[indexes indexed injected inferred].each do |word|
+        expect(Glossary.key_for(word)).to be_nil, "#{word} matched again; the production listing read it in another sense"
+      end
+    end
+
     it "resolves a plural to its singular entry rather than to a shorter key inside it" do
       expect(Glossary.key_for("unique indexes")).to eq("unique index")
       expect(Glossary.key_for("Dead-letter queues")).to eq("dead-letter queue")

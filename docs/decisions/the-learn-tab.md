@@ -149,12 +149,15 @@ their text. A separate agent fact-checked the 37 definitions and found six
 wrong, which were corrected. Every new key and form also runs through a
 wrong-sense listing over production reference prose and the app owner's last
 60 days of exercise text, and a match in another sense drops the key or form
-before the change merges. That listing ran on 2026-10-26.
+before the change merges. That listing ran on 2026-10-26 and dropped four
+forms: `indexes` and `indexed` (search indexes, array positions, TypeScript's
+indexed access types), `injected` (an injected script) and `inferred` (an
+inferred intent).
 
 Coverage is measured by `script/glossary_coverage.rb` over the audit's three
 TSVs, for the rows a reader sees. At main, 104 were matched as a whole term,
 41 matched inside a longer term and 625 matched nothing. After batch one, 259
-match as a whole term, 42 inside a longer term and 469 match nothing. The bar
+match as a whole term, 41 inside a longer term and 470 match nothing. The bar
 was 480 or fewer unmatched, so it is met. Batch two takes its input from the
 top unmatched terms after the audit is re-run on the deployed glossary. The
 largest are `selector`, `context`, `binary search`, `concurrent index build`,
