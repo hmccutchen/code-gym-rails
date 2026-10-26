@@ -70,8 +70,7 @@ read it before changing that area.
   styles of its own keeps them in `app/assets/stylesheets/pages/<page>.css`,
   phone rules first and its 900px rules in one block at the end
   (`page_stylesheets_spec`), linked by `page_stylesheet` between `desktop` and
-  the display sheets (the light palette's equal-weight overrides need to load
-  after it). A view holds no `<style>` unless design warrants it
+  the display sheets (the user's preferences load last). A view holds no `<style>` unless design warrants it
   (`app_views_spec`); a rule more than one page uses stays shared.
 - **Desktop layout** (`docs/decisions/desktop-layout.md`): at 900px and wider
   a page that calls `wide_page` gets a centered column up to 1040px, built

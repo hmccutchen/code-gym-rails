@@ -26,12 +26,13 @@ attribute, and any author `display` rule beats the browser's own `[hidden]`
 rule. Two rules restore it here: the page sheet's `.learn-entry[hidden]` and
 `phone_cards.css`'s `:is(.phone-page, .card-page) [hidden]`, both at 0,2,0.
 The phone rules on those three classes stay at 0,1,0, under both.
-The page sheet loads after `phone_cards.css`, so a desktop rule at 0,2,0 that
-set `display` on one of them would win the tie and stop the filter on a
-desktop only. The grids therefore sit on `.learn-buckets` and `.learn-groups`,
-which the filter never hides, and `page_stylesheets_spec` fails on a
-desktop rule that sets `display` on a selector whose last part names one of
-those three classes, `.learn-bucket-grouped` included.
+The page sheet loads after `phone_cards.css`, so any rule in it at 0,2,0 that
+set `display` on one of them would win the tie and stop the filter, on a
+phone or a desktop. The grids therefore sit on `.learn-buckets` and
+`.learn-groups`, which the filter never hides, and `page_stylesheets_spec`
+fails on any rule in the sheet heavier than one class that sets `display` on a
+selector whose last part names one of those three classes,
+`.learn-bucket-grouped` included.
 
 ## Featured concept
 

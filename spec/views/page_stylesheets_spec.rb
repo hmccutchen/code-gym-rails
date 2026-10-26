@@ -56,11 +56,12 @@ RSpec.describe "page stylesheets" do
     expect(after_desktop_block(css)).to eq(".b { color: blue; }")
   end
 
-  it "never sets display on an element the Learn filter hides, so its [hidden] keeps working on a desktop" do
-    desktop = rules_for("learn").select { |rule| rule.media == [ DESKTOP_QUERY ] && rule.declaration("display") }
+  it "never outweighs the card page's [hidden] rule on an element the Learn filter hides, at any width" do
+    weighty = rules_for("learn").select { |rule| rule.declaration("display") }.flat_map(&:selectors)
+                                .reject { |selector| selector.match?(/\A\.[a-z-]+\z/) || selector.end_with?("[hidden]") }
 
-    desktop.flat_map(&:selectors).each do |selector|
-      expect(hidden_by_filter?(selector)).to be(false), "#{selector} sets display"
+    weighty.each do |selector|
+      expect(hidden_by_filter?(selector)).to be(false), "#{selector} sets display at the weight of :is(.phone-page, .card-page) [hidden] or more"
     end
   end
 

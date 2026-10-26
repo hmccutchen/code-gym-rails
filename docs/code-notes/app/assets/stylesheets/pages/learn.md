@@ -1,6 +1,6 @@
 # pages/learn.css
 
-the Learn index's styles: its phone rules, then its desktop rules in one
+The Learn index's styles: its phone rules, then its desktop rules in one
 `@media (min-width: 900px)` block at the end, so a desktop rule wins every tie
 with the page's phone rules. The layout links it on the Learn index only, through
 `page_stylesheet` (`docs/decisions/page-stylesheets.md`).
@@ -25,8 +25,9 @@ muted-colour rule for a rule of its own here.
   opens beside it.
 - The prepare and drills boxes stay full width, with their sentences held to
   `65ch`.
-- No rule here sets `display` on `.learn-bucket`, `.learn-group-block` or
-  `.learn-entry`, the elements the filter hides; the grids sit on their
+- No desktop rule here sets `display` on `.learn-bucket`, `.learn-group-block`
+  or `.learn-entry`, the elements the filter hides, and no phone rule does so
+  above one class; the grids sit on their
   wrappers, and `page_stylesheets_spec` holds that (`docs/code-notes/app/views/learn/index.html.md`).
 - A selector list is written out in full, not inside `:is()`:
   `page_stylesheets_spec` reads selectors with `ViewStyles`, which splits a

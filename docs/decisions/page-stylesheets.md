@@ -19,10 +19,13 @@ page's phone rules by coming last in the same file.
 A view calls `page_stylesheet "history"` beside `page_title` and `wide_page`.
 The layout links `pages/<name>` right after `desktop` and before the display
 sheets. After `desktop`, so the page's rules win ties with the shared sheets
-as a view's `<style>` did. Before `display` and `display_light`, because the
-light palette overrides the Learn search field's border with a rule of the
-same weight and wins only by loading later. One sheet per page: a second call
-replaces the first.
+as a view's `<style>` did. Before `display` and `display_light`, because those
+are the user's display preferences and load last on purpose. Their overrides
+of page rules (the light palette's field border and rung colours) already
+outweigh them, so the order is a margin, not what makes them win. One sheet
+per page: a second call replaces the first, so a component sheet shared by
+several pages needs the helper to take more than one name when the first
+such partial moves.
 
 ## What stays shared
 
