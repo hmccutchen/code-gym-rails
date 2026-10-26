@@ -13,9 +13,9 @@ of its key. Bare adjectives like `pure` and `immutable`, and words that are no
 key's inflection, stay out.
 
 Forms are unique across the glossary. No form equals a key or another key's
-form, and `glossary_spec` fails when one does. That spec also pins the
-longest-wins order: "composite index" shows its own entry, and the
-shorter key `indexing` does not win inside it.
+form, and `glossary_spec` fails when one does. The pattern lists longer words
+first, so "idempotency key" shows its own entry and the shorter key
+`idempotency` does not win inside it; `glossary_spec` pins that order.
 
 A new key or form is checked against real text before it merges. A listing of
 every match over reference prose and the app owner's recent exercise text, with
