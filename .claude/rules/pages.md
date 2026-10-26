@@ -74,7 +74,8 @@ read it before changing that area.
   each rule scoped to a page class; a view's own `<style>` renders after it,
   so a desktop rule beats one of the view's with a more specific selector.
   A page's targets stay 44px at every width, with no `(pointer: fine)`
-  relaxation; the top nav's links are 34px until #550.
+  relaxation (`nav_link_targets_spec` holds the top nav's links to it); the
+  nav's name field is still under 44px until #555.
 - **Push reminders** (`docs/decisions/push-reminders.md`): Optional weekday
   ready and afternoon nudge notifications. Intent (`User#reminder_level`) and
   transport (`PushSubscription`) are separate: an endpoint can die without

@@ -252,6 +252,10 @@ data.*
   critical review, before the merge
 - the swap picker says "skip" and "turn Skip off" for a skipped kind `#552`
   **I decided:** its own PR, separate from the desktop work
+- the top nav's links to 44px at desktop widths, as foreman `#554`
+  **I decided:** Claude implements and investigates; I decide the design. The
+  nav gets the 1040px column on every page, its own PR after this one, and
+  the doubled notch inset on landscape phones becomes its own issue
 - called the phone redesign done at four PRs; the authenticator forms work
   fine for me, so no code screens
 - glossary terms on the reference dropdown and every Learn page `#556`
