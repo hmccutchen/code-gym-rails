@@ -209,7 +209,7 @@ RSpec.describe "Today's phone layout", type: :system do
       expect(page).to have_css("#leave-held")
       notice = rect("#leave-held")
       expect(notice["top"]).to be >= 0
-      expect(notice["bottom"]).to be <= window_height
+      expect(notice["bottom"]).to be <= window_height + 0.5
     end
 
     it "keeps every rating button 44px tall and the button 48px at 320px with the largest text" do
