@@ -1,0 +1,43 @@
+.page-header { margin-bottom: 2rem; }
+.page-header h1 { font-size: 1.5rem; }
+.page-header .date { color: var(--muted); font-size: .9rem; }
+.page-header .streak { margin-left: .5rem; }
+
+textarea.answer { width: 100%; min-height: 120px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; color: var(--text); font-size: var(--input-font-size); font-family: inherit; resize: vertical; line-height: 1.6; }
+textarea.answer:focus { border-color: var(--accent); }
+textarea.code-answer { font-family: "Fira Code", "Cascadia Code", monospace; font-size: var(--input-font-size); min-height: 160px; }
+
+.progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 1.5rem; }
+.progress-fill { width: 0; height: 100%; background: linear-gradient(90deg, var(--accent), var(--slot-2)); border-radius: 2px; transition: width .3s; }
+@media (prefers-reduced-motion: reduce) { .progress-fill { transition: none; } }
+.progress-label { font-size: .8rem; color: var(--muted); margin-top: .3rem; }
+/* Fixed height, read by scroll-padding-top below so a focused field and its ring stop clear of the bar. */
+:root { --progress-sticky-height: 3.25rem; }
+html:has(.progress-sticky) {
+  scroll-padding-top: calc(var(--progress-sticky-height) + var(--focus-ring-width) + var(--focus-ring-offset));
+}
+.progress-sticky { position: sticky; top: 0; z-index: 10; height: var(--progress-sticky-height); background: var(--bg); padding: .75rem 0 .5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+.progress-sticky .progress-bar { margin-bottom: 0; }
+
+.rating-row { display: flex; gap: .75rem; margin-top: 1rem; }
+.rating-btn { flex: 1; padding: calc(.5rem + 5.5px) .5rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font-size: .85rem; text-align: center; }
+#submit-answers { padding-block: calc(.5rem + 6px); }
+.rating-btn:hover { border-color: var(--accent); }
+.rating-btn.active { background: var(--button-bg); border-color: var(--button-bg); color: #fff; }
+#rating-nudge { margin-top: .5rem; margin-bottom: 1.5rem; }
+
+.regenerate-row { margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.flash.regeneration-failed { margin-bottom: 1.5rem; }
+.auto-saved { font-size: .8rem; color: var(--muted); }
+.trial-banner.hint { margin: -1rem 0 1.5rem; }
+
+.today-state { text-align: center; padding: 3rem; }
+.today-state .spinner { margin-bottom: 1rem; }
+.today-state-title { color: var(--muted); margin-bottom: .5rem; }
+.today-state-message { color: var(--muted); margin-bottom: 1rem; }
+.today-state-detail { font-size: .85rem; color: var(--muted); }
+.today-state-link { font-size: .85rem; }
+.today-state form + .today-state-link { margin-top: 1rem; }
+
+.review-heading-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; }
+.review-heading-row h2 { font-size: 1rem; }

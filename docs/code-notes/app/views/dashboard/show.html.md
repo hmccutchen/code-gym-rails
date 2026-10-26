@@ -1,12 +1,10 @@
 # app/views/dashboard/show.html.erb
 
-## Sticky progress bar height
+## Styles
 
-The sticky progress bar has a fixed height, `--progress-sticky-height`, so the
-page can keep a focused field clear of it. A browser that scrolls a field to
-the top edge stops at `scroll-padding-top`, which reads the same variable. The
-focus ring's width and offset are added because the ring sits outside the
-field.
+The page's styles live in `pages/today.css`
+(`docs/code-notes/app/assets/stylesheets/pages/today.md`), including the
+sticky progress bar's fixed height.
 
 ## Featured concept callout
 
