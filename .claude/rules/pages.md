@@ -74,7 +74,7 @@ read it before changing that area.
   pages. `desktop.css` holds nothing
   outside its one `@media (min-width: 900px)` block (`desktop_stylesheet_spec`),
   each rule scoped to a page class, the wide container or the nav, and none
-  setting `display` on an element a filter hides; it loads
+  setting `display` on an element the Learn filter hides; it loads
   after the layout's `<style>`, so the nav's cap wins a tie with the layout's
   own `nav .inner` rule. A view's own `<style>` renders after it,
   so a desktop rule beats one of the view's with a more specific selector.

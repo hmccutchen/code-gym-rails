@@ -89,9 +89,10 @@ cap wins. `desktop_stylesheet_spec` holds that order. `container_gutter_spec` ho
   Without a featured concept the filter is the only child and spans the row.
 - A grouped bucket's `.learn-groups` is a three-column grid, so its groups sit
   three across. `.learn-buckets` is one too, and a grouped bucket
-  (`.learn-bucket-grouped`) spans it. The four single-group buckets each keep
-  their own heading and sit in rows of three and one, so the fourth sits
-  alone beside two empty cells. A single-group bucket's `.learn-groups` stays
+  (`.learn-bucket-grouped`) spans it. The single-group buckets, one per
+  `ConceptBucket::LANGUAGE_INDEPENDENT` entry and four of them today, each
+  keep their own heading and sit in rows of three and one, so the fourth
+  sits alone beside two empty cells. A single-group bucket's `.learn-groups` stays
   a flex column, as on Progress, so its card isn't split twice.
 - `align-items: start` keeps a card at its own height when a recognition guide
   opens beside it.

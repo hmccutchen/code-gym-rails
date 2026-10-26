@@ -160,6 +160,8 @@ RSpec.describe "Learn layout", type: :system do
       expect(filter["top"]).to be_within(0.5).of(featured["top"])
       [ featured, filter ].each { |card| expect(card["width"]).to be_within(0.5).of(half) }
 
+      expect(flat_cards.size).to eq(ConceptBucket::LANGUAGE_INDEPENDENT.size), "this example expects one card per language-independent bucket"
+      expect(flat_cards.size).to be >= 4, "this example needs a fourth single-group card to start a second row"
       [ grouped_cards, flat_cards ].each do |cards|
         expect(cards[1..2].map { |r| r["top"] }).to all(be_within(0.5).of(cards[0]["top"]))
         expect(cards[3]["top"]).to be >= cards[0]["bottom"]

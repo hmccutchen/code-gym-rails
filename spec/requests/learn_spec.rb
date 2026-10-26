@@ -110,7 +110,6 @@ RSpec.describe "Learn", type: :request do
     end
   end
 
-  # Views resolve headings by key, so a bucket or group missing its string would raise only in the template.
   describe "layout of GET /learn" do
     before { user.update!(language: "ruby_rails") }
 
@@ -227,6 +226,7 @@ RSpec.describe "Learn", type: :request do
     end
   end
 
+  # Views resolve headings by key, so a bucket or group missing its string would raise only in the template.
   describe "heading coverage" do
     it "has a locale string for every bucket a user can browse" do
       ConceptVocabulary.languages.each do |bucket|

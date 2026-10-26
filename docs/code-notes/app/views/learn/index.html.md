@@ -30,7 +30,8 @@ The phone rules on those three classes stay at 0,1,0, under both.
 set `display` on one of them would win the tie and stop the filter on a
 desktop only. The grids therefore sit on `.learn-buckets` and `.learn-groups`,
 which the filter never hides, and `desktop_stylesheet_spec` fails on a
-desktop rule that sets `display` on a hidden class.
+desktop rule that sets `display` on a selector whose last part names one of
+those three classes, `.learn-bucket-grouped` included.
 
 ## Featured concept
 
@@ -54,11 +55,11 @@ already makes mostly harmless.
 
 ## Group headings
 
-A bucket with more than one group carries `.learn-bucket-grouped`, which the
-desktop grid reads. A bucket whose concepts all fall in one group renders flat. That covers every
+A bucket whose concepts all fall in one group renders flat. That covers every
 language-independent bucket, where a heading over the only group would be
 noise. A group drill sits with the heading, so a bucket with no headings
-offers none; its core group is the whole bucket.
+offers none; its core group is the whole bucket. A bucket with more than one
+group carries `.learn-bucket-grouped`, which the desktop grid reads.
 
 ## Not-generated markers
 
