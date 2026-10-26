@@ -3,7 +3,8 @@
 The app is laid out for a phone first. At 900px and wider, a page that asks
 for it gets a desktop layout: a centered column up to 1040px wide, with the
 page's own arrangement inside it (History puts its title in a left rail beside
-the entries). Pages move onto it one at a time: History first, then Progress, then Learn.
+the entries). Pages move onto it one at a time: History first, then
+Progress, Learn, and Account and Settings.
 
 ## The breakpoints
 

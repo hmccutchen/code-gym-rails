@@ -225,6 +225,16 @@ RSpec.describe "Accounts", type: :request do
   end
 
   describe "card order" do
+    it "marks the page and its identity card for the desktop grid" do
+      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+
+      get account_path
+
+      page = Nokogiri::HTML(response.body)
+      expect(page.at_css("main .phone-page.account-page")).to be_present
+      expect(page.css("main .account-page > .card").first["class"].split).to include("account-id-card")
+    end
+
     def card_headings
       Nokogiri::HTML(response.body).css("main .phone-page > .card").map { |card| card.at_css("h2")&.text&.strip }
     end

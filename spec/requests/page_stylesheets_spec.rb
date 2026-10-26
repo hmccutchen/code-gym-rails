@@ -14,7 +14,8 @@ RSpec.describe "Page stylesheets", type: :request do
 
   def page_sheets = stylesheets.grep(%r{\Apages/})
 
-  { "history" => :history_path, "progress" => :progress_path, "learn" => :learn_path }.each do |page, path|
+  { "history" => :history_path, "progress" => :progress_path, "learn" => :learn_path,
+    "account" => :account_path, "settings" => :setup_path }.each do |page, path|
     it "links #{page}'s own sheet, after the desktop sheet and before the display sheets" do
       get public_send(path)
 
@@ -27,7 +28,7 @@ RSpec.describe "Page stylesheets", type: :request do
   end
 
   it "links no page sheet on a page that has none" do
-    [ root_path, setup_path, account_path, learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one") ].each do |path|
+    [ root_path, learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one") ].each do |path|
       get path
       expect(page_sheets).to be_empty, "#{path} links #{page_sheets.inspect}"
     end

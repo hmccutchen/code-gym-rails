@@ -177,6 +177,21 @@ RSpec.describe "ApiKeys", type: :request do
   end
 
   describe "GET /setup" do
+    it "marks the page and wraps each Exercise mix group's kinds for the desktop grid" do
+      login_as(user)
+
+      get setup_path
+
+      page = Nokogiri::HTML(response.body)
+      expect(page.at_css("main .phone-page.settings-page")).to be_present
+      groups = page.css("#exercise-mix fieldset.mix-group")
+      expect(groups).not_to be_empty
+      groups.each do |group|
+        expect(group.css(".mix-row").size).to eq(group.css("> .mix-kinds > .mix-row").size)
+        expect(group.css("> .mix-kinds .mix-last-note")).to be_empty
+      end
+    end
+
     it "offers a provider choice for each saved key only, with the one in use checked" do
       user.update!(provider: "openai", api_keys: { "anthropic" => "sk-ant-existing", "openai" => "sk-proj-kept" })
       login_as(user)
@@ -480,21 +495,20 @@ RSpec.describe "ApiKeys", type: :request do
       expect(page.css("#exercise-mix .mix-coverage").map { |note| note["class"].split }).to all(include("card-note"))
     end
 
-    it "carries the difficulty controls' styles once, however many kinds render them" do
+    it "styles the difficulty controls from the page's one sheet, however many kinds render them" do
       get setup_path
 
       page = Nokogiri::HTML(response.body)
       expect(page.css("fieldset.mix-difficulty").size).to be > 1
-      expect(page.css("style").count { |style| style.text.include?(".mix-difficulty {") }).to eq(1)
-      expect(response.body).not_to include(".mix-difficulty.mix-suggested {")
+      expect(page.css("style").select { |style| style.text.include?(".mix-difficulty") }).to be_empty
+      expect(page.css("fieldset.mix-difficulty.mix-suggested")).to be_empty
     end
 
-    it "adds the suggestion outline's style only when the page marks a suggested kind" do
+    it "marks only the suggested kinds' controls for the outline" do
       get setup_path(suggested: %w[code_review pattern], suggested_level: "junior")
 
       page = Nokogiri::HTML(response.body)
-      expect(page.css("fieldset.mix-difficulty.mix-suggested").size).to eq(2)
-      expect(page.css("style").count { |style| style.text.include?(".mix-difficulty.mix-suggested {") }).to eq(1)
+      expect(page.css("fieldset.mix-difficulty.mix-suggested").map { |box| box["data-kind"] }).to match_array(%w[code_review pattern])
     end
 
     it "hides the bulk button from a trial account" do
