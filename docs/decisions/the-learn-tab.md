@@ -128,3 +128,34 @@ The architecture section's inline reference
 (`responses/bodies/_architecture.html.erb`, built from the exercise JSON) stays
 plain too, because the production audit never covered that text. Issue #561
 covers auditing and wrapping it.
+
+**Glossary backfill, batch one (2026-10-26).** The production audit of the
+existing references found 770 term rows in fields a reader sees, and 625 of
+them matched no glossary entry. Batch one adds 37 keys, the terms used in three
+or more references plus five named techniques (idempotency key, backfill,
+compensating action, form object, value object). It leaves out `context`,
+`origin`, `selector` and `fake`, each of which has a second common sense, and
+leaves the 115 less common terms to batch two.
+
+Word forms are hand-listed in `Glossary::FORMS`, one list per key, because a
+suffix rule would match verbs ("concerns", "fakes") and double-count
+"indexing". `Glossary.key_for` maps any matched word to its key, so "memoized"
+shows the memoization entry and a key and its form underline once per field.
+The five duplicate plural keys were folded into forms of their singular.
+
+New entries are one sentence of at most 180 characters. Twelve older entries
+that break the rule are named in `GlossaryLengthRule::LONG_ENTRIES` and keep
+their text. A separate agent fact-checked the 37 definitions and found six
+wrong, which were corrected. Every new key and form also runs through a
+wrong-sense listing over production reference prose and the operator's last
+60 days of exercise text, and a match in another sense drops the key or form
+before the change merges.
+
+Coverage is measured by `script/glossary_coverage.rb` over the audit's three
+TSVs, for the rows a reader sees. At main, 104 were matched as a whole term,
+41 matched inside a longer term and 625 matched nothing. After batch one, 259
+match as a whole term, 42 inside a longer term and 469 match nothing. The bar
+was 480 or fewer unmatched, so it is met. Batch two takes its input from the
+top unmatched terms after the audit is re-run on the deployed glossary. The
+largest are `selector`, `context`, `binary search`, `concurrent index build`,
+`fake`, `origin`, `outbox pattern`, `preloading` and `result object`.

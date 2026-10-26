@@ -40,6 +40,8 @@ read it before changing that area.
   out, and "seen" reads `ConceptExposureIndex#count`, never `ConceptMastery`.
   Every prose reference field renders through `glossary_wrap`, and the wrapper
   never touches code (`code_example`, a worked example's code, `<code>` spans).
+  A word in `Glossary::FORMS` resolves to its key's definition, and a new entry
+  is one sentence of at most 180 characters.
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
   `ConceptGroup` or language-independent bucket gets one shared
   `RecognitionGuide` on how to look for that kind of problem. It teaches a

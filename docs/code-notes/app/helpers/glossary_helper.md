@@ -11,7 +11,9 @@ One underline for a whole page would leave every later field plain.
 
 `seen` holds keys, resolved through `Glossary.key_for`, so "memoization" and
 then "memoized" in one field underline once. The span keeps the text's own
-word and takes the key's definition.
+word and takes the key's definition. The helper never inspects forms itself:
+`Glossary.key_for` is the one place that knows a word is a form, so a new form
+needs no change here (see `docs/code-notes/app/models/glossary.md`).
 
 Pass `seen:` to share one set across several calls that make up one field.
 `#glossary_wrap_prose` does this.
