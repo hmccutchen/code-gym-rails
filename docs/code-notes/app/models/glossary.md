@@ -23,6 +23,11 @@ context on both sides, shows any match in a different sense from its key. That
 listing gates forms as well as keys, and a wrong-sense match drops the form or
 gives it a longer phrase.
 
+`script/glossary_sense_listing.rb` produces that listing. Give it the export as
+JSONL (`source`, `id`, `field` and `text` on each line) and the keys from `main`,
+and it prints every match of a new key or form, grouped by key. The export stays
+outside the repository.
+
 ## `key_for`
 
 `key_for(text)` returns the key that a matched word belongs to, whether the
