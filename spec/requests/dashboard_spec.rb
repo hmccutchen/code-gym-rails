@@ -426,7 +426,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       summary = Nokogiri::HTML(response.body).at_css(%(details.section[data-section-fold="pattern"] > summary))
       expect(summary.text).to include("Service Objects")
       expect(summary.css(".gloss-term")).to be_empty
-      expect(response.body).to include(%(<span class="gloss-term" data-definition="#{ERB::Util.html_escape(Glossary::TERMS['service objects'])}"))
+      expect(response.body).to include(%(<span class="gloss-term" data-definition="#{ERB::Util.html_escape(Glossary::TERMS['service object'])}"))
+      expect(response.body).to include(">Service objects</span>")
 
       create_response(exercise)
       get root_path

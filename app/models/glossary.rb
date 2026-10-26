@@ -1,4 +1,4 @@
-# Hand-curated; keys must already be lowercase, since glossary_wrap downcases only the matched text.
+# Hand-curated; keys must already be lowercase, since key_for downcases only the text it looks up.
 module Glossary
   TERMS = {
     "abstraction" => "Hiding the messy details behind a simpler interface so callers only need to know what something does, not how.",
@@ -13,7 +13,6 @@ module Glossary
     "async/await" => "Syntax for writing asynchronous, promise-based code that reads top-to-bottom like synchronous code.",
     "authorization" => "Checking whether an already-identified user is allowed to perform a specific action, distinct from authentication (who they are).",
     "background job" => "Work queued to run outside the request/response cycle, so a slow task doesn't make the user wait for it.",
-    "background jobs" => "Work queued to run outside the request/response cycle, so a slow task doesn't make the user wait for it.",
     "big o notation" => "A way to describe how an algorithm's time or memory use grows as its input grows, ignoring constant factors.",
     "blue-green deployment" => "Running two identical production environments and switching traffic from one to the other, so a release has an instant rollback path.",
     "build vs buy" => "The decision between building a capability in-house versus adopting an existing tool or vendor for it.",
@@ -29,7 +28,6 @@ module Glossary
     "canary release" => "Rolling a change out to a small slice of traffic first, so a bad deploy affects a few users instead of everyone.",
     "circuit breaker" => "A safeguard that stops calling a failing dependency for a while after repeated failures, instead of retrying into a wall.",
     "closure" => "A function that remembers the variables from where it was defined, even after that outer scope has finished running.",
-    "closures" => "A function that remembers the variables from where it was defined, even after that outer scope has finished running.",
     "closures in loops" => "A classic bug where every closure created inside a loop captures the same variable binding, not a snapshot of its value at that iteration.",
     "code splitting" => "Breaking a JS bundle into smaller chunks that load only when needed, instead of one large file up front.",
     "cognitive load" => "How much a reader has to hold in their head to change a piece of code safely — every extra thing they must know before touching it is part of the cost.",
@@ -126,7 +124,6 @@ module Glossary
     "pass through method" => "A method that does little but forward its arguments to another method with a nearly identical signature, adding an interface to learn without hiding anything.",
     "pessimistic locking" => "Locking a row for the duration of a transaction so no other transaction can touch it, trading concurrency for certainty.",
     "policy object" => "A class that centralizes an authorization decision (can this user do this?) instead of scattering permission checks through controllers.",
-    "policy objects" => "A class that centralizes an authorization decision (can this user do this?) instead of scattering permission checks through controllers.",
     "polymorphism" => "Different objects responding to the same method call in ways specific to their own type.",
     "primitive obsession" => "Representing a domain concept with a raw primitive (a string, a number) instead of a type of its own, losing the validation and meaning a dedicated object would carry.",
     "promise" => "An object representing the eventual result (or failure) of an asynchronous operation, which callbacks or await can attach to.",
@@ -136,7 +133,6 @@ module Glossary
     "pub/sub" => "A messaging pattern where publishers emit events without knowing who's listening, and subscribers receive events without knowing who sent them.",
     "pure function" => "A function whose output depends only on its inputs and that causes no observable side effects, making it predictable and easy to test.",
     "query object" => "A class that encapsulates a specific, reusable database query, keeping complex query logic out of the model.",
-    "query objects" => "A class that encapsulates a specific, reusable database query, keeping complex query logic out of the model.",
     "race condition" => "A bug where the outcome depends on the unpredictable timing of concurrent operations, e.g. two requests reading-then-writing the same value.",
     "rate limiting" => "Capping how many requests a client can make in a given time window, to protect a system from overload or abuse.",
     "reading for intent" => "Reading code or a request for what it's trying to accomplish, not just what it literally does — the difference between spotting a bug and spotting a mismatch between the code and its actual goal.",
@@ -153,7 +149,6 @@ module Glossary
     "separating symptom from cause" => "Distinguishing what a bug or complaint looks like on the surface from what's actually producing it, so a fix addresses the root cause rather than papering over its visible effect.",
     "service boundaries" => "The lines drawn between separate services in a system, defining what each one owns and how they're allowed to talk to each other.",
     "service object" => "A plain class that holds a single business operation, used when logic doesn't naturally belong on a model or in a controller.",
-    "service objects" => "A plain class that holds a single business operation, used when logic doesn't naturally belong on a model or in a controller.",
     "shallow module" => "A module whose interface costs about as much to learn as the implementation it hides, so wrapping it buys little; the opposite is a deep module with a simple interface over real complexity.",
     "sharding" => "Splitting a dataset across multiple databases, each holding a subset of the rows, to scale beyond what one database can hold.",
     "shotgun surgery" => "A single change that forces small edits across many unrelated classes or files, a sign the behavior it touches isn't consolidated anywhere.",
@@ -206,10 +201,56 @@ module Glossary
     TERMS.transform_keys { |term| "glossary:#{term}" }
   end
 
-  # Longest term first, so the alternation prefers the longer of two overlapping terms at the same position.
-  def self.pattern_for(terms)
-    Regexp.union(terms.keys.sort_by { |term| -term.length }.map { |term| /\b#{Regexp.escape(term)}\b/i })
+  FORMS = {
+    "memoization" => %w[memoized memoizing],
+    "indexing" => %w[indexes indexed],
+    "sharding" => %w[shards sharded],
+    "webhook" => %w[webhooks],
+    "thread pool" => [ "thread pools" ],
+    "thread safety" => %w[thread-safe],
+    "stub" => %w[stubs],
+    "mock" => %w[mocks],
+    "race condition" => [ "race conditions" ],
+    "pessimistic locking" => [ "pessimistic locks" ],
+    "normalization" => %w[normalize normalized],
+    "n+1" => %w[n+1s],
+    "missing index" => [ "missing indexes" ],
+    "composite index" => [ "composite indexes" ],
+    "garbage collection" => [ "garbage collected" ],
+    "foreign key" => [ "foreign keys" ],
+    "feature flag" => [ "feature flags" ],
+    "duck typing" => %w[duck-typed],
+    "dependency injection" => %w[injecting injected],
+    "debouncing" => %w[debounce debounced],
+    "canary release" => %w[canaries],
+    "type inference" => %w[inferred],
+    "union type" => [ "union types" ],
+    "state lifting" => [ "lift it up" ],
+    "background job" => [ "background jobs" ],
+    "closure" => %w[closures],
+    "policy object" => [ "policy objects" ],
+    "query object" => [ "query objects" ],
+    "service object" => [ "service objects" ]
+  }.freeze
+
+  # Longest first, so the alternation prefers the longer of two overlapping words at the same position.
+  def self.pattern_for(terms, forms = {})
+    words = terms.keys + forms.values.flatten
+    Regexp.union(words.sort_by { |word| -word.length }.map { |word| /\b#{Regexp.escape(word)}\b/i })
   end
 
-  TERM_PATTERN = pattern_for(TERMS)
+  TERM_PATTERN = pattern_for(TERMS, FORMS)
+
+  def self.key_for(text)
+    lookup[text.downcase]
+  end
+
+  def self.lookup
+    return @lookup if @lookup_terms.equal?(TERMS) && @lookup_forms.equal?(FORMS)
+
+    @lookup_terms = TERMS
+    @lookup_forms = FORMS
+    @lookup = TERMS.keys.index_with { |key| key }.merge(FORMS.flat_map { |key, forms| forms.map { |form| [ form, key ] } }.to_h)
+  end
+  private_class_method :lookup
 end

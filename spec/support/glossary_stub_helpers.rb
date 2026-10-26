@@ -1,7 +1,8 @@
 module GlossaryStubHelpers
-  def stub_glossary(terms)
+  def stub_glossary(terms, forms = {})
     stub_const("Glossary::TERMS", terms)
-    stub_const("Glossary::TERM_PATTERN", Glossary.pattern_for(terms))
+    stub_const("Glossary::FORMS", forms)
+    stub_const("Glossary::TERM_PATTERN", Glossary.pattern_for(terms, forms))
   end
 end
 

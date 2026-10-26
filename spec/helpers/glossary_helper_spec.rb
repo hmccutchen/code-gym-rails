@@ -45,6 +45,30 @@ RSpec.describe GlossaryHelper, type: :helper do
       expect(result).not_to include('data-definition="shorter"')
     end
 
+    it "wraps an inflected form with its key's definition and keeps the text's own word" do
+      stub_glossary({ "memoization" => "M." }, { "memoization" => %w[memoized] })
+      result = helper.glossary_wrap("It is memoized.")
+
+      expect(result).to include('data-definition="M."')
+      expect(result).to include(">memoized</span>")
+    end
+
+    it "underlines a key and its form once per field" do
+      stub_glossary({ "memoization" => "M." }, { "memoization" => %w[memoized] })
+      result = helper.glossary_wrap("memoization helps; memoized code is fast")
+
+      expect(result.scan("gloss-term").size).to eq(1)
+    end
+
+    it "prefers the longer plural form" do
+      stub_glossary({ "indexing" => "I.", "unique index" => "U." },
+                    { "indexing" => %w[indexes], "unique index" => [ "unique indexes" ] })
+      result = helper.glossary_wrap("two unique indexes")
+
+      expect(result.scan("gloss-term").size).to eq(1)
+      expect(result).to include('data-definition="U."')
+    end
+
     it "silently skips a term with no match in the text" do
       stub_glossary("nonexistentword" => "def")
       result = helper.glossary_wrap("Nothing to see here.")
