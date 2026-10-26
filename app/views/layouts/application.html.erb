@@ -234,10 +234,10 @@
     details.section > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
     details.section > summary::-webkit-details-marker { display: none; }
     details.section > summary::before, details.ref summary::before, details.hint summary::before, details.kind-about summary::before,
-    details.review summary::before, details.answers summary::before, details.progress-group summary::before { content: ""; display: inline-block; flex-shrink: 0; width: .45rem; height: .45rem; margin-inline: .1rem .5rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-25%) rotate(45deg); transition: transform .2s; }
+    details.review summary::before, details.answers summary::before, details.progress-group summary::before, .learn-recognition summary::before { content: ""; display: inline-block; flex-shrink: 0; width: .45rem; height: .45rem; margin-inline: .1rem .5rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-25%) rotate(45deg); transition: transform .2s; }
     details.section > summary::before { align-self: center; margin-inline-end: .15rem; }
     details.section:not([open]) > summary::before, details.ref:not([open]) summary::before, details.hint:not([open]) summary::before, details.kind-about:not([open]) summary::before,
-    details.review:not([open]) summary::before, details.answers:not([open]) summary::before, details.progress-group:not([open]) summary::before { transform: rotate(-45deg); }
+    details.review:not([open]) summary::before, details.answers:not([open]) summary::before, details.progress-group:not([open]) summary::before, .learn-recognition:not([open]) summary::before { transform: rotate(-45deg); }
     details.section:not([open]) > summary { margin-bottom: 0; }
     details.section > summary { padding-block: 12.5px; margin-top: -12.5px; margin-bottom: calc(.95rem - 12.5px); }
     details.section:not([open]) > summary { margin-bottom: -12.5px; }
@@ -390,20 +390,26 @@
     }
     .name-editor-status { font-size: .75rem; color: var(--muted); margin-left: .4rem; }
 
-    .learn-filter { display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
-    .learn-filter input[type="search"] { flex: 1 1 16rem; min-width: 0; padding: .55rem .75rem; background: var(--code-bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: var(--input-font-size); font-family: inherit; }
-    .learn-bucket { margin-bottom: 2rem; }
-    .learn-group { font-size: .95rem; color: var(--muted); margin: 1rem 0 .5rem; }
-    .learn-list { list-style: none; padding: 0; }
-    .learn-group-block { margin-bottom: 1rem; }
-    .learn-entry { padding: .35rem 0; display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
+    .learn-head h1 { font-size: 1.5rem; }
+    .learn-top, .learn-buckets, .learn-groups { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+    .learn-page .featured-concept { margin-bottom: 0; }
+    .learn-page .featured-title a { display: inline-flex; align-items: center; min-height: 44px; }
+    .learn-filter { display: flex; flex-direction: column; gap: 8px; }
+    .learn-filter label { display: flex; align-items: center; gap: 12px; min-height: 48px; cursor: pointer; }
+    .learn-filter input[type="checkbox"] { width: 20px; height: 20px; flex: none; }
+    .learn-filter input[type="search"] { min-height: 48px; min-width: 0; padding: .55rem .75rem; background: var(--code-bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: var(--input-font-size); font-family: inherit; }
+    .learn-bucket { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+    .learn-group { font-size: .95rem; color: var(--muted); margin: 0; }
+    .learn-list { list-style: none; padding: 0; margin: 0; }
+    .learn-entry { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; min-height: 48px; padding: 2px 0; border-top: 1px solid var(--border); }
+    .learn-entry a { display: flex; align-items: center; flex: 1 1 auto; min-height: 44px; }
     .learn-entry[hidden] { display: none; }
     .learn-seen { font-size: .75rem; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 .5rem; }
     .learn-ungenerated { font-size: .75rem; color: var(--muted); }
     .learn-back { display: inline-block; padding-block: 4px; }
     .learn-intro, .learn-bucket-label, .learn-no-guide, .learn-empty { color: var(--muted); }
     .learn-status { font-size: .75rem; color: var(--muted); margin-left: .5rem; }
-    .learn-prepare { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; }
+    .learn-page .btn-sm { display: inline-flex; align-items: center; min-height: 44px; }
     .learn-prepare p { margin-bottom: .75rem; }
     .learn-drilling { font-size: .75rem; color: var(--accent-text); border: 1px solid var(--accent); border-radius: 999px; padding: 0 .5rem; }
     .progress-head h1 { font-size: 1.5rem; }
@@ -438,18 +444,19 @@
     .progress-rung.held { background: var(--rung); border-color: var(--rung); }
     .progress-rung.toward { border-color: var(--rung); background: linear-gradient(90deg, var(--rung) 50%, transparent 50%); }
     .progress-word { font-size: .8rem; color: var(--muted); margin-left: auto; }
-    .learn-drill, .learn-drills { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin: 1.5rem 0; }
+    .learn-drill { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin: 1.5rem 0; }
     .learn-drills form, .learn-group-head form { display: inline-block; margin-right: .5rem; }
     .learn-drill-paused { color: var(--accent-text); }
-    .learn-group-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .learn-group-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; min-height: 48px; padding-block: 2px; }
     .learn-group-head h3 { margin: 0; }
     .learn-worked-example { white-space: pre-wrap; overflow-wrap: anywhere; }
     .learn-lesson { margin: .75rem 0 1rem; }
     .learn-lesson p { margin-bottom: .75rem; }
     .learn-lesson ul { padding-left: 1.25rem; margin: 0 0 .75rem; }
     .learn-lesson li { margin-bottom: .4rem; }
-    .learn-recognition { border: 1px solid var(--border); border-radius: 6px; padding: .5rem 1rem; margin: .5rem 0 1rem; }
-    .learn-recognition summary { cursor: pointer; color: var(--muted); }
+    .learn-recognition { border-top: 1px solid var(--border); }
+    .learn-recognition summary { cursor: pointer; color: var(--muted); list-style: none; display: flex; align-items: center; min-height: 48px; }
+    .learn-recognition summary::-webkit-details-marker { display: none; }
     .learn-recognition-label { font-size: .85rem; font-weight: 600; margin: .75rem 0 .25rem; }
 
     .featured-concept { background: linear-gradient(135deg, rgba(124, 106, 247, .14), rgba(92, 207, 230, .08)), var(--surface); border: 1px solid var(--accent); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.25rem; margin-bottom: 1.5rem; }
@@ -480,7 +487,7 @@
       .spinner, .btn-loading::before, .pull-refresh.is-refreshing .spinner { animation: none; }
       .pull-refresh.is-settling, .pull-settling { transition: none; }
       nav .nav-links a, .btn, details.section > summary::before, details.ref summary::before, details.hint summary::before, details.kind-about summary::before,
-      details.review summary::before, details.answers summary::before, details.progress-group summary::before { transition: none; }
+      details.review summary::before, details.answers summary::before, details.progress-group summary::before, .learn-recognition summary::before { transition: none; }
       .btn:not(:disabled):active, .rating-btn:active { transform: none; }
       .daily-kind-sheet[open] { animation: none; }
     }

@@ -3,14 +3,14 @@
 The app is laid out for a phone first. At 900px and wider, a page that asks
 for it gets a desktop layout: a centered column up to 1040px wide, with the
 page's own arrangement inside it (History puts its title in a left rail beside
-the entries). Pages move onto it one at a time: History first, then Progress.
+the entries). Pages move onto it one at a time: History first, then Progress, then Learn.
 
 ## The breakpoints
 
 - **Under 600px:** the phone layout. Card pages put each card `max(16px, inset)`
   from the screen edge (`phone_cards.css`).
 - **600 to 899px:** one column. Account and Settings stay a centered 480px
-  column (`.phone-page`). History and Progress, and later Today and Learn,
+  column (`.phone-page`). History, Progress and Learn, and later Today,
   take the container's full width (`.card-page`), because code and reviews are
   cramped at 480px. An iPad in portrait and a phone in landscape land here.
 - **900px and wider:** the desktop layout, from `desktop.css`.

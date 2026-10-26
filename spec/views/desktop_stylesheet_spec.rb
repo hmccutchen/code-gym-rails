@@ -40,6 +40,26 @@ RSpec.describe "desktop stylesheet" do
     end
   end
 
+  # The Learn filter sets [hidden] on its buckets, group blocks and entries; the last compound is the styled element.
+  def hidden_by_filter?(selector)
+    selector.split(/\s*[ >+~]\s*/).last.match?(/\.learn-(bucket|group-block|entry)\b/)
+  end
+
+  it "never sets display on an element the Learn filter hides, so its [hidden] keeps working on a desktop" do
+    rules.select { |rule| rule.declaration("display") }.flat_map(&:selectors).each do |selector|
+      expect(hidden_by_filter?(selector)).to be(false), "#{selector} sets display"
+    end
+  end
+
+  it "recognizes a hidden element in any form of the selector's last part" do
+    hidden = [ ".learn-page .learn-bucket", ".learn-page .learn-bucket-grouped", ".learn-page section.learn-bucket.learn-bucket-grouped",
+               ".learn-page .learn-bucket:not(.x)", ".learn-page .learn-group-block.card", ".learn-groups > .learn-entry" ]
+    shown = [ ".learn-page .learn-buckets", ".learn-page .learn-bucket-grouped .learn-groups", ".learn-page .learn-entry a" ]
+
+    expect(hidden.map { |selector| hidden_by_filter?(selector) }).to all(be(true))
+    expect(shown.map { |selector| hidden_by_filter?(selector) }).to all(be(false))
+  end
+
   it "notices an at-rule left outside the block" do
     css = "#{desktop_query} { .a { color: red; } }\n@font-face { font-family: X; src: url(x.woff2); }"
 
