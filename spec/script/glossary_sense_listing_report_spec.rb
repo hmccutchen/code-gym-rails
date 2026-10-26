@@ -42,6 +42,27 @@ RSpec.describe GlossarySenseListingReport do
     TEXT
   end
 
+  it "lists nothing and totals 0 when the base words are every key and form" do
+    unchanged = described_class.new(described_class.read_rows(path), base_words: terms.keys + forms.values.flatten,
+                                    terms: terms, forms: forms, key_for: ->(word) { word.downcase })
+    out = StringIO.new
+    unchanged.print(out)
+
+    expect(out.string).to eq("== total matches: 0 across 0 keys\n")
+  end
+
+  context "when a new key overlaps a base key" do
+    let(:terms) { { "adapter pattern" => "A pattern.", "adapter" => "An adapter." } }
+    let(:forms) { {} }
+    let(:rows) { [ { "source" => "s", "id" => "1", "field" => "f", "text" => "the adapter pattern here" }, { "source" => "s", "id" => "2", "field" => "f", "text" => "an adapter here" } ] }
+    let(:overlap_report) { described_class.new(rows, base_words: [ "adapter pattern" ], terms: terms, forms: forms) }
+
+    it "lets the longer base key win, so only the lone new key is listed" do
+      expect(overlap_report.groups.transform_values(&:size)).to eq("adapter" => 1)
+      expect(overlap_report.groups["adapter"].first).to include("[adapter]").and include("s 2 f")
+    end
+  end
+
   it "reads one base word per line, ignoring blanks" do
     File.write(path, "seam\n\nmemo\n")
 

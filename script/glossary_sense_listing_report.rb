@@ -14,14 +14,20 @@ class GlossarySenseListingReport
 
   def initialize(rows, base_words:, terms: Glossary::TERMS, forms: Glossary::FORMS, pattern_for: Glossary.method(:pattern_for), key_for: Glossary.method(:key_for))
     @rows = rows
-    @new_words = (terms.keys + forms.values.flatten) - base_words
-    @pattern = pattern_for.call(@new_words.to_h { |word| [ word, nil ] })
+    @base_words = base_words
+    @pattern = pattern_for.call(terms, forms)
     @key_for = key_for
+  end
+
+  def self.words_in(terms: Glossary::TERMS, forms: Glossary::FORMS)
+    terms.keys + forms.values.flatten
   end
 
   def groups
     @rows.each_with_object(Hash.new { |hash, key| hash[key] = [] }) do |row, found|
-      row["text"].to_s.scan(@pattern) { found[@key_for.call($~[0])] << line_for(row, $~) }
+      row["text"].to_s.scan(@pattern) do
+        found[@key_for.call($~[0])] << line_for(row, $~) unless @base_words.include?($~[0].downcase)
+      end
     end
   end
 

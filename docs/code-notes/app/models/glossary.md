@@ -24,9 +24,13 @@ listing gates forms as well as keys, and a wrong-sense match drops the form or
 gives it a longer phrase.
 
 `script/glossary_sense_listing.rb` produces that listing. Give it the export as
-JSONL (`source`, `id`, `field` and `text` on each line) and the keys from `main`,
-and it prints every match of a new key or form, grouped by key. The export stays
-outside the repository.
+JSONL (`source`, `id`, `field` and `text` on each line) and a base words file,
+and it prints every match of a new spelling, grouped by key. The base words file
+holds every key and every form, one per line; run the script with `--words` at
+the base commit to make it. The scan uses the pattern over all keys and forms,
+as the page does, and drops a match only when its spelling is in the base words,
+so the longer key still wins where two overlap (`adapter pattern` over a new
+`adapter`). The export stays outside the repository.
 
 ## `key_for`
 
