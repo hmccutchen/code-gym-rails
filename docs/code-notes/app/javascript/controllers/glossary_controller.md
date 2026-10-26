@@ -22,5 +22,15 @@ calls `preventDefault`, so Space scrolls the page only when no term has focus.
 
 The panel is as wide as the section or container the term sits in, which is a
 rendered width no stylesheet can name. `--gloss-width` and `--gloss-shift` are
-recomputed on open, on resize, and when a disclosure containing the term
-toggles, since each changes that box.
+recomputed on open and on resize, since each changes that box.
+
+## Learn has no `.section`
+
+The panel sizes to the nearest `.section` or `.container`. The dashboard's
+concept dropdown sits inside a `.section`, but the Learn pages and the lesson
+page do not. They sit directly in `.container`, so the panel there is as wide
+as the container. The fallback is what makes a term on Learn measure at all,
+so removing `.container` from that selector would leave Learn panels unsized.
+A term inside a closed `details` (such as "Code examples") has no panel box
+until the reader opens it, and the panel is re-measured on `focusin` and
+`pointerover`, so opening the disclosure and then touching the term works.

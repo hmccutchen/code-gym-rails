@@ -8,18 +8,18 @@
       <p><strong><%= t("learn.lesson.#{key}") %></strong></p>
       <ul>
         <% value.each do |situation| %>
-          <li><%= situation %></li>
+          <li><%= glossary_wrap(situation) %></li>
         <% end %>
       </ul>
     <% when "habits" %>
       <p><strong><%= t("learn.lesson.#{key}") %></strong></p>
       <ul>
         <% value.each do |habit| %>
-          <li><%= habit["habit"] %> <em><%= t("learn.lesson.catch") %></em> <%= habit["catch"] %></li>
+          <li><%= glossary_wrap(habit["habit"]) %> <em><%= t("learn.lesson.catch") %></em> <%= glossary_wrap(habit["catch"]) %></li>
         <% end %>
       </ul>
     <% else %>
-      <p><strong><%= t("learn.lesson.#{key}") %></strong> <%= value %></p>
+      <p><strong><%= t("learn.lesson.#{key}") %></strong> <%= glossary_wrap(value) %></p>
     <% end %>
   <% end %>
 </div>

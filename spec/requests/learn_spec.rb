@@ -685,4 +685,154 @@ RSpec.describe "Learn", type: :request do
       expect(GenerateConceptReferenceJob).not_to have_been_enqueued.with(hash_including(concept: concept))
     end
   end
+
+  describe "glossary terms on a concept page and the Learn index" do
+    let(:twice) { "A closure holds scope, and a closure outlives its frame." }
+    let(:path) { learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one") }
+    let(:interactive_ancestor) do
+      "a .gloss-term, button .gloss-term, summary .gloss-term, label .gloss-term, :not(body)[data-action*=click] .gloss-term"
+    end
+
+    def page_at(url)
+      get url
+      Nokogiri::HTML5(response.body)
+    end
+
+    def guided_reference(**overrides)
+      ConceptReference.create!(
+        { concept: "n_plus_one", language: "ruby_rails", tagline: twice, explanation: twice,
+          code_example: "closure = 1", senior_lens: twice, guide_plain_language: twice,
+          guide_pitfalls: twice,
+          guide_worked_example: "a = 1\nb = 2\n\nA `closure` costs little; a closure is common and a closure is cheap." }.merge(overrides)
+      )
+    end
+
+    before do
+      user.update!(language: "ruby_rails")
+      stub_glossary("closure" => "A function bundled with its surrounding variables.")
+    end
+
+    describe "a row without a lesson" do
+      before { guided_reference }
+
+      it "wraps each visible field once and leaves headings, snippets and code alone" do
+        doc = page_at(path)
+        prose = doc.css("p").select { |p| p.text.include?("outlives its frame") }
+
+        expect(prose.size).to eq(5)
+        expect(prose.map { |p| p.css(".gloss-term").size }).to eq([ 1, 1, 1, 1, 1 ])
+        expect(doc.css("h1 .gloss-term")).to be_empty
+        expect(doc.css("pre.snippet .gloss-term")).to be_empty
+        expect(doc.css(".learn-worked-example code").text).to eq("closure")
+        expect(doc.css(".learn-worked-example .gloss-term").size).to eq(1)
+      end
+
+      it "wraps a term in both the explanation and the senior lens" do
+        doc = page_at(path)
+
+        expect(doc.css("details.learn-senior-lens .gloss-term").size).to eq(1)
+        explanation = doc.css("p").find { |p| p.text.start_with?("A closure holds") && p.ancestors("details").empty? && p.at_css("strong").nil? }
+        expect(explanation.css(".gloss-term").size).to eq(1)
+      end
+
+      it "escapes markup in a wrapped field" do
+        ConceptReference.find_by!(concept: "n_plus_one").update!(explanation: "Use <b>raw</b> closure")
+        get path
+
+        expect(response.body).to include("&lt;b&gt;raw&lt;/b&gt;")
+        expect(response.body).not_to include("<b>raw</b>")
+        expect(Nokogiri::HTML5(response.body).css("p").select { |p| p.text.include?("raw") }.first.css(".gloss-term").size).to eq(1)
+      end
+
+      it "renders a worked example with no prose part" do
+        ConceptReference.find_by!(concept: "n_plus_one").update!(guide_worked_example: "a = 1\nb = 2")
+        doc = page_at(path)
+
+        expect(response).to have_http_status(:ok)
+        expect(doc.css(".learn-worked-example")).to be_empty
+      end
+
+      it "puts no glossary term inside an interactive element" do
+        doc = page_at(path)
+
+        expect(doc.css(".gloss-term")).not_to be_empty
+        expect(doc.css(interactive_ancestor)).to be_empty
+      end
+    end
+
+    describe "a row with a lesson" do
+      def with_closure_in_labels
+        originals = { definition: I18n.t("learn.lesson.definition"), catch: I18n.t("learn.lesson.catch") }
+        I18n.backend.store_translations(:en, learn: { lesson: { definition: "closure label:", catch: "closure catch:" } })
+        yield
+      ensure
+        I18n.backend.store_translations(:en, learn: { lesson: originals })
+      end
+
+      it "wraps each lesson value and not its label" do
+        lesson = { "definition" => twice, "comparison" => twice, "comparison_limit" => twice,
+                   "misunderstanding" => twice, "carry_question" => twice, "quick_test" => twice,
+                   "situations" => [ twice ], "habits" => [ { "habit" => twice, "catch" => twice } ] }
+        guided_reference(lesson: lesson)
+        doc = nil
+        with_closure_in_labels { doc = page_at(path) }
+        expect(doc.css(".learn-lesson strong").text).to include("closure label:")
+        expect(doc.css(".learn-lesson em").text).to include("closure catch:")
+        values = doc.css(".learn-lesson p, .learn-lesson li")
+        values = values.reject { |node| node.css("strong").any? && node.text.strip == node.at_css("strong").text.strip }
+
+        expect(values).not_to be_empty
+        expect(values.map { |node| node.css(".gloss-term").size }).to all(be >= 1)
+        expect(doc.css(".learn-lesson strong .gloss-term, .learn-lesson em .gloss-term")).to be_empty
+        expect(doc.css(".learn-lesson li").last.css(".gloss-term").size).to eq(2)
+      end
+    end
+
+    describe "a row whose lesson is not a hash (pinned as it renders today)" do
+      before do
+        guided_reference(lesson: "None", explanation: "hiddenprose closure", guide_plain_language: "hiddenprose closure",
+                         guide_pitfalls: "hiddenprose closure", senior_lens: "A senior view.",
+                         guide_worked_example: "a = 1\nb = 2")
+      end
+
+      it "renders an empty lesson block and hides the explanation and guide prose, without raising" do
+        doc = page_at(path)
+
+        expect(response).to have_http_status(:ok)
+        expect(doc.css("div.learn-lesson").size).to eq(1)
+        expect(doc.css("div.learn-lesson").text.strip).to eq("")
+        expect(doc.css("div.learn-lesson .gloss-term")).to be_empty
+        expect(response.body).not_to include("hiddenprose")
+        wrapped = doc.css("p").select { |p| p.at_css(".gloss-term") }
+        expect(wrapped.map { |p| p.at_css("strong") ? :tagline : p.text }).to eq([ :tagline ])
+      end
+
+      it "still wraps the tagline" do
+        expect(page_at(path).css("p > strong .gloss-term").size).to eq(1)
+      end
+    end
+
+    describe "GET /learn" do
+      before do
+        guided_reference
+        submit_set_showing(user, "n_plus_one", date: Date.current - 3)
+        FeaturedConcept.for(user)
+        RecognitionGuide.create!(group_key: "code_smell", questions: twice, contrast: twice, misfires: twice)
+      end
+
+      it "wraps the recognition guide and the featured tagline" do
+        doc = page_at(learn_path)
+
+        expect(doc.css("details.learn-recognition p").map { |p| p.css(".gloss-term").size }).to eq([ 0, 1, 0, 1, 0, 1 ])
+        expect(doc.css("p.featured-tagline span.gloss-term").size).to eq(1)
+      end
+
+      it "puts no glossary term inside an interactive element" do
+        doc = page_at(learn_path)
+
+        expect(doc.css(".gloss-term")).not_to be_empty
+        expect(doc.css(interactive_ancestor)).to be_empty
+      end
+    end
+  end
 end

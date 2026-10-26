@@ -3,6 +3,6 @@
   <% if part.kind == :code %>
     <pre class="snippet"><%= highlighted_code(part.text, language) %></pre>
   <% else %>
-    <p class="learn-worked-example"><%= prose_with_inline_code(part.text) %></p>
+    <p class="learn-worked-example"><%= glossary_wrap_prose(part.text) %></p>
   <% end %>
 <% end %>

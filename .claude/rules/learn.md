@@ -38,6 +38,8 @@ read it before changing that area.
   `#generate_concept_reference` call, outside its required fields;
   `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
   out, and "seen" reads `ConceptExposureIndex#count`, never `ConceptMastery`.
+  Every prose reference field renders through `glossary_wrap`, and the wrapper
+  never touches code (`code_example`, a worked example's code, `<code>` spans).
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
   `ConceptGroup` or language-independent bucket gets one shared
   `RecognitionGuide` on how to look for that kind of problem. It teaches a

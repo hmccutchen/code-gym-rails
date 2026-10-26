@@ -3,10 +3,10 @@
 <details class="ref"<%= " open".html_safe if open %>>
   <summary><%= t("concept_reference.summary", concept: reference.concept.humanize) %></summary>
   <div class="ref-body">
-    <p style="margin-bottom:.75rem"><strong><%= reference.tagline %></strong></p>
-    <p style="margin-bottom:.75rem"><%= reference.explanation %></p>
+    <p style="margin-bottom:.75rem"><strong><%= glossary_wrap(reference.tagline) %></strong></p>
+    <p style="margin-bottom:.75rem"><%= glossary_wrap(reference.explanation) %></p>
     <pre class="snippet"><%= highlighted_code(reference.code_example, reference.language) %></pre>
-    <p>🔭 <%= reference.senior_lens %></p>
+    <p>🔭 <%= glossary_wrap(reference.senior_lens) %></p>
     <%# Inside the disclosure so a collapsed <details> hides it with no script. %>
     <div class="concept-alternates" data-controller="concept-alternates"
          <%= tag.attributes(data: {
