@@ -583,7 +583,8 @@
   <div class="card learn-filter">
     <input type="search" id="learn-filter-input" placeholder="Filter concepts"
            aria-label="Filter concepts"
-           data-learn-filter-target="input" data-action="input->learn-filter#apply">
+           autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="search"
+           data-learn-filter-target="input" data-action="input->learn-filter#apply keydown.enter->learn-filter#dismiss">
     <label>
       <input type="checkbox" id="learn-seen-only"
              data-learn-filter-target="seenOnly" data-action="change->learn-filter#apply">
@@ -622,85 +623,85 @@
 
 
         <ul class="learn-list">
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="n_plus_one" data-search="n_plus_one n plus one">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="n_plus_one" data-search="n plus one core ruby/rails n+1 eager loading">
               <a href="/learn/ruby_rails/n_plus_one">N plus one</a>
                 <span class="learn-seen">in your sets</span>
                 <span class="learn-drilling">drilling</span>
                 <span class="learn-ungenerated">reference only</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="transaction_safety" data-search="transaction_safety transaction safety">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="transaction_safety" data-search="transaction safety core ruby/rails">
               <a href="/learn/ruby_rails/transaction_safety">Transaction safety</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="memoization" data-search="memoization memoization">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="memoization" data-search="memoization core ruby/rails memoized memoizing memoize memoised">
               <a href="/learn/ruby_rails/memoization">Memoization</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="service_objects" data-search="service_objects service objects">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="service_objects" data-search="service objects core ruby/rails service object">
               <a href="/learn/ruby_rails/service_objects">Service objects</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="scope_chaining" data-search="scope_chaining scope chaining">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="scope_chaining" data-search="scope chaining core ruby/rails">
               <a href="/learn/ruby_rails/scope_chaining">Scope chaining</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="idempotency" data-search="idempotency idempotency">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="idempotency" data-search="idempotency core ruby/rails">
               <a href="/learn/ruby_rails/idempotency">Idempotency</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="authorization" data-search="authorization authorization">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="authorization" data-search="authorization core ruby/rails">
               <a href="/learn/ruby_rails/authorization">Authorization</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="background_jobs" data-search="background_jobs background jobs">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="background_jobs" data-search="background jobs core ruby/rails background job">
               <a href="/learn/ruby_rails/background_jobs">Background jobs</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="caching" data-search="caching caching">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="caching" data-search="caching core ruby/rails">
               <a href="/learn/ruby_rails/caching">Caching</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="validations" data-search="validations validations">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="validations" data-search="validations core ruby/rails">
               <a href="/learn/ruby_rails/validations">Validations</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="callbacks_vs_service" data-search="callbacks_vs_service callbacks vs service">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="callbacks_vs_service" data-search="callbacks vs service core ruby/rails">
               <a href="/learn/ruby_rails/callbacks_vs_service">Callbacks vs service</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="query_objects" data-search="query_objects query objects">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="query_objects" data-search="query objects core ruby/rails query object">
               <a href="/learn/ruby_rails/query_objects">Query objects</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="policy_objects" data-search="policy_objects policy objects">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="policy_objects" data-search="policy objects core ruby/rails policy object">
               <a href="/learn/ruby_rails/policy_objects">Policy objects</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="indexing" data-search="indexing indexing">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="indexing" data-search="indexing core ruby/rails">
               <a href="/learn/ruby_rails/indexing">Indexing</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="concurrency" data-search="concurrency concurrency">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="concurrency" data-search="concurrency core ruby/rails race condition">
               <a href="/learn/ruby_rails/concurrency">Concurrency</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="error_handling" data-search="error_handling error handling">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="error_handling" data-search="error handling core ruby/rails">
               <a href="/learn/ruby_rails/error_handling">Error handling</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="mass_assignment_protection" data-search="mass_assignment_protection mass assignment protection">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="mass_assignment_protection" data-search="mass assignment protection core ruby/rails strong params">
               <a href="/learn/ruby_rails/mass_assignment_protection">Mass assignment protection</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="sql_injection_prevention" data-search="sql_injection_prevention sql injection prevention">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="sql_injection_prevention" data-search="sql injection prevention core ruby/rails sqli">
               <a href="/learn/ruby_rails/sql_injection_prevention">Sql injection prevention</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="over_mocking" data-search="over_mocking over mocking">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="over_mocking" data-search="over mocking core ruby/rails">
               <a href="/learn/ruby_rails/over_mocking">Over mocking</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="testing_implementation_not_behavior" data-search="testing_implementation_not_behavior testing implementation not behavior">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="testing_implementation_not_behavior" data-search="testing implementation not behavior core ruby/rails">
               <a href="/learn/ruby_rails/testing_implementation_not_behavior">Testing implementation not behavior</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
@@ -715,23 +716,23 @@
 
 
         <ul class="learn-list">
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="missing_index" data-search="missing_index missing index">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="missing_index" data-search="missing index data modeling ruby/rails missing indexes">
               <a href="/learn/ruby_rails/missing_index">Missing index</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="wrong_cardinality" data-search="wrong_cardinality wrong cardinality">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="wrong_cardinality" data-search="wrong cardinality data modeling ruby/rails">
               <a href="/learn/ruby_rails/wrong_cardinality">Wrong cardinality</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="missing_constraint" data-search="missing_constraint missing constraint">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="missing_constraint" data-search="missing constraint data modeling ruby/rails">
               <a href="/learn/ruby_rails/missing_constraint">Missing constraint</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="denormalization_tradeoffs" data-search="denormalization_tradeoffs denormalization tradeoffs">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="denormalization_tradeoffs" data-search="denormalization tradeoffs data modeling ruby/rails">
               <a href="/learn/ruby_rails/denormalization_tradeoffs">Denormalization tradeoffs</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unsafe_migration" data-search="unsafe_migration unsafe migration">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unsafe_migration" data-search="unsafe migration data modeling ruby/rails">
               <a href="/learn/ruby_rails/unsafe_migration">Unsafe migration</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
@@ -746,11 +747,11 @@
 
 
         <ul class="learn-list">
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="ubiquitous_language" data-search="ubiquitous_language ubiquitous language">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="ubiquitous_language" data-search="ubiquitous language domain modeling ruby/rails">
               <a href="/learn/ruby_rails/ubiquitous_language">Ubiquitous language</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="aggregate_boundaries" data-search="aggregate_boundaries aggregate boundaries">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="aggregate_boundaries" data-search="aggregate boundaries domain modeling ruby/rails">
               <a href="/learn/ruby_rails/aggregate_boundaries">Aggregate boundaries</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
@@ -765,19 +766,19 @@
 
 
         <ul class="learn-list">
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="allocation_rounding" data-search="allocation_rounding allocation rounding">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="allocation_rounding" data-search="allocation rounding silent correctness ruby/rails">
               <a href="/learn/ruby_rails/allocation_rounding">Allocation rounding</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="semantic_input_validation" data-search="semantic_input_validation semantic input validation">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="semantic_input_validation" data-search="semantic input validation silent correctness ruby/rails">
               <a href="/learn/ruby_rails/semantic_input_validation">Semantic input validation</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="cache_key_completeness" data-search="cache_key_completeness cache key completeness">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="cache_key_completeness" data-search="cache key completeness silent correctness ruby/rails">
               <a href="/learn/ruby_rails/cache_key_completeness">Cache key completeness</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="deterministic_ordering" data-search="deterministic_ordering deterministic ordering">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="deterministic_ordering" data-search="deterministic ordering silent correctness ruby/rails">
               <a href="/learn/ruby_rails/deterministic_ordering">Deterministic ordering</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
@@ -792,19 +793,19 @@
 
 
         <ul class="learn-list">
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="reading_for_intent" data-search="reading_for_intent reading for intent">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="reading_for_intent" data-search="reading for intent reading and reasoning ruby/rails">
               <a href="/learn/ruby_rails/reading_for_intent">Reading for intent</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="spotting_unstated_assumptions" data-search="spotting_unstated_assumptions spotting unstated assumptions">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="spotting_unstated_assumptions" data-search="spotting unstated assumptions reading and reasoning ruby/rails">
               <a href="/learn/ruby_rails/spotting_unstated_assumptions">Spotting unstated assumptions</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="separating_symptom_from_cause" data-search="separating_symptom_from_cause separating symptom from cause">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="separating_symptom_from_cause" data-search="separating symptom from cause reading and reasoning ruby/rails">
               <a href="/learn/ruby_rails/separating_symptom_from_cause">Separating symptom from cause</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="reading_unfamiliar_code" data-search="reading_unfamiliar_code reading unfamiliar code">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="reading_unfamiliar_code" data-search="reading unfamiliar code reading and reasoning ruby/rails">
               <a href="/learn/lessons/reading_unfamiliar_code">Reading unfamiliar code</a>
             </li>
         </ul>
@@ -828,19 +829,19 @@
 
 
         <ul class="learn-list">
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="god_object" data-search="god_object god object">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="god_object" data-search="god object code smells ruby/rails god objects god class">
               <a href="/learn/ruby_rails/god_object">God object</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="primitive_obsession" data-search="primitive_obsession primitive obsession">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="primitive_obsession" data-search="primitive obsession code smells ruby/rails">
               <a href="/learn/ruby_rails/primitive_obsession">Primitive obsession</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="shotgun_surgery" data-search="shotgun_surgery shotgun surgery">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="shotgun_surgery" data-search="shotgun surgery code smells ruby/rails">
               <a href="/learn/ruby_rails/shotgun_surgery">Shotgun surgery</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="feature_envy" data-search="feature_envy feature envy">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="feature_envy" data-search="feature envy code smells ruby/rails">
               <a href="/learn/ruby_rails/feature_envy">Feature envy</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
@@ -855,15 +856,15 @@
 
 
         <ul class="learn-list">
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="open_closed" data-search="open_closed open closed">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="open_closed" data-search="open closed design principles ruby/rails solid">
               <a href="/learn/ruby_rails/open_closed">Open closed</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="dependency_inversion" data-search="dependency_inversion dependency inversion">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="dependency_inversion" data-search="dependency inversion design principles ruby/rails solid">
               <a href="/learn/ruby_rails/dependency_inversion">Dependency inversion</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="composition_over_inheritance" data-search="composition_over_inheritance composition over inheritance">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="composition_over_inheritance" data-search="composition over inheritance design principles ruby/rails">
               <a href="/learn/ruby_rails/composition_over_inheritance">Composition over inheritance</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
@@ -878,15 +879,15 @@
 
 
         <ul class="learn-list">
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="shallow_module" data-search="shallow_module shallow module">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="shallow_module" data-search="shallow module module design ruby/rails">
               <a href="/learn/ruby_rails/shallow_module">Shallow module</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="pass_through_method" data-search="pass_through_method pass through method">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="pass_through_method" data-search="pass through method module design ruby/rails">
               <a href="/learn/ruby_rails/pass_through_method">Pass through method</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="temporal_decomposition" data-search="temporal_decomposition temporal decomposition">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="temporal_decomposition" data-search="temporal decomposition module design ruby/rails">
               <a href="/learn/ruby_rails/temporal_decomposition">Temporal decomposition</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
@@ -903,63 +904,63 @@
 
 
         <ul class="learn-list">
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="sync_vs_async" data-search="sync_vs_async sync vs async">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="sync_vs_async" data-search="sync vs async architecture">
               <a href="/learn/architecture/sync_vs_async">Sync vs async</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="service_boundaries" data-search="service_boundaries service boundaries">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="service_boundaries" data-search="service boundaries architecture">
               <a href="/learn/architecture/service_boundaries">Service boundaries</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="coupling_cohesion" data-search="coupling_cohesion coupling cohesion">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="coupling_cohesion" data-search="coupling cohesion architecture">
               <a href="/learn/architecture/coupling_cohesion">Coupling cohesion</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="data_consistency_tradeoffs" data-search="data_consistency_tradeoffs data consistency tradeoffs">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="data_consistency_tradeoffs" data-search="data consistency tradeoffs architecture">
               <a href="/learn/architecture/data_consistency_tradeoffs">Data consistency tradeoffs</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="caching_strategy" data-search="caching_strategy caching strategy">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="caching_strategy" data-search="caching strategy architecture">
               <a href="/learn/architecture/caching_strategy">Caching strategy</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="build_vs_buy" data-search="build_vs_buy build vs buy">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="build_vs_buy" data-search="build vs buy architecture">
               <a href="/learn/architecture/build_vs_buy">Build vs buy</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="scaling_bottlenecks" data-search="scaling_bottlenecks scaling bottlenecks">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="scaling_bottlenecks" data-search="scaling bottlenecks architecture">
               <a href="/learn/architecture/scaling_bottlenecks">Scaling bottlenecks</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="failure_mode_design" data-search="failure_mode_design failure mode design">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="failure_mode_design" data-search="failure mode design architecture">
               <a href="/learn/architecture/failure_mode_design">Failure mode design</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="api_versioning" data-search="api_versioning api versioning">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="api_versioning" data-search="api versioning architecture">
               <a href="/learn/architecture/api_versioning">Api versioning</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="event_driven_vs_request_response" data-search="event_driven_vs_request_response event driven vs request response">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="event_driven_vs_request_response" data-search="event driven vs request response architecture">
               <a href="/learn/architecture/event_driven_vs_request_response">Event driven vs request response</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="data_ownership" data-search="data_ownership data ownership">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="data_ownership" data-search="data ownership architecture">
               <a href="/learn/architecture/data_ownership">Data ownership</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="idempotency_at_scale" data-search="idempotency_at_scale idempotency at scale">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="idempotency_at_scale" data-search="idempotency at scale architecture">
               <a href="/learn/architecture/idempotency_at_scale">Idempotency at scale</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="observability_tradeoffs" data-search="observability_tradeoffs observability tradeoffs">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="observability_tradeoffs" data-search="observability tradeoffs architecture">
               <a href="/learn/architecture/observability_tradeoffs">Observability tradeoffs</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="cognitive_load" data-search="cognitive_load cognitive load">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="cognitive_load" data-search="cognitive load architecture">
               <a href="/learn/architecture/cognitive_load">Cognitive load</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unknown_unknowns" data-search="unknown_unknowns unknown unknowns">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unknown_unknowns" data-search="unknown unknowns architecture">
               <a href="/learn/architecture/unknown_unknowns">Unknown unknowns</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
@@ -976,19 +977,19 @@
 
 
         <ul class="learn-list">
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unjustified_constant" data-search="unjustified_constant unjustified constant">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unjustified_constant" data-search="unjustified constant plan review">
               <a href="/learn/plan_review/unjustified_constant">Unjustified constant</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="contradicts_existing_pattern" data-search="contradicts_existing_pattern contradicts existing pattern">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="contradicts_existing_pattern" data-search="contradicts existing pattern plan review">
               <a href="/learn/plan_review/contradicts_existing_pattern">Contradicts existing pattern</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="scope_creep" data-search="scope_creep scope creep">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="scope_creep" data-search="scope creep plan review">
               <a href="/learn/plan_review/scope_creep">Scope creep</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="silent_behavior_change" data-search="silent_behavior_change silent behavior change">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="silent_behavior_change" data-search="silent behavior change plan review">
               <a href="/learn/plan_review/silent_behavior_change">Silent behavior change</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
@@ -1005,23 +1006,23 @@
 
 
         <ul class="learn-list">
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="undefined_scope_boundary" data-search="undefined_scope_boundary undefined scope boundary">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="undefined_scope_boundary" data-search="undefined scope boundary ambiguity hunting">
               <a href="/learn/ambiguity_hunt/undefined_scope_boundary">Undefined scope boundary</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unspecified_edge_cases" data-search="unspecified_edge_cases unspecified edge cases">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unspecified_edge_cases" data-search="unspecified edge cases ambiguity hunting">
               <a href="/learn/ambiguity_hunt/unspecified_edge_cases">Unspecified edge cases</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="missing_success_criteria" data-search="missing_success_criteria missing success criteria">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="missing_success_criteria" data-search="missing success criteria ambiguity hunting">
               <a href="/learn/ambiguity_hunt/missing_success_criteria">Missing success criteria</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unstated_data_implications" data-search="unstated_data_implications unstated data implications">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unstated_data_implications" data-search="unstated data implications ambiguity hunting">
               <a href="/learn/ambiguity_hunt/unstated_data_implications">Unstated data implications</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="undefined_permissions_model" data-search="undefined_permissions_model undefined permissions model">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="undefined_permissions_model" data-search="undefined permissions model ambiguity hunting">
               <a href="/learn/ambiguity_hunt/undefined_permissions_model">Undefined permissions model</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
@@ -1038,35 +1039,35 @@
 
 
         <ul class="learn-list">
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="missing_base_case" data-search="missing_base_case missing base case">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="missing_base_case" data-search="missing base case pseudocode to code">
               <a href="/learn/pseudocode_to_code/missing_base_case">Missing base case</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unhandled_empty_input" data-search="unhandled_empty_input unhandled empty input">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unhandled_empty_input" data-search="unhandled empty input pseudocode to code">
               <a href="/learn/pseudocode_to_code/unhandled_empty_input">Unhandled empty input</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="off_by_one_boundary" data-search="off_by_one_boundary off by one boundary">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="off_by_one_boundary" data-search="off by one boundary pseudocode to code fencepost">
               <a href="/learn/pseudocode_to_code/off_by_one_boundary">Off by one boundary</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="ambiguous_ordering" data-search="ambiguous_ordering ambiguous ordering">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="ambiguous_ordering" data-search="ambiguous ordering pseudocode to code">
               <a href="/learn/pseudocode_to_code/ambiguous_ordering">Ambiguous ordering</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unstated_mutation" data-search="unstated_mutation unstated mutation">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="unstated_mutation" data-search="unstated mutation pseudocode to code">
               <a href="/learn/pseudocode_to_code/unstated_mutation">Unstated mutation</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="conflated_responsibilities" data-search="conflated_responsibilities conflated responsibilities">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="conflated_responsibilities" data-search="conflated responsibilities pseudocode to code">
               <a href="/learn/pseudocode_to_code/conflated_responsibilities">Conflated responsibilities</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="missing_termination_condition" data-search="missing_termination_condition missing termination condition">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="missing_termination_condition" data-search="missing termination condition pseudocode to code">
               <a href="/learn/pseudocode_to_code/missing_termination_condition">Missing termination condition</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="undefined_failure_path" data-search="undefined_failure_path undefined failure path">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="undefined_failure_path" data-search="undefined failure path pseudocode to code">
               <a href="/learn/pseudocode_to_code/undefined_failure_path">Undefined failure path</a>
                 <span class="learn-ungenerated">not written yet</span>
             </li>
