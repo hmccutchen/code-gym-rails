@@ -6,16 +6,16 @@
 
 <% if @reference %>
   <%# Reference fields render for any row, guide or not; only the three guide fields check guide?. %>
-  <p><strong><%= @reference.tagline %></strong></p>
+  <p><strong><%= glossary_wrap(@reference.tagline) %></strong></p>
   <% if @reference.lesson? %>
     <%= render "learn/lesson", lesson: @reference.lesson %>
   <% else %>
-    <p><%= @reference.explanation %></p>
+    <p><%= glossary_wrap(@reference.explanation) %></p>
   <% end %>
 <% end %>
 
 <% if @reference&.guide? && !@reference.lesson? %>
-  <p><%= @reference.guide_plain_language %></p>
+  <p><%= glossary_wrap(@reference.guide_plain_language) %></p>
 <% end %>
 
 <% if @reference %>
@@ -31,13 +31,13 @@
 
 <% if @reference&.guide? && !@reference.lesson? %>
   <h2><%= t("learn.pitfalls") %></h2>
-  <p><%= @reference.guide_pitfalls %></p>
+  <p><%= glossary_wrap(@reference.guide_pitfalls) %></p>
 <% end %>
 
 <% if @reference %>
   <details class="ref learn-senior-lens">
     <summary><%= t("learn.senior_lens") %></summary>
-    <p>🔭 <%= @reference.senior_lens %></p>
+    <p>🔭 <%= glossary_wrap(@reference.senior_lens) %></p>
   </details>
 <% end %>
 

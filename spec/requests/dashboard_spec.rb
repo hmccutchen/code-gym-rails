@@ -449,12 +449,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   describe "glossary terms in the reference dropdown and the featured tagline" do
     let(:twice) { "A closure holds scope, and a closure outlives its frame." }
 
-    def stub_glossary(terms)
-      stub_const("Glossary::TERMS", terms)
-      stub_const("Glossary::TERM_PATTERN",
-        Regexp.union(terms.keys.sort_by { |t| -t.length }.map { |t| /\b#{Regexp.escape(t)}\b/i }))
-    end
-
     def page
       get root_path
       Nokogiri::HTML5(response.body)
