@@ -306,18 +306,18 @@ module Glossary
     Regexp.union(words.sort_by { |word| -word.length }.map { |word| /\b#{Regexp.escape(word)}\b/i })
   end
 
+  def self.lookup_for(terms, forms = {})
+    terms.keys.index_with { |key| key }.merge(forms.flat_map { |key, words| words.map { |word| [ word, key ] } }.to_h)
+  end
+
   TERM_PATTERN = pattern_for(TERMS, FORMS)
+  LOOKUP = lookup_for(TERMS, FORMS).freeze
 
   def self.key_for(text)
-    lookup[text.downcase]
+    LOOKUP[text.downcase]
   end
 
-  def self.lookup
-    return @lookup if @lookup_terms.equal?(TERMS) && @lookup_forms.equal?(FORMS)
-
-    @lookup_terms = TERMS
-    @lookup_forms = FORMS
-    @lookup = TERMS.keys.index_with { |key| key }.merge(FORMS.flat_map { |key, forms| forms.map { |form| [ form, key ] } }.to_h)
+  def self.definition_for(text)
+    TERMS[key_for(text)]
   end
-  private_class_method :lookup
 end

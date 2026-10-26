@@ -12,7 +12,7 @@ class GlossaryCoverageReport
     paths.flat_map { |path| parse(File.read(path)) }
   end
 
-  def initialize(rows, terms: Glossary::TERMS, pattern: Glossary::TERM_PATTERN, resolver: nil)
+  def initialize(rows, terms: Glossary::TERMS, pattern: Glossary::TERM_PATTERN, resolver: Glossary.method(:key_for))
     @rows = rows.select { |row| row["visible"] == "yes" }
     @terms = terms
     @pattern = pattern

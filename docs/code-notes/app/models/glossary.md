@@ -26,9 +26,11 @@ gives it a longer phrase.
 ## `key_for`
 
 `key_for(text)` returns the key that a matched word belongs to, whether the
-word is the key or one of its forms. The reverse lookup is memoized against the
-identity of `TERMS` and `FORMS`, so `stub_glossary` replacing the constants
-needs no cache reset.
+word is the key or one of its forms. It reads `LOOKUP`, the reverse
+hash `lookup_for(TERMS, FORMS)` builds once at load and freezes, so no request
+changes shared state. `stub_glossary` replaces `LOOKUP` with the constants it
+stubs. `definition_for(text)` returns the definition for a key or a form, so a
+caller that only needs the definition never reads `TERMS` itself.
 
 ## The length rule
 

@@ -6,7 +6,6 @@ module GlossaryLengthRule
     "reconciliation", "semantic input validation", "shallow module", "spotting unstated assumptions",
     "strict mode", "throttling", "ubiquitous language", "wrong cardinality"
   ].freeze
-  SENTENCE_END = /[.!?](?=\s+[A-Z])/
   MAX_CHARS = 180
   CEILING_CHARS = 300
 end
@@ -74,6 +73,28 @@ RSpec.describe Glossary do
     end
   end
 
+  describe "LOOKUP" do
+    it "resolves a key and a form, and is frozen so no request can change it" do
+      expect(Glossary::LOOKUP["closure"]).to eq("closure")
+      expect(Glossary::LOOKUP["closures"]).to eq("closure")
+      expect(Glossary::LOOKUP).to be_frozen
+    end
+
+    it "is rebuilt for any terms and forms by lookup_for" do
+      lookup = Glossary.lookup_for({ "foo" => "x" }, { "foo" => %w[foos] })
+
+      expect(lookup).to eq("foo" => "foo", "foos" => "foo")
+    end
+  end
+
+  describe ".definition_for" do
+    it "returns the definition for a key or a form, and nil for an unknown word" do
+      expect(Glossary.definition_for("Closures")).to eq(Glossary::TERMS["closure"])
+      expect(Glossary.definition_for("closure")).to eq(Glossary::TERMS["closure"])
+      expect(Glossary.definition_for("nonexistentword")).to be_nil
+    end
+  end
+
   describe "the reference-audit entries" do
     let(:audit_keys) do
       [
@@ -124,12 +145,8 @@ RSpec.describe Glossary do
   end
 
   describe "definition length" do
-    def sentence_count(definition)
-      definition.gsub(/\b(e\.g|i\.e)\./i, "").split(GlossaryLengthRule::SENTENCE_END).size
-    end
-
     def over_the_rule(definition)
-      sentence_count(definition) > 1 || definition.length > GlossaryLengthRule::MAX_CHARS
+      SentenceCount.of(definition) > 1 || definition.length > GlossaryLengthRule::MAX_CHARS
     end
 
     it "keeps every definition at or under the ceiling, listed or not" do
@@ -143,7 +160,7 @@ RSpec.describe Glossary do
     it "holds every unlisted definition to one sentence of at most 180 characters" do
       offenders = Glossary::TERMS.reject { |key, _| GlossaryLengthRule::LONG_ENTRIES.include?(key) }.select { |_key, definition| over_the_rule(definition) }
 
-      report = offenders.map { |key, definition| "#{key} (#{sentence_count(definition)} sentence(s), #{definition.length} chars)" }
+      report = offenders.map { |key, definition| "#{key} (#{SentenceCount.of(definition)} sentence(s), #{definition.length} chars)" }
 
       expect(report).to be_empty, "shorten to one sentence of at most #{GlossaryLengthRule::MAX_CHARS} chars: #{report.join('; ')}"
     end

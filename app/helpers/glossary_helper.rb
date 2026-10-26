@@ -11,7 +11,7 @@ module GlossaryHelper
       match = Regexp.last_match
       key = Glossary.key_for(match[0])
       next unless seen.add?(key)
-      matches << { range: match.begin(0)...match.end(0), definition: Glossary::TERMS[key] }
+      matches << { range: match.begin(0)...match.end(0), definition: Glossary.definition_for(match[0]) }
     end
 
     return text if matches.empty?

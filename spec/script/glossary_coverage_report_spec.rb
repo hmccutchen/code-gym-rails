@@ -14,7 +14,7 @@ RSpec.describe GlossaryCoverageReport do
   let(:terms) { { "foo" => "A foo." } }
   let(:pattern) { Glossary.pattern_for(terms) }
   let(:rows) { described_class.parse(tsv) }
-  let(:report) { described_class.new(rows, terms: terms, pattern: pattern) }
+  let(:report) { described_class.new(rows, terms: terms, pattern: pattern, resolver: nil) }
 
   it "counts visible terms by how the glossary covers them" do
     expect(report.summary).to eq(visible: 3, whole_term: 1, by_form: 0, inside_term: 1, unmatched: 1)
@@ -29,6 +29,12 @@ RSpec.describe GlossaryCoverageReport do
     resolved = described_class.new(rows, terms: terms, pattern: pattern, resolver: resolver)
 
     expect(resolved.summary).to eq(visible: 3, whole_term: 2, by_form: 1, inside_term: 1, unmatched: 0)
+  end
+
+  it "resolves a form through the real glossary when no resolver is passed" do
+    form_rows = described_class.parse("concept\tlanguage\tterm\tfirst_field\tvisible\nc\truby_rails\tclosures\tplain\tyes\n")
+
+    expect(described_class.new(form_rows).summary).to include(whole_term: 1, by_form: 1)
   end
 
   it "prints the five numbers and the top unmatched terms" do
