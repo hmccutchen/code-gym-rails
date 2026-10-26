@@ -147,9 +147,9 @@ New entries are one sentence of at most 180 characters. Twelve older entries
 that break the rule are named in `GlossaryLengthRule::LONG_ENTRIES` and keep
 their text. A separate agent fact-checked the 37 definitions and found six
 wrong, which were corrected. Every new key and form also runs through a
-wrong-sense listing over production reference prose and the operator's last
+wrong-sense listing over production reference prose and the app owner's last
 60 days of exercise text, and a match in another sense drops the key or form
-before the change merges.
+before the change merges. That listing ran on 2026-10-26.
 
 Coverage is measured by `script/glossary_coverage.rb` over the audit's three
 TSVs, for the rows a reader sees. At main, 104 were matched as a whole term,
