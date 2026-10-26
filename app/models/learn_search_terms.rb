@@ -1,4 +1,4 @@
-# Words the Learn filter also matches; read only by the views, so nothing here reaches a provider.
+# Words the Learn filter also matches; read only by LearnSearchHelper, so nothing here reaches a provider.
 module LearnSearchTerms
   SYNONYMS = {
     "n_plus_one" => [ "n+1", "eager loading" ],

@@ -29,8 +29,12 @@ A word is a run of letters, digits and `+`, lowercased with accents dropped;
 spaces around `+` collapse, so "n + 1" reads as "n+1". Every query word must
 match some word of the entry. Under 5 letters it needs an exact or prefix
 match; 5 to 7 letters may be 1 edit away and 8 or more 2, measured against
-the entry word or its start, with a swap of neighbouring letters counting as
-one edit. The system spec's matching table holds the agreed cases.
+the entry word or its start. The distance is Damerau-Levenshtein, where a
+swap of neighbouring letters counts as one edit even beside another edit, so
+"arictecture" is two edits from "architecture". A restricted version, which
+the first release used, counted that as three. The system spec pins each
+limit from both sides, the swap, accent folding and a prefix outranking a
+typo.
 
 ## Order
 

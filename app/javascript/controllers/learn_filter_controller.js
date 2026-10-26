@@ -3,6 +3,10 @@ import { Controller } from "@hotwired/stimulus"
 
 const EXACT = 3
 const PREFIX = 2
+const TYPO = 1
+const PER_EDIT = 0.25
+const ONE_EDIT_FROM = 5
+const TWO_EDITS_FROM = 8
 
 export default class extends Controller {
   static targets = ["input", "seenOnly", "empty", "entry", "block", "section"]
@@ -61,31 +65,34 @@ export default class extends Controller {
     const allowed = this.allowedEdits(queryWord.length)
     if (allowed === 0) return 0
     const edits = this.prefixDistance(queryWord, entryWord)
-    return edits <= allowed ? 1 - edits / 4 : 0
+    return edits <= allowed ? TYPO - edits * PER_EDIT : 0
   }
 
   allowedEdits(length) {
-    if (length < 5) return 0
-    return length < 8 ? 1 : 2
+    if (length < ONE_EDIT_FROM) return 0
+    return length < TWO_EDITS_FROM ? 1 : 2
   }
 
-  // Edits to turn the query word into the closest leading part of the entry word; a swap of neighbours counts as one.
+  // Damerau-Levenshtein to the closest leading part of the entry word, so a swap counts as one edit even beside another.
   prefixDistance(queryWord, entryWord) {
-    let before = null
-    let previous = Array.from({ length: entryWord.length + 1 }, (_, j) => j)
+    const far = queryWord.length + entryWord.length
+    const d = Array.from({ length: queryWord.length + 2 }, () => new Array(entryWord.length + 2).fill(far))
+    for (let i = 0; i <= queryWord.length; i++) d[i + 1][1] = i
+    for (let j = 0; j <= entryWord.length; j++) d[1][j + 1] = j
+    const lastRowOf = new Map()
     for (let i = 1; i <= queryWord.length; i++) {
-      const current = [ i ]
+      let lastMatchColumn = 0
       for (let j = 1; j <= entryWord.length; j++) {
-        const substitution = previous[j - 1] + (queryWord[i - 1] === entryWord[j - 1] ? 0 : 1)
-        current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, substitution)
-        if (i > 1 && j > 1 && queryWord[i - 1] === entryWord[j - 2] && queryWord[i - 2] === entryWord[j - 1]) {
-          current[j] = Math.min(current[j], before[j - 2] + 1)
-        }
+        const k = lastRowOf.get(entryWord[j - 1]) || 0
+        const l = lastMatchColumn
+        const cost = queryWord[i - 1] === entryWord[j - 1] ? 0 : 1
+        if (cost === 0) lastMatchColumn = j
+        d[i + 1][j + 1] = Math.min(d[i][j] + cost, d[i + 1][j] + 1, d[i][j + 1] + 1,
+          d[k][l] + (i - k - 1) + 1 + (j - l - 1))
       }
-      before = previous
-      previous = current
+      lastRowOf.set(queryWord[i - 1], i)
     }
-    return Math.min(...previous.slice(1))
+    return Math.min(...d[queryWord.length + 1].slice(2))
   }
 
   sortLists(scores) {

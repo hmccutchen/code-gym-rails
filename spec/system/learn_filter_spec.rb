@@ -31,6 +31,14 @@ RSpec.describe "Learn tab filter", type: :system do
     visible_entries.map { |href| href.split("/").last }
   end
 
+  def entries_with_a_word_starting(prefix)
+    searches = page.evaluate_script(<<~JS)
+      [...document.querySelectorAll(".learn-entry")]
+        .map((entry) => [ entry.querySelector("a").getAttribute("href").split("/").pop(), entry.dataset.search ])
+    JS
+    searches.select { |_concept, search| search.scan(/[\p{L}\p{N}+]+/).any? { |word| word.start_with?(prefix) } }.map(&:first)
+  end
+
   def filter_to(term, expected)
     fill_in "Filter concepts", with: term
     expect(page).to have_css(".learn-entry", visible: :visible, count: expected.size)
@@ -78,9 +86,26 @@ RSpec.describe "Learn tab filter", type: :system do
     filter_to "n + 1", %w[n_plus_one]
     filter_to "code smell", ConceptVocabulary::CODE_SMELL_CONCEPTS
     filter_to "code", ConceptVocabulary::CODE_SMELL_CONCEPTS + ConceptVocabulary::PSEUDOCODE_TO_CODE_CONCEPTS + %w[reading_unfamiliar_code]
-    filter_to "in", %w[indexing sql_injection_prevention missing_index semantic_input_validation reading_for_intent
-                       dependency_inversion composition_over_inheritance unhandled_empty_input]
+    filter_to "in", entries_with_a_word_starting("in")
     filter_to "ruby", ConceptVocabulary::RAILS_CONCEPTS + %w[reading_unfamiliar_code]
+  end
+
+  it "allows one edit from five letters and two from eight, counting a swap as one even beside another edit" do
+    visit_learn_as("ruby_rails")
+
+    filter_to "cahce", %w[cache_key_completeness]
+    filter_to "idmpotn", []
+    filter_to "valdaton", %w[validations semantic_input_validation]
+    filter_to "idmptncy", []
+    filter_to "arictecture", ConceptVocabulary::ARCHITECTURE_CONCEPTS
+    filter_to "mémoization", %w[memoization]
+  end
+
+  it "ranks a prefix match above a typo within a group" do
+    visit_learn_as("ruby_rails")
+
+    filter_to "inher", %w[composition_over_inheritance dependency_inversion]
+    expect(visible_concepts).to eq(%w[composition_over_inheritance dependency_inversion])
   end
 
   it "allows no typo in a word under five letters" do

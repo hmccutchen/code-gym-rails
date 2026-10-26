@@ -33,6 +33,8 @@ Every query word must match some word of the entry. A word under 5 letters
 needs an exact or prefix match. A word of 5 to 7 letters may be 1 edit away,
 and 8 or more letters 2, where an edit is an insertion, deletion, change or
 swap of neighbouring letters, measured against the entry word or its start.
+A swap counts as one edit even when another edit sits beside it
+(Damerau-Levenshtein distance), so "arictecture" finds Architecture.
 The limit began at 4 letters. At that limit "such" matched Missing success
 criteria, so 4-letter words became prefix-only.
 
