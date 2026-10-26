@@ -259,3 +259,15 @@ data.*
 - build the desktop foundation and History from the spec `#549`
   **I decided:** the spec rides in the PR for review and comes out after the
   critical review, before the merge
+- called the phone redesign done at four PRs; the authenticator forms work
+  fine for me, so no code screens
+- the swap picker says "skip" where it said "turned off" `#552`
+  **why:** beside the Skip switch, "turn it on again" pointed the wrong way
+- glossary terms on the reference dropdown and every Learn page `#556`
+  **why:** references use terms like partial index and sequential scan with
+  no definition, and the Learn pages never ran the glossary at all
+  **I decided:** wire it at render time so every existing reference gains it;
+  never inside code; first occurrence per field; audit production read-only
+  before writing any term list; fix the three wrong-sense entries here and
+  leave the backfill, the matcher and the technique terms to the next PR;
+  pin the "None" lesson rows as they render today rather than fix them

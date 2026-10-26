@@ -1,13 +1,6 @@
 require "rails_helper"
 
 RSpec.describe GlossaryHelper, type: :helper do
-  # Stubs a small glossary for readable edge cases; one example below runs against the real Glossary::TERMS.
-  def stub_glossary(terms)
-    stub_const("Glossary::TERMS", terms)
-    stub_const("Glossary::TERM_PATTERN",
-      Regexp.union(terms.keys.sort_by { |t| -t.length }.map { |t| /\b#{Regexp.escape(t)}\b/i }))
-  end
-
   describe "#glossary_wrap" do
     it "wraps the first case-insensitive match of a term in a span with its definition" do
       stub_glossary("closure" => "A function bundled with its surrounding variables.")

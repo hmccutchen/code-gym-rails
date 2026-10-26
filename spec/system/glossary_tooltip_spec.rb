@@ -190,6 +190,8 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
           const left = term.getBoundingClientRect().left + parseFloat(style.left);
           return {
             display: style.display,
+            panelWeight: style.fontWeight,
+            termWeight: getComputedStyle(term).fontWeight,
             left: left,
             right: left + parseFloat(style.width),
             width: parseFloat(style.width),
@@ -235,6 +237,8 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
         expect(box["right"]).to be <= phone_width
         expect(box["scrollWidth"]).to eq(phone_width)
       end
+      tagline_box = panel_box(0)
+      expect([ tagline_box["termWeight"], tagline_box["panelWeight"] ]).to eq([ "700", "400" ])
     end
 
     it "opens the dropdown's term inside the viewport on the dashboard at 320px" do

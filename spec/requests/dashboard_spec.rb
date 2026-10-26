@@ -469,8 +469,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     it "wraps each dropdown field once and leaves the code example alone" do
       doc = page
       body = doc.at_css("details.ref .ref-body")
-      prose = body.css("p").reject { |p| p.at_css("button") }
+      prose = body.css("> p")
 
+      expect(body.at_css("pre.snippet")).to be_present
       expect(prose.map { |p| p.css(".gloss-term").size }).to eq([ 1, 1, 1 ])
       expect(body.css("pre.snippet .gloss-term")).to be_empty
       expect(doc.css("details.ref > summary .gloss-term")).to be_empty

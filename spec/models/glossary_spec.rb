@@ -26,13 +26,21 @@ RSpec.describe Glossary do
     expect(missing).to be_empty
   end
 
+  describe ".pattern_for" do
+    it "matches the longer of two overlapping terms" do
+      pattern = Glossary.pattern_for("partial index" => "x", "index" => "y")
+
+      expect("a partial index helps"[pattern]).to eq("partial index")
+    end
+  end
+
   describe "entries that reference pages read in two senses" do
     it "defines strict mode for JavaScript and for React" do
       expect(Glossary::TERMS["strict mode"]).to match(/use strict/).and match(/React/)
     end
 
     it "defines reconciliation as repairing differences and as React's render diff" do
-      expect(Glossary::TERMS["reconciliation"]).to match(/differ|repair/i).and match(/React/)
+      expect(Glossary::TERMS["reconciliation"]).to match(/repair/i).and match(/React/)
     end
 
     it "defines throttling for a function and for a processor" do

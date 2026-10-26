@@ -22,8 +22,7 @@ calls `preventDefault`, so Space scrolls the page only when no term has focus.
 
 The panel is as wide as the section or container the term sits in, which is a
 rendered width no stylesheet can name. `--gloss-width` and `--gloss-shift` are
-recomputed on open, on resize, and when a disclosure containing the term
-toggles, since each changes that box.
+recomputed on open and on resize, since each changes that box.
 
 ## Learn has no `.section`
 

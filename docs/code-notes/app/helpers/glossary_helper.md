@@ -38,3 +38,10 @@ A term inside code is an identifier or a literal, not a use of the word. A
 span inside a highlighted block would break the highlighter's markup. So the
 code example, the worked example's code and every `<code>` span stay as they
 are. Views call the wrapper only for prose fields.
+
+## Alternate framings stay plain
+
+Alternate framings of a concept arrive after the page loads, as text that
+`concept_alternates_controller.js` inserts with `textContent`. No term in them
+is wrapped, since the helper only runs when the server renders a page. Issue
+#557 tracks wrapping them.
