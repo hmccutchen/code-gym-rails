@@ -436,7 +436,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(labels.css(".gloss-term")).to be_empty
     end
 
-    it "underlines the same terms in FakeService's day as the glossary did before the reference-audit entries" do
+    it "pins the set of terms the real glossary underlines in FakeService's day, which only a new key or form or a FakeService prose change moves" do
       create_exercise(problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_dup)
       get root_path
       terms = Nokogiri::HTML5(response.body).css(".gloss-term").map(&:text).to_set
