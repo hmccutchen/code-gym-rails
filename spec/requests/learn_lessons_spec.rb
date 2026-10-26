@@ -64,7 +64,7 @@ RSpec.describe "Learn lessons", type: :request do
         { group: "meta_skill", summary: "A closure summary",
           sections: [
             { heading: "The closure heading",
-              blocks: [ [ :paragraph, "A closure holds a closure." ], [ :steps, [ [ "Look", "A closure here" ] ] ], [ :code, "closure = 1" ] ] },
+              blocks: [ [ :paragraph, "A closure holds a closure." ], [ :steps, [ [ "Closure look", "A closure here" ] ] ], [ :code, "closure = 1" ] ] },
             { heading: "Second", blocks: [ [ :paragraph, "Plain text." ] ] }
           ] }
       end
