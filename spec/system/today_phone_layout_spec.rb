@@ -24,18 +24,9 @@ RSpec.describe "Today's phone layout", type: :system do
 
   def cards = rects(".today-page .section")
 
-  def bar = rect("#submit-row")
+  def submit_row = rect("#submit-row")
 
-  def focus_ring_reach
-    page.evaluate_script(<<~JS)
-      (() => {
-        const style = getComputedStyle(document.documentElement);
-        return parseFloat(style.getPropertyValue("--focus-ring-width")) + parseFloat(style.getPropertyValue("--focus-ring-offset"));
-      })()
-    JS
-  end
-
-  def bar_position = computed_style("#submit-row", "position")
+  def row_position = computed_style("#submit-row", "position")
 
   describe "the section cards" do
     [ 320, 390 ].each do |width|
@@ -81,115 +72,30 @@ RSpec.describe "Today's phone layout", type: :system do
     end
   end
 
-  describe "the Submit bar" do
-    it "sits at the bottom of a browser tab over the sections, as wide as the cards" do
+
+  describe "the Submit row" do
+    it "stays at the end of the form, with a button as wide as the cards, in a browser tab and the home-screen app" do
+      set_safe_area(bottom: 34)
       visit_today
 
-      expect(bar["bottom"]).to be_within(0.5).of(window_height)
-      expect(bar["top"]).to be < cards.last["bottom"]
+      expect(row_position).to eq("static")
+      expect(submit_row["top"]).to be > cards.last["bottom"]
       button = rect("#submit-answers")
       expect(button["left"]).to be_within(0.5).of(cards.first["left"])
       expect(button["right"]).to be_within(0.5).of(cards.first["right"])
       expect(button["height"]).to be >= 48
-    end
 
-    it "keeps the button above a browser tab's bottom safe area" do
-      set_safe_area(bottom: 34)
-      visit_today
-
-      expect(bar["bottom"]).to be_within(0.5).of(window_height)
-      expect(rect("#submit-answers")["bottom"]).to be <= window_height - 34
-    end
-
-    it "sits on top of the tab bar in the home-screen app" do
-      set_safe_area(bottom: 34)
-      visit_today
       force_standalone
-
-      tab_bar = rect(".tab-bar")
-      expect(tab_bar["bottom"]).to be_within(0.5).of(window_height)
-      # The tab bar's 1px top border sits over the bar's bottom edge.
-      expect(bar["bottom"]).to be_within(1).of(tab_bar["top"])
-      expect(rect("#submit-answers")["bottom"]).to be <= tab_bar["top"] - 8 + 0.5
+      expect(row_position).to eq("static")
+      expect(submit_row["top"]).to be > cards.last["bottom"]
     end
 
-    it "settles after the last section once the page is scrolled to its end" do
-      visit_today
-      page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
-
-      expect(bar["top"]).to be >= cards.last["bottom"]
-    end
-
-    it "lets go while an answer field has focus, so it never covers the typing" do
-      visit_today
-      find(%(textarea[data-field="code_review"])).click
-      expect(bar_position).to eq("static")
-      expect(computed_style("html", "scrollPaddingBottom")).to eq("auto")
-
-      find(".today-page .page-header h1").click
-      expect(bar_position).to eq("sticky")
-    end
-
-    it "shows a refused submit's nudge inside the bar, on screen" do
+    it "shows a refused submit's nudge under the button" do
       visit_today
       click_button "Submit answers"
 
       expect(page).to have_css("#rating-nudge", visible: true)
-      nudge = rect("#rating-nudge")
-      expect(nudge["top"]).to be >= bar["top"]
-      expect(nudge["bottom"]).to be <= bar["bottom"]
-      expect(bar["bottom"]).to be_within(0.5).of(window_height)
-    end
-
-    [ [ 390, {} ], [ 390, LayoutHelpers::LARGEST_TEXT ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
-      it "keeps a focused rating button and its ring above the bar at #{width}px#{' with the largest text' if prefs.any?}" do
-        visit_today(width: width, prefs: prefs)
-        page.execute_script(<<~JS)
-          const button = document.querySelectorAll(".rating-row .rating-btn")[4];
-          window.scrollTo(0, 0);
-          window.scrollBy(0, button.getBoundingClientRect().bottom - window.innerHeight + 40);
-          button.focus({ preventScroll: true });
-          button.scrollIntoView({ block: "nearest" });
-        JS
-
-        button = page.evaluate_script("document.activeElement.getBoundingClientRect().bottom")
-        # Scroll positions snap to whole pixels, so allow a sub-pixel overlap.
-        expect(button + focus_ring_reach).to be <= bar["top"] + 0.5
-      end
-    end
-
-    it "lifts a failed save's message clear of the bar at 320px with the largest text" do
-      visit_today(width: 320, prefs: LayoutHelpers::LARGEST_TEXT)
-      fail_requests_to("/responses")
-      find(%(textarea[data-field="code_review"])).fill_in(with: "It re-runs the query inside the loop.")
-      find(".today-page .page-header h1").click
-
-      expect(page).to have_css("#save-status", visible: true)
-      expect(rect("#save-status")["bottom"]).to be <= bar["top"]
-    end
-
-    it "keeps a failed save's message on screen while the field keeps focus in a window the keyboard has shrunk" do
-      set_safe_area(bottom: 34)
-      visit_today(prefs: LayoutHelpers::LARGEST_TEXT)
-      force_standalone
-      fail_requests_to("/responses")
-      find(%(textarea[data-field="code_review"])).fill_in(with: "It re-runs the query inside the loop.")
-      resize(390, height: 300)
-
-      expect(page).to have_css("#save-status", visible: true)
-      expect(page.evaluate_script("document.activeElement.matches('textarea')")).to be(true)
-      expect(rect("#save-status")["top"]).to be >= 0
-      expect(rect("#save-status")["bottom"]).to be <= window_height
-    end
-
-    it "fits within the 10rem it reserves with a wrapped nudge at 320px with the largest text" do
-      visit_today(width: 320, prefs: LayoutHelpers::LARGEST_TEXT)
-      click_button "Submit answers"
-      expect(page).to have_css("#rating-nudge", visible: true)
-
-      root_font = page.evaluate_script("parseFloat(getComputedStyle(document.documentElement).fontSize)")
-      expect(rect("#rating-nudge")["height"]).to be > root_font * 2
-      expect(bar["height"]).to be <= root_font * 10
+      expect(rect("#rating-nudge")["top"]).to be >= rect("#submit-answers")["bottom"]
     end
 
     it "brings a held submit's notice on screen" do
@@ -209,6 +115,7 @@ RSpec.describe "Today's phone layout", type: :system do
       expect(page).to have_css("#leave-held")
       notice = rect("#leave-held")
       expect(notice["top"]).to be >= 0
+      # Scroll positions snap to whole pixels, so allow a sub-pixel overlap.
       expect(notice["bottom"]).to be <= window_height + 0.5
     end
 
@@ -222,49 +129,12 @@ RSpec.describe "Today's phone layout", type: :system do
 
   it "applies the phone rules below 600px, with the cards' gutter, and not at 600px" do
     visit_today(width: 599)
-    expect(bar_position).to eq("sticky")
     expect(edges(".today-page .section").first.first).to be_within(0.5).of(16)
+    expect(rect("#submit-answers")["width"]).to be_within(0.5).of(cards.first["width"])
 
     resize(600)
-    expect(bar_position).to eq("static")
     expect(edges(".today-page .section").first.first).to be_within(0.5).of(24)
     expect(computed_style(".today-page .section", "marginBottom")).to eq("24px")
-  end
-
-  it "keeps a lost connection's message readable above the bar in the shortest window the bar sticks in" do
-    set_safe_area(top: 47, bottom: 34)
-    visit_today(width: 320, height: 512, prefs: LayoutHelpers::LARGEST_TEXT)
-    force_standalone
-    drop_requests_to("/responses")
-    find(%(textarea[data-field="code_review"])).fill_in(with: "It re-runs the query inside the loop.")
-    find(".today-page .page-header h1").click
-
-    expect(page).to have_css("#save-status", visible: true)
-    expect(bar_position).to eq("sticky")
-    banner = rect("#save-status")
-    expect(banner["top"]).to be >= 47
-    expect(banner["bottom"]).to be <= bar["top"]
-  end
-
-  it "sticks the bar only in a window at least 512px tall" do
-    visit_today(height: 512)
-    expect(bar_position).to eq("sticky")
-
-    resize(390, height: 511)
-    expect(bar_position).to eq("static")
-    expect(computed_style("html", "scrollPaddingBottom")).to eq("auto")
-  end
-
-  it "keeps a failed save's message on screen in a phone held sideways in the home-screen app" do
-    set_safe_area(left: 44, right: 44, bottom: 21)
-    visit_today(width: 568, height: 320, prefs: LayoutHelpers::LARGEST_TEXT)
-    force_standalone
-    fail_requests_to("/responses")
-    find(%(textarea[data-field="code_review"])).fill_in(with: "It re-runs the query inside the loop.")
-    find(".today-page .page-header h1").click
-
-    expect(page).to have_css("#save-status", visible: true)
-    expect(bar_position).to eq("static")
-    expect(rect("#save-status")["top"]).to be >= 0
+    expect(rect("#submit-answers")["width"]).to be < cards.first["width"] / 2
   end
 end

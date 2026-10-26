@@ -9,8 +9,8 @@ Progress, Learn, and Account and Settings.
 ## The breakpoints
 
 - **Under 600px:** the phone layout. Card pages and Today put each card
-  `max(16px, inset)` from the screen edge (`phone_cards.css`), and Today's
-  Submit button sticks to the bottom of a window at least 512px tall
+  `max(16px, inset)` from the screen edge (`phone_cards.css`); Today's
+  Submit stays at the end of its form
   (`docs/code-notes/app/assets/stylesheets/pages/today.md`).
 - **600 to 899px:** one column. Account and Settings stay a centered 480px
   column (`.phone-page`). History, Progress, Learn and Today take the

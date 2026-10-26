@@ -29,7 +29,7 @@ width from the answered count once it connects.
 
 The phone rules sit in one `@media (max-width: 599.98px)` block at the end,
 the width `phone_cards.css` gives the phone gutter, so the cards, the gaps and
-the bar change together.
+the Submit row change together.
 
 - **Cards.** `.today-page` takes the phone gutter from `phone_cards.css`, so
   each section is a card `max(16px, inset)` from the screen edge, as on the
@@ -37,46 +37,15 @@ the bar change together.
   section are 16px apart. A trial's banner gets its own margin there: its
   wider rule pulls it up into the title block's 2rem margin, which the 16px
   gap would otherwise cancel.
-- **The Submit bar.** The submit row becomes a bar stuck to the bottom of the
-  window while the form is on screen, and settles in place after the last
-  section. It holds the button, full width, the "saves as you type" note and
-  the nudge. The nudge sits inside the bar so a refused submit's sentence,
-  which takes focus, shows where the reader is rather than at the end of the
-  form.
-- **Only in a window at least 512px tall.** The bar, its reserve and the
-  save banner's lift sit in a second block, `(max-width: 599.98px) and
-  (min-height: 512px)`. A phone held sideways is about 320 to 430px tall; there
-  the bar (up to about 190px at the largest text), the tab bar and the progress
-  bar left about 20px for the answers, and the lifted save banner ran off the
-  top. Below that height the submit row keeps its phone look but stays at the
-  end of the form, as it does from 600px up.
-- **`position: sticky`, not `fixed`.** Pull-to-refresh moves
-  `.container[data-pull-content]` with a `transform`, and a transform makes a
-  fixed element position itself against the container instead of the window,
-  so a fixed bar would jump to the end of the page during a pull.
-- **Two bottom offsets.** In the home-screen app at phone width the tab bar
-  covers the bottom of the window, so the bar sits on top of it; in a browser
-  tab it sits at the bottom and pads itself clear of the home indicator. Both
-  come from the layout's `--tab-bar-clearance` and `--bottom-safe-inset`
-  (`docs/decisions/home-screen-app.md`), so the standalone test stays in one
-  place.
-- **It lets go while someone types.** While an answer field or the duck's
-  field has focus the bar is static. On a phone whose keyboard shrinks the
-  window, a stuck bar would take a third of what is left and could cover the
-  line being typed.
-- **What it covers.** A focused control scrolled into view stops above the
-  bar (`scroll-padding-bottom`), and a failed save's message is lifted above
-  it. Both use `--submit-bar-reach`, a deliberate overestimate (10rem plus the
-  offsets): the bar holds three lines of rem-sized text and the nudge wraps
-  at narrow widths, so its height isn't fixed. Too much only leaves a little
-  more space; too little would hide the control. At 320px with the largest
-  text and a wrapped nudge the bar is about 192px of the 224px reserved, which
-  `today_phone_layout_spec` measures. Both are off while a text field has
-  focus, since the bar has let go then. The lifted banner is also capped at
-  the height left between the top safe area and the bar, and scrolls inside
-  that: in a 512px window at the largest text the lost-connection message
-  wraps taller than the space above the bar.
+- **The Submit row.** It stays at the end of the form, with the button full
+  width and 48px tall, and the "saves as you type" note and the nudge
+  centered under it.
+- **No sticky Submit bar.** The phone board drew Submit as a bar stuck above
+  the tab bar, and one was built. It was taken out before merge: with the
+  progress bar already stuck at the top, a bar and the tab bar at the bottom
+  left the answers scrolling through a narrow middle of the screen the whole
+  time. It also needed space reserved above it for focus, a lifted save
+  banner, a rule for while someone types and a minimum window height.
 - **A held submit.** When a submit waits on another save, the answer-form
   controller scrolls its notice into view
   (`docs/code-notes/app/javascript/controllers/answer_form_controller.md`).
-

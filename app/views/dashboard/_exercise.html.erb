@@ -93,7 +93,7 @@
         <p class="hint"><%= t("dashboard.shared_concept", sections: exercise.daily_kinds.map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
       <% end %>
 
-      <div class="submit-row submit-bar" id="submit-row">
+      <div class="submit-row" id="submit-row">
         <%= f.hidden_field :submit, value: "1" %>
         <%# Not type=submit: a click before the module loads would otherwise natively post the whole day. %>
         <%= f.button t("dashboard.exercise.submit"), type: "button", id: "submit-answers", class: "btn btn-primary",

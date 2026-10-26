@@ -51,10 +51,8 @@ the directory it is served from.
 
 **What the tab bar covers.** Where the tab bar shows, the layout's
 standalone rule sets `--tab-bar-clearance` to the tab bar's height plus the
-bottom safe area, and `--bottom-safe-inset` to 0, since the tab bar already
-pads itself clear of the home indicator. Everywhere else they are 0 and the
-safe area. The body's bottom padding, the save banner and Today's Submit bar
-read them, so the standalone test stays in that one rule.
+bottom safe area; everywhere else it is 0. The body's bottom padding and the
+save banner read it, so the formula is written once.
 
 **Pull-to-refresh in the installed app.** The layout's
 `overscroll-behavior-y: none` removes the rubber-band bounce, and with it

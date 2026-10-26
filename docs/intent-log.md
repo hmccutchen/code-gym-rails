@@ -313,5 +313,5 @@ data.*
   **I decided:** Account's paired cards stretch to the same height
 - fuzzy Learn search `#570`
 - Today on phone cards, styles in its own sheet `#572`
-  **I decided:** a sticky Submit bar, never fixed, offset for the tab bar and
-  for a browser tab
+  **I decided:** no sticky Submit bar; with the progress and tab bars the
+  screen felt sandwiched

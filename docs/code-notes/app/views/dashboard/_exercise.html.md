@@ -107,10 +107,8 @@ the submission is saved and confirmed before the review is requested.
 ## The submit row
 
 The submit row holds the button, the "saves as you type" note and the
-nudge, so on a phone the three stick to the bottom of the window together
-(`docs/code-notes/app/assets/stylesheets/pages/today.md`). The nudge takes
-the row's full width, so from 601px it still reads as a line under the
-button.
+nudge (`docs/code-notes/app/assets/stylesheets/pages/today.md`). The nudge
+takes the row's full width, so it reads as a line under the button.
 
 ## Refused submission
 
