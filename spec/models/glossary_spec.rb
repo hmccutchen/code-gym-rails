@@ -77,6 +77,49 @@ RSpec.describe Glossary do
     end
   end
 
+  describe "definition length" do
+    LONG_ENTRIES = [
+      "aggregate boundaries", "allocation rounding", "debouncing throttling", "reading for intent",
+      "reconciliation", "semantic input validation", "shallow module", "spotting unstated assumptions",
+      "strict mode", "throttling", "ubiquitous language", "wrong cardinality"
+    ].freeze
+    SENTENCE_END = /[.!?](?=\s+[A-Z])/
+    MAX_CHARS = 180
+    CEILING_CHARS = 300
+
+    def sentence_count(definition)
+      definition.gsub(/\b(e\.g|i\.e)\./i, "").split(SENTENCE_END).size
+    end
+
+    def over_the_rule(definition)
+      sentence_count(definition) > 1 || definition.length > MAX_CHARS
+    end
+
+    it "keeps every definition at or under the ceiling, listed or not" do
+      too_long = Glossary::TERMS.select { |_key, definition| definition.length > CEILING_CHARS }
+
+      report = too_long.map { |key, definition| "#{key} (#{definition.length} chars)" }
+
+      expect(report).to be_empty, "over #{CEILING_CHARS} chars: #{report.join('; ')}"
+    end
+
+    it "holds every unlisted definition to one sentence of at most 180 characters" do
+      offenders = Glossary::TERMS.reject { |key, _| LONG_ENTRIES.include?(key) }.select { |_key, definition| over_the_rule(definition) }
+
+      report = offenders.map { |key, definition| "#{key} (#{sentence_count(definition)} sentence(s), #{definition.length} chars)" }
+
+      expect(report).to be_empty, "shorten to one sentence of at most #{MAX_CHARS} chars: #{report.join('; ')}"
+    end
+
+    # Without this a fixed entry would stay listed and the list would slowly stop meaning anything.
+    it "lists only keys that still need listing, and only keys that exist" do
+      expect(LONG_ENTRIES - Glossary::TERMS.keys).to be_empty
+      stale = LONG_ENTRIES.select { |key| Glossary::TERMS[key] && !over_the_rule(Glossary::TERMS[key]) }
+
+      expect(stale).to be_empty, "now one short sentence, remove from LONG_ENTRIES: #{stale.join(', ')}"
+    end
+  end
+
   describe "entries that reference pages read in two senses" do
     it "defines strict mode for JavaScript and for React" do
       expect(Glossary::TERMS["strict mode"]).to match(/use strict/).and match(/React/)
