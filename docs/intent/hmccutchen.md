@@ -256,3 +256,4 @@ data.*
   **I decided:** Claude implements and investigates; I decide the design. The
   nav gets the 1040px column on every page, its own PR after this one, and
   the doubled notch inset on landscape phones becomes its own issue
+- the nav takes the page's 1040px column on every page at desktop widths `#562`
