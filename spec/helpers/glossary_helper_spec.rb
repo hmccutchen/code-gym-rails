@@ -152,5 +152,37 @@ RSpec.describe GlossaryHelper, type: :helper do
         %(<span class="gloss-term" data-definition="#{ERB::Util.html_escape(Glossary::TERMS['idempotency'])}")
       )
     end
+
+    it "shares the first-occurrence set across fragments when given one" do
+      stub_glossary("closure" => "A function with its scope.")
+      seen = Set.new
+      first = helper.glossary_wrap("A closure here.", seen: seen)
+      second = helper.glossary_wrap("Another closure there.", seen: seen)
+      expect(first).to include("gloss-term")
+      expect(second).not_to include("gloss-term")
+    end
+  end
+
+  describe "#glossary_wrap_prose" do
+    it "leaves a term inside backticks as code and wraps it once in the prose around it" do
+      stub_glossary("closure" => "A function with its scope.")
+      html = helper.glossary_wrap_prose("A `closure` holds state; a closure is cheap, and a closure is common.")
+      expect(html).to include("<code>closure</code>")
+      expect(html.scan("gloss-term").size).to eq(1)
+      expect(html.index("gloss-term")).to be > html.index("</code>")
+    end
+
+    it "keeps escaping inside code and prose" do
+      stub_glossary("closure" => "x")
+      expect(helper.glossary_wrap_prose("`<b>raw</b>` and <i>closure</i>")).to eq(%(<code>&lt;b&gt;raw&lt;/b&gt;</code> and &lt;i&gt;<span class="gloss-term" data-definition="x" tabindex="0" role="button" aria-label="closure: x">closure</span>&lt;/i&gt;))
+    end
+
+    it "returns html_safe output" do
+      expect(helper.glossary_wrap_prose("plain")).to be_html_safe
+    end
+  end
+
+  it "no longer defines prose_with_inline_code" do
+    expect(helper).not_to respond_to(:prose_with_inline_code)
   end
 end

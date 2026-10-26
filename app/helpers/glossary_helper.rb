@@ -1,18 +1,16 @@
 # Works on raw text and escapes each fragment before marking the result html_safe, so `text` can't break the markup.
 module GlossaryHelper
-  def glossary_wrap(text)
+  def glossary_wrap(text, seen: Set.new)
     return text if text.blank?
 
     # html_escape is a no-op on html_safe input, so a SafeBuffer would silently skip every escape below.
     text = text.to_str
 
     matches = []
-    seen_terms = {}
     text.to_enum(:scan, Glossary::TERM_PATTERN).each do
       match = Regexp.last_match
       key = match[0].downcase
-      next if seen_terms[key]
-      seen_terms[key] = true
+      next unless seen.add?(key)
       matches << { range: match.begin(0)...match.end(0), definition: Glossary::TERMS[key] }
     end
 
@@ -30,5 +28,13 @@ module GlossaryHelper
     result << ERB::Util.html_escape(text[cursor..])
 
     result.html_safe
+  end
+
+  def glossary_wrap_prose(text)
+    seen = Set.new
+    segments = text.to_str.split(SyntaxHighlightingHelper::INLINE_CODE).each_with_index.map do |segment, index|
+      index.odd? ? content_tag(:code, segment) : glossary_wrap(segment, seen: seen)
+    end
+    safe_join(segments)
   end
 end

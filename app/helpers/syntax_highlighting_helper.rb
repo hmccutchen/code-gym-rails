@@ -5,8 +5,4 @@ module SyntaxHighlightingHelper
   end
 
   INLINE_CODE = /`([^`\n]+)`/
-
-  def prose_with_inline_code(text)
-    safe_join(text.split(INLINE_CODE).each_with_index.map { |segment, index| index.odd? ? content_tag(:code, segment) : segment })
-  end
 end
