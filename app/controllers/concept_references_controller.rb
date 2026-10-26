@@ -44,7 +44,7 @@ class ConceptReferencesController < ApplicationController
   end
 
   def alternate_html(alternate)
-    ERB::Util.html_escape(helpers.glossary_wrap(alternate)).to_str
+    helpers.glossary_wrap(alternate).to_str
   end
 
   def render_error(message)

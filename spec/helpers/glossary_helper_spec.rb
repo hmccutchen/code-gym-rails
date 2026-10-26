@@ -157,10 +157,12 @@ RSpec.describe GlossaryHelper, type: :helper do
       expect(result).to include('aria-label="closure: a trick&quot; onmouseover=&quot;alert(1)"')
     end
 
-    it "treats no-match result (plain text) as not html_safe by default" do
+    it "escapes text with no match and marks it html_safe, so every caller gets safe HTML" do
       stub_glossary("nonexistentword" => "y")
-      result = helper.glossary_wrap("Nothing.")
-      expect(result.html_safe?).to be(false)
+      result = helper.glossary_wrap("<b>Nothing</b> here.")
+
+      expect(result).to eq("&lt;b&gt;Nothing&lt;/b&gt; here.")
+      expect(result).to be_html_safe
     end
 
     it "returns html_safe result when a match exists" do
