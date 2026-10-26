@@ -17,8 +17,8 @@ muted colour and bottom margin. The page rule that gives them that is
 makes the two ids add no weight, so the rule counts as one class (the
 `:not()` takes its argument's weight) plus one element: (0,1,1). That is
 exactly the weight of the `.setup-wrap p` rule it replaced, and it sits in
-the same place in the page's rules, now at the top of `pages/settings.css`. A `.card-note` paragraph is excluded and is
-left to `phone_cards.css`. Because the weight and the position match, every
+the same place in the page's rules, now at the top of `pages/settings.css`.
+A `.card-note` paragraph is excluded and is left to `phone_cards.css`. Because the weight and the position match, every
 paragraph the rule matches resolves as it did before the change. That
 includes the `.mix-note` shorthand `margin: .5rem 0 1rem`, which gives up its
 bottom margin to the rule's 2rem as it always did. A computed-style dump of

@@ -37,7 +37,9 @@ and Today's submitted day), `.learn-intro` (Progress and Learn), the
 disclosure chevron rule, and the Learn concept and lesson pages' rules, which
 aren't part of the page layout work. A partial's styles go in the sheet of
 the page it renders on, or, when it renders on several pages, in a small
-shared sheet named for the component.
+shared sheet named for the component. `spec/conventions/app_views_spec.rb`
+fails when a partial styled by a page sheet is rendered anywhere but that
+page, since it would show up there unstyled.
 
 ## Views carry no `<style>`
 

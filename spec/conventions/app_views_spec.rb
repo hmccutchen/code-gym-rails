@@ -78,4 +78,30 @@ RSpec.describe "Conventions held over app/views" do
 
     expect(offenders).to be_empty, "#{offenders.join(', ')} carry a <style> block; move it to app/assets/stylesheets/pages (docs/decisions/page-stylesheets.md)"
   end
+
+  PAGE_SHEET_PARTIALS = { %r{\Aaccounts/} => "app/views/accounts/show.html.erb",
+                          %r{\Aapi_keys/} => "app/views/api_keys/edit.html.erb",
+                          %r{\Alearn/recognition_guide\z} => "app/views/learn/index.html.erb" }.freeze
+
+  def rendered_partials(source) = source.scan(/\brender[ (]+(?:partial:\s*)?["']([\w\/]+)["']/).flatten
+
+  def page_for(partial) = PAGE_SHEET_PARTIALS.find { |pattern, _| partial.match?(pattern) }&.last
+
+  it "renders a partial styled by a page sheet only on the page that links that sheet" do
+    offenders = Dir[Rails.root.join("app/{views,controllers,helpers}/**/*.{erb,rb}")].flat_map do |path|
+      rendered_partials(File.read(path)).filter_map do |partial|
+        page = page_for(partial)
+        "#{relative(path)} renders #{partial}" if page && relative(path) != page && !relative(path).start_with?(File.dirname(page) + "/_")
+      end
+    end
+
+    expect(offenders).to be_empty, "#{offenders.join(', ')}; its styles live in that page's sheet, so give it a shared sheet named for the component (docs/decisions/page-stylesheets.md)"
+  end
+
+  it "recognises the partial a render names" do
+    expect(rendered_partials(%(<%= render "accounts/api_usage", usage: u %>))).to eq([ "accounts/api_usage" ])
+    expect(rendered_partials(%(<%= render(partial: "api_keys/key_guide") %>))).to eq([ "api_keys/key_guide" ])
+    expect(page_for("learn/recognition_guide")).to eq("app/views/learn/index.html.erb")
+    expect(page_for("learn/concept")).to be_nil
+  end
 end

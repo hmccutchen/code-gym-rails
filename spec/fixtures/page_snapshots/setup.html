@@ -682,9 +682,9 @@
     <fieldset class="mix-group">
       <legend>In every set</legend>
       <div class="mix-kinds">
-        <div class="mix-row mix-row-fixed">
-          <span id="mix-name-code_review">Code Review</span>
-          <fieldset class="mix-difficulty" data-kind="code_review"
+          <div class="mix-row mix-row-fixed">
+            <span id="mix-name-code_review">Code Review</span>
+            <fieldset class="mix-difficulty" data-kind="code_review"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-code_review mix-level-legend-code_review">
   <legend id="mix-level-legend-code_review">Difficulty target</legend>
   <label class="mix-level">
@@ -724,7 +724,7 @@
   </p>
 </fieldset>
 
-          <details class="kind-about" data-kind-about="code_review">
+            <details class="kind-about" data-kind-about="code_review">
   <summary>About Code Review</summary>
   <div class="kind-about-body">
     <p>Find the one problem in a short piece of code and say how you&#39;d fix it. This builds the habit of reading a change closely before you approve it.</p>
@@ -732,10 +732,10 @@
   </div>
 </details>
 
-        </div>
-        <div class="mix-row mix-row-fixed">
-          <span id="mix-name-design_comparison">Design Comparison</span>
-          <fieldset class="mix-difficulty" data-kind="design_comparison"
+          </div>
+          <div class="mix-row mix-row-fixed">
+            <span id="mix-name-design_comparison">Design Comparison</span>
+            <fieldset class="mix-difficulty" data-kind="design_comparison"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-design_comparison mix-level-legend-design_comparison">
   <legend id="mix-level-legend-design_comparison">Difficulty target</legend>
   <label class="mix-level">
@@ -775,7 +775,7 @@
   </p>
 </fieldset>
 
-          <details class="kind-about" data-kind-about="design_comparison">
+            <details class="kind-about" data-kind-about="design_comparison">
   <summary>About Design Comparison</summary>
   <div class="kind-about-body">
     <p>Two pieces of code both work, and you pick the one that suits the system described. Then you name the fact from the scenario or question that decides it.</p>
@@ -783,7 +783,7 @@
   </div>
 </details>
 
-        </div>
+          </div>
       </div>
     </fieldset>
       <fieldset class="mix-group">
@@ -847,20 +847,20 @@
         <legend>Rotating third section</legend>
 
         <div class="mix-kinds">
-          <div class="mix-row" data-kind="architecture" data-exercise-mix-target="row">
-            <label id="mix-name-architecture" for="weight-architecture">Architecture Decision</label>
-            <input type="range" id="weight-architecture" min="0" max="4" step="1"
-                   value="2" 
-                   aria-valuetext="Default"
-                   data-action="input->exercise-mix#slide">
-            <output id="weight-label-architecture">Default</output>
-            <label class="switch-row" for="exclude-architecture">
-              <span id="exclude-text-architecture">Skip this kind</span>
-              <input type="checkbox" id="exclude-architecture" class="switch mix-exclude-box" role="switch"
-                     aria-labelledby="mix-name-architecture exclude-text-architecture" 
-                     data-action="change->exercise-mix#toggleExclude">
-            </label>
-            <fieldset class="mix-difficulty" data-kind="architecture"
+            <div class="mix-row" data-kind="architecture" data-exercise-mix-target="row">
+              <label id="mix-name-architecture" for="weight-architecture">Architecture Decision</label>
+              <input type="range" id="weight-architecture" min="0" max="4" step="1"
+                     value="2" 
+                     aria-valuetext="Default"
+                     data-action="input->exercise-mix#slide">
+              <output id="weight-label-architecture">Default</output>
+              <label class="switch-row" for="exclude-architecture">
+                <span id="exclude-text-architecture">Skip this kind</span>
+                <input type="checkbox" id="exclude-architecture" class="switch mix-exclude-box" role="switch"
+                       aria-labelledby="mix-name-architecture exclude-text-architecture" 
+                       data-action="change->exercise-mix#toggleExclude">
+              </label>
+              <fieldset class="mix-difficulty" data-kind="architecture"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-architecture mix-level-legend-architecture">
   <legend id="mix-level-legend-architecture">Difficulty target</legend>
   <label class="mix-level">
@@ -900,7 +900,7 @@
   </p>
 </fieldset>
 
-            <details class="kind-about" data-kind-about="architecture">
+              <details class="kind-about" data-kind-about="architecture">
   <summary>About Architecture Decision</summary>
   <div class="kind-about-body">
     <p>Choose between two or three ways to build something, and justify the choice by what each one costs. You write reasoning, not code.</p>
@@ -908,21 +908,21 @@
   </div>
 </details>
 
-          </div>
-          <div class="mix-row" data-kind="security_review" data-exercise-mix-target="row">
-            <label id="mix-name-security_review" for="weight-security_review">Security Review</label>
-            <input type="range" id="weight-security_review" min="0" max="4" step="1"
-                   value="2" 
-                   aria-valuetext="Default"
-                   data-action="input->exercise-mix#slide">
-            <output id="weight-label-security_review">Default</output>
-            <label class="switch-row" for="exclude-security_review">
-              <span id="exclude-text-security_review">Skip this kind</span>
-              <input type="checkbox" id="exclude-security_review" class="switch mix-exclude-box" role="switch"
-                     aria-labelledby="mix-name-security_review exclude-text-security_review" 
-                     data-action="change->exercise-mix#toggleExclude">
-            </label>
-            <fieldset class="mix-difficulty" data-kind="security_review"
+            </div>
+            <div class="mix-row" data-kind="security_review" data-exercise-mix-target="row">
+              <label id="mix-name-security_review" for="weight-security_review">Security Review</label>
+              <input type="range" id="weight-security_review" min="0" max="4" step="1"
+                     value="2" 
+                     aria-valuetext="Default"
+                     data-action="input->exercise-mix#slide">
+              <output id="weight-label-security_review">Default</output>
+              <label class="switch-row" for="exclude-security_review">
+                <span id="exclude-text-security_review">Skip this kind</span>
+                <input type="checkbox" id="exclude-security_review" class="switch mix-exclude-box" role="switch"
+                       aria-labelledby="mix-name-security_review exclude-text-security_review" 
+                       data-action="change->exercise-mix#toggleExclude">
+              </label>
+              <fieldset class="mix-difficulty" data-kind="security_review"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-security_review mix-level-legend-security_review">
   <legend id="mix-level-legend-security_review">Difficulty target</legend>
   <label class="mix-level">
@@ -962,7 +962,7 @@
   </p>
 </fieldset>
 
-            <details class="kind-about" data-kind-about="security_review">
+              <details class="kind-about" data-kind-about="security_review">
   <summary>About Security Review</summary>
   <div class="kind-about-body">
     <p>Find the one weakness someone could exploit in a short piece of code, and say how you&#39;d close it. It trains you to read code the way an attacker would.</p>
@@ -970,21 +970,21 @@
   </div>
 </details>
 
-          </div>
-          <div class="mix-row" data-kind="challenge" data-exercise-mix-target="row">
-            <label id="mix-name-challenge" for="weight-challenge">Coding Challenge</label>
-            <input type="range" id="weight-challenge" min="0" max="4" step="1"
-                   value="2" 
-                   aria-valuetext="Default"
-                   data-action="input->exercise-mix#slide">
-            <output id="weight-label-challenge">Default</output>
-            <label class="switch-row" for="exclude-challenge">
-              <span id="exclude-text-challenge">Skip this kind</span>
-              <input type="checkbox" id="exclude-challenge" class="switch mix-exclude-box" role="switch"
-                     aria-labelledby="mix-name-challenge exclude-text-challenge" 
-                     data-action="change->exercise-mix#toggleExclude">
-            </label>
-            <fieldset class="mix-difficulty" data-kind="challenge"
+            </div>
+            <div class="mix-row" data-kind="challenge" data-exercise-mix-target="row">
+              <label id="mix-name-challenge" for="weight-challenge">Coding Challenge</label>
+              <input type="range" id="weight-challenge" min="0" max="4" step="1"
+                     value="2" 
+                     aria-valuetext="Default"
+                     data-action="input->exercise-mix#slide">
+              <output id="weight-label-challenge">Default</output>
+              <label class="switch-row" for="exclude-challenge">
+                <span id="exclude-text-challenge">Skip this kind</span>
+                <input type="checkbox" id="exclude-challenge" class="switch mix-exclude-box" role="switch"
+                       aria-labelledby="mix-name-challenge exclude-text-challenge" 
+                       data-action="change->exercise-mix#toggleExclude">
+              </label>
+              <fieldset class="mix-difficulty" data-kind="challenge"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-challenge mix-level-legend-challenge">
   <legend id="mix-level-legend-challenge">Difficulty target</legend>
   <label class="mix-level">
@@ -1024,7 +1024,7 @@
   </p>
 </fieldset>
 
-            <details class="kind-about" data-kind-about="challenge">
+              <details class="kind-about" data-kind-about="challenge">
   <summary>About Coding Challenge</summary>
   <div class="kind-about-body">
     <p>Write working code for a small task the question describes. Some days you start from a skeleton, and other days from an empty box.</p>
@@ -1032,21 +1032,21 @@
   </div>
 </details>
 
-          </div>
-          <div class="mix-row" data-kind="parsons_problem" data-exercise-mix-target="row">
-            <label id="mix-name-parsons_problem" for="weight-parsons_problem">Parsons Problem</label>
-            <input type="range" id="weight-parsons_problem" min="0" max="4" step="1"
-                   value="2" 
-                   aria-valuetext="Default"
-                   data-action="input->exercise-mix#slide">
-            <output id="weight-label-parsons_problem">Default</output>
-            <label class="switch-row" for="exclude-parsons_problem">
-              <span id="exclude-text-parsons_problem">Skip this kind</span>
-              <input type="checkbox" id="exclude-parsons_problem" class="switch mix-exclude-box" role="switch"
-                     aria-labelledby="mix-name-parsons_problem exclude-text-parsons_problem" 
-                     data-action="change->exercise-mix#toggleExclude">
-            </label>
-            <fieldset class="mix-difficulty" data-kind="parsons_problem"
+            </div>
+            <div class="mix-row" data-kind="parsons_problem" data-exercise-mix-target="row">
+              <label id="mix-name-parsons_problem" for="weight-parsons_problem">Parsons Problem</label>
+              <input type="range" id="weight-parsons_problem" min="0" max="4" step="1"
+                     value="2" 
+                     aria-valuetext="Default"
+                     data-action="input->exercise-mix#slide">
+              <output id="weight-label-parsons_problem">Default</output>
+              <label class="switch-row" for="exclude-parsons_problem">
+                <span id="exclude-text-parsons_problem">Skip this kind</span>
+                <input type="checkbox" id="exclude-parsons_problem" class="switch mix-exclude-box" role="switch"
+                       aria-labelledby="mix-name-parsons_problem exclude-text-parsons_problem" 
+                       data-action="change->exercise-mix#toggleExclude">
+              </label>
+              <fieldset class="mix-difficulty" data-kind="parsons_problem"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-parsons_problem mix-level-legend-parsons_problem">
   <legend id="mix-level-legend-parsons_problem">Difficulty target</legend>
   <label class="mix-level">
@@ -1086,7 +1086,7 @@
   </p>
 </fieldset>
 
-            <details class="kind-about" data-kind-about="parsons_problem">
+              <details class="kind-about" data-kind-about="parsons_problem">
   <summary>About Parsons Problem</summary>
   <div class="kind-about-body">
     <p>Put shuffled pieces of code back in the order that works. Drag them into place, or move them with the keyboard.</p>
@@ -1094,7 +1094,7 @@
   </div>
 </details>
 
-          </div>
+            </div>
         </div>
 
         <p class="card-note mix-last-note" hidden>At least one section in this group has to stay in rotation.</p>
@@ -1103,20 +1103,20 @@
         <legend>Rotating fourth section</legend>
 
         <div class="mix-kinds">
-          <div class="mix-row" data-kind="plan_review" data-exercise-mix-target="row">
-            <label id="mix-name-plan_review" for="weight-plan_review">Plan Review</label>
-            <input type="range" id="weight-plan_review" min="0" max="4" step="1"
-                   value="2" 
-                   aria-valuetext="Default"
-                   data-action="input->exercise-mix#slide">
-            <output id="weight-label-plan_review">Default</output>
-            <label class="switch-row" for="exclude-plan_review">
-              <span id="exclude-text-plan_review">Skip this kind</span>
-              <input type="checkbox" id="exclude-plan_review" class="switch mix-exclude-box" role="switch"
-                     aria-labelledby="mix-name-plan_review exclude-text-plan_review" 
-                     data-action="change->exercise-mix#toggleExclude">
-            </label>
-            <fieldset class="mix-difficulty" data-kind="plan_review"
+            <div class="mix-row" data-kind="plan_review" data-exercise-mix-target="row">
+              <label id="mix-name-plan_review" for="weight-plan_review">Plan Review</label>
+              <input type="range" id="weight-plan_review" min="0" max="4" step="1"
+                     value="2" 
+                     aria-valuetext="Default"
+                     data-action="input->exercise-mix#slide">
+              <output id="weight-label-plan_review">Default</output>
+              <label class="switch-row" for="exclude-plan_review">
+                <span id="exclude-text-plan_review">Skip this kind</span>
+                <input type="checkbox" id="exclude-plan_review" class="switch mix-exclude-box" role="switch"
+                       aria-labelledby="mix-name-plan_review exclude-text-plan_review" 
+                       data-action="change->exercise-mix#toggleExclude">
+              </label>
+              <fieldset class="mix-difficulty" data-kind="plan_review"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-plan_review mix-level-legend-plan_review">
   <legend id="mix-level-legend-plan_review">Difficulty target</legend>
   <label class="mix-level">
@@ -1156,7 +1156,7 @@
   </p>
 </fieldset>
 
-            <details class="kind-about" data-kind-about="plan_review">
+              <details class="kind-about" data-kind-about="plan_review">
   <summary>About Plan Review</summary>
   <div class="kind-about-body">
     <p>Read an implementation plan, written as if by an AI assistant, before any code exists. Say what you&#39;d push back on, since a problem costs less to fix in a plan than in finished code.</p>
@@ -1164,21 +1164,21 @@
   </div>
 </details>
 
-          </div>
-          <div class="mix-row" data-kind="ambiguity_hunt" data-exercise-mix-target="row">
-            <label id="mix-name-ambiguity_hunt" for="weight-ambiguity_hunt">Ambiguity Hunt</label>
-            <input type="range" id="weight-ambiguity_hunt" min="0" max="4" step="1"
-                   value="2" 
-                   aria-valuetext="Default"
-                   data-action="input->exercise-mix#slide">
-            <output id="weight-label-ambiguity_hunt">Default</output>
-            <label class="switch-row" for="exclude-ambiguity_hunt">
-              <span id="exclude-text-ambiguity_hunt">Skip this kind</span>
-              <input type="checkbox" id="exclude-ambiguity_hunt" class="switch mix-exclude-box" role="switch"
-                     aria-labelledby="mix-name-ambiguity_hunt exclude-text-ambiguity_hunt" 
-                     data-action="change->exercise-mix#toggleExclude">
-            </label>
-            <fieldset class="mix-difficulty" data-kind="ambiguity_hunt"
+            </div>
+            <div class="mix-row" data-kind="ambiguity_hunt" data-exercise-mix-target="row">
+              <label id="mix-name-ambiguity_hunt" for="weight-ambiguity_hunt">Ambiguity Hunt</label>
+              <input type="range" id="weight-ambiguity_hunt" min="0" max="4" step="1"
+                     value="2" 
+                     aria-valuetext="Default"
+                     data-action="input->exercise-mix#slide">
+              <output id="weight-label-ambiguity_hunt">Default</output>
+              <label class="switch-row" for="exclude-ambiguity_hunt">
+                <span id="exclude-text-ambiguity_hunt">Skip this kind</span>
+                <input type="checkbox" id="exclude-ambiguity_hunt" class="switch mix-exclude-box" role="switch"
+                       aria-labelledby="mix-name-ambiguity_hunt exclude-text-ambiguity_hunt" 
+                       data-action="change->exercise-mix#toggleExclude">
+              </label>
+              <fieldset class="mix-difficulty" data-kind="ambiguity_hunt"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-ambiguity_hunt mix-level-legend-ambiguity_hunt">
   <legend id="mix-level-legend-ambiguity_hunt">Difficulty target</legend>
   <label class="mix-level">
@@ -1218,7 +1218,7 @@
   </p>
 </fieldset>
 
-            <details class="kind-about" data-kind-about="ambiguity_hunt">
+              <details class="kind-about" data-kind-about="ambiguity_hunt">
   <summary>About Ambiguity Hunt</summary>
   <div class="kind-about-body">
     <p>Read a vague feature request and write down what you&#39;d need clarified before you could build it. Asking early costs less than building the wrong thing.</p>
@@ -1226,21 +1226,21 @@
   </div>
 </details>
 
-          </div>
-          <div class="mix-row" data-kind="pseudocode_to_code" data-exercise-mix-target="row">
-            <label id="mix-name-pseudocode_to_code" for="weight-pseudocode_to_code">Pseudocode to Code</label>
-            <input type="range" id="weight-pseudocode_to_code" min="0" max="4" step="1"
-                   value="2" 
-                   aria-valuetext="Default"
-                   data-action="input->exercise-mix#slide">
-            <output id="weight-label-pseudocode_to_code">Default</output>
-            <label class="switch-row" for="exclude-pseudocode_to_code">
-              <span id="exclude-text-pseudocode_to_code">Skip this kind</span>
-              <input type="checkbox" id="exclude-pseudocode_to_code" class="switch mix-exclude-box" role="switch"
-                     aria-labelledby="mix-name-pseudocode_to_code exclude-text-pseudocode_to_code" 
-                     data-action="change->exercise-mix#toggleExclude">
-            </label>
-            <fieldset class="mix-difficulty" data-kind="pseudocode_to_code"
+            </div>
+            <div class="mix-row" data-kind="pseudocode_to_code" data-exercise-mix-target="row">
+              <label id="mix-name-pseudocode_to_code" for="weight-pseudocode_to_code">Pseudocode to Code</label>
+              <input type="range" id="weight-pseudocode_to_code" min="0" max="4" step="1"
+                     value="2" 
+                     aria-valuetext="Default"
+                     data-action="input->exercise-mix#slide">
+              <output id="weight-label-pseudocode_to_code">Default</output>
+              <label class="switch-row" for="exclude-pseudocode_to_code">
+                <span id="exclude-text-pseudocode_to_code">Skip this kind</span>
+                <input type="checkbox" id="exclude-pseudocode_to_code" class="switch mix-exclude-box" role="switch"
+                       aria-labelledby="mix-name-pseudocode_to_code exclude-text-pseudocode_to_code" 
+                       data-action="change->exercise-mix#toggleExclude">
+              </label>
+              <fieldset class="mix-difficulty" data-kind="pseudocode_to_code"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-pseudocode_to_code mix-level-legend-pseudocode_to_code">
   <legend id="mix-level-legend-pseudocode_to_code">Difficulty target</legend>
   <label class="mix-level">
@@ -1280,7 +1280,7 @@
   </p>
 </fieldset>
 
-            <details class="kind-about" data-kind-about="pseudocode_to_code">
+              <details class="kind-about" data-kind-about="pseudocode_to_code">
   <summary>About Pseudocode to Code</summary>
   <div class="kind-about-body">
     <p>Write the steps to solve a problem in plain words, without worrying about syntax. When your answer is reviewed, Coding Gym turns your steps into code exactly as written, so you can see what a missing step would do.</p>
@@ -1288,7 +1288,7 @@
   </div>
 </details>
 
-          </div>
+            </div>
         </div>
 
         <p class="card-note mix-last-note" hidden>At least one section in this group has to stay in rotation.</p>

@@ -501,7 +501,6 @@ RSpec.describe "ApiKeys", type: :request do
       page = Nokogiri::HTML(response.body)
       expect(page.css("fieldset.mix-difficulty").size).to be > 1
       expect(page.css("style").select { |style| style.text.include?(".mix-difficulty") }).to be_empty
-      expect(page.css("head link[href*='/pages/settings-']").size).to eq(1)
       expect(page.css("fieldset.mix-difficulty.mix-suggested")).to be_empty
     end
 

@@ -18,8 +18,7 @@ RSpec.describe "page stylesheets" do
   def after_desktop_block(css)
     source = css.gsub(%r{/\*.*?\*/}m, "")
     start = source.index(DESKTOP_QUERY)
-    return "" if start.nil?
-    return nil if source.index(DESKTOP_QUERY, start + 1)
+    return nil if start.nil? || source.index(DESKTOP_QUERY, start + 1)
 
     depth = 0
     close_brace = (source.index("{", start)...source.length).find do |i|
@@ -48,15 +47,16 @@ RSpec.describe "page stylesheets" do
       expect(used - queries).to be_empty, "#{page}.css adds #{(used - queries).join(', ')}; a new query is a decision"
     end
 
-    it "ends #{page}.css with its one 900px block, if it has one, so a desktop rule wins every tie with the page's phone rules" do
+    it "ends #{page}.css with its one 900px block, so a desktop rule wins every tie with the page's phone rules" do
       expect(after_desktop_block(path_for(page).read)).to eq("")
     end
   end
 
-  it "notices a rule left after the 900px block" do
+  it "notices a rule left after the 900px block, and a sheet with no 900px block" do
     css = "#{DESKTOP_QUERY} { .a { color: red; } }\n.b { color: blue; }"
 
     expect(after_desktop_block(css)).to eq(".b { color: blue; }")
+    expect(after_desktop_block(".b { color: blue; }")).to be_nil
   end
 
   it "never outweighs the card page's [hidden] rule on an element the Learn filter hides, at any width" do
