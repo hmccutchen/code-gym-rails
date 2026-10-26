@@ -4,8 +4,9 @@
 
 The page is a `.card-page` (`phone_cards.css`): on a phone each entry is a
 card `max(16px, inset)` from the screen edge, from 600 to 899px the entries
-take the container's full width, and at 900px and wider `desktop.css` puts
-the rail beside them (`docs/code-notes/app/assets/stylesheets/desktop.md`).
+take the container's full width, and at 900px and wider the page's sheet,
+`pages/history.css`, puts the rail beside them
+(`docs/code-notes/app/assets/stylesheets/pages/history.md`).
 The page calls `wide_page`, so its desktop column is 1040px.
 
 `.history-rail` holds the title, the session count and, when there is more

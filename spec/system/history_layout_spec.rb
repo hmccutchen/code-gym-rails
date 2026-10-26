@@ -77,7 +77,7 @@ RSpec.describe "History layout", type: :system do
         travel_to(a_weekday) do
           visit_history(width: width)
           with_desktop = layout_facts
-          without = without_desktop_stylesheet { layout_facts }
+          without = without_desktop_rules { layout_facts }
           expect(without).to eq(with_desktop)
         end
       end
@@ -87,7 +87,7 @@ RSpec.describe "History layout", type: :system do
       travel_to(a_weekday) do
         visit_history(width: 900)
         with_desktop = layout_facts
-        without = without_desktop_stylesheet { layout_facts }
+        without = without_desktop_rules { layout_facts }
         expect(without).not_to eq(with_desktop)
       end
     end
@@ -203,7 +203,7 @@ RSpec.describe "History layout", type: :system do
         expect(rect("nav .nav-links")["right"]).to be_within(1).of(container_content["right"])
         brand_on_history = rect("nav .brand")["left"]
 
-        visit learn_path
+        visit setup_path
         expect(page).to have_css(".container[data-pull-content]:not(.container-wide)")
         expect(rect("nav .brand")["left"]).to be_within(0.5).of(brand_on_history)
       end

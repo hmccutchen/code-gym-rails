@@ -1,11 +1,11 @@
 # phone_cards.css
 
-The card, full-width button, switch, value row, segmented control and card heading styles, and the two card page wrappers. The Account and Settings pages use them, and History and Progress use `.card-page`.
+The card, full-width button, switch, value row, segmented control and card heading styles, and the two card page wrappers. The Account and Settings pages use them, and History, Progress and Learn use `.card-page`.
 
 ## What each class is for
 
 - `.phone-page`: the page wrapper. Cards stack with a 16px gap, and the page adds 16px of bottom padding on top of the tab-bar clearance `body` already has. From 600px it is a centered 480px column.
-- `.card-page`: the same wrapper without the 480px column, for a page that takes the container's full width from 600px (History, Progress). `desktop.css` lays it out differently at 900px and wider.
+- `.card-page`: the same wrapper without the 480px column, for a page that takes the container's full width from 600px (History, Progress, Learn). Each page's own sheet lays it out differently at 900px and wider.
 - `.card`: one section of the page. 16px padding, the shared radius, surface background and border, no shadow. `.card h2` is `1rem`.
 - `.card-note`: muted `.85rem` text inside a card. It is the one place that style lives, so a status line, a field label or a usage line that should look muted takes this class, and its page sets only spacing.
 - `.btn-block`: a modifier on `.btn` that makes the button full width and at least 48px tall. `.btn` itself does not change. The rule is written `.btn.btn-block` so it outranks `.btn`'s `inline-block` on its own, rather than by loading after the layout's styles.

@@ -70,4 +70,12 @@ RSpec.describe "Conventions held over app/views" do
     expect(%(<%= javascript_include_tag "app" %>)).not_to match(inline_script)
     expect(%(<%= javascript_importmap_tags %>)).not_to match(inline_script)
   end
+
+  it "keeps a page's styles in its own stylesheet, never a <style> block in its views" do
+    paged = Dir[Rails.root.join("app/views/{history,progress}/*.erb")] +
+            %w[index.html.erb _recognition_guide.html.erb].map { |name| Rails.root.join("app/views/learn", name).to_s }
+    offenders = paged.select { |path| File.read(path).match?(/<style\b/) }.map { |path| relative(path) }
+
+    expect(offenders).to be_empty, "#{offenders.join(', ')} carry a <style> block; move it to app/assets/stylesheets/pages (docs/decisions/page-stylesheets.md)"
+  end
 end

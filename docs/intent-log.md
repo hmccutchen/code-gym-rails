@@ -301,3 +301,16 @@ data.*
   full container width from 600px; the app wins where the boards differ;
   I took the spec as written, so the note stays visible and Progress gets
   its own bucket class
+- Learn on phone cards and the desktop layout, specced first `#567`
+  **I decided:** lay out everything the page has and keep the filter's
+  hiding working; the app wins where the boards differ; reorder so this
+  week's concept and the search come first, side by side on a desktop,
+  ahead of the prepare and drills boxes
+- one stylesheet per page, History, Progress and Learn first, with no visual
+  change `#568`
+  **why:** I don't think styling should live in the markup unless good design
+  warrants it; each page should have its own modular style file
+  **I decided:** refactor the three finished pages first, then build Account
+  and Settings desktop straight into their own sheets; a partial's styles go
+  with the page it renders on, or a shared component sheet; Account's paired
+  cards stretch to the same height

@@ -3,17 +3,19 @@
 The app is laid out for a phone first. At 900px and wider, a page that asks
 for it gets a desktop layout: a centered column up to 1040px wide, with the
 page's own arrangement inside it (History puts its title in a left rail beside
-the entries). Pages move onto it one at a time: History first, then Progress.
+the entries). Pages move onto it one at a time: History first, then Progress, then Learn.
 
 ## The breakpoints
 
 - **Under 600px:** the phone layout. Card pages put each card `max(16px, inset)`
   from the screen edge (`phone_cards.css`).
 - **600 to 899px:** one column. Account and Settings stay a centered 480px
-  column (`.phone-page`). History and Progress, and later Today and Learn,
+  column (`.phone-page`). History, Progress and Learn, and later Today,
   take the container's full width (`.card-page`), because code and reviews are
   cramped at 480px. An iPad in portrait and a phone in landscape land here.
-- **900px and wider:** the desktop layout, from `desktop.css`.
+- **900px and wider:** the desktop layout: the shared column and nav from
+  `desktop.css`, and each page's arrangement from the 900px block at the end
+  of its own sheet (`docs/decisions/page-stylesheets.md`).
 
 900px, not 1024px, so an iPad Pro in portrait (1024px) and an iPhone Pro Max
 in landscape (932px) both get the desktop layout. That makes the desktop
@@ -75,15 +77,11 @@ width, so it scrolls the page sideways on Windows and Linux.
 
 Everything in `desktop.css` sits inside one `@media (min-width: 900px)` block,
 so it can't change the phone layout, and `desktop_stylesheet_spec` fails on
-anything outside it, an at-rule like `@font-face` included. Its rules are
-scoped to a page class (`.history-page`), the wide container or the nav. The file loads
-after `phone_cards.css`, so it wins a tie with a phone card rule. A view's own
-`<style>` block renders in the body, after it, so a desktop rule that overrides
-a view's rule needs a more specific selector. History, Progress and Learn have
-no such block or a small one; Account, Settings and Today have several, so
-their PRs either prefix each desktop rule with the page class or move their
-900px rules into the view itself. That choice is open and gets made on the
-Account and Settings PR.
+anything outside it, an at-rule like `@font-face` included. It holds only the
+shared rule: the wide container and the nav. A page's own desktop rules live
+in the 900px block at the end of that page's sheet, which the History PR left
+as an open question (a page class prefix in `desktop.css`, or the view's own
+`<style>`). Page stylesheets answered it (`docs/decisions/page-stylesheets.md`).
 
 ## What the boards had that the app doesn't
 

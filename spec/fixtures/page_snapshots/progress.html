@@ -315,10 +315,10 @@
     details.section > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
     details.section > summary::-webkit-details-marker { display: none; }
     details.section > summary::before, details.ref summary::before, details.hint summary::before, details.kind-about summary::before,
-    details.review summary::before, details.answers summary::before, details.progress-group summary::before { content: ""; display: inline-block; flex-shrink: 0; width: .45rem; height: .45rem; margin-inline: .1rem .5rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-25%) rotate(45deg); transition: transform .2s; }
+    details.review summary::before, details.answers summary::before, details.progress-group summary::before, .learn-recognition summary::before { content: ""; display: inline-block; flex-shrink: 0; width: .45rem; height: .45rem; margin-inline: .1rem .5rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-25%) rotate(45deg); transition: transform .2s; }
     details.section > summary::before { align-self: center; margin-inline-end: .15rem; }
     details.section:not([open]) > summary::before, details.ref:not([open]) summary::before, details.hint:not([open]) summary::before, details.kind-about:not([open]) summary::before,
-    details.review:not([open]) summary::before, details.answers:not([open]) summary::before, details.progress-group:not([open]) summary::before { transform: rotate(-45deg); }
+    details.review:not([open]) summary::before, details.answers:not([open]) summary::before, details.progress-group:not([open]) summary::before, .learn-recognition:not([open]) summary::before { transform: rotate(-45deg); }
     details.section:not([open]) > summary { margin-bottom: 0; }
     details.section > summary { padding-block: 12.5px; margin-top: -12.5px; margin-bottom: calc(.95rem - 12.5px); }
     details.section:not([open]) > summary { margin-bottom: -12.5px; }
@@ -471,67 +471,16 @@
     }
     .name-editor-status { font-size: .75rem; color: var(--muted); margin-left: .4rem; }
 
-    .learn-filter { display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
-    .learn-filter input[type="search"] { flex: 1 1 16rem; min-width: 0; padding: .55rem .75rem; background: var(--code-bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: var(--input-font-size); font-family: inherit; }
-    .learn-bucket { margin-bottom: 2rem; }
-    .learn-group { font-size: .95rem; color: var(--muted); margin: 1rem 0 .5rem; }
-    .learn-list { list-style: none; padding: 0; }
-    .learn-group-block { margin-bottom: 1rem; }
-    .learn-entry { padding: .35rem 0; display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
-    .learn-entry[hidden] { display: none; }
-    .learn-seen { font-size: .75rem; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 .5rem; }
-    .learn-ungenerated { font-size: .75rem; color: var(--muted); }
     .learn-back { display: inline-block; padding-block: 4px; }
-    .learn-intro, .learn-bucket-label, .learn-no-guide, .learn-empty { color: var(--muted); }
+    .learn-intro, .learn-bucket-label, .learn-no-guide { color: var(--muted); }
     .learn-status { font-size: .75rem; color: var(--muted); margin-left: .5rem; }
-    .learn-prepare { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; }
-    .learn-prepare p { margin-bottom: .75rem; }
-    .learn-drilling { font-size: .75rem; color: var(--accent-text); border: 1px solid var(--accent); border-radius: 999px; padding: 0 .5rem; }
-    .progress-head h1 { font-size: 1.5rem; }
-    .progress-legend { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px 24px; font-size: .85rem; color: var(--muted); margin-top: .25rem; }
-    @media (min-width: 600px) {
-      .progress-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-    .progress-legend dt { font-weight: 600; color: var(--text); }
-    .progress-legend dd { margin: 0; }
-    .progress-note { font-size: .8rem; color: var(--muted); }
-    .progress-buckets, .progress-groups { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-    .progress-bucket { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-    details.progress-group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 16px; }
-    details.progress-group summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; min-height: 48px; padding-block: 8px; }
-    details.progress-group summary::-webkit-details-marker { display: none; }
-    details.progress-group summary::before { color: var(--accent-text); margin-inline-end: 0; }
-    .progress-group-name { font-weight: 600; min-width: 9rem; }
-    .rung-principal_engineer, .rung-developing_principal_engineer { --rung: #7c6af7; }
-    .rung-senior, .rung-developing_senior { --rung: #22c55e; }
-    .rung-mid_level, .rung-developing_mid_level { --rung: #4ade80; }
-    .rung-junior, .rung-developing_junior { --rung: #86efac; }
-    .rung-not_yet, .rung-not_offered { --rung: transparent; }
-    .rung-bar { display: flex; flex: 1 1 8rem; height: .55rem; border-radius: 999px; overflow: hidden; background: var(--border); }
-    .rung-bar span { display: block; height: 100%; background: var(--rung); }
-    .rung-bar span[class^="rung-developing"] { background: repeating-linear-gradient(135deg, var(--rung) 0 3px, transparent 3px 6px); }
-    .progress-counts { font-size: .8rem; color: var(--muted); }
-    .progress-list { list-style: none; margin: 0; padding: 0; }
-    .progress-entry { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; min-height: 48px; padding: 2px 0; border-top: 1px solid var(--border); }
-    .progress-entry a { display: flex; align-items: center; flex: 1 1 auto; min-height: 44px; }
-    .progress-rungs { display: inline-flex; gap: .2rem; }
-    .progress-rung { width: .5rem; height: .5rem; border-radius: 999px; border: 1px solid var(--muted); }
-    .progress-rung.held { background: var(--rung); border-color: var(--rung); }
-    .progress-rung.toward { border-color: var(--rung); background: linear-gradient(90deg, var(--rung) 50%, transparent 50%); }
-    .progress-word { font-size: .8rem; color: var(--muted); margin-left: auto; }
-    .learn-drill, .learn-drills { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin: 1.5rem 0; }
-    .learn-drills form, .learn-group-head form { display: inline-block; margin-right: .5rem; }
+    .learn-drill { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin: 1.5rem 0; }
     .learn-drill-paused { color: var(--accent-text); }
-    .learn-group-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-    .learn-group-head h3 { margin: 0; }
     .learn-worked-example { white-space: pre-wrap; overflow-wrap: anywhere; }
     .learn-lesson { margin: .75rem 0 1rem; }
     .learn-lesson p { margin-bottom: .75rem; }
     .learn-lesson ul { padding-left: 1.25rem; margin: 0 0 .75rem; }
     .learn-lesson li { margin-bottom: .4rem; }
-    .learn-recognition { border: 1px solid var(--border); border-radius: 6px; padding: .5rem 1rem; margin: .5rem 0 1rem; }
-    .learn-recognition summary { cursor: pointer; color: var(--muted); }
-    .learn-recognition-label { font-size: .85rem; font-weight: 600; margin: .75rem 0 .25rem; }
 
     .featured-concept { background: linear-gradient(135deg, rgba(124, 106, 247, .14), rgba(92, 207, 230, .08)), var(--surface); border: 1px solid var(--accent); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.25rem; margin-bottom: 1.5rem; }
     .featured-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-text); margin-bottom: .5rem; }
@@ -561,13 +510,14 @@
       .spinner, .btn-loading::before, .pull-refresh.is-refreshing .spinner { animation: none; }
       .pull-refresh.is-settling, .pull-settling { transition: none; }
       nav .nav-links a, .btn, details.section > summary::before, details.ref summary::before, details.hint summary::before, details.kind-about summary::before,
-      details.review summary::before, details.answers summary::before, details.progress-group summary::before { transition: none; }
+      details.review summary::before, details.answers summary::before, details.progress-group summary::before, .learn-recognition summary::before { transition: none; }
       .btn:not(:disabled):active, .rating-btn:active { transform: none; }
       .daily-kind-sheet[open] { animation: none; }
     }
   </style>
   <link rel="stylesheet" href="/assets/phone_cards-DIGEST.css" />
   <link rel="stylesheet" href="/assets/desktop-DIGEST.css" />
+  <link rel="stylesheet" href="/assets/pages/progress-DIGEST.css" />
 </head>
 <body data-signed-out-text="Your session expired, so that didn&#39;t go through. Reload the page and sign in again." data-save-failed-text="Couldn&#39;t save your last change. It hasn&#39;t reached the server — check your connection and try again."
       data-controller="glossary code-lines mermaid"

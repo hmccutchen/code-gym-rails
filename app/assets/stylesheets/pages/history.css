@@ -1,0 +1,38 @@
+.history-rail h1 { font-size: 1.5rem; }
+.history-rail .count, .history-rail-page { color: var(--muted); font-size: .9rem; }
+.history-rail-page { display: none; }
+
+.history-entries { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.history-entry { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.history-entry h2 { font-size: 1.05rem; margin-bottom: .5rem; }
+.history-meta { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; font-size: .85rem; color: var(--muted); margin-bottom: .5rem; }
+.history-tag { border: 1px solid var(--accent); color: var(--accent-text); border-radius: 999px; padding: .15rem .5rem; font-size: .8rem; }
+
+details.review summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); display: flex; align-items: center; min-height: 48px; list-style: none; }
+.no-review { font-size: .85rem; color: var(--muted); }
+
+details.answers { margin: 0; }
+details.answers summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); display: flex; align-items: center; min-height: 48px; list-style: none; }
+details.answers .section { margin-top: 1rem; }
+
+/* The layout's 600px rule bleeds .section to the screen edge; inside an entry it stays inset. */
+@media (max-width: 600px) {
+  .history-entry .section {
+    margin-inline: 0;
+    border-radius: var(--radius);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+}
+.pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1rem; font-size: .9rem; }
+.pagination a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 1rem; color: var(--accent-text); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; }
+.pagination a[aria-disabled="true"] { color: var(--muted); opacity: .5; pointer-events: none; }
+.pagination span { color: var(--muted); }
+
+@media (min-width: 900px) {
+  .history-page { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 24px; align-items: start; }
+  .history-page .history-rail { position: sticky; top: 24px; }
+  .history-page .history-rail-page { display: block; }
+  .history-page .history-entry { padding: 20px; }
+  .history-page details.review { max-width: 65ch; }
+}

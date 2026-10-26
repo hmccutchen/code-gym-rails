@@ -1,14 +1,34 @@
 <% page_title t("learn.title") %>
-<h1><%= t("learn.title") %></h1>
-<p class="learn-intro"><%= t("learn.intro") %></p>
+<% wide_page %>
+<% page_stylesheet "learn" %>
+
+<div class="card-page learn-page" data-controller="learn-filter">
+<div class="learn-head">
+  <h1><%= t("learn.title") %></h1>
+  <p class="learn-intro"><%= t("learn.intro") %></p>
+</div>
 
 <%# Design notes: docs/code-notes/app/views/learn/index.html.md %>
-<% if featured_concept %>
-  <%= render "shared/featured_concept", featured: featured_concept %>
-<% end %>
+<div class="learn-top">
+  <% if featured_concept %>
+    <%= render "shared/featured_concept", featured: featured_concept %>
+  <% end %>
+  <div class="card learn-filter">
+    <input type="search" id="learn-filter-input" placeholder="<%= t("learn.filter_placeholder") %>"
+           aria-label="<%= t("learn.filter_placeholder") %>"
+           autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="search"
+           data-learn-filter-target="input" data-action="input->learn-filter#apply keydown.enter->learn-filter#dismiss">
+    <label>
+      <input type="checkbox" id="learn-seen-only"
+             data-learn-filter-target="seenOnly" data-action="change->learn-filter#apply">
+      <%= t("learn.seen_only") %>
+    </label>
+    <p id="learn-empty" class="learn-empty" hidden data-learn-filter-target="empty"><%= t("learn.no_matches") %></p>
+  </div>
+</div>
 
 <% if @ungenerated.positive? || @ungenerated_guides.positive? %>
-  <div class="learn-prepare">
+  <div class="card learn-prepare">
     <p>
       <% if @ungenerated.positive? %><%= t("learn.prepare_prompt", count: @ungenerated) %><% end %>
       <% if @ungenerated_guides.positive? %><%= t("learn.prepare_guides_prompt", count: @ungenerated_guides) %><% end %>
@@ -21,7 +41,7 @@
 <% end %>
 
 <% if @drills.any? %>
-  <div class="learn-drills">
+  <div class="card learn-drills">
     <p><%= t("learn.drill.current", drills: drill_names(@drills)) %> <%= t("learn.drill.current_note") %>
       <% if @drills.full? %><%= t("learn.drill.at_cap") %><% end %></p>
     <% @drills.entries.each do |entry| %>
@@ -31,30 +51,19 @@
   </div>
 <% end %>
 
-<div data-controller="learn-filter">
-<div class="learn-filter">
-  <input type="search" id="learn-filter-input" placeholder="<%= t("learn.filter_placeholder") %>"
-         aria-label="<%= t("learn.filter_placeholder") %>"
-         autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="search"
-         data-learn-filter-target="input" data-action="input->learn-filter#apply keydown.enter->learn-filter#dismiss">
-  <label>
-    <input type="checkbox" id="learn-seen-only"
-           data-learn-filter-target="seenOnly" data-action="change->learn-filter#apply">
-    <%= t("learn.seen_only") %>
-  </label>
-  <p id="learn-empty" class="learn-empty" hidden data-learn-filter-target="empty"><%= t("learn.no_matches") %></p>
-</div>
 
+<div class="learn-buckets">
 <% @buckets.each do |bucket| %>
-  <section class="learn-bucket" data-learn-filter-target="section">
+  <% grouped = bucket[:groups].size > 1 %>
+  <section class="learn-bucket<%= " learn-bucket-grouped" if grouped %>" data-learn-filter-target="section">
     <h2><%= t("learn.buckets.#{bucket[:key]}") %></h2>
 
+    <div class="learn-groups">
     <% bucket[:groups].each do |group_key, concepts| %>
-      <% shown_group = group_key if bucket[:groups].size > 1 %>
-      <div class="learn-group-block" id="<%= learn_group_anchor(bucket[:key], group_key) %>"
+      <div class="card learn-group-block" id="<%= learn_group_anchor(bucket[:key], group_key) %>"
            data-learn-filter-target="block">
         <%# A single-group bucket renders flat, so it offers no group drill; its core group is the whole bucket. %>
-        <% if shown_group %>
+        <% if grouped %>
           <div class="learn-group-head">
             <h3 class="learn-group"><%= t("learn.groups.#{group_key}") %></h3>
             <% if group_key != ConceptGroup::CORE %>
@@ -75,7 +84,7 @@
 
         <ul class="learn-list">
           <% concepts.each do |concept| %>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="<%= concept %>" data-search="<%= learn_search_text(concept, bucket: bucket[:key], group: shown_group) %>">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="<%= concept %>" data-search="<%= learn_search_text(concept, bucket: bucket[:key], group: (group_key if grouped)) %>">
               <%= link_to concept.humanize, learn_concept_path(bucket: bucket[:key], concept: concept) %>
               <% if encountered?(concept, bucket[:key]) %>
                 <span class="learn-seen"><%= t("learn.encountered") %></span>
@@ -93,13 +102,15 @@
             </li>
           <% end %>
           <% LearnLessons.in_group(group_key).each do |lesson| %>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="<%= lesson %>" data-search="<%= learn_search_text(lesson, bucket: bucket[:key], group: shown_group) %>">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="<%= lesson %>" data-search="<%= learn_search_text(lesson, bucket: bucket[:key], group: (group_key if grouped)) %>">
               <%= link_to lesson.humanize, learn_lesson_path(lesson: lesson) %>
             </li>
           <% end %>
         </ul>
       </div>
     <% end %>
+    </div>
   </section>
 <% end %>
+</div>
 </div>

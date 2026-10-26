@@ -43,10 +43,10 @@ order exactly, whatever the checkbox hides.
 
 A group whose every entry is hidden is hidden itself, and so is a bucket whose
 groups are all empty. Otherwise a filtered page shows headings over nothing.
-`.learn-entry` sets `display: flex`, so it needs its own `[hidden]` rule in the
-layout. `.learn-group-block` and `.learn-bucket` set no `display` and rely on
-the browser's; giving either one a `display` means adding a `[hidden]` rule
-beside it.
+All three set `display` in the page's sheet, so `hidden` works only because
+of the rules that restore it; `docs/code-notes/app/views/learn/index.html.md`
+says which ones and what a new rule must not do. Sorting never touches
+`hidden`.
 
 ## Enter closes the keyboard
 

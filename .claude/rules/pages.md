@@ -65,18 +65,23 @@ read it before changing that area.
   collapsible card, the range slider and the disabled switch row, for the
   Account and Settings pages; it loads on every
   page, so a new rule in it stays scoped to its own class. `.card-page` is
-  the full-width card page (History, Progress), with the same phone gutter.
+  the full-width card page (History, Progress, Learn), with the same phone gutter.
+- **Page stylesheets** (`docs/decisions/page-stylesheets.md`): a page with
+  styles of its own keeps them in `app/assets/stylesheets/pages/<page>.css`,
+  phone rules first and its 900px rules in one block at the end
+  (`page_stylesheets_spec`), linked by `page_stylesheet` between `desktop` and
+  the display sheets (the user's preferences load last). A view holds no `<style>` unless design warrants it
+  (`app_views_spec`); a rule more than one page uses stays shared.
 - **Desktop layout** (`docs/decisions/desktop-layout.md`): at 900px and wider
   a page that calls `wide_page` gets a centered column up to 1040px, built
   from `.container`'s gutter properties; a page widens only that way, and
   the `.container` rule itself is not edited. The nav's `.inner` takes the
   same cap from the same rule on every page, so it never moves between
-  pages. `desktop.css` holds nothing
-  outside its one `@media (min-width: 900px)` block (`desktop_stylesheet_spec`),
-  each rule scoped to a page class, the wide container or the nav; it loads
+  pages. `desktop.css` holds only that shared rule, inside its one
+  `@media (min-width: 900px)` block (`desktop_stylesheet_spec`); it loads
   after the layout's `<style>`, so the nav's cap wins a tie with the layout's
-  own `nav .inner` rule. A view's own `<style>` renders after it,
-  so a desktop rule beats one of the view's with a more specific selector.
+  own `nav .inner` rule. A page's own desktop rules sit at the end of its page
+  sheet, and none on Learn sets `display` on an element the filter hides.
   A page's targets stay 44px at every width, apart from a link inside a
   sentence, with no `(pointer: fine)`
   relaxation (`nav_link_targets_spec` holds the top nav's links to it); the

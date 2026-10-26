@@ -5,10 +5,9 @@
 The page is a `.card-page` (`phone_cards.css`) and calls `wide_page`. On a
 phone the legend and each group are cards `max(16px, inset)` from the screen
 edge, 16px apart. From 600 to 899px they take the container's full width. At
-900px and wider `desktop.css` puts the groups two across
-(`docs/code-notes/app/assets/stylesheets/desktop.md`). The page's rules live
-in the layout's `<style>`, so a desktop rule wins over them by load order and
-needs no extra specificity.
+900px and wider the page's sheet puts the groups two across. Every rule lives
+in `pages/progress.css` (`docs/code-notes/app/assets/stylesheets/pages/progress.md`),
+linked by `page_stylesheet "progress"`, with the desktop rules last.
 
 `.progress-head` holds the title and the intro, so the card page's 16px gap
 doesn't fall between them.
