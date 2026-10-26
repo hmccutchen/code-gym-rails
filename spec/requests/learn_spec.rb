@@ -761,24 +761,39 @@ RSpec.describe "Learn", type: :request do
     end
 
     describe "a row with a lesson" do
+      def with_closure_in_labels
+        originals = { definition: I18n.t("learn.lesson.definition"), catch: I18n.t("learn.lesson.catch") }
+        I18n.backend.store_translations(:en, learn: { lesson: { definition: "closure label:", catch: "closure catch:" } })
+        yield
+      ensure
+        I18n.backend.store_translations(:en, learn: { lesson: originals })
+      end
+
       it "wraps each lesson value and not its label" do
         lesson = { "definition" => twice, "comparison" => twice, "comparison_limit" => twice,
                    "misunderstanding" => twice, "carry_question" => twice, "quick_test" => twice,
                    "situations" => [ twice ], "habits" => [ { "habit" => twice, "catch" => twice } ] }
         guided_reference(lesson: lesson)
-        doc = page_at(path)
+        doc = nil
+        with_closure_in_labels { doc = page_at(path) }
+        expect(doc.css(".learn-lesson strong").text).to include("closure label:")
+        expect(doc.css(".learn-lesson em").text).to include("closure catch:")
         values = doc.css(".learn-lesson p, .learn-lesson li")
         values = values.reject { |node| node.css("strong").any? && node.text.strip == node.at_css("strong").text.strip }
 
         expect(values).not_to be_empty
         expect(values.map { |node| node.css(".gloss-term").size }).to all(be >= 1)
-        expect(doc.css(".learn-lesson strong .gloss-term")).to be_empty
+        expect(doc.css(".learn-lesson strong .gloss-term, .learn-lesson em .gloss-term")).to be_empty
         expect(doc.css(".learn-lesson li").last.css(".gloss-term").size).to eq(2)
       end
     end
 
     describe "a row whose lesson is not a hash (pinned as it renders today)" do
-      before { guided_reference(lesson: "None") }
+      before do
+        guided_reference(lesson: "None", explanation: "hiddenprose closure", guide_plain_language: "hiddenprose closure",
+                         guide_pitfalls: "hiddenprose closure", senior_lens: "A senior view.",
+                         guide_worked_example: "a = 1\nb = 2")
+      end
 
       it "renders an empty lesson block and hides the explanation and guide prose, without raising" do
         doc = page_at(path)
@@ -787,7 +802,9 @@ RSpec.describe "Learn", type: :request do
         expect(doc.css("div.learn-lesson").size).to eq(1)
         expect(doc.css("div.learn-lesson").text.strip).to eq("")
         expect(doc.css("div.learn-lesson .gloss-term")).to be_empty
-        expect(response.body).not_to include("outlives its frame, and a closure")
+        expect(response.body).not_to include("hiddenprose")
+        wrapped = doc.css("p").select { |p| p.at_css(".gloss-term") }
+        expect(wrapped.map { |p| p.at_css("strong") ? :tagline : p.text }).to eq([ :tagline ])
       end
 
       it "still wraps the tagline" do
@@ -806,7 +823,7 @@ RSpec.describe "Learn", type: :request do
       it "wraps the recognition guide and the featured tagline" do
         doc = page_at(learn_path)
 
-        expect(doc.css("details.learn-recognition .gloss-term").size).to eq(3)
+        expect(doc.css("details.learn-recognition p").map { |p| p.css(".gloss-term").size }).to eq([ 0, 1, 0, 1, 0, 1 ])
         expect(doc.css("p.featured-tagline span.gloss-term").size).to eq(1)
       end
 
