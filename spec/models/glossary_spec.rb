@@ -74,6 +74,35 @@ RSpec.describe Glossary do
     end
   end
 
+  describe "the reference-audit entries" do
+    let(:audit_keys) do
+      [
+        "unique index", "invariant", "reducer", "seam", "happy path", "dependency array", "ref", "adapter",
+        "blast radius", "eventual consistency", "replica", "tenant", "connection pool", "context provider",
+        "partial index", "query planner", "react.memo", "soft delete", "ttl", "abortcontroller",
+        "atomic operation", "code smell", "contention", "dead-letter queue", "external store", "fixture",
+        "guard clause", "hot key", "low selectivity", "p99 latency", "polyfill", "row lock",
+        "idempotency key", "backfill", "compensating action", "form object", "value object"
+      ]
+    end
+
+    it "defines every term the audit found in three or more references" do
+      expect(audit_keys.size).to eq(37)
+      expect(audit_keys - Glossary::TERMS.keys).to be_empty
+    end
+
+    it "resolves a plural to its singular entry rather than to a shorter key inside it" do
+      expect(Glossary.key_for("unique indexes")).to eq("unique index")
+      expect(Glossary.key_for("Dead-letter queues")).to eq("dead-letter queue")
+      expect("two unique indexes"[Glossary::TERM_PATTERN]).to eq("unique indexes")
+    end
+
+    it "matches React.memo as one token, dot included" do
+      expect("wrap it in React.memo first"[Glossary::TERM_PATTERN]).to eq("React.memo")
+      expect(Glossary.key_for("React.memo")).to eq("react.memo")
+    end
+  end
+
   describe "FORMS" do
     it "lets no form equal a key or another key's form" do
       forms = Glossary::FORMS.values.flatten

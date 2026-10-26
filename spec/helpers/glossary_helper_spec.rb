@@ -10,6 +10,13 @@ RSpec.describe GlossaryHelper, type: :helper do
       expect(result).to include('<span class="gloss-term" data-definition="A function bundled with its surrounding variables." tabindex="0" role="button" aria-label="Closure: A function bundled with its surrounding variables.">Closure</span>')
     end
 
+    it "wraps a plural of a two-word key once, with the singular's definition" do
+      result = Nokogiri::HTML5.fragment(helper.glossary_wrap("two unique indexes")).css(".gloss-term")
+
+      expect(result.map(&:text)).to eq([ "unique indexes" ])
+      expect(result.first["data-definition"]).to eq(Glossary::TERMS["unique index"])
+    end
+
     it "only wraps the first occurrence, leaving later repeats plain" do
       stub_glossary("closure" => "def")
       result = helper.glossary_wrap("A closure is a closure of scope.")

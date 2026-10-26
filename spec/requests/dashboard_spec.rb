@@ -436,6 +436,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(labels.css(".gloss-term")).to be_empty
     end
 
+    it "underlines the same terms in FakeService's day as the glossary did before the reference-audit entries" do
+      create_exercise(problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_dup)
+      get root_path
+      terms = Nokogiri::HTML5(response.body).css(".gloss-term").map(&:text).to_set
+
+      expect(terms).to eq(Set["service object", "background job"])
+    end
+
     it "renders an old exercise with a populated but now-unused glossary field without error" do
       ps = base_problem_set
       ps["code_review"]["glossary"] = [ { "term" => "closure", "definition" => "stale AI-generated definition" } ]
