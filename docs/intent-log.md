@@ -301,3 +301,8 @@ data.*
   full container width from 600px; the app wins where the boards differ;
   I took the spec as written, so the note stays visible and Progress gets
   its own bucket class
+- Learn on phone cards and the desktop layout, specced first `#567`
+  **I decided:** lay out everything the page has and keep the filter's
+  hiding working; the app wins where the boards differ; reorder so this
+  week's concept and the search come first, side by side on a desktop,
+  ahead of the prepare and drills boxes
