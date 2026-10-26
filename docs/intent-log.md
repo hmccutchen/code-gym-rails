@@ -312,5 +312,6 @@ data.*
   warrants it; each page should have its own modular style file
   **I decided:** refactor the three finished pages first, then build Account
   and Settings desktop straight into their own sheets; a partial's styles go
-  with the page it renders on, or a shared component sheet; Account's paired
-  cards stretch to the same height
+  with the page it renders on, or a shared component sheet
+- Account and Settings in their own page sheets, laid out for a desktop `#571`
+  **I decided:** Account's paired cards stretch to the same height

@@ -1,16 +1,11 @@
 <% page_title t("accounts.show.title") %>
-<style>
-  .account-id { color: var(--muted); font-size: .9rem; }
-  .account-id .email { color: var(--text); font-family: monospace; display: block; margin-bottom: .2rem; overflow-wrap: anywhere; }
-  .danger-zone h2 { color: var(--red); }
-  .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
-  .btn-danger:hover { background: var(--red); color: var(--bg); }
-</style>
+<% wide_page %>
+<% page_stylesheet "account" %>
 
-<div class="phone-page">
+<div class="phone-page account-page">
   <h1><%= t("accounts.show.title") %></h1>
 
-  <section class="card">
+  <section class="card account-id-card">
     <p class="account-id">
       <span class="email"><%= current_user.email %></span>
       <%= current_user.provider_label %> · <%= t("languages.#{current_user.language}") %>

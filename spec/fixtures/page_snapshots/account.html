@@ -517,7 +517,7 @@
   </style>
   <link rel="stylesheet" href="/assets/phone_cards-DIGEST.css" />
   <link rel="stylesheet" href="/assets/desktop-DIGEST.css" />
-  
+  <link rel="stylesheet" href="/assets/pages/account-DIGEST.css" />
 </head>
 <body data-signed-out-text="Your session expired, so that didn&#39;t go through. Reload the page and sign in again." data-save-failed-text="Couldn&#39;t save your last change. It hasn&#39;t reached the server — check your connection and try again."
       data-controller="glossary code-lines mermaid"
@@ -559,22 +559,15 @@
     </div>
   </nav>
 
-  <div class="container" data-pull-content>
+  <div class="container container-wide" data-pull-content>
     <main id="main-content" tabindex="-1">
       <div class="flash notice" id="flash-notice">Welcome back, Existing!</div>
 
-    <style>
-  .account-id { color: var(--muted); font-size: .9rem; }
-  .account-id .email { color: var(--text); font-family: monospace; display: block; margin-bottom: .2rem; overflow-wrap: anywhere; }
-  .danger-zone h2 { color: var(--red); }
-  .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
-  .btn-danger:hover { background: var(--red); color: var(--bg); }
-</style>
-
-<div class="phone-page">
+    
+<div class="phone-page account-page">
   <h1>Account</h1>
 
-  <section class="card">
+  <section class="card account-id-card">
     <p class="account-id">
       <span class="email">existing@example.com</span>
       Claude · Ruby / Rails
@@ -589,28 +582,14 @@
 
   
 
-  <style>
-  .authenticator-form label.card-note { margin-bottom: 0; }
-  .authenticator-settings h3 { font-size: .9rem; margin-bottom: .4rem; }
-  .authenticator-form { margin-top: 1.25rem; display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; }
-  .authenticator-form input[type="text"] { width: 100%; padding: .55rem .8rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); }
-</style>
-<section class="card authenticator-settings">
+  <section class="card authenticator-settings">
   <h2>Authenticator app</h2>
     <p class="card-note">Signing in needs only the emailed code. Adding an authenticator app means a stolen inbox alone can&#39;t sign in.</p>
     <a class="btn btn-ghost btn-block" href="/account/authenticator">Add an authenticator app</a>
 </section>
 
 
-  <style>
-  .api-usage .card-note { margin-bottom: 0; }
-  .api-usage-total { font-size: 2rem; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
-  .api-usage-providers { margin: .75rem 0; }
-  .api-usage-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .25rem .75rem; min-height: 48px; border-top: 1px solid var(--border); }
-  .api-usage-row dd { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; }
-  .api-usage-row-unpriced dd { color: var(--muted); }
-</style>
-<section class="card api-usage" aria-labelledby="api-usage-heading">
+  <section class="card api-usage" aria-labelledby="api-usage-heading">
   <h2 id="api-usage-heading">AI usage</h2>
     <p class="card-note">No requests sent with your API key since September 1.</p>
 </section>

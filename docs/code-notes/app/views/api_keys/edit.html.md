@@ -17,8 +17,8 @@ muted colour and bottom margin. The page rule that gives them that is
 makes the two ids add no weight, so the rule counts as one class (the
 `:not()` takes its argument's weight) plus one element: (0,1,1). That is
 exactly the weight of the `.setup-wrap p` rule it replaced, and it sits in
-the same place in the page style. A `.card-note` paragraph is excluded and is
-left to `phone_cards.css`. Because the weight and the position match, every
+the same place in the page's rules, now at the top of `pages/settings.css`.
+A `.card-note` paragraph is excluded and is left to `phone_cards.css`. Because the weight and the position match, every
 paragraph the rule matches resolves as it did before the change. That
 includes the `.mix-note` shorthand `margin: .5rem 0 1rem`, which gives up its
 bottom margin to the rule's 2rem as it always did. A computed-style dump of
@@ -69,6 +69,12 @@ markup lacks. A copy in each partial would repeat the rule. Every other note tak
 from `.card-note` and sets only its spacing, so two rules no longer give the
 same muted text.
 
+Each group's kind rows sit in a `.mix-kinds` wrapper, which the desktop grid
+lays out two across. The grid goes on the wrapper, not the fieldset, because a
+`fieldset` as a grid container has a history of browser bugs. The Exercise mix
+controller finds rows by their target, never as a fieldset's children, so the
+wrapper changes nothing it reads.
+
 A `.mix-group` is a fieldset with no box. Boxes inside a card made every kind
 look like a card of its own, with three borders and two paddings between the
 card edge and a control, which cost width at 320px. A divider above each group
@@ -78,23 +84,24 @@ otherwise stop a long label from wrapping.
 
 ## Partials' styles
 
-Each partial the page renders carries the rules for its own classes:
-`api_keys/_key_guide` its spacing, `api_keys/_display_preferences` its
-groups and hints, and `api_keys/_difficulty_controls` its fieldset, lock,
-coverage line and suggestion outline, once per page (its own note says how).
+The page and its partials keep their rules in one sheet,
+`pages/settings.css` (`docs/decisions/page-stylesheets.md`): the page's own
+rules first, then `api_keys/_key_guide`'s spacing,
+`api_keys/_difficulty_controls`'s fieldset, lock, coverage line and
+suggestion outline, and `api_keys/_display_preferences`'s groups and hints,
+in the order their `<style>` blocks used to render.
 `.mix-row .kind-about`, which places the
 shared `responses/_kind_about` disclosure across a mix row, sits in the
 layout beside the other `details.kind-about` rules, since that partial also
 renders on the answer form.
 
-Every partial's `<style>` comes after this page's own block, so a moved rule
+Each partial's rules come after the page's own in that sheet, so a moved rule
 still wins a tie in specificity it won before: `.mix-difficulty label` and
 `.display-group label` over the settings label rule, `.mix-difficulty legend`
 over `.mix-group legend`, and `.key-guide > * + *` and `.mix-coverage` over
 `.hint`. `spec/system/settings_partial_styles_spec.rb` measures each result.
 The key guide shows only to an account with no key and no sets, so the page
-snapshot, taken for an account with a key, carries neither the guide nor its
-rules.
+snapshot, taken for an account with a key, doesn't carry the guide.
 
 ## Where save feedback appears
 
