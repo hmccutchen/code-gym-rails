@@ -178,7 +178,7 @@ RSpec.describe DailyKindSwap do
       expect(outcome.daily_kinds).to eq(%w[code_review design_comparison])
     end
 
-    it "refuses a swap that would leave every remaining kind in a group turned off" do
+    it "refuses a swap that would leave every remaining kind in a group skipped" do
       user.update!(excluded_section_kinds: %w[challenge security_review parsons_problem])
 
       outcome = expect_refused(:empties_a_slot, place: 1, kind: "architecture")

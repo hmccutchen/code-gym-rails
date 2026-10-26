@@ -259,3 +259,5 @@ data.*
 - build the desktop foundation and History from the spec `#549`
   **I decided:** the spec rides in the PR for review and comes out after the
   critical review, before the merge
+- the swap picker says "skip" and "turn Skip off" for a skipped kind `#552`
+  **I decided:** its own PR, separate from the desktop work
