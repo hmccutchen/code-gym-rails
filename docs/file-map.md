@@ -239,11 +239,17 @@ What each listed file does.
   rather than restating their membership. Has no relationship to `ConceptBucket`,
   which decides where a concept's mastery history records, and must not
   acquire one.
-- `spec/system/learn_filter_spec.rb` — pins that typing the humanized label
-  actually shown on screen narrows the Learn list; the `learn-filter` controller matches
-  against a rendered attribute a request spec never executes, so a mismatch
-  between that label and the raw concept key was invisible to request specs
-  and only caught here.
+- `app/models/learn_search_terms.rb` — `LearnSearchTerms`: the hand-written
+  synonyms the Learn filter also matches (`n+1` for N plus one). Read only by
+  `LearnSearchHelper`, never by a prompt
+- `app/helpers/learn_search_helper.rb` — `#learn_search_text`: one Learn
+  entry's `data-search` words, from its name, the group heading shown, the
+  bucket, its glossary forms and its synonyms
+- `spec/system/learn_filter_spec.rb` — pins what the Learn filter finds:
+  typos, partial words, synonyms, group and bucket names, the order within a
+  group and its restoring, a concept both languages hold, and Enter. The
+  `learn-filter` controller matches against a rendered attribute a request
+  spec never executes, so its matching is tested here.
 - `config/initializers/content_security_policy.rb` — the policy that makes the Stimulus convention enforceable: `script-src` is this origin, the mermaid and SortableJS package directories on `cdn.jsdelivr.net`, and a per-request nonce, and `style-src` keeps `'unsafe-inline'`, since the views still carry `style=` attributes
 - `spec/conventions/locale_copy_spec.rb` — fails on copy under `exercise_mix.*` or `daily_kinds.*`, or naming the exercise mix in any case, that describes skipping a kind as turning it on or off, enabling or disabling it; and on a swap picker sentence that names the Skip switch by any word but its label's
 - `spec/conventions/app_views_spec.rb` — fails on an inline `<script>`, `on*` handler or `javascript:` URL in any view, so the convention breaks a build rather than a page

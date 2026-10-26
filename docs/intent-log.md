@@ -315,3 +315,4 @@ data.*
   with the page it renders on, or a shared component sheet
 - Account and Settings in their own page sheets, laid out for a desktop `#571`
   **I decided:** Account's paired cards stretch to the same height
+- fuzzy Learn search `#570`

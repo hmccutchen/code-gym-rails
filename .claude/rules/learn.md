@@ -2,11 +2,11 @@
 paths:
   - "app/controllers/{learn,learn_lessons,concept_references,concept_drills,progress}_controller.rb"
   - "app/controllers/concerns/learn_scope.rb"
-  - "app/models/{concept_reference,concept_lesson,concept_group,concept_book_sources,learn_lessons,glossary,hand_written_learn_text,section_kind_guide,recognition_guide,featured_concept,rung_ledger,concept_hosts,worked_example,ladder_coverage,concept_exposure_index}.rb"
+  - "app/models/{concept_reference,concept_lesson,concept_group,concept_book_sources,learn_lessons,glossary,hand_written_learn_text,section_kind_guide,recognition_guide,featured_concept,rung_ledger,concept_hosts,worked_example,ladder_coverage,concept_exposure_index,learn_search_terms}.rb"
   - "app/models/featured_concept_pick.rb"
   - "app/prompts/{concept_reference_prompt,recognition_guide_prompt,explain_differently_prompt}.rb"
   - "app/jobs/{generate_concept_reference_job,generate_recognition_guide_job}.rb"
-  - "app/helpers/{featured_concept,concept_references,concept_drills,progress,section_kind_guide,glossary}_helper.rb"
+  - "app/helpers/{featured_concept,concept_references,concept_drills,progress,section_kind_guide,glossary,learn_search}_helper.rb"
   - "app/views/{learn,learn_lessons,progress}/**"
   - "app/views/shared/{_concept_reference,_featured_concept}.html.erb"
   - "app/views/responses/{_featured_marker,_kind_about,_kind_guide}.html.erb"
@@ -62,6 +62,17 @@ read it before changing that area.
   static reader-facing module is listed in `HandWrittenLearnText::MODULES` and
   answers `.learn_text`, which a spec holds to the plain-language standard's
   checkable rules.
+- **Searching the Learn list** (`docs/decisions/learn-search.md`): the
+  `learn-filter` controller scores each entry in the browser against its
+  `data-search`, which `LearnSearchHelper#learn_search_text` builds from the
+  humanized name, the group heading shown, the bucket name,
+  `Glossary.forms_for` and `LearnSearchTerms::SYNONYMS`, and never from
+  reference text. Every query word must match; a word under 5 letters needs
+  an exact or prefix match, 5 to 7 letters allow 1 edit, 8 or more allow 2.
+  Entries hide in place and sort by score within their group, back to page
+  order when the field clears. `LearnSearchTerms` is read only by the
+  helper, and a synonym naming a family (`solid`) goes on every member the
+  vocabulary holds.
 - **What each section kind is**: `SectionKindGuide` holds a hand-written
   summary, a short example and a one-line `short` summary for every
   registered kind. The summary and example are shown in an "About"

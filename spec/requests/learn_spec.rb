@@ -39,6 +39,26 @@ RSpec.describe "Learn", type: :request do
       expect(response.body).to include("prototype_chain")
     end
 
+    it "gives each entry its search words and keeps the reference text out of them" do
+      user.update!(language: "ruby_rails")
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "Zanzibar loads every row.",
+                               explanation: "One query per row.", code_example: "x", senior_lens: "y")
+
+      get learn_path
+
+      entry = Nokogiri::HTML(response.body).at_css('.learn-entry[data-concept="n_plus_one"]')
+      expect(entry["data-search"]).to eq("n plus one core ruby/rails n+1 eager loading")
+      expect(response.body.scan(/data-search="[^"]*zanzibar/i)).to eq([])
+    end
+
+    it "keeps phone keyboards from rewriting a technical word before the filter sees it" do
+      get learn_path
+
+      input = Nokogiri::HTML(response.body).at_css("#learn-filter-input")
+      expect(input.to_h).to include("autocapitalize" => "none", "autocorrect" => "off", "spellcheck" => "false",
+                                    "autocomplete" => "off", "enterkeyhint" => "search")
+    end
+
     it "renders concepts that have no reference row at all" do
       user.update!(language: "ruby_rails")
       expect(ConceptReference.count).to eq(0)

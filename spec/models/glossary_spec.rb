@@ -87,6 +87,18 @@ RSpec.describe Glossary do
     end
   end
 
+  describe ".forms_for" do
+    it "returns a key with its forms, from the key or from any of its forms" do
+      expect(Glossary.forms_for("memoization")).to eq(%w[memoization memoized memoizing memoize memoised])
+      expect(Glossary.forms_for("Memoized")).to eq(%w[memoization memoized memoizing memoize memoised])
+    end
+
+    it "returns a key with no forms alone, and nothing for an unknown word" do
+      expect(Glossary.forms_for("caching")).to eq(%w[caching])
+      expect(Glossary.forms_for("nonexistentword")).to eq([])
+    end
+  end
+
   describe ".definition_for" do
     it "returns the definition for a key or a form, and nil for an unknown word" do
       expect(Glossary.definition_for("Closures")).to eq(Glossary::TERMS["closure"])

@@ -16,7 +16,8 @@
   <div class="card learn-filter">
     <input type="search" id="learn-filter-input" placeholder="<%= t("learn.filter_placeholder") %>"
            aria-label="<%= t("learn.filter_placeholder") %>"
-           data-learn-filter-target="input" data-action="input->learn-filter#apply">
+           autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="search"
+           data-learn-filter-target="input" data-action="input->learn-filter#apply keydown.enter->learn-filter#dismiss">
     <label>
       <input type="checkbox" id="learn-seen-only"
              data-learn-filter-target="seenOnly" data-action="change->learn-filter#apply">
@@ -83,7 +84,7 @@
 
         <ul class="learn-list">
           <% concepts.each do |concept| %>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="<%= concept %>" data-search="<%= "#{concept} #{concept.humanize}".downcase %>">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="<%= concept %>" data-search="<%= learn_search_text(concept, bucket: bucket[:key], group: (group_key if grouped)) %>">
               <%= link_to concept.humanize, learn_concept_path(bucket: bucket[:key], concept: concept) %>
               <% if encountered?(concept, bucket[:key]) %>
                 <span class="learn-seen"><%= t("learn.encountered") %></span>
@@ -101,7 +102,7 @@
             </li>
           <% end %>
           <% LearnLessons.in_group(group_key).each do |lesson| %>
-            <li class="learn-entry" data-learn-filter-target="entry" data-concept="<%= lesson %>" data-search="<%= "#{lesson} #{lesson.humanize}".downcase %>">
+            <li class="learn-entry" data-learn-filter-target="entry" data-concept="<%= lesson %>" data-search="<%= learn_search_text(lesson, bucket: bucket[:key], group: (group_key if grouped)) %>">
               <%= link_to lesson.humanize, learn_lesson_path(lesson: lesson) %>
             </li>
           <% end %>
