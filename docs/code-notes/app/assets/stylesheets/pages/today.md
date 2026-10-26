@@ -72,7 +72,10 @@ the bar change together.
   more space; too little would hide the control. At 320px with the largest
   text and a wrapped nudge the bar is about 192px of the 224px reserved, which
   `today_phone_layout_spec` measures. Both are off while a text field has
-  focus, since the bar has let go then.
+  focus, since the bar has let go then. The lifted banner is also capped at
+  the height left between the top safe area and the bar, and scrolls inside
+  that: in a 512px window at the largest text the lost-connection message
+  wraps taller than the space above the bar.
 - **A held submit.** When a submit waits on another save, the answer-form
   controller scrolls its notice into view
   (`docs/code-notes/app/javascript/controllers/answer_form_controller.md`).

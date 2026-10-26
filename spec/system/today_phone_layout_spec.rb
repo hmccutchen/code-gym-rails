@@ -231,6 +231,21 @@ RSpec.describe "Today's phone layout", type: :system do
     expect(computed_style(".today-page .section", "marginBottom")).to eq("24px")
   end
 
+  it "keeps a lost connection's message readable above the bar in the shortest window the bar sticks in" do
+    set_safe_area(top: 47, bottom: 34)
+    visit_today(width: 320, height: 512, prefs: LayoutHelpers::LARGEST_TEXT)
+    force_standalone
+    drop_requests_to("/responses")
+    find(%(textarea[data-field="code_review"])).fill_in(with: "It re-runs the query inside the loop.")
+    find(".today-page .page-header h1").click
+
+    expect(page).to have_css("#save-status", visible: true)
+    expect(bar_position).to eq("sticky")
+    banner = rect("#save-status")
+    expect(banner["top"]).to be >= 47
+    expect(banner["bottom"]).to be <= bar["top"]
+  end
+
   it "sticks the bar only in a window at least 512px tall" do
     visit_today(height: 512)
     expect(bar_position).to eq("sticky")
