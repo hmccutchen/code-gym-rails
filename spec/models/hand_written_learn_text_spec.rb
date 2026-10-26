@@ -9,10 +9,6 @@ RSpec.describe HandWrittenLearnText do
                                 .scan(/"([^"]+)"/).flatten
                                 .map { |phrase| phrase.sub(/[,.]\z/, "").downcase }
 
-  def self.sentences(text)
-    text.split(/(?<=[.?!])\s+/).map(&:strip).reject(&:empty?)
-  end
-
   # The first word stands in for a sentence's construction, so only the plainest repetition is caught.
   def self.opening_word(sentence)
     sentence[/[[:alpha:]']+/]&.downcase
@@ -29,7 +25,7 @@ RSpec.describe HandWrittenLearnText do
   end
 
   def self.same_opening?(text)
-    openings = sentences(text).map { |sentence| opening_word(sentence) }
+    openings = SentenceCount.split(text).map { |sentence| opening_word(sentence) }
     openings.size > 1 && openings.uniq.size == 1
   end
 
@@ -57,6 +53,11 @@ RSpec.describe HandWrittenLearnText do
     it "catch an exclamation point and pass a plain sentence" do
       expect(self.class.exclamation?("Fix the cache!")).to be(true)
       expect(self.class.exclamation?("Fix the cache.")).to be(false)
+    end
+
+    it "do not split a sentence at e.g. or i.e." do
+      expect(self.class.same_opening?("You open the file, e.g. the log. You read the name.")).to be(true)
+      expect(SentenceCount.of("Use a cache, e.g. Redis. It is fast.")).to eq(2)
     end
 
     it "leave a single sentence alone" do

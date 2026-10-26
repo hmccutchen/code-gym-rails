@@ -10,6 +10,13 @@ RSpec.describe GlossaryHelper, type: :helper do
       expect(result).to include('<span class="gloss-term" data-definition="A function bundled with its surrounding variables." tabindex="0" role="button" aria-label="Closure: A function bundled with its surrounding variables.">Closure</span>')
     end
 
+    it "wraps a plural of a two-word key once, with the singular's definition" do
+      result = Nokogiri::HTML5.fragment(helper.glossary_wrap("two unique indexes")).css(".gloss-term")
+
+      expect(result.map(&:text)).to eq([ "unique indexes" ])
+      expect(result.first["data-definition"]).to eq(Glossary::TERMS["unique index"])
+    end
+
     it "only wraps the first occurrence, leaving later repeats plain" do
       stub_glossary("closure" => "def")
       result = helper.glossary_wrap("A closure is a closure of scope.")
@@ -43,6 +50,30 @@ RSpec.describe GlossaryHelper, type: :helper do
       expect(result.scan("gloss-term").size).to eq(1)
       expect(result).to include('data-definition="longer"')
       expect(result).not_to include('data-definition="shorter"')
+    end
+
+    it "wraps an inflected form with its key's definition and keeps the text's own word" do
+      stub_glossary({ "memoization" => "M." }, { "memoization" => %w[memoized] })
+      result = helper.glossary_wrap("It is memoized.")
+
+      expect(result).to include('data-definition="M."')
+      expect(result).to include(">memoized</span>")
+    end
+
+    it "underlines a key and its form once per field" do
+      stub_glossary({ "memoization" => "M." }, { "memoization" => %w[memoized] })
+      result = helper.glossary_wrap("memoization helps; memoized code is fast")
+
+      expect(result.scan("gloss-term").size).to eq(1)
+    end
+
+    it "prefers the longer plural form" do
+      stub_glossary({ "indexing" => "I.", "unique index" => "U." },
+                    { "indexing" => %w[indexes], "unique index" => [ "unique indexes" ] })
+      result = helper.glossary_wrap("two unique indexes")
+
+      expect(result.scan("gloss-term").size).to eq(1)
+      expect(result).to include('data-definition="U."')
     end
 
     it "silently skips a term with no match in the text" do

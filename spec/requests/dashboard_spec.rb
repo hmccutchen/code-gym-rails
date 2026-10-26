@@ -426,13 +426,22 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       summary = Nokogiri::HTML(response.body).at_css(%(details.section[data-section-fold="pattern"] > summary))
       expect(summary.text).to include("Service Objects")
       expect(summary.css(".gloss-term")).to be_empty
-      expect(response.body).to include(%(<span class="gloss-term" data-definition="#{ERB::Util.html_escape(Glossary::TERMS['service objects'])}"))
+      expect(response.body).to include(%(<span class="gloss-term" data-definition="#{ERB::Util.html_escape(Glossary::TERMS['service object'])}"))
+      expect(response.body).to include(">Service objects</span>")
 
       create_response(exercise)
       get root_path
       labels = Nokogiri::HTML(response.body).css("details.section > summary")
       expect(labels.map(&:text).join).to include("Service Objects")
       expect(labels.css(".gloss-term")).to be_empty
+    end
+
+    it "pins the set of terms the real glossary underlines in FakeService's day, which only a new key or form or a FakeService prose change moves" do
+      create_exercise(problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_dup)
+      get root_path
+      terms = Nokogiri::HTML5(response.body).css(".gloss-term").map(&:text).to_set
+
+      expect(terms).to eq(Set["service object", "background job"])
     end
 
     it "renders an old exercise with a populated but now-unused glossary field without error" do
