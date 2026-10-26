@@ -8,12 +8,13 @@ Progress, Learn, and Account and Settings.
 
 ## The breakpoints
 
-- **Under 600px:** the phone layout. Card pages put each card `max(16px, inset)`
-  from the screen edge (`phone_cards.css`).
+- **Under 600px:** the phone layout. Card pages and Today put each card
+  `max(16px, inset)` from the screen edge (`phone_cards.css`), and Today's
+  Submit button sticks to the bottom of the window
+  (`docs/code-notes/app/assets/stylesheets/pages/today.md`).
 - **600 to 899px:** one column. Account and Settings stay a centered 480px
-  column (`.phone-page`). History, Progress and Learn, and later Today,
-  take the container's full width (`.card-page`), because code and reviews are
-  cramped at 480px. An iPad in portrait and a phone in landscape land here.
+  column (`.phone-page`). History, Progress, Learn and Today take the
+  container's full width, because code and reviews are cramped at 480px. An iPad in portrait and a phone in landscape land here.
 - **900px and wider:** the desktop layout: the shared column and nav from
   `desktop.css`, and each page's arrangement from the 900px block at the end
   of its own sheet (`docs/decisions/page-stylesheets.md`).

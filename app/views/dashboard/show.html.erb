@@ -1,38 +1,40 @@
 <% page_title t("dashboard.show.title") %>
 <% page_stylesheet "today" %>
 
-<div class="page-header">
-  <h1><%= t("dashboard.show.title") %></h1>
-  <div class="date">
-    <%= Date.current.strftime("%A, %B %-d") %>
-    <% if (streak = current_user.current_streak).positive? %>
-      <span class="streak"><%= t("dashboard.show.streak", days: streak) %></span>
+<div class="today-page">
+  <div class="page-header">
+    <h1><%= t("dashboard.show.title") %></h1>
+    <div class="date">
+      <%= Date.current.strftime("%A, %B %-d") %>
+      <% if (streak = current_user.current_streak).positive? %>
+        <span class="streak"><%= t("dashboard.show.streak", days: streak) %></span>
+      <% end %>
+    </div>
+  </div>
+
+  <% if @trial_status %>
+    <%= render "dashboard/trial_banner", status: @trial_status %>
+  <% end %>
+  <div id="dashboard-content">
+    <% if @trial_ended %>
+      <%= render "dashboard/trial_ended", status: @trial_status %>
+    <% elsif @generating %>
+      <%= render "dashboard/generating" %>
+    <% elsif @generation_failed %>
+      <%= render "dashboard/generation_failed", message: current_user.generation_failure_message(surface: :generation) %>
+    <% elsif @generation_paused %>
+      <%= render "dashboard/paused_empty" %>
+    <% elsif @weekend_no_exercise %>
+      <%= render "dashboard/weekend_empty" %>
+    <% else %>
+      <%= render "dashboard/exercise", exercise: @exercise, response: @response %>
     <% end %>
   </div>
-</div>
 
-<% if @trial_status %>
-  <%= render "dashboard/trial_banner", status: @trial_status %>
-<% end %>
-<div id="dashboard-content">
-  <% if @trial_ended %>
-    <%= render "dashboard/trial_ended", status: @trial_status %>
-  <% elsif @generating %>
-    <%= render "dashboard/generating" %>
-  <% elsif @generation_failed %>
-    <%= render "dashboard/generation_failed", message: current_user.generation_failure_message(surface: :generation) %>
-  <% elsif @generation_paused %>
-    <%= render "dashboard/paused_empty" %>
-  <% elsif @weekend_no_exercise %>
-    <%= render "dashboard/weekend_empty" %>
-  <% else %>
-    <%= render "dashboard/exercise", exercise: @exercise, response: @response %>
+  <%# Outside #dashboard-content, which the generating poller replaces. Placement: docs/code-notes/app/views/dashboard/show.html.md %>
+  <% if featured_concept %>
+    <div class="featured-compact">
+      <%= render "shared/featured_concept", featured: featured_concept, day_response: @response %>
+    </div>
   <% end %>
 </div>
-
-<%# Outside #dashboard-content, which the generating poller replaces. Placement: docs/code-notes/app/views/dashboard/show.html.md %>
-<% if featured_concept %>
-  <div class="featured-compact">
-    <%= render "shared/featured_concept", featured: featured_concept, day_response: @response %>
-  </div>
-<% end %>

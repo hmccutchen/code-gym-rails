@@ -22,13 +22,6 @@ surface background and border) but not the `.card` class.
 specificity as the layout's `.section h2`, so it would shrink every nested
 section's title inside "Problems & answers".
 
-## The nested section rule
-
-The layout's 600px rule runs every `.section` to the screen edge, with no
-side borders or radius. An entry is already a card, so its nested sections
-keep their margins, radius and side borders under 600px. The rule goes when
-the layout's bleed rule goes.
-
 ## The disclosures and the pager
 
 "Problems & answers" and the review summary are each at least 48px tall, and

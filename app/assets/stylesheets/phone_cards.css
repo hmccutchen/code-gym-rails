@@ -3,7 +3,7 @@
   .phone-page { max-width: 480px; margin-inline: auto; }
 }
 @media (max-width: 599.98px) {
-  .phone-page, .card-page {
+  .phone-page, .card-page, .today-page {
     margin-left: calc(max(16px, env(safe-area-inset-left)) - var(--container-pad-left));
     margin-right: calc(max(16px, env(safe-area-inset-right)) - var(--container-pad-right));
   }

@@ -93,15 +93,15 @@
         <p class="hint"><%= t("dashboard.shared_concept", sections: exercise.daily_kinds.map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
       <% end %>
 
-      <div class="submit-row" id="submit-row">
+      <div class="submit-row submit-bar" id="submit-row">
         <%= f.hidden_field :submit, value: "1" %>
         <%# Not type=submit: a click before the module loads would otherwise natively post the whole day. %>
         <%= f.button t("dashboard.exercise.submit"), type: "button", id: "submit-answers", class: "btn btn-primary",
               data: { answer_form_target: "submitButton", action: "answer-form#submit" } %>
         <span class="auto-saved"><%= t("dashboard.exercise.auto_saved") %></span>
+        <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge", tabindex: "-1",
+                  hidden: submit_blocker.nil?, data: submit_nudges.merge(answer_form_target: "nudge"), aria: { live: "polite" } %>
       </div>
-      <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge", tabindex: "-1",
-                hidden: submit_blocker.nil?, data: submit_nudges.merge(answer_form_target: "nudge"), aria: { live: "polite" } %>
     <% end %>
   </div>
 <% end %>

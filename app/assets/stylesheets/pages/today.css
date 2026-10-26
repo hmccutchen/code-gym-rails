@@ -24,7 +24,7 @@ html:has(.progress-sticky) {
 #submit-answers { padding-block: calc(.5rem + 6px); }
 .rating-btn:hover { border-color: var(--accent); }
 .rating-btn.active { background: var(--button-bg); border-color: var(--button-bg); color: #fff; }
-#rating-nudge { margin-top: .5rem; margin-bottom: 1.5rem; }
+#rating-nudge { flex-basis: 100%; margin: -.5rem 0 0; }
 
 .regenerate-row { margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .flash.regeneration-failed { margin-bottom: 1.5rem; }
@@ -41,3 +41,19 @@ html:has(.progress-sticky) {
 
 .review-heading-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; }
 .review-heading-row h2 { font-size: 1rem; }
+
+/* 10rem is more than the bar's padding, button, note and a wrapped nudge reach at any text size (today_phone_layout_spec). */
+@media (max-width: 600px) {
+  html:has(.submit-bar) {
+    --submit-bar-reach: calc(var(--tab-bar-clearance) + var(--bottom-safe-inset) + 10rem);
+    scroll-padding-bottom: calc(var(--submit-bar-reach) + var(--focus-ring-width) + var(--focus-ring-offset));
+  }
+  html:has(.submit-bar) #save-status { bottom: calc(var(--submit-bar-reach) + .75rem); }
+
+  .today-page .page-header, .today-page .regenerate-row, .today-page .progress-sticky, .today-page .section { margin-bottom: 16px; }
+
+  .submit-bar { position: sticky; bottom: var(--tab-bar-clearance); z-index: 10; gap: 4px; margin-top: 0; padding: 8px 0 calc(8px + var(--bottom-safe-inset)); background: var(--bg); border-top: 1px solid var(--border); }
+  .submit-bar #submit-answers { width: 100%; min-height: 48px; }
+  .submit-bar .auto-saved, .submit-bar #rating-nudge { width: 100%; margin: 0; text-align: center; }
+  #gym-form:has(textarea:focus, input[type="text"]:focus) .submit-bar { position: static; }
+}

@@ -120,6 +120,8 @@
       --radius: 14px; --radius-sm: 8px;
       --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
       --tab-bar-height: 56px;
+      --tab-bar-clearance: 0px;
+      --bottom-safe-inset: env(safe-area-inset-bottom);
       --pattern-mask: url("/assets/gym-pattern-tile-dark-DIGEST.png");
       --pattern-tint: rgb(190, 205, 240); --pattern-opacity: .08;
       /* iOS zooms a focused input below 16px; max() keeps that floor without overriding a larger default. */
@@ -148,10 +150,11 @@
       body .pull-refresh { display: flex; }
       nav, .tab-bar, .btn, .rating-btn, summary { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
       @media (max-width: 48rem) {
+        :root { --tab-bar-clearance: calc(var(--tab-bar-height) + env(safe-area-inset-bottom)); --bottom-safe-inset: 0px; }
         body .tab-bar { display: flex; }
         body nav .nav-toggle, body nav .nav-links, body nav .nav-links[data-open] { display: none; }
-        body { padding-bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom)); }
-        body .save-status { bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom) + .75rem); }
+        body { padding-bottom: var(--tab-bar-clearance); }
+        body .save-status { bottom: calc(var(--tab-bar-clearance) + .75rem); }
       }
     }
     a { color: var(--accent-text); text-decoration: none; }
@@ -373,16 +376,8 @@
     .daily-kind-actions { display: flex; flex-direction: row-reverse; flex-wrap: wrap; gap: .75rem; }
     .daily-kind-actions .btn { white-space: nowrap; }
 
-    /* The -1.5rem tracks .container's padding and must change with it. */
     @media (max-width: 600px) {
-      .section {
-        margin-inline: -1.5rem;
-        padding: 1.25rem 1rem;
-        border-radius: 0;
-        border-left: none;
-        border-right: none;
-        box-shadow: none;
-      }
+      .section { padding: 1.25rem 1rem; box-shadow: none; }
       .section[data-slot] { box-shadow: inset 0 3px 0 var(--slot-accent); }
       .daily-kind-trigger { top: calc(1.25rem - 12.5px); right: 1rem; }
     }

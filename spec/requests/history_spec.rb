@@ -572,7 +572,7 @@ RSpec.describe "History", type: :request do
   end
 
   describe "mobile gutter" do
-    it "keeps history entries inset as cards on phones, and nested sections inset inside them" do
+    it "keeps history entries inset as cards on phones, with no rule of its own for their nested sections" do
       login_as(user)
       create_session_for(user, date: Date.current)
 
@@ -580,7 +580,7 @@ RSpec.describe "History", type: :request do
 
       history_rules = ViewStyles.stylesheet_rules(Rails.root.join("app/assets/stylesheets/pages/history.css"))
       expect(history_rules.select { |rule| rule.selectors.include?(".history-entry") }.filter_map { |rule| rule.declaration("margin-inline") }).to be_empty
-      expect(history_rules.select { |rule| rule.selectors.include?(".history-entry .section") }.map { |rule| rule.declaration("margin-inline") }).to eq([ "0" ])
+      expect(history_rules.select { |rule| rule.selectors.include?(".history-entry .section") }).to be_empty
     end
   end
 

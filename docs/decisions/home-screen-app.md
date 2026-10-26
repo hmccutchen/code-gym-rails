@@ -49,6 +49,13 @@ now, for the daily reminder (see `push-reminders.md`); `GET
 /service-worker.js` serves it from the root path, since a worker's scope is
 the directory it is served from.
 
+**What the tab bar covers.** Where the tab bar shows, the layout's
+standalone rule sets `--tab-bar-clearance` to the tab bar's height plus the
+bottom safe area, and `--bottom-safe-inset` to 0, since the tab bar already
+pads itself clear of the home indicator. Everywhere else they are 0 and the
+safe area. The body's bottom padding, the save banner and Today's Submit bar
+read them, so the standalone test stays in that one rule.
+
 **Pull-to-refresh in the installed app.** The layout's
 `overscroll-behavior-y: none` removes the rubber-band bounce, and with it
 the only way to reload a home-screen launch, which has no reload button.

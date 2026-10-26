@@ -105,11 +105,10 @@ larger text size cannot push six tabs past a phone's width.
 ## `.container` from 1024px
 
 A desktop window gets a wider column and more side padding, so the page reads
-as a web app rather than a phone layout centred in a large window. The
-`-1.5rem` coupling below applies only under 600px, where this rule never runs. Both widths take the larger of their padding and the side safe-area
-insets, because `viewport-fit=cover` lets a landscape phone draw the column
-under its notch. A portrait phone reports no side inset, so the `-1.5rem`
-coupling still matches.
+as a web app rather than a phone layout centred in a large window. Both
+widths take the larger of their padding and the side safe-area insets,
+because `viewport-fit=cover` lets a landscape phone draw the column under its
+notch.
 
 The padding is built from `--container-pad-left` and `--container-pad-right`,
 and this rule sets them again rather than the padding. `phone_cards.css`
@@ -333,9 +332,12 @@ no slot keeps `--accent-text`.
 
 ## `.section` below 600px
 
-The rule is scoped to `.section` rather than zeroing `.container`'s padding,
-which would drag the nav and every page heading flush against the screen
-edge. The `-1.5rem` tracks `.container`'s padding and must change with it.
+A section keeps its border and radius on a phone and only tightens its
+padding and drops its shadow. It used to run to the screen edge, with no side
+borders; Today's phone layout made every section an inset card, which put
+History's own override and the `-1.5rem` coupling to `.container`'s padding
+out of use. A page that wants its cards nearer the edge than the container's
+gutter says so itself, as Today does with `.today-page` in `phone_cards.css`.
 
 ## `.daily-kind-trigger`
 
@@ -384,10 +386,9 @@ an empty box behind.
 
 ## `.gloss-term::after` below 600px
 
-Below this breakpoint `.section` breaks out of `.container`
-(`margin-inline: -1.5rem`) and sets its own padding, so the panel is measured
-against the section rather than the container, to line up with the text it
-defines. Every fallback equals the desktop value, so the paths that reveal the
+Below this breakpoint `.section` sets its own padding, so the panel is
+measured against the section rather than the container, to line up with the
+text it defines. Every fallback equals the desktop value, so the paths that reveal the
 panel without running the script (`:focus-visible`, hover on a hover-capable
 pointer, or no script at all) stay capped as before. `max-width` reuses
 `--gloss-width` so that it is a no-op once the script has set an explicit
