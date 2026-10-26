@@ -100,6 +100,44 @@ RSpec.describe "Progress", type: :request do
     expect(response.body).to match(%r{data-concept="sync_vs_async"[^>]*data-standing="not_yet"})
   end
 
+  describe "layout" do
+    let(:page) do
+      get progress_path
+      Nokogiri::HTML(response.body)
+    end
+
+    it "puts the legend in a closed card disclosure, with the note outside it" do
+      legend = page.at_css("details.card.progress-legend-card")
+
+      expect(legend).to be_present
+      expect(legend["open"]).to be_nil
+      expect(legend.at_css("> summary").text.strip).to eq("How standings work")
+      expect(legend.at_css(".progress-legend")).to be_present
+      expect(page.at_css(".progress-note").ancestors("details")).to be_empty
+    end
+
+    it "gives a bucket a heading exactly when it holds more than one group, and wraps its groups" do
+      buckets = page.css(".progress-buckets > section.progress-bucket")
+
+      expect(buckets.size).to eq(ConceptBucket.slice_for("ruby_rails").size)
+      buckets.each do |bucket|
+        groups = bucket.css("details.progress-group")
+        expect(bucket.at_css("> h2").present?).to eq(bucket["class"].split.include?("progress-bucket-grouped"))
+        expect(bucket.at_css("> h2").present?).to eq(groups.size > 1)
+        expect(bucket.css("> .progress-groups > details.progress-group").size).to eq(groups.size)
+      end
+    end
+
+    it "renders every group closed, and no longer borrows Learn's bucket class" do
+      expect(page.css("details.progress-group").map { |group| group["open"] }).to all(be_nil)
+      expect(page.css(".learn-bucket")).to be_empty
+    end
+
+    it "is a card page" do
+      expect(page.at_css("#main-content .card-page.progress-page")).to be_present
+    end
+  end
+
   it "appears in the navigation" do
     get root_path
 
