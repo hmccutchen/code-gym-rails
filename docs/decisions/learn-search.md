@@ -73,3 +73,13 @@ text.
 A concept in both the Ruby/Rails and JavaScript vocabularies shows once under
 each bucket, since each copy leads to its own page. Adding the language to
 the query ("javascript god object") narrows it to one.
+
+## Known limit: a typo near a heading shows the whole group
+
+Group and bucket headings are in every entry's search words, and they follow
+the same typo rule as every other word. A query a few letters from a heading
+therefore shows that whole group. For example, `score` is one edit from
+"Core", so it shows every Core-group concept. Matching heading words only by
+exact or prefix match would avoid this, at the cost of a second search
+attribute and word list in the controller. It was considered after review
+and left as it is: the rule stays the same for every word.
