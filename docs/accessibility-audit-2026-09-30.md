@@ -113,7 +113,7 @@ the box, still leaves the lock, exclude and set-size rows 22px tall.
 | "This didn't quite land — try a different explanation" | 290–324 × 42 | Dashboard, history |
 | Exercise mix summary | 342 × 26 | Setup |
 | Exercise mix sliders | 316 × 39 (the whole track responds to a tap) | Setup |
-| Learn and Progress concept links | 59–256 × 26 | Learn index, Progress |
+| Learn and Progress concept links | 59–256 × 26 (Progress **now 44 tall**) | Learn index, Progress |
 | Learn "Write this up", "Drill this", "Drill this group", "Write up the rest" | 77–126 × 25 | Learn |
 | Filter concepts input | 342 × 33 | Learn index |
 | Nav name field | 336 × 25 | Every signed-in page |
@@ -275,7 +275,8 @@ the largest display settings.
   fixed height cuts its text off.
 - **No text overlaps.** The script flagged the Progress legend, where each term
   and its definition are inline, so their boxes intersect by construction. The
-  screenshot shows it reading correctly.
+  screenshot shows it reading correctly. The legend has since become a grid,
+  each term on its own line.
 - The spacing made the section 3 overflows worse: with the largest display
   settings plus the override, the menu button was pushed off screen at 390px,
   and the submitted dashboard's row reached 734px wide. After the section 3

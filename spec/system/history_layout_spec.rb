@@ -33,33 +33,8 @@ RSpec.describe "History layout", type: :system do
     expect(page).to have_css(".history-entry .review-block")
   end
 
-  def entry_edges
-    rects(".history-entry").map { |r| [ r["left"], page.evaluate_script("document.documentElement.clientWidth") - r["right"] ] }
-  end
-
-  def computed(selector, property)
-    page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).#{property}")
-  end
-
-  def container_content
-    page.evaluate_script(<<~JS)
-      (() => {
-        const el = document.querySelector("#main-content").closest(".container");
-        const r = el.getBoundingClientRect(), s = getComputedStyle(el);
-        return { left: r.left + parseFloat(s.paddingLeft), right: r.right - parseFloat(s.paddingRight) };
-      })()
-    JS
-  end
-
   def layout_facts
     [ rect(".history-rail"), rects(".history-entry"), rect("nav.pagination") ]
-  end
-
-  def without_desktop_stylesheet
-    page.execute_script("document.querySelector('link[href*=\"/desktop\"]').sheet.disabled = true")
-    yield
-  ensure
-    page.execute_script("document.querySelector('link[href*=\"/desktop\"]').sheet.disabled = false")
   end
 
   describe "sideways scroll" do
@@ -124,14 +99,14 @@ RSpec.describe "History layout", type: :system do
         travel_to(a_weekday) do
           visit_history(width: width, prefs: prefs)
 
-          entry_edges.each { |edges| expect(edges).to all(be_within(0.5).of(16)) }
-          expect(computed(".history-entry", "paddingLeft")).to eq("16px")
-          expect(computed(".history-entry", "borderTopLeftRadius")).to eq("14px")
+          edges(".history-entry").each { |pair| expect(pair).to all(be_within(0.5).of(16)) }
+          expect(computed_style(".history-entry", "paddingLeft")).to eq("16px")
+          expect(computed_style(".history-entry", "borderTopLeftRadius")).to eq("14px")
           entries = rects(".history-entry")
           entries.each_cons(2) { |above, below| expect(below["top"] - above["bottom"]).to be_within(0.5).of(16) }
           expect(rects("details.answers > summary, details.review > summary").map { |r| r["height"] }).to all(be >= 48)
           expect(rects(".pagination a").map { |r| r["height"] }).to all(be >= 44)
-          expect(computed(".history-rail-page", "display")).to eq("none")
+          expect(computed_style(".history-rail-page", "display")).to eq("none")
         end
       end
     end
@@ -140,7 +115,7 @@ RSpec.describe "History layout", type: :system do
       travel_to(a_weekday) do
         set_safe_area(left: 44, right: 44)
         visit_history(width: 390)
-        entry_edges.each { |edges| expect(edges).to all(be_within(0.5).of(44)) }
+        edges(".history-entry").each { |pair| expect(pair).to all(be_within(0.5).of(44)) }
         expect(sideways_overflow).to eq(0)
       end
     end
@@ -149,7 +124,7 @@ RSpec.describe "History layout", type: :system do
       travel_to(a_weekday) do
         set_safe_area(left: 20)
         visit_history(width: 390)
-        entry_edges.each do |left, right|
+        edges(".history-entry").each do |left, right|
           expect(left).to be_within(0.5).of(20)
           expect(right).to be_within(0.5).of(16)
         end
@@ -197,8 +172,8 @@ RSpec.describe "History layout", type: :system do
         expect(rail["width"]).to be_within(0.5).of(240)
         expect(entries["left"] - rail["right"]).to be_within(0.5).of(24)
         expect(entries["top"]).to be_within(0.5).of(rail["top"])
-        expect(computed(".history-rail-page", "display")).to eq("block")
-        expect(computed(".history-entry", "paddingLeft")).to eq("20px")
+        expect(computed_style(".history-rail-page", "display")).to eq("block")
+        expect(computed_style(".history-entry", "paddingLeft")).to eq("20px")
       end
     end
 
@@ -208,7 +183,7 @@ RSpec.describe "History layout", type: :system do
           visit_history(width: width)
           content = container_content
           expect(content["right"] - content["left"]).to be_within(0.5).of(1040)
-          expect(content["left"]).to be_within(1).of(page.evaluate_script("document.documentElement.clientWidth") - content["right"])
+          expect(content["left"]).to be_within(1).of(client_width - content["right"])
         end
       end
     end
@@ -264,7 +239,7 @@ RSpec.describe "History layout", type: :system do
         set_safe_area(left: 59, right: 59)
         visit_history(width: 932, height: 430)
         expect(rect(".history-rail")["left"]).to be_within(0.5).of(59)
-        expect(page.evaluate_script("document.documentElement.clientWidth") - rect(".history-entries")["right"]).to be_within(0.5).of(59)
+        expect(client_width - rect(".history-entries")["right"]).to be_within(0.5).of(59)
         expect(sideways_overflow).to eq(0)
       end
     end

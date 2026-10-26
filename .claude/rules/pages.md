@@ -77,7 +77,8 @@ read it before changing that area.
   after the layout's `<style>`, so the nav's cap wins a tie with the layout's
   own `nav .inner` rule. A view's own `<style>` renders after it,
   so a desktop rule beats one of the view's with a more specific selector.
-  A page's targets stay 44px at every width, with no `(pointer: fine)`
+  A page's targets stay 44px at every width, apart from a link inside a
+  sentence, with no `(pointer: fine)`
   relaxation (`nav_link_targets_spec` holds the top nav's links to it); the
   nav's name field is still under 44px until #555.
 - **Push reminders** (`docs/decisions/push-reminders.md`): Optional weekday

@@ -19,8 +19,12 @@ The file loads after `phone_cards.css`, so on a tie a desktop rule beats a
 phone card rule (`.history-page`'s grid replaces `.card-page`'s flex column).
 A view's own `<style>` block renders in the body, after this file, so on a tie
 the view's rule wins. A desktop rule that overrides a rule in a view uses a
-more specific selector: `.history-rail .history-rail-page` beats the History
+more specific selector: `.history-page .history-rail-page` beats the History
 view's `.history-rail-page { display: none }`.
+
+Every selector starts with a page class, the wide container or the nav, so
+no rule reaches a page it wasn't written for. `desktop_stylesheet_spec` holds
+that.
 
 ## The wide container
 
@@ -70,4 +74,8 @@ cap wins. `desktop_stylesheet_spec` holds that order. `container_gutter_spec` ho
   column.
 - The note is held to `65ch`, the same reading width as History's review.
 - The Progress rules being overridden are in the layout's `<style>`, which
-  loads before this file, so these selectors need no extra specificity.
+  loads before this file. The `.progress-page` prefix scopes each rule to the
+  page; the rules would win without it.
+- The single-group buckets pair up because each language's slice has four
+  of them today. With an odd number, the last one would sit alone in its
+  row.

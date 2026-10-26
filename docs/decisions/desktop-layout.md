@@ -30,6 +30,10 @@ above the width where the nav collapses they are 44px tall
 beside them is the one exception left: it is about 27px tall, and #555 gives
 it a 44px target.
 
+A link inside a sentence is exempt, as WCAG 2.5.8 allows and
+`docs/accessibility-audit-2026-09-30.md` records: Progress' "Change the mix"
+link, in its note about kinds left out of the mix, is 15px tall.
+
 ## The desktop column is per page
 
 `.container` itself doesn't change: a page widens by calling `wide_page`,

@@ -12,37 +12,10 @@ RSpec.describe "Progress layout", type: :system do
     expect(page).to have_css(".progress-bucket-grouped h2")
   end
 
-  def client_width = page.evaluate_script("document.documentElement.clientWidth")
-
-  def edges(selector)
-    rects(selector).map { |r| [ r["left"], client_width - r["right"] ] }
-  end
-
   def card_selector = ".progress-legend-card, details.progress-group"
-
-  def computed(selector, property)
-    page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).#{property}")
-  end
-
-  def container_content
-    page.evaluate_script(<<~JS)
-      (() => {
-        const el = document.querySelector("#main-content").closest(".container");
-        const r = el.getBoundingClientRect(), s = getComputedStyle(el);
-        return { left: r.left + parseFloat(s.paddingLeft), right: r.right - parseFloat(s.paddingRight) };
-      })()
-    JS
-  end
 
   def layout_facts
     [ rects(".progress-legend-card"), rects(".progress-legend > div"), rects("details.progress-group"), rects(".progress-bucket") ]
-  end
-
-  def without_desktop_stylesheet
-    page.execute_script("document.querySelector('link[href*=\"/desktop\"]').sheet.disabled = true")
-    yield
-  ensure
-    page.execute_script("document.querySelector('link[href*=\"/desktop\"]').sheet.disabled = false")
   end
 
   def open_legend = page.execute_script("document.querySelector('.progress-legend-card').open = true")
@@ -106,8 +79,8 @@ RSpec.describe "Progress layout", type: :system do
         expect(page).to have_css(".progress-legend-card:not([open])")
         expect(page).to have_css(".progress-note", visible: :visible)
         edges(card_selector).each { |pair| expect(pair).to all(be_within(0.5).of(16)) }
-        expect(computed("details.progress-group", "borderTopLeftRadius")).to eq("14px")
-        expect(computed(".progress-legend-card", "borderTopLeftRadius")).to eq("14px")
+        expect(computed_style("details.progress-group", "borderTopLeftRadius")).to eq("14px")
+        expect(computed_style(".progress-legend-card", "borderTopLeftRadius")).to eq("14px")
         grouped_cards.each_cons(2) { |above, below| expect(below["top"] - above["bottom"]).to be_within(0.5).of(16) }
         expect_targets
         expect(rects(".progress-legend dt").map { |r| r["left"] }.uniq.size).to eq(1)
@@ -181,7 +154,7 @@ RSpec.describe "Progress layout", type: :system do
       expect(grouped_cards[1]["height"]).to be_within(0.5).of(before)
     end
 
-    it "holds the note to a reading width, and every target to 44px" do
+    it "holds the note to a reading width, and the summaries, rows and concept links to their target sizes" do
       visit_progress(width: 1280)
       note_width, max_width = page.evaluate_script(<<~JS)
         (() => { const el = document.querySelector(".progress-note"); return [el.getBoundingClientRect().width, parseFloat(getComputedStyle(el).maxWidth)]; })()
