@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Account and Settings pages' own styles" do
+RSpec.describe "Page sheets' own styles" do
   def foreign_classes(source)
     carried = ViewStyles.markup_classes(source)
     ViewStyles.selected_classes(ViewStyles.rules(source)).reject { |name| carried.include?(name) }
@@ -57,10 +57,10 @@ RSpec.describe "Account and Settings pages' own styles" do
     expect(foreign_classes(source)).to eq([ "kept" ])
   end
 
-  { "account" => "accounts", "settings" => "api_keys" }.each do |page, folder|
+  { "account" => "accounts", "settings" => "api_keys", "today" => "{dashboard,responses}" }.each do |page, folder|
     it "keeps pages/#{page}.css to classes the #{folder} views carry" do
-      markup = Dir[Rails.root.join("app/views/#{folder}/*.erb")].sort.map { |path| File.read(path) }.join("\n")
-      carried = ViewStyles.markup_classes(markup)
+      markup = Dir[Rails.root.join("app/views/#{folder}/**/*.erb")].sort.map { |path| File.read(path) }.join("\n")
+      carried = ViewStyles.markup_classes(markup) + ExerciseSection.all.flat_map { |kind| kind.answer_class.split }
       rules = ViewStyles.stylesheet_rules(Rails.root.join("app/assets/stylesheets/pages/#{page}.css"))
       foreign = ViewStyles.selected_classes(rules).reject { |name| carried.include?(name) }
 

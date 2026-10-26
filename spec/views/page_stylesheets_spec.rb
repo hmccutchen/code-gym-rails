@@ -7,7 +7,8 @@ RSpec.describe "page stylesheets" do
     "progress" => [ DESKTOP_QUERY, "@media (min-width: 600px)" ],
     "learn" => [ DESKTOP_QUERY ],
     "account" => [ DESKTOP_QUERY ],
-    "settings" => [ DESKTOP_QUERY, "@media (forced-colors: active)" ]
+    "settings" => [ DESKTOP_QUERY, "@media (forced-colors: active)" ],
+    "today" => [ "@media (prefers-reduced-motion: reduce)" ]
   }.freeze
 
   def path_for(page) = Rails.root.join("app/assets/stylesheets/pages/#{page}.css")
@@ -46,6 +47,8 @@ RSpec.describe "page stylesheets" do
 
       expect(used - queries).to be_empty, "#{page}.css adds #{(used - queries).join(', ')}; a new query is a decision"
     end
+
+    next unless queries.include?(DESKTOP_QUERY)
 
     it "ends #{page}.css with its one 900px block, so a desktop rule wins every tie with the page's phone rules" do
       expect(after_desktop_block(path_for(page).read)).to eq("")
