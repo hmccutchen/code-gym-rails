@@ -10,6 +10,6 @@ RSpec.describe "disclosure chevrons" do
 
     chevron = ViewStyles.rules(layout).find { |rule| rule.selectors.include?("details.section > summary::before") }
     expect(chevron.selectors).to include("details.review summary::before", "details.answers summary::before",
-                                         "details.progress-group summary::before")
+                                         "details.progress-group summary::before", ".learn-recognition summary::before")
   end
 end

@@ -40,6 +40,13 @@ RSpec.describe "desktop stylesheet" do
     end
   end
 
+  it "never sets display on an element the Learn filter hides, so its [hidden] keeps working on a desktop" do
+    hidden_by_filter = /\.(learn-bucket|learn-group-block|learn-entry)\z/
+    rules.select { |rule| rule.declaration("display") }.flat_map(&:selectors).each do |selector|
+      expect(selector).not_to match(hidden_by_filter), "#{selector} sets display"
+    end
+  end
+
   it "notices an at-rule left outside the block" do
     css = "#{desktop_query} { .a { color: red; } }\n@font-face { font-family: X; src: url(x.woff2); }"
 

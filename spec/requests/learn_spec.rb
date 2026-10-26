@@ -111,6 +111,47 @@ RSpec.describe "Learn", type: :request do
   end
 
   # Views resolve headings by key, so a bucket or group missing its string would raise only in the template.
+  describe "layout of GET /learn" do
+    before { user.update!(language: "ruby_rails") }
+
+    def learn_page
+      get learn_path
+      Nokogiri::HTML(response.body)
+    end
+
+    def position(page, selector) = page.css("*").index(page.at_css(selector))
+
+    it "is a card page that carries the filter controller" do
+      expect(learn_page.at_css("#main-content .card-page.learn-page[data-controller='learn-filter']")).to be_present
+    end
+
+    it "puts this week's concept and the filter in the top row, ahead of the prepare and drills boxes and the list" do
+      submit_set_showing(user, "n_plus_one", date: Date.current - 1)
+      ConceptDrills.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+      page = learn_page
+
+      expect(page.css(".learn-top > *").map { |el| el["class"].split.first }).to eq(%w[featured-concept card])
+      expect(page.at_css(".learn-top > .learn-filter")).to be_present
+      top = position(page, ".learn-top")
+      expect([ ".learn-prepare", ".learn-drills", ".learn-buckets" ].map { |selector| position(page, selector) }).to all(be > top)
+    end
+
+    it "holds only the filter in the top row when there's no concept this week" do
+      expect(learn_page.css(".learn-top > *").map { |el| el["class"] }).to eq([ "card learn-filter" ])
+    end
+
+    it "marks a bucket grouped exactly when it holds more than one group, and wraps its groups" do
+      buckets = learn_page.css(".learn-buckets > section.learn-bucket")
+
+      expect(buckets.size).to eq(ConceptBucket.slice_for("ruby_rails").size)
+      buckets.each do |bucket|
+        blocks = bucket.css(".learn-group-block")
+        expect(bucket["class"].split.include?("learn-bucket-grouped")).to eq(blocks.size > 1)
+        expect(bucket.css("> .learn-groups > .learn-group-block.card").size).to eq(blocks.size)
+      end
+    end
+  end
+
   describe "recognition guides on GET /learn" do
     before { user.update!(language: "ruby_rails") }
 
