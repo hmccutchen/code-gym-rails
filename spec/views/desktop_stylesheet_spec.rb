@@ -48,4 +48,11 @@ RSpec.describe "desktop stylesheet" do
     expect(desktop).to be_present
     expect(desktop).to be > phone
   end
+
+  it "loads after the layout's own styles, so its nav cap wins the tie with the layout's same-specificity rule" do
+    layout = Rails.root.join("app/views/layouts/application.html.erb").read
+
+    expect(layout.scan("</style>").size).to eq(1)
+    expect(layout.index('stylesheet_link_tag "desktop"')).to be > layout.index("</style>")
+  end
 end

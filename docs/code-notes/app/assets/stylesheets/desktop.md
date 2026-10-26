@@ -32,10 +32,13 @@ gutters are unchanged.
 
 The same rule caps `nav .inner`, the nav's own `.container`, so the brand and
 links line up with a wide page's content, and the formula stays in one place.
+With a side safe-area inset they line up only once the window is wider than
+1040px plus four times the inset, because the nav counts the inset twice
+(#553).
 It applies on every page, wide or not, so the nav doesn't move between pages.
 The layout's `nav .inner` rule sets `max-width: 1200px` with the same
 specificity, and this file loads after the layout's `<style>`, so the 1040px
-cap wins. `container_gutter_spec` holds both selectors to the one rule.
+cap wins. `desktop_stylesheet_spec` holds that order. `container_gutter_spec` holds both selectors to the one rule.
 
 ## History
 

@@ -73,7 +73,9 @@ read it before changing that area.
   same cap from the same rule on every page, so it never moves between
   pages. `desktop.css` holds nothing
   outside its one `@media (min-width: 900px)` block (`desktop_stylesheet_spec`),
-  each rule scoped to a page class; a view's own `<style>` renders after it,
+  each rule scoped to a page class, the wide container or the nav; it loads
+  after the layout's `<style>`, so the nav's cap wins a tie with the layout's
+  own `nav .inner` rule. A view's own `<style>` renders after it,
   so a desktop rule beats one of the view's with a more specific selector.
   A page's targets stay 44px at every width, with no `(pointer: fine)`
   relaxation (`nav_link_targets_spec` holds the top nav's links to it); the

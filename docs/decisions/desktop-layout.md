@@ -47,10 +47,12 @@ not yet moved stay plain.
 
 At 900px and wider, the nav's `.inner` takes the same 1040px cap as a wide
 page, from the same rule in `desktop.css`, so the formula lives in one place.
-Before #551 it kept the layout's own 1200px cap, and above a 1104px window the
-brand sat 48px left of a wide page's content: at 1280px the brand was at
-x=72 and History's content at x=120. Below 1104px nothing changes, since the
-cap is wider than the window there.
+Before #551 it kept the layout's own 1200px cap, and once the window was wider
+than the cap (1040px plus the gutters) the brand sat left of a wide page's
+content: at 1280px and the default text size it was at x=72 and History's
+content at x=120. Below that width nothing changes, since the cap is wider
+than the window: 1104px at the default text size, 1129.6px at 140%, where
+the 2rem gutters are larger.
 
 The nav doesn't follow the page. It uses the 1040px cap on every page, wide
 or not, because a nav that matched the page would jump 48px each time someone

@@ -222,6 +222,18 @@ RSpec.describe "History layout", type: :system do
       end
     end
 
+    it "ends the nav's links at the content's right edge, and keeps the nav in place on a page that isn't wide" do
+      travel_to(a_weekday) do
+        visit_history(width: 1280)
+        expect(rect("nav .nav-links")["right"]).to be_within(1).of(container_content["right"])
+        brand_on_history = rect("nav .brand")["left"]
+
+        visit learn_path
+        expect(page).to have_css(".container[data-pull-content]:not(.container-wide)")
+        expect(rect("nav .brand")["left"]).to be_within(0.5).of(brand_on_history)
+      end
+    end
+
     it "holds the open review to a reading width, and every target to 44px" do
       travel_to(a_weekday) do
         visit_history(width: 1280)
