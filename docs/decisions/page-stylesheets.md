@@ -5,8 +5,9 @@ Each page that has styles of its own keeps them in one file,
 desktop rules in one `@media (min-width: 900px)` block at the end. History,
 Progress and the Learn index moved first, then Account and Settings, whose
 partials' `<style>` blocks joined their page's sheet in the order they
-rendered, then Today, whose partials' `style` attributes became classes in
-its sheet. Today has no desktop rules yet, so its sheet has no 900px block.
+rendered, then Today, whose dashboard partials' `style` attributes, and the
+submitted day's review heading's, became classes in its sheet. Two response
+partials Today shares with History and Learn keep theirs. Today has no desktop rules yet, so its sheet has no 900px block.
 
 ## Why a sheet per page
 

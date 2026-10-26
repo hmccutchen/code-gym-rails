@@ -25,15 +25,18 @@ field.
 `.progress-fill` starts at `width: 0`; the answer-form controller sets its
 width from the answered count once it connects.
 
-## 600px and narrower
+## Under 600px
 
-The phone rules sit in one `@media (max-width: 600px)` block at the end,
-matching the layout's own `.section` rule at that width.
+The phone rules sit in one `@media (max-width: 599.98px)` block at the end,
+the width `phone_cards.css` gives the phone gutter, so the cards, the gaps and
+the bar change together.
 
 - **Cards.** `.today-page` takes the phone gutter from `phone_cards.css`, so
   each section is a card `max(16px, inset)` from the screen edge, as on the
   card pages. The title block, the regenerate row, the progress bar and each
-  section are 16px apart.
+  section are 16px apart. A trial's banner gets its own margin there: its
+  wider rule pulls it up into the title block's 2rem margin, which the 16px
+  gap would otherwise cancel.
 - **The Submit bar.** The submit row becomes a bar stuck to the bottom of the
   window while the form is on screen, and settles in place after the last
   section. It holds the button, full width, the "saves as you type" note and
@@ -59,6 +62,11 @@ matching the layout's own `.section` rule at that width.
   it. Both use `--submit-bar-reach`, a deliberate overestimate (10rem plus the
   offsets): the bar holds three lines of rem-sized text and the nudge wraps
   at narrow widths, so its height isn't fixed. Too much only leaves a little
-  more space; too little would hide the control. `today_phone_layout_spec`
-  checks it at 320px with the largest text.
+  more space; too little would hide the control. At 320px with the largest
+  text and a wrapped nudge the bar is about 192px of the 224px reserved, which
+  `today_phone_layout_spec` measures. Both are off while a text field has
+  focus, since the bar has let go then.
+- **A held submit.** When a submit waits on another save, the answer-form
+  controller scrolls its notice into view
+  (`docs/code-notes/app/javascript/controllers/answer_form_controller.md`).
 

@@ -338,6 +338,8 @@ borders; Today's phone layout made every section an inset card, which put
 History's own override and the `-1.5rem` coupling to `.container`'s padding
 out of use. A page that wants its cards nearer the edge than the container's
 gutter says so itself, as Today does with `.today-page` in `phone_cards.css`.
+The two admin index pages lost 25px of table width with the bleed; their
+tables were already wider than a phone and still scroll sideways.
 
 ## `.daily-kind-trigger`
 

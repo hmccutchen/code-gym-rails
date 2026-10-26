@@ -3,9 +3,8 @@ require "rails_helper"
 RSpec.describe "Today's phone layout", type: :system do
   around { |example| travel_to(a_weekday) { example.run } }
 
-  def visit_today(width: 390, height: 844, prefs: {})
+  def visit_today(width: 390, height: 844, prefs: {}, user: create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS))
     resize(width, height: height)
-    user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
     user.update!(display_preferences: prefs)
     visit_with_todays_set(user)
   end
@@ -64,6 +63,12 @@ RSpec.describe "Today's phone layout", type: :system do
       expect(sideways_overflow).to eq(0)
     end
 
+    it "keeps a trial's banner 16px under the title block" do
+      visit_today(user: create_trial_user)
+
+      expect(rect(".trial-banner")["top"] - rect(".today-page .page-header")["bottom"]).to be_within(0.5).of(16)
+    end
+
     it "moves the cards in to a side inset wider than 16px" do
       set_safe_area(left: 20, right: 20)
       visit_today
@@ -119,6 +124,7 @@ RSpec.describe "Today's phone layout", type: :system do
       visit_today
       find(%(textarea[data-field="code_review"])).click
       expect(bar_position).to eq("static")
+      expect(computed_style("html", "scrollPaddingBottom")).to eq("auto")
 
       find(".today-page .page-header h1").click
       expect(bar_position).to eq("sticky")
@@ -162,6 +168,36 @@ RSpec.describe "Today's phone layout", type: :system do
       expect(rect("#save-status")["bottom"]).to be <= bar["top"]
     end
 
+    it "fits within the 10rem it reserves with a wrapped nudge at 320px with the largest text" do
+      visit_today(width: 320, prefs: LayoutHelpers::LARGEST_TEXT)
+      click_button "Submit answers"
+      expect(page).to have_css("#rating-nudge", visible: true)
+
+      root_font = page.evaluate_script("parseFloat(getComputedStyle(document.documentElement).fontSize)")
+      expect(rect("#rating-nudge")["height"]).to be > root_font * 2
+      expect(bar["height"]).to be <= root_font * 10
+    end
+
+    it "brings a held submit's notice on screen" do
+      visit_today
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch;
+        window.fetch = (url, options) => {
+          const body = options?.body ? JSON.parse(options.body) : {};
+          if (!body.response || body.response.submit === "1") return originalFetch(url, options);
+          return new Promise(() => {});
+        };
+      JS
+      fill_in_answer("code_review", "The answer an autosave is still carrying when the submit goes out.")
+      rate_section("code_review")
+      click_button "Submit answers"
+
+      expect(page).to have_css("#leave-held")
+      notice = rect("#leave-held")
+      expect(notice["top"]).to be >= 0
+      expect(notice["bottom"]).to be <= window_height
+    end
+
     it "keeps every rating button 44px tall and the button 48px at 320px with the largest text" do
       visit_today(width: 320, prefs: LayoutHelpers::LARGEST_TEXT)
 
@@ -170,12 +206,14 @@ RSpec.describe "Today's phone layout", type: :system do
     end
   end
 
-  it "applies the phone rules up to 600px and not at 601px" do
-    visit_today(width: 600)
+  it "applies the phone rules below 600px, with the cards' gutter, and not at 600px" do
+    visit_today(width: 599)
     expect(bar_position).to eq("sticky")
+    expect(edges(".today-page .section").first.first).to be_within(0.5).of(16)
 
-    resize(601)
+    resize(600)
     expect(bar_position).to eq("static")
+    expect(edges(".today-page .section").first.first).to be_within(0.5).of(24)
     expect(computed_style(".today-page .section", "marginBottom")).to eq("24px")
   end
 end

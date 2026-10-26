@@ -363,6 +363,7 @@ export default class extends Controller {
     reload.addEventListener("click", () => window.location.reload())
     notice.append(reload)
     this.element.append(notice)
+    notice.scrollIntoView({ block: "nearest" })
   }
 
   unlock() {
