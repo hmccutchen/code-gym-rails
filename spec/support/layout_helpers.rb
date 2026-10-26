@@ -45,6 +45,34 @@ module LayoutHelpers
   end
 
   def rect(selector) = rects(selector).first
+
+  def client_width = page.evaluate_script("document.documentElement.clientWidth")
+
+  # Each match's distance from the left and right edges of the window.
+  def edges(selector)
+    rects(selector).map { |r| [ r["left"], client_width - r["right"] ] }
+  end
+
+  def computed_style(selector, property)
+    page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).#{property}")
+  end
+
+  def container_content
+    page.evaluate_script(<<~JS)
+      (() => {
+        const el = document.querySelector("#main-content").closest(".container");
+        const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+        return { left: r.left + parseFloat(s.paddingLeft), right: r.right - parseFloat(s.paddingRight) };
+      })()
+    JS
+  end
+
+  def without_desktop_stylesheet
+    page.execute_script("document.querySelector('link[href*=\"/desktop\"]').sheet.disabled = true")
+    yield
+  ensure
+    page.execute_script("document.querySelector('link[href*=\"/desktop\"]').sheet.disabled = false")
+  end
 end
 
 RSpec.configure do |config|

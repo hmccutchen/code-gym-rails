@@ -17,4 +17,5 @@ end
 RSpec.configure do |config|
   config.include MetConceptHelpers, type: :model
   config.include MetConceptHelpers, type: :request
+  config.include MetConceptHelpers, type: :system
 end

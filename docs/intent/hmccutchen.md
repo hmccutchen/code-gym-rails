@@ -286,3 +286,9 @@ data.*
   then `normalize`, `normalized`, `injecting` and `lift it up` from the
   critical review; the listing tool gets tracked; the pre-submission tooltip
   question becomes an issue
+- Progress on phone cards and the desktop layout, specced first `#565`
+  **I decided:** the legend stays a disclosure at every width with its 7
+  real entries and their wording; groups two across on a desktop and the
+  full container width from 600px; the app wins where the boards differ;
+  I took the spec as written, so the note stays visible and Progress gets
+  its own bucket class

@@ -33,6 +33,13 @@ RSpec.describe "desktop stylesheet" do
     expect(outside_the_block(File.read(path))).to eq("")
   end
 
+  it "scopes every rule to a page class, the wide container or the nav" do
+    scoped = /\A(\.[a-z-]+-page\b|\.container\.container-wide\z|nav\b)/
+    rules.flat_map(&:selectors).each do |selector|
+      expect(selector).to match(scoped), "#{selector} isn't scoped to a page"
+    end
+  end
+
   it "notices an at-rule left outside the block" do
     css = "#{desktop_query} { .a { color: red; } }\n@font-face { font-family: X; src: url(x.woff2); }"
 

@@ -3,8 +3,13 @@
   .container.container-wide, nav .inner { max-width: calc(1040px + var(--container-pad-left) + var(--container-pad-right)); }
 
   .history-page { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 24px; align-items: start; }
-  .history-rail { position: sticky; top: 24px; }
-  .history-rail .history-rail-page { display: block; }
+  .history-page .history-rail { position: sticky; top: 24px; }
+  .history-page .history-rail-page { display: block; }
   .history-page .history-entry { padding: 20px; }
   .history-page details.review { max-width: 65ch; }
+
+  .progress-page .progress-legend { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .progress-page .progress-buckets, .progress-page .progress-bucket-grouped .progress-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .progress-page .progress-bucket-grouped { grid-column: 1 / -1; }
+  .progress-page .progress-note { max-width: 65ch; }
 }

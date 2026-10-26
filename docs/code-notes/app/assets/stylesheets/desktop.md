@@ -19,8 +19,12 @@ The file loads after `phone_cards.css`, so on a tie a desktop rule beats a
 phone card rule (`.history-page`'s grid replaces `.card-page`'s flex column).
 A view's own `<style>` block renders in the body, after this file, so on a tie
 the view's rule wins. A desktop rule that overrides a rule in a view uses a
-more specific selector: `.history-rail .history-rail-page` beats the History
+more specific selector: `.history-page .history-rail-page` beats the History
 view's `.history-rail-page { display: none }`.
+
+Every selector starts with a page class, the wide container or the nav, so
+no rule reaches a page it wasn't written for. `desktop_stylesheet_spec` holds
+that.
 
 ## The wide container
 
@@ -55,3 +59,26 @@ cap wins. `desktop_stylesheet_spec` holds that order. `container_gutter_spec` ho
 - An entry's padding is 20px here and 16px on a phone.
 - The open review is held to `65ch`, a comfortable reading width. Answers and
   code keep the entry's full width.
+
+## Progress
+
+- The open legend is four across, so its 7 entries make a row of 4 and a row
+  of 3.
+- A grouped bucket's `.progress-groups` is a two-column grid, so its groups
+  sit two across. `.progress-buckets` is one too, and a bucket with more than
+  one group (`.progress-bucket-grouped`) spans both columns. A single-group
+  bucket's `.progress-groups` stays a flex column, since it already sits in
+  one column of the outer grid and a second grid would halve its card again.
+  The single-group buckets then sit two to a row instead of each stretching
+  across 1040px.
+- `align-items: start` keeps a group at its own height when the one beside
+  it opens.
+- Both grids use `minmax(0, 1fr)`, for the same reason as History's entries
+  column.
+- The note is held to `65ch`, the same reading width as History's review.
+- The Progress rules being overridden are in the layout's `<style>`, which
+  loads before this file. The `.progress-page` prefix scopes each rule to the
+  page; the rules would win without it.
+- The single-group buckets pair up because each language's slice has four
+  of them today. With an odd number, the last one would sit alone in its
+  row.

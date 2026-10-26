@@ -3,15 +3,15 @@
 The app is laid out for a phone first. At 900px and wider, a page that asks
 for it gets a desktop layout: a centered column up to 1040px wide, with the
 page's own arrangement inside it (History puts its title in a left rail beside
-the entries). Pages move onto it one at a time, History first.
+the entries). Pages move onto it one at a time: History first, then Progress.
 
 ## The breakpoints
 
 - **Under 600px:** the phone layout. Card pages put each card `max(16px, inset)`
   from the screen edge (`phone_cards.css`).
 - **600 to 899px:** one column. Account and Settings stay a centered 480px
-  column (`.phone-page`). History, and later Today, Learn and Progress, take
-  the container's full width (`.card-page`), because code and reviews are
+  column (`.phone-page`). History and Progress, and later Today and Learn,
+  take the container's full width (`.card-page`), because code and reviews are
   cramped at 480px. An iPad in portrait and a phone in landscape land here.
 - **900px and wider:** the desktop layout, from `desktop.css`.
 
@@ -29,6 +29,10 @@ above the width where the nav collapses they are 44px tall
 (`nav_link_targets_spec`), where they were 34px before #550. The name field
 beside them is the one exception left: it is about 27px tall, and #555 gives
 it a 44px target.
+
+A link inside a sentence is exempt, as WCAG 2.5.8 allows and
+`docs/accessibility-audit-2026-09-30.md` records: Progress' "Change the mix"
+link, in its note about kinds left out of the mix, is 15px tall.
 
 ## The desktop column is per page
 
