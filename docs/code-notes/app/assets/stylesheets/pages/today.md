@@ -43,6 +43,13 @@ the bar change together.
   the nudge. The nudge sits inside the bar so a refused submit's sentence,
   which takes focus, shows where the reader is rather than at the end of the
   form.
+- **Only in a window at least 512px tall.** The bar, its reserve and the
+  save banner's lift sit in a second block, `(max-width: 599.98px) and
+  (min-height: 512px)`. A phone held sideways is about 320 to 430px tall; there
+  the bar (up to about 190px at the largest text), the tab bar and the progress
+  bar left about 20px for the answers, and the lifted save banner ran off the
+  top. Below that height the submit row keeps its phone look but stays at the
+  end of the form, as it does from 600px up.
 - **`position: sticky`, not `fixed`.** Pull-to-refresh moves
   `.container[data-pull-content]` with a `transform`, and a transform makes a
   fixed element position itself against the container instead of the window,

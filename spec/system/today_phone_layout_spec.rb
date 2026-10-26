@@ -230,4 +230,26 @@ RSpec.describe "Today's phone layout", type: :system do
     expect(edges(".today-page .section").first.first).to be_within(0.5).of(24)
     expect(computed_style(".today-page .section", "marginBottom")).to eq("24px")
   end
+
+  it "sticks the bar only in a window at least 512px tall" do
+    visit_today(height: 512)
+    expect(bar_position).to eq("sticky")
+
+    resize(390, height: 511)
+    expect(bar_position).to eq("static")
+    expect(computed_style("html", "scrollPaddingBottom")).to eq("auto")
+  end
+
+  it "keeps a failed save's message on screen in a phone held sideways in the home-screen app" do
+    set_safe_area(left: 44, right: 44, bottom: 21)
+    visit_today(width: 568, height: 320, prefs: LayoutHelpers::LARGEST_TEXT)
+    force_standalone
+    fail_requests_to("/responses")
+    find(%(textarea[data-field="code_review"])).fill_in(with: "It re-runs the query inside the loop.")
+    find(".today-page .page-header h1").click
+
+    expect(page).to have_css("#save-status", visible: true)
+    expect(bar_position).to eq("static")
+    expect(rect("#save-status")["top"]).to be >= 0
+  end
 end

@@ -42,19 +42,22 @@ html:has(.progress-sticky) {
 .review-heading-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; }
 .review-heading-row h2 { font-size: 1rem; }
 
-/* 10rem is more than the bar reaches with a wrapped nudge at the largest text size offered (today_phone_layout_spec). */
 @media (max-width: 599.98px) {
+  .today-page .page-header, .today-page .regenerate-row, .today-page .progress-sticky, .today-page .section, .today-page .flash.regeneration-failed { margin-bottom: 16px; }
+  .today-page .trial-banner.hint { margin: 0 0 16px; }
+
+  .submit-bar { gap: 4px; margin-top: 0; padding: 8px 0 calc(8px + var(--bottom-safe-inset)); background: var(--bg); border-top: 1px solid var(--border); }
+  .submit-bar #submit-answers { width: 100%; min-height: 48px; }
+  .submit-bar .auto-saved, .submit-bar #rating-nudge { width: 100%; margin: 0; text-align: center; }
+}
+
+/* 10rem is more than the bar reaches with a wrapped nudge at the largest text size offered (today_phone_layout_spec). */
+@media (max-width: 599.98px) and (min-height: 512px) {
   html:has(.submit-bar):not(:has(#gym-form textarea:focus)):not(:has(#gym-form input[type="text"]:focus)) {
     --submit-bar-reach: calc(var(--tab-bar-clearance) + var(--bottom-safe-inset) + 10rem);
     scroll-padding-bottom: calc(var(--submit-bar-reach) + var(--focus-ring-width) + var(--focus-ring-offset));
   }
   html:has(.submit-bar):not(:has(#gym-form textarea:focus)):not(:has(#gym-form input[type="text"]:focus)) #save-status { bottom: calc(var(--submit-bar-reach) + .75rem); }
-
-  .today-page .page-header, .today-page .regenerate-row, .today-page .progress-sticky, .today-page .section, .today-page .flash.regeneration-failed { margin-bottom: 16px; }
-  .today-page .trial-banner.hint { margin: 0 0 16px; }
-
-  .submit-bar { position: sticky; bottom: var(--tab-bar-clearance); z-index: 10; gap: 4px; margin-top: 0; padding: 8px 0 calc(8px + var(--bottom-safe-inset)); background: var(--bg); border-top: 1px solid var(--border); }
-  .submit-bar #submit-answers { width: 100%; min-height: 48px; }
-  .submit-bar .auto-saved, .submit-bar #rating-nudge { width: 100%; margin: 0; text-align: center; }
+  .submit-bar { position: sticky; bottom: var(--tab-bar-clearance); z-index: 10; }
   #gym-form:has(textarea:focus) .submit-bar, #gym-form:has(input[type="text"]:focus) .submit-bar { position: static; }
 }
