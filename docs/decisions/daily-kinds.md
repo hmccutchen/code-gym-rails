@@ -314,7 +314,7 @@ or `Consequences`.
   block, directly above the buttons, and the primary button points at the
   block. Suppression comes first, at any size: a fourth swapped for a fourth
   won't appear at all, and neither will an excluded kind whose group still
-  has a kind turned on. Then, only on a two-section day: a fixed setting of 2
+  has a kind not skipped. Then, only on a two-section day: a fixed setting of 2
   means the kind won't appear at all; on Automatic, an excluded kind won't
   appear at all, a braked day (the row's `plan_notes["brake"]`) gets "will
   rarely appear until your sets grow" with no figure, since the brake blocks
