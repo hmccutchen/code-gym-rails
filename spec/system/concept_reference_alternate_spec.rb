@@ -43,6 +43,33 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
     end
   end
 
+  it "underlines glossary terms in a framing and still sends the plain text back as a prior framing" do
+    user = create_fake_provider_user
+    cache_reference
+
+    travel_to(a_weekday) do
+      box = open_reference(user)
+      page.execute_script(<<~JS)
+        window.alternateBodies = [];
+        const realFetch = window.fetch;
+        window.fetch = (url, options) => {
+          if (String(url).includes("explain_differently")) window.alternateBodies.push(JSON.parse(options.body));
+          return realFetch(url, options);
+        };
+      JS
+
+      box.find(".explain-concept-differently").click
+      term = box.find(".alternate-item .gloss-term", text: "eager loading")
+      term.click
+      expect(term[:class]).to include("gloss-open")
+
+      box.find(".explain-concept-differently").click
+      expect(box).to have_css(".alternate-item", count: ConceptReferencesController::MAX_ALTERNATES_PER_CONCEPT)
+      expect(page.evaluate_script("window.alternateBodies.map((body) => body.prior_alternates)"))
+        .to eq([ [], [ FakeService::CONCEPT_ALTERNATE_TEXT ] ])
+    end
+  end
+
   it "announces each framing and keeps focus in the page when the control goes" do
     user = create_fake_provider_user
     cache_reference
@@ -78,6 +105,25 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
       expect(box).to have_content(/session expired/i)
       expect(box).to have_no_css(".alternate-item")
       expect(box.find(".explain-concept-differently")).not_to be_disabled
+    end
+  end
+
+  it "shows a framing from a server that sends no HTML as plain text, since the call was already paid for" do
+    user = create_fake_provider_user
+    cache_reference
+
+    travel_to(a_weekday) do
+      box = open_reference(user)
+      stub_fetch(box["data-concept-alternates-url-value"], <<~JS)
+        Promise.resolve(new Response(JSON.stringify({ status: "ok", alternate: "<b>Bold</b> eager loading", remaining: 1 }),
+          { status: 200, headers: { "Content-Type": "application/json" } }))
+      JS
+
+      box.find(".explain-concept-differently").click
+
+      expect(box.find(".alternate-item")).to have_text("<b>Bold</b> eager loading")
+      expect(box).to have_no_css(".alternate-item b, .alternate-item .gloss-term")
+      expect(box.find(".alternate-status")).to have_text("A different explanation was added above")
     end
   end
 

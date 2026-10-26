@@ -29,7 +29,9 @@ read it before changing that area.
   `ConceptReference` row is never written.
   `AiService#explain_concept_differently(user, reference, prior_alternates:)`
   takes no exercise, response or section, since it runs before submission; a
-  spec pins that signature.
+  spec pins that signature. The reply carries the framing as plain text and as
+  escaped, glossary-wrapped HTML; the page shows the HTML and sends the plain
+  text back as `prior_alternates`.
 - **The Learn tab** (`docs/decisions/the-learn-tab.md`): `/learn` lists every
   concept in the user's slice by `user.language`, never `#language_for_today`,
   and shows explanations before first exposure on this tab only.
