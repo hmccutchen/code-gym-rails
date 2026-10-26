@@ -24,9 +24,9 @@ layout a touch layout too, and so is the next rule.
 Every target on a page is at least 44px tall on a desktop too, and nothing
 relaxes that under `(pointer: fine)`. An iPad in standalone mode is a
 desktop-width touch device, and a pointer query can't be trusted to tell it
-apart from a laptop with a touch screen. The top nav is the one exception
-today: its links are 34px tall above the width where it collapses, which
-predates this layout and is #550.
+apart from a laptop with a touch screen. The top nav's links follow it too:
+above the width where the nav collapses they are 44px tall
+(`nav_link_targets_spec`), where they were 34px before #550.
 
 ## The desktop column is per page
 
