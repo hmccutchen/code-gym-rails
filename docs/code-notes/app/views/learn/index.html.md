@@ -5,11 +5,11 @@
 The page is a `.card-page` (`phone_cards.css`) and calls `wide_page`. On a
 phone every box and group is a card `max(16px, inset)` from the screen edge,
 16px apart. From 600 to 899px they take the container's full width. At 900px
-and wider `desktop.css` puts this week's concept beside the filter and the
-groups three across (`docs/code-notes/app/assets/stylesheets/desktop.md`).
-The page's rules live in the layout's `<style>`; the ones that would also
-reach the concept page or Today's featured card carry the `.learn-page`
-prefix.
+and wider the page's own sheet puts this week's concept beside the filter
+and the groups three across. Every rule lives in `pages/learn.css`
+(`docs/code-notes/app/assets/stylesheets/pages/learn.md`), linked by
+`page_stylesheet "learn"`; the ones that would also reach Today's featured
+card carry the `.learn-page` prefix.
 
 The order is this week's concept and the filter (`.learn-top`), the prepare
 box, the drills box, then the buckets. The filter sits beside this week's
@@ -23,13 +23,13 @@ are now the filter in the top row and the buckets below the boxes.
 
 The filter hides entries, group blocks and buckets with the `hidden`
 attribute, and any author `display` rule beats the browser's own `[hidden]`
-rule. Two rules restore it here: the layout's `.learn-entry[hidden]` and
+rule. Two rules restore it here: the page sheet's `.learn-entry[hidden]` and
 `phone_cards.css`'s `:is(.phone-page, .card-page) [hidden]`, both at 0,2,0.
 The phone rules on those three classes stay at 0,1,0, under both.
-`desktop.css` loads after `phone_cards.css`, so a desktop rule at 0,2,0 that
+The page sheet loads after `phone_cards.css`, so a desktop rule at 0,2,0 that
 set `display` on one of them would win the tie and stop the filter on a
 desktop only. The grids therefore sit on `.learn-buckets` and `.learn-groups`,
-which the filter never hides, and `desktop_stylesheet_spec` fails on a
+which the filter never hides, and `page_stylesheets_spec` fails on a
 desktop rule that sets `display` on a selector whose last part names one of
 those three classes, `.learn-bucket-grouped` included.
 

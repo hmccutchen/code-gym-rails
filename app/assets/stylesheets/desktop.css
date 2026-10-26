@@ -1,21 +1,4 @@
 /* Only 900px and wider: a rule outside this block would reach a phone (desktop_stylesheet_spec). */
 @media (min-width: 900px) {
   .container.container-wide, nav .inner { max-width: calc(1040px + var(--container-pad-left) + var(--container-pad-right)); }
-
-  .history-page { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 24px; align-items: start; }
-  .history-page .history-rail { position: sticky; top: 24px; }
-  .history-page .history-rail-page { display: block; }
-  .history-page .history-entry { padding: 20px; }
-  .history-page details.review { max-width: 65ch; }
-
-  .progress-page .progress-legend { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .progress-page .progress-buckets, .progress-page .progress-bucket-grouped .progress-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-  .progress-page .progress-bucket-grouped { grid-column: 1 / -1; }
-  .progress-page .progress-note { max-width: 65ch; }
-
-  .learn-page .learn-top { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-  .learn-page .learn-top > :only-child { grid-column: 1 / -1; }
-  .learn-page .learn-buckets, .learn-page .learn-bucket-grouped .learn-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
-  .learn-page .learn-bucket-grouped { grid-column: 1 / -1; }
-  .learn-page .learn-prepare p, .learn-page .learn-drills p { max-width: 65ch; }
 }

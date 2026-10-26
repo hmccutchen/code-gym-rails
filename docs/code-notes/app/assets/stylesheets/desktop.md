@@ -1,7 +1,10 @@
 # desktop.css
 
-The rules for 900px and wider. The reasoning behind the breakpoint, the column
-width and the per-page modifier is in `docs/decisions/desktop-layout.md`.
+The shared rules for 900px and wider: the wide container and the nav. Each
+page's own desktop rules live at the end of its sheet under
+`app/assets/stylesheets/pages` (`docs/decisions/page-stylesheets.md`). The
+reasoning behind the breakpoint, the column width and the per-page modifier
+is in `docs/decisions/desktop-layout.md`.
 
 ## Why everything sits in one media block
 
@@ -15,16 +18,9 @@ block is enough.
 
 ## Which rule wins
 
-The file loads after `phone_cards.css`, so on a tie a desktop rule beats a
-phone card rule (`.history-page`'s grid replaces `.card-page`'s flex column).
-A view's own `<style>` block renders in the body, after this file, so on a tie
-the view's rule wins. A desktop rule that overrides a rule in a view uses a
-more specific selector: `.history-page .history-rail-page` beats the History
-view's `.history-rail-page { display: none }`.
-
-Every selector starts with a page class, the wide container or the nav, so
-no rule reaches a page it wasn't written for. `desktop_stylesheet_spec` holds
-that.
+The file loads after `phone_cards.css` and before a page's own sheet. Every
+selector here is the wide container or the nav, and `desktop_stylesheet_spec`
+holds that.
 
 ## The wide container
 
@@ -43,64 +39,3 @@ It applies on every page, wide or not, so the nav doesn't move between pages.
 The layout's `nav .inner` rule sets `max-width: 1200px` with the same
 specificity, and this file loads after the layout's `<style>`, so the 1040px
 cap wins. `desktop_stylesheet_spec` holds that order. `container_gutter_spec` holds both selectors to the one rule.
-
-## History
-
-- `.history-page` is a grid: a 240px rail, a 24px gap, then the entries. The
-  entries column is `minmax(0, 1fr)`, not `1fr`. A grid track defaults to
-  its content's minimum width, so a long path in a review or a wide code
-  block would otherwise widen the column and scroll the page sideways.
-- `.history-rail` is sticky 24px from the top. It holds three short lines,
-  about 200px at the largest text, which is under the shortest window that
-  reaches this layout (430px, an iPhone Pro Max in landscape). So it needs no
-  minimum-height guard.
-- The rail's "Page X of Y" shows only here. On a phone the pager already says
-  it.
-- An entry's padding is 20px here and 16px on a phone.
-- The open review is held to `65ch`, a comfortable reading width. Answers and
-  code keep the entry's full width.
-
-## Progress
-
-- The open legend is four across, so its 7 entries make a row of 4 and a row
-  of 3.
-- A grouped bucket's `.progress-groups` is a two-column grid, so its groups
-  sit two across. `.progress-buckets` is one too, and a bucket with more than
-  one group (`.progress-bucket-grouped`) spans both columns. A single-group
-  bucket's `.progress-groups` stays a flex column, since it already sits in
-  one column of the outer grid and a second grid would halve its card again.
-  The single-group buckets then sit two to a row instead of each stretching
-  across 1040px.
-- `align-items: start` keeps a group at its own height when the one beside
-  it opens.
-- Both grids use `minmax(0, 1fr)`, for the same reason as History's entries
-  column.
-- The note is held to `65ch`, the same reading width as History's review.
-- The Progress rules being overridden are in the layout's `<style>`, which
-  loads before this file. The `.progress-page` prefix scopes each rule to the
-  page; the rules would win without it.
-- The single-group buckets pair up because each language's slice has four
-  of them today. With an odd number, the last one would sit alone in its
-  row.
-
-## Learn
-
-- `.learn-top` is a two-column grid: this week's concept beside the filter.
-  Without a featured concept the filter is the only child and spans the row.
-- A grouped bucket's `.learn-groups` is a three-column grid, so its groups sit
-  three across. `.learn-buckets` is one too, and a grouped bucket
-  (`.learn-bucket-grouped`) spans it. The single-group buckets, one per
-  `ConceptBucket::LANGUAGE_INDEPENDENT` entry and four of them today, each
-  keep their own heading and sit in rows of three and one, so the fourth
-  sits alone beside two empty cells. A single-group bucket's `.learn-groups` stays
-  a flex column, as on Progress, so its card isn't split twice.
-- `align-items: start` keeps a card at its own height when a recognition guide
-  opens beside it.
-- The prepare and drills boxes stay full width, with their sentences held to
-  `65ch`.
-- No rule here sets `display` on `.learn-bucket`, `.learn-group-block` or
-  `.learn-entry`, the elements the filter hides; the grids sit on their
-  wrappers (`docs/code-notes/app/views/learn/index.html.md`).
-- A selector list is written out in full, not inside `:is()`:
-  `desktop_stylesheet_spec` reads selectors with `ViewStyles`, which splits a
-  rule's selectors at every comma.

@@ -126,6 +126,13 @@ content at 900px and wider. Every other page keeps the plain class
 plain class too, and `desktop.css` gives `nav .inner` the same 1040px cap at
 900px and wider, on every page.
 
+## A page's own stylesheet
+
+A view that calls `page_stylesheet` gets one more `<link>`, to
+`pages/<name>.css`, after `desktop` and before the display sheets
+(`docs/decisions/page-stylesheets.md`). On a page that calls nothing, the
+line renders empty.
+
 ## `nav .inner`
 
 Its 1200px cap lifts it over `.container`'s 800px and 920px, so below 900px

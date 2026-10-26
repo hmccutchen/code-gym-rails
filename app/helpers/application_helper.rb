@@ -12,6 +12,10 @@ module ApplicationHelper
     content_for(:container_width, "wide", flush: true)
   end
 
+  def page_stylesheet(name)
+    content_for(:page_stylesheet, name, flush: true)
+  end
+
   def container_class
     content_for(:container_width) == "wide" ? "container container-wide" : "container"
   end
