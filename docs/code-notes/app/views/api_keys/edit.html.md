@@ -69,6 +69,12 @@ markup lacks. A copy in each partial would repeat the rule. Every other note tak
 from `.card-note` and sets only its spacing, so two rules no longer give the
 same muted text.
 
+Each group's kind rows sit in a `.mix-kinds` wrapper, which the desktop grid
+lays out two across. The grid goes on the wrapper, not the fieldset, because a
+`fieldset` as a grid container has a history of browser bugs. The Exercise mix
+controller finds rows by their target, never as a fieldset's children, so the
+wrapper changes nothing it reads.
+
 A `.mix-group` is a fieldset with no box. Boxes inside a card made every kind
 look like a card of its own, with three borders and two paddings between the
 card edge and a control, which cost width at 320px. A divider above each group

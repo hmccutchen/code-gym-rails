@@ -34,3 +34,11 @@
 .display-group legend { font-size: .8rem; color: var(--muted); padding: 0; margin-bottom: .35rem; }
 .display-group label { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 0; color: var(--text); }
 .display-hint { flex-basis: 100%; margin-top: 0; }
+
+@media (min-width: 900px) {
+  .settings-page { max-width: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+  .settings-page > h1, .settings-page > details.card { grid-column: 1 / -1; }
+  .settings-page .mix-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+  .settings-page .mix-kinds > .mix-row { margin-bottom: 0; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
+  .settings-page .settings-fields .card-note { max-width: 65ch; }
+}

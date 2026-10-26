@@ -562,12 +562,12 @@
     </div>
   </nav>
 
-  <div class="container" data-pull-content>
+  <div class="container container-wide" data-pull-content>
     <main id="main-content" tabindex="-1">
       <div class="flash notice" id="flash-notice">Welcome back, Existing!</div>
 
     
-<div class="phone-page" data-controller="profile-preferences"
+<div class="phone-page settings-page" data-controller="profile-preferences"
      data-profile-preferences-url-value="/profile"
      data-profile-preferences-label-template-value="Your track (__LEVEL__)">
   <h1>Add your API key</h1>
@@ -681,6 +681,7 @@
 
     <fieldset class="mix-group">
       <legend>In every set</legend>
+      <div class="mix-kinds">
         <div class="mix-row mix-row-fixed">
           <span id="mix-name-code_review">Code Review</span>
           <fieldset class="mix-difficulty" data-kind="code_review"
@@ -783,12 +784,14 @@
 </details>
 
         </div>
+      </div>
     </fieldset>
       <fieldset class="mix-group">
         <legend>Pattern section, in some sets</legend>
-        <div class="mix-row mix-row-fixed">
-          <span id="mix-name-pattern">Pattern of the Month</span>
-          <fieldset class="mix-difficulty" data-kind="pattern"
+        <div class="mix-kinds">
+          <div class="mix-row mix-row-fixed">
+            <span id="mix-name-pattern">Pattern of the Month</span>
+            <fieldset class="mix-difficulty" data-kind="pattern"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-pattern mix-level-legend-pattern">
   <legend id="mix-level-legend-pattern">Difficulty target</legend>
   <label class="mix-level">
@@ -828,7 +831,7 @@
   </p>
 </fieldset>
 
-          <details class="kind-about" data-kind-about="pattern">
+            <details class="kind-about" data-kind-about="pattern">
   <summary>About Pattern of the Month</summary>
   <div class="kind-about-body">
     <p>This section names a design pattern and why it exists, then asks how you&#39;d apply it to a stated problem. The answer box starts with headings for the parts a full answer covers.</p>
@@ -836,12 +839,14 @@
   </div>
 </details>
 
+          </div>
         </div>
       </fieldset>
 
       <fieldset class="mix-group mix-group-rotating" data-exercise-mix-target="group">
         <legend>Rotating third section</legend>
 
+        <div class="mix-kinds">
           <div class="mix-row" data-kind="architecture" data-exercise-mix-target="row">
             <label id="mix-name-architecture" for="weight-architecture">Architecture Decision</label>
             <input type="range" id="weight-architecture" min="0" max="4" step="1"
@@ -1090,12 +1095,14 @@
 </details>
 
           </div>
+        </div>
 
         <p class="card-note mix-last-note" hidden>At least one section in this group has to stay in rotation.</p>
       </fieldset>
       <fieldset class="mix-group mix-group-rotating" data-exercise-mix-target="group">
         <legend>Rotating fourth section</legend>
 
+        <div class="mix-kinds">
           <div class="mix-row" data-kind="plan_review" data-exercise-mix-target="row">
             <label id="mix-name-plan_review" for="weight-plan_review">Plan Review</label>
             <input type="range" id="weight-plan_review" min="0" max="4" step="1"
@@ -1282,6 +1289,7 @@
 </details>
 
           </div>
+        </div>
 
         <p class="card-note mix-last-note" hidden>At least one section in this group has to stay in rotation.</p>
       </fieldset>
