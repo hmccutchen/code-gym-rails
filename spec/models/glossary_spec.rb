@@ -113,7 +113,7 @@ RSpec.describe Glossary do
     end
 
     it "leaves the words the wrong-sense listing caught in another sense unmatched" do
-      %w[indexes indexed injected inferred].each do |word|
+      [ "indexes", "indexed", "injected", "inferred", "injecting", "normalize", "normalized", "lift it up" ].each do |word|
         expect(Glossary.key_for(word)).to be_nil, "#{word} matched again; the production listing read it in another sense"
       end
     end

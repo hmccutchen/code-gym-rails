@@ -152,7 +152,10 @@ wrong-sense listing over production reference prose and the app owner's last
 before the change merges. That listing ran on 2026-10-26 and dropped four
 forms: `indexes` and `indexed` (search indexes, array positions, TypeScript's
 indexed access types), `injected` (an injected script) and `inferred` (an
-inferred intent).
+inferred intent). The critical review then dropped three more whose second
+sense the one-user sample could not show, `normalize` and `normalized` (a
+normalized email) and `injecting` (injecting SQL), and `lift it up`, which is a
+phrase rather than an inflection of `state lifting`.
 
 Coverage is measured by `script/glossary_coverage.rb` over the audit's three
 TSVs, for the rows a reader sees. At main, 104 were matched as a whole term,
