@@ -5,7 +5,9 @@ RSpec.describe "page stylesheets" do
   ALLOWED_QUERIES = {
     "history" => [ DESKTOP_QUERY, "@media (max-width: 600px)" ],
     "progress" => [ DESKTOP_QUERY, "@media (min-width: 600px)" ],
-    "learn" => [ DESKTOP_QUERY ]
+    "learn" => [ DESKTOP_QUERY ],
+    "account" => [ DESKTOP_QUERY ],
+    "settings" => [ DESKTOP_QUERY, "@media (forced-colors: active)" ]
   }.freeze
 
   def path_for(page) = Rails.root.join("app/assets/stylesheets/pages/#{page}.css")
@@ -16,7 +18,8 @@ RSpec.describe "page stylesheets" do
   def after_desktop_block(css)
     source = css.gsub(%r{/\*.*?\*/}m, "")
     start = source.index(DESKTOP_QUERY)
-    return nil if start.nil? || source.index(DESKTOP_QUERY, start + 1)
+    return "" if start.nil?
+    return nil if source.index(DESKTOP_QUERY, start + 1)
 
     depth = 0
     close_brace = (source.index("{", start)...source.length).find do |i|
@@ -45,7 +48,7 @@ RSpec.describe "page stylesheets" do
       expect(used - queries).to be_empty, "#{page}.css adds #{(used - queries).join(', ')}; a new query is a decision"
     end
 
-    it "ends #{page}.css with its one 900px block, so a desktop rule wins every tie with the page's phone rules" do
+    it "ends #{page}.css with its one 900px block, if it has one, so a desktop rule wins every tie with the page's phone rules" do
       expect(after_desktop_block(path_for(page).read)).to eq("")
     end
   end

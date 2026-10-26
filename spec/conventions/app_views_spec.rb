@@ -72,7 +72,7 @@ RSpec.describe "Conventions held over app/views" do
   end
 
   it "keeps a page's styles in its own stylesheet, never a <style> block in its views" do
-    paged = Dir[Rails.root.join("app/views/{history,progress}/*.erb")] +
+    paged = Dir[Rails.root.join("app/views/{history,progress,accounts,api_keys}/*.erb")] +
             %w[index.html.erb _recognition_guide.html.erb].map { |name| Rails.root.join("app/views/learn", name).to_s }
     offenders = paged.select { |path| File.read(path).match?(/<style\b/) }.map { |path| relative(path) }
 

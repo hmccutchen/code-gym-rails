@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Account and Settings views' own styles" do
+RSpec.describe "Account and Settings pages' own styles" do
   def foreign_classes(source)
     carried = ViewStyles.markup_classes(source)
     ViewStyles.selected_classes(ViewStyles.rules(source)).reject { |name| carried.include?(name) }
@@ -57,13 +57,14 @@ RSpec.describe "Account and Settings views' own styles" do
     expect(foreign_classes(source)).to eq([ "kept" ])
   end
 
-  Dir[Rails.root.join("app/views/{accounts,api_keys}/*.erb")].sort.each do |path|
-    view = Pathname(path).relative_path_from(Rails.root).to_s
+  { "account" => "accounts", "settings" => "api_keys" }.each do |page, folder|
+    it "keeps pages/#{page}.css to classes the #{folder} views carry" do
+      markup = Dir[Rails.root.join("app/views/#{folder}/*.erb")].sort.map { |path| File.read(path) }.join("\n")
+      carried = ViewStyles.markup_classes(markup)
+      rules = ViewStyles.stylesheet_rules(Rails.root.join("app/assets/stylesheets/pages/#{page}.css"))
+      foreign = ViewStyles.selected_classes(rules).reject { |name| carried.include?(name) }
 
-    it "keeps #{view}'s style to classes its own markup carries" do
-      foreign = foreign_classes(File.read(path))
-
-      expect(foreign).to be_empty, "#{view} styles #{foreign.join(', ')}, which its markup never uses. Move each rule to the view that renders that class."
+      expect(foreign).to be_empty, "pages/#{page}.css styles #{foreign.join(', ')}, which no #{folder} view uses. Move each rule to the sheet of the page that renders that class."
     end
   end
 end
