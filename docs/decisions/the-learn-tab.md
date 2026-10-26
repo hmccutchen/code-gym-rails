@@ -95,3 +95,28 @@ derives from `ConceptExposureIndex#count` (submitted responses only), never
 from `ConceptMastery`: tier is kept invisible everywhere by design, and a
 marker sourced from it would be exactly the readout the post-hoc difficulty
 rating went to lengths to avoid becoming.
+
+**Glossary terms on reference fields.** Every prose field of a concept
+reference now renders through `glossary_wrap`: the tagline, explanation,
+senior lens, plain-language guide, pitfalls, worked-example prose, the short
+lesson, the recognition guide and the hand-written lessons. The wrapping
+happens at render time, so the provider's stored text is unchanged and no
+reference had to be regenerated. The wrapper never touches code (the inline
+`code_example`, a worked example's code and `<code>` spans), because a term
+inside code is an identifier, not a word being used. Each field underlines a
+term's first use on its own, so a reader who skips to a later field still sees
+it marked.
+
+Glossary entries have no per-language scope, so wiring them in would have
+shown a wrong definition where a reference uses a word in another sense. The
+audit of the existing references found three entries to reword first:
+`strict mode` (now covers React's development wrapper as well as
+JavaScript's `'use strict'`), `reconciliation` (now covers repairing
+differences between two records or systems as well as React's render diff)
+and `throttling` (now covers a device slowing its processor as well as a
+function limited to one call per interval).
+
+Alternate framings of a concept reference are left plain. They are written
+fresh per request and not stored, so there is no stable text to audit against
+the glossary. A follow-up change (PR B) covers the backfill of terms in
+existing references; this change only wires what renders.

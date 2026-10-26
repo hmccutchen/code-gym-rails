@@ -199,6 +199,11 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
       JS
     end
 
+    def open_code_examples
+      find("details.learn-code-examples > summary").click
+      expect(page).to have_css("details.learn-code-examples[open]")
+    end
+
     def press(key)
       page.driver.with_playwright_page { |pw| pw.keyboard.press(key) }
     end
@@ -217,6 +222,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
       user = create_fake_provider_user
       page.current_window.resize_to(phone_width, 800)
       visit_learn_concept(user)
+      open_code_examples
 
       [ 0, 1 ].each do |index|
         expect(scroll_to_term(index)["found"]).to be(true), term_missing
@@ -255,6 +261,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
       user = create_fake_provider_user
       page.current_window.resize_to(phone_width, 800)
       visit_learn_concept(user)
+      open_code_examples
 
       expect([ scroll_to_term(1)["found"], scroll_to_term(0)["found"] ]).to eq([ true, true ]), term_missing
       focus_term(0)
