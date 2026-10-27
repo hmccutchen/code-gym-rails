@@ -1,66 +1,40 @@
 <% page_title t("dashboard.show.title") %>
-<style>
-  .page-header { margin-bottom: 2rem; }
-  .page-header h1 { font-size: 1.5rem; }
-  .page-header .date { color: var(--muted); font-size: .9rem; }
-  .page-header .streak { margin-left: .5rem; }
+<% page_stylesheet "today" %>
 
-  textarea.answer { width: 100%; min-height: 120px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; color: var(--text); font-size: var(--input-font-size); font-family: inherit; resize: vertical; line-height: 1.6; }
-  textarea.answer:focus { border-color: var(--accent); }
-  textarea.code-answer { font-family: "Fira Code", "Cascadia Code", monospace; font-size: var(--input-font-size); min-height: 160px; }
+<div class="today-page">
+  <div class="page-header">
+    <h1><%= t("dashboard.show.title") %></h1>
+    <div class="date">
+      <%= Date.current.strftime("%A, %B %-d") %>
+      <% if (streak = current_user.current_streak).positive? %>
+        <span class="streak"><%= t("dashboard.show.streak", days: streak) %></span>
+      <% end %>
+    </div>
+  </div>
 
-  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 1.5rem; }
-  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--slot-2)); border-radius: 2px; transition: width .3s; }
-  @media (prefers-reduced-motion: reduce) { .progress-fill { transition: none; } }
-  .progress-label { font-size: .8rem; color: var(--muted); margin-top: .3rem; }
-  /* Fixed height, read by scroll-padding-top below so a focused field and its ring stop clear of the bar. */
-  :root { --progress-sticky-height: 3.25rem; }
-  html:has(.progress-sticky) {
-    scroll-padding-top: calc(var(--progress-sticky-height) + var(--focus-ring-width) + var(--focus-ring-offset));
-  }
-  .progress-sticky { position: sticky; top: 0; z-index: 10; height: var(--progress-sticky-height); background: var(--bg); padding: .75rem 0 .5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
-  .progress-sticky .progress-bar { margin-bottom: 0; }
-
-  .rating-row { display: flex; gap: .75rem; margin-top: 1rem; }
-  .rating-btn { flex: 1; padding: calc(.5rem + 5.5px) .5rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font-size: .85rem; text-align: center; }
-  #submit-answers { padding-block: calc(.5rem + 6px); }
-  .rating-btn:hover { border-color: var(--accent); }
-  .rating-btn.active { background: var(--button-bg); border-color: var(--button-bg); color: #fff; }
-  #rating-nudge { margin-top: .5rem; margin-bottom: 1.5rem; }
-</style>
-
-<div class="page-header">
-  <h1><%= t("dashboard.show.title") %></h1>
-  <div class="date">
-    <%= Date.current.strftime("%A, %B %-d") %>
-    <% if (streak = current_user.current_streak).positive? %>
-      <span class="streak"><%= t("dashboard.show.streak", days: streak) %></span>
+  <% if @trial_status %>
+    <%= render "dashboard/trial_banner", status: @trial_status %>
+  <% end %>
+  <div id="dashboard-content">
+    <% if @trial_ended %>
+      <%= render "dashboard/trial_ended", status: @trial_status %>
+    <% elsif @generating %>
+      <%= render "dashboard/generating" %>
+    <% elsif @generation_failed %>
+      <%= render "dashboard/generation_failed", message: current_user.generation_failure_message(surface: :generation) %>
+    <% elsif @generation_paused %>
+      <%= render "dashboard/paused_empty" %>
+    <% elsif @weekend_no_exercise %>
+      <%= render "dashboard/weekend_empty" %>
+    <% else %>
+      <%= render "dashboard/exercise", exercise: @exercise, response: @response %>
     <% end %>
   </div>
-</div>
 
-<% if @trial_status %>
-  <%= render "dashboard/trial_banner", status: @trial_status %>
-<% end %>
-<div id="dashboard-content">
-  <% if @trial_ended %>
-    <%= render "dashboard/trial_ended", status: @trial_status %>
-  <% elsif @generating %>
-    <%= render "dashboard/generating" %>
-  <% elsif @generation_failed %>
-    <%= render "dashboard/generation_failed", message: current_user.generation_failure_message(surface: :generation) %>
-  <% elsif @generation_paused %>
-    <%= render "dashboard/paused_empty" %>
-  <% elsif @weekend_no_exercise %>
-    <%= render "dashboard/weekend_empty" %>
-  <% else %>
-    <%= render "dashboard/exercise", exercise: @exercise, response: @response %>
+  <%# Outside #dashboard-content, which the generating poller replaces. Placement: docs/code-notes/app/views/dashboard/show.html.md %>
+  <% if featured_concept %>
+    <div class="featured-compact">
+      <%= render "shared/featured_concept", featured: featured_concept, day_response: @response %>
+    </div>
   <% end %>
 </div>
-
-<%# Outside #dashboard-content, which the generating poller replaces. Placement: docs/code-notes/app/views/dashboard/show.html.md %>
-<% if featured_concept %>
-  <div class="featured-compact">
-    <%= render "shared/featured_concept", featured: featured_concept, day_response: @response %>
-  </div>
-<% end %>

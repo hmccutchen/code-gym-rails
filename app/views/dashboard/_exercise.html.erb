@@ -1,6 +1,6 @@
 <%# Design notes: docs/code-notes/app/views/dashboard/_exercise.html.md %>
 <% if @regeneration_failed %>
-  <div class="flash alert" style="margin-bottom:1.5rem;">
+  <div class="flash alert regeneration-failed">
     <%= regeneration_failure_line(current_user) %>
   </div>
 <% end %>
@@ -10,7 +10,7 @@
   <form id="daily-kind-swap" hidden></form>
 <% end %>
 
-<div class="regenerate-row" style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+<div class="regenerate-row">
   <div>
     <% if response.persisted? && response.reviewed? %>
       <p class="hint"><%= t("dashboard.exercise.reviewed") %></p>
@@ -73,7 +73,7 @@
        data-answer-form-reload-now-value="<%= t("dashboard.exercise.reload_now") %>">
     <div class="progress-sticky">
       <div class="progress-bar">
-        <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill" style="width:0%"></div>
+        <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill"></div>
       </div>
       <div class="progress-label" id="progress-label" data-answer-form-target="progressLabel"><%= t("dashboard.exercise.answered_count", answered: 0, total: exercise.active_section_keys.size) %></div>
     </div>
@@ -98,10 +98,10 @@
         <%# Not type=submit: a click before the module loads would otherwise natively post the whole day. %>
         <%= f.button t("dashboard.exercise.submit"), type: "button", id: "submit-answers", class: "btn btn-primary",
               data: { answer_form_target: "submitButton", action: "answer-form#submit" } %>
-        <span style="font-size:.8rem;color:var(--muted)"><%= t("dashboard.exercise.auto_saved") %></span>
+        <span class="auto-saved"><%= t("dashboard.exercise.auto_saved") %></span>
+        <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge", tabindex: "-1",
+                  hidden: submit_blocker.nil?, data: submit_nudges.merge(answer_form_target: "nudge"), aria: { live: "polite" } %>
       </div>
-      <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge", tabindex: "-1",
-                hidden: submit_blocker.nil?, data: submit_nudges.merge(answer_form_target: "nudge"), aria: { live: "polite" } %>
     <% end %>
   </div>
 <% end %>

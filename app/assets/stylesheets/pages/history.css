@@ -15,15 +15,6 @@ details.answers { margin: 0; }
 details.answers summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); display: flex; align-items: center; min-height: 48px; list-style: none; }
 details.answers .section { margin-top: 1rem; }
 
-/* The layout's 600px rule bleeds .section to the screen edge; inside an entry it stays inset. */
-@media (max-width: 600px) {
-  .history-entry .section {
-    margin-inline: 0;
-    border-radius: var(--radius);
-    border-left: 1px solid var(--border);
-    border-right: 1px solid var(--border);
-  }
-}
 .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1rem; font-size: .9rem; }
 .pagination a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 1rem; color: var(--accent-text); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; }
 .pagination a[aria-disabled="true"] { color: var(--muted); opacity: .5; pointer-events: none; }

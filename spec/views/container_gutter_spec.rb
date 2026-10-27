@@ -24,11 +24,11 @@ RSpec.describe "container gutter" do
     expect(File.read(Rails.root.join("app/assets/stylesheets/phone_cards.css"))).not_to include("1.5rem")
   end
 
-  it "insets a full-width card page by the same one formula as .phone-page" do
+  it "insets a full-width card page and Today by the same one formula as .phone-page" do
     margin_rules = phone_cards.select { |rule| rule.declaration("margin-left") }
 
     expect(margin_rules.size).to eq(1)
-    expect(margin_rules.first.selectors).to contain_exactly(".phone-page", ".card-page")
+    expect(margin_rules.first.selectors).to contain_exactly(".phone-page", ".card-page", ".today-page")
     expect(margin_rules.first.media).to eq([ "@media (max-width: 599.98px)" ])
   end
 

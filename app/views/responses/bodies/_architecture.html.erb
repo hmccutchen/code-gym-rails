@@ -8,8 +8,8 @@
   <details class="ref">
     <summary><%= t("sections.architecture.reference_summary", title: data["title"]) %></summary>
     <div class="ref-body">
-      <p style="margin-bottom:.75rem"><strong><%= data.dig("reference", "tagline") %></strong></p>
-      <p style="margin-bottom:.75rem"><%= data.dig("reference", "explanation") %></p>
+      <p class="ref-lead"><strong><%= data.dig("reference", "tagline") %></strong></p>
+      <p class="ref-lead"><%= data.dig("reference", "explanation") %></p>
       <% if data.dig("reference", "tradeoffs").present? %>
         <ul><% data.dig("reference", "tradeoffs").each do |t| %><li><%= t %></li><% end %></ul>
       <% end %>

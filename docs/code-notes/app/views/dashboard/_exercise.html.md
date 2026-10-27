@@ -104,6 +104,12 @@ redirects and flashes land exactly as they do from the manual button in
 the flash. The two stay separate requests in the same order as two clicks:
 the submission is saved and confirmed before the review is requested.
 
+## The submit row
+
+The submit row holds the button, the "saves as you type" note and the
+nudge (`docs/code-notes/app/assets/stylesheets/pages/today.md`). The nudge
+takes the row's full width, so it reads as a line under the button.
+
 ## Refused submission
 
 Submit is never disabled. When the day isn't ready, `#create` answers with a

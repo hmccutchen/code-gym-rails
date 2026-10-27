@@ -5,7 +5,11 @@ Each page that has styles of its own keeps them in one file,
 desktop rules in one `@media (min-width: 900px)` block at the end. History,
 Progress and the Learn index moved first, then Account and Settings, whose
 partials' `<style>` blocks joined their page's sheet in the order they
-rendered.
+rendered, then Today, whose dashboard partials' `style` attributes, and the
+submitted day's review heading's, became classes in its sheet. The response
+partials Today shares with History lost theirs too, to a layout class or the
+`hidden` attribute, since History never loads Today's sheet. Today has no
+desktop rules yet, so its sheet has no 900px block.
 
 ## Why a sheet per page
 
@@ -54,3 +58,7 @@ default and the largest text, and at 390 and 1280px with the light theme,
 before and after; the 15,158 element records matched exactly. Account (with
 and without push reminders) and Settings (with a key and without, both
 disclosures open) were checked the same way: 10,236 records, no difference.
+Today was checked with a fresh set, a partly answered set, a submitted and
+reviewed day, the weekend, paused and failed states: 16,660 records, no
+difference. On the generating state only the spinner's rotation differed,
+since it was caught at another point in its animation.

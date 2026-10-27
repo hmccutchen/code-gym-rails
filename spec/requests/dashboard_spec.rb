@@ -604,11 +604,13 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   end
 
   describe "mobile section gutter" do
-    it "renders a 600px breakpoint that pulls section cards out to the screen edges" do
+    it "keeps sections inset as cards on phones, inside Today's own phone gutter" do
       create_exercise
       get root_path
 
-      expect(response.body).to match(/@media \(max-width: 600px\) \{\s*\.section \{[^}]*margin-inline: -1\.5rem;/)
+      layout = ViewStyles.rules(Rails.root.join("app/views/layouts/application.html.erb").read)
+      expect(layout.select { |rule| rule.selectors.include?(".section") }.filter_map { |rule| rule.declaration("margin-inline") }).to be_empty
+      expect(Nokogiri::HTML(response.body).css(".today-page .section")).to be_present
     end
   end
 

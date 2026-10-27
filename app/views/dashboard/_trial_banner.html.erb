@@ -1,5 +1,5 @@
 <%# Required locals: status (a TrialStatus). One line: the trial page carries the rest. %>
-<p class="trial-banner hint" style="margin:-1rem 0 1.5rem;">
+<p class="trial-banner hint">
   <% if status.active? %>
     <% days = t("dashboard.trial_banner.days", count: status.days_left) %>
     <%= status.cap ? t("dashboard.trial_banner.active", days: days, used: status.used, cap: status.cap)

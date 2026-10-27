@@ -72,14 +72,23 @@ RSpec.describe "Conventions held over app/views" do
   end
 
   it "keeps a page's styles in its own stylesheet, never a <style> block in its views" do
-    paged = Dir[Rails.root.join("app/views/{history,progress,accounts,api_keys}/*.erb")] +
+    paged = Dir[Rails.root.join("app/views/{history,progress,accounts,api_keys,dashboard}/*.erb")] +
             %w[index.html.erb _recognition_guide.html.erb].map { |name| Rails.root.join("app/views/learn", name).to_s }
     offenders = paged.select { |path| File.read(path).match?(/<style\b/) }.map { |path| relative(path) }
 
     expect(offenders).to be_empty, "#{offenders.join(', ')} carry a <style> block; move it to app/assets/stylesheets/pages (docs/decisions/page-stylesheets.md)"
   end
 
+  it "keeps Today's styles out of style attributes in its views" do
+    today = Dir[Rails.root.join("app/views/{dashboard,responses}/**/*.erb")]
+    offenders = today.select { |path| File.read(path).match?(/\bstyle\s*[=:]/) }.map { |path| relative(path) }
+
+    expect(offenders).to be_empty, "#{offenders.join(', ')} carry a style attribute; give the element a class, styled in pages/today.css or, for a partial History also renders, the layout"
+  end
+
   PAGE_SHEET_PARTIALS = { %r{\Aaccounts/} => "app/views/accounts/show.html.erb",
+                          %r{\Adashboard/(?!teaching_hint\z)} => "app/views/dashboard/show.html.erb",
+                          %r{\Aresponses/submission\z} => "app/views/dashboard/show.html.erb",
                           %r{\Aapi_keys/} => "app/views/api_keys/edit.html.erb",
                           %r{\Alearn/recognition_guide\z} => "app/views/learn/index.html.erb" }.freeze
 
@@ -103,5 +112,6 @@ RSpec.describe "Conventions held over app/views" do
     expect(rendered_partials(%(<%= render(partial: "api_keys/key_guide") %>))).to eq([ "api_keys/key_guide" ])
     expect(page_for("learn/recognition_guide")).to eq("app/views/learn/index.html.erb")
     expect(page_for("learn/concept")).to be_nil
+    expect(page_for("dashboard/teaching_hint")).to be_nil
   end
 end

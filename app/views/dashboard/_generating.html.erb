@@ -1,12 +1,12 @@
 <%# Outlasts both first-time generation and a regeneration claim going stale, whichever is longer %>
 <% poll_interval_s = 3.0 %>
-<div class="section" style="text-align:center;padding:3rem;"
+<div class="section today-state"
      data-controller="generating"
      data-generating-url-value="<%= dashboard_status_path %>"
      data-generating-interval-value="<%= (poll_interval_s * 1000).to_i %>"
      data-generating-max-attempts-value="<%= ([CallProfiles::JUDGED_GENERATION_BUDGET, DailyExercise::REGENERATION_STALE_AFTER.to_i].max / poll_interval_s).ceil + 1 %>"
      data-generating-slow-hint-value="<%= t("dashboard.generating.slow_hint") %>">
-  <div class="spinner" style="margin-bottom:1rem;" aria-hidden="true"></div>
-  <p style="color:var(--muted);margin-bottom:.5rem;"><%= t("dashboard.generating.title") %></p>
-  <p style="font-size:.85rem;color:var(--muted);" id="generating-hint" data-generating-target="hint" aria-live="polite"><%= t("dashboard.generating.hint") %></p>
+  <div class="spinner" aria-hidden="true"></div>
+  <p class="today-state-title"><%= t("dashboard.generating.title") %></p>
+  <p class="today-state-detail" id="generating-hint" data-generating-target="hint" aria-live="polite"><%= t("dashboard.generating.hint") %></p>
 </div>

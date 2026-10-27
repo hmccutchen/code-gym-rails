@@ -119,6 +119,7 @@
       --radius: 14px; --radius-sm: 8px;
       --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
       --tab-bar-height: 56px;
+      --tab-bar-clearance: 0px;
       --pattern-mask: url("/assets/gym-pattern-tile-dark-DIGEST.png");
       --pattern-tint: rgb(190, 205, 240); --pattern-opacity: .08;
       /* iOS zooms a focused input below 16px; max() keeps that floor without overriding a larger default. */
@@ -147,10 +148,11 @@
       body .pull-refresh { display: flex; }
       nav, .tab-bar, .btn, .rating-btn, summary { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
       @media (max-width: 48rem) {
+        :root { --tab-bar-clearance: calc(var(--tab-bar-height) + env(safe-area-inset-bottom)); }
         body .tab-bar { display: flex; }
         body nav .nav-toggle, body nav .nav-links, body nav .nav-links[data-open] { display: none; }
-        body { padding-bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom)); }
-        body .save-status { bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom) + .75rem); }
+        body { padding-bottom: var(--tab-bar-clearance); }
+        body .save-status { bottom: calc(var(--tab-bar-clearance) + .75rem); }
       }
     }
     a { color: var(--accent-text); text-decoration: none; }
@@ -372,16 +374,8 @@
     .daily-kind-actions { display: flex; flex-direction: row-reverse; flex-wrap: wrap; gap: .75rem; }
     .daily-kind-actions .btn { white-space: nowrap; }
 
-    /* The -1.5rem tracks .container's padding and must change with it. */
     @media (max-width: 600px) {
-      .section {
-        margin-inline: -1.5rem;
-        padding: 1.25rem 1rem;
-        border-radius: 0;
-        border-left: none;
-        border-right: none;
-        box-shadow: none;
-      }
+      .section { padding: 1.25rem 1rem; box-shadow: none; }
       .section[data-slot] { box-shadow: inset 0 3px 0 var(--slot-accent); }
       .daily-kind-trigger { top: calc(1.25rem - 12.5px); right: 1rem; }
     }
@@ -409,6 +403,7 @@
     details.ref { margin-bottom: 1rem; }
     details.ref summary { cursor: pointer; font-size: .85rem; color: var(--slot-accent, var(--accent-text)); padding: .4rem 0; list-style: none; }
     .ref-body { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .5rem; font-size: .88rem; line-height: 1.7; }
+    .ref-lead { margin-bottom: .75rem; }
     .mermaid-diagram:empty { display: none; }
     .mermaid-diagram { margin-top: .9rem; overflow-x: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; }
     .mermaid-diagram svg { max-width: 100%; height: auto; }
@@ -517,7 +512,7 @@
   </style>
   <link rel="stylesheet" href="/assets/phone_cards-DIGEST.css" />
   <link rel="stylesheet" href="/assets/desktop-DIGEST.css" />
-  
+  <link rel="stylesheet" href="/assets/pages/today-DIGEST.css" />
 </head>
 <body data-signed-out-text="Your session expired, so that didn&#39;t go through. Reload the page and sign in again." data-save-failed-text="Couldn&#39;t save your last change. It hasn&#39;t reached the server — check your connection and try again."
       data-controller="glossary code-lines mermaid"
@@ -563,47 +558,19 @@
     <main id="main-content" tabindex="-1">
       <div class="flash notice" id="flash-notice">Welcome back, Existing!</div>
 
-    <style>
-  .page-header { margin-bottom: 2rem; }
-  .page-header h1 { font-size: 1.5rem; }
-  .page-header .date { color: var(--muted); font-size: .9rem; }
-  .page-header .streak { margin-left: .5rem; }
-
-  textarea.answer { width: 100%; min-height: 120px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; color: var(--text); font-size: var(--input-font-size); font-family: inherit; resize: vertical; line-height: 1.6; }
-  textarea.answer:focus { border-color: var(--accent); }
-  textarea.code-answer { font-family: "Fira Code", "Cascadia Code", monospace; font-size: var(--input-font-size); min-height: 160px; }
-
-  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 1.5rem; }
-  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--slot-2)); border-radius: 2px; transition: width .3s; }
-  @media (prefers-reduced-motion: reduce) { .progress-fill { transition: none; } }
-  .progress-label { font-size: .8rem; color: var(--muted); margin-top: .3rem; }
-  /* Fixed height, read by scroll-padding-top below so a focused field and its ring stop clear of the bar. */
-  :root { --progress-sticky-height: 3.25rem; }
-  html:has(.progress-sticky) {
-    scroll-padding-top: calc(var(--progress-sticky-height) + var(--focus-ring-width) + var(--focus-ring-offset));
-  }
-  .progress-sticky { position: sticky; top: 0; z-index: 10; height: var(--progress-sticky-height); background: var(--bg); padding: .75rem 0 .5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
-  .progress-sticky .progress-bar { margin-bottom: 0; }
-
-  .rating-row { display: flex; gap: .75rem; margin-top: 1rem; }
-  .rating-btn { flex: 1; padding: calc(.5rem + 5.5px) .5rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font-size: .85rem; text-align: center; }
-  #submit-answers { padding-block: calc(.5rem + 6px); }
-  .rating-btn:hover { border-color: var(--accent); }
-  .rating-btn.active { background: var(--button-bg); border-color: var(--button-bg); color: #fff; }
-  #rating-nudge { margin-top: .5rem; margin-bottom: 1.5rem; }
-</style>
-
-<div class="page-header">
-  <h1>Today&#39;s Workout</h1>
-  <div class="date">
-    Tuesday, September 29
+    
+<div class="today-page">
+  <div class="page-header">
+    <h1>Today&#39;s Workout</h1>
+    <div class="date">
+      Tuesday, September 29
+    </div>
   </div>
-</div>
 
-<div id="dashboard-content">
-      <form id="daily-kind-swap" hidden></form>
+  <div id="dashboard-content">
+        <form id="daily-kind-swap" hidden></form>
 
-<div class="regenerate-row" style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+<div class="regenerate-row">
   <div>
       <form data-controller="loading-form" data-action="submit-&gt;loading-form#submit pageshow@window-&gt;loading-form#restore" data-loading-form-label-value="Generating…" data-loading-form-confirm-message-value="Generate a new set for today?" class="button_to" method="post" action="/regenerate"><button class="btn btn-ghost btn-sm" disabled="disabled" type="submit">Generate new set</button></form>
   </div>
@@ -629,7 +596,7 @@
        data-answer-form-reload-now-value="Reload now">
     <div class="progress-sticky">
       <div class="progress-bar">
-        <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill" style="width:0%"></div>
+        <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill"></div>
       </div>
       <div class="progress-label" id="progress-label" data-answer-form-target="progressLabel">0 of 3 answered</div>
     </div>
@@ -987,13 +954,14 @@ What would be easy to get wrong or worth testing:
       <div class="submit-row" id="submit-row">
         <input autocomplete="off" value="1" type="hidden" name="submit" id="submit" />
         <button name="button" type="button" id="submit-answers" class="btn btn-primary" data-answer-form-target="submitButton" data-action="answer-form#submit">Submit answers</button>
-        <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
+        <span class="auto-saved">Auto-saved as you type</span>
+        <p class="progress-label" id="rating-nudge" tabindex="-1" data-unanswered="Answer at least one section to finish up." data-unrated="Rate each section you answered to finish up." data-answer-form-target="nudge" aria-live="polite">Answer at least one section to finish up.</p>
       </div>
-      <p class="progress-label" id="rating-nudge" tabindex="-1" data-unanswered="Answer at least one section to finish up." data-unrated="Rate each section you answered to finish up." data-answer-form-target="nudge" aria-live="polite">Answer at least one section to finish up.</p>
 </form>  </div>
 
-</div>
+  </div>
 
+</div>
 
     </main>
   </div>

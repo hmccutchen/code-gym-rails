@@ -1,6 +1,6 @@
-<div class="section" style="text-align:center;padding:3rem;">
-  <p style="color:var(--muted);margin-bottom:.5rem;"><%= t("dashboard.generation_failed.title") %></p>
-  <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem;"><%= message %></p>
+<div class="section today-state">
+  <p class="today-state-title"><%= t("dashboard.generation_failed.title") %></p>
+  <p class="today-state-detail today-state-message"><%= message %></p>
   <%= button_to t("dashboard.generation_failed.try_again"), generate_path, method: :post, class: "btn btn-ghost btn-sm",
         form: { data: loading_form_data(label: t("dashboard.generating_label")) } %>
 </div>

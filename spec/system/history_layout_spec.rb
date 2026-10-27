@@ -111,6 +111,20 @@ RSpec.describe "History layout", type: :system do
       end
     end
 
+    it "keeps an entry's nested sections inset inside it as cards" do
+      travel_to(a_weekday) do
+        visit_history(width: 390)
+        page.execute_script("document.querySelector('.history-entry details.answers').open = true")
+
+        entry = rect(".history-entry")
+        section = rect(".history-entry .section")
+        expect(section["left"] - entry["left"]).to be_within(0.5).of(17)
+        expect(entry["right"] - section["right"]).to be_within(0.5).of(17)
+        expect(computed_style(".history-entry .section", "borderLeftWidth")).to eq("1px")
+        expect(computed_style(".history-entry .section", "borderTopLeftRadius")).not_to eq("0px")
+      end
+    end
+
     it "keeps entries clear of a 44px notch" do
       travel_to(a_weekday) do
         set_safe_area(left: 44, right: 44)

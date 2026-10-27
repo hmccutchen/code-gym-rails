@@ -166,8 +166,7 @@ data.*
 
 ## Fri Oct 23
 
-- passwordless again: Devise out, the emailed code the only first factor
-  `#491`
+- passwordless again: Devise out, the emailed code the only first factor `#491`
   **why:** no password column ever, and an optional authenticator app later
   **I decided:** sign-up unchanged; Devise columns dropped in the same PR; a
   10-minute code; trusted proxies split out, required before I post publicly
@@ -197,15 +196,15 @@ data.*
   **I decided:** a double-tapped address gets its challenge back for 30 seconds
 - a flaky system spec `#499`
 - the Account page as phone cards, second of five redesign PRs `#504`
-  **I decided:** the card styles load everywhere; Reminders keeps Save;
-  cards clear a landscape notch
+  **I decided:** the card styles load everywhere; Reminders keeps Save; cards
+  clear a landscape notch
 - lefthook: lint on commit, CI's checks on push `#508`
   **I decided:** system specs stay in CI
 - edits typed behind a save survive a reload `#509`
   **I decided:** the copy keeps unconfirmed saves
 - the Settings page as phone cards, with the Account nudges switch `#512`
-  **I decided:** the nudges switch saves on change; Connection gets a "Tap
-  Save to apply" tag; value rows keep the invisible select
+  **I decided:** the nudges switch saves on change; Connection gets a "Tap Save
+  to apply" tag; value rows keep the invisible select
 - History scrolled sideways in the home-screen app; fixed there too
 
 ## Sat Oct 24
@@ -215,14 +214,14 @@ data.*
 - a separate agent reviews each review-comment fix before it's pushed
 - a save queued behind a submit, already fixed; pinned with a spec `#521`
 - find where the app has got slow and make those pages faster `#517`
-  **I decided:** the work goes in its own worktree, off main, so it stays
-  clear of the two branches I had open
+  **I decided:** the work goes in its own worktree, off main, so it stays clear
+  of the two branches I had open
 - show a saved time zone in Settings even outside its existing choices `#522`
   **why:** Europe/London showed Detect automatically despite being a valid
   saved zone
 - stop automatic push registration undoing Turn off `#523`
-  **I decided:** Claude implements; the foreman does the final reviews.
-  Each issue gets its own PR, Copilot review and a green-CI merge.
+  **I decided:** Claude implements; the foreman does the final reviews. Each
+  issue gets its own PR, Copilot review and a green-CI merge.
 - share the VAPID test credentials across request, job and system specs `#525`
 - share the draft key and settled-save waits across system specs `#529`
 - keep Account styles with the partials that render them `#530`
@@ -263,59 +262,58 @@ data.*
   **I decided:** its own PR, separate from the desktop work
 - the top nav's links to 44px at desktop widths, as foreman `#554`
   **I decided:** Claude implements and investigates; I decide the design. The
-  nav gets the 1040px column on every page, its own PR after this one, and
-  the doubled notch inset on landscape phones becomes its own issue
-- called the phone redesign done at four PRs; the authenticator forms work
-  fine for me, so no code screens
+  nav gets the 1040px column on every page, its own PR after this one, and the
+  doubled notch inset on landscape phones becomes its own issue
+- called the phone redesign done at four PRs; the authenticator forms work fine
+  for me, so no code screens
 - glossary terms on the reference dropdown and every Learn page `#556`
-  **why:** references use terms like partial index and sequential scan with
-  no definition, and the Learn pages never ran the glossary at all
+  **why:** references use terms like partial index and sequential scan with no
+  definition, and the Learn pages never ran the glossary at all
   **I decided:** wire it at render time so every existing reference gains it;
   never inside code; first occurrence per field; audit production read-only
   before writing any term list; fix the three wrong-sense entries here and
-  leave the backfill, the matcher and the technique terms to the next PR;
-  pin the "None" lesson rows as they render today rather than fix them
+  leave the backfill, the matcher and the technique terms to the next PR; pin
+  the "None" lesson rows as they render today rather than fix them
 - the nav takes the page's 1040px column on every page at desktop widths `#562`
 
 ## Mon Oct 26
 
-- glossary backfill, batch one: the audit's 47-reference terms, inflections
-  and the five techniques as one-liners `#563`
+- glossary backfill, batch one: the audit's 47-reference terms, inflections and
+  the five techniques as one-liners `#563`
   **why:** the audit showed 730 undefined terms with no glossary match, and
   "memoized" never found the memoization entry
-  **I decided:** lean short, start with the 47 and size a second batch from a
-  re-run of the audit after this deploys; no new concepts; inflections of a
-  key match but the whole-word rule stands otherwise; every noun key gets its
-  plural; one plain sentence per entry with a fact check by an agent that
-  didn't write it; a read-only export of the references and my own last 60
-  days of exercise text, with my yes on the export and a read of the listing
-  before the PR leaves draft; after deploy only the coverage script re-runs;
-  a 480-or-fewer bar that reports a miss and never blocks the merge; drop
-  `indexes`, `indexed`, `injected` and `inferred` after reading the listing;
-  then `normalize`, `normalized`, `injecting` and `lift it up` from the
-  critical review; the listing tool gets tracked; the pre-submission tooltip
-  question becomes an issue
+  **I decided:** start with the 47; size a second batch from the post-deploy
+  audit; no new concepts; inflections of a key match but the whole-word rule
+  stands otherwise; every noun key gets its plural; one plain sentence per
+  entry with a fact check by an agent that didn't write it; a read-only export
+  of the references and my last 60 days of exercise text, which I approve and
+  read before the PR leaves draft; after deploy only the coverage script
+  re-runs; a 480-or-fewer bar that reports a miss, never blocking the merge;
+  drop `indexes`, `indexed`, `injected` and `inferred` after reading the
+  listing; then `normalize`, `normalized`, `injecting` and `lift it up` from
+  the critical review; the listing tool gets tracked; the pre-submission
+  tooltip question becomes an issue
 - Progress on phone cards and the desktop layout, specced first `#565`
-  **I decided:** the legend stays a disclosure at every width with its 7
-  real entries and their wording; groups two across on a desktop and the
-  full container width from 600px; the app wins where the boards differ;
-  I took the spec as written, so the note stays visible and Progress gets
-  its own bucket class
+  **I decided:** the legend stays a disclosure at every width, with its 7 real
+  entries as written; groups two across on a desktop and the full container
+  width from 600px; the app wins where the boards differ; the note stays
+  visible and Progress gets its own bucket class, as specced
 - Learn on phone cards and the desktop layout, specced first `#567`
-  **I decided:** lay out everything the page has and keep the filter's
-  hiding working; the app wins where the boards differ; reorder so this
-  week's concept and the search come first, side by side on a desktop,
-  ahead of the prepare and drills boxes
+  **I decided:** lay out everything the page has and keep the filter's hiding
+  working; reorder so this week's concept and the search come first, side by
+  side on a desktop, ahead of the prepare and drills boxes
 - one stylesheet per page, History, Progress and Learn first, with no visual
   change `#568`
   **why:** I don't think styling should live in the markup unless good design
   warrants it; each page should have its own modular style file
   **I decided:** refactor the three finished pages first, then build Account
-  and Settings desktop straight into their own sheets; a partial's styles go
-  with the page it renders on, or a shared component sheet
+  and Settings into their own sheets; a partial's styles go with the page it
+  renders on, or a shared component sheet
 - Account and Settings in their own page sheets, laid out for a desktop `#571`
   **I decided:** Account's paired cards stretch to the same height
 - fuzzy Learn search `#570`
 - glossary terms in alternate framings `#573`
+- Today on phone cards, styles in its own sheet `#572`
+  **I decided:** no sticky Submit bar: the screen felt sandwiched
 - glossary_wrap always returns escaped HTML `#576`
 - glossary terms throughout the review `#577`
