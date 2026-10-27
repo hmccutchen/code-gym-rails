@@ -78,7 +78,7 @@ class ResponsesController < ApplicationController
     )
 
     capped_outcome(@response.append_alternate!(@section, alternate), alternates_used_message) do |remaining|
-      { alternate: alternate, remaining: remaining }
+      { alternate: alternate, alternate_html: helpers.glossary_wrap(alternate).to_str, remaining: remaining }
     end
   rescue ProviderError, SetupError => e
     render_provider_failure(e, :alternate)

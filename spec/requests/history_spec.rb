@@ -31,6 +31,31 @@ RSpec.describe "History", type: :request do
     )
   end
 
+  it "underlines glossary terms in the review's prose and its saved explanations, and escapes markup in them" do
+    reviewed = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+    reviewed.update!(
+      ai_review: { "code_review" => {
+        "rating" => "solid",
+        "correct" => [ "You named the memoization." ],
+        "missed" => [ "<b>Bold</b> plain words" ],
+        "next_step" => "Read about eager loading.",
+        "difficulty" => { "level" => DailyResponse::DIFFICULTY_LEVELS.first, "reason" => "It hinged on a race condition." }
+      } },
+      review_alternates: { "code_review" => [ "Think of a background job as a queue." ] }
+    )
+
+    login_as(user)
+    get history_path
+
+    review = Nokogiri::HTML(response.body).at_css(".review-block")
+    expect(review.css(".review-points .gloss-term").map(&:text)).to include("memoization")
+    expect(review.at_css("p.review-item .gloss-term").text).to eq("eager loading")
+    expect(review.at_css(".difficulty-note .gloss-term").text).to eq("race condition")
+    expect(review.at_css(".alternate-item .gloss-term").text).to eq("background job")
+    expect(review.css(".review-points b")).to be_empty
+    expect(review.text).to include("<b>Bold</b> plain words")
+  end
+
   it "shows a rewritten review and never the grader's original kept for audit" do
     reviewed = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
     reviewed.update!(ai_review: { "code_review" => {
@@ -458,8 +483,8 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      expect(response.body).to include("<li>The missing index on user_id</li>")
-      expect(response.body).to include("<li>No transaction around the writes</li>")
+      points = Nokogiri::HTML(response.body).css(".review-points li").map(&:text)
+      expect(points).to include("The missing index on user_id", "No transaction around the writes")
     end
 
     it "renders a legacy string-shaped review field as a single-item list" do

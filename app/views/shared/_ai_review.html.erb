@@ -10,7 +10,7 @@
     <% if (difficulty = response.difficulty_for(section)) %>
       <p class="difficulty-note">
         <%= t("review.difficulty_note", level: difficulty["level"]) %>
-        <%= difficulty["reason"] %>
+        <%= glossary_wrap(difficulty["reason"]) %>
       </p>
     <% end %>
     <% if response.answered?(section) && response.self_rating_favorable?(section) && response.ai_rating_unfavorable?(section) %>
@@ -23,14 +23,14 @@
           <div class="review-item">
             <strong><%= DailyResponse.ai_review_label(key) %>:</strong>
             <ul class="review-points">
-              <% points.each do |point| %><li><%= point %></li><% end %>
+              <% points.each do |point| %><li><%= glossary_wrap(point) %></li><% end %>
             </ul>
           </div>
         <% end %>
       <% else %>
         <% text = DailyResponse.review_points(fb[key]).join(" ") %>
         <% if text.present? %>
-          <p class="review-item"><strong><%= DailyResponse.ai_review_label(key) %>:</strong> <%= text %></p>
+          <p class="review-item"><strong><%= DailyResponse.ai_review_label(key) %>:</strong> <%= glossary_wrap(text) %></p>
         <% end %>
       <% end %>
     <% end %>
@@ -52,7 +52,7 @@
          data-review-alternates-added-last-text-value="<%= t("review.alternate_added_last") %>"
          data-review-alternates-failed-text-value="<%= t("review.alternate_failed") %>">
       <% Array(response.review_alternates[section]).each do |alt| %>
-        <p class="alternate-item"><%= alt %></p>
+        <p class="alternate-item"><%= glossary_wrap(alt) %></p>
       <% end %>
       <% if response.alternates_left(section).positive? %>
         <button type="button" class="btn btn-ghost btn-sm explain-differently"

@@ -59,4 +59,6 @@ them. `ConceptReferencesController#explain_differently` runs the framing
 through this helper and returns the result as `alternate_html`, which the page
 inserts with `innerHTML`.
 `docs/code-notes/app/controllers/concept_references_controller.md` has the
-detail. Framings of a reviewed section are still plain text.
+detail. A reviewed section's explanations get the same treatment from
+`ResponsesController#explain_differently`, and the review partial wraps the
+saved ones.

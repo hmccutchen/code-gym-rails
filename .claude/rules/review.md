@@ -38,6 +38,11 @@ read it before changing that area.
   `DailyResponse::REVIEW_CLAIM_STALE_AFTER` (12 minutes) covers it, so the
   claim outlasts the grading chain. The switch (`REVIEW_PROSE_JUDGE`) is on;
   any change to its prompt or route must re-pass the doc's activation gate.
+- **Glossary terms in a review**: the review partial renders its prose fields,
+  the difficulty reason and saved alternate explanations through
+  `glossary_wrap`, and `ResponsesController#explain_differently` returns a new
+  explanation as escaped, glossary-wrapped `alternate_html` beside the plain
+  `alternate` it saves. The improved code and follow-up turns stay plain.
 - **Post-hoc difficulty rating**
   (`docs/decisions/post-hoc-difficulty-rating.md`): A reviewed section shows
   how hard the problem was (`DailyResponse::DIFFICULTY_LEVELS`), kept disjoint

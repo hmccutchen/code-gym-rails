@@ -21,6 +21,16 @@ expected; deduplicating them would leave sections without their controls.
 `spec/requests/history_spec.rb` counts three follow-ups mounts because its
 fixture has three entries with one reviewed section each.
 
+## Glossary terms in the review
+
+The review's prose renders through `glossary_wrap`: every field and point,
+the difficulty note's reason, and the saved alternate explanations. The
+improved code stays out, since the wrapper never touches code, and so do the
+follow-up turns, which are the engineer's own questions and the answers to
+them. A review is only shown after submission, so a definition here can't
+hint at an answer the way one on the unsubmitted form could (#564). Each
+field wraps on its own, so a term is underlined once per field.
+
 ## Caps and the follow-up thread
 
 Whether the "explain differently" button and the follow-up form still show,
