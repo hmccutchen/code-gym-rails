@@ -28,8 +28,13 @@ read it before changing that area.
   prose needs any text left after scaffold labels are removed, a design
   comparison needs a pick or a reason, and Parsons needs a saved complete
   permutation. The browser holds no copy of the rule; it shows the
-  `answered_sections` and `submit_blocker` from each reply. History, mastery and generation ask the same authority.
-- **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so reloading offers the scaffold again without storing its labels as the user's work. Other draft text remains intact; grading and read-only displays use `answer_for` (`docs/decisions/one-answered-authority.md`).
+  `answered_sections` and `submit_blocker` from each reply. History, mastery
+  and generation ask the same authority. A short answer is an answer: the old
+  10-character floor was removed on 2026-10-27.
+- **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them.
+  Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically.
+  `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so reloading offers the scaffold again without storing its labels as the user's work. Other draft text remains intact; grading and read-only displays use `answer_for`
+  (`docs/decisions/one-answered-authority.md`).
 - **One finish action** (`docs/decisions/one-finish-action.md`): Submit is
   always clickable and the server decides via `DailyResponse#submit_blocker`;
   the browser keeps no copy of the rule. `ResponsesController#create` refuses

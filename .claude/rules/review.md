@@ -32,8 +32,8 @@ read it before changing that area.
   an unanswered section gets `ReviewPrompt.walkthrough_prompt`. It stores no
   rating and no rubric stamp, `ai_rating_for` is nil for it, and
   `review_field_label` heads its "missed" list "What a good answer covers".
-  `review_badge` shows "Skipped" in place of the grade badge. `RUBRIC_VERSION`
-  is unchanged.
+  `review_badge` shows "Skipped" in place of the grade badge. A short answer is
+  an answer and is graded. `RUBRIC_VERSION` is unchanged.
 - **Review prose judge** (`docs/decisions/review-prose-judge.md`): An optional
   second pass that may reword a graded review's prose fields for plain
   language or length (`AiService#judge_review_prose`); it is never shown the

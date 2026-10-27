@@ -25,8 +25,41 @@ its level's description is graded on what it actually asks. The day context no
 longer calls the engineer "junior/mid", which would contradict a senior
 pitch.
 
-The rubric applies to answered sections only. An unanswered section is
-reviewed as a walkthrough with no rating, `essential_gaps` or stamp.
+**An unanswered section is walked through, not graded.** The rubric applies
+to answered sections only. A section is unanswered when
+`DailyResponse#answered?` is false: it is blank or holds only scaffold labels,
+a design comparison has neither a valid pick nor a reason, or a Parsons
+exercise has no saved complete order. A short answer such as "add index" is an
+answer (the 10-character floor was removed on 2026-10-27,
+`docs/decisions/one-answered-authority.md`), so it is graded and needs a
+self-rating like any other.
+
+The mechanism, front to back:
+
+- `AiService#build_review_section_prompt` picks `ReviewPrompt.walkthrough_prompt`
+  for an unanswered section. It says no answer was given, asks for a walkthrough
+  of what a good answer covers, and never asks for "rating" or
+  "essential_gaps". Each kind adds its own text through
+  `ExerciseSection.walkthrough_note(section:)`: empty for most kinds, and for
+  Parsons the correct block order with a request to explain why each block
+  belongs there (or a statement that the exercise data is unavailable when no
+  blocks are stored).
+- `ReviewGrading#ungraded` removes "rating", "essential_gaps" and "rubric"
+  from whatever the provider returned, before the prose judge runs. Parsons'
+  `fixed_rating` and `RubricCheck` do not run for the section. The prose judge
+  and the difficulty note still do.
+- `DailyResponse#ai_rating_for` returns nil for an unanswered section even when
+  an older row stored a rating, so every evidence reader that goes through it
+  reads old and new rows alike, with no data migration. Readers that take the
+  rating from the stored review directly (`ReviewedSectionResults`) first
+  restrict themselves to `answered_sections`.
+- `DailyResponse#review_badge` is the one choice between the grade and the
+  "Skipped" label; the review partial and the email both read it.
+  `#review_field_label` heads the "missed" list "What a good answer covers" on
+  an unanswered section.
+- `RUBRIC_VERSION` is unchanged, `missing_sections`, `fully_reviewed?` and
+  `defer_skipped_checks!` are unchanged, and the follow-up chat prompt keeps
+  "What you missed".
 
 **The rubric is checked, never enforced.** The grader also returns
 `essential_gaps`, the positions in "missed" it counts as essential.

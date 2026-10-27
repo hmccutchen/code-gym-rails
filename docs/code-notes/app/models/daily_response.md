@@ -136,7 +136,7 @@ compares it with the stored column across those shapes.
 
 ## `#ai_rating_for`
 
-It returns nil for an unanswered section whatever is stored, so reviews written before unanswered sections stopped being graded read the same as new ones, with no data migration. Every reader of a grade goes through it.
+It returns nil for an unanswered section whatever is stored, so reviews written before unanswered sections stopped being graded read the same as new ones, with no data migration. Readers of a grade go through it, or first restrict themselves to `answered_sections` as `ReviewedSectionResults.for` does.
 
 ## `#review_badge` and `#review_field_label`
 
