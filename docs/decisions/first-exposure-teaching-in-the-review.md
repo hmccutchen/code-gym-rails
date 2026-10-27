@@ -15,8 +15,8 @@ reference.
 offers the short version when its concept is tagged and isn't `"other"`, and
 either:
 
-- **First exposure.** `ConceptExposureIndex#count_for` returns 1 on the
-  response's date. After submit, the count includes the day itself, so 1
+- **First exposure.** `ConceptExposureIndex` counts the section's
+  `[concept, bucket]` key once on the response's date. After submit, the count includes the day itself, so 1
   means no earlier submitted day carried the concept. The dashboard's
   `first_exposure?` runs before submit and tests `.zero?`.
 - **A low grade.** `DailyResponse#ai_rating_unfavorable?` is true:
@@ -59,7 +59,10 @@ Decided by the owner after the plan review, on 2026-10-27.
   (`.key_for`). `DailyResponse#improved_code_visible?`, the first-exposure
   helper and `ReviewShortVersion` all read it, and nothing else restates the
   key. `ReviewShortVersion` is handed the index, so its specs need no
-  database.
+  database. `ReviewShortVersion#key` is the `[concept, bucket]` it decided
+  on, from `ConceptExposureIndex.key_for`. The duplicate check compares it,
+  and the page looks up the reference row with it, so the bucket rule is
+  stated nowhere else.
 - **The review as graded.** `ReviewProseVerdict.as_graded` puts the
   grader's own fields back over the prose judge's rewording. Every reader
   of `graded_prose` goes through it (#592).
@@ -92,6 +95,15 @@ and either:
 A `developing` review with an empty gap list counts, because the rating the
 review shows says so. A skipped section never shows pitfalls.
 
+**The gap can be on another section sharing the concept.** The block shows
+pitfalls when any section that carries the same concept and bucket has an
+essential gap (`ReviewShortVersion#pitfalls?`), not only the section that
+offers it. Otherwise a first exposure where the first section is gap-free
+and a later one has the gap would offer the block without pitfalls and
+suppress the later section, so nobody saw them. A provider can tag two
+sections with one concept on a first exposure, so the case is reachable.
+Decided by the owner on 2026-10-27, after the build review.
+
 Matching a pitfall to the missing step waits until the grader names the
 missing step. Matching text in Ruby is rejected: word overlap between a
 provider's miss and a provider's pitfall is a guess that looks like a rule.
@@ -99,7 +111,10 @@ provider's miss and a provider's pitfall is a guess that looks like a rule.
 ## Where it sits and how it looks
 
 Inside the section's `review-block` in `shared/_ai_review`, after the review
-fields and before `improved_code`. On a first exposure the improved code is
+fields and before `improved_code`. The partial only renders what
+`ReviewHelper#review_short_version` returns: the reference row, its bucket
+and whether pitfalls show, or nil. The helper builds one `ReviewShortVersion`
+per response for the page. On a first exposure the improved code is
 hidden, so the short version stands where the fix would be. On a later
 exposure with a low grade both show, the short version first and closed.
 

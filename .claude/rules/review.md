@@ -64,11 +64,13 @@ read it before changing that area.
 - **The concept's short version in the review**
   (`docs/decisions/first-exposure-teaching-in-the-review.md`):
   `ReviewShortVersion#offered?` is the one rule: a tagged, non-`"other"`
-  concept on its first exposure (`ConceptExposureIndex#count_for` is 1) or
+  concept on its first exposure (its `#key` counted once in `ConceptExposureIndex`) or
   with a `beginner` or `developing` grade, on the first qualifying section
   that carries the concept. It reads the exposure count and the section's
   own rating and review, never `ConceptMastery` (a convention spec scans
-  for it). Pitfalls show only when `#essential_gap?`. The block renders
-  closed, after the review fields, only when the concept has a reference
-  row, and the review email leaves it out. Every reader of `graded_prose`
+  for it). Pitfalls show when any section sharing the concept has an
+  essential gap (`#pitfalls?`). The partial renders only what
+  `ReviewHelper#review_short_version` returns: closed, after the review
+  fields, only when the concept has a reference row; the review email
+  leaves it out. Every reader of `graded_prose`
   goes through `ReviewProseVerdict.as_graded`.

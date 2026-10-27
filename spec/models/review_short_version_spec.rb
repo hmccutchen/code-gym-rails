@@ -82,6 +82,40 @@ RSpec.describe ReviewShortVersion do
     end
   end
 
+  describe "#key" do
+    it "is the concept and the bucket the section records under, or nil for a tag that doesn't count" do
+      response = response_for(tags: { "code_review" => "n_plus_one", "pattern" => "other" })
+      short_version = described_class.new(response, exposures: exposures({}))
+
+      expect(short_version.key("code_review")).to eq(ConceptExposureIndex.key_for("code_review", "n_plus_one", "ruby_rails"))
+      expect(short_version.key("pattern")).to be_nil
+    end
+  end
+
+  describe "#pitfalls?" do
+    let(:tags) { { "code_review" => "n_plus_one", "pattern" => "n_plus_one" } }
+    let(:seen) { exposures("n_plus_one" => [ day ]) }
+
+    it "shows pitfalls on the offering section when a later section sharing the concept has the gap" do
+      response = response_for(tags: tags, reviews: { "code_review" => review("solid", gaps: []), "pattern" => review("developing", gaps: [ 0 ]) })
+
+      expect(described_class.new(response, exposures: seen).pitfalls?("code_review")).to be(true)
+    end
+
+    it "shows none when no section sharing the concept has a gap" do
+      response = response_for(tags: tags, reviews: { "code_review" => review("solid", gaps: []), "pattern" => review("strong", gaps: []) })
+
+      expect(described_class.new(response, exposures: seen).pitfalls?("code_review")).to be(false)
+    end
+
+    it "ignores a gap on a section with another concept" do
+      response = response_for(tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
+                              reviews: { "code_review" => review("solid", gaps: []), "pattern" => review("developing", gaps: [ 0 ]) })
+
+      expect(described_class.new(response, exposures: seen).pitfalls?("code_review")).to be(false)
+    end
+  end
+
   describe "#essential_gap?" do
     def gap?(section_review, answers: nil)
       response = response_for(tags: { "code_review" => "n_plus_one" }, reviews: { "code_review" => section_review }, answers: answers)

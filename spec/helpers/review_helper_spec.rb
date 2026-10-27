@@ -24,6 +24,37 @@ RSpec.describe ReviewHelper, type: :helper do
     end
   end
 
+  describe "#review_short_version" do
+    let(:guide) do
+      { tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
+        guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "f" }
+    end
+
+    def reviewed(rating:, gaps:)
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                                   answers: { "code_review" => "a" * 20 }, concept_tags: { "code_review" => "n_plus_one" },
+                                   ai_review: { "code_review" => { "rating" => rating, "missed" => [ "m" ], "essential_gaps" => gaps } })
+    end
+
+    it "gives the reference row, its bucket and whether pitfalls show, for a section that offers it" do
+      reference = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+
+      offer = helper.review_short_version(reviewed(rating: "developing", gaps: [ 0 ]), "code_review")
+
+      expect(offer).to have_attributes(reference: reference, bucket: "ruby_rails", show_pitfalls: true)
+    end
+
+    it "gives nothing when the concept has no reference row" do
+      expect(helper.review_short_version(reviewed(rating: "developing", gaps: [ 0 ]), "code_review")).to be_nil
+    end
+
+    it "gives nothing for a section that doesn't offer it" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+
+      expect(helper.review_short_version(reviewed(rating: "developing", gaps: [ 0 ]), "pattern")).to be_nil
+    end
+  end
+
   describe "#review_field_label" do
     let(:response) { DailyResponse.new(daily_exercise: exercise, answers: { "code_review" => "a" * 20, "pattern" => "" }) }
 

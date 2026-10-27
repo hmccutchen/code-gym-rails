@@ -5,9 +5,15 @@ class ReviewShortVersion
     @exposures = exposures
   end
 
+  def key(section) = ConceptExposureIndex.key_for(section, @response.concept_tags[section.to_s], @response.daily_exercise.language)
+
   def offered?(section)
     section = section.to_s
-    qualifies?(section) && earlier_sections(section).none? { |other| tag(other) == tag(section) && qualifies?(other) }
+    qualifies?(section) && earlier_sections(section).none? { |other| key(other) == key(section) && qualifies?(other) }
+  end
+
+  def pitfalls?(section)
+    @response.section_keys.any? { |other| key(other) == key(section) && essential_gap?(other) }
   end
 
   def essential_gap?(section)
@@ -19,11 +25,9 @@ class ReviewShortVersion
   private
 
   def qualifies?(section)
-    return false unless @response.section_reviewed?(section)
+    return false unless @response.section_reviewed?(section) && key(section)
 
-    count = @exposures.count_for(section, tag(section), @response.daily_exercise.language, on_or_before: @response.date)
-    return false if count.nil?
-
+    count = @exposures.count(*key(section), on_or_before: @response.date)
     count == 1 || @response.ai_rating_unfavorable?(section)
   end
 
@@ -32,7 +36,5 @@ class ReviewShortVersion
     RubricCheck.new(graded).essential_gaps if graded
   end
 
-  def earlier_sections(section) = @response.section_keys.take_while { |key| key != section }
-
-  def tag(section) = @response.concept_tags[section]
+  def earlier_sections(section) = @response.section_keys.take_while { |other| other != section }
 end

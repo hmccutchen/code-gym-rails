@@ -45,6 +45,18 @@ RSpec.describe "The concept's short version in a review", type: :request do
     expect(block.at_css("a")["href"]).to eq(learn_concept_path("ruby_rails", "n_plus_one"))
   end
 
+  it "builds the exposure index once for the submitted dashboard" do
+    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+    reviewed_day(date: Date.current)
+
+    builds = 0
+    counter = ->(*, payload) { builds += 1 if payload[:sql].include?(%("daily_exercises"."language" FROM "daily_responses")) }
+    ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { get root_path }
+
+    expect(Nokogiri::HTML(response.body).css("details.review-short-version").size).to eq(1)
+    expect(builds).to eq(1)
+  end
+
   it "renders on History too" do
     ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
     reviewed_day(date: Date.current - 1)
@@ -87,6 +99,63 @@ RSpec.describe "The concept's short version in a review", type: :request do
     blocks = Nokogiri::HTML(response.body).css(".review-block details.review-short-version")
 
     expect(blocks.map { |block| block.text.include?(guide[:guide_pitfalls]) }).to eq([ true, false ])
+  end
+
+  def two_section_day(reviews:)
+    exercise = DailyExercise.create!(
+      user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+      problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+                     "pattern" => { "title" => "t", "question" => "p", "concept" => "n_plus_one" } }
+    )
+    DailyResponse.create!(
+      user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+      answers: { "code_review" => "Add includes.", "pattern" => "Preload it." },
+      section_ratings: { "code_review" => "right_level", "pattern" => "right_level" },
+      concept_tags: { "code_review" => "n_plus_one", "pattern" => "n_plus_one" }, ai_review: reviews
+    )
+  end
+
+  def blocks_by_section
+    get root_path
+    Nokogiri::HTML(response.body).css(".review-block").to_h do |block|
+      [ block["data-slot"], block.css("details.review-short-version").size ]
+    end
+  end
+
+  it "renders one block for two sections sharing a concept, with pitfalls when either has the gap" do
+    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+    two_section_day(reviews: { "code_review" => { "rating" => "solid", "missed" => [], "essential_gaps" => [] },
+                               "pattern" => { "rating" => "developing", "missed" => [ "m" ], "essential_gaps" => [ 0 ] } })
+
+    expect(blocks_by_section.values.sum).to eq(1)
+    expect(Nokogiri::HTML(response.body).at_css("details.review-short-version").text).to include(guide[:guide_pitfalls])
+  end
+
+  it "renders the block on the later section when the earlier one's review failed" do
+    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+    two_section_day(reviews: { "pattern" => { "rating" => "developing", "missed" => [ "m" ], "essential_gaps" => [ 0 ] } })
+
+    page = blocks_by_section
+    expect(page.values.sum).to eq(1)
+    expect(Nokogiri::HTML(response.body).at_css(".review-block details.review-short-version")
+             .ancestors(".review-block").first.at_css("h3").text).to include("Pattern")
+  end
+
+  it "escapes markup in every reference field it shows" do
+    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                             **guide.merge(guide_worked_example: "<i>worked</i> example", guide_pitfalls: "<i>pitfall</i> text"))
+    reviewed_day(date: Date.current)
+    with_guide = short_version(root_path)
+
+    ConceptReference.delete_all
+    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                             **guide.except(:guide_plain_language, :guide_worked_example, :guide_pitfalls)
+                                   .merge(explanation: "<i>explained</i>", code_example: "<i>code</i>"))
+    without_guide = short_version(root_path)
+
+    [ with_guide, without_guide ].each { |block| expect(block.css("i")).to be_empty }
+    expect(with_guide.text).to include("<i>worked</i> example", "<i>pitfall</i> text")
+    expect(without_guide.text).to include("<i>explained</i>", "<i>code</i>")
   end
 
   it "underlines a glossary term once across the block and escapes markup in reference fields" do

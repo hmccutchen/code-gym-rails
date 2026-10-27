@@ -4,11 +4,11 @@
 `concept_tags` with its day's date and language in one query, and keys each
 date by `[concept, bucket]` from `.key_for`, which is the one place that
 says which tags count (`.counted?`) and which bucket a section records
-under. `#count_for` answers a section's count through the same key, so
-`DailyResponse#improved_code_visible?` and `ReviewShortVersion` can't drift
-from the index: a section's revised code shows once its own bucket has two
-exposures. `#count_for` is nil for a tag that doesn't count, and each caller
-decides what that means.
+under. `#count_for` answers a section's count through the same key, and
+`ReviewShortVersion#key` is that key, so `DailyResponse#improved_code_visible?`
+and the short version can't drift from the index: a section's revised code
+shows once its own bucket has two exposures. `#count_for` is nil for a tag
+that doesn't count, and each caller decides what that means.
 A skipped section of a submitted day still counts, since it was shown;
 unsubmitted days, blank tags and `"other"` never count.
 

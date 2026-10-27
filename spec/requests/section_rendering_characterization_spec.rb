@@ -216,7 +216,10 @@ RSpec.describe "section rendering", type: :request do
 
     def page_outside_short_version
       get root_path
-      Nokogiri::HTML(response.body).tap { |page| page.css("details.review-short-version").each(&:remove) }.text.squish
+      page = Nokogiri::HTML(response.body)
+      page.css("details.review-short-version, meta[name=csrf-token], meta[name=csp-nonce], input[name=authenticity_token]").each(&:remove)
+      page.xpath("//@nonce").each(&:remove)
+      page.to_html.gsub(/>\s+</, "><")
     end
 
     it "adds the block and changes nothing else on the page" do

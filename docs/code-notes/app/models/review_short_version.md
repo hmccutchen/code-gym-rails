@@ -14,8 +14,15 @@ index doesn't hold yet, so it tests `.zero?`. Both read
 ## Why the reference row isn't checked here
 
 Sections that share a concept share its `ConceptReference` row, so a missing
-row can't change which section offers the short version. The partial renders
-nothing when the row is missing, and the model stays free of database reads.
+row can't change which section offers the short version. `ReviewHelper#review_short_version`
+returns nothing when the row is missing, and the model issues no queries of
+its own.
+
+## Pitfalls follow any section sharing the concept
+
+`#pitfalls?` is true when any section with the same `#key` has an essential
+gap, since only one section offers the block for a concept on a day. The
+decision record says why.
 
 ## Why the index is passed in
 
