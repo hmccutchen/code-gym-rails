@@ -2,7 +2,7 @@ Walk through the "code_review" section from the day's context above. No answer w
 Pitched at: senior — the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
 
 Return a single JSON object (NOT wrapped in a "code_review" key) with:
-- "correct": array of strings — each entry one distinct thing in what they wrote that is on the right track
+- "correct": array of strings — always empty
 - "missed": array of strings — each entry one distinct thing a good answer would cover
 - "better_questions": array of strings — each entry one question they should have asked themselves
 - "next_step": string — one specific thing to study

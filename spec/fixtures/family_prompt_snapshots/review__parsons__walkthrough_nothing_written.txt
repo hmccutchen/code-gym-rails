@@ -1,0 +1,18 @@
+Walk through the "parsons_problem" section from the day's context above. No answer was given for this section, so it must not be rated. Return "correct" as an empty array, since nothing was written.
+Pitched at: junior — one clearly visible instance of the concept in a small scenario.
+
+Correct blocks, in order: 1. total = 0 / 2. items.each { |i| total += i } / 3. total
+
+Explain WHY each block belongs where it does — cite the actual dependency or logical reason (e.g. "this block uses a variable an earlier block declares, so it must come after it").
+
+Return a single JSON object (NOT wrapped in a "parsons_problem" key) with:
+- "correct": array of strings — always empty
+- "missed": array of strings — each entry one distinct thing a good answer would cover
+- "better_questions": array of strings — each entry one question they should have asked themselves
+- "next_step": string — one specific thing to study
+- "improved_code": string — must be an empty string for this section
+
+Each array entry must be ONE self-contained idea in one or two sentences. Never pack
+several points into one entry, and never number points inside an entry ("1) ... 2) ...")
+— separate ideas belong in separate entries. Use an empty array when there is nothing to
+say for that field.

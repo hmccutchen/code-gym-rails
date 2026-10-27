@@ -1053,12 +1053,31 @@ RSpec.describe ExerciseSection do
       expect(note).to match(/5 block\(s\) out of place/)
       expect(note).not_to include("exact match")
     end
+  end
 
-    it "refuses to claim a verified parsons result with no stored blocks" do
-      note = ExerciseSection::ParsonsProblem.grading_note(section: {}, answer: "order:1,0")
+  describe "walkthrough note per kind" do
+    it "is empty for every kind but parsons, so shared code needs no branch" do
+      (ExerciseSection.all - [ ExerciseSection::ParsonsProblem ]).each do |kind|
+        expect(kind.walkthrough_note(section: { "blocks" => %w[a b] })).to eq(""), kind.key
+      end
+    end
 
-      expect(note).to include("CANNOT be verified")
-      expect(note).not_to match(/block\(s\) out of place/)
+    it "gives parsons the correct order and nothing about a score" do
+      note = ExerciseSection::ParsonsProblem.walkthrough_note(section: { "blocks" => %w[a b c] })
+
+      expect(note).to include("Correct blocks, in order: 1. a / 2. b / 3. c")
+      expect(note).not_to match(/rating|out of place|misplaced|verified|scored/i)
+    end
+
+    it "says the exercise data is unavailable for a parsons section with no blocks" do
+      note = ExerciseSection::ParsonsProblem.walkthrough_note(section: {})
+
+      expect(note).to include("unavailable")
+      expect(note).not_to include("Correct blocks")
+    end
+
+    it "never counts a parsons section with no blocks as answered, whatever order is stored" do
+      expect(ExerciseSection::ParsonsProblem.answered?("order:1,0", {})).to be(false)
     end
   end
 

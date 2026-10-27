@@ -2699,19 +2699,6 @@ RSpec.describe AiService do
       )
       expect(fixed_rating_for(exercise, response)).to eq("beginner")
     end
-
-    it "leaves the rating to the grader when the exercise's parsons_problem has no blocks" do
-      exercise = DailyExercise.create!(
-        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
-        problem_set: {
-          "code_review"     => { "question" => "q", "snippet" => "s" },
-          "pattern"         => { "title" => "t", "question" => "q" },
-          "parsons_problem" => { "title" => "T", "question" => "Q" }
-        }
-      )
-      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
-      expect(fixed_rating_for(exercise, response)).to be_nil
-    end
   end
 
   describe "read timeout per call type" do

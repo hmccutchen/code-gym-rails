@@ -14,7 +14,7 @@ The scramble is rolled once at ingest and persisted as `display_order`, so every
 
 ## `.fixed_rating`
 
-The computed rating replaces whatever the grader returned. It is nil when the section has no blocks, because an empty block list would otherwise read as a perfect score.
+The computed rating replaces whatever the grader returned. It is only reached for an answered section, and `.answered?` needs at least one block, so an empty block list never reaches it.
 
 ## `.block_token`
 
@@ -42,7 +42,11 @@ The review context has no answer line: Ruby has already graded the order, and a 
 
 ## `.grading_note`
 
-A section can resolve with no blocks. The note then tells the grader to skip grading instead of claiming a verified "0 out of place".
+Only an answered section is graded, and a section with no blocks can never be answered, so the note assumes blocks exist.
+
+## `.walkthrough_note`
+
+The walkthrough has no answer to score, so the grader is given only the correct block order (shared with `.grading_note` through `.correct_block_order`) and asked to explain why each block belongs where it does. With no stored blocks it says the exercise data is unavailable.
 
 ## `.describe_mismatches`
 

@@ -68,13 +68,18 @@ class ReviewPrompt
       Walk through the "#{key}" section from the day's context above. No answer was given for this section, so it must not be rated. Return "correct" as an empty array, since nothing was written.
       Pitched at: #{rung} — #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}
 
-      #{json_header(key)}
-      - "correct": array of strings — each entry one distinct thing in what they wrote that is on the right track
+      #{walkthrough_note_block(kind, section)}#{json_header(key)}
+      - "correct": array of strings — always empty
       - "missed": array of strings — each entry one distinct thing a good answer would cover
       #{shared_review_fields(kind)}
 
       #{ENTRY_RULES}
     PROMPT
+  end
+
+  def self.walkthrough_note_block(kind, section)
+    note = kind.walkthrough_note(section: section)
+    note.empty? ? "" : "#{note}\n\n"
   end
 
   def self.json_header(key)
@@ -95,5 +100,5 @@ class ReviewPrompt
       "must be an empty string for this section"
   end
 
-  private_class_method :improved_code_instruction, :json_header, :shared_review_fields
+  private_class_method :walkthrough_note_block, :improved_code_instruction, :json_header, :shared_review_fields
 end
