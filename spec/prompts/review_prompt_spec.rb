@@ -119,4 +119,26 @@ RSpec.describe ReviewPrompt do
       expect_prompt_snapshot("review__day_a__code_review__walkthrough_nothing_written", nothing_written)
     end
   end
+  describe ".for_section" do
+    let(:entry) { day_a.first }
+
+    def prompt_for(answered:)
+      described_class.for_section(key: entry[:key], section: entry[:section], answer: entry[:answer], answered: answered, rung: entry[:rung])
+    end
+
+    it "grades an answered section with the section prompt" do
+      expect(prompt_for(answered: true))
+        .to eq(described_class.section_prompt(key: entry[:key], section: entry[:section], answer: entry[:answer], rung: entry[:rung]))
+    end
+
+    it "walks through an unanswered section, whatever answer text it is handed" do
+      expect(prompt_for(answered: false))
+        .to eq(described_class.walkthrough_prompt(key: entry[:key], section: entry[:section], rung: entry[:rung]))
+    end
+
+    it "takes the answer state as a value, so it never reads a response" do
+      expect(described_class.method(:for_section).parameters)
+        .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :answer ], [ :keyreq, :answered ], [ :keyreq, :rung ] ])
+    end
+  end
 end
