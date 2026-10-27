@@ -87,6 +87,18 @@ RSpec.describe Glossary do
     end
   end
 
+  # Reviews of Rails code use both words in their Rails sense, so neither definition may describe only one stack.
+  describe "terms reviews use across stacks" do
+    it "defines callback to cover a Rails model hook as well as a function passed in" do
+      expect(Glossary::TERMS["callback"]).to include("after_save").and include("function")
+    end
+
+    it "defines ref beyond React's useRef" do
+      expect(Glossary::TERMS["ref"]).to include("useRef")
+      expect(Glossary::TERMS["ref"]).not_to start_with("In React")
+    end
+  end
+
   describe ".forms_for" do
     it "returns a key with its forms, from the key or from any of its forms" do
       expect(Glossary.forms_for("memoization")).to eq(%w[memoization memoized memoizing memoize memoised])

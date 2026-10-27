@@ -1163,6 +1163,21 @@ RSpec.describe "Responses", type: :request do
       expect(r.reload.review_alternates["code_review"]).to eq([ "First alternate" ])
     end
 
+    it "returns the explanation as plain text and as glossary-wrapped, escaped HTML" do
+      r = reviewed_response_for(user)
+      stub_alternate("<i>Look</i> at eager loading.")
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+
+      body = JSON.parse(response.body)
+      expect(body["alternate"]).to eq("<i>Look</i> at eager loading.")
+      html = Nokogiri::HTML.fragment(body["alternate_html"])
+      expect(html.at_css(".gloss-term").text).to eq("eager loading")
+      expect(html.css("i")).to be_empty
+      expect(r.reload.review_alternates["code_review"]).to eq([ "<i>Look</i> at eager loading." ])
+    end
+
     it "appends rather than replacing on a second call" do
       r = reviewed_response_for(user)
       stub_alternate("Second alternate")

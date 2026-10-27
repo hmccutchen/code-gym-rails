@@ -25,7 +25,11 @@ export default class extends Controller {
     if (result.ok && data) {
       const paragraph = document.createElement("p")
       paragraph.className = "alternate-item"
-      paragraph.textContent = data.alternate
+      if (typeof data.alternate_html === "string") {
+        paragraph.innerHTML = data.alternate_html
+      } else {
+        paragraph.textContent = data.alternate
+      }
       this.element.insertBefore(paragraph, this.buttonTarget)
       // Set, never cleared: the explanation lands outside this live region.
       this.statusTarget.textContent = data.remaining > 0 ? this.addedTextValue : this.addedLastTextValue

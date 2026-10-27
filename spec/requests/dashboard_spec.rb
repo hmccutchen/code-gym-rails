@@ -191,10 +191,11 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   it "renders the review with the keys review_response actually returns" do
     create_response(create_exercise, ai_review: sample_review)
     get root_path
-    expect(response.body).to include("Good catch on the missing index")
-    expect(response.body).to include("Missed the race condition")
-    expect(response.body).to include("What about locks?")
-    expect(response.body).to include("Read about advisory locks")
+    review_text = Nokogiri::HTML(response.body).css(".review-block").text
+    expect(review_text).to include("Good catch on the missing index")
+    expect(review_text).to include("Missed the race condition")
+    expect(review_text).to include("What about locks?")
+    expect(review_text).to include("Read about advisory locks")
     expect(response.body).to include("improved_code_marker")
     expect(response.body).to include('class="review-rating">solid</span>')
   end

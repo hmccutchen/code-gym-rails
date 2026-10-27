@@ -123,6 +123,15 @@ the HTML with `innerHTML`, and the plain text stays what goes back as
 `prior_alternates`. A follow-up change (PR B) covers the backfill of terms in
 existing references; this change only wires what renders.
 
+A reviewed section's prose was wrapped later (#575): every review field and
+point, the difficulty reason and the alternate explanations, with the improved
+code and the follow-up turns left plain. A review only shows after
+submission, so a definition there can't hint at an answer. Unlike the
+reference prose above, review text was wrapped without a wrong-sense listing
+first. The two misfires found in review were reworded: `callback` now covers a
+Rails model hook as well as a function passed in, and `ref` no longer reads as
+React-only. Issue #578 tracks a full listing over stored review text.
+
 The architecture section's inline reference
 (`responses/bodies/_architecture.html.erb`, built from the exercise JSON) stays
 plain too, because the production audit never covered that text. Issue #561
