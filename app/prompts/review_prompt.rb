@@ -9,6 +9,13 @@ class ReviewPrompt
     The rating must agree with "missed": when "missed" names an essential gap, the rating is not "solid" or "strong". When a section's grading note says its rating is already fixed, that note wins.
   RUBRIC
 
+  ENTRY_RULES = <<~RULES.chomp.freeze
+    Each array entry must be ONE self-contained idea in one or two sentences. Never pack
+    several points into one entry, and never number points inside an entry ("1) ... 2) ...")
+    — separate ideas belong in separate entries. Use an empty array when there is nothing to
+    say for that field.
+  RULES
+
   def self.day_system(coach:, sections:)
     others = sections.size - 1
     others_clause =
@@ -43,19 +50,14 @@ class ReviewPrompt
 
       #{kind.grading_note(section: section, answer: answer)}
 
-      Return a single JSON object (NOT wrapped in a "#{key}" key) with:
+      #{json_header(key)}
       - "rating": "beginner" | "developing" | "solid" | "strong"
       - "correct": array of strings — each entry one distinct thing they got right
       - "missed": array of strings — each entry one distinct thing they missed or got wrong
       - "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
-      - "better_questions": array of strings — each entry one question they should have asked themselves
-      - "next_step": string — one specific thing to study
-      - "improved_code": string — #{improved_code_instruction(kind)}
+      #{shared_review_fields(kind)}
 
-      Each array entry must be ONE self-contained idea in one or two sentences. Never pack
-      several points into one entry, and never number points inside an entry ("1) ... 2) ...")
-      — separate ideas belong in separate entries. Use an empty array when there is nothing to
-      say for that field.
+      #{ENTRY_RULES}
     PROMPT
   end
 
@@ -66,24 +68,17 @@ class ReviewPrompt
       Walk through the "#{key}" section from the day's context above. #{walkthrough_opening(written)}
       Pitched at: #{rung} — #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}
 
-      #{kind.grading_note(section: section, answer: nil)}
-
-      Return a single JSON object (NOT wrapped in a "#{key}" key) with:
-      - "correct": array of strings — each entry one distinct thing in what they wrote that is on the right track; an empty array when nothing qualifies
+      #{json_header(key)}
+      - "correct": array of strings — each entry one distinct thing in what they wrote that is on the right track
       - "missed": array of strings — each entry one distinct thing a good answer would cover
-      - "better_questions": array of strings — each entry one question they should have asked themselves
-      - "next_step": string — one specific thing to study
-      - "improved_code": string — #{improved_code_instruction(kind)}
+      #{shared_review_fields(kind)}
 
-      Each array entry must be ONE self-contained idea in one or two sentences. Never pack
-      several points into one entry, and never number points inside an entry ("1) ... 2) ...")
-      — separate ideas belong in separate entries. Use an empty array when there is nothing to
-      say for that field.
+      #{ENTRY_RULES}
     PROMPT
   end
 
   def self.walkthrough_opening(written)
-    return "The engineer wrote nothing for this section; no answer was given, so it must not be rated." if written.nil?
+    return 'No answer was given for this section, so it must not be rated. Return "correct" as an empty array, since nothing was written.' if written.nil?
 
     <<~OPENING.chomp
       The engineer wrote only the text below, which is too short to count as an answer, so it must not be rated.
@@ -93,11 +88,23 @@ class ReviewPrompt
     OPENING
   end
 
+  def self.json_header(key)
+    %(Return a single JSON object (NOT wrapped in a "#{key}" key) with:)
+  end
+
+  def self.shared_review_fields(kind)
+    <<~FIELDS.chomp
+      - "better_questions": array of strings — each entry one question they should have asked themselves
+      - "next_step": string — one specific thing to study
+      - "improved_code": string — #{improved_code_instruction(kind)}
+    FIELDS
+  end
+
   def self.improved_code_instruction(kind)
     kind.improved_code? ?
       "the #{kind.improved_code_label.downcase} for this section" :
       "must be an empty string for this section"
   end
 
-  private_class_method :improved_code_instruction, :walkthrough_opening
+  private_class_method :improved_code_instruction, :walkthrough_opening, :json_header, :shared_review_fields
 end

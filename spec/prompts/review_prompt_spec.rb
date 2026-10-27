@@ -56,7 +56,7 @@ RSpec.describe ReviewPrompt do
     let(:short_note) { described_class.walkthrough_prompt(key: "code_review", section: section, rung: "senior", written: "N+1?") }
 
     it "says no answer was given and asks for no rating when nothing was written" do
-      expect(nothing_written).to include("no answer was given", "must not be rated", "Pitched at: senior")
+      expect(nothing_written).to include("No answer was given", "must not be rated", "Pitched at: senior")
       expect(nothing_written).not_to include("\"rating\"", "essential_gaps", "<engineer_text>")
     end
 
@@ -73,7 +73,24 @@ RSpec.describe ReviewPrompt do
     end
 
     it "asks for what is on the right track in a short note first" do
-      expect(short_note).to match(/"correct".*on the right track/)
+      opening = "Put what in it is on the right track, if anything, in \"correct\" first"
+      expect(short_note).to include(opening)
+      expect(nothing_written).not_to include(opening)
+    end
+
+    it "tells the grader to return an empty correct array when nothing was written" do
+      expect(nothing_written).to include("No answer was given for this section", "\"correct\" as an empty array")
+    end
+
+    it "carries no grading instruction for any section kind, with or without a short note" do
+      ExerciseSection.all.each do |kind|
+        section = { "blocks" => %w[a b c] }
+        [ nil, "N+1?" ].each do |written|
+          prompt = described_class.walkthrough_prompt(key: kind.key, section: section, rung: "junior", written: written)
+
+          expect(prompt).not_to include("\"rating\"", "essential_gaps", "rubric", "Grade "), "#{kind.key} with written #{written.inspect}"
+        end
+      end
     end
 
     it "renders each form exactly as recorded" do

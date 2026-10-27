@@ -7,11 +7,8 @@ N+1?
 Put what in it is on the right track, if anything, in "correct" first, then walk through what a good answer covers.
 Pitched at: senior — the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
 
-Main point: the one planted issue — the defect in the snippet, the smell in the test file, or the flaw in the migration.
-Essential pieces: why it is a problem in this code, and a fix that would work as written.
-
 Return a single JSON object (NOT wrapped in a "code_review" key) with:
-- "correct": array of strings — each entry one distinct thing in what they wrote that is on the right track; an empty array when nothing qualifies
+- "correct": array of strings — each entry one distinct thing in what they wrote that is on the right track
 - "missed": array of strings — each entry one distinct thing a good answer would cover
 - "better_questions": array of strings — each entry one question they should have asked themselves
 - "next_step": string — one specific thing to study
