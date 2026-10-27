@@ -309,3 +309,4 @@ data.*
 - fuzzy Learn search `#570`
 - glossary terms in alternate framings `#573`
 - glossary_wrap always returns escaped HTML `#576`
+- glossary terms throughout the review `#577`
