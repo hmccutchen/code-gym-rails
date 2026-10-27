@@ -119,6 +119,7 @@ RSpec.describe ReviewPrompt do
       expect_prompt_snapshot("review__day_a__code_review__walkthrough_nothing_written", nothing_written)
     end
   end
+
   describe ".for_section" do
     let(:entry) { day_a.first }
 
