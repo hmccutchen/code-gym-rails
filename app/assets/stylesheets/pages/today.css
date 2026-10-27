@@ -28,7 +28,7 @@ html:has(.progress-sticky) {
 
 .regenerate-row { margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .today-side { display: flex; flex-direction: column; gap: 16px; }
-.today-side .regenerate-row { margin-bottom: 0; }
+.today-side .regenerate-row, .today-side #submit-row { margin: 0; }
 .flash.regeneration-failed { margin-bottom: 1.5rem; }
 .auto-saved { font-size: .8rem; color: var(--muted); }
 .trial-banner.hint { margin: -1rem 0 1.5rem; }
@@ -48,7 +48,7 @@ html:has(.progress-sticky) {
   .today-page .page-header, .today-page .progress-sticky, .today-page .section, .today-page .flash.regeneration-failed { margin-bottom: 16px; }
   .today-page .trial-banner.hint { margin: 0 0 16px; }
 
-  #submit-row { gap: 4px; margin-top: 0; }
+  #submit-row { gap: 4px; }
   #submit-row #submit-answers { width: 100%; min-height: 48px; }
   #submit-row .auto-saved, #submit-row #rating-nudge { width: 100%; margin: 0; text-align: center; }
 }
@@ -56,7 +56,7 @@ html:has(.progress-sticky) {
 @media (min-width: 900px) {
   .today-day { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
   .today-side { padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
-  .today-side #submit-row { gap: 4px; margin-top: 0; }
+  .today-side #submit-row { gap: 4px; }
   .today-side #submit-answers { width: 100%; min-height: 48px; }
   .today-side .auto-saved, .today-side #rating-nudge { width: 100%; margin: 0; text-align: center; }
   .today-side .regenerate-row { flex-direction: column; align-items: stretch; }

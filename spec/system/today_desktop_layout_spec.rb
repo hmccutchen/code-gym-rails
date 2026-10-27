@@ -65,6 +65,12 @@ RSpec.describe "Today's desktop layout", type: :system do
     end
   end
 
+  it "keeps the gap before Submit at one section margin between 600 and 899px" do
+    visit_today(width: 768)
+
+    expect(rect("#submit-row")["top"] - rects(".today-main .section").last["bottom"]).to be_within(0.5).of(24)
+  end
+
   it "ends the page with Submit and then the regenerate row on a phone" do
     visit_today(width: 390, height: 844)
 

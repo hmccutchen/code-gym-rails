@@ -111,8 +111,9 @@ and the daily cards' swap rows stay usable, so the save that blocks the page
 can be retried, and Submit is disabled. When the gate holds,
 `holdForOtherSaves` applies the same freeze (to a submit's form too) and adds
 a notice with a Reload button right after the form, in the main column, then
-scrolls it into view, since on a phone it lands just below the screen and on
-a desktop at the end of the answers. It can't go inside the submit row, which the freeze makes inert. When the armed leave finally runs, `relockAndLeave`
+scrolls it into view, since it lands at the end of the answers, often below
+the screen. It sits with the answers rather than in the side column, so on a
+desktop it stays beside the frozen form it explains. When the armed leave finally runs, `relockAndLeave`
 closes any open dialog in the form first (a daily card's swap sheet), then
 makes the whole form inert again, swap rows included, so no new swap can be
 queued while the review POST or the reload is on its way. The close comes

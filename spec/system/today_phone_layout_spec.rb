@@ -74,7 +74,7 @@ RSpec.describe "Today's phone layout", type: :system do
 
 
   describe "the Submit row" do
-    it "stays at the end of the form, with a button as wide as the cards, in a browser tab and the home-screen app" do
+    it "comes after the last section, with a button as wide as the cards, in a browser tab and the home-screen app" do
       set_safe_area(bottom: 34)
       visit_today
 

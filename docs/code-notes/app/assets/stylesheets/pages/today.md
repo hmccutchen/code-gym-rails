@@ -33,8 +33,8 @@ the Submit row change together.
 
 - **Cards.** `.today-page` takes the phone gutter from `phone_cards.css`, so
   each section is a card `max(16px, inset)` from the screen edge, as on the
-  card pages. The title block, the regenerate row, the progress bar and each
-  section are 16px apart. A trial's banner gets its own margin there: its
+  card pages. The title block, the progress bar and each section are 16px
+  apart. A trial's banner gets its own margin there: its
   wider rule pulls it up into the title block's 2rem margin, which the 16px
   gap would otherwise cancel.
 - **The side column.** It ends the page: the Submit row, with the button full
