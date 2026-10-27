@@ -367,8 +367,26 @@ times running. The stability runs show whether a key makes grading more
 consistent; the validity check (section 8, option B) shows whether the keys
 are right. Both are needed before the `RUBRIC_VERSION` decision stands.
 
-The stability baseline is the before picture. After keys ship and about
-two weeks of keyed days exist:
+The stability baseline is the before picture. It ran on 2026-10-27 over
+the owner's 15 most recent graded sections (8 `code_review`, 7
+`design_comparison`, all at junior, all stored by Claude), 5 runs each on
+`claude-sonnet-5-5`, for $0.81:
+
+- **Stability:** 14 of 15 sections gave the same rating on all 5 runs. One
+  `code_review` section gave `solid` once and `developing` four times. No
+  section moved more than one level, and no grade failed.
+- **Drift from the stored rating:** 69 of 75 grades matched. Five of the six
+  mismatches are one `design_comparison` section, stored `beginner` on
+  2026-10-11 and graded `developing` on every run now; the sixth is the
+  one-off `solid` above.
+
+So run-to-run noise on these two kinds is about one grade in 75, one level
+apart, which the movement threshold below clears easily. The baseline
+covers no `security_review`, `plan_review` or `pseudocode_to_code`
+section, because every day in the sample had two sections. Those three
+kinds have no before picture yet.
+
+After keys ship and about two weeks of keyed days exist:
 
 1. Export keyed sections with the same script.
 2. Regrade each one 5 times with the key, and 5 times with the new
