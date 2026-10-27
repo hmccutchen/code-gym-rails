@@ -25,11 +25,12 @@ fixture has three entries with one reviewed section each.
 
 The review's prose renders through `glossary_wrap`: every field and point,
 the difficulty note's reason, and the saved alternate explanations. The
-improved code stays out, since the wrapper never touches code, and so do the
-follow-up turns, which are the engineer's own questions and the answers to
-them. A review is only shown after submission, so a definition here can't
-hint at an answer the way one on the unsubmitted form could (#564). Each
-field wraps on its own, so a term is underlined once per field.
+improved code stays out: for code kinds the wrapper never touches code, and a
+plan review's rewritten plan is left plain by choice. The follow-up turns stay
+plain too. A review is only shown after submission, so a definition here can't
+hint at an answer the way one on the unsubmitted form could (#564). A term is
+underlined once per field: a list field's points share one `seen:` set, so a
+term repeated across its bullets is underlined in the first only.
 
 ## Caps and the follow-up thread
 

@@ -23,7 +23,8 @@
           <div class="review-item">
             <strong><%= DailyResponse.ai_review_label(key) %>:</strong>
             <ul class="review-points">
-              <% points.each do |point| %><li><%= glossary_wrap(point) %></li><% end %>
+              <% seen = Set.new %>
+              <% points.each do |point| %><li><%= glossary_wrap(point, seen: seen) %></li><% end %>
             </ul>
           </div>
         <% end %>

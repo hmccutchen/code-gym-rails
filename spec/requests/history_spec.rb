@@ -56,6 +56,22 @@ RSpec.describe "History", type: :request do
     expect(review.text).to include("<b>Bold</b> plain words")
   end
 
+  it "underlines a glossary term once per review field, even when several of its points repeat it" do
+    reviewed = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+    reviewed.update!(ai_review: { "code_review" => {
+      "rating" => "solid",
+      "missed" => [ "A race condition in the save.", "Another race condition in the update." ],
+      "correct" => [ "You saw the race condition." ]
+    } })
+
+    login_as(user)
+    get history_path
+
+    review = Nokogiri::HTML(response.body).at_css(".review-block")
+    terms_per_list = review.css(".review-points").map { |list| list.css(".gloss-term").map(&:text) }
+    expect(terms_per_list).to all(eq([ "race condition" ]))
+  end
+
   it "shows a rewritten review and never the grader's original kept for audit" do
     reviewed = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
     reviewed.update!(ai_review: { "code_review" => {
