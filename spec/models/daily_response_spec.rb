@@ -11,15 +11,15 @@ RSpec.describe DailyResponse, type: :model do
       .to raise_error(ActiveRecord::RecordNotUnique)
   end
 
-  describe "#reviewed_by" do
+  describe "#review_provider_key" do
     let(:user) { User.create!(email: "label@example.com", name: "L", provider: "openai", api_keys: { "openai" => "sk-proj-x" }) }
 
     it "is the provider that wrote the review" do
-      expect(DailyResponse.new(user: user, review_provider: "anthropic").reviewed_by).to eq("anthropic")
+      expect(DailyResponse.new(user: user, review_provider: "anthropic").review_provider_key).to eq("anthropic")
     end
 
     it "falls back to the user's provider for a review written before it was recorded" do
-      expect(DailyResponse.new(user: user, review_provider: nil).reviewed_by).to eq("openai")
+      expect(DailyResponse.new(user: user, review_provider: nil).review_provider_key).to eq("openai")
     end
   end
 

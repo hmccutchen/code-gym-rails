@@ -4,7 +4,7 @@ The review's labels moved here from `DailyResponse` (#582), so the model keeps t
 
 ## `#review_provider_label`
 
-Names `DailyResponse#reviewed_by` through `AiProvider.label`, so a stored `unknown` reads "AI" (#588).
+Names `DailyResponse#review_provider_key` through `AiProvider.label`, so a stored `unknown` reads "AI" (#588).
 
 ## `#review_badge`
 

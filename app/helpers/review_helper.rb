@@ -4,7 +4,7 @@ module ReviewHelper
   end
 
   def review_provider_label(response)
-    AiProvider.label(response.reviewed_by)
+    AiProvider.label(response.review_provider_key)
   end
 
   def review_badge(response, section)

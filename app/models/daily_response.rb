@@ -93,7 +93,7 @@ class DailyResponse < ApplicationRecord
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
 
-  def reviewed_by = review_provider.presence || user.provider
+  def review_provider_key = review_provider.presence || user.provider
 
   def replace_blocker
     return :reviewed if reviewed?
