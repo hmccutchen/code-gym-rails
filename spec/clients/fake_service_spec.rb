@@ -142,6 +142,13 @@ RSpec.describe FakeService do
       expect(described_class::REPLIES.keys.sort).to eq(ApiUsage::PURPOSES.sort)
     end
 
+    it "answers a walkthrough prompt for an unanswered section the same way" do
+      prompt = %(Walk through the "code_review" section from the day's context above.)
+      reply  = service.send(:call, AiService.request_for("review_response", system: "s", prompt: prompt))
+
+      expect(JSON.parse(reply[:text])).to include("missed")
+    end
+
     ApiUsage::PURPOSES.each do |purpose|
       it "answers #{purpose} with a zero-cost reply its caller can read" do
         result = reply_for(purpose)

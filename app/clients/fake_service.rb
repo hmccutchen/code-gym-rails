@@ -294,7 +294,7 @@ class FakeService < AiService
     "What would happen to that method if it ran a hundred times in one request — where would the slowdown show up?"
 
   def self.review_section(prompt)
-    section = prompt[/Grade ONLY the "(\w+)" section/, 1]
+    section = prompt[/(?:Grade ONLY|Walk through) the "(\w+)" section/, 1]
     raise "FakeService could not extract the section key from the review prompt" if section.blank?
 
     REVIEW_SECTION.to_json

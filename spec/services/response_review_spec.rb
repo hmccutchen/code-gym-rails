@@ -204,6 +204,28 @@ RSpec.describe ResponseReview do
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
     end
 
+    it "reviews an unanswered section in the same batch, with no grade stored and the same number of calls" do
+      daily_response = create_submitted_response
+      daily_response.update!(answers: { "code_review" => "a" * 20, "pattern" => "N+1?" })
+      purposes = Queue.new
+      allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, request|
+        purposes << request.purpose
+        original.call(request)
+      end
+      allow(AiService).to receive(:for).with(user).and_return(FakeService.new("key"))
+
+      expect(review_through_provider(daily_response).status).to eq(:ready)
+
+      daily_response.reload
+      expect(daily_response).to be_fully_reviewed
+      expect(daily_response.ai_review["code_review"]).to include("rating", "rubric")
+      %w[pattern challenge].each do |unanswered|
+        expect(daily_response.ai_review[unanswered].keys).not_to include("rating", "essential_gaps", "rubric")
+        expect(daily_response.ai_review[unanswered]).to have_key("missed")
+      end
+      expect(Array.new(purposes.size) { purposes.pop }.tally).to eq("review_response" => 3, "assess_difficulty" => 1)
+    end
+
     it "saves the ai_review from the user's configured provider" do
       daily_response = create_submitted_response
       stub_reviewer(

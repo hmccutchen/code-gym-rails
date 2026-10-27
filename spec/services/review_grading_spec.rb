@@ -197,6 +197,94 @@ RSpec.describe ReviewGrading do
     end
   end
 
+  describe "an unanswered section" do
+    around do |example|
+      original = ENV["REVIEW_PROSE_JUDGE"]
+      example.run
+    ensure
+      ENV["REVIEW_PROSE_JUDGE"] = original
+    end
+
+    def mixed_day(unanswered_answer)
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "cr?", "snippet" => "code" },
+                       "pattern" => { "title" => "P", "question" => "pat?" },
+                       "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] } }
+      )
+      answers = { "code_review" => "a" * 20, "pattern" => unanswered_answer }
+      [ exercise, DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: answers, submitted_at: Time.current) ]
+    end
+
+    let(:graded_reply) do
+      ->(*) { { "rating" => "solid", "essential_gaps" => [ 0 ], "rubric" => 2, "missed" => [ "x" ], "correct" => [] } }
+    end
+
+    [ [ "blank", "" ], [ "too short", "N+1?" ], [ "scaffold-only", nil ] ].each do |name, written|
+      it "stores a #{name} section without rating, essential_gaps or rubric, and keeps the answered one whole" do
+        exercise, response = mixed_day(written)
+        results = review(%w[code_review pattern], exercise: exercise, response: response, grade: graded_reply)
+
+        expect(results["pattern"][:review]).to eq("missed" => [ "x" ], "correct" => [])
+        expect(results["code_review"][:review]).to include("rating" => "solid", "missed" => [ "x" ])
+        expect(results["code_review"][:review]).to have_key("rubric")
+      end
+    end
+
+    it "strips the grade from a scaffold-only answer" do
+      exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                       problem_set: { "plan_review" => { "title" => "T", "question" => "Q" } })
+      scaffold = ExerciseSection::PlanReview::DEFAULT_SCAFFOLD.join("\n\n")
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                       answers: { "plan_review" => scaffold }, submitted_at: Time.current)
+      expect(response).not_to be_answered("plan_review")
+
+      results = review(%w[plan_review], exercise: exercise, response: response, grade: graded_reply)
+
+      expect(results["plan_review"][:review]).to eq("missed" => [ "x" ], "correct" => [])
+    end
+
+    it "gives an untouched Parsons section no computed rating" do
+      exercise, response = mixed_day("")
+      results = review(%w[parsons_problem], exercise: exercise, response: response, grade: graded_reply)
+
+      expect(results["parsons_problem"][:review]).not_to have_key("rating")
+    end
+
+    it "does not run the rubric check on an unanswered section" do
+      exercise, response = mixed_day("")
+      allow(RubricCheck).to receive(:new).and_call_original
+
+      review(%w[pattern], exercise: exercise, response: response, grade: graded_reply)
+
+      expect(RubricCheck).not_to have_received(:new)
+    end
+
+    it "still runs the prose judge, which is handed a review with no rating" do
+      exercise, response = mixed_day("")
+      judged = []
+      judge = ->(_user, _kind, graded, **) { judged << graded; ReviewProseVerdict.new(status: :keep) }
+
+      ENV["REVIEW_PROSE_JUDGE"] = "1"
+      review(%w[pattern], exercise: exercise, response: response, grade: graded_reply, judge_prose: judge, judges_prose: true)
+
+      expect(judged.size).to eq(1)
+      expect(judged.first).not_to have_key("rating")
+    end
+
+    it "makes one grade call, one difficulty assessment and one judge call per section" do
+      exercise, response = mixed_day("")
+      ENV["REVIEW_PROSE_JUDGE"] = "1"
+      calls = Queue.new
+      review(%w[code_review pattern], exercise: exercise, response: response, judges_prose: true,
+             grade: ->(*) { calls << :grade; graded_reply.call },
+             assess_difficulty: ->(*, **) { calls << :assess; {} },
+             judge_prose: ->(*, **) { calls << :judge; ReviewProseVerdict.new(status: :keep) })
+
+      expect(drained(calls).tally).to eq(grade: 2, assess: 1, judge: 2)
+    end
+  end
+
   describe "a computed rating" do
     it "replaces the grader's rating with the kind's computed one" do
       exercise = DailyExercise.create!(
@@ -360,6 +448,15 @@ RSpec.describe ReviewGrading do
     context "with the switch on" do
       before { ENV["REVIEW_PROSE_JUDGE"] = "1" }
 
+      it "judges an unanswered section's walkthrough and stores it with no rating, gaps or rubric stamp" do
+        response.update!(answers: {})
+        result, calls = graded
+        expect(calls).to eq(1)
+        expect(result[:ok]).to be(true)
+        expect(result[:review].keys).not_to include("rating", "essential_gaps", "rubric")
+        expect(result[:review]["missed"]).to eq(grade["missed"])
+      end
+
       it "applies an edit, keeps the rating, and stores the grader's prose" do
         result, calls = graded(judge_reply: edit_reply)
         expect(calls).to eq(1)
@@ -435,9 +532,11 @@ RSpec.describe ReviewGrading do
       DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
                             problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys)
     end
+    let(:parsons_blocks) { FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys["parsons_problem"]["blocks"].size }
     let(:saved_response) do
       DailyResponse.create!(user: user, daily_exercise: saved_exercise, date: Date.current,
-                            answers: { "code_review" => "The query runs once per row, so preload it." }, submitted_at: Time.current)
+                            answers: { "code_review" => "The query runs once per row, so preload it.", "parsons_problem" => "order:#{(0...parsons_blocks).to_a.join(",")}" },
+                            submitted_at: Time.current)
     end
 
     around do |example|
@@ -501,13 +600,14 @@ RSpec.describe ReviewGrading do
       expect(result[:review]["rubric"]).to eq(ReviewedSectionResults::RUBRIC_VERSION)
     end
 
-    it "checks the grader's own rating when a parsons section has no blocks to compute from" do
+    it "treats a parsons section with no blocks as unanswered, so the grader's rating is neither checked nor kept" do
       saved_exercise.problem_set["parsons_problem"].delete("blocks")
       saved_exercise.save!
 
-      graded(base.merge("essential_gaps" => []), section: "parsons_problem")
+      result = graded(base.merge("essential_gaps" => []), section: "parsons_problem")
 
-      expect(logged.string).to include("[rubric_check] user=#{user.id} section=parsons_problem rating=solid")
+      expect(logged.string).not_to include("[rubric_check]")
+      expect(result[:review].keys).not_to include("rating", "essential_gaps", "rubric")
     end
 
     it "skips a kind whose rating is computed, dropping any positions the grader sent" do
