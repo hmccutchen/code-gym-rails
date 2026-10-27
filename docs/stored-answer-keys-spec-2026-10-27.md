@@ -14,6 +14,10 @@ today's grader to compare against.
 - **A different finding:** it meets the main point only when it is at least
   as serious as the keyed one in this code; a lesser real finding is
   credited and the keyed point stays an essential gap (section 6).
+- **Plan review's main point:** the same rule applies to it. A keyed flaw
+  meets the main point, and so does a real flaw at least as serious as the
+  least serious keyed flaw. Each keyed flaw the answer missed stays an
+  essential gap (section 6). Confirmed by the owner on 2026-10-27.
 - **Checking keys:** the free quote check at ingest, plus a sampled manual
   read. The owner reads the Ruby `code_review` sections, and a senior
   colleague the owner chooses reads the other three kinds (section 8,
@@ -305,11 +309,22 @@ checking another from the same provider. If B finds wrong keys often
 enough to matter, A is the next step, with its isolation exception decided
 then. Not built in this spec beyond the quote check.
 
-The colleague's reading sheet holds only what the call needs: each
-section's problem as shown and its key, with no answer, rating or review.
-The owner's answers stay with the owner. The sheet is made from the
-read-only export, kept outside the repository, and deleted once the calls
-are recorded. Only the counts of calls go into the build PR.
+The colleague's reading sheet comes from its own read-only production
+export, separate from the stability export, and that export runs only
+after the owner approves it. It runs in the same `SET TRANSACTION READ
+ONLY` transaction as the stability export, and only over sections the owner
+has already had reviewed, so no key it carries is for a problem still
+waiting on an answer. The build PR adds it as an option on
+`script/export_review_baseline.rb` (`--key-sheet`), with a spec that the
+output holds none of the fields listed below.
+
+Each entry holds what the reader needs to judge the key against the code:
+the kind, the scenario, the question, the full snippet or plan as shown
+(`snippet`, plus `current_schema` for a migration; `plan_excerpt`; or
+`problem_statement`), and the key. It holds no answer, rating, review,
+self-rating or date, so the owner's work stays with the owner. The sheet is
+saved outside the repository and deleted once the calls are recorded. Only
+the counts of calls go into the build PR.
 
 ### 9. Teaching from the key (out of scope)
 
@@ -348,7 +363,8 @@ two weeks of keyed days exist:
    sections' typical rating differs between the two and in which direction.
 4. Run the sampled manual check (section 8, option B) on the same export:
    the owner reads the Ruby `code_review` sections, and the chosen senior
-   colleague reads the other three kinds from a sheet with no answers on it.
+   colleague reads the other three kinds from the key sheet (section 8),
+   which comes from its own approved, read-only export.
 
 **Sample size.** About 14 sections per kind is what two weeks gives
 `code_review`, which every day carries, if a set is done every day. The
@@ -378,6 +394,8 @@ shows for that kind. If that happens, say so on the build PR and reopen the
   `SET TRANSACTION READ ONLY` transaction) and runs only with the owner's
   approval of that export.
 - Every export is saved outside the repository and deleted after use.
+- The key sheet (section 8) is its own export with its own approval;
+  approving the stability export doesn't cover it.
 - Any real generation run for measuring token cost uses only keys the owner
   holds, and is asked about before it runs.
 
