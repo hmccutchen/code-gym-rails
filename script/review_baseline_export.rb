@@ -1,7 +1,7 @@
 # Design notes: docs/code-notes/script/review_baseline_export.md
 class ReviewBaselineExport
   FORMAT = 1
-  MAX_SECTIONS = 50
+  PER_KIND = 10
 
   Entry = Data.define(:date, :section, :rung, :stored_rating, :review_provider, :exercise, :response)
 
@@ -39,9 +39,9 @@ class ReviewBaselineExport
       "day's last recorded provider: #{providers.join(', ')}"
   end
 
-  def initialize(user_id:, limit: MAX_SECTIONS)
-    @user_id = user_id
-    @limit   = limit
+  def initialize(user_id:, per_kind: PER_KIND)
+    @user_id  = user_id
+    @per_kind = per_kind
   end
 
   def call
@@ -54,15 +54,13 @@ class ReviewBaselineExport
   private
 
   def days
-    taken = 0
+    taken = Hash.new(0)
     responses.each_with_object([]) do |response, days|
-      break days if taken >= @limit
-
-      sections = gradable_sections(response).first(@limit - taken)
+      sections = gradable_sections(response).select { |section| taken[section] < @per_kind }
       next if sections.empty?
 
+      sections.each { |section| taken[section] += 1 }
       days << day(response, sections)
-      taken += sections.size
     end
   end
 
@@ -90,7 +88,6 @@ class ReviewBaselineExport
     review = response.ai_review[section]
     graded = review.merge(review.fetch(ReviewProseVerdict::ORIGINAL_KEY, {}))
     { "kind" => section, "pitched_at" => response.daily_exercise.problem_set.dig(section, "pitched_at"),
-      "answer" => response.answer_for(section), "rating" => review["rating"],
-      "missed" => graded["missed"], "essential_gaps" => graded["essential_gaps"] }
+      "answer" => response.answer_for(section), "rating" => review["rating"], "essential_gaps" => graded["essential_gaps"] }
   end
 end

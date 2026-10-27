@@ -34,7 +34,7 @@ RSpec.describe ReviewBaselineExport do
 
     expect(day["sections"]).to eq([
       { "kind" => "code_review", "pitched_at" => "senior", "answer" => "Add includes(:customer).",
-        "rating" => "developing", "missed" => [ "m" ], "essential_gaps" => [ 0 ] }
+        "rating" => "developing", "essential_gaps" => [ 0 ] }
     ])
     expect(day["problem_set"]).to include("code_review", "parsons_problem", "pattern", "challenge")
     expect(day.keys).to include("answers", "section_ratings", "pseudocode_rounds", "plan_notes", "language", "review_provider")
@@ -48,17 +48,32 @@ RSpec.describe ReviewBaselineExport do
     expect(described_class.new(user_id: user.id).call["days"]).to be_empty
   end
 
-  it "takes the newest sections first and stops at the limit, inside a day if it has to" do
+  it "takes the newest sections of each kind up to the per-kind limit, with no overall cap" do
+    reviewed_day(Date.new(2026, 10, 18), { "code_review" => {}, "challenge" => {} })
+    reviewed_day(Date.new(2026, 10, 19), { "code_review" => {} })
+    reviewed_day(Date.new(2026, 10, 20), { "code_review" => {}, "security_review" => {} })
+
+    payload = described_class.new(user_id: user.id, per_kind: 2).call
+
+    expect(exported_kinds(payload)).to eq([ %w[2026-10-20 code_review], %w[2026-10-20 security_review],
+                                            %w[2026-10-19 code_review], %w[2026-10-18 challenge] ])
+  end
+
+  it "keeps a day whole for context while listing only the sections it takes from it" do
     reviewed_day(Date.new(2026, 10, 19), { "code_review" => {} })
     reviewed_day(Date.new(2026, 10, 20), { "code_review" => {}, "challenge" => {} })
 
-    payload = described_class.new(user_id: user.id, limit: 2).call
+    days = described_class.new(user_id: user.id, per_kind: 1).call["days"]
 
-    expect(exported_kinds(payload)).to eq([ %w[2026-10-20 code_review], %w[2026-10-20 challenge] ])
-    expect(exported_kinds(described_class.new(user_id: user.id, limit: 1).call)).to eq([ %w[2026-10-20 code_review] ])
+    expect(days.map { |day| day["sections"].map { |stored| stored["kind"] } }).to eq([ %w[code_review challenge] ])
+    expect(days.first["problem_set"].keys).to include("code_review", "challenge")
   end
 
-  it "exports the missed list and gaps the grader wrote when the prose judge reworded them" do
+  it "defaults to 10 sections per kind" do
+    expect(described_class::PER_KIND).to eq(10)
+  end
+
+  it "exports the gap positions the grader wrote when the prose judge reworded the review, and none of its text" do
     reviewed_day(Date.new(2026, 10, 20), { "code_review" => { review: {
       "rating" => "developing", "missed" => [ "reworded" ], "rubric" => stamp,
       ReviewProseVerdict::ORIGINAL_KEY => { "missed" => [ "as graded", "second" ], "essential_gaps" => [ 1 ] }
@@ -66,7 +81,9 @@ RSpec.describe ReviewBaselineExport do
 
     stored = described_class.new(user_id: user.id).call["days"].sole["sections"].sole
 
-    expect(stored).to include("missed" => [ "as graded", "second" ], "essential_gaps" => [ 1 ])
+    expect(stored).to include("essential_gaps" => [ 1 ])
+    expect(stored).not_to have_key("missed")
+    expect(stored.to_json).not_to include("as graded", "reworded")
   end
 
   it "refuses any write inside its read-only transaction" do

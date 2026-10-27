@@ -14,6 +14,9 @@ today's grader to compare against.
 - **A different finding:** it meets the main point only when it is at least
   as serious as the keyed one in this code; a lesser real finding is
   credited and the keyed point stays an essential gap (section 6).
+- **The movement threshold:** systematic rating movement is measured
+  against the unkeyed run on the same keyed sections, not the stability
+  baseline (Measuring). Decided by the owner on 2026-10-27.
 - **Plan review's main point:** the same rule applies to it. A keyed flaw
   meets the main point, and so does a real flaw at least as serious as the
   least serious keyed flaw. Each keyed flaw the answer missed stays an
@@ -390,7 +393,9 @@ the third slot with three other kinds, and `plan_review` and
 `pseudocode_to_code` share the fourth slot with `ambiguity_hunt` on days
 long enough to have one. Expect roughly 3-5 of each in two weeks. For those
 kinds, either keep measuring until each has about 10, or read the result as
-a direction, not a figure.
+a direction, not a figure. The export takes up to 10 of each kind
+(`ReviewBaselineExport::PER_KIND`), so waiting adds rows without changing
+the script.
 
 **Reporting.** Results are counts ("3 of 14 sections changed rating between
 runs"), never percentages. With samples this small a percentage claims a
@@ -401,8 +406,12 @@ since the stored review, so it is never read as stability.
 
 **What counts as systematic rating movement.** For a kind, at least 3
 sections whose typical rating differs between keyed and unkeyed grading,
-all in the same direction, and more than the run-to-run change the baseline
-shows for that kind. If that happens, say so on the build PR and reopen the
+all in the same direction, and more than the run-to-run change the unkeyed
+run (step 2) shows on those same sections. The comparison uses the unkeyed
+arm, not the stability baseline, because it covers the same sections, model
+and day, with only the key different. The baseline is an older sample of
+unkeyed sections, with only a few rows of each rotating kind. It stays a
+general measure of today's grader, not this threshold's reference. If that happens, say so on the build PR and reopen the
 `RUBRIC_VERSION` decision.
 
 **Handling production data.**
