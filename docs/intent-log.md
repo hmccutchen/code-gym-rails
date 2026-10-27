@@ -338,3 +338,26 @@ data.*
   the critical review of the ReviewPrompt work `#586`
 - the review badge and headings moved off DailyResponse into a view helper
   `#587`
+- a read-only baseline of how stable grading is: export my graded answers,
+  regrade each five times `#590`
+  **why:** I'm considering grading by an answer's route instead of a key,
+  and wanted a measurement first
+  **I decided:** every production export read-only, approved by me, kept
+  outside the repo and deleted after; 10 sections per kind, not 50 overall;
+  gap positions without the review's text; drift apart from stability
+- a spec for storing what code review, security review, plan review and
+  pseudocode-to-code planted
+  **I decided:** an unusable key keeps the section, without a key;
+  `RUBRIC_VERSION` stays unless keyed grading moves ratings beyond the
+  unkeyed run on the same sections; a different finding counts only if it is
+  at least as serious, plan review included; I read the Ruby code-review
+  keys, a colleague reads the rest from a sheet with no answers
+- a spec for a closed short version of the concept in the review, on a
+  first exposure or a low grade
+  **I decided:** pitfalls only with an essential gap; keep both reference
+  disclosures; the first qualifying section offers it when two share a
+  concept
+- the flaky Submit nudge layout spec, fixed on its own `#591 open`
+
+*Postponed: running the baseline, until its PR merges and I approve the
+plan's cost*

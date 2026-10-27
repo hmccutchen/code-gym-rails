@@ -71,3 +71,7 @@ Each answer is `[label, expected ratings, run]`. The first three are the quality
 ## `#review_heading`
 
 A real review translates pseudocode before grading. This script writes nothing, so an untranslated plan is graded as written, and the heading says so.
+
+## `#review_stability`
+
+Grades an exported baseline several times per section and hands the ratings to `ReviewStability`; `docs/code-notes/script/review_stability.md` has the details. It grades through `#grade_result`, which `#graded_review` also calls, so the stability run, `#review` and `#review_calibration` send the same request. It runs on unsaved records from `ReviewBaselineExport.entries`, inside a read-only transaction.
