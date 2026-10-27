@@ -23,7 +23,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
     end
   end
 
-  it "marks a blank section Skipped and a too-short note Not graded, and grades only the answered one" do
+  it "marks a blank section Skipped and grades a short answer like a longer one" do
     user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
     weekday = a_weekday
 
@@ -32,20 +32,21 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
       expect(page).to have_content(/Code Review/i)
 
       fields = all("textarea[data-field]").map { |area| area["data-field"] }.uniq
-      answered, _blank, noted = fields.first(3)
+      answered, _blank, short = fields.first(3)
       find(%(textarea[data-field="#{answered}"])).fill_in(
         with: "It re-runs the loyalty_tier query inside the loop — precompute it once outside the loop."
       )
-      find(%(textarea[data-field="#{noted}"])).fill_in(with: "N+1?")
+      find(%(textarea[data-field="#{short}"])).fill_in(with: "N+1?")
       rate_section(answered)
+      rate_section(short)
       click_button "Submit answers"
 
       expect(page).to have_content("Review ready!")
-      expect(page).to have_selector(".review-rating", count: 1)
+      expect(page).to have_selector(".review-rating", count: 2)
       expect(page).to have_selector(".review-ungraded", text: "Skipped")
-      expect(page).to have_selector(".review-ungraded", text: "Not graded", count: 1)
+      expect(page).to have_no_selector(".review-ungraded", text: "Not graded")
       expect(page).to have_selector(".answer-display", text: "N+1?")
-      expect(page).to have_selector(".answer-note", text: "Not counted as an answer.", count: 1)
+      expect(page).to have_no_text("Not counted as an answer.")
     end
   end
 

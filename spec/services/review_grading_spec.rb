@@ -220,7 +220,7 @@ RSpec.describe ReviewGrading do
       ->(*) { { "rating" => "solid", "essential_gaps" => [ 0 ], "rubric" => 2, "missed" => [ "x" ], "correct" => [] } }
     end
 
-    [ [ "blank", "" ], [ "too short", "N+1?" ], [ "scaffold-only", nil ] ].each do |name, written|
+    [ [ "blank", "" ], [ "scaffold-only", nil ] ].each do |name, written|
       it "stores a #{name} section without rating, essential_gaps or rubric, and keeps the answered one whole" do
         exercise, response = mixed_day(written)
         results = review(%w[code_review pattern], exercise: exercise, response: response, grade: graded_reply)
@@ -229,6 +229,13 @@ RSpec.describe ReviewGrading do
         expect(results["code_review"][:review]).to include("rating" => "solid", "missed" => [ "x" ])
         expect(results["code_review"][:review]).to have_key("rubric")
       end
+    end
+
+    it "keeps the grade on a short answer, since it is still an answer" do
+      exercise, response = mixed_day("N+1?")
+      results = review(%w[pattern], exercise: exercise, response: response, grade: graded_reply)
+
+      expect(results["pattern"][:review]).to include("rating" => "solid", "essential_gaps" => [ 0 ], "missed" => [ "x" ])
     end
 
     it "strips the grade from a scaffold-only answer" do

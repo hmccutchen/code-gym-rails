@@ -1,8 +1,10 @@
 # One "answered" authority
 
 `DailyResponse.answered?` delegates completion
-to the section kind. Prose still needs more than 10 characters after
-untouched scaffold labels are removed; `ANSWER_MIN_LENGTH` is unchanged.
+to the section kind. Prose needs any text left after untouched scaffold
+labels are removed. Until 2026-10-27 it needed more than 10 characters
+(`ANSWER_MIN_LENGTH`); that floor was removed because a short answer is still
+an answer. A design comparison needs a valid pick or a non-blank reason.
 Parsons instead needs an explicitly saved complete permutation of its
 stored blocks, regardless of encoded length. One- and two-block exercises
 are supported; the generation prompt's five-to-eight target is not an
@@ -17,11 +19,10 @@ the hint lock, the status lines and the nudge show the latest reply.
 History, mastery and generation ask the same authority.
 
 `DailyResponse#answer_for` delegates review/display representation to the
-kind too. Prose below the floor, including "add index", stays stored as a draft.
-The answer area shows it with "Not counted as an answer." under it, through
-`DailyResponse#partial_answer`, and the review calls the section "Not graded".
-Only a blank or scaffold-only section shows "(skipped)". A design comparison
-pick with no reason, or a reason with no pick, is shown the same way. Parsons preserves malformed attempts
+kind too. A short answer such as "add index" is shown, graded and needs a
+self-rating like any other. Only a blank or scaffold-only section shows
+"(skipped)". A design comparison pick with no reason, or a reason with no
+pick, is shown as written. Parsons preserves malformed attempts
 for its strict local grading and lenient read-only replay, so a corrupt id
 cannot hide the other blocks the engineer arranged; it does not count as
 completed work. Calibration mismatch notes require completion.

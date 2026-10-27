@@ -135,42 +135,32 @@ RSpec.describe ExerciseSection::DesignComparison do
       expect(described_class.parse_answer("b\n#{reason}")).to eq([ nil, reason ])
     end
 
-    it "counts as answered with a pick and any reason, however short" do
+    it "counts as answered with a valid pick or a reason, either one alone" do
       expect(described_class.answered?("pick:a\n#{reason}")).to be(true)
       expect(described_class.answered?("pick:a\nRetries")).to be(true)
-      expect(described_class.answered?("pick:a\n   ")).to be(false)
-      expect(described_class.answered?("\n#{reason}")).to be(false)
-      expect(described_class.answered?("pick:a")).to be(false)
+      expect(described_class.answered?("pick:a\n   ")).to be(true)
+      expect(described_class.answered?("pick:a")).to be(true)
+      expect(described_class.answered?("\n#{reason}")).to be(true)
+      expect(described_class.answered?("pick:c\nIt retries safely")).to be(true)
+    end
+
+    it "is unanswered with neither a valid pick nor a reason" do
+      expect(described_class.answered?(nil)).to be(false)
+      expect(described_class.answered?("")).to be(false)
+      expect(described_class.answered?("\n  ")).to be(false)
+      expect(described_class.answered?("pick:c\n  ")).to be(false)
     end
 
     it "is the authority DailyResponse.answered? reads" do
-      expect(DailyResponse.answered?("design_comparison", "pick:a\n", {})).to be(false)
-      expect(DailyResponse.answered?("design_comparison", "pick:a\nfine", {})).to be(true)
+      expect(DailyResponse.answered?("design_comparison", "\n ", {})).to be(false)
+      expect(DailyResponse.answered?("design_comparison", "pick:a\n", {})).to be(true)
+      expect(DailyResponse.answered?("design_comparison", "\nfine", {})).to be(true)
     end
 
-    it "shows nothing for a pick with no reason, and shows a short one" do
-      expect(described_class.answer_for("pick:a\n  ")).to be_nil
-      expect(described_class.answer_for("pick:a\nshort")).to be_present
-    end
-  end
-
-  describe ".partial_answer" do
-    it "shows the pick the way the page does when there is no reason" do
-      expect(described_class.partial_answer("pick:b\n  ")).to eq(I18n.t("sections.design_comparison.picked", piece: "B"))
-    end
-
-    it "shows the reason when there is no valid pick" do
-      expect(described_class.partial_answer("pick:c\nIt retries safely")).to eq("It retries safely")
-      expect(described_class.partial_answer("\nIt retries safely")).to eq("It retries safely")
-    end
-
-    it "is nil once a pick and a reason are both there" do
-      expect(described_class.partial_answer("pick:a\nRetries")).to be_nil
-    end
-
-    it "is nil when nothing was written" do
-      expect(described_class.partial_answer(nil)).to be_nil
-      expect(described_class.partial_answer("")).to be_nil
+    it "shows a pick with no reason and a reason with no pick" do
+      expect(described_class.answer_for("pick:a\n  ")).to eq("pick:a\n  ")
+      expect(described_class.answer_for("\nshort")).to eq("\nshort")
+      expect(described_class.answer_for("\n  ")).to be_nil
     end
   end
 
@@ -192,6 +182,19 @@ RSpec.describe ExerciseSection::DesignComparison do
 
       expect(context).to include("the better piece is B", "A new carrier every month.", "class Better", "class Other")
       expect(context).to include("Their answer: (skipped)")
+    end
+
+    it "tells the grader when there is a pick but no reason" do
+      context = described_class.review_context(section: section, answer: "pick:a\n  ", rating: "right_level")
+
+      expect(context).to include("Picked: A. Reason: (none given)")
+    end
+
+    it "tells the grader when there is a reason but no pick" do
+      context = described_class.review_context(section: section, answer: "\nMonthly carriers.", rating: "right_level")
+
+      expect(context).to include("Picked: no piece. Reason:\n<#{UserText::TAG}>\nMonthly carriers.\n</#{UserText::TAG}>")
+      expect(context).not_to include("(skipped)")
     end
   end
 

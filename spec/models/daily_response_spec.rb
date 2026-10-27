@@ -262,15 +262,15 @@ RSpec.describe DailyResponse, type: :model do
   end
 
   describe "#answered_sections" do
-    it "returns keys whose answers have substance (>10 chars), preserving the completeness heuristic" do
+    it "returns keys whose answers have any substance, a short one included" do
       daily_response = user.daily_responses.create!(
         daily_exercise: exercise,
         date: Date.current,
         answers: { "code_review" => "Found the N+1 in the loop", "pattern" => "short", "challenge" => "" }
       )
 
-      expect(daily_response.answered_sections).to eq([ "code_review" ])
-      expect(daily_response.completeness).to eq(33)
+      expect(daily_response.answered_sections).to eq([ "code_review", "pattern" ])
+      expect(daily_response.completeness).to eq(67)
     end
 
     it "computes completeness against the exercise's own section count, not a hardcoded 3" do
@@ -329,11 +329,9 @@ RSpec.describe DailyResponse, type: :model do
         expect(response_with(template).answered_sections).to be_empty
       end
 
-      # The labels alone pass the threshold, so unstripped they would count a two-word answer as answered.
-      it "measures only what the user typed under the labels" do
-        expect(response_with(template + "Redis").answered_sections).to be_empty
-        expect(response_with(template + "Redis, because reads dominate").answered_sections)
-          .to eq([ "architecture" ])
+      it "counts one word typed under the labels, and nothing for the labels with only whitespace added" do
+        expect(response_with(template + "  \n").answered_sections).to be_empty
+        expect(response_with(template + "Redis").answered_sections).to eq([ "architecture" ])
       end
 
       it "falls back to the kind's default labels when the problem carries no scaffold" do
@@ -451,26 +449,25 @@ RSpec.describe DailyResponse, type: :model do
   end
 
   describe "#answered_concept_tags" do
-    it "keeps only the tags of sections that were answered" do
+    it "keeps only the tags of sections that were answered, a short answer included" do
       response = user.daily_responses.create!(
         daily_exercise: exercise, date: Date.current,
         answers: { "code_review" => "a" * 20, "pattern" => "", "challenge" => "short" },
         concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization", "challenge" => "caching" }
       )
 
-      expect(response.answered_concept_tags).to eq("code_review" => "n_plus_one")
+      expect(response.answered_concept_tags).to eq("code_review" => "n_plus_one", "challenge" => "caching")
       expect(response.concept_tags.keys).to contain_exactly("code_review", "pattern", "challenge")
     end
   end
 
-  describe "#partial_answer" do
-    it "delegates to the section's kind with the section's data" do
-      response = described_class.new(daily_exercise: exercise,
-        answers: { "code_review" => "N+1?", "pattern" => "My approach:\nUse a bounded cache" })
+  describe "#answered? on a short answer" do
+    it "counts any substantive text, however short, and leaves a blank section unanswered" do
+      response = described_class.new(daily_exercise: exercise, answers: { "code_review" => "N+1?", "pattern" => "  " })
 
-      expect(response.partial_answer("code_review")).to eq("N+1?")
-      expect(response.partial_answer("pattern")).to be_nil
-      expect(response.partial_answer("challenge")).to be_nil
+      expect(response.answered?("code_review")).to be(true)
+      expect(response.answered?("pattern")).to be(false)
+      expect(response.answered?("challenge")).to be(false)
     end
   end
 
@@ -479,14 +476,14 @@ RSpec.describe DailyResponse, type: :model do
       response = described_class.new(daily_exercise: exercise,
         answers: { "code_review" => "add index", "pattern" => "My approach:\nUse a bounded cache" })
 
-      expect(response.answer_for("code_review")).to be_nil
+      expect(response.answer_for("code_review")).to eq("add index")
       expect(response.answer_for("challenge")).to be_nil
       expect(response.answer_for("pattern")).to eq("My approach:\nUse a bounded cache")
     end
 
     describe "positional answer completion" do
       [ 1, 2, 3 ].each do |count|
-        it "counts an explicit #{count}-block arrangement without applying the prose floor" do
+        it "counts an explicit #{count}-block arrangement" do
           exercise = DailyExercise.new(problem_set: { "parsons_problem" => { "blocks" => Array.new(count, "block") } })
           order = "order:#{(0...count).to_a.join(',')}"
           response = described_class.new(daily_exercise: exercise, answers: { "parsons_problem" => order })
@@ -640,7 +637,6 @@ RSpec.describe DailyResponse, type: :model do
 
     {
       "blank"         => [ "code_review", "" ],
-      "too short"     => [ "code_review", "N+1?" ],
       "scaffold-only" => [ "plan_review", :scaffold ]
     }.each do |label, (section, written)|
       it "is nil for a #{label} answer even with a stored rating" do
@@ -664,6 +660,16 @@ RSpec.describe DailyResponse, type: :model do
 
       expect(response.ai_rating_for("code_review")).to eq("strong")
       expect(response.ai_rating_for("pattern")).to be_nil
+    end
+
+    it "keeps the stored rating for a short answer, since it is still an answer" do
+      response = user.daily_responses.create!(
+        daily_exercise: exercise, date: Date.current, answers: { "code_review" => "N+1?" },
+        ai_review: { "code_review" => { "rating" => "developing" } }
+      )
+
+      expect(response.ai_rating_for("code_review")).to eq("developing")
+      expect(response.ai_rating_unfavorable?("code_review")).to be(true)
     end
   end
 

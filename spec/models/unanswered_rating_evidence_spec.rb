@@ -2,7 +2,7 @@ require "rails_helper"
 
 # A day that stores a rating on a section nobody answered must give every reader the same result as the day without it.
 RSpec.describe "Evidence readers ignore a rating stored on an unanswered section" do
-  let(:unanswered_sections) { { "blank" => "", "too short" => "N+1?" } }
+  let(:unanswered_sections) { { "blank" => "", "whitespace-only" => "  \n  " } }
 
   def submitted_day(user, written, with_rating:)
     exercise = user.daily_exercises.create!(
@@ -35,8 +35,13 @@ RSpec.describe "Evidence readers ignore a rating stored on an unanswered section
   end
 
   it "leaves the day with its unanswered section outside the answered sections and the submit blocker" do
-    same_either_way("N+1?") { |_, response| [ response.answered_sections, response.submit_blocker ] }
-    expect(result_for("N+1?", with_rating: true) { |_, response| response.answered_sections }).to eq([ "code_review" ])
+    same_either_way("") { |_, response| [ response.answered_sections, response.submit_blocker ] }
+    expect(result_for("", with_rating: true) { |_, response| response.answered_sections }).to eq([ "code_review" ])
+  end
+
+  it "counts a short answer as answered, so its stored rating is evidence" do
+    result = result_for("N+1?", with_rating: true) { |_, response| [ response.answered_sections, response.ai_rating_for("pattern") ] }
+    expect(result).to eq([ %w[code_review pattern], "developing" ])
   end
 
   it "gives ConceptMastery.record_review! the same rows" do

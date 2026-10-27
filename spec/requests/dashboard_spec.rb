@@ -277,24 +277,25 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
-  it "shows a short note under its own text, with no calibration note and the not-counted line" do
+  it "shows a short answer as an answer, with its grade and calibration note" do
     exercise = create_exercise(problem_set: base_problem_set.deep_merge("pattern" => { "answer_scaffold" => [ "Approach:", "Why:" ] }))
     create_response(exercise, ai_review: sample_review).update!(
       answers: { "pattern" => "add index" }, section_ratings: { "pattern" => "right_level" }
     )
     get root_path
 
-    expect(response.body).not_to include("You rated this")
+    expect(response.body.scan("You rated this").size).to eq(1)
     expect(Nokogiri::HTML(response.body).css(".answer-display").map(&:text)).to include("add index")
-    expect(response.body).to include("Not counted as an answer.")
+    expect(Nokogiri::HTML(response.body).css(".review-rating").map(&:text)).to include("developing")
+    expect(response.body).not_to include("Not counted as an answer.", "Not graded")
   end
 
-  it "shows short submitted pseudocode with the not-counted line" do
+  it "shows short submitted pseudocode as the answer" do
     exercise = create_exercise(problem_set: { "pseudocode_to_code" => { "question" => "Plan it" } })
     create_response(exercise).update!(answers: { "pseudocode_to_code" => "add index" })
     get root_path
     expect(Nokogiri::HTML(response.body).css(".answer-display").map(&:text)).to eq([ "add index" ])
-    expect(response.body).to include("Not counted as an answer.")
+    expect(response.body).not_to include("Not counted as an answer.")
   end
 
   [ 1, 2, 3 ].each do |count|
@@ -1594,7 +1595,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   describe "a submitted day with an unanswered section" do
     let(:difficulty) { { "level" => "demanding", "reason" => "The query hides behind an association." } }
 
-    def create_unanswered_day(note: "<b>N+1")
+    def create_unanswered_day(note: "")
       exercise = create_exercise
       DailyResponse.create!(
         user: user, daily_exercise: exercise, date: Date.current,
@@ -1602,7 +1603,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         submitted_at: Time.current,
         ai_review: {
           "code_review" => { "rating" => "solid", "missed" => [ "Blank missed point" ], "difficulty" => difficulty },
-          "pattern" => { "correct" => [ "Short correct point" ], "missed" => [ "Short missed point" ], "difficulty" => difficulty },
+          "pattern" => { "rating" => "developing", "correct" => [ "Short correct point" ], "missed" => [ "Short missed point" ],
+                         "difficulty" => difficulty },
           "challenge" => { "rating" => "strong", "missed" => [ "Answered missed point" ] }
         }
       )
@@ -1612,16 +1614,17 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       Nokogiri::HTML(response.body).css(".review-block").to_h { |block| [ block["data-slot"], block ] }
     end
 
-    it "labels a blank section Skipped and a short one Not graded, with no badge on either" do
-      create_unanswered_day
+    it "labels a blank section Skipped with no badge, and grades a short answer" do
+      create_unanswered_day(note: "<b>N+1")
       get root_path
 
-      expect(blocks["1"].text).to include("Skipped")
-      expect(blocks["2"].text).to include("Not graded")
+      expect(blocks["1"].css(".review-ungraded").text).to eq("Skipped")
       expect(blocks["1"].css(".review-rating")).to be_empty
-      expect(blocks["2"].css(".review-rating")).to be_empty
+      expect(blocks["2"].css(".review-rating").text).to eq("developing")
+      expect(blocks["2"].css(".review-ungraded")).to be_empty
       expect(blocks["3"].css(".review-rating").text).to eq("strong")
       expect(blocks["2"].text).to include("Short correct point")
+      expect(response.body).not_to include("Not graded")
     end
 
     it "labels a scaffold-only section Skipped" do
@@ -1629,8 +1632,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       DailyExercise.last.update!(problem_set: base_problem_set.deep_merge("pattern" => { "answer_scaffold" => [ "Approach:", "Why:" ] }))
       get root_path
 
-      expect(blocks["2"].text).to include("Skipped")
-      expect(blocks["2"].text).not_to include("Not graded")
+      expect(blocks["2"].css(".review-ungraded").text).to eq("Skipped")
       expect(blocks["2"].css(".review-rating")).to be_empty
     end
 
@@ -1643,19 +1645,33 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
 
     {
-      "a pick with no reason" => [ "pick:a\n", "Picked piece A", true ],
-      "a reason with no pick" => [ "\nlooks <i>slow", "looks <i>slow", true ],
-      "nothing" => [ "", "(skipped)", false ]
-    }.each do |name, (stored, shown, noted)|
+      "a pick with no reason" => [ "pick:a\n", "Picked piece A" ],
+      "a reason with no pick" => [ "\nlooks <i>slow", "looks <i>slow" ],
+      "nothing" => [ "", "(skipped)" ]
+    }.each do |name, (stored, shown)|
       it "shows #{name} on a design comparison" do
         exercise = create_exercise(problem_set: { "design_comparison" => { "title" => "D", "question" => "q" } })
         DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                               answers: { "design_comparison" => stored }, submitted_at: Time.current)
         get root_path
 
-        expect(Nokogiri::HTML(response.body).css(".answer-display").text).to include(shown)
-        expect(response.body.include?("Not counted as an answer.")).to eq(noted)
+        expect(Nokogiri::HTML(response.body).css(".answer-display").text.strip).to eq(shown)
+        expect(response.body).not_to include("Not counted as an answer.")
       end
+    end
+
+    it "shows the answer key under a reviewed design comparison answered with only a pick" do
+      exercise = create_exercise(problem_set: { "design_comparison" => {
+        "title" => "D", "question" => "q",
+        "answer_key" => { "better" => "b", "deciding_fact" => "Monthly carriers", "principle" => "p", "why_other_fails" => "w" }
+      } })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                            answers: { "design_comparison" => "pick:a\n" },
+                            ai_review: { "design_comparison" => { "rating" => "beginner", "missed" => [ "No reason" ] } })
+      get root_path
+
+      expect(Nokogiri::HTML(response.body).css(".comparison-key").text).to include("Monthly carriers")
+      expect(Nokogiri::HTML(response.body).css(".review-rating").text).to eq("beginner")
     end
 
     it "heads the missed list for what a good answer covers, except on an answered section" do
@@ -1668,14 +1684,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(blocks["3"].text).not_to include("What a good answer covers")
     end
 
-    it "shows a short note escaped, with the not-counted line, and (skipped) for the blank one" do
-      create_unanswered_day
+    it "shows a short answer escaped, and (skipped) for the blank one" do
+      create_unanswered_day(note: "<b>N+1")
       get root_path
 
       answers = Nokogiri::HTML(response.body).css(".answer-display")
       expect(answers.map(&:text)).to include("(skipped)", "<b>N+1")
       expect(response.body).to include("&lt;b&gt;N+1")
-      expect(response.body.scan("Not counted as an answer.").size).to eq(1)
+      expect(response.body).not_to include("Not counted as an answer.")
     end
   end
 end

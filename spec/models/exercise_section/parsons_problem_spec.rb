@@ -137,10 +137,10 @@ RSpec.describe ExerciseSection::ParsonsProblem do
     end
   end
 
-  describe ".partial_answer" do
-    it "is always nil, since an arrangement has no partial text" do
-      expect(described_class.partial_answer("order:0,1", { "blocks" => %w[a b c] })).to be_nil
-      expect(described_class.partial_answer("", { "blocks" => %w[a b c] })).to be_nil
+  describe ".answered?" do
+    it "still needs a complete arrangement, since a short answer counts only for prose" do
+      expect(described_class.answered?("order:0,1", { "blocks" => %w[a b c] })).to be(false)
+      expect(described_class.answered?("order:2,0,1", { "blocks" => %w[a b c] })).to be(true)
     end
   end
 end

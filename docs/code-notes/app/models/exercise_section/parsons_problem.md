@@ -47,7 +47,3 @@ A section can resolve with no blocks. The note then tells the grader to skip gra
 ## `.describe_mismatches`
 
 Normalizes and pads the submitted order the same way `.grade` does, so the description the reviewer gets cannot contradict the score.
-
-## `.partial_answer`
-
-Always nil. An untouched or incomplete order is not text the engineer wrote, and its answer area already replays the stored order.

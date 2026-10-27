@@ -206,7 +206,7 @@ RSpec.describe ResponseReview do
 
     it "reviews an unanswered section in the same batch, with no grade stored and the same number of calls" do
       daily_response = create_submitted_response
-      daily_response.update!(answers: { "code_review" => "a" * 20, "pattern" => "N+1?" })
+      daily_response.update!(answers: { "code_review" => "a" * 20, "pattern" => "" })
       purposes = Queue.new
       allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, request|
         purposes << request.purpose

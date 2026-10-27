@@ -97,7 +97,3 @@ Returning nil drops the section from the payload, rather than storing something 
 ## `.substantive_answer`
 
 Scaffold labels are matched against whole stripped lines, so a label the user edited becomes their own text and counts toward the answer.
-
-## `.partial_answer`
-
-The text written on a section that fell short of `.answered?`, or nil. A scaffold-only answer returns nil, since the engineer wrote nothing of their own. Design comparison returns the pick or the reason, whichever exists, and Parsons always returns nil because an untouched order says nothing the engineer wrote.

@@ -6,11 +6,8 @@
 <% next unless fb.is_a?(Hash) -%>
 == <%= section.humanize %> ==
 
-<% if (rating = @response.ai_rating_for(section)).present? -%>
-<%= t("review_mailer.send_review.rating", rating: rating) %>
-
-<% elsif (label = @response.ungraded_label(section)) -%>
-<%= label %>
+<% if (badge = @response.review_badge(section)) -%>
+<%= badge.graded? ? t("review_mailer.send_review.rating", rating: badge.text) : badge.text %>
 
 <% end -%>
 <% if (difficulty = @response.difficulty_for(section)) -%>

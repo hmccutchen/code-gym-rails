@@ -106,7 +106,7 @@ RSpec.describe LevelSuggestion::Evidence do
 
   it "ignores orphaned answers and uses the existing answer completion rule" do
     response = day(1, { "code_review" => { rung: "junior" }, "pattern" => { rung: "junior" } })
-    response.update!(answers: { "code_review" => "too short", "pattern" => "a" * 20, "architecture" => "a" * 20 })
+    response.update!(answers: { "code_review" => "  ", "pattern" => "a" * 20, "architecture" => "a" * 20 })
 
     expect(described_class.for(user).results.keys).to eq([ "pattern" ])
   end

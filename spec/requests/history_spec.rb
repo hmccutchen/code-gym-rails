@@ -852,7 +852,7 @@ RSpec.describe "History", type: :request do
         submitted_at: Time.current,
         ai_review: {
           "code_review" => { "rating" => "solid", "missed" => [ "Blank missed point" ] },
-          "pattern" => { "correct" => [ "Short correct point" ], "missed" => [ "Short missed point" ] },
+          "pattern" => { "rating" => "developing", "correct" => [ "Short correct point" ], "missed" => [ "Short missed point" ] },
           "challenge" => { "rating" => "strong", "missed" => [ "Answered missed point" ] }
         }
       )
@@ -860,21 +860,22 @@ RSpec.describe "History", type: :request do
       get history_path
     end
 
-    it "shows the labels and headings with no badge on the unanswered sections" do
+    it "labels the blank section Skipped with no badge, and grades the short answer" do
       blocks = Nokogiri::HTML(response.body).css(".review-block").to_h { |block| [ block["data-slot"], block ] }
 
-      expect(blocks["1"].text).to include("Skipped")
-      expect(blocks["2"].text).to include("Not graded")
+      expect(blocks["1"].css(".review-ungraded").text).to eq("Skipped")
       expect(blocks["1"].css(".review-rating")).to be_empty
-      expect(blocks["2"].css(".review-rating")).to be_empty
+      expect(blocks["2"].css(".review-rating").text).to eq("developing")
+      expect(blocks["2"].css(".review-ungraded")).to be_empty
       expect(blocks["1"].text).to include("What a good answer covers:")
-      expect(blocks["2"].text).to include("What a good answer covers:")
+      expect(blocks["2"].text).to include("What you missed:")
       expect(blocks["3"].text).to include("What you missed:")
+      expect(response.body).not_to include("Not graded")
     end
 
-    it "shows the short note escaped with the not-counted line" do
+    it "shows the short answer escaped" do
       expect(response.body).to include("&lt;b&gt;N+1")
-      expect(response.body.scan("Not counted as an answer.").size).to eq(1)
+      expect(response.body).not_to include("Not counted as an answer.")
     end
 
     it "shows (skipped) for the blank section" do
@@ -887,7 +888,7 @@ RSpec.describe "History", type: :request do
     end
   end
 
-  it "shows a design comparison pick with no reason in bold, with the not-counted line" do
+  it "shows a design comparison pick with no reason in bold, as an answer" do
     exercise = DailyExercise.create!(user: user, date: 2.days.ago.to_date, generated_at: Time.current,
                                      problem_set: { "design_comparison" => { "title" => "D", "question" => "q" } })
     DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date,
@@ -896,6 +897,6 @@ RSpec.describe "History", type: :request do
     get history_path
 
     expect(Nokogiri::HTML(response.body).css(".answer-display strong").text).to eq("Picked piece A")
-    expect(response.body.scan("Not counted as an answer.").size).to eq(1)
+    expect(response.body).not_to include("Not counted as an answer.", "(skipped)")
   end
 end

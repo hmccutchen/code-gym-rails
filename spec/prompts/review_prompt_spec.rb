@@ -52,55 +52,36 @@ RSpec.describe ReviewPrompt do
 
   describe ".walkthrough_prompt" do
     let(:section) { day_a.first[:section] }
-    let(:nothing_written) { described_class.walkthrough_prompt(key: "code_review", section: section, rung: "senior", written: nil) }
-    let(:short_note) { described_class.walkthrough_prompt(key: "code_review", section: section, rung: "senior", written: "N+1?") }
+    let(:nothing_written) { described_class.walkthrough_prompt(key: "code_review", section: section, rung: "senior") }
 
-    it "says no answer was given and asks for no rating when nothing was written" do
-      expect(nothing_written).to include("No answer was given", "must not be rated", "Pitched at: senior")
-      expect(nothing_written).not_to include("\"rating\"", "essential_gaps", "<engineer_text>")
+    it "takes the rung as a value and no answer text, since a section with any written answer is graded instead" do
+      expect(described_class.method(:walkthrough_prompt).parameters)
+        .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :rung ] ])
     end
 
-    it "asks for every walkthrough field when nothing was written" do
+    it "says no answer was given and asks for no rating" do
+      expect(nothing_written).to include("No answer was given", "must not be rated", "Pitched at: senior")
+      expect(nothing_written).not_to include("\"rating\"", "essential_gaps", "<engineer_text>", "too short")
+    end
+
+    it "asks for every walkthrough field" do
       expect(nothing_written).to include("\"correct\"", "\"missed\"", "\"better_questions\"", "\"next_step\"", "\"improved_code\"")
     end
 
-    it "gives a short note inside the user-text tags and says it was too short to count" do
-      expect(short_note).to include("<engineer_text>\nN+1?\n</engineer_text>", "too short to count", "must not be rated")
-    end
-
-    it "never calls a short note blank or skipped, and asks for no rating" do
-      expect(short_note).not_to include("blank", "skipped", "no answer was given", "\"rating\"", "essential_gaps")
-    end
-
-    it "asks for what is on the right track in a short note first" do
-      opening = "Put what in it is on the right track, if anything, in \"correct\" first"
-      expect(short_note).to include(opening)
-      expect(nothing_written).not_to include(opening)
-    end
-
-    it "tells the grader to return an empty correct array when nothing was written" do
+    it "tells the grader to return an empty correct array" do
       expect(nothing_written).to include("No answer was given for this section", "\"correct\" as an empty array")
     end
 
-    it "carries no grading instruction for any section kind, with or without a short note" do
+    it "carries no grading instruction for any section kind" do
       ExerciseSection.all.each do |kind|
-        section = { "blocks" => %w[a b c] }
-        [ nil, "N+1?" ].each do |written|
-          prompt = described_class.walkthrough_prompt(key: kind.key, section: section, rung: "junior", written: written)
+        prompt = described_class.walkthrough_prompt(key: kind.key, section: { "blocks" => %w[a b c] }, rung: "junior")
 
-          expect(prompt).not_to include("\"rating\"", "essential_gaps", "rubric", "Grade "), "#{kind.key} with written #{written.inspect}"
-        end
+        expect(prompt).not_to include("\"rating\"", "essential_gaps", "rubric", "Grade "), kind.key
       end
     end
 
-    it "renders each form exactly as recorded" do
+    it "renders exactly as recorded" do
       expect_prompt_snapshot("review__day_a__code_review__walkthrough_nothing_written", nothing_written)
-      expect_prompt_snapshot("review__day_a__code_review__walkthrough_short_note", short_note)
-    end
-
-    it "takes the rung and the written text as values" do
-      expect(described_class.method(:walkthrough_prompt).parameters)
-        .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :rung ], [ :keyreq, :written ] ])
     end
   end
 end

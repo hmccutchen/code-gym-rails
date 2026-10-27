@@ -59,4 +59,4 @@ keeps the plain accent.
 
 ## Label in place of the badge
 
-An unanswered section shows `DailyResponse#ungraded_label` as muted text, never a pill, so it does not read as a score. The answer area and the label both read `DailyResponse#partial_answer`, so they agree on whether anything was written. The "missed" heading comes from `DailyResponse#review_field_label`.
+An unanswered section shows "Skipped" from `DailyResponse#review_badge` as muted text, never a pill, so it does not read as a score. The "missed" heading comes from `DailyResponse#review_field_label`.

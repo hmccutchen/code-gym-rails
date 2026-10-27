@@ -61,11 +61,11 @@ class ReviewPrompt
     PROMPT
   end
 
-  def self.walkthrough_prompt(key:, section:, rung:, written:)
+  def self.walkthrough_prompt(key:, section:, rung:)
     kind = ExerciseSection.for(key)
 
     <<~PROMPT
-      Walk through the "#{key}" section from the day's context above. #{walkthrough_opening(written)}
+      Walk through the "#{key}" section from the day's context above. No answer was given for this section, so it must not be rated. Return "correct" as an empty array, since nothing was written.
       Pitched at: #{rung} — #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}
 
       #{json_header(key)}
@@ -75,17 +75,6 @@ class ReviewPrompt
 
       #{ENTRY_RULES}
     PROMPT
-  end
-
-  def self.walkthrough_opening(written)
-    return 'No answer was given for this section, so it must not be rated. Return "correct" as an empty array, since nothing was written.' if written.nil?
-
-    <<~OPENING.chomp
-      The engineer wrote only the text below, which is too short to count as an answer, so it must not be rated.
-      The day's context shows no answer for this section because what they wrote was too short to count; here is what they wrote.
-      #{UserText.labelled("What they wrote:", written)}
-      Put what in it is on the right track, if anything, in "correct" first, then walk through what a good answer covers.
-    OPENING
   end
 
   def self.json_header(key)
@@ -106,5 +95,5 @@ class ReviewPrompt
       "must be an empty string for this section"
   end
 
-  private_class_method :improved_code_instruction, :walkthrough_opening, :json_header, :shared_review_fields
+  private_class_method :improved_code_instruction, :json_header, :shared_review_fields
 end

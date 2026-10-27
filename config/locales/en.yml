@@ -665,7 +665,6 @@ en:
       example_label: "Example:"
     answered:
       skipped: "(skipped)"
-      not_counted: "Not counted as an answer."
     section_status:
       in_progress: "in progress"
     submission:
@@ -688,7 +687,6 @@ en:
     walkthrough_fields:
       missed: "What a good answer covers"
     skipped_label: "Skipped"
-    not_graded_label: "Not graded"
     finish_button: "Finish review"
     generating_label: "Generating review…"
     in_progress:

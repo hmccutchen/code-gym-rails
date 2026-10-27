@@ -149,12 +149,11 @@ RSpec.describe ReviewMailer, type: :mailer do
         expect(body).not_to include("What you missed:")
       end
 
-      it "says Not graded for a short note" do
+      it "grades a short answer like any other answer" do
         body = body_for("code_review" => "N+1?")
 
-        expect(body).to include("Not graded")
-        expect(body).not_to include("Rating:")
-        expect(body).to include("What a good answer covers:")
+        expect(body).to include("Rating: solid", "What you missed:\n- A gap")
+        expect(body).not_to include("Skipped", "Not graded", "What a good answer covers:")
       end
 
       it "keeps Rating and Missed for an answered section" do

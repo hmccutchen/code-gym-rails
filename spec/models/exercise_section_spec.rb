@@ -1207,30 +1207,28 @@ RSpec.describe ExerciseSection, "judge facets" do
   end
 end
 
-RSpec.describe ExerciseSection, ".partial_answer" do
+RSpec.describe ExerciseSection, ".answered?" do
   let(:plan_review) { ExerciseSection.find("plan_review") }
   let(:labels) { plan_review.default_scaffold }
 
-  it "is nil for a blank answer" do
-    expect(ExerciseSection::CodeReview.partial_answer("  ")).to be_nil
-    expect(ExerciseSection::CodeReview.partial_answer(nil)).to be_nil
+  it "is false for a blank answer" do
+    expect(ExerciseSection::CodeReview.answered?("  ")).to be(false)
+    expect(ExerciseSection::CodeReview.answered?(nil)).to be(false)
   end
 
-  it "is nil for a scaffold with only its template labels" do
-    expect(plan_review.partial_answer(plan_review.scaffold_template)).to be_nil
+  it "is false for a scaffold with only its template labels" do
+    expect(plan_review.answered?(plan_review.scaffold_template)).to be(false)
   end
 
-  it "is the stripped text of an answer too short to count" do
-    expect(ExerciseSection::CodeReview.partial_answer("  N+1?\n")).to eq("N+1?")
+  it "counts a short answer, which answer_for returns as written" do
+    expect(ExerciseSection::CodeReview.answered?("  N+1?\n")).to be(true)
+    expect(ExerciseSection::CodeReview.answer_for("  N+1?\n")).to eq("  N+1?\n")
   end
 
-  it "keeps what was typed under the scaffold labels" do
+  it "counts a short answer typed under the scaffold labels" do
     typed = "#{labels.first}\nN+1?\n\n#{labels.last}"
 
-    expect(plan_review.partial_answer(typed)).to eq("N+1?")
-  end
-
-  it "is nil for an answered section" do
-    expect(ExerciseSection::CodeReview.partial_answer("The query runs once per row")).to be_nil
+    expect(plan_review.answered?(typed)).to be(true)
+    expect(plan_review.answer_for(typed)).to eq(typed)
   end
 end

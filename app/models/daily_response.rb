@@ -22,6 +22,10 @@ class DailyResponse < ApplicationRecord
 
   HISTORY_PAGE_SIZE = 10
 
+  ReviewBadge = Data.define(:text, :graded) do
+    def graded? = graded
+  end
+
   validates :date, uniqueness: { scope: :user_id }
 
   scope :submitted, -> { where.not(submitted_at: nil) }
@@ -238,16 +242,16 @@ class DailyResponse < ApplicationRecord
     ai_review&.dig(section.to_s, AI_RATING_FIELD)
   end
 
-  def ungraded_label(section)
-    return if answered?(section)
-
-    I18n.t(partial_answer(section).present? ? "review.not_graded_label" : "review.skipped_label")
+  def review_badge(section)
+    if (rating = ai_rating_for(section)).present?
+      ReviewBadge.new(text: rating, graded: true)
+    elsif !answered?(section)
+      ReviewBadge.new(text: I18n.t("review.skipped_label"), graded: false)
+    end
   end
 
   def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))
   def ai_rating_unfavorable?(section) = AI_RATING_UNFAVORABLE.include?(ai_rating_for(section))
-
-  ANSWER_MIN_LENGTH = 10
 
   def self.substantive_answer(section, value, section_data = nil)
     kind = ExerciseSection.find(section)
@@ -280,10 +284,6 @@ class DailyResponse < ApplicationRecord
 
   def answer_for(section)
     (ExerciseSection.find(section) || ExerciseSection).answer_for(answers[section.to_s], section_data(section))
-  end
-
-  def partial_answer(section)
-    (ExerciseSection.find(section) || ExerciseSection).partial_answer(answers[section.to_s], section_data(section))
   end
 
   def draft_token

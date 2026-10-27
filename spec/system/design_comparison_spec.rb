@@ -38,7 +38,7 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
         choose("Piece B")
       end
       wait_for_saved_comparison(user, "pick:b\n")
-      expect(page).to have_css(".section-status[data-status-for='design_comparison']", text: "", exact_text: true)
+      expect(page).to have_css(".section-status[data-status-for='design_comparison']", text: in_progress)
 
       within(comparison) { fill_in("What decides it?", with: "Retries") }
       expect(page).to have_css(".section-status[data-status-for='design_comparison']", text: in_progress)

@@ -2372,7 +2372,7 @@ RSpec.describe AiService do
       end
     end
 
-    [ "add index", "Approach:\nWhy:" ].each do |answer|
+    [ "", "Approach:\nWhy:" ].each do |answer|
       it "treats #{answer.inspect} as skipped in grading and re-explanation" do
         exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
           "pattern" => { "question" => "Why?", "answer_scaffold" => [ "Approach:", "Why:" ] }
@@ -2383,7 +2383,7 @@ RSpec.describe AiService do
 
         context = svc.send(:build_review_day_context, "Rails", exercise, resp)
         expect(context).to include("Their answer: (skipped)")
-        expect(context).not_to include(answer)
+        expect(context).not_to include("Approach:\nWhy:")
         expect(svc).to receive(:call).with(having_attributes(prompt: include("Their answer: (skipped)"))).and_call_original
         svc.explain_differently(user, exercise, resp, section: "pattern")
         expect(svc).to receive(:call).with(having_attributes(prompt: include("Their answer was: (skipped)"))).and_call_original
@@ -2391,9 +2391,26 @@ RSpec.describe AiService do
       end
     end
 
-    it "treats short pseudocode as skipped without changing substantive pseudocode" do
+    it "hands a short answer to grading and re-explanation as the answer" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "pattern" => { "question" => "Why?", "answer_scaffold" => [ "Approach:", "Why:" ] }
+      })
+      resp = DailyResponse.new(daily_exercise: exercise, answers: { "pattern" => "add index" }, ai_review: { "pattern" => {} })
+      svc = double_class.new(canned_text: "A different explanation")
+
+      context = svc.send(:build_review_day_context, "Rails", exercise, resp)
+      expect(context).to include(UserText.tagged("add index"))
+      expect(context).not_to include("Their answer: (skipped)")
+      expect(svc).to receive(:call).with(having_attributes(prompt: include(UserText.tagged("add index")))).and_call_original
+      svc.explain_differently(user, exercise, resp, section: "pattern")
+    end
+
+    it "hands short pseudocode to grading the same as longer pseudocode" do
       exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "pseudocode_to_code" => {} })
       resp = DailyResponse.new(daily_exercise: exercise, answers: { "pseudocode_to_code" => "add index" })
+      expect(service.send(:build_review_day_context, "Rails", exercise, resp))
+        .to include("Their final pseudocode:\n#{UserText.tagged('add index')}")
+      resp.answers["pseudocode_to_code"] = ""
       expect(service.send(:build_review_day_context, "Rails", exercise, resp))
         .to include("Their final pseudocode: (skipped)")
 
@@ -2576,14 +2593,14 @@ RSpec.describe AiService do
         service.send(:build_review_section_prompt, exercise, DailyResponse.new(answers: { "pattern" => answer }), "pattern")
       end
 
-      it "uses the walkthrough prompt, with no written text for a blank answer" do
-        expect(ReviewPrompt).to receive(:walkthrough_prompt).with(hash_including(key: "pattern", written: nil)).and_call_original
+      it "uses the walkthrough prompt for a blank answer" do
+        expect(ReviewPrompt).to receive(:walkthrough_prompt).with(hash_including(key: "pattern")).and_call_original
         expect(prompt_for("")).to include("must not be rated")
       end
 
-      it "hands a too-short answer to the walkthrough as the written text" do
-        expect(ReviewPrompt).to receive(:walkthrough_prompt).with(hash_including(key: "pattern", written: "N+1?")).and_call_original
-        prompt_for("N+1?")
+      it "grades a short answer instead of walking through it" do
+        expect(ReviewPrompt).not_to receive(:walkthrough_prompt)
+        expect(prompt_for("N+1?")).to include("Grade ONLY")
       end
 
       it "keeps the grading prompt for an answered section" do
