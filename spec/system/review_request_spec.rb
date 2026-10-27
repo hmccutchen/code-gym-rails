@@ -32,7 +32,8 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
       expect(page).to have_content(/Code Review/i)
 
       fields = all("textarea[data-field]").map { |area| area["data-field"] }.uniq
-      answered, _blank, short = fields.first(3)
+      answered, blank, short = fields.first(3)
+      graded = [ answered, short ]
       find(%(textarea[data-field="#{answered}"])).fill_in(
         with: "It re-runs the loyalty_tier query inside the loop — precompute it once outside the loop."
       )
@@ -42,8 +43,10 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
       click_button "Submit answers"
 
       expect(page).to have_content("Review ready!")
-      expect(page).to have_selector(".review-rating", count: 2)
-      expect(page).to have_selector(".review-ungraded", text: "Skipped", count: 2)
+      expect(page).to have_selector(".review-rating", count: graded.size)
+      expect(page).to have_selector(".review-ungraded", text: "Skipped", count: all(".review-block").size - graded.size)
+      expect(page).to have_selector("h3", text: /\A#{blank.humanize}\s*Skipped\z/i)
+      expect(page).to have_selector("h3", text: /\A#{short.humanize}\s*(beginner|developing|solid|strong)\z/i)
       expect(page).to have_no_selector(".review-ungraded", text: "Not graded")
       expect(page).to have_selector(".answer-display", text: "N+1?")
       expect(page).to have_no_text("Not counted as an answer.")

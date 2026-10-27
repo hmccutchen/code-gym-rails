@@ -2383,12 +2383,22 @@ RSpec.describe AiService do
 
         context = svc.send(:build_review_day_context, "Rails", exercise, resp)
         expect(context).to include("Their answer: (skipped)")
-        expect(context).not_to include("Approach:\nWhy:") if answer.present?
         expect(svc).to receive(:call).with(having_attributes(prompt: include("Their answer: (skipped)"))).and_call_original
         svc.explain_differently(user, exercise, resp, section: "pattern")
         expect(svc).to receive(:call).with(having_attributes(prompt: include("Their answer was: (skipped)"))).and_call_original
         svc.answer_follow_up(user, exercise, resp, section: "pattern", question: "Why?", thread: [])
       end
+    end
+
+    it "leaves the scaffold labels out of the grading context when the answer is only labels" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "pattern" => { "question" => "Why?", "answer_scaffold" => [ "Approach:", "Why:" ] }
+      })
+      resp = DailyResponse.new(daily_exercise: exercise, answers: { "pattern" => "Approach:\nWhy:" }, ai_review: { "pattern" => {} })
+
+      context = double_class.new(canned_text: "x").send(:build_review_day_context, "Rails", exercise, resp)
+
+      expect(context).not_to include("Approach:\nWhy:")
     end
 
     it "hands a short answer to grading and re-explanation as the answer" do

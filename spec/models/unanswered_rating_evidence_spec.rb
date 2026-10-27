@@ -30,7 +30,9 @@ RSpec.describe "Evidence readers ignore a rating stored on an unanswered section
   end
 
   def same_either_way(written)
-    results = [ true, false ].map { |with_rating| result_for(written, with_rating: with_rating) { |user, response| yield user, response } }
+    results = [ true, false ].map do |with_rating|
+      freeze_time { result_for(written, with_rating: with_rating) { |user, response| yield user, response } }
+    end
     expect(results.first).to eq(results.last)
   end
 
@@ -48,7 +50,7 @@ RSpec.describe "Evidence readers ignore a rating stored on an unanswered section
     unanswered_sections.each_value do |written|
       same_either_way(written) do |user, response|
         ConceptMastery.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
-        user.concept_masteries.order(:concept).map { |cm| cm.attributes.except("id", "user_id", "created_at", "updated_at", "mastered_at") }
+        user.concept_masteries.order(:concept).map { |cm| cm.attributes.except("id", "user_id", "created_at", "updated_at") }
       end
     end
   end
