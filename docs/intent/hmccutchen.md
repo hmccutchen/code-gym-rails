@@ -308,3 +308,8 @@ data.*
   **I decided:** no sticky Submit bar: the screen felt sandwiched
 - glossary_wrap always returns escaped HTML `#576`
 - glossary terms throughout the review `#577`
+- the layered-design review for cloud sessions, which have no plugins `#580`
+  **why:** a cloud session skipped the layered review
+  **I decided:** keep the plugin locally and let a repo copy fill in on the
+  cloud; copy only the review workflow and the files it links to, with the
+  links to anything left behind rewritten, rather than the whole skill
