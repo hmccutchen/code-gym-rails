@@ -324,4 +324,5 @@ data.*
   **I decided:** one side column after the answers with Submit, Generate new
   set and Start over, which ends the page on a phone; the progress bar stays
   in the main column, the featured card below the day, and the column sticks
-  only in a tall window
+  only in a tall window; disable Generate new set and Start over while a
+  submit runs
