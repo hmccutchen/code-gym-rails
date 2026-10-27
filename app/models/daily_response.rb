@@ -238,6 +238,12 @@ class DailyResponse < ApplicationRecord
     ai_review&.dig(section.to_s, AI_RATING_FIELD)
   end
 
+  def ungraded_label(section)
+    return if answered?(section)
+
+    I18n.t(partial_answer(section).present? ? "review.not_graded_label" : "review.skipped_label")
+  end
+
   def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))
   def ai_rating_unfavorable?(section) = AI_RATING_UNFAVORABLE.include?(ai_rating_for(section))
 

@@ -6,8 +6,11 @@
 <% next unless fb.is_a?(Hash) -%>
 == <%= section.humanize %> ==
 
-<% if fb["rating"].present? -%>
-<%= t("review_mailer.send_review.rating", rating: fb["rating"]) %>
+<% if (rating = @response.ai_rating_for(section)).present? -%>
+<%= t("review_mailer.send_review.rating", rating: rating) %>
+
+<% elsif (label = @response.ungraded_label(section)) -%>
+<%= label %>
 
 <% end -%>
 <% if (difficulty = @response.difficulty_for(section)) -%>
@@ -18,7 +21,7 @@
 <% if field[:list] -%>
 <% points = DailyResponse.review_points(fb[key]) -%>
 <% next if points.empty? -%>
-<%= DailyResponse.ai_review_label(key) %>:
+<%= @response.review_field_label(section, key) %>:
 <% points.each do |point| -%>
 - <%= point %>
 <% end -%>
@@ -26,7 +29,7 @@
 <% else -%>
 <% text = DailyResponse.review_points(fb[key]).join(" ") -%>
 <% next if text.blank? -%>
-<%= DailyResponse.ai_review_label(key) %>: <%= text %>
+<%= @response.review_field_label(section, key) %>: <%= text %>
 
 <% end -%>
 <% end -%>

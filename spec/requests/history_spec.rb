@@ -835,4 +835,46 @@ RSpec.describe "History", type: :request do
       expect(instantiations).to eq(1)
     end
   end
+
+  describe "a submitted day with an unanswered section" do
+    before do
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current,
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern" => { "title" => "Pat", "question" => "pq" },
+          "challenge" => { "question" => "cq" }
+        }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: exercise.date,
+        answers: { "code_review" => "", "pattern" => "<b>N+1", "challenge" => "c" * 20 },
+        submitted_at: Time.current,
+        ai_review: {
+          "code_review" => { "rating" => "solid", "missed" => [ "Blank missed point" ] },
+          "pattern" => { "missed" => [ "Short missed point" ] },
+          "challenge" => { "rating" => "strong", "missed" => [ "Answered missed point" ] }
+        }
+      )
+      login_as(user)
+      get history_path
+    end
+
+    it "shows the labels and headings with no badge on the unanswered sections" do
+      blocks = Nokogiri::HTML(response.body).css(".review-block").to_h { |block| [ block["data-slot"], block ] }
+
+      expect(blocks["1"].text).to include("Skipped")
+      expect(blocks["2"].text).to include("Not graded")
+      expect(blocks["1"].css(".review-rating")).to be_empty
+      expect(blocks["2"].css(".review-rating")).to be_empty
+      expect(blocks["1"].text).to include("What a good answer covers:")
+      expect(blocks["2"].text).to include("What a good answer covers:")
+      expect(blocks["3"].text).to include("What you missed:")
+    end
+
+    it "shows the short note escaped with the not-counted line" do
+      expect(response.body).to include("&lt;b&gt;N+1")
+      expect(response.body.scan("Not counted as an answer.").size).to eq(1)
+    end
+  end
 end
