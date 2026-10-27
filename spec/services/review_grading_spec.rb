@@ -220,7 +220,7 @@ RSpec.describe ReviewGrading do
       ->(*) { { "rating" => "solid", "essential_gaps" => [ 0 ], "rubric" => 2, "missed" => [ "x" ], "correct" => [] } }
     end
 
-    [ [ "blank", "" ], [ "scaffold-only", nil ] ].each do |name, written|
+    [ [ "blank", "" ], [ "unsaved", nil ], [ "scaffold-only", ExerciseSection::Pattern::DEFAULT_SCAFFOLD.join("\n\n") ] ].each do |name, written|
       it "stores a #{name} section without rating, essential_gaps or rubric, and keeps the answered one whole" do
         exercise, response = mixed_day(written)
         results = review(%w[code_review pattern], exercise: exercise, response: response, grade: graded_reply)
@@ -249,6 +249,18 @@ RSpec.describe ReviewGrading do
       results = review(%w[plan_review], exercise: exercise, response: response, grade: graded_reply)
 
       expect(results["plan_review"][:review]).to eq("missed" => [ "x" ], "correct" => [])
+    end
+
+    it "walks through a Parsons section with no blocks and a saved order, storing no rating" do
+      exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                       problem_set: { "parsons_problem" => { "title" => "T", "question" => "Q" } })
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                       answers: { "parsons_problem" => "order:1,0" }, submitted_at: Time.current)
+      expect(response).not_to be_answered("parsons_problem")
+
+      results = review(%w[parsons_problem], exercise: exercise, response: response, grade: graded_reply)
+
+      expect(results["parsons_problem"][:review]).to eq("missed" => [ "x" ], "correct" => [])
     end
 
     it "gives an untouched Parsons section no computed rating" do

@@ -628,6 +628,23 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
+  describe "#review_badge" do
+    {
+      "the rating on an answered section"                 => [ "a" * 20, { "rating" => "strong" }, [ "strong", true ] ],
+      "Skipped on an unanswered section with a rating"    => [ "", { "rating" => "strong" }, [ "Skipped", false ] ],
+      "Skipped on an unanswered section without a rating" => [ "", {}, [ "Skipped", false ] ],
+      "nothing on an answered section without a rating"   => [ "a" * 20, {}, nil ]
+    }.each do |label, (written, review, expected)|
+      it "gives #{label}" do
+        response = user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+                                                answers: { "code_review" => written }, ai_review: { "code_review" => review })
+        badge = response.review_badge("code_review")
+
+        expect(badge && [ badge.text, badge.graded? ]).to eq(expected)
+      end
+    end
+  end
+
   describe "#ai_rating_for on an unanswered section" do
     let(:scaffold_only) { ExerciseSection.find("plan_review").scaffold_template }
     let(:plan_exercise) do

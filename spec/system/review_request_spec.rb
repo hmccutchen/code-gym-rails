@@ -43,7 +43,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
 
       expect(page).to have_content("Review ready!")
       expect(page).to have_selector(".review-rating", count: 2)
-      expect(page).to have_selector(".review-ungraded", text: "Skipped")
+      expect(page).to have_selector(".review-ungraded", text: "Skipped", count: 1)
       expect(page).to have_no_selector(".review-ungraded", text: "Not graded")
       expect(page).to have_selector(".answer-display", text: "N+1?")
       expect(page).to have_no_text("Not counted as an answer.")

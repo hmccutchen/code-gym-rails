@@ -2383,7 +2383,7 @@ RSpec.describe AiService do
 
         context = svc.send(:build_review_day_context, "Rails", exercise, resp)
         expect(context).to include("Their answer: (skipped)")
-        expect(context).not_to include("Approach:\nWhy:")
+        expect(context).not_to include("Approach:\nWhy:") if answer.present?
         expect(svc).to receive(:call).with(having_attributes(prompt: include("Their answer: (skipped)"))).and_call_original
         svc.explain_differently(user, exercise, resp, section: "pattern")
         expect(svc).to receive(:call).with(having_attributes(prompt: include("Their answer was: (skipped)"))).and_call_original

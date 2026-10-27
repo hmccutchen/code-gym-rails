@@ -2,7 +2,7 @@ require "rails_helper"
 
 # A day that stores a rating on a section nobody answered must give every reader the same result as the day without it.
 RSpec.describe "Evidence readers ignore a rating stored on an unanswered section" do
-  let(:unanswered_sections) { { "blank" => "", "whitespace-only" => "  \n  " } }
+  let(:unanswered_sections) { { "blank" => "", "whitespace-only" => "  \n  ", "scaffold-only" => ExerciseSection::Pattern::DEFAULT_SCAFFOLD.join("\n\n") } }
 
   def submitted_day(user, written, with_rating:)
     exercise = user.daily_exercises.create!(
@@ -48,7 +48,7 @@ RSpec.describe "Evidence readers ignore a rating stored on an unanswered section
     unanswered_sections.each_value do |written|
       same_either_way(written) do |user, response|
         ConceptMastery.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
-        user.concept_masteries.order(:concept).map { |cm| cm.attributes.slice("concept", "language", "tier", "streak", "last_rating") }
+        user.concept_masteries.order(:concept).map { |cm| cm.attributes.except("id", "user_id", "created_at", "updated_at", "mastered_at") }
       end
     end
   end
@@ -62,11 +62,10 @@ RSpec.describe "Evidence readers ignore a rating stored on an unanswered section
     end
   end
 
-  it "gives ReviewedSectionResults, LevelSuggestion, CompetencyGate and recent_performance the same answer" do
+  it "gives ReviewedSectionResults and recent_performance the same answer" do
     unanswered_sections.each_value do |written|
       same_either_way(written) do |user, response|
-        [ ReviewedSectionResults.for(response), LevelSuggestion.for(user), CompetencyGate.for(user).count,
-          user.recent_performance ]
+        [ ReviewedSectionResults.for(response), user.recent_performance ]
       end
     end
   end

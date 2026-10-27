@@ -4,6 +4,9 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
 
   TOKEN_LENGTH = 16
 
+  NO_BLOCKS_WALKTHROUGH =
+    "This section's blocks are missing from the stored exercise, so say only that the exercise data is unavailable.".freeze
+
   class << self
     def improved_code?
       false
@@ -177,7 +180,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
 
     def walkthrough_note(section:)
       blocks = Array(section["blocks"])
-      return "This section's blocks are missing from the stored exercise, so say only that the exercise data is unavailable." if blocks.empty?
+      return NO_BLOCKS_WALKTHROUGH if blocks.empty?
 
       <<~PARSONS.chomp
         #{correct_block_order(blocks)}
