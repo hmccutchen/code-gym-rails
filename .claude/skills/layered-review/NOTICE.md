@@ -10,7 +10,10 @@ The one change from the source: four links in `workflows/analyze-services.md`
 that pointed at pattern files not copied here now point at those files on
 GitHub at v3.1.0.
 
-The project is published under the MIT License:
+Upstream ships no license file. Its README, its `plugin.json` and its gemspec
+each declare the MIT License, and the gemspec names Vladimir Dementyev as the
+author. The text below is the standard MIT text with that author as the
+holder, written for this copy rather than copied from upstream:
 
 > Copyright (c) Vladimir Dementyev
 >

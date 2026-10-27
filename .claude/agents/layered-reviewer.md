@@ -11,9 +11,14 @@ maxTurns: 60
 
 Read and follow `.claude/skills/layered-review/workflows/review.md`, applied to
 the PR, branch, diff or file paths you were given. With none given, review the
-current branch's open PR (`gh pr view`), or the current branch against `main`
-when it has none. `.claude/skills/layered-review/SKILL.md` says which files
-were copied and where the rest live.
+current branch's open PR (`gh pr view`), or the current branch against
+`origin/main` when it has none. `.claude/skills/layered-review/SKILL.md` says
+which files were copied and how to read the rest from upstream with `gh api`.
+
+Where the workflow shows a shell snippet such as a `find` loop, get the same
+answer with Glob, Grep or `rg` instead of running it. You can't read web pages,
+so mark any finding that rests on a library's or SDK's documentation as
+unverified.
 
 Before judging placement, read `CLAUDE.md` and `.claude/rules/patterns.md`.
 Where the workflow and this repository's recorded decisions disagree, report
