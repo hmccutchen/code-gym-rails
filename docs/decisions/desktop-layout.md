@@ -4,13 +4,13 @@ The app is laid out for a phone first. At 900px and wider, a page that asks
 for it gets a desktop layout: a centered column up to 1040px wide, with the
 page's own arrangement inside it (History puts its title in a left rail beside
 the entries). Pages move onto it one at a time: History first, then
-Progress, Learn, and Account and Settings.
+Progress, Learn, Account and Settings, and Today.
 
 ## The breakpoints
 
 - **Under 600px:** the phone layout. Card pages and Today put each card
   `max(16px, inset)` from the screen edge (`phone_cards.css`); Today's
-  Submit stays at the end of its form
+  Submit and regenerate controls end the page
   (`docs/code-notes/app/assets/stylesheets/pages/today.md`).
 - **600 to 899px:** one column. Account and Settings stay a centered 480px
   column (`.phone-page`). History, Progress, Learn and Today take the
@@ -90,3 +90,5 @@ as an open question (a page class prefix in `desktop.css`, or the view's own
 The design boards drew the desktop layout. Where they disagreed with the app,
 the app wins: its nav, its Progress legend copy, no month list in History's
 rail, no "5 of 10" counts, and 44px controls where the boards drew 40px.
+Today's side column holds Submit and the regenerate controls but not this
+week's concept, which stays below the day.

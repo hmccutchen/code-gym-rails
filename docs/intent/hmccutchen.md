@@ -300,11 +300,20 @@ data.*
   **I decided:** refactor the three finished pages first, then build Account
   and Settings into their own sheets; a partial's styles go with the page it
   renders on, or a shared component sheet
-- Account and Settings in their own page sheets, laid out for a desktop `#571`
-  **I decided:** Account's paired cards stretch to the same height
+- Account and Settings page sheets and desktop layout `#571`
+  **I decided:** Account's paired cards share a height
 - fuzzy Learn search `#570`
 - glossary terms in alternate framings `#573`
 - Today on phone cards, styles in its own sheet `#572`
   **I decided:** no sticky Submit bar: the screen felt sandwiched
 - glossary_wrap always returns escaped HTML `#576`
 - glossary terms throughout the review `#577`
+
+## Tue Oct 27
+
+- Today on a desktop: the answers beside a side column `#579`
+  **I decided:** one side column after the answers with Submit, Generate new
+  set and Start over, which ends the page on a phone; the progress bar stays
+  in the main column, the featured card below the day, and the column sticks
+  only in a tall window; disable Generate new set and Start over while a
+  submit runs

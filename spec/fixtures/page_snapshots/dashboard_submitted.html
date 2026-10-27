@@ -554,7 +554,7 @@
     </div>
   </nav>
 
-  <div class="container" data-pull-content>
+  <div class="container container-wide" data-pull-content>
     <main id="main-content" tabindex="-1">
       <div class="flash notice" id="flash-notice">Welcome back, Existing!</div>
 
@@ -571,15 +571,10 @@
   <div id="dashboard-content">
         <form id="daily-kind-swap" hidden></form>
 
-<div class="regenerate-row">
-  <div>
-      <p class="hint">Today&#39;s set has been reviewed, so it can&#39;t be replaced — tomorrow&#39;s set builds on it.</p>
-  </div>
-
-</div>
-
-  <div data-submitted-day hidden></div>
-    <details class="section" open data-slot="1" data-section-fold="code_review">
+  <div class="today-day">
+    <div class="today-main">
+      <div data-submitted-day hidden></div>
+        <details class="section" open data-slot="1" data-section-fold="code_review">
   <summary class="section-label"><h2 class="section-title">  1 — Code Review
 </h2>
   </summary>
@@ -790,7 +785,7 @@
 
 
 
-  <div class="submit-row">
+      <div class="submit-row">
   <span class="submitted-badge">✓ Submitted</span>
     <span class="history-pill">Pattern: just right</span>
     <span class="history-pill">Challenge: too easy</span>
@@ -919,6 +914,17 @@
 
   </div>
 
+    </div>
+    <div class="today-side">
+      <div class="regenerate-row">
+  <div>
+      <p class="hint">Today&#39;s set has been reviewed, so it can&#39;t be replaced — tomorrow&#39;s set builds on it.</p>
+  </div>
+
+</div>
+
+    </div>
+  </div>
 
   </div>
 
