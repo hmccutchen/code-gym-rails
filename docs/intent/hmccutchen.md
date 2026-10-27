@@ -350,7 +350,6 @@ data.*
   concept
 - the flaky Submit nudge layout spec, fixed on its own `#591`
 
-*Postponed: running the baseline, until its PR merges and I approve the
-plan's cost*
+*Postponed: running the baseline until I approve the plan's cost*
 
 *From review: `#595`*
