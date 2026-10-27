@@ -133,3 +133,15 @@ passes through as stored, so the error it raised before still raises. The
 rows are read-only, so a trimmed review is never saved over the stored one.
 `RungLedger.for` uses it (#518), and `daily_response_ai_ratings_only_spec`
 compares it with the stored column across those shapes.
+
+## `#ai_rating_for`
+
+It returns nil for an unanswered section whatever is stored, so reviews written before unanswered sections stopped being graded read the same as new ones, with no data migration. Every reader of a grade goes through it.
+
+## `#partial_answer`
+
+What the engineer wrote on an unanswered section, or nil when nothing was. The prompt, the answer area and `#ungraded_label` all read it, so they agree on whether anything was written.
+
+## `#ungraded_label` and `#review_field_label`
+
+"Not graded" when `#partial_answer` is present and "Skipped" otherwise, because "Skipped" reads wrong for someone who wrote a short answer. `#review_field_label` gives the view and the email one source for the "missed" heading, "What a good answer covers" on an unanswered section.

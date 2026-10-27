@@ -267,3 +267,7 @@ since a gap the error explains is not a missing price. `Price`
 turns each rate into a `BigDecimal` through `to_s` when the table is built, so
 `0.2` stays two tenths rather than a float's nearest value, and a missing or
 negative rate raises at boot rather than on a call.
+
+## `#build_review_section_prompt`
+
+It chooses the walkthrough prompt when `DailyResponse#answered?` is false. That is a branch on answer state, which one authority decides, and not on section kind or provider.

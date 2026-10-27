@@ -28,6 +28,12 @@ read it before changing that area.
   only logs agreement and never rewrites a rating. The competency gate and
   `LevelSuggestion` read only `RUBRIC_VERSION`-stamped reviews;
   `ConceptMastery` and `RungLedger` read all history on purpose.
+- **Unanswered sections are reviewed, not graded** (`docs/decisions/grading-rubric.md`):
+  an unanswered section gets `ReviewPrompt.walkthrough_prompt`, with
+  `DailyResponse#partial_answer` as its text. It stores no rating and no rubric
+  stamp, `ai_rating_for` is nil for it, and `review_field_label` heads its
+  "missed" list "What a good answer covers". `ungraded_label` shows "Skipped"
+  or "Not graded" in place of the badge. `RUBRIC_VERSION` is unchanged.
 - **Review prose judge** (`docs/decisions/review-prose-judge.md`): An optional
   second pass that may reword a graded review's prose fields for plain
   language or length (`AiService#judge_review_prose`); it is never shown the

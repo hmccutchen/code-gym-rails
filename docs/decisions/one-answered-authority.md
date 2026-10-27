@@ -17,8 +17,11 @@ the hint lock, the status lines and the nudge show the latest reply.
 History, mastery and generation ask the same authority.
 
 `DailyResponse#answer_for` delegates review/display representation to the
-kind too. Prose below the floor, including "add index", appears as skipped
-without deleting the stored draft. Parsons preserves malformed attempts
+kind too. Prose below the floor, including "add index", stays stored as a draft.
+The answer area shows it with "Not counted as an answer." under it, through
+`DailyResponse#partial_answer`, and the review calls the section "Not graded".
+Only a blank or scaffold-only section shows "(skipped)". A design comparison
+pick with no reason, or a reason with no pick, is shown the same way. Parsons preserves malformed attempts
 for its strict local grading and lenient read-only replay, so a corrupt id
 cannot hide the other blocks the engineer arranged; it does not count as
 completed work. Calibration mismatch notes require completion.

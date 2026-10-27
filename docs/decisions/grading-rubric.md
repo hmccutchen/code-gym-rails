@@ -25,6 +25,9 @@ its level's description is graded on what it actually asks. The day context no
 longer calls the engineer "junior/mid", which would contradict a senior
 pitch.
 
+The rubric applies to answered sections only. An unanswered section is
+reviewed as a walkthrough with no rating, `essential_gaps` or stamp.
+
 **The rubric is checked, never enforced.** The grader also returns
 `essential_gaps`, the positions in "missed" it counts as essential.
 `RubricCheck` reads them against the rating (solid and strong list none,

@@ -17,7 +17,10 @@ as before, with `brake: DaySize::Decision#brake?`, so `CoverageException`
 keeps one caller (`DailyPlan.coverage_for`). The decision rides on
 `DailyPlan::Result#size`, and its count and reason go into `plan_notes`.
 `SectionCount` is the completion rule alone; `DaySize` owns a fixed
-setting's precedence.
+setting's precedence. Completion counts answered sections on any past day,
+submitted or not, because it measures how much you engage
+(`spec/models/user_spec.rb`, 'counts an autosaved draft's answered
+sections').
 
 **Every account starts at two.** The gate reads rubric-stamped reviews
 only, so an account grows past two only as favourable, rubric-graded work

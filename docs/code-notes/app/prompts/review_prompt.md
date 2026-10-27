@@ -9,3 +9,7 @@ It takes the rung as a value. `AiService#review_rung` chooses it: the section's 
 ## `RATING_RUBRIC`
 
 Stated once, in the day-level system prompt, so the section prompts never repeat it and the grader reads one definition of the four ratings.
+
+## `.walkthrough_prompt`
+
+It shares the entry rules and the JSON header with `.section_prompt` but leaves out the per-kind grading note on purpose: a grading note brings grading instructions into a prompt that must request no grade. It never asks for "rating" or "essential_gaps". When the engineer wrote something too short to count, it says so and does not call the section blank.
