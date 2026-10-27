@@ -159,6 +159,34 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).not_to match(/id="submit-row"[^>]*style="display:none"/)
   end
 
+  describe "the day's two columns" do
+    def page_html = Nokogiri::HTML(response.body)
+
+    it "puts the answer form in the main column and Submit, then the regenerate row, in the side column after it" do
+      create_exercise
+      get root_path
+
+      day = page_html.at_css(".today-day[data-controller='answer-form']")
+      expect(day.element_children.map { |child| child["class"] }).to eq(%w[today-main today-side])
+      expect(day.at_css(".today-main #gym-form")).to be_present
+      expect(day.at_css(".today-main .progress-sticky")).to be_present
+      expect(day.at_css(".today-side").element_children.map { |child| child["class"] }).to eq([ "submit-row", "regenerate-row" ])
+      expect(page_html.at_css("#gym-form #submit-row")).to be_nil
+      expect(page_html.css(".regenerate-row").size).to eq(1)
+    end
+
+    it "keeps the side column on a submitted day, holding only the regenerate row" do
+      create_response(create_exercise)
+      get root_path
+
+      day = page_html.at_css(".today-day")
+      expect(day["data-controller"]).to be_nil
+      expect(day.element_children.map { |child| child["class"] }).to eq(%w[today-main today-side])
+      expect(day.at_css(".today-side").element_children.map { |child| child["class"] }).to eq([ "regenerate-row" ])
+      expect(day.at_css(".today-main #ai-review, .today-main .submission")).to be_present
+    end
+  end
+
   it "never renders a Turbo Stream subscription tag (this app loads no Turbo JS)" do
     create_exercise
     get root_path

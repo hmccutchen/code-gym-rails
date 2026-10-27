@@ -11,14 +11,15 @@ RSpec.describe "Page width", type: :request do
   before { login_as(user) }
 
   it "keeps the standard container on every page that hasn't asked to be wide" do
-    [ root_path ].each do |path|
+    user.update!(language: "ruby_rails")
+    [ learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one") ].each do |path|
       get path
       expect(container_class).to eq("container"), "#{path} has #{container_class.inspect}"
     end
   end
 
-  it "widens History, Progress, Learn, Account and Settings" do
-    [ history_path, progress_path, learn_path, account_path, setup_path ].each do |path|
+  it "widens Today, History, Progress, Learn, Account and Settings" do
+    [ root_path, history_path, progress_path, learn_path, account_path, setup_path ].each do |path|
       get path
       expect(container_class).to eq("container container-wide"), "#{path} has #{container_class.inspect}"
     end
