@@ -11,6 +11,16 @@ to cite, as `docs/stored-answer-keys-spec-2026-10-27.md` section 9 does.
   "Pitfalls" below).
 - **Both disclosures stay:** the section's own closed reference by the
   problem, and the review's closed short version by the feedback.
+- **One exposure count:** the count both rules read lives on
+  `ConceptExposureIndex`, which also owns the blank and `"other"` skip and
+  the bucket lookup. `DailyResponse` and the concept-reference helper call
+  it instead of repeating that rule. This replaces the shared private
+  method on `DailyResponse` described below. Decided by the owner on
+  2026-10-27, after the plan review.
+- **One `graded_prose` reader:** before the short version reads a review's
+  gaps, one reader for the grader's original review is built beside
+  `ReviewProseVerdict` (issue #592), and the existing readers move onto it.
+  Decided by the owner on 2026-10-27, after the plan review.
 
 ## Why
 

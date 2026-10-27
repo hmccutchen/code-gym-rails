@@ -25,6 +25,11 @@ today's grader to compare against.
   read. The owner reads the Ruby `code_review` sections, and a senior
   colleague the owner chooses reads the other three kinds (section 8,
   option B).
+- **Quotes in a key:** a key puts the code or plan text it quotes in
+  backticks, and a key with no backticked quote counts as a quote miss.
+  Every keyed section is logged with its kind, language and outcome (`ok`,
+  `missing` or `quote_missing`), so the quote threshold is counted straight
+  from the logs. Decided by the owner on 2026-10-27, after the plan review.
 
 ## Why
 
@@ -118,8 +123,9 @@ owner before making it.
 The section stays because the key only helps grading, and the grader falls
 back to today's behavior for a keyless section. Rejecting would spend a
 retry, or drop the section, over a field the engineer never sees.
-`GenerationDiagnostics` logs `answer_key=missing kind=…` (no content) so the
-miss rate is visible. If it turns out high, revisit.
+`GenerationDiagnostics` logs one `answer_key=<outcome> kind=… language=…`
+line per keyed section (no content), so the miss rate and its denominator
+are visible. If it turns out high, revisit.
 
 ### 4. The section judge never sees a key
 
@@ -298,8 +304,8 @@ plan text in `flaw`) is looked for in the formatted snippet or plan, with
 whitespace collapsed. It runs after `ProblemSetIngest#format_code!`, so it
 sees the code as shown, through a per-kind hook beside `.reject_unusable!`.
 That keeps `ProblemSetIngest` free of any branch on kind. Misses travel on
-`ProblemSetIngest::Result`, and `GenerationDiagnostics` logs them as
-`answer_key_quote=missing kind=…`, next to `answer_key=missing`. A miss
+`ProblemSetIngest::Result`, and `GenerationDiagnostics` logs them as the
+outcome `quote_missing` on the same per-section line. A miss
 changes nothing. It catches a key that quotes code that isn't there. It
 can't catch a key that quotes the right line and misreads it. Prettier can
 change quotes and semicolons in JavaScript, so a miss there is a lead to
@@ -344,8 +350,9 @@ the counts of calls go into the build PR.
 Out of scope for this PR. Whether the review may show the key's
 `why_it_matters` and `fix` (or a vulnerability's `exploit` and `mitigation`,
 or a plan flaw's `pushback`) after submission is a separate decision. Today
-the rule says a key never reaches the page, before or after review, and
-showing these parts would narrow it to "never before review", with
+the four new keys never reach the page, before or after review. Only
+`design_comparison` shows its `answer_key` once reviewed. Showing these
+parts would narrow the rule for the four kinds to "never before review", with
 `section_rendering_characterization_spec` changed to match. The place
 would be the review block, beside the first-exposure short version, never
 the section itself. The short version itself
@@ -381,7 +388,8 @@ the owner's 15 most recent graded sections (8 `code_review`, 7
   one-off `solid` above.
 
 So run-to-run noise on these two kinds is about one grade in 75, one level
-apart, which the movement threshold below clears easily. The baseline
+apart. That is well under the movement threshold below, which is measured
+against the unkeyed run on the same sections, not against this baseline. The baseline
 covers no `security_review`, `plan_review` or `pseudocode_to_code`
 section, because every day in the sample had two sections. Those three
 kinds have no before picture yet.

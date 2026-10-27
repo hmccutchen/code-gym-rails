@@ -353,4 +353,8 @@ data.*
 - two implementation plans, the short version first since it needs no keys
   `#596 open`
   **I decided:** two separate plans; every production query, generation and
-  calibration run waits for my approval
+  calibration run waits for my approval; after the plan reviews, the
+  exposure count lives on `ConceptExposureIndex`, the short version builds
+  #592's single `graded_prose` reader first, every keyed section is logged
+  with its kind, language and outcome, and a key quotes in backticks, with no
+  quote counted as a miss
