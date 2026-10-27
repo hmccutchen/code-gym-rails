@@ -273,17 +273,17 @@ data.*
   the five techniques as one-liners `#563`
   **why:** the audit showed 730 undefined terms with no glossary match, and
   "memoized" never found the memoization entry
-  **I decided:** start with the 47 and size a second batch from the audit's
-  re-run after deploy; no new concepts; inflections of a key match but the
-  whole-word rule stands otherwise; every noun key gets its plural; one plain
-  sentence per entry with a fact check by an agent that didn't write it; a
-  read-only export of the references and my last 60 days of exercise text,
-  which I approve and read before the PR leaves draft; after deploy only the
-  coverage script re-runs; a 480-or-fewer bar that reports a miss and never
-  blocks the merge; drop `indexes`, `indexed`, `injected` and `inferred` after
-  reading the listing; then `normalize`, `normalized`, `injecting` and
-  `lift it up` from the critical review; the listing tool gets tracked; the
-  pre-submission tooltip question becomes an issue
+  **I decided:** start with the 47; size a second batch from the post-deploy
+  audit; no new concepts; inflections of a key match but the whole-word rule
+  stands otherwise; every noun key gets its plural; one plain sentence per
+  entry with a fact check by an agent that didn't write it; a read-only export
+  of the references and my last 60 days of exercise text, which I approve and
+  read before the PR leaves draft; after deploy only the coverage script
+  re-runs; a 480-or-fewer bar that reports a miss, never blocking the merge;
+  drop `indexes`, `indexed`, `injected` and `inferred` after reading the
+  listing; then `normalize`, `normalized`, `injecting` and `lift it up` from
+  the critical review; the listing tool gets tracked; the pre-submission
+  tooltip question becomes an issue
 - Progress on phone cards and the desktop layout, specced first `#565`
   **I decided:** the legend stays a disclosure at every width, with its 7 real
   entries as written; groups two across on a desktop and the full container
@@ -306,3 +306,4 @@ data.*
 - glossary terms in alternate framings `#573`
 - Today on phone cards, styles in its own sheet `#572`
   **I decided:** no sticky Submit bar: the screen felt sandwiched
+- glossary_wrap always returns escaped HTML `#576`
