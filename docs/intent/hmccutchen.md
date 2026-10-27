@@ -327,3 +327,5 @@ data.*
   walkthrough work `#584`
 - a spec pinning the walkthrough prompt and the stripped grade together, from
   the critical review of the ReviewPrompt work `#586`
+- the review badge and headings moved off DailyResponse into a view helper
+  `#587`
