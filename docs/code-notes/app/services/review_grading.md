@@ -41,3 +41,12 @@ Grades one section by the same per-section rules, with no difficulty
 assessment and no translation. `script/model_comparison.rb` uses it to compare
 graders on stored days without billing those extra calls, and it grades a
 pseudocode section as written when no translation was saved.
+
+## `#ungraded`
+
+A section the engineer did not answer (`DailyResponse#answered?` is false) gets
+a walkthrough prompt that never asks for a grade, but a provider can send one
+anyway, and `AiService#grade_review` stamps the rubric version on whatever comes
+back. This is the one place that drops "rating", "essential_gaps" and "rubric"
+for such a section, before the prose judge runs, and it skips `#rated` so
+Parsons' `fixed_rating` and the rubric check never see it.

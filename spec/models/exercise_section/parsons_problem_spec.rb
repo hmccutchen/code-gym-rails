@@ -136,4 +136,11 @@ RSpec.describe ExerciseSection::ParsonsProblem do
       expect(section).to eq("question" => "q", "blocks" => "not a list")
     end
   end
+
+  describe ".answered?" do
+    it "still needs a complete arrangement, since a short answer counts only for prose" do
+      expect(described_class.answered?("order:0,1", { "blocks" => %w[a b c] })).to be(false)
+      expect(described_class.answered?("order:2,0,1", { "blocks" => %w[a b c] })).to be(true)
+    end
+  end
 end

@@ -163,6 +163,10 @@ class ExerciseSection
       ""
     end
 
+    def walkthrough_note(section:)
+      ""
+    end
+
     # Every kind gets the same context and states only its own vocabulary (#81); absorb unread values with `**`.
     def generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil, alongside: [])
       raise NotImplementedError, "#{self} must implement .generation_guidance"
@@ -275,7 +279,7 @@ class ExerciseSection
     end
 
     def answered?(value, section_data = nil)
-      substantive_answer(value, section_data).length > DailyResponse::ANSWER_MIN_LENGTH
+      substantive_answer(value, section_data).present?
     end
 
     def answer_for(value, section_data = nil)

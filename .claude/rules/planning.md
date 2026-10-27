@@ -145,7 +145,7 @@ read it before changing that area.
   `#current_streak`, and re-pausing never moves the `#held_exercise` floor.
 - **Personalization loop** (`docs/decisions/personalization-loop.md`):
   `User#recent_performance` feeds the last 10 sessions into the generation
-  prompt. A skipped section's AI grade is never skill evidence: ratings,
+  prompt. A skipped section is reviewed but never graded: ratings,
   `ConceptMastery.record_review!` and reinforcement read
   `DailyResponse#answered_concept_tags`, and only where today can host them.
   A skipped, due retention check is

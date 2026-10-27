@@ -2372,7 +2372,7 @@ RSpec.describe AiService do
       end
     end
 
-    [ "add index", "Approach:\nWhy:" ].each do |answer|
+    [ "", "Approach:\nWhy:" ].each do |answer|
       it "treats #{answer.inspect} as skipped in grading and re-explanation" do
         exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
           "pattern" => { "question" => "Why?", "answer_scaffold" => [ "Approach:", "Why:" ] }
@@ -2383,7 +2383,6 @@ RSpec.describe AiService do
 
         context = svc.send(:build_review_day_context, "Rails", exercise, resp)
         expect(context).to include("Their answer: (skipped)")
-        expect(context).not_to include(answer)
         expect(svc).to receive(:call).with(having_attributes(prompt: include("Their answer: (skipped)"))).and_call_original
         svc.explain_differently(user, exercise, resp, section: "pattern")
         expect(svc).to receive(:call).with(having_attributes(prompt: include("Their answer was: (skipped)"))).and_call_original
@@ -2391,9 +2390,37 @@ RSpec.describe AiService do
       end
     end
 
-    it "treats short pseudocode as skipped without changing substantive pseudocode" do
+    it "leaves the scaffold labels out of the grading context when the answer is only labels" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "pattern" => { "question" => "Why?", "answer_scaffold" => [ "Approach:", "Why:" ] }
+      })
+      resp = DailyResponse.new(daily_exercise: exercise, answers: { "pattern" => "Approach:\nWhy:" }, ai_review: { "pattern" => {} })
+
+      context = double_class.new(canned_text: "x").send(:build_review_day_context, "Rails", exercise, resp)
+
+      expect(context).not_to include("Approach:\nWhy:")
+    end
+
+    it "hands a short answer to grading and re-explanation as the answer" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "pattern" => { "question" => "Why?", "answer_scaffold" => [ "Approach:", "Why:" ] }
+      })
+      resp = DailyResponse.new(daily_exercise: exercise, answers: { "pattern" => "add index" }, ai_review: { "pattern" => {} })
+      svc = double_class.new(canned_text: "A different explanation")
+
+      context = svc.send(:build_review_day_context, "Rails", exercise, resp)
+      expect(context).to include(UserText.tagged("add index"))
+      expect(context).not_to include("Their answer: (skipped)")
+      expect(svc).to receive(:call).with(having_attributes(prompt: include(UserText.tagged("add index")))).and_call_original
+      svc.explain_differently(user, exercise, resp, section: "pattern")
+    end
+
+    it "hands short pseudocode to grading the same as longer pseudocode" do
       exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "pseudocode_to_code" => {} })
       resp = DailyResponse.new(daily_exercise: exercise, answers: { "pseudocode_to_code" => "add index" })
+      expect(service.send(:build_review_day_context, "Rails", exercise, resp))
+        .to include("Their final pseudocode:\n#{UserText.tagged('add index')}")
+      resp.answers["pseudocode_to_code"] = ""
       expect(service.send(:build_review_day_context, "Rails", exercise, resp))
         .to include("Their final pseudocode: (skipped)")
 
@@ -2569,16 +2596,45 @@ RSpec.describe AiService do
       expect(prompt).to match(/separate ideas belong in separate entries/i)
     end
 
+    describe "for an unanswered section" do
+      let(:exercise) { exercise_with_third("challenge", { "question" => "q" }) }
+
+      def prompt_for(answer)
+        service.send(:build_review_section_prompt, exercise, DailyResponse.new(answers: { "pattern" => answer }), "pattern")
+      end
+
+      it "uses the walkthrough prompt for a blank answer" do
+        expect(ReviewPrompt).to receive(:walkthrough_prompt).with(hash_including(key: "pattern")).and_call_original
+        expect(prompt_for("")).to include("must not be rated")
+      end
+
+      it "grades a short answer instead of walking through it" do
+        expect(ReviewPrompt).not_to receive(:walkthrough_prompt)
+        expect(prompt_for("N+1?")).to include("Grade ONLY")
+      end
+
+      it "keeps the grading prompt for an answered section" do
+        expect(ReviewPrompt).not_to receive(:walkthrough_prompt)
+        expect(prompt_for("a" * 40)).to include("Grade ONLY")
+      end
+
+      it "reviews under the same call purpose as an answered section" do
+        allow(service).to receive(:call).and_return(text: "{}", input_tokens: 1, output_tokens: 1)
+        service.send(:grade_review, nil, exercise, DailyResponse.new(answers: {}), "pattern", "ctx")
+        expect(service).to have_received(:call).with(have_attributes(purpose: "review_response"))
+      end
+    end
+
     it "names pattern as structural and asks for a refactored structure" do
       exercise = exercise_with_third("challenge", { "question" => "q" })
-      resp = DailyResponse.new(answers: {})
+      resp = DailyResponse.new(answers: { "pattern" => "a" * 40 })
       prompt = service.send(:build_review_section_prompt, exercise, resp, "pattern")
       expect(prompt).to match(/refactored structure/i)
     end
 
     it "evaluates architecture on depth of reasoning, not correctness, and forbids improved_code" do
       exercise = exercise_with_third("architecture", { "title" => "A", "question" => "q", "scenario" => "s" })
-      resp = DailyResponse.new(answers: {})
+      resp = DailyResponse.new(answers: { "architecture" => "a" * 40 })
       prompt = service.send(:build_review_section_prompt, exercise, resp, "architecture")
 
       expect(prompt.downcase).to include("tradeoff")
@@ -2588,7 +2644,7 @@ RSpec.describe AiService do
 
     it "evaluates security_review on vulnerability + mitigation with partial credit" do
       exercise = exercise_with_third("security_review", { "title" => "S", "question" => "q", "snippet" => "code" })
-      resp = DailyResponse.new(answers: {})
+      resp = DailyResponse.new(answers: { "security_review" => "a" * 40 })
       prompt = service.send(:build_review_section_prompt, exercise, resp, "security_review")
 
       expect(prompt.downcase).to include("mitigation")
@@ -2599,7 +2655,7 @@ RSpec.describe AiService do
       exercise = exercise_with_third("parsons_problem", {
         "title" => "T", "question" => "Q", "blocks" => %w[a b c d e]
       })
-      resp = DailyResponse.new(answers: { "parsons_problem" => "order:0,2,1,3,4" })
+      resp = DailyResponse.new(daily_exercise: exercise, answers: { "parsons_problem" => "order:0,2,1,3,4" })
       prompt = service.send(:build_review_section_prompt, exercise, resp, "parsons_problem")
 
       expect(prompt).to match(/2 block\(s\) out of place/)
@@ -2607,12 +2663,12 @@ RSpec.describe AiService do
       expect(prompt).to include('must be an empty string')
     end
 
-    it "does not claim a verified parsons result when the exercise has no blocks array" do
+    it "walks through a parsons section with no blocks array, since no order can count as an answer" do
       exercise = exercise_with_third("parsons_problem", { "title" => "T", "question" => "Q" })
-      resp = DailyResponse.new(answers: {})
+      resp = DailyResponse.new(daily_exercise: exercise, answers: { "parsons_problem" => "order:0,1" })
       prompt = service.send(:build_review_section_prompt, exercise, resp, "parsons_problem")
       expect(prompt).not_to match(/block\(s\) out of place/)
-      expect(prompt).to include("CANNOT be verified")
+      expect(prompt).to include("Walk through the", "must not be rated")
     end
   end
 
@@ -2652,19 +2708,6 @@ RSpec.describe AiService do
         answers: { "parsons_problem" => "order:0,1,2,3,4,999" }
       )
       expect(fixed_rating_for(exercise, response)).to eq("beginner")
-    end
-
-    it "leaves the rating to the grader when the exercise's parsons_problem has no blocks" do
-      exercise = DailyExercise.create!(
-        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
-        problem_set: {
-          "code_review"     => { "question" => "q", "snippet" => "s" },
-          "pattern"         => { "title" => "t", "question" => "q" },
-          "parsons_problem" => { "title" => "T", "question" => "Q" }
-        }
-      )
-      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
-      expect(fixed_rating_for(exercise, response)).to be_nil
     end
   end
 
@@ -5840,6 +5883,8 @@ RSpec.describe AiService, "the grading rubric" do
   end
 
   it "asks for the positions of the essential gaps in missed" do
+    response.answers["code_review"] = "a" * 40
+
     expect(service.send(:build_review_section_prompt, exercise, response, "code_review"))
       .to include('"essential_gaps": array of integers')
   end

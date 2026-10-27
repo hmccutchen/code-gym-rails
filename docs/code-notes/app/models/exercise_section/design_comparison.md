@@ -15,3 +15,7 @@ The list is an allowlist, so a concept added to a vocabulary later is not offere
 ## `.code_review_overlap_line`
 
 The line keeps a design comparison from restating the code review's defect when both take the same concept. It renders only when `code_review` is requested alongside this kind, so a pair without it leaves the line out. A retry of this kind alone also leaves it out, even on a day with a code review, because `alongside:` holds the kinds requested together, not the day's kinds.
+
+## `.answered?`
+
+A valid pick or a non-blank reason counts as an answer, so a half answer is graded like any other. `.review_context` tells the grader which half is missing.

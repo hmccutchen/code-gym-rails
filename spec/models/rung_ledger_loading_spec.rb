@@ -56,7 +56,7 @@ RSpec.describe RungLedger, ".for" do
     submit_day(Date.new(2026, 3, 5),
                { "code_review" => section("callbacks", rung: "mid_level"), "pattern" => section("n_plus_one", rung: "senior"),
                  "architecture" => section("callbacks", rung: "junior") },
-               answers: { "code_review" => long_answer, "pattern" => "too short", "architecture" => long_answer },
+               answers: { "code_review" => long_answer, "pattern" => "", "architecture" => long_answer },
                ai: { "code_review" => "solid", "architecture" => nil },
                plan_notes: { "daily_kinds" => %w[code_review] })
     submit_day(Date.new(2026, 3, 6),

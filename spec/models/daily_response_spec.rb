@@ -262,15 +262,15 @@ RSpec.describe DailyResponse, type: :model do
   end
 
   describe "#answered_sections" do
-    it "returns keys whose answers have substance (>10 chars), preserving the completeness heuristic" do
+    it "returns keys whose answers have any substance, a short one included" do
       daily_response = user.daily_responses.create!(
         daily_exercise: exercise,
         date: Date.current,
         answers: { "code_review" => "Found the N+1 in the loop", "pattern" => "short", "challenge" => "" }
       )
 
-      expect(daily_response.answered_sections).to eq([ "code_review" ])
-      expect(daily_response.completeness).to eq(33)
+      expect(daily_response.answered_sections).to eq([ "code_review", "pattern" ])
+      expect(daily_response.completeness).to eq(67)
     end
 
     it "computes completeness against the exercise's own section count, not a hardcoded 3" do
@@ -329,11 +329,9 @@ RSpec.describe DailyResponse, type: :model do
         expect(response_with(template).answered_sections).to be_empty
       end
 
-      # The labels alone pass the threshold, so unstripped they would count a two-word answer as answered.
-      it "measures only what the user typed under the labels" do
-        expect(response_with(template + "Redis").answered_sections).to be_empty
-        expect(response_with(template + "Redis, because reads dominate").answered_sections)
-          .to eq([ "architecture" ])
+      it "counts one word typed under the labels, and nothing for the labels with only whitespace added" do
+        expect(response_with(template + "  \n").answered_sections).to be_empty
+        expect(response_with(template + "Redis").answered_sections).to eq([ "architecture" ])
       end
 
       it "falls back to the kind's default labels when the problem carries no scaffold" do
@@ -451,15 +449,25 @@ RSpec.describe DailyResponse, type: :model do
   end
 
   describe "#answered_concept_tags" do
-    it "keeps only the tags of sections that were answered" do
+    it "keeps only the tags of sections that were answered, a short answer included" do
       response = user.daily_responses.create!(
         daily_exercise: exercise, date: Date.current,
         answers: { "code_review" => "a" * 20, "pattern" => "", "challenge" => "short" },
         concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization", "challenge" => "caching" }
       )
 
-      expect(response.answered_concept_tags).to eq("code_review" => "n_plus_one")
+      expect(response.answered_concept_tags).to eq("code_review" => "n_plus_one", "challenge" => "caching")
       expect(response.concept_tags.keys).to contain_exactly("code_review", "pattern", "challenge")
+    end
+  end
+
+  describe "#answered? on a short answer" do
+    it "counts any substantive text, however short, and leaves a blank section unanswered" do
+      response = described_class.new(daily_exercise: exercise, answers: { "code_review" => "N+1?", "pattern" => "  " })
+
+      expect(response.answered?("code_review")).to be(true)
+      expect(response.answered?("pattern")).to be(false)
+      expect(response.answered?("challenge")).to be(false)
     end
   end
 
@@ -468,14 +476,14 @@ RSpec.describe DailyResponse, type: :model do
       response = described_class.new(daily_exercise: exercise,
         answers: { "code_review" => "add index", "pattern" => "My approach:\nUse a bounded cache" })
 
-      expect(response.answer_for("code_review")).to be_nil
+      expect(response.answer_for("code_review")).to eq("add index")
       expect(response.answer_for("challenge")).to be_nil
       expect(response.answer_for("pattern")).to eq("My approach:\nUse a bounded cache")
     end
 
     describe "positional answer completion" do
       [ 1, 2, 3 ].each do |count|
-        it "counts an explicit #{count}-block arrangement without applying the prose floor" do
+        it "counts an explicit #{count}-block arrangement" do
           exercise = DailyExercise.new(problem_set: { "parsons_problem" => { "blocks" => Array.new(count, "block") } })
           order = "order:#{(0...count).to_a.join(',')}"
           response = described_class.new(daily_exercise: exercise, answers: { "parsons_problem" => order })
@@ -595,11 +603,12 @@ RSpec.describe DailyResponse, type: :model do
 
   describe "#ai_rating_for, #ai_rating_favorable?, and #ai_rating_unfavorable?" do
     it "reads the per-section rating out of ai_review, nil-safe when unreviewed or the section is missing" do
+      answers = { "code_review" => "a" * 20, "pattern" => "My approach:\n#{"b" * 20}" }
       reviewed = user.daily_responses.create!(
-        daily_exercise: exercise, date: Date.current, answers: {},
+        daily_exercise: exercise, date: Date.current, answers: answers,
         ai_review: { "code_review" => { "rating" => "developing" }, "pattern" => { "rating" => "strong" } }
       )
-      unreviewed = user.daily_responses.create!(daily_exercise: next_exercise, date: Date.current + 1, answers: {})
+      unreviewed = user.daily_responses.create!(daily_exercise: next_exercise, date: Date.current + 1, answers: answers)
 
       expect(reviewed.ai_rating_for("code_review")).to eq("developing")
       expect(reviewed.ai_rating_favorable?("code_review")).to be(false)
@@ -616,6 +625,84 @@ RSpec.describe DailyResponse, type: :model do
       expect(unreviewed.ai_rating_for("code_review")).to be_nil
       expect(unreviewed.ai_rating_favorable?("code_review")).to be(false)
       expect(unreviewed.ai_rating_unfavorable?("code_review")).to be(false)
+    end
+  end
+
+  describe "#review_badge" do
+    {
+      "the rating on an answered section"                 => [ "a" * 20, { "rating" => "strong" }, [ "strong", true ] ],
+      "Skipped on an unanswered section with a rating"    => [ "", { "rating" => "strong" }, [ "Skipped", false ] ],
+      "Skipped on an unanswered section without a rating" => [ "", {}, [ "Skipped", false ] ],
+      "nothing on an answered section without a rating"   => [ "a" * 20, {}, nil ]
+    }.each do |label, (written, review, expected)|
+      it "gives #{label}" do
+        response = user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+                                                answers: { "code_review" => written }, ai_review: { "code_review" => review })
+        badge = response.review_badge("code_review")
+
+        expect(badge && [ badge.text, badge.graded? ]).to eq(expected)
+      end
+    end
+  end
+
+  describe "#ai_rating_for on an unanswered section" do
+    let(:scaffold_only) { ExerciseSection.find("plan_review").scaffold_template }
+    let(:plan_exercise) do
+      user.daily_exercises.create!(date: Date.current + 2, generated_at: Time.current,
+                                   problem_set: exercise.problem_set.merge("plan_review" => { "question" => "plan-q" }))
+    end
+
+    {
+      "blank"         => [ "code_review", "" ],
+      "scaffold-only" => [ "plan_review", :scaffold ]
+    }.each do |label, (section, written)|
+      it "is nil for a #{label} answer even with a stored rating" do
+        written = scaffold_only if written == :scaffold
+        response = user.daily_responses.create!(
+          daily_exercise: plan_exercise, date: Date.current + 2, answers: { section => written },
+          ai_review: { section => { "rating" => "strong" } }
+        )
+
+        expect(response.ai_rating_for(section)).to be_nil
+        expect(response.ai_rating_favorable?(section)).to be(false)
+        expect(response.ai_rating_unfavorable?(section)).to be(false)
+      end
+    end
+
+    it "keeps the stored rating for an answered section" do
+      response = user.daily_responses.create!(
+        daily_exercise: exercise, date: Date.current, answers: { "code_review" => "a" * 20, "pattern" => "" },
+        ai_review: { "code_review" => { "rating" => "strong" }, "pattern" => { "rating" => "strong" } }
+      )
+
+      expect(response.ai_rating_for("code_review")).to eq("strong")
+      expect(response.ai_rating_for("pattern")).to be_nil
+    end
+
+    it "keeps the stored rating for a short answer, since it is still an answer" do
+      response = user.daily_responses.create!(
+        daily_exercise: exercise, date: Date.current, answers: { "code_review" => "N+1?" },
+        ai_review: { "code_review" => { "rating" => "developing" } }
+      )
+
+      expect(response.ai_rating_for("code_review")).to eq("developing")
+      expect(response.ai_rating_unfavorable?("code_review")).to be(true)
+    end
+  end
+
+  describe "#review_field_label" do
+    let(:response) { described_class.new(daily_exercise: exercise, answers: { "code_review" => "a" * 20, "pattern" => "" }) }
+
+    it "uses the walkthrough heading for the missed list on an unanswered section" do
+      expect(response.review_field_label("pattern", "missed")).to eq("What a good answer covers")
+    end
+
+    it "uses the graded heading for the missed list on an answered section" do
+      expect(response.review_field_label("code_review", "missed")).to eq("What you missed")
+    end
+
+    it "leaves a field with no walkthrough heading unchanged on an unanswered section" do
+      expect(response.review_field_label("pattern", "next_step")).to eq("Next step")
     end
   end
 

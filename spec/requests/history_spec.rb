@@ -835,4 +835,68 @@ RSpec.describe "History", type: :request do
       expect(instantiations).to eq(1)
     end
   end
+
+  describe "a submitted day with an unanswered section" do
+    before do
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current,
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern" => { "title" => "Pat", "question" => "pq" },
+          "challenge" => { "question" => "cq" }
+        }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: exercise.date,
+        answers: { "code_review" => "", "pattern" => "<b>N+1", "challenge" => "c" * 20 },
+        submitted_at: Time.current,
+        ai_review: {
+          "code_review" => { "rating" => "solid", "missed" => [ "Blank missed point" ] },
+          "pattern" => { "rating" => "developing", "correct" => [ "Short correct point" ], "missed" => [ "Short missed point" ] },
+          "challenge" => { "rating" => "strong", "missed" => [ "Answered missed point" ] }
+        }
+      )
+      login_as(user)
+      get history_path
+    end
+
+    it "labels the blank section Skipped with no badge, and grades the short answer" do
+      blocks = Nokogiri::HTML(response.body).css(".review-block").to_h { |block| [ block["data-slot"], block ] }
+
+      expect(blocks["1"].css(".review-ungraded").text).to eq("Skipped")
+      expect(blocks["1"].css(".review-rating")).to be_empty
+      expect(blocks["2"].css(".review-rating").text).to eq("developing")
+      expect(blocks["2"].css(".review-ungraded")).to be_empty
+      expect(blocks["1"].text).to include("What a good answer covers:")
+      expect(blocks["2"].text).to include("What you missed:")
+      expect(blocks["3"].text).to include("What you missed:")
+      expect(response.body).not_to include("Not graded")
+    end
+
+    it "shows the short answer escaped" do
+      expect(response.body).to include("&lt;b&gt;N+1")
+      expect(response.body).not_to include("Not counted as an answer.")
+    end
+
+    it "shows (skipped) for the blank section" do
+      expect(Nokogiri::HTML(response.body).css(".answer-display").map(&:text)).to include("(skipped)")
+    end
+
+    it "lists the correct points of a short section" do
+      blocks = Nokogiri::HTML(response.body).css(".review-block").to_h { |block| [ block["data-slot"], block ] }
+      expect(blocks["2"].text).to include("Short correct point")
+    end
+  end
+
+  it "shows a design comparison pick with no reason in bold, as an answer" do
+    exercise = DailyExercise.create!(user: user, date: 2.days.ago.to_date, generated_at: Time.current,
+                                     problem_set: { "design_comparison" => { "title" => "D", "question" => "q" } })
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date,
+                          answers: { "design_comparison" => "pick:a\n" }, submitted_at: Time.current)
+    login_as(user)
+    get history_path
+
+    expect(Nokogiri::HTML(response.body).css(".answer-display strong").text).to eq("Picked piece A")
+    expect(response.body).not_to include("Not counted as an answer.", "(skipped)")
+  end
 end

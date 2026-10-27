@@ -49,7 +49,7 @@ class SendPushReminderJob < ApplicationJob
     end
   end
 
-  # :unrated is its own stage because Submit stays disabled until every answered section is rated.
+  # :unrated is its own stage because the server refuses a submit until every answered section is rated.
   def stage_for(exercise, response)
     answered = answered_count(response)
 

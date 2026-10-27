@@ -4,6 +4,9 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
 
   TOKEN_LENGTH = 16
 
+  NO_BLOCKS_WALKTHROUGH =
+    "This section's blocks are missing from the stored exercise, so say only that the exercise data is unavailable.".freeze
+
   class << self
     def improved_code?
       false
@@ -20,7 +23,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
 
     def fixed_rating(section:, answer:)
       blocks = Array(section["blocks"])
-      return if blocks.empty?
 
       grade(submitted_order(answer, blocks.size), blocks.size)[:rating]
     end
@@ -163,19 +165,11 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     end
 
     def grading_note(section:, answer:)
-      blocks = Array(section["blocks"])
-
-      if blocks.empty?
-        return <<~UNVERIFIED.chomp
-          This section's blocks are missing from the stored exercise, so the submitted ordering CANNOT be verified. Do not state or imply how many blocks were misplaced, and do not rate this section's correctness — say only that the exercise data is unavailable.
-          For this section "improved_code" must be an empty string.
-        UNVERIFIED
-      end
-
+      blocks    = Array(section["blocks"])
       submitted = submitted_order(answer, blocks.size)
 
       <<~PARSONS.chomp
-        Correct blocks, in order: #{blocks.each_with_index.map { |b, i| "#{i + 1}. #{b}" }.join(" / ")}
+        #{correct_block_order(blocks)}
         What they misplaced: #{describe_mismatches(blocks, submitted)}
         Verified result (already scored in Ruby — do not re-judge correctness or propose a different rating): #{grade(submitted, blocks.size)[:mismatches]} block(s) out of place.
 
@@ -184,9 +178,22 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       PARSONS
     end
 
-    def describe_mismatches(blocks, submitted_ids)
-      return "cannot verify — the exercise's blocks are unavailable" if blocks.empty?
+    def walkthrough_note(section:)
+      blocks = Array(section["blocks"])
+      return NO_BLOCKS_WALKTHROUGH if blocks.empty?
 
+      <<~PARSONS.chomp
+        #{correct_block_order(blocks)}
+
+        Explain WHY each block belongs where it does — cite the actual dependency or logical reason (e.g. "this block uses a variable an earlier block declares, so it must come after it").
+      PARSONS
+    end
+
+    def correct_block_order(blocks)
+      "Correct blocks, in order: #{blocks.each_with_index.map { |b, i| "#{i + 1}. #{b}" }.join(" / ")}"
+    end
+
+    def describe_mismatches(blocks, submitted_ids)
       submitted_ids = normalize_order(submitted_ids, blocks.size)
       padded = Array.new(blocks.size) { |i| submitted_ids[i] }
       descriptions = padded.each_index.filter_map { |i|

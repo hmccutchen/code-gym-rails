@@ -242,18 +242,17 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     end
   end
 
-  it "counts Unicode characters against the same answer floor as the server" do
+  it "counts a one-character answer as the server does" do
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i)
       rate_section("code_review")
-      fill_in_answer("code_review", "🦆" * DailyResponse::ANSWER_MIN_LENGTH)
-      wait_for_saved_answer(user, "code_review", "🦆" * DailyResponse::ANSWER_MIN_LENGTH)
       expect_blocked("Answer at least one section to finish up.")
 
-      fill_in_answer("code_review", "🦆" * (DailyResponse::ANSWER_MIN_LENGTH + 1))
+      fill_in_answer("code_review", "🦆")
+      wait_for_saved_answer(user, "code_review", "🦆")
       expect_ready_to_submit
       click_button "Submit answers"
       expect(page).to have_content("Review ready!")
@@ -281,6 +280,9 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
       find(%([data-comparison-answer="design_comparison"])).choose("Piece A")
       wait_for_saved_answer(user, "design_comparison", "pick:a\n")
+      expect_blocked("Rate each section you answered to finish up.")
+
+      rate_section("design_comparison")
       expect_ready_to_submit
     end
   end

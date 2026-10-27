@@ -36,7 +36,8 @@ class ReviewGrading
   def grade_section(section, context)
     provider = @providers.call
     review   = provider.grade.call(@user, @exercise, @response, section, context)
-    review   = gaps_beside_their_prose(judged_review(provider, section, rated(section, review)))
+    review   = unanswered?(section) ? ungraded(review) : rated(section, review)
+    review   = gaps_beside_their_prose(judged_review(provider, section, review))
     [ section, { ok: true, review: review } ]
   rescue ProviderError, *AiService::INFRASTRUCTURE_ERRORS => e
     [ section, { ok: false, error_code: AiService.error_code_for(e), failure: ProviderFailure.classify(e),
@@ -88,6 +89,14 @@ class ReviewGrading
 
       result[:review]["difficulty"] = difficulty[section]
     end
+  end
+
+  def unanswered?(section)
+    !@response.answered?(section)
+  end
+
+  def ungraded(review)
+    review.except("rating", "essential_gaps", "rubric")
   end
 
   def rated(section, review)

@@ -294,6 +294,21 @@ RSpec.describe ConceptMastery, type: :model do
         tier: "standard", streak: 2, last_rating: "strong", mastered_at: mastered_at)
     end
 
+    it "defers a skipped due retention check whose stored review has no rating" do
+      due_on = Date.current - 1
+      cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :standard,
+                                          streak: 2, last_rating: "strong", mastered_at: 30.days.ago.change(usec: 0),
+                                          retention_interval_days: 7, next_retention_check_on: due_on)
+      response = reviewed_day(answers: { "code_review" => "" },
+                              concept_tags: { "code_review" => "n_plus_one" },
+                              ai_review: { "code_review" => { "missed" => [ "x" ] } })
+
+      described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
+
+      expect(cm.reload).to have_attributes(next_retention_check_on: Date.current + 7, retention_interval_days: 7,
+        tier: "standard", streak: 2, last_rating: "strong")
+    end
+
     it "does not defer again when a skipped batch is retried after its deferred date" do
       cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
         retention_interval_days: 7, next_retention_check_on: Date.current)

@@ -144,7 +144,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
 
     def answered?(value, _section_data = nil)
       pick, reason = parse_answer(value)
-      pick.present? && reason.present?
+      pick.present? || reason.present?
     end
 
     def review_context(section:, answer:, rating:)
@@ -231,9 +231,9 @@ class ExerciseSection::DesignComparison < ExerciseSection
 
     def decoded_answer_line(answer)
       pick, reason = parse_answer(answer)
-      return "Their answer: (skipped)" unless pick
+      return "Their answer: (skipped)" unless pick || reason.present?
 
-      "Picked: #{pick.upcase}. #{UserText.labelled('Reason:', reason)}"
+      "Picked: #{pick ? pick.upcase : 'no piece'}. #{UserText.labelled('Reason:', reason, blank: '(none given)')}"
     end
   end
 end

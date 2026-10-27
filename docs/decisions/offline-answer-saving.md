@@ -31,10 +31,11 @@ Parsons answers are not restored, and opening the app offline still shows
 the browser's offline page, since nothing caches the dashboard.
 
 **Partial submission still incurs a full-day review.** The existing review
-fan-out grades every active section, including skipped ones, and also calls
-the difficulty assessment. Skipping a section does not remove its grading
-call or the assessment. Skipped grades stay outside skill evidence; review
-scheduling and provider fan-out are unchanged.
+fan-out reviews every active section; an unanswered one gets an ungraded
+walkthrough. It also calls the difficulty assessment. Skipping a section does
+not remove its review call or the assessment. A skipped section has no grade,
+so none reaches skill evidence; review scheduling and provider fan-out are
+unchanged.
 
 A submitted self-rating now describes a counted answer. This deliberately
 replaces the earlier policy that retained intentional ratings on skipped

@@ -49,4 +49,74 @@ RSpec.describe ReviewPrompt do
     expect(described_class.method(:section_prompt).parameters)
       .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :answer ], [ :keyreq, :rung ] ])
   end
+
+  describe ".walkthrough_prompt" do
+    let(:section) { day_a.first[:section] }
+    let(:nothing_written) { described_class.walkthrough_prompt(key: "code_review", section: section, rung: "senior") }
+
+    it "takes the rung as a value and no answer text, since a section with any written answer is graded instead" do
+      expect(described_class.method(:walkthrough_prompt).parameters)
+        .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :rung ] ])
+    end
+
+    it "says no answer was given and asks for no rating" do
+      expect(nothing_written).to include("No answer was given", "must not be rated", "Pitched at: senior")
+      expect(nothing_written).not_to include("\"rating\"", "essential_gaps", "<engineer_text>", "too short")
+    end
+
+    it "asks for every walkthrough field" do
+      expect(nothing_written).to include("\"correct\"", "\"missed\"", "\"better_questions\"", "\"next_step\"", "\"improved_code\"")
+    end
+
+    it "tells the grader to return an empty correct array" do
+      expect(nothing_written).to include("No answer was given for this section", "\"correct\" as an empty array")
+    end
+
+    it "carries no grading instruction for any section kind" do
+      ExerciseSection.all.each do |kind|
+        prompt = described_class.walkthrough_prompt(key: kind.key, section: { "blocks" => %w[a b c] }, rung: "junior")
+
+        expect(prompt).not_to include("\"rating\"", "essential_gaps", "rubric", "Grade ", "out of place", "misplaced"), kind.key
+        expect(prompt).not_to match(/rating|already scored|verified result/i), kind.key
+      end
+    end
+
+    it "leaves no stray blank line for a kind with no walkthrough note" do
+      prompt = described_class.walkthrough_prompt(key: "code_review", section: section, rung: "senior")
+
+      expect(prompt).not_to include("\n\n\n")
+    end
+
+    context "for a parsons problem" do
+      let(:blocks) { [ "total = 0", "items.each { |i| total += i }", "total" ] }
+      let(:parsons) { described_class.walkthrough_prompt(key: "parsons_problem", section: { "blocks" => blocks }, rung: "junior") }
+
+      it "lists every block in the correct order" do
+        expect(parsons).to include("Correct blocks, in order: 1. total = 0 / 2. items.each { |i| total += i } / 3. total")
+      end
+
+      it "asks the grader to explain why each block belongs where it does" do
+        expect(parsons).to include("Explain WHY each block belongs where it does", "dependency or logical reason")
+      end
+
+      it "says improved_code is empty once, through the shared fields" do
+        expect(parsons.scan('"improved_code" must be an empty string').size + parsons.scan("must be an empty string for this section").size).to eq(1)
+      end
+
+      it "says the exercise data is unavailable when the exercise has no blocks" do
+        prompt = described_class.walkthrough_prompt(key: "parsons_problem", section: {}, rung: "junior")
+
+        expect(prompt).to include("exercise data is unavailable")
+        expect(prompt).not_to include("Correct blocks")
+      end
+
+      it "renders exactly as recorded" do
+        expect_prompt_snapshot("review__parsons__walkthrough_nothing_written", parsons)
+      end
+    end
+
+    it "renders exactly as recorded" do
+      expect_prompt_snapshot("review__day_a__code_review__walkthrough_nothing_written", nothing_written)
+    end
+  end
 end

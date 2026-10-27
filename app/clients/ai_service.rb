@@ -429,8 +429,11 @@ class AiService
   end
 
   def build_review_section_prompt(exercise, daily_response, section)
-    ReviewPrompt.section_prompt(key: section, section: exercise.problem_set[section] || {},
-                                answer: daily_response.answer_for(section), rung: review_rung(exercise, daily_response, section))
+    prompt_section = exercise.problem_set[section] || {}
+    rung           = review_rung(exercise, daily_response, section)
+    return ReviewPrompt.walkthrough_prompt(key: section, section: prompt_section, rung: rung) unless daily_response.answered?(section)
+
+    ReviewPrompt.section_prompt(key: section, section: prompt_section, answer: daily_response.answer_for(section), rung: rung)
   end
 
   def review_rung(exercise, daily_response, section)

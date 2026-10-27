@@ -534,7 +534,7 @@ RSpec.describe "Responses", type: :request do
         } }, as: :json
       end
 
-      [ "", "N+1 query", "Reason:\nTradeoff:" ].each do |cleared_answer|
+      [ "", "  \n ", "Reason:\nTradeoff:" ].each do |cleared_answer|
         it "prunes the rating at submission when an answer becomes #{cleared_answer.inspect}" do
           post responses_path, params: { response: {
             answers: { code_review: "A substantive answer", pattern: cleared_answer }
@@ -546,6 +546,14 @@ RSpec.describe "Responses", type: :request do
           expect(response).to have_http_status(:ok)
           expect(user.daily_responses.sole.section_ratings).to eq("code_review" => "right_level")
         end
+      end
+
+      it "keeps the rating at submission when an answer becomes a short one" do
+        post responses_path, params: { response: { answers: { code_review: "A substantive answer", pattern: "N+1 query" } } }, as: :json
+        post responses_path, params: { response: { submit: "1" } }, as: :json
+
+        expect(response).to have_http_status(:ok)
+        expect(user.daily_responses.sole.section_ratings).to eq("code_review" => "right_level", "pattern" => "too_hard")
       end
 
       it "uses the merged answers and ratings when submitting a partial payload" do
@@ -577,7 +585,7 @@ RSpec.describe "Responses", type: :request do
     end
 
     it "reports on every autosave which sections count and what still blocks submitting" do
-      post responses_path, params: { response: { answers: { code_review: "A substantive answer", pattern: "short" } } }, as: :json
+      post responses_path, params: { response: { answers: { code_review: "A substantive answer", pattern: "  " } } }, as: :json
 
       expect(response.parsed_body).to include("answered_sections" => [ "code_review" ], "submit_blocker" => "unrated",
                                               "section_statuses" => { "code_review" => "in progress", "pattern" => "" })
@@ -588,9 +596,21 @@ RSpec.describe "Responses", type: :request do
                                               "section_statuses" => { "code_review" => "✓ just right", "pattern" => "" })
     end
 
+    it "counts a short answer and holds submitting until it is rated" do
+      post responses_path, params: { response: { answers: { code_review: "A substantive answer", pattern: "short" },
+                                                 section_ratings: { code_review: "right_level" } } }, as: :json
+
+      expect(response.parsed_body).to include("answered_sections" => %w[code_review pattern], "submit_blocker" => "unrated",
+                                              "section_statuses" => { "code_review" => "✓ just right", "pattern" => "in progress" })
+
+      post responses_path, params: { response: { section_ratings: { pattern: "too_easy" } } }, as: :json
+
+      expect(response.parsed_body).to include("answered_sections" => %w[code_review pattern], "submit_blocker" => nil)
+    end
+
     it "refuses a submit that answers nothing, saving nothing and enqueuing nothing" do
       expect {
-        post responses_path, params: { response: { answers: { code_review: "short" }, submit: "1" } }, as: :json
+        post responses_path, params: { response: { answers: { code_review: "   " }, submit: "1" } }, as: :json
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
 
       expect(response).to have_http_status(:unprocessable_content)

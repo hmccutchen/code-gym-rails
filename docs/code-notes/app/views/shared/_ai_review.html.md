@@ -56,3 +56,7 @@ that section's label above it. The blocks follow the stored review's key
 order, which is not page order, so the slot is looked up per section rather
 than counted. A review for a section the day no longer shows gets no slot and
 keeps the plain accent.
+
+## Label in place of the badge
+
+An unanswered section shows "Skipped" from `DailyResponse#review_badge` as muted text, never a pill, so it does not read as a score. The "missed" heading comes from `DailyResponse#review_field_label`.

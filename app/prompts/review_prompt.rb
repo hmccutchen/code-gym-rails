@@ -9,6 +9,13 @@ class ReviewPrompt
     The rating must agree with "missed": when "missed" names an essential gap, the rating is not "solid" or "strong". When a section's grading note says its rating is already fixed, that note wins.
   RUBRIC
 
+  ENTRY_RULES = <<~RULES.chomp.freeze
+    Each array entry must be ONE self-contained idea in one or two sentences. Never pack
+    several points into one entry, and never number points inside an entry ("1) ... 2) ...")
+    — separate ideas belong in separate entries. Use an empty array when there is nothing to
+    say for that field.
+  RULES
+
   def self.day_system(coach:, sections:)
     others = sections.size - 1
     others_clause =
@@ -43,20 +50,48 @@ class ReviewPrompt
 
       #{kind.grading_note(section: section, answer: answer)}
 
-      Return a single JSON object (NOT wrapped in a "#{key}" key) with:
+      #{json_header(key)}
       - "rating": "beginner" | "developing" | "solid" | "strong"
       - "correct": array of strings — each entry one distinct thing they got right
       - "missed": array of strings — each entry one distinct thing they missed or got wrong
       - "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
+      #{shared_review_fields(kind)}
+
+      #{ENTRY_RULES}
+    PROMPT
+  end
+
+  def self.walkthrough_prompt(key:, section:, rung:)
+    kind = ExerciseSection.for(key)
+
+    <<~PROMPT
+      Walk through the "#{key}" section from the day's context above. No answer was given for this section, so it must not be rated. Return "correct" as an empty array, since nothing was written.
+      Pitched at: #{rung} — #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}
+
+      #{walkthrough_note_block(kind, section)}#{json_header(key)}
+      - "correct": array of strings — always empty
+      - "missed": array of strings — each entry one distinct thing a good answer would cover
+      #{shared_review_fields(kind)}
+
+      #{ENTRY_RULES}
+    PROMPT
+  end
+
+  def self.walkthrough_note_block(kind, section)
+    note = kind.walkthrough_note(section: section)
+    note.empty? ? "" : "#{note}\n\n"
+  end
+
+  def self.json_header(key)
+    %(Return a single JSON object (NOT wrapped in a "#{key}" key) with:)
+  end
+
+  def self.shared_review_fields(kind)
+    <<~FIELDS.chomp
       - "better_questions": array of strings — each entry one question they should have asked themselves
       - "next_step": string — one specific thing to study
       - "improved_code": string — #{improved_code_instruction(kind)}
-
-      Each array entry must be ONE self-contained idea in one or two sentences. Never pack
-      several points into one entry, and never number points inside an entry ("1) ... 2) ...")
-      — separate ideas belong in separate entries. Use an empty array when there is nothing to
-      say for that field.
-    PROMPT
+    FIELDS
   end
 
   def self.improved_code_instruction(kind)
@@ -65,5 +100,5 @@ class ReviewPrompt
       "must be an empty string for this section"
   end
 
-  private_class_method :improved_code_instruction
+  private_class_method :walkthrough_note_block, :improved_code_instruction, :json_header, :shared_review_fields
 end

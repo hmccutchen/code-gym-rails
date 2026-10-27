@@ -130,5 +130,39 @@ RSpec.describe ReviewMailer, type: :mailer do
       daily_response.ai_review["code_review"]["missed"] = []
       expect(mail.body.encoded).not_to include("What you missed")
     end
+
+    describe "an unanswered section" do
+      def body_for(answers)
+        daily_response.update!(
+          answers: answers,
+          ai_review: { "code_review" => { "rating" => "solid", "correct" => [ "A point" ], "missed" => [ "A gap" ] } }
+        )
+        ReviewMailer.send_review(daily_response).body.decoded
+      end
+
+      it "says Skipped for a blank section, with no rating line" do
+        body = body_for("code_review" => "")
+
+        expect(body).to include("Skipped")
+        expect(body).not_to include("Rating:")
+        expect(body).to include("What a good answer covers:\n- A gap")
+        expect(body).not_to include("What you missed:")
+      end
+
+      it "grades a short answer like any other answer" do
+        body = body_for("code_review" => "N+1?")
+
+        expect(body).to include("Rating: solid", "What you missed:\n- A gap")
+        expect(body).not_to include("Skipped", "Not graded", "What a good answer covers:")
+      end
+
+      it "keeps Rating and Missed for an answered section" do
+        body = body_for("code_review" => "Found the N+1 in the loop")
+
+        expect(body).to include("Rating: solid")
+        expect(body).to include("What you missed:")
+        expect(body).not_to include("Skipped")
+      end
+    end
   end
 end
