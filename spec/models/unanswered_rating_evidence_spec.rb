@@ -29,9 +29,10 @@ RSpec.describe "Evidence readers ignore a rating stored on an unanswered section
     yield user, response
   end
 
+  # One frozen clock for both runs, or a second boundary between them shows up as a timestamp difference.
   def same_either_way(written)
-    results = [ true, false ].map do |with_rating|
-      freeze_time { result_for(written, with_rating: with_rating) { |user, response| yield user, response } }
+    results = freeze_time do
+      [ true, false ].map { |with_rating| result_for(written, with_rating: with_rating) { |user, response| yield user, response } }
     end
     expect(results.first).to eq(results.last)
   end

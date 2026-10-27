@@ -362,3 +362,5 @@ data.*
   in production, from Copilot's review
   **why:** keyed grades keep today's `RUBRIC_VERSION`, so the competency gate
   and level suggestions would read them before the movement check ran
+
+*From review: `#595`*
