@@ -79,6 +79,40 @@ RSpec.describe ConceptExposureIndex do
     end
   end
 
+  describe ".key_for" do
+    it "names the concept and the bucket its section records under" do
+      expect(described_class.key_for("code_review", "n_plus_one", "ruby_rails")).to eq([ "n_plus_one", "ruby_rails" ])
+      expect(described_class.key_for("plan_review", "scope_creep", "javascript"))
+        .to eq([ "scope_creep", ConceptBucket.for("plan_review", "javascript") ])
+    end
+
+    it "is nil for a blank or \"other\" tag, which no exposure records" do
+      expect(described_class.key_for("code_review", nil, "ruby_rails")).to be_nil
+      expect(described_class.key_for("code_review", "", "ruby_rails")).to be_nil
+      expect(described_class.key_for("code_review", "other", "ruby_rails")).to be_nil
+    end
+  end
+
+  describe "#count_for" do
+    let(:hand_built) { described_class.new({ [ "n_plus_one", "ruby_rails" ] => Set[Date.new(2026, 10, 1), Date.new(2026, 10, 8)] }) }
+
+    it "counts the section's concept in its bucket, on or before the date" do
+      expect(hand_built.count_for("code_review", "n_plus_one", "ruby_rails", on_or_before: Date.new(2026, 10, 1))).to eq(1)
+      expect(hand_built.count_for("code_review", "n_plus_one", "ruby_rails", on_or_before: Date.new(2026, 10, 8))).to eq(2)
+    end
+
+    it "is nil for a blank or \"other\" tag" do
+      expect(hand_built.count_for("code_review", "", "ruby_rails", on_or_before: Date.new(2026, 10, 8))).to be_nil
+      expect(hand_built.count_for("code_review", "other", "ruby_rails", on_or_before: Date.new(2026, 10, 8))).to be_nil
+    end
+
+    it "agrees with the index's own keys for a section counted on a submitted day" do
+      submit(concept: "n_plus_one", date: Date.current - 1, section: "pattern")
+
+      expect(index.count_for("pattern", "n_plus_one", "ruby_rails", on_or_before: Date.current)).to eq(1)
+    end
+  end
+
   describe "#last_seen" do
     it "is the latest exposure date, or nil when the concept was never seen in that bucket" do
       submit(concept: "n_plus_one", date: Date.current - 5)
