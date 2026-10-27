@@ -217,9 +217,10 @@ difference outside the block is a stop condition.
 ## Step 5. System spec
 
 One system spec at phone width (360 pixels):
-- the block is closed on load, and its closed `<summary>` is one line high
-  (its height is at most one line-height), which measures the spec's
-  360-pixel stop condition
+- the block is closed on load, and its closed `<summary>` text forms one
+  line box (counted from the text's client rects, so the `.4rem` padding
+  `details.ref summary` keeps for the tap target doesn't count), which
+  measures the spec's 360-pixel stop condition
 - it opens on a tap
 - a glossary term inside it opens its tooltip on a tap
 

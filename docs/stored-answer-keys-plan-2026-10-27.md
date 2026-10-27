@@ -89,7 +89,8 @@ splitting the file isn't this PR's job.
   - `.all_answer_key_fields`: the first expectation (exactly `answer_key`
     and `planted_ambiguities`) still holds. The second, that every kind
     except design comparison and ambiguity hunt returns no key field, fails
-    on purpose. Change it to list the six kinds that keep none.
+    on purpose. Change it to list the four kinds that keep none:
+    `pattern`, `challenge`, `architecture` and `parsons_problem`.
   - every `.planted_key?` kind lists `answer_key` in `.answer_key_fields`,
     so the two can't disagree.
 
@@ -341,8 +342,18 @@ before step 7.
   is 48 calls. One normal `review_calibration` run is 40.
 - **`script/regrade_review_baseline.rb --without-keys`:** applies
   `without_planted_keys` to every day before grading, for step 8.
-- **Specs:** both modes against the Faraday stub, as `model_comparison_spec`
-  does today, with no provider call.
+- **`script/export_review_baseline.rb --keyed-only`:** keeps only sections
+  whose kind is `.planted_key?` and that carry an `answer_key`, filtering
+  before the per-kind limit, so step 8 regrades the keyed sample and not
+  older keyless sections that fill a short kind. Each day keeps its whole
+  problem set, answers and ratings for context. The `--key-sheet` export
+  can't stand in for it, since it carries no answers.
+- **Specs:**
+  - both regrade modes against the Faraday stub, as `model_comparison_spec`
+    does today, with no provider call
+  - `--keyed-only` leaves out an older keyless section of a keyed kind and
+    a keyless kind, keeps the day's other sections as context, and still
+    takes up to the per-kind limit
 
 ### Step 7. Running the calibration
 
@@ -365,8 +376,9 @@ That way neither `CompetencyGate::Evidence` nor `LevelSuggestion::Evidence`
 reads a keyed grade under the unchanged `RUBRIC_VERSION` until the check
 has passed (owner's decision, after review).
 
-1. **Export,** with the owner's approval: keyed sections, up to 10 per
-   kind, read-only, saved outside the repository.
+1. **Export** with `--keyed-only` (step 6), with the owner's approval:
+   keyed sections, up to 10 per kind, read-only, saved outside the
+   repository.
 2. **Regrade on this branch,** on the owner's machine with the export copied
    down and the owner's key in the provider's environment variable: each
    section 5 times as stored and 5 times with `--without-keys`. Ask the
