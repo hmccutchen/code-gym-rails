@@ -11,7 +11,7 @@
            t("dashboard.exercise.regenerate_confirm_with_progress") :
            t("dashboard.exercise.regenerate_confirm") %>
       <%= button_to t("dashboard.exercise.regenerate"), regenerate_path, method: :post,
-            class: "btn btn-ghost btn-sm", disabled: true,
+            class: "btn btn-ghost btn-sm", disabled: true, data: { answer_form_target: "replaceButton" },
             form: { data: loading_form_data(label: t("dashboard.generating_label"),
                             confirm_message: confirm_msg) } %>
     <% else %>
@@ -21,7 +21,7 @@
 
   <% if response.persisted? && !response.reviewed? %>
     <%= button_to t("dashboard.exercise.start_over"), start_over_response_path(response), method: :delete,
-          class: "btn btn-ghost btn-sm", disabled: true,
+          class: "btn btn-ghost btn-sm", disabled: true, data: { answer_form_target: "replaceButton" },
           form: { data: loading_form_data(label: t("dashboard.exercise.starting_over"),
                           confirm_message: t("dashboard.exercise.start_over_confirm")) } %>
   <% end %>

@@ -136,6 +136,7 @@ RSpec.describe "Today's desktop layout", type: :system do
       click_button "Submit answers"
 
       expect(page).to have_css(".today-main #leave-held")
+      expect(page).to have_button("Generate new set", disabled: true)
       notice = rect("#leave-held")
       expect(notice["top"]).to be >= 0
       # Scroll positions snap to whole pixels, so allow a sub-pixel overlap.

@@ -37,6 +37,40 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     end
   end
 
+  it "disables Generate new set and Start over while a submit runs, and turns them back on when it's refused" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      fill_in_answer("code_review", "An answer long enough to count, so the day has a response to start over.")
+      wait_for_answers_settled
+      visit root_path
+      wait_for_js
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch;
+        window.fetch = (url, options) => {
+          const body = options?.body ? JSON.parse(options.body) : {};
+          if (body.response?.submit !== "1") return originalFetch(url, options);
+          return new Promise((resolve) => { window.releaseSubmit = () => resolve(originalFetch(url, options)); });
+        };
+      JS
+
+      click_button "Submit answers"
+      wait_for_js_condition("window.releaseSubmit")
+      within(".regenerate-row") do
+        expect(page).to have_button("Generate new set", disabled: true)
+        expect(page).to have_button("Start over", disabled: true)
+      end
+
+      page.execute_script("window.releaseSubmit()")
+      expect(page).to have_selector("#rating-nudge:focus")
+      within(".regenerate-row") do
+        expect(page).to have_button("Generate new set", disabled: false)
+        expect(page).to have_button("Start over", disabled: false)
+      end
+    end
+  end
+
   it "keeps draft ratings while clearing answers, but submits only ratings for answers kept" do
     user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
 

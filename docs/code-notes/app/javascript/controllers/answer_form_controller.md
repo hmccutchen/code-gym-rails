@@ -108,7 +108,11 @@ before the gate answers, unless the form is already inert from a submit:
 every answer, rating and section control becomes `inert`, so no edit can be
 made during the wait and then dropped by the leave. Each section's summary
 and the daily cards' swap rows stay usable, so the save that blocks the page
-can be retried, and Submit is disabled. When the gate holds,
+can be retried, and Submit is disabled. Generate new set and Start over
+(`replaceButton` targets) are disabled too, here and in `lockForSubmit`, and
+`unlock` turns them back on: they sit right beside Submit in the side column,
+and either one, landing after the submit commits, would replace or delete the
+day just submitted. When the gate holds,
 `holdForOtherSaves` applies the same freeze (to a submit's form too) and adds
 a notice with a Reload button right after the form, in the main column, then
 scrolls it into view, since it lands at the end of the answers, often below

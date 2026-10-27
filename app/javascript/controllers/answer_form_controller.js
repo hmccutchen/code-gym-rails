@@ -7,7 +7,7 @@ import DraftCopy from "code_gym/draft_store"
 const AUTOSAVE_DELAY_MS = 800
 
 export default class extends Controller {
-  static targets = ["form", "progressFill", "progressLabel", "submitButton", "nudge"]
+  static targets = ["form", "progressFill", "progressLabel", "submitButton", "nudge", "replaceButton"]
 
   static values = {
     answeredSections: Array,
@@ -306,6 +306,7 @@ export default class extends Controller {
     this.saveTimer = null
     this.formTarget.inert = true
     this.submitButtonTarget.disabled = true
+    this.setReplaceButtonsDisabled(true)
     this.submitButtonTarget.classList.add("btn-loading")
     this.submitButtonTarget.textContent = this.submittingValue
   }
@@ -340,6 +341,11 @@ export default class extends Controller {
       if (!element.matches("details.section, summary, .daily-kind-swap")) element.inert = true
     })
     this.submitButtonTarget.disabled = true
+    this.setReplaceButtonsDisabled(true)
+  }
+
+  setReplaceButtonsDisabled(disabled) {
+    this.replaceButtonTargets.forEach((button) => button.disabled = disabled)
   }
 
   holdForOtherSaves() {
@@ -371,6 +377,7 @@ export default class extends Controller {
     this.submitButtonTarget.classList.remove("btn-loading")
     this.submitButtonTarget.textContent = this.submitLabelValue
     this.submitButtonTarget.disabled = false
+    this.setReplaceButtonsDisabled(false)
     this.autoSave()
   }
 }

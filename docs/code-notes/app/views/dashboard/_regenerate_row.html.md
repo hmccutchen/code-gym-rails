@@ -13,3 +13,10 @@ it.
 layout's loading-form script provides the confirmation and the in-flight
 spinner. The request then blocks on the provider (10 to 30 seconds) until the
 redirect lands.
+
+## Locked while a submit runs
+
+Both buttons are `answer-form` `replaceButton` targets, so the controller
+disables them while a submit runs or waits on another save
+(`docs/code-notes/app/javascript/controllers/answer_form_controller.md`). On a
+submitted day there is no answer form, and the attribute does nothing.
