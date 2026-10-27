@@ -3,7 +3,7 @@ module ReviewHelper
     def graded? = graded
   end
 
-  ShortVersion = Data.define(:reference, :bucket, :show_pitfalls)
+  ShortVersion = Data.define(:reference, :bucket, :show_pitfalls, :learn_link)
 
   def review_short_version(response, section)
     short_version = short_version_for(response)
@@ -11,7 +11,10 @@ module ReviewHelper
 
     concept, bucket = short_version.key(section)
     reference = concept_reference_for(concept, bucket)
-    ShortVersion.new(reference: reference, bucket: bucket, show_pitfalls: short_version.pitfalls?(section)) if reference
+    return unless reference
+
+    ShortVersion.new(reference: reference, bucket: bucket, show_pitfalls: short_version.pitfalls?(section),
+                     learn_link: ConceptBucket.slice_for(response.user.language).include?(bucket))
   end
 
   def review_badge(response, section)

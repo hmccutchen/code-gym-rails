@@ -1,4 +1,4 @@
-<%# Required locals: reference (a ConceptReference), bucket (its Learn bucket), show_pitfalls (true when the section has an essential gap). %>
+<%# Required locals: reference (a ConceptReference), bucket (its Learn bucket), show_pitfalls (true when a section sharing the concept has an essential gap), learn_link (true when Learn serves the bucket). %>
 <% seen = Set.new %>
 <details class="ref review-short-version">
   <summary><%= t("review.short_version.summary") %></summary>
@@ -14,6 +14,8 @@
       <p><%= glossary_wrap(reference.explanation, seen: seen) %></p>
       <pre class="snippet"><%= highlighted_code(reference.code_example, bucket) %></pre>
     <% end %>
-    <p><%= link_to t("review.short_version.more"), learn_concept_path(bucket, reference.concept) %></p>
+    <% if learn_link %>
+      <p><%= link_to t("review.short_version.more"), learn_concept_path(bucket, reference.concept) %></p>
+    <% end %>
   </div>
 </details>

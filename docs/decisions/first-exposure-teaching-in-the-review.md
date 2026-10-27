@@ -77,7 +77,11 @@ From the section's reference row, in this order:
 
 A row without a guide shows `explanation` and `code_example` in place of 2
 and 3. The senior lens, the ladder and the lesson stay on the Learn page,
-and the block links there ("More on this concept").
+and the block links there ("More on this concept"). The link shows only
+when Learn serves the bucket for the user's current language
+(`ConceptBucket.slice_for`). After a language change, History still shows
+past days, and Learn would answer a 404 for their bucket, so the block stays
+and the link goes.
 
 ## Pitfalls only with an essential gap
 

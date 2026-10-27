@@ -41,7 +41,7 @@ RSpec.describe ReviewHelper, type: :helper do
 
       offer = helper.review_short_version(reviewed(rating: "developing", gaps: [ 0 ]), "code_review")
 
-      expect(offer).to have_attributes(reference: reference, bucket: "ruby_rails", show_pitfalls: true)
+      expect(offer).to have_attributes(reference: reference, bucket: "ruby_rails", show_pitfalls: true, learn_link: true)
     end
 
     it "gives nothing when the concept has no reference row" do

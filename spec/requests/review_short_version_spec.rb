@@ -64,6 +64,17 @@ RSpec.describe "The concept's short version in a review", type: :request do
     expect(short_version(history_path)).to be_present
   end
 
+  it "keeps the block but drops the Learn link for a bucket outside the user's current language" do
+    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+    reviewed_day(date: Date.current - 1)
+    user.update!(language: "javascript")
+
+    block = short_version(history_path)
+
+    expect(block).to be_present
+    expect(block.css("a")).to be_empty
+  end
+
   it "renders nothing when the concept has no reference row" do
     reviewed_day(date: Date.current)
 

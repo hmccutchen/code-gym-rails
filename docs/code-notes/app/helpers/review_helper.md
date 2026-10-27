@@ -20,3 +20,8 @@ decided on, through `concept_reference_for`, which memoizes per request. It
 reads `response.user.concept_exposures`, so a caller that has the signed-in
 user should hand the response that same instance; `DashboardController#show`
 does, and History's `includes(:user)` does through `inverse_of`.
+
+`learn_link` is false when the bucket is outside
+`ConceptBucket.slice_for(response.user.language)`, the same check
+`LearnScope#validated_bucket` makes, so a past day in a language the user
+has since switched away from shows the block without a link that would 404.
