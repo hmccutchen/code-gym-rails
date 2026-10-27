@@ -446,6 +446,36 @@ RSpec.describe ReviewGrading do
       expect(Rails.logger).not_to have_received(:error).with(/SENTINEL/)
     end
 
+    def graded_with_prompts
+      prompts = []
+      svc = FakeService.new("key")
+      allow(svc).to receive(:call).and_wrap_original do |_m, request|
+        prompts << request.prompt
+        { text: grade.to_json, input_tokens: 1, output_tokens: 1 }
+      end
+      [ graded_by(svc, "code_review", exercise, response), prompts ]
+    end
+
+    it "sends an unanswered section the walkthrough prompt and stores none of the grade it gets back" do
+      response.update!(answers: {})
+      result, prompts = graded_with_prompts
+
+      expect(prompts.size).to eq(1)
+      expect(prompts.first).to include("No answer was given")
+      expect(prompts.first).not_to include("Grade ONLY")
+      expect(grade).to include("rating", "essential_gaps")
+      expect(result[:review].keys).not_to include("rating", "essential_gaps", "rubric")
+    end
+
+    it "sends an answered section the grading prompt and keeps its rating" do
+      result, prompts = graded_with_prompts
+
+      expect(prompts.size).to eq(1)
+      expect(prompts.first).to include("Grade ONLY")
+      expect(prompts.first).not_to include("No answer was given")
+      expect(result[:review]).to include("rating" => grade["rating"], "rubric" => ReviewedSectionResults::RUBRIC_VERSION)
+    end
+
     def edit_reply
       { "status" => "edit", "issues" => [ { "type" => "verbosity", "evidence" => "SENTINEL-G two." } ],
         "fields" => { "missed" => [ { "from" => [ 0, 1 ], "text" => "One query per row." } ] } }.to_json
