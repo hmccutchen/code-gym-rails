@@ -463,6 +463,17 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
+  describe "#partial_answer" do
+    it "delegates to the section's kind with the section's data" do
+      response = described_class.new(daily_exercise: exercise,
+        answers: { "code_review" => "N+1?", "pattern" => "My approach:\nUse a bounded cache" })
+
+      expect(response.partial_answer("code_review")).to eq("N+1?")
+      expect(response.partial_answer("pattern")).to be_nil
+      expect(response.partial_answer("challenge")).to be_nil
+    end
+  end
+
   describe "#answer_for" do
     it "uses the answered rule while preserving the original substantive answer" do
       response = described_class.new(daily_exercise: exercise,

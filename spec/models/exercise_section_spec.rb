@@ -1206,3 +1206,31 @@ RSpec.describe ExerciseSection, "judge facets" do
       .to match_array(%w[code_review design_comparison security_review plan_review parsons_problem])
   end
 end
+
+RSpec.describe ExerciseSection, ".partial_answer" do
+  let(:plan_review) { ExerciseSection.find("plan_review") }
+  let(:labels) { plan_review.default_scaffold }
+
+  it "is nil for a blank answer" do
+    expect(ExerciseSection::CodeReview.partial_answer("  ")).to be_nil
+    expect(ExerciseSection::CodeReview.partial_answer(nil)).to be_nil
+  end
+
+  it "is nil for a scaffold with only its template labels" do
+    expect(plan_review.partial_answer(plan_review.scaffold_template)).to be_nil
+  end
+
+  it "is the stripped text of an answer too short to count" do
+    expect(ExerciseSection::CodeReview.partial_answer("  N+1?\n")).to eq("N+1?")
+  end
+
+  it "keeps what was typed under the scaffold labels" do
+    typed = "#{labels.first}\nN+1?\n\n#{labels.last}"
+
+    expect(plan_review.partial_answer(typed)).to eq("N+1?")
+  end
+
+  it "is nil for an answered section" do
+    expect(ExerciseSection::CodeReview.partial_answer("The query runs once per row")).to be_nil
+  end
+end

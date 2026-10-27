@@ -136,4 +136,11 @@ RSpec.describe ExerciseSection::ParsonsProblem do
       expect(section).to eq("question" => "q", "blocks" => "not a list")
     end
   end
+
+  describe ".partial_answer" do
+    it "is always nil, since an arrangement has no partial text" do
+      expect(described_class.partial_answer("order:0,1", { "blocks" => %w[a b c] })).to be_nil
+      expect(described_class.partial_answer("", { "blocks" => %w[a b c] })).to be_nil
+    end
+  end
 end

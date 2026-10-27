@@ -147,6 +147,13 @@ class ExerciseSection::DesignComparison < ExerciseSection
       pick.present? && reason.present?
     end
 
+    def partial_answer(value, _section_data = nil)
+      return if answered?(value)
+
+      pick, reason = parse_answer(value)
+      pick ? I18n.t("sections.design_comparison.picked", piece: pick.upcase) : reason.presence
+    end
+
     def review_context(section:, answer:, rating:)
       key = section[ANSWER_KEY_FIELD].is_a?(Hash) ? section[ANSWER_KEY_FIELD] : {}
 

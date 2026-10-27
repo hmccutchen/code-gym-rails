@@ -154,6 +154,26 @@ RSpec.describe ExerciseSection::DesignComparison do
     end
   end
 
+  describe ".partial_answer" do
+    it "shows the pick the way the page does when there is no reason" do
+      expect(described_class.partial_answer("pick:b\n  ")).to eq(I18n.t("sections.design_comparison.picked", piece: "B"))
+    end
+
+    it "shows the reason when there is no valid pick" do
+      expect(described_class.partial_answer("pick:c\nIt retries safely")).to eq("It retries safely")
+      expect(described_class.partial_answer("\nIt retries safely")).to eq("It retries safely")
+    end
+
+    it "is nil once a pick and a reason are both there" do
+      expect(described_class.partial_answer("pick:a\nRetries")).to be_nil
+    end
+
+    it "is nil when nothing was written" do
+      expect(described_class.partial_answer(nil)).to be_nil
+      expect(described_class.partial_answer("")).to be_nil
+    end
+  end
+
   describe ".review_context" do
     let(:section) do
       roll_better("b")

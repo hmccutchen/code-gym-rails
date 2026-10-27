@@ -282,6 +282,10 @@ class ExerciseSection
       value if answered?(value, section_data)
     end
 
+    def partial_answer(value, section_data = nil)
+      substantive_answer(value, section_data).presence unless answered?(value, section_data)
+    end
+
     def decode_answer(value, exercise: nil, key: nil, section_data: nil)
       value
     end

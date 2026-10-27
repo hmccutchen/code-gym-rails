@@ -264,6 +264,10 @@ class DailyResponse < ApplicationRecord
     (ExerciseSection.find(section) || ExerciseSection).answer_for(answers[section.to_s], section_data(section))
   end
 
+  def partial_answer(section)
+    (ExerciseSection.find(section) || ExerciseSection).partial_answer(answers[section.to_s], section_data(section))
+  end
+
   def draft_token
     saved_draft = Digest::SHA256.hexdigest([ answers.sort, section_ratings.sort ].to_json).first(16)
     [ daily_exercise.draft_scope, id || "new", saved_draft ].join(":")
