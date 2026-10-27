@@ -62,10 +62,10 @@ RSpec.describe ReviewStability do
     expect(posted.map { |body| body["model"] }.uniq).to eq([ ClaudeService::DEFAULT_ROUTE[:model] ])
     expect(out.string).to include("2026-10-20 code_review (senior): stored solid · runs solid developing solid")
     expect(out.string).to include("2026-10-20 challenge (senior): stored solid · runs strong strong beginner")
-    expect(out.string).to include("code_review: 1 sections · changed between runs 1/1 (100%) · spread 0:0 1:1 2:0 3:0 · " \
-                                  "moved more than one level 0/1 (0%) · regrades matching the stored rating 2/3 (67%)")
-    expect(out.string).to include("all kinds: 2 sections · changed between runs 2/2 (100%) · spread 0:0 1:1 2:0 3:1 · " \
-                                  "moved more than one level 1/2 (50%)")
+    expect(out.string).to include("code_review: 1 sections · changed between runs 1/1 · spread 0:0 1:1 2:0 3:0 · " \
+                                  "moved more than one level 0/1 · regrades matching the stored rating 2/3")
+    expect(out.string).to include("all kinds: 2 sections · changed between runs 2/2 · spread 0:0 1:1 2:0 3:1 · " \
+                                  "moved more than one level 1/2")
   end
 
   it "writes nothing to the database while grading" do
@@ -87,6 +87,14 @@ RSpec.describe ReviewStability do
     expect(out.string).to include("all kinds: 1 sections")
   end
 
+  it "reports counts, never a percentage" do
+    export_days(Date.new(2026, 10, 20) => %w[code_review])
+
+    comparison.review_stability(export_path, runs: 3, run: true)
+
+    expect(out.string).not_to include("%")
+  end
+
   it "counts a section with fewer than two grades as too few to compare" do
     row = described_class::Row.new(date: Date.current, section: "code_review", rung: "senior", stored_rating: "solid",
                                    ratings: [ "solid", nil ], failures: 1)
@@ -95,6 +103,6 @@ RSpec.describe ReviewStability do
 
     expect(out.string).to include("runs solid - · failed 1")
     expect(out.string).to include("changed between runs 0/0 · spread 0:0 1:0 2:0 3:0 · moved more than one level 0/0 · " \
-                                  "regrades matching the stored rating 1/1 (100%) · failed calls 1 · too few grades to compare 1")
+                                  "regrades matching the stored rating 1/1 · failed calls 1 · too few grades to compare 1")
   end
 end

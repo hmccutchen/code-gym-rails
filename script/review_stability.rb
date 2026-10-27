@@ -60,9 +60,6 @@ class ReviewStability
       "failed calls #{rows.sum(&:failures)}#{" · too few grades to compare #{rows.size - comparable.size}" if comparable.size < rows.size}"
   end
 
-  def share(count, total)
-    return "0/0" if total.zero?
-
-    "#{count}/#{total} (#{(100.0 * count / total).round}%)"
-  end
+  # Counts only: with a dozen sections a kind, a percentage claims precision the sample doesn't have.
+  def share(count, total) = "#{count}/#{total}"
 end
