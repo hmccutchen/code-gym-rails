@@ -1,6 +1,16 @@
 # Spec: a short version of the concept in the review (2026-10-27)
 
-Checked against origin/main at `b52423e`. Not built yet.
+Checked against origin/main at `6ecfced`. Not built yet. Once built, its
+reasoning moves to `docs/decisions/first-exposure-teaching-in-the-review.md`,
+which replaces this spec as the reference; until then this file is the one
+to cite, as `docs/stored-answer-keys-spec-2026-10-27.md` section 9 does.
+
+## Decisions
+
+- **Pitfalls** show only when the section has an essential gap (see
+  "Pitfalls" below).
+- **Both disclosures stay:** the section's own closed reference by the
+  problem, and the review's closed short version by the feedback.
 
 ## Why
 
@@ -47,8 +57,12 @@ names it, in the style of `spec/conventions/app_source_spec.rb`.
   version under "What a good answer covers". A skipped section on a later
   exposure doesn't; the walkthrough already teaches.
 - **Two sections, one concept, one day.** Common on a shared-concept day.
-  The first of them in `active_section_keys` order offers it; the other
-  doesn't, so the page never shows the same text twice.
+  The first section in `active_section_keys` order that qualifies offers
+  it, and no other section with that concept does, so the page never shows
+  the same text twice. A section that doesn't qualify never takes the place:
+  with a `solid` section on a later exposure ahead of a `developing` one,
+  the `developing` one offers it. On a first exposure both qualify, so the
+  first one offers it.
 - **A Parsons section.** Its rating is fixed in Ruby, but it is still the
   section's rating, so it follows the same rule.
 - **Old rows.** Nothing is stored, so history pages for past days get the
@@ -73,22 +87,38 @@ per request), in this order:
 version links there ("More on this concept", to `learn_concept_path(bucket, concept)`)
 for anyone who wants the rest.
 
-### Pitfalls, and "when the missing step matches one"
+### Pitfalls
 
+Decided: pitfalls show only when the section has an essential gap.
 `guide_pitfalls` is one block of prose, not a list, and the review has no
-structured missing step yet; that arrives with the route fields. So no
-code can tell which pitfall a miss matches today. Options:
+structured missing step yet, so no code can tell which pitfall a miss
+matches. Limiting them to sections with an essential gap shows them only
+where something essential was missed.
 
-- **Show pitfalls whenever the section has an essential gap (recommended
-  for now):** the rating is beginner or developing, or `essential_gaps` is
-  non-empty. No matching, but they only show where something was missed.
-- **Wait for the route fields:** the grader names the missing step, and a
-  later change asks it which pitfall, if any, that step is. That needs the
-  pitfalls in the grading prompt. Allowed (the isolation rules cover
-  `SectionKindGuide` and `ConceptBookSources`, not the reference), but it
-  is a prompt change with its own measurement.
-- **Match text in Ruby:** rejected. Word overlap between a provider's miss
-  and a provider's pitfall is a guess that looks like a rule.
+A section has an essential gap when it was graded (it has a rating; a
+skipped section never shows pitfalls) and either:
+
+- its stored `essential_gaps` is non-empty. When the prose judge reworded
+  the review, the positions live in `graded_prose`
+  (`ReviewProseVerdict::ORIGINAL_KEY`) beside the list they number, so the
+  check reads them there first, as `ReviewGrading#gaps_beside_their_prose`
+  stores them; or
+- no gaps were stored (a Parsons section, whose rating Ruby fixes, or a
+  review whose gap positions the grader returned unreadably) and the rating
+  is `beginner` or `developing`, which by the rubric means an essential gap.
+
+A `developing` section whose stored `essential_gaps` is empty is the
+rubric check's disagreement case (`RubricCheck#agrees?` is false). It counts
+as having a gap, because the rating the review shows says so.
+
+Matching a pitfall to the missing step waits for the route fields: the
+grader names the missing step, and a later change asks it which pitfall, if
+any, that step is. That needs the pitfalls in the grading prompt, which the
+isolation rules allow (they cover `SectionKindGuide` and
+`ConceptBookSources`, not the reference), but it is a prompt change with
+its own measurement. Matching text in Ruby is rejected: word overlap between
+a provider's miss and a provider's pitfall is a guess that looks like a
+rule.
 
 ## Where it sits in the review
 
@@ -108,14 +138,12 @@ fields and before `improved_code`:
   covers" and the other walkthrough fields.
 
 The section on the submitted dashboard keeps its own closed reference
-disclosure (tagline, explanation, code example, senior lens). The two
-overlap on the tagline and, for a row with no guide, the explanation and
-code. **Decision for you:** keep both (recommended: the dashboard one is the
-full reference by the problem; the review one is the short version by the
-feedback, and both are closed), or hide the section's disclosure when the
-review offers the short version. On `/history` the section disclosures sit
-inside the collapsed "problems" block, so there the review's copy is the one
-in view.
+disclosure (tagline, explanation, code example, senior lens), decided above.
+The two overlap on the tagline and, for a row with no guide, the explanation
+and code. The dashboard one is the full reference beside the problem; the
+review one is the short version beside the feedback, and both are closed.
+On `/history` the section disclosures sit inside the collapsed "problems"
+block, so there the review's copy is the one in view.
 
 The review email (`review_mailer/send_review.text.erb`) leaves it out: it
 is plain text and already long, and it carries no link to the page today,
@@ -151,16 +179,22 @@ a reference field and checks it renders escaped.
 
 - `spec/models/daily_response_spec.rb`: `#short_version_offered?` for first
   exposure, second exposure, low grade on a later exposure, solid on a later
-  exposure, skipped first and later exposures, a blank or `"other"` tag, and
-  two sections sharing a concept (only the first offers it).
+  exposure, skipped first and later exposures, and a blank or `"other"` tag.
+  Two sections sharing a concept: on a first exposure only the first
+  offers it; on a later exposure with a `solid` section ahead of a
+  `developing` one, only the `developing` one offers it.
   `#improved_code_visible?` stays green through the shared count.
+- The pitfalls rule, by table: gaps stored on the review, gaps stored in
+  `graded_prose`, no gaps with `developing`, no gaps with `solid`, a Parsons
+  `beginner`, a skipped section, and a `developing` review with an empty
+  gap list.
 - A convention spec: the predicate and the partial never name
   `ConceptMastery`.
 - `spec/requests/dashboard_spec.rb` (submitted dashboard) and
   `spec/requests/history_spec.rb`: the block renders closed, with its
   summary text; nothing renders when the reference row is missing; a row
   without a guide falls back to `explanation` and `code_example`; pitfalls
-  show only under the pitfalls rule; glossary terms are underlined once and
+  show only when the section has an essential gap; glossary terms are underlined once and
   markup is escaped.
 - `spec/requests/section_rendering_characterization_spec.rb`: its
   submitted render gains the block where a fixture qualifies; re-record
@@ -181,7 +215,8 @@ a reference field and checks it renders escaped.
   `ConceptReference`'s guide fields, so a change to those fields checks the
   review too.
 - `docs/decisions/first-exposure-teaching-in-the-review.md` for the full
-  text, with the two decisions above as you settle them.
+  text, with the two decisions above. It replaces this spec as the
+  reference, and `docs/decisions/stored-answer-keys.md` cites it there.
 - `docs/code-notes/app/models/daily_response.md`: the `== 1` versus
   `.zero?` difference.
 
@@ -191,11 +226,13 @@ Stop and come back to you, without building further, if:
 
 - the predicate needs anything beyond the exposure count and the section's
   own rating, which would put the mastery rule at risk
-- most concepts have no guide yet: a read-only count of
-  `ConceptReference` rows with `#guide?`, by bucket, runs first, and if fewer
-  than about half the concepts the user has seen have one, the short version
-  is mostly the explanation fallback, which the section's disclosure already
-  shows
+- most concepts have no guide yet. A count of `ConceptReference` rows with
+  `#guide?`, by bucket, for the concepts the owner has seen, runs first. It
+  is a read-only production query, run only with the owner's approval, and
+  its output stays outside the repository; only the two counts go into the
+  build PR. If fewer than about half those concepts have a guide, the short
+  version is mostly the explanation fallback, which the section's disclosure
+  already shows
 - closed, the block takes more than one line on a 360-pixel-wide screen
 - a glossary tooltip inside the open block can't be opened by tap on a phone
 - the characterization re-record changes anything outside the review block

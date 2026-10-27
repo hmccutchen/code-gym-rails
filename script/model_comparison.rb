@@ -164,7 +164,8 @@ class ModelComparison
       next report.print_plan(entries, runs: runs, route: route, estimate: stability_estimate(service, route, entries, runs)) unless run
 
       rows, stopped = stability_rows(service, entries, runs)
-      report.print_report(rows, runs: runs, route: route, cost_line: stability_cost_line(service, route, usage))
+      report.print_report(rows, runs: runs, route: route, regrade_provider: service_class.provider_key,
+                                cost_line: stability_cost_line(service, route, usage))
       @out.puts "stopped early, after #{rows.size} of #{entries.size} sections: #{stopped}" if stopped
     end
   end
@@ -651,6 +652,7 @@ class ModelComparison
   def stability_row(service, entry, runs)
     results = Array.new(runs) { stability_grade(service, entry) }
     ReviewStability::Row.new(date: entry.date, section: entry.section, rung: entry.rung, stored_rating: entry.stored_rating,
+                             stored_provider: entry.review_provider,
                              ratings: results.map { |result| result[:review]&.fetch("rating", nil) },
                              failures: results.count { |result| !result[:ok] })
   end

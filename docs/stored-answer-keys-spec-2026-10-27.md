@@ -11,6 +11,13 @@ today's grader to compare against.
 - **`RUBRIC_VERSION`:** unchanged (section 6). This holds only if Measuring
   shows no systematic rating movement between keyed and unkeyed grading. If
   it does, the decision is reopened before keys feed any evidence reader.
+- **A different finding:** it meets the main point only when it is at least
+  as serious as the keyed one in this code; a lesser real finding is
+  credited and the keyed point stays an essential gap (section 6).
+- **Checking keys:** the free quote check at ingest, plus a sampled manual
+  read. The owner reads the Ruby `code_review` sections, and a senior
+  colleague the owner chooses reads the other three kinds (section 8,
+  option B).
 
 ## Why
 
@@ -161,50 +168,100 @@ doesn't.
 
 #### When an answer finds something real that isn't in the key
 
-The key names the intended point, not the only valid one. Each kind's
-`.grading_note`, when the section has a key, says so in its own terms:
+The key names the intended point, not the only valid one. A different
+finding counts in full only when it is at least as serious as the keyed one
+in this code. Each kind's `.grading_note`, when the section has a key, says
+so in its own terms, judging seriousness against the key's own
+`why_it_matters`, `exploit` or `pushback`, which is why the key carries
+them:
 
-- **`code_review` and `security_review`:** an answer that finds a different
-  real defect or exploitable vulnerability in this code, explains why it is
-  a problem here and gives a fix that works, has met the main point. "missed"
-  names the keyed issue, but not as an essential gap. Without this, a keyed
-  grader would mark down an answer today's grader accepts. Today's grader,
-  guessing what was planted, tends to take the defect the answer found as
-  the planted one.
-- **`plan_review`:** a real flaw the key doesn't list is credited in
-  "correct" with no penalty, as `ambiguity_hunt` already does for an
-  unplanted ambiguity. Each keyed flaw the answer missed stays an essential
-  gap, as each planted flaw is today.
-- **`pseudocode_to_code`:** the key lists requirements, never an approach.
-  A plan that meets a requirement some other way has met it.
+- **`code_review`:** "A different issue meets the main point only if, left
+  as written, it would do at least as much harm in this code as the answer
+  key's why_it_matters describes: a wrong result, lost or corrupted data, or
+  a requirement the question states going unmet. A real but lesser issue,
+  such as a slower query that still returns the right rows, a naming or
+  style problem, or a guard for input this code can't receive, is credited
+  in "correct", and the keyed issue stays an essential gap in "missed"." In
+  `test_file` mode the harm is a real bug the suite would let through. In
+  `schema_review` mode it is data the migration would lose or corrupt, or a
+  deploy it would break.
+- **`security_review`:** "A different vulnerability meets the main point
+  only if an attacker with no more access than the answer key's exploit
+  needs could use it to do at least as much: read or change another user's
+  data, run code, or gain a role. A real but lesser weakness, such as a
+  missing rate limit, a hardening header, an error message that leaks less
+  than the keyed vulnerability exposes, or a flaw that needs more access
+  than the keyed one, is credited in "correct", and the keyed vulnerability
+  stays an essential gap in "missed"."
+- **`plan_review`:** "The main point is met by a keyed flaw, or by a real
+  flaw in the plan at least as serious as the least serious keyed flaw: one
+  that would ship wrong behavior, change behavior nobody asked to change, or
+  grow the work past the stated request as much as a keyed flaw does. Each
+  keyed flaw the answer missed stays an essential gap. A real flaw the key
+  doesn't list is credited in "correct" with no penalty, as an unplanted
+  ambiguity is in an ambiguity hunt." This is the same rule as the other
+  kinds, applied to the main point. Each keyed flaw stays essential, as each
+  planted flaw is today.
+- **`pseudocode_to_code`:** "The answer key lists requirements, never an
+  approach. A plan that meets a keyed requirement some other way has met
+  it. A plan that handles some other real edge case but not a keyed
+  requirement is credited for the edge case in "correct", and the keyed
+  requirement stays an essential gap." Here the keyed requirements are
+  essential pieces rather than the main point, which stays "an approach
+  that would solve the problem".
 
 With no key, each note keeps today's wording. The rubric, the levels and
 what earns each rating are unchanged.
 
-How a different finding should weigh against the intended one in the rating,
-beyond this default, is left to the route-based review work. Until then,
-calibration guards the default:
+How a different finding should weigh against the intended one beyond this
+rule is left to the route-based review work. Until then, calibration guards
+the rule.
 
-- **Fixtures.** Each of the four kinds gets at least two keyed calibration
-  answers that find a different real flaw from the one the key names, each
-  with its own expected rating. `spec/fixtures/review_calibration/` can carry
-  a key: a fixture's `section` goes into the problem set as written, and
-  `design_comparison_shipping_rates.json` already holds an `answer_key` that
-  reaches the grader (`model_comparison_spec`, "grades a design comparison's
-  extra cases from the decoded answer and the key"). `code_review_n_plus_one`
-  and `security_review_sql_like` gain a key and two `extra_answers` each. Their
-  snippets may need a second real flaw added, kept clearly secondary to the
-  planted one, so a different finding exists to be found. `plan_review` and
-  `pseudocode_to_code` have no fixture today, so each gets a new one with
-  `complete`, `partial` and `miss` answers (the calibration run grades all
-  three for every fixture) and the two extra answers.
-- **The keyed versus unkeyed comparison.** `review_calibration` grades each
-  fixture once, as written. The build adds a `--without-keys` pass, which
-  grades the same fixtures through `ExerciseSection.without_answer_keys`,
-  so each alternative-finding answer is graded both ways, three times each
-  (8 answers × 2 × 3 = 48 calls, about $0.60 on Sonnet 5.5 at the
-  calibration run's measured cost per grade). It uses only a key the owner
-  holds, and the build asks before running it.
+**Fixtures.** `code_review_n_plus_one` and `security_review_sql_like` stay
+exactly as they are: their expected ratings anchor every earlier
+calibration run. Each of the four kinds gets one new keyed fixture in
+`spec/fixtures/review_calibration/` instead. A fixture can carry a key: its
+`section` goes into the problem set as written, and
+`design_comparison_shipping_rates.json` already holds an `answer_key` that
+reaches the grader (`model_comparison_spec`, "grades a design comparison's
+extra cases from the decoded answer and the key"). Each new fixture holds
+the `complete`, `partial` and `miss` answers every fixture needs, since the
+calibration run grades all three, and two `extra_answers`. Each extra
+answer's only finding is a real flaw the key doesn't name, and each has
+its own expected rating:
+
+| Kind | Comparable-severity answer | Expected | Clearly lesser answer | Expected |
+|---|---|---|---|---|
+| `code_review` | a second real defect in the snippet, as harmful as the keyed one, explained, with a working fix | `solid` | a real but minor issue (a style problem, an unneeded query that still returns the right rows) | `beginner` |
+| `security_review` | a second exploitable vulnerability needing no more access, with a mitigation that closes it | `solid` | a hardening gap (a missing rate limit or header) | `beginner` |
+| `plan_review` | an unkeyed flaw as serious as the least serious keyed one, with pushback | `developing` (main point met, keyed flaws missed) | a wording or formatting nit in the plan | `beginner` |
+| `pseudocode_to_code` | a plan that meets every keyed requirement by a different decomposition | `solid` | a plan that handles a minor unkeyed edge case and misses a keyed requirement | `developing` |
+
+Each snippet or plan is written so that both alternative flaws really
+exist in it and the comparable one really is as serious as the keyed one.
+Whoever reviews the fixtures checks that before anything is run.
+
+Comparisons with earlier calibration runs use the six original fixtures'
+lines, which don't change. The run's totals ("in order", "matched
+expected") grow with the new fixtures and stop being comparable with older
+totals.
+
+**Keyed versus unkeyed.** `review_calibration` grades each fixture once, as
+written. The build adds a `--without-keys` pass, which grades the same
+fixtures through `ExerciseSection.without_answer_keys`, so each
+alternative answer is graded both ways.
+
+**Calls and cost**, at the calibration run's measured $0.013 a grade on
+Sonnet 5.5 ($0.2613 for 20 grades on 2026-10-09):
+
+| Run | Calls | Cost |
+|---|---|---|
+| One full calibration run with the new fixtures: 6 original fixtures (20 grades, as today) plus 4 new × 5 answers | 40 | about $0.52 |
+| Keyed versus unkeyed: 8 alternative answers × 2 ways × 3 runs | 48 | about $0.63 |
+| Total | 88 | about $1.15 |
+
+Both use only a key the owner holds, and the build asks before running
+either.
 
 ### 7. Only new problems get keys
 
@@ -229,14 +286,16 @@ whitespace collapsed. A miss logs `answer_key_quote=missing kind=…` and
 changes nothing. It catches a key that quotes code that isn't there. It
 can't catch a key that quotes the right line and misreads it. Prettier can
 change quotes and semicolons in JavaScript, so a miss there is a lead to
-read, not proof the key is wrong.
+read, not proof the key is wrong, and the threshold below counts Ruby
+sections only. More than 2 misses in the first 10 keyed Ruby sections is a
+stop condition: it would mean keys routinely quote code that isn't there.
 
 Options for checking what the quote check can't:
 
 | Option | Cost | Catches | Can't catch |
 |---|---|---|---|
 | **A. A key-aware check at ingest.** A separate provider call is given the section and its key and asks whether the snippet has the issue the key names and whether the fix works. Its verdict is stored server-side and only logged, or used to drop a bad key; it never feeds the page or any prompt. | One more call per keyed section, about $0.005-0.01 on Sonnet 5.5, so a few cents a day; more time inside the generation deadline. It is also a new pre-submission AI context that sees a key, an exception the isolation rule would have to name. | A key describing a defect the code doesn't have; a fix that doesn't work; a snippet whose worse flaw the key missed. | Mistakes the generator and checker share. A user has one provider key, so in production both calls come from the same provider. |
-| **B. A sampled manual check during Measuring.** The owner, or a senior colleague the owner chooses, reads keyed sections already reviewed, from the read-only export, and records for each: key right, key wrong, or key right but the snippet has a worse flaw. | Reading time: about 2-3 minutes a section, so roughly an hour for 5 sections per kind. No build beyond the export, which exists. | Anything a careful reader sees, including a subtly wrong fix or a misread quote. | Everything outside the sample. It measures how often keys are wrong; it never stops a wrong key from grading. |
+| **B. A sampled manual check during Measuring.** Keyed sections already reviewed are read from the read-only export, and each gets one call: key right, key wrong, or key right but the code or plan has a worse flaw. The owner reads the Ruby `code_review` sections. A senior colleague the owner chooses reads `security_review`, `plan_review` and `pseudocode_to_code` (and any `code_review` in another language). | Reading time: about 2-3 minutes a section, so roughly an hour for 5 sections per kind, split between two readers. No build beyond the export, which exists. | Anything a careful reader sees, including a subtly wrong fix or a misread quote. | Everything outside the sample. It measures how often keys are wrong; it never stops a wrong key from grading. |
 | **C. Neither.** Trust the generator: it wrote the snippet and the key in one reply. | None. | Nothing. | Everything. The reason to choose this would be that a key wrong as often as today's grader guesses wrong costs no accuracy. Nobody has measured how often either one is wrong, so there is no case for it yet. |
 
 **Recommendation: B, with the free quote check.** A key is new, and the
@@ -245,6 +304,12 @@ answers that and nothing else does: option A puts one model in charge of
 checking another from the same provider. If B finds wrong keys often
 enough to matter, A is the next step, with its isolation exception decided
 then. Not built in this spec beyond the quote check.
+
+The colleague's reading sheet holds only what the call needs: each
+section's problem as shown and its key, with no answer, rating or review.
+The owner's answers stay with the owner. The sheet is made from the
+read-only export, kept outside the repository, and deleted once the calls
+are recorded. Only the counts of calls go into the build PR.
 
 ### 9. Teaching from the key (out of scope)
 
@@ -255,8 +320,10 @@ the rule says a key never reaches the page, before or after review, and
 showing these parts would narrow it to "never before review", with
 `section_rendering_characterization_spec` changed to match. The place
 would be the review block, beside or inside the first-exposure short
-version (`docs/first-exposure-teaching-spec-2026-10-27.md`), never the
-section itself. It would also overlap with `improved_code`, which already
+version, never the section itself. That feature is specified in
+`docs/first-exposure-teaching-spec-2026-10-27.md`; once built, its reasoning
+lives in `docs/decisions/first-exposure-teaching-in-the-review.md`, which this
+spec's own decision record cites in place of the spec. It would also overlap with `improved_code`, which already
 shows a corrected version from a concept's second exposure. The field
 shapes in section 1 keep the issue apart from its explanation and fix so
 that spec can use the latter two without revealing more than it needs.
@@ -279,7 +346,9 @@ two weeks of keyed days exist:
 3. Compare, by kind, how many sections change rating between runs and how
    many move more than one level, with and without the key, and how many
    sections' typical rating differs between the two and in which direction.
-4. Run the sampled manual check (section 8, option B) on the same export.
+4. Run the sampled manual check (section 8, option B) on the same export:
+   the owner reads the Ruby `code_review` sections, and the chosen senior
+   colleague reads the other three kinds from a sheet with no answers on it.
 
 **Sample size.** About 14 sections per kind is what two weeks gives
 `code_review`, which every day carries, if a set is done every day. The
@@ -292,7 +361,10 @@ a direction, not a figure.
 
 **Reporting.** Results are counts ("3 of 14 sections changed rating between
 runs"), never percentages. With samples this small a percentage claims a
-precision the data doesn't have. `ReviewStability` prints counts only.
+precision the data doesn't have. `ReviewStability` prints counts only, and
+reports drift from the stored rating apart from stability, split by the
+stored review's provider. Drift moves with every model and prompt change
+since the stored review, so it is never read as stability.
 
 **What counts as systematic rating movement.** For a kind, at least 3
 sections whose typical rating differs between keyed and unkeyed grading,
@@ -316,6 +388,9 @@ shows for that kind. If that happens, say so on the build PR and reopen the
 - `docs/decisions/stored-answer-keys.md`: the decision, including both
   decisions above. It states that `RUBRIC_VERSION` stays unchanged only while
   Measuring shows no systematic rating movement, and what counts as one.
+  Where it mentions teaching from the key, it cites
+  `docs/decisions/first-exposure-teaching-in-the-review.md` once that exists,
+  and this spec's section 9 until then.
 - `docs/code-notes/app/models/exercise_section/*.md` for each kind that
   gains a key, where the reasoning needs more than the code says.
 - The CLAUDE.md isolation bullet already covers `all_answer_key_fields`, so
@@ -332,9 +407,17 @@ Stop and come back to the owner, without building further, if:
 - any strip site turns out to name a field instead of reading the list
 - the keyed grading run in the PR moves a calibration fixture off its
   expected rating (`script/compare_models.rb review_calibration`)
-- the keyed grader rates the alternative-finding calibration answers lower
-  than the unkeyed grader does, for any kind, by typical rating over the
-  three runs. That would mean the key is being treated as the only valid
-  answer.
-- the quote check logs a miss on more than a few Ruby sections in the first
-  week, which would mean keys quote code that isn't there
+- for any kind, the keyed grader rates the comparable-severity answer lower
+  than the unkeyed grader does, by typical rating over the three runs. That
+  would mean the key is being treated as the only valid answer. This
+  applies to the comparable-severity answers only; a lesser-flaw answer is
+  meant to rate lower once the grader knows the key.
+- for any kind, the keyed grader rates the lesser-flaw answer as meeting
+  the keyed point, by typical rating over the three runs: `developing` or
+  higher for `code_review`, `security_review` and `plan_review`, where it
+  would mean the main point was met, and `solid` or higher for
+  `pseudocode_to_code`, where the keyed requirement is an essential piece
+  and `solid` would mean nothing essential was missed. That would mean the
+  severity rule isn't holding.
+- the quote check logs a miss on more than 2 of the first 10 keyed Ruby
+  sections, which would mean keys routinely quote code that isn't there

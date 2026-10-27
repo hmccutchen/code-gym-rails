@@ -31,11 +31,11 @@ RSpec.describe ReviewStability do
 
   after { FileUtils.rm_f(export_path) }
 
-  def export_days(sections_by_date)
+  def export_days(sections_by_date, review_provider: "anthropic")
     sections_by_date.each do |date, sections|
       exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
                                        problem_set: sections.index_with { { "question" => "q", "snippet" => "s", "pitched_at" => "senior" } })
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current, review_provider: review_provider,
                             answers: sections.index_with { "An answer." }, section_ratings: sections.index_with { "right_level" },
                             ai_review: sections.index_with { { "rating" => "solid", "rubric" => ReviewedSectionResults::RUBRIC_VERSION } })
     end
@@ -43,7 +43,7 @@ RSpec.describe ReviewStability do
   end
 
   it "plans without a provider call: sections by kind, the call count and an estimated cost" do
-    export_days(Date.new(2026, 10, 20) => %w[code_review challenge])
+    export_days({ Date.new(2026, 10, 20) => %w[code_review challenge] })
 
     comparison.review_stability(export_path, runs: 5)
 
@@ -53,7 +53,7 @@ RSpec.describe ReviewStability do
   end
 
   it "grades every section the asked number of times on the production review route and reports how the ratings moved" do
-    export_days(Date.new(2026, 10, 20) => %w[code_review challenge])
+    export_days({ Date.new(2026, 10, 20) => %w[code_review challenge] })
     replies.concat(%w[solid developing solid] + %w[strong strong beginner])
 
     comparison.review_stability(export_path, runs: 3, run: true)
@@ -63,13 +63,13 @@ RSpec.describe ReviewStability do
     expect(out.string).to include("2026-10-20 code_review (senior): stored solid · runs solid developing solid")
     expect(out.string).to include("2026-10-20 challenge (senior): stored solid · runs strong strong beginner")
     expect(out.string).to include("code_review: 1 sections · changed between runs 1/1 · spread 0:0 1:1 2:0 3:0 · " \
-                                  "moved more than one level 0/1 · regrades matching the stored rating 2/3")
+                                  "moved more than one level 0/1 · failed calls 0")
     expect(out.string).to include("all kinds: 2 sections · changed between runs 2/2 · spread 0:0 1:1 2:0 3:1 · " \
                                   "moved more than one level 1/2")
   end
 
   it "writes nothing to the database while grading" do
-    export_days(Date.new(2026, 10, 20) => %w[code_review])
+    export_days({ Date.new(2026, 10, 20) => %w[code_review] })
     counts = -> { [ ApiUsage.count, DailyResponse.count, DailyExercise.count, User.count ] }
 
     expect { comparison.review_stability(export_path, runs: 2, run: true) }.not_to change(&counts)
@@ -77,7 +77,7 @@ RSpec.describe ReviewStability do
   end
 
   it "stops at a failure no later call could recover from and reports the sections it finished" do
-    export_days(Date.new(2026, 10, 19) => %w[code_review], Date.new(2026, 10, 20) => %w[challenge])
+    export_days({ Date.new(2026, 10, 19) => %w[code_review], Date.new(2026, 10, 20) => %w[challenge] })
     replies.concat(%w[solid solid] + [ :bad_key ])
 
     comparison.review_stability(export_path, runs: 2, run: true)
@@ -88,7 +88,7 @@ RSpec.describe ReviewStability do
   end
 
   it "reports counts, never a percentage" do
-    export_days(Date.new(2026, 10, 20) => %w[code_review])
+    export_days({ Date.new(2026, 10, 20) => %w[code_review] })
 
     comparison.review_stability(export_path, runs: 3, run: true)
 
@@ -97,12 +97,62 @@ RSpec.describe ReviewStability do
 
   it "counts a section with fewer than two grades as too few to compare" do
     row = described_class::Row.new(date: Date.current, section: "code_review", rung: "senior", stored_rating: "solid",
-                                   ratings: [ "solid", nil ], failures: 1)
+                                   stored_provider: "anthropic", ratings: [ "solid", nil ], failures: 1)
 
-    described_class.new(out: out).print_report([ row ], runs: 2, route: { model: "m" }, cost_line: "$0")
+    described_class.new(out: out).print_report([ row ], runs: 2, route: { model: "m" }, regrade_provider: "anthropic", cost_line: "$0")
 
     expect(out.string).to include("runs solid - · failed 1")
     expect(out.string).to include("changed between runs 0/0 · spread 0:0 1:0 2:0 3:0 · moved more than one level 0/0 · " \
-                                  "regrades matching the stored rating 1/1 · failed calls 1 · too few grades to compare 1")
+                                  "failed calls 1 · too few grades to compare 1")
+  end
+
+  describe "drift from the stored review" do
+    def row(section, stored_rating, stored_provider, ratings)
+      described_class::Row.new(date: Date.current, section: section, rung: "senior", stored_rating: stored_rating,
+                               stored_provider: stored_provider, ratings: ratings, failures: 0)
+    end
+
+    def report(rows)
+      described_class.new(out: out).print_report(rows, runs: 2, route: { model: "m" }, regrade_provider: "anthropic", cost_line: "$0")
+      out.string
+    end
+
+    it "labels the stored-rating comparison as drift, apart from the stability lines" do
+      printed = report([ row("code_review", "solid", "anthropic", %w[solid developing]) ])
+
+      expect(printed).to include("drift, not stability: regrades on anthropic matching the stored rating")
+      expect(printed).to include("code_review drift, stored by anthropic: matching 1/2\n")
+      expect(printed.lines.grep(/changed between runs/)).to all(satisfy { |line| !line.include?("matching") })
+    end
+
+    it "splits drift by the stored review's provider and says when it differs from the regrade's" do
+      printed = report([ row("code_review", "solid", "anthropic", %w[solid solid]),
+                         row("code_review", "strong", "openai", %w[solid developing]),
+                         row("code_review", "solid", nil, %w[solid solid]) ])
+
+      expect(printed).to include("code_review drift, stored by anthropic: matching 2/2\n")
+      expect(printed).to include("code_review drift, stored by openai: matching 0/2 · stored by a different provider " \
+                                 "than the regrade (anthropic), so this also compares providers")
+      expect(printed).to include("code_review drift, stored by an unrecorded provider: matching 2/2 · " \
+                                 "the stored review may come from a different provider than the regrade")
+    end
+
+    it "leaves a section with no stored rating out of the drift denominator and says how many" do
+      printed = report([ row("challenge", "solid", "anthropic", %w[solid developing]),
+                         row("challenge", nil, "anthropic", %w[solid solid]) ])
+
+      expect(printed).to include("challenge drift, stored by anthropic: matching 1/2\n")
+      expect(printed).to include("challenge drift: 1 sections with no stored rating left out")
+      expect(printed).to include("stored none · runs solid solid")
+    end
+
+    it "takes the stored provider from the export and the regrade provider from the route in a real run" do
+      export_days({ Date.new(2026, 10, 20) => %w[code_review] }, review_provider: "gemini")
+
+      comparison.review_stability(export_path, runs: 2, run: true)
+
+      expect(out.string).to include("code_review drift, stored by gemini: matching 2/2 · stored by a different provider " \
+                                    "than the regrade (anthropic)")
+    end
   end
 end

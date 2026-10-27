@@ -51,8 +51,24 @@ rating (`-` for a failed call). Then one line per kind and one for all kinds:
 - **spread**: how many sections had 0, 1, 2 or 3 levels between their lowest
   and highest rating.
 - **moved more than one level**: sections with a spread of 2 or more.
-- **regrades matching the stored rating**: of every rating the runs gave.
 - **failed calls**, and how many sections had too few ratings to compare.
+
+The counts carry no percentages. With a dozen sections a kind, a percentage
+claims a precision the sample doesn't have.
+
+## Drift is reported apart from stability
+
+Below the stability lines, a block headed "drift, not stability" compares
+the regrades with the rating stored when the review was written. Stability
+is how much one grader disagrees with itself today. Drift also moves with
+every model and prompt change since the stored review, so a low match there
+says nothing about how stable today's grader is.
+
+Drift is split by the stored review's provider (`review_provider`). When that
+differs from the provider the regrade runs on, the line says so, since it then
+compares providers too. When it was never recorded, the line says the
+provider may differ. A section with no stored rating is left out of the
+denominator and counted on a line of its own.
 
 It never prints an answer, a key, or any review text, so the output can be
 pasted anywhere.
