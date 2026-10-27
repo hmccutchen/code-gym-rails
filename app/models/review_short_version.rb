@@ -19,6 +19,8 @@ class ReviewShortVersion
   private
 
   def qualifies?(section)
+    return false unless @response.section_reviewed?(section)
+
     count = @exposures.count_for(section, tag(section), @response.daily_exercise.language, on_or_before: @response.date)
     return false if count.nil?
 

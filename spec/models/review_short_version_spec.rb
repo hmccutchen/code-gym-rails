@@ -39,7 +39,8 @@ RSpec.describe ReviewShortVersion do
     end
 
     it "offers it to a skipped section on its first exposure only" do
-      skipped = response_for(tags: { "code_review" => "n_plus_one" }, answers: {})
+      skipped = response_for(tags: { "code_review" => "n_plus_one" }, answers: {},
+                             reviews: { "code_review" => { "missed" => [ "What a good answer covers." ] } })
 
       expect(described_class.new(skipped, exposures: exposures("n_plus_one" => [ day ])).offered?("code_review")).to be(true)
       expect(described_class.new(skipped, exposures: exposures("n_plus_one" => [ earlier_day, day ])).offered?("code_review")).to be(false)
@@ -60,6 +61,15 @@ RSpec.describe ReviewShortVersion do
 
       expect(short_version.offered?("code_review")).to be(true)
       expect(short_version.offered?("pattern")).to be(false)
+    end
+
+    it "passes over an earlier section sharing the concept whose review failed in a partial review" do
+      response = response_for(tags: { "code_review" => "n_plus_one", "pattern" => "n_plus_one" },
+                              reviews: { "pattern" => review("solid") })
+      short_version = described_class.new(response, exposures: exposures("n_plus_one" => [ day ]))
+
+      expect(short_version.offered?("code_review")).to be(false)
+      expect(short_version.offered?("pattern")).to be(true)
     end
 
     it "passes over an earlier section that doesn't qualify" do
