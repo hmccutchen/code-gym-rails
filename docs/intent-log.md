@@ -338,3 +338,5 @@ data.*
   the critical review of the ReviewPrompt work `#586`
 - the review badge and headings moved off DailyResponse into a view helper
   `#587`
+- the self-rating labels and reviewing provider name moved to view helpers too
+  `#589`
