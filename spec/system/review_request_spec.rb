@@ -23,6 +23,32 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
     end
   end
 
+  it "marks a blank section Skipped and a too-short note Not graded, and grades only the answered one" do
+    user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
+    weekday = a_weekday
+
+    travel_to(weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_content(/Code Review/i)
+
+      fields = all("textarea[data-field]").map { |area| area["data-field"] }.uniq
+      answered, _blank, noted = fields.first(3)
+      find(%(textarea[data-field="#{answered}"])).fill_in(
+        with: "It re-runs the loyalty_tier query inside the loop — precompute it once outside the loop."
+      )
+      find(%(textarea[data-field="#{noted}"])).fill_in(with: "N+1?")
+      rate_section(answered)
+      click_button "Submit answers"
+
+      expect(page).to have_content("Review ready!")
+      expect(page).to have_selector(".review-rating", count: 1)
+      expect(page).to have_selector(".review-ungraded", text: "Skipped")
+      expect(page).to have_selector(".review-ungraded", text: "Not graded", count: 1)
+      expect(page).to have_selector(".answer-display", text: "N+1?")
+      expect(page).to have_selector(".answer-note", text: "Not counted as an answer.", count: 1)
+    end
+  end
+
   it "shows the submitted state, not the answer form, when Back restores the page" do
     # Back can restore from bfcache or replay the cached response; this driver makes bfcache reachable at all.
     driven_by(:capybara_playwright_bfcache)
