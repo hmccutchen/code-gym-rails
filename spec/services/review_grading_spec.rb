@@ -446,34 +446,52 @@ RSpec.describe ReviewGrading do
       expect(Rails.logger).not_to have_received(:error).with(/SENTINEL/)
     end
 
-    def graded_with_prompts
-      prompts = []
-      svc = FakeService.new("key")
-      allow(svc).to receive(:call).and_wrap_original do |_m, request|
-        prompts << request.prompt
-        { text: grade.to_json, input_tokens: 1, output_tokens: 1 }
+    describe "the prompt sent and the grade stored" do
+      before { ENV["REVIEW_PROSE_JUDGE"] = nil }
+
+      def graded_with_prompts(section, section_data, answer)
+        day = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                    problem_set: { section => section_data })
+        written = DailyResponse.create!(user: user, daily_exercise: day, date: Date.current,
+                                        answers: { section => answer }.compact, submitted_at: Time.current)
+        prompts = []
+        svc = FakeService.new("key")
+        allow(svc).to receive(:call).and_wrap_original do |_m, request|
+          prompts << request.prompt
+          { text: grade.to_json, input_tokens: 1, output_tokens: 1 }
+        end
+        [ graded_by(svc, section, day, written), prompts ]
       end
-      [ graded_by(svc, "code_review", exercise, response), prompts ]
-    end
 
-    it "sends an unanswered section the walkthrough prompt and stores none of the grade it gets back" do
-      response.update!(answers: {})
-      result, prompts = graded_with_prompts
+      {
+        "a blank code review" => [ "code_review", { "question" => "cr?", "snippet" => "code" }, nil ],
+        "a scaffold-only pattern" => [ "pattern", { "title" => "P", "question" => "pat?" }, ExerciseSection::Pattern::DEFAULT_SCAFFOLD.join("\n\n") ],
+        "a Parsons order with no blocks" => [ "parsons_problem", { "title" => "T", "question" => "Q" }, "order:1,0" ]
+      }.each do |name, (section, section_data, answer)|
+        it "sends #{name} the walkthrough prompt and stores none of the grade it gets back" do
+          expect(grade).to include("rating", "essential_gaps")
+          result, prompts = graded_with_prompts(section, section_data, answer)
 
-      expect(prompts.size).to eq(1)
-      expect(prompts.first).to include("No answer was given")
-      expect(prompts.first).not_to include("Grade ONLY")
-      expect(grade).to include("rating", "essential_gaps")
-      expect(result[:review].keys).not_to include("rating", "essential_gaps", "rubric")
-    end
+          expect(prompts.size).to eq(1)
+          expect(prompts.first).to include("No answer was given")
+          expect(prompts.first).not_to include("Grade ONLY")
+          expect(result[:review].keys).not_to include("rating", "essential_gaps", "rubric")
+        end
+      end
 
-    it "sends an answered section the grading prompt and keeps its rating" do
-      result, prompts = graded_with_prompts
+      {
+        "a short pattern answer" => [ "pattern", { "title" => "P", "question" => "pat?" }, "N+1?" ],
+        "a written code review" => [ "code_review", { "question" => "cr?", "snippet" => "code" }, "The query runs once per row, so preload it." ]
+      }.each do |name, (section, section_data, answer)|
+        it "sends #{name} the grading prompt and keeps its rating" do
+          result, prompts = graded_with_prompts(section, section_data, answer)
 
-      expect(prompts.size).to eq(1)
-      expect(prompts.first).to include("Grade ONLY")
-      expect(prompts.first).not_to include("No answer was given")
-      expect(result[:review]).to include("rating" => grade["rating"], "rubric" => ReviewedSectionResults::RUBRIC_VERSION)
+          expect(prompts.size).to eq(1)
+          expect(prompts.first).to include("Grade ONLY")
+          expect(prompts.first).not_to include("No answer was given")
+          expect(result[:review]).to include("rating" => grade["rating"], "rubric" => ReviewedSectionResults::RUBRIC_VERSION)
+        end
+      end
     end
 
     def edit_reply
