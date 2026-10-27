@@ -317,3 +317,9 @@ data.*
   set and Start over, which ends the page on a phone; the progress bar stays in
   the main column, the featured card below the day, and the column sticks only
   in a tall window; disable Generate new set and Start over while a submit runs
+- a skipped section reviewed as a walkthrough with no grade `#581`
+  **why:** an unanswered section was graded like an answer
+  **I decided:** keep its review; "What a good answer covers" heads its list;
+  a short answer is still an answer and gets graded, with no character count;
+  Parsons keeps showing the correct block order; follow-up chat keeps "What
+  you missed"
