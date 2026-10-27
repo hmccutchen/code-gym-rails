@@ -628,23 +628,6 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
-  describe "#review_badge" do
-    {
-      "the rating on an answered section"                 => [ "a" * 20, { "rating" => "strong" }, [ "strong", true ] ],
-      "Skipped on an unanswered section with a rating"    => [ "", { "rating" => "strong" }, [ "Skipped", false ] ],
-      "Skipped on an unanswered section without a rating" => [ "", {}, [ "Skipped", false ] ],
-      "nothing on an answered section without a rating"   => [ "a" * 20, {}, nil ]
-    }.each do |label, (written, review, expected)|
-      it "gives #{label}" do
-        response = user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
-                                                answers: { "code_review" => written }, ai_review: { "code_review" => review })
-        badge = response.review_badge("code_review")
-
-        expect(badge && [ badge.text, badge.graded? ]).to eq(expected)
-      end
-    end
-  end
-
   describe "#ai_rating_for on an unanswered section" do
     let(:scaffold_only) { ExerciseSection.find("plan_review").scaffold_template }
     let(:plan_exercise) do
@@ -687,22 +670,6 @@ RSpec.describe DailyResponse, type: :model do
 
       expect(response.ai_rating_for("code_review")).to eq("developing")
       expect(response.ai_rating_unfavorable?("code_review")).to be(true)
-    end
-  end
-
-  describe "#review_field_label" do
-    let(:response) { described_class.new(daily_exercise: exercise, answers: { "code_review" => "a" * 20, "pattern" => "" }) }
-
-    it "uses the walkthrough heading for the missed list on an unanswered section" do
-      expect(response.review_field_label("pattern", "missed")).to eq("What a good answer covers")
-    end
-
-    it "uses the graded heading for the missed list on an answered section" do
-      expect(response.review_field_label("code_review", "missed")).to eq("What you missed")
-    end
-
-    it "leaves a field with no walkthrough heading unchanged on an unanswered section" do
-      expect(response.review_field_label("pattern", "next_step")).to eq("Next step")
     end
   end
 

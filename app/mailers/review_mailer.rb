@@ -1,4 +1,6 @@
 class ReviewMailer < ApplicationMailer
+  helper ReviewHelper
+
   # On-demand copy of a completed AI review, sent to the user's own address.
   def send_review(daily_response)
     @response = daily_response

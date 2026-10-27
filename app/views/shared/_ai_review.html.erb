@@ -5,7 +5,7 @@
   <% next unless fb.is_a?(Hash) %>
   <% slot = section_keys.index(section)&.succ %>
   <div class="review-block"<% if slot %> data-slot="<%= slot %>"<% end %>>
-    <h3><%= section.humanize %><% if (badge = response.review_badge(section)) %><span class="<%= badge.graded? ? "review-rating" : "review-ungraded" %>"><%= badge.text %></span><% end %></h3>
+    <h3><%= section.humanize %><% if (badge = review_badge(response, section)) %><span class="<%= badge.graded? ? "review-rating" : "review-ungraded" %>"><%= badge.text %></span><% end %></h3>
     <%# Context under the grade badge, never a badge of its own: a second pill would read as a second score. %>
     <% if (difficulty = response.difficulty_for(section)) %>
       <p class="difficulty-note">
@@ -21,7 +21,7 @@
         <% points = DailyResponse.review_points(fb[key]) %>
         <% if points.any? %>
           <div class="review-item">
-            <strong><%= response.review_field_label(section, key) %>:</strong>
+            <strong><%= review_field_label(response, section, key) %>:</strong>
             <ul class="review-points">
               <% seen = Set.new %>
               <% points.each do |point| %><li><%= glossary_wrap(point, seen: seen) %></li><% end %>
@@ -31,7 +31,7 @@
       <% else %>
         <% text = DailyResponse.review_points(fb[key]).join(" ") %>
         <% if text.present? %>
-          <p class="review-item"><strong><%= response.review_field_label(section, key) %>:</strong> <%= glossary_wrap(text) %></p>
+          <p class="review-item"><strong><%= review_field_label(response, section, key) %>:</strong> <%= glossary_wrap(text) %></p>
         <% end %>
       <% end %>
     <% end %>

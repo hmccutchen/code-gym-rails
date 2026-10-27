@@ -8,6 +8,8 @@ paths:
   - "app/views/shared/_ai_review.html.erb"
   - "app/views/responses/{_submission,_review_in_progress,_answered_sections}.html.erb"
   - "app/views/review_mailer/**"
+  - "app/helpers/review_helper.rb"
+  - "app/mailers/review_mailer.rb"
   - "spec/fixtures/{review_calibration,review_judge}/**"
   - "spec/**/*{review,rubric,grading,difficulty_prompt}*"
   - "app/models/exercise_section/**"
@@ -32,9 +34,10 @@ read it before changing that area.
   `ReviewPrompt.for_section` gives an unanswered section the walkthrough
   prompt, choosing on `DailyResponse#answered?` as a value. It stores no
   rating and no rubric stamp, `ai_rating_for` is nil for it, and
-  `review_field_label` heads its "missed" list "What a good answer covers".
-  `review_badge` shows "Skipped" in place of the grade badge. A short answer is
-  an answer and is graded. `RUBRIC_VERSION` is unchanged.
+  `ReviewHelper#review_field_label` heads its "missed" list "What a good
+  answer covers". `ReviewHelper#review_badge` shows "Skipped" in place of the
+  grade badge. A short answer is an answer and is graded. `RUBRIC_VERSION` is
+  unchanged.
 - **Review prose judge** (`docs/decisions/review-prose-judge.md`): An optional
   second pass that may reword a graded review's prose fields for plain
   language or length (`AiService#judge_review_prose`); it is never shown the

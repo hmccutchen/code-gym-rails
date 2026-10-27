@@ -138,6 +138,3 @@ compares it with the stored column across those shapes.
 
 It returns nil for an unanswered section whatever is stored, so reviews written before unanswered sections stopped being graded read the same as new ones, with no data migration. Readers of a grade go through it, or first restrict themselves to `answered_sections` as `ReviewedSectionResults.for` does.
 
-## `#review_badge` and `#review_field_label`
-
-`#review_badge` is the one choice between the grade badge and the "Skipped" label, which the review partial and the email both read. `#review_field_label` gives them one source for the "missed" heading, "What a good answer covers" on an unanswered section.
