@@ -8,7 +8,7 @@ paths:
   - "app/jobs/{generate_concept_reference_job,generate_recognition_guide_job}.rb"
   - "app/helpers/{featured_concept,concept_references,concept_drills,progress,section_kind_guide,glossary,learn_search}_helper.rb"
   - "app/views/{learn,learn_lessons,progress}/**"
-  - "app/views/shared/{_concept_reference,_featured_concept}.html.erb"
+  - "app/views/shared/{_concept_reference,_featured_concept,_review_short_version}.html.erb"
   - "app/views/responses/{_featured_marker,_kind_about,_kind_guide}.html.erb"
   - "app/javascript/controllers/{concept_alternates,learn_filter,write_up_control,glossary}_controller.js"
   - "spec/**/*{learn,concept_reference,explain_differently_prompt,featured,progress,rung_ledger,recognition,lesson,book_source,kind_guide,glossary,hand_written}*"
@@ -40,6 +40,9 @@ read it before changing that area.
   `#generate_concept_reference` call, outside its required fields;
   `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
   out, and "seen" reads `ConceptExposureIndex#count`, never `ConceptMastery`.
+  The review's short version reads the tagline, explanation, code example
+  and guide fields too (`shared/_review_short_version`), so a change to
+  them checks the review as well.
   Every prose reference field renders through `glossary_wrap`, and the wrapper
   never touches code (`code_example`, a worked example's code, `<code>` spans).
   A word in `Glossary::FORMS` resolves to its key's definition, and a new entry

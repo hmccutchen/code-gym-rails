@@ -3,9 +3,9 @@ paths:
   - "app/services/{response_review,review_grading}.rb"
   - "app/clients/{review_prose_judge,ai_service}.rb"
   - "app/prompts/{review_prose_judge_prompt,review_prompt,difficulty_prompt,prompt_standards}.rb"
-  - "app/models/{review_prose_verdict,rubric_check,daily_response,review_follow_up}.rb"
+  - "app/models/{review_prose_verdict,rubric_check,daily_response,review_follow_up,review_short_version}.rb"
   - "app/controllers/responses_controller.rb"
-  - "app/views/shared/_ai_review.html.erb"
+  - "app/views/shared/{_ai_review,_review_short_version}.html.erb"
   - "app/views/responses/{_submission,_review_in_progress,_answered_sections}.html.erb"
   - "app/views/review_mailer/**"
   - "app/helpers/review_helper.rb"
@@ -27,7 +27,8 @@ read it before changing that area.
   graded against the section's `pitched_at` rung; `eased` is never passed to
   the grader. Per-kind grading notes name the main point and never restate the
   levels. Parsons' rating comes from its `fixed_rating` hook. `RubricCheck`
-  only logs agreement and never rewrites a rating. The competency gate and
+  never rewrites a rating: it logs agreement, and its gap list also decides
+  whether the short version shows pitfalls. The competency gate and
   `LevelSuggestion` read only `RUBRIC_VERSION`-stamped reviews;
   `ConceptMastery` and `RungLedger` read all history on purpose.
 - **Unanswered sections are reviewed, not graded** (`docs/decisions/grading-rubric.md`):
@@ -60,3 +61,14 @@ read it before changing that area.
   answers, ratings or history, so it can never read out `ConceptMastery` tier.
   Any failure is swallowed so it never costs the review, and the result is
   display-only.
+- **The concept's short version in the review**
+  (`docs/decisions/first-exposure-teaching-in-the-review.md`):
+  `ReviewShortVersion#offered?` is the one rule: a tagged, non-`"other"`
+  concept on its first exposure (`ConceptExposureIndex#count_for` is 1) or
+  with a `beginner` or `developing` grade, on the first qualifying section
+  that carries the concept. It reads the exposure count and the section's
+  own rating and review, never `ConceptMastery` (a convention spec scans
+  for it). Pitfalls show only when `#essential_gap?`. The block renders
+  closed, after the review fields, only when the concept has a reference
+  row, and the review email leaves it out. Every reader of `graded_prose`
+  goes through `ReviewProseVerdict.as_graded`.
