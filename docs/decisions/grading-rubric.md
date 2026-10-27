@@ -54,9 +54,9 @@ The mechanism, front to back:
   reads old and new rows alike, with no data migration. Readers that take the
   rating from the stored review directly (`ReviewedSectionResults`) first
   restrict themselves to `answered_sections`.
-- `DailyResponse#review_badge` is the one choice between the grade and the
+- `ReviewHelper#review_badge` is the one choice between the grade and the
   "Skipped" label; the review partial and the email both read it.
-  `#review_field_label` heads the "missed" list "What a good answer covers" on
+  `ReviewHelper#review_field_label` heads the "missed" list "What a good answer covers" on
   an unanswered section.
 - `RUBRIC_VERSION` is unchanged, `missing_sections`, `fully_reviewed?` and
   `defer_skipped_checks!` are unchanged, and the follow-up chat prompt keeps
