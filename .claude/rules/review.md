@@ -8,6 +8,8 @@ paths:
   - "app/views/shared/_ai_review.html.erb"
   - "app/views/responses/{_submission,_review_in_progress,_answered_sections}.html.erb"
   - "app/views/review_mailer/**"
+  - "app/helpers/review_helper.rb"
+  - "app/mailers/review_mailer.rb"
   - "spec/fixtures/{review_calibration,review_judge}/**"
   - "spec/**/*{review,rubric,grading,difficulty_prompt}*"
   - "app/models/exercise_section/**"
