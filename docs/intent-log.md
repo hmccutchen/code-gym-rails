@@ -367,3 +367,7 @@ data.*
   #592's single `graded_prose` reader first, every keyed section is logged
   with its kind, language and outcome, and a key quotes in backticks, with no
   quote counted as a miss
+- keyed grading measured on the stored-key days before the grader reads keys
+  in production, from Copilot's review
+  **why:** keyed grades keep today's `RUBRIC_VERSION`, so the competency gate
+  and level suggestions would read them before the movement check ran

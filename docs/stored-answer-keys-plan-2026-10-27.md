@@ -340,8 +340,7 @@ before step 7.
   `without_planted_keys`, then prints each answer's ratings both ways. That
   is 48 calls. One normal `review_calibration` run is 40.
 - **`script/regrade_review_baseline.rb --without-keys`:** applies
-  `without_planted_keys` to every day before grading. Measuring needs it
-  after merge.
+  `without_planted_keys` to every day before grading, for step 8.
 - **Specs:** both modes against the Faraday stub, as `model_comparison_spec`
   does today, with no provider call.
 
@@ -358,7 +357,34 @@ before step 7.
   keyed point: `developing` or higher for `code_review`, `security_review`
   and `plan_review`, or `solid` or higher for `pseudocode_to_code`
 
-### Step 8. Docs, checks and the PR
+### Step 8. Measuring, before PR 2 merges
+
+PR 1's days already carry keys, so the movement check runs on them with this
+branch's code, and keyed grading never reaches production before it passes.
+That way neither `CompetencyGate::Evidence` nor `LevelSuggestion::Evidence`
+reads a keyed grade under the unchanged `RUBRIC_VERSION` until the check
+has passed (owner's decision, after review).
+
+1. **Export,** with the owner's approval: keyed sections, up to 10 per
+   kind, read-only, saved outside the repository.
+2. **Regrade on this branch,** on the owner's machine with the export copied
+   down and the owner's key in the provider's environment variable: each
+   section 5 times as stored and 5 times with `--without-keys`. Ask the
+   owner first, with the plan output's call count and cost.
+3. **Compare, by kind,** in counts:
+   - how many sections change rating between runs, with and without the key
+   - how many sections' typical rating differs between the two, and in
+     which direction
+4. **Systematic movement** is at least 3 sections in one kind differing in
+   the same direction, beyond the unkeyed run's own run-to-run change on
+   those sections. If that happens, stop: PR 2 doesn't merge, and the
+   `RUBRIC_VERSION` decision is reopened with the owner.
+5. **Delete every export.** Only the counts go into the PR description.
+
+A kind with too few keyed sections for a reading stays off in PR 2 until it
+has them, as in the read between the PRs.
+
+### Step 9. Docs, checks and the PR
 
 **Docs:**
 - `docs/decisions/stored-answer-keys.md`: the grading half, with the
@@ -375,23 +401,7 @@ in the PR description.
 findings comment.
 
 **PR description:** the key-read counts, the fixture check, the calibration
-counts, the departure above, and that `RUBRIC_VERSION` is unchanged and why.
+counts, the Measuring counts, the departure above, and that `RUBRIC_VERSION`
+is unchanged and why.
 
 **Intent log:** the entry, then `compose.rb` and `check.rb`.
-
-## After PR 2 merges: Measuring
-
-From the spec, after about two weeks of keyed days:
-1. **Export,** with approval: keyed sections, up to 10 per kind.
-2. **Regrade each section** 5 times as stored and 5 times with
-   `--without-keys`.
-3. **Compare, by kind,** in counts:
-   - how many sections change rating between runs, with and without the key
-   - how many sections' typical rating differs between the two, and in
-     which direction
-4. **Systematic movement** is at least 3 sections in one kind differing in
-   the same direction, beyond the unkeyed run's own run-to-run change on
-   those sections. If that happens, say so and reopen the `RUBRIC_VERSION`
-   decision before the competency gate or level suggestions read
-   keyed-era ratings.
-5. **Delete every export.**

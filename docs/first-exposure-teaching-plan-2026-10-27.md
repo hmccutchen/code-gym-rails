@@ -104,7 +104,9 @@ so its specs build an index from a hash of dates.
 **`#offered?(section)`** is true when `qualifies?(section)`, and no earlier
 key in `response.section_keys` with the same concept qualifies.
 
-**`qualifies?(section)`** (private) is true when
+**`qualifies?(section)`** (private) is true when the section has a stored
+review (`response.section_reviewed?(section)`; a skipped section's
+walkthrough counts), and
 `exposures.count_for(section, tag, language, on_or_before: response.date)`
 is a number and either:
 - it is `== 1`, or
@@ -135,6 +137,8 @@ hand-built index):
   - second exposure with `solid`
   - second exposure with `developing`
   - a skipped section on first and on later exposure
+  - a partial review: an earlier section sharing the concept whose review
+    failed doesn't qualify, so the later section offers it
   - a blank tag and `"other"`
   - two sections sharing a concept on a first exposure, where only the first
     offers it

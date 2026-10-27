@@ -9,8 +9,12 @@ today's grader to compare against.
 
 - **An unusable key:** the section is kept, without a key (section 3).
 - **`RUBRIC_VERSION`:** unchanged (section 6). This holds only if Measuring
-  shows no systematic rating movement between keyed and unkeyed grading. If
-  it does, the decision is reopened before keys feed any evidence reader.
+  shows no systematic rating movement between keyed and unkeyed grading.
+  Measuring runs on the keyed days the store-only PR collects, with the
+  grading PR's code from its branch, before that PR merges. So no evidence
+  reader sees a keyed grade until the check has passed. If it shows
+  movement, the grading PR waits while the decision is reopened. The
+  timing was decided by the owner on 2026-10-27, after review.
 - **A different finding:** it meets the main point only when it is at least
   as serious as the keyed one in this code; a lesser real finding is
   credited and the keyed point stays an essential gap (section 6).
@@ -394,10 +398,12 @@ covers no `security_review`, `plan_review` or `pseudocode_to_code`
 section, because every day in the sample had two sections. Those three
 kinds have no before picture yet.
 
-After keys ship and about two weeks of keyed days exist:
+Once the keys are stored, about two weeks of keyed days exist, and before
+the grader reads keys in production:
 
 1. Export keyed sections with the same script.
-2. Regrade each one 5 times with the key, and 5 times with the new
+2. Regrade each one 5 times with the key, using the grading PR's code on
+   its branch, and 5 times with the new
    `answer_key` removed from every section of the four keyed kinds in that
    day, since the day context shows every section's key, not only the graded
    one's. The `design_comparison` and `ambiguity_hunt` keys stay, as in the
@@ -438,7 +444,7 @@ arm, not the stability baseline, because it covers the same sections, model
 and day, with only the key different. The baseline is an older sample of
 unkeyed sections, with only a few rows of each rotating kind. It stays a
 general measure of today's grader, not this threshold's reference. If that happens, say so on the build PR and reopen the
-`RUBRIC_VERSION` decision.
+`RUBRIC_VERSION` decision before that PR merges.
 
 **Handling production data.**
 
