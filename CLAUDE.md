@@ -33,8 +33,11 @@ already decided it is right, so it doesn't review its own work.
   whole, using the whole repository.
 - **Layered-design review:** `/layered-rails:review` checks layer boundaries,
   callbacks, concerns and where each class lives. It comes from the
-  `layered-rails` plugin, which each developer installs. If it isn't
-  installed, say so in the PR rather than skipping the review silently.
+  `layered-rails` plugin, which each developer installs. Where the plugin
+  isn't installed, as in a Claude Code cloud session, run the
+  `layered-reviewer` agent (`.claude/agents/layered-reviewer.md`) instead. It
+  follows the repository's copy of the plugin's review workflow, pinned at
+  3.1.0 under `.claude/skills/layered-review/`.
 
 **Findings are checked before any code changes.** Hand both reviews' findings
 to another fresh agent. It checks each finding against the code and reports
