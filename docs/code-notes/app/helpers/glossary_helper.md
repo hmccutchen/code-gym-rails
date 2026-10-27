@@ -33,7 +33,8 @@ Text with no term in it comes back escaped and marked `html_safe` too, so every
 non-blank result is safe HTML, whatever it matched. A view would escape a
 plain string anyway, but a caller that sends the result to a page script for
 `innerHTML` would not; returning one kind of value means no caller has to know
-which case it got. Blank text and `nil` come back unchanged.
+which case it got. Text that is `blank?` comes back unchanged: `nil`, an empty
+string, and a string of only whitespace, which has nothing to escape.
 
 ## `#glossary_wrap_prose`
 
