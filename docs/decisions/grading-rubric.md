@@ -36,8 +36,9 @@ self-rating like any other.
 
 The mechanism, front to back:
 
-- `AiService#build_review_section_prompt` picks `ReviewPrompt.walkthrough_prompt`
-  for an unanswered section. It says no answer was given, asks for a walkthrough
+- `ReviewPrompt.for_section` picks `.walkthrough_prompt` for an unanswered
+  section, from the `answered:` value `AiService#build_review_section_prompt`
+  reads off `DailyResponse#answered?`. It says no answer was given, asks for a walkthrough
   of what a good answer covers, and never asks for "rating" or
   "essential_gaps". Each kind adds its own text through
   `ExerciseSection.walkthrough_note(section:)`: empty for most kinds, and for

@@ -41,6 +41,12 @@ class ReviewPrompt
     CONTEXT
   end
 
+  def self.for_section(key:, section:, answer:, answered:, rung:)
+    return walkthrough_prompt(key: key, section: section, rung: rung) unless answered
+
+    section_prompt(key: key, section: section, answer: answer, rung: rung)
+  end
+
   def self.section_prompt(key:, section:, answer:, rung:)
     kind = ExerciseSection.for(key)
 

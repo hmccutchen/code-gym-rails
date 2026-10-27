@@ -270,4 +270,4 @@ negative rate raises at boot rather than on a call.
 
 ## `#build_review_section_prompt`
 
-It chooses the walkthrough prompt when `DailyResponse#answered?` is false. That is a branch on answer state, which one authority decides, and not on section kind or provider.
+It gathers values only: the section, `DailyResponse#answer_for`, `DailyResponse#answered?` and the rung from `#review_rung`. `ReviewPrompt.for_section` chooses between the graded and the walkthrough prompt (#583).

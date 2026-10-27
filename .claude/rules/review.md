@@ -29,7 +29,8 @@ read it before changing that area.
   `LevelSuggestion` read only `RUBRIC_VERSION`-stamped reviews;
   `ConceptMastery` and `RungLedger` read all history on purpose.
 - **Unanswered sections are reviewed, not graded** (`docs/decisions/grading-rubric.md`):
-  an unanswered section gets `ReviewPrompt.walkthrough_prompt`. It stores no
+  `ReviewPrompt.for_section` gives an unanswered section the walkthrough
+  prompt, choosing on `DailyResponse#answered?` as a value. It stores no
   rating and no rubric stamp, `ai_rating_for` is nil for it, and
   `review_field_label` heads its "missed" list "What a good answer covers".
   `review_badge` shows "Skipped" in place of the grade badge. A short answer is
