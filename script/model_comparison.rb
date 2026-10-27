@@ -650,11 +650,9 @@ class ModelComparison
   end
 
   def stability_row(service, entry, runs)
-    results = Array.new(runs) { stability_grade(service, entry) }
+    ratings = Array.new(runs) { stability_grade(service, entry) }.map { |result| ReviewStability.usable_rating(result[:review]) }
     ReviewStability::Row.new(date: entry.date, section: entry.section, rung: entry.rung, stored_rating: entry.stored_rating,
-                             stored_provider: entry.review_provider,
-                             ratings: results.map { |result| result[:review]&.fetch("rating", nil) },
-                             failures: results.count { |result| !result[:ok] })
+                             stored_provider: entry.review_provider, ratings: ratings, failures: ratings.count(nil))
   end
 
   def stability_grade(service, entry)

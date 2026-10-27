@@ -20,7 +20,8 @@ the day as context, but only the sections taken are listed under `sections`.
 
 ## What it writes
 
-Per day: the date, language, `review_provider`, the whole `problem_set`
+Per day: the date, language, `review_provider` (the provider of the day's
+last review attempt, not necessarily of every section), the whole `problem_set`
 (answer keys included, since grading needs them and every exported section
 has already been reviewed), `plan_notes`, `answers`, `section_ratings` and
 `pseudocode_rounds`. Per taken section: the kind, its rung, the answer as

@@ -96,7 +96,7 @@ RSpec.describe ReviewBaselineExport do
 
     summary = described_class.summary(described_class.new(user_id: user.id).call)
 
-    expect(summary).to eq("exported 2 sections from 1 days · challenge 1, code_review 1 · reviewed by: unrecorded 1")
+    expect(summary).to eq("exported 2 sections from 1 days · challenge 1, code_review 1 · day's last recorded provider: unrecorded 1")
     expect(summary).not_to include("includes(:customer)")
   end
 end

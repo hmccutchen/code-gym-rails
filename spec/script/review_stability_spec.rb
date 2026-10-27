@@ -63,7 +63,7 @@ RSpec.describe ReviewStability do
     expect(out.string).to include("2026-10-20 code_review (senior): stored solid · runs solid developing solid")
     expect(out.string).to include("2026-10-20 challenge (senior): stored solid · runs strong strong beginner")
     expect(out.string).to include("code_review: 1 sections · changed between runs 1/1 · spread 0:0 1:1 2:0 3:0 · " \
-                                  "moved more than one level 0/1 · failed calls 0")
+                                  "moved more than one level 0/1 · failed or unusable grades 0")
     expect(out.string).to include("all kinds: 2 sections · changed between runs 2/2 · spread 0:0 1:1 2:0 3:1 · " \
                                   "moved more than one level 1/2")
   end
@@ -95,6 +95,17 @@ RSpec.describe ReviewStability do
     expect(out.string).not_to include("%")
   end
 
+  it "keeps a rating outside the four levels out of the report and counts it as unusable" do
+    export_days({ Date.new(2026, 10, 20) => %w[code_review] })
+    replies.concat([ "solid", "SENTINEL-PROSE the answer said includes(:customer)" ])
+
+    comparison.review_stability(export_path, runs: 2, run: true)
+
+    expect(out.string).not_to include("SENTINEL-PROSE")
+    expect(out.string).to include("stored solid · runs solid - · failed 1")
+    expect(out.string).to include("failed or unusable grades 1")
+  end
+
   it "counts a section with fewer than two grades as too few to compare" do
     row = described_class::Row.new(date: Date.current, section: "code_review", rung: "senior", stored_rating: "solid",
                                    stored_provider: "anthropic", ratings: [ "solid", nil ], failures: 1)
@@ -103,7 +114,7 @@ RSpec.describe ReviewStability do
 
     expect(out.string).to include("runs solid - · failed 1")
     expect(out.string).to include("changed between runs 0/0 · spread 0:0 1:0 2:0 3:0 · moved more than one level 0/0 · " \
-                                  "failed calls 1 · too few grades to compare 1")
+                                  "failed or unusable grades 1 · too few grades to compare 1")
   end
 
   describe "drift from the stored review" do
@@ -117,11 +128,18 @@ RSpec.describe ReviewStability do
       out.string
     end
 
+    it "says the recorded provider is the one that wrote the day's last review attempt" do
+      printed = report([ row("code_review", "solid", "anthropic", %w[solid solid]) ])
+
+      expect(printed).to include("a day records the provider of its last review attempt, " \
+                                 "so a section graded in an earlier attempt may come from another")
+    end
+
     it "labels the stored-rating comparison as drift, apart from the stability lines" do
       printed = report([ row("code_review", "solid", "anthropic", %w[solid developing]) ])
 
       expect(printed).to include("drift, not stability: regrades on anthropic matching the stored rating")
-      expect(printed).to include("code_review drift, stored by anthropic: matching 1/2\n")
+      expect(printed).to include("code_review drift, day's last recorded provider anthropic: matching 1/2\n")
       expect(printed.lines.grep(/changed between runs/)).to all(satisfy { |line| !line.include?("matching") })
     end
 
@@ -130,10 +148,10 @@ RSpec.describe ReviewStability do
                          row("code_review", "strong", "openai", %w[solid developing]),
                          row("code_review", "solid", nil, %w[solid solid]) ])
 
-      expect(printed).to include("code_review drift, stored by anthropic: matching 2/2\n")
-      expect(printed).to include("code_review drift, stored by openai: matching 0/2 · stored by a different provider " \
-                                 "than the regrade (anthropic), so this also compares providers")
-      expect(printed).to include("code_review drift, stored by an unrecorded provider: matching 2/2 · " \
+      expect(printed).to include("code_review drift, day's last recorded provider anthropic: matching 2/2\n")
+      expect(printed).to include("code_review drift, day's last recorded provider openai: matching 0/2 · " \
+                                 "not the regrade's provider (anthropic), so this also compares providers")
+      expect(printed).to include("code_review drift, no recorded provider: matching 2/2 · " \
                                  "the stored review may come from a different provider than the regrade")
     end
 
@@ -141,7 +159,7 @@ RSpec.describe ReviewStability do
       printed = report([ row("challenge", "solid", "anthropic", %w[solid developing]),
                          row("challenge", nil, "anthropic", %w[solid solid]) ])
 
-      expect(printed).to include("challenge drift, stored by anthropic: matching 1/2\n")
+      expect(printed).to include("challenge drift, day's last recorded provider anthropic: matching 1/2\n")
       expect(printed).to include("challenge drift: 1 sections with no stored rating left out")
       expect(printed).to include("stored none · runs solid solid")
     end
@@ -151,8 +169,8 @@ RSpec.describe ReviewStability do
 
       comparison.review_stability(export_path, runs: 2, run: true)
 
-      expect(out.string).to include("code_review drift, stored by gemini: matching 2/2 · stored by a different provider " \
-                                    "than the regrade (anthropic)")
+      expect(out.string).to include("code_review drift, day's last recorded provider gemini: matching 2/2 · " \
+                                    "not the regrade's provider (anthropic)")
     end
   end
 end

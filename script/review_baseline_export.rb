@@ -36,7 +36,7 @@ class ReviewBaselineExport
     providers = payload.fetch("days").map { |day| day["review_provider"].presence || "unrecorded" }.tally.sort.map { |name, count| "#{name} #{count}" }
 
     "exported #{sections.size} sections from #{payload.fetch('days').size} days · #{by_kind.join(', ')} · " \
-      "reviewed by: #{providers.join(', ')}"
+      "day's last recorded provider: #{providers.join(', ')}"
   end
 
   def initialize(user_id:, limit: MAX_SECTIONS)

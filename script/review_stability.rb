@@ -22,6 +22,11 @@ class ReviewStability
 
   def self.spread_levels = (0...ConceptMastery::AI_RATING_RANK.size).to_a
 
+  def self.usable_rating(review)
+    rating = review.is_a?(Hash) ? review["rating"] : nil
+    rating if ConceptMastery::AI_RATING_RANK.key?(rating)
+  end
+
   def initialize(out:)
     @out = out
   end
@@ -29,7 +34,7 @@ class ReviewStability
   def print_plan(entries, runs:, route:, estimate:)
     @out.puts "=== review_stability plan: #{route[:model]} · #{runs} runs per section · no provider call made ==="
     @out.puts "sections: #{entries.size} · #{entries.group_by(&:section).sort.map { |kind, rows| "#{kind} #{rows.size}" }.join(', ')}"
-    @out.puts "reviewed by: #{entries.map { |entry| entry.review_provider.presence || 'unrecorded' }.tally.sort.map { |name, count| "#{name} #{count}" }.join(', ')}"
+    @out.puts "day's last recorded provider: #{entries.map { |entry| entry.review_provider.presence || 'unrecorded' }.tally.sort.map { |name, count| "#{name} #{count}" }.join(', ')}"
     @out.puts "calls: #{entries.size * runs}"
     @out.puts estimate
   end
@@ -42,6 +47,7 @@ class ReviewStability
     groups.each { |label, group| @out.puts summary_line(label, group) }
     @out.puts
     @out.puts "drift, not stability: regrades on #{regrade_provider} matching the stored rating, which moves with every model and prompt change since the stored review"
+    @out.puts "a day records the provider of its last review attempt, so a section graded in an earlier attempt may come from another"
     groups.each { |label, group| drift_lines(label, group, regrade_provider).each { |line| @out.puts line } }
   end
 
@@ -59,14 +65,14 @@ class ReviewStability
     "#{label}: #{rows.size} sections · changed between runs #{share(comparable.count(&:changed?), comparable.size)} · " \
       "spread #{self.class.spread_levels.map { |level| "#{level}:#{spreads.fetch(level, 0)}" }.join(' ')} · " \
       "moved more than one level #{share(comparable.count(&:jumped?), comparable.size)} · " \
-      "failed calls #{rows.sum(&:failures)}#{" · too few grades to compare #{rows.size - comparable.size}" if comparable.size < rows.size}"
+      "failed or unusable grades #{rows.sum(&:failures)}#{" · too few grades to compare #{rows.size - comparable.size}" if comparable.size < rows.size}"
   end
 
   # Rows with no stored rating stay out of the denominator, since there is nothing to drift from.
   def drift_lines(label, rows, regrade_provider)
     stored = rows.select(&:stored?)
     lines  = stored.group_by(&:stored_provider).sort_by { |provider, _| provider.to_s }.map do |provider, group|
-      "#{label} drift, stored by #{provider.presence || 'an unrecorded provider'}: " \
+      "#{label} drift, #{provider.present? ? "day's last recorded provider #{provider}" : 'no recorded provider'}: " \
         "matching #{share(group.sum(&:matching_stored), group.sum { |row| row.graded.size })}#{provider_note(provider, regrade_provider)}"
     end
     missing = rows.size - stored.size
@@ -77,7 +83,7 @@ class ReviewStability
     return " · the stored review may come from a different provider than the regrade" if provider.blank?
     return "" if provider == regrade_provider
 
-    " · stored by a different provider than the regrade (#{regrade_provider}), so this also compares providers"
+    " · not the regrade's provider (#{regrade_provider}), so this also compares providers"
   end
 
   # Counts only: with a dozen sections a kind, a percentage claims precision the sample doesn't have.
