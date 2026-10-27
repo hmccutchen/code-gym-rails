@@ -10,51 +10,30 @@
   <form id="daily-kind-swap" hidden></form>
 <% end %>
 
-<div class="regenerate-row">
-  <div>
-    <% if response.persisted? && response.reviewed? %>
-      <p class="hint"><%= t("dashboard.exercise.reviewed") %></p>
-    <% elsif exercise.regenerated_at.present? %>
-      <p class="hint"><%= t("dashboard.exercise.already_regenerated") %></p>
-    <% elsif exercise.regeneration_offered?(response) %>
-      <% has_progress = response.persisted? && (response.submitted? || response.answers.values.any?(&:present?)) %>
-      <% confirm_msg = has_progress ?
-           t("dashboard.exercise.regenerate_confirm_with_progress") :
-           t("dashboard.exercise.regenerate_confirm") %>
-      <%= button_to t("dashboard.exercise.regenerate"), regenerate_path, method: :post,
-            class: "btn btn-ghost btn-sm", disabled: true,
-            form: { data: loading_form_data(label: t("dashboard.generating_label"),
-                            confirm_message: confirm_msg) } %>
-    <% else %>
-      <%# Nothing: an ended trial cannot regenerate, the banner says so, and #regenerate refuses it too. %>
-    <% end %>
-  </div>
-
-  <% if response.persisted? && !response.reviewed? %>
-    <%= button_to t("dashboard.exercise.start_over"), start_over_response_path(response), method: :delete,
-          class: "btn btn-ghost btn-sm", disabled: true,
-          form: { data: loading_form_data(label: t("dashboard.exercise.starting_over"),
-                          confirm_message: t("dashboard.exercise.start_over_confirm")) } %>
-  <% end %>
-</div>
-
 <% if submitted %>
-  <div data-submitted-day hidden></div>
-  <%= render "responses/answered_sections", exercise: exercise, response: response, pickers: @daily_kind_pickers %>
-  <%= render "responses/submission", response: response %>
-  <% if @size_change&.direction == :larger %>
-    <p class="hint"><%= t("dashboard.size_change.larger") %></p>
-  <% elsif @size_change&.direction == :smaller %>
-    <p class="hint"><%= t("dashboard.size_change.smaller", count: @size_change.count) %></p>
-  <% end %>
-  <% if @level_suggestion %>
-    <%= render "dashboard/level_suggestion", proposal: @level_suggestion %>
-  <% end %>
+  <div class="today-day">
+    <div class="today-main">
+      <div data-submitted-day hidden></div>
+      <%= render "responses/answered_sections", exercise: exercise, response: response, pickers: @daily_kind_pickers %>
+      <%= render "responses/submission", response: response %>
+      <% if @size_change&.direction == :larger %>
+        <p class="hint"><%= t("dashboard.size_change.larger") %></p>
+      <% elsif @size_change&.direction == :smaller %>
+        <p class="hint"><%= t("dashboard.size_change.smaller", count: @size_change.count) %></p>
+      <% end %>
+      <% if @level_suggestion %>
+        <%= render "dashboard/level_suggestion", proposal: @level_suggestion %>
+      <% end %>
+    </div>
+    <div class="today-side">
+      <%= render "dashboard/regenerate_row", exercise: exercise, response: response %>
+    </div>
+  </div>
 <% else %>
   <% submit_blocker = response.submit_blocker %>
   <% submit_nudges = { unanswered: t("dashboard.exercise.submit_nudges.unanswered"),
                        unrated:    t("dashboard.exercise.submit_nudges.unrated") } %>
-  <div data-controller="answer-form" data-answer-form-answered-sections-value="<%= response.answered_sections.to_json %>"
+  <div class="today-day" data-controller="answer-form" data-answer-form-answered-sections-value="<%= response.answered_sections.to_json %>"
        data-answer-form-submit-blocker-value="<%= submit_blocker %>"
        data-answer-form-draft-scope-value="<%= exercise.draft_scope %>"
        data-answer-form-draft-token-value="<%= response.draft_token %>"
@@ -71,37 +50,39 @@
        data-answer-form-controls-not-ready-value="<%= t("dashboard.exercise.controls_not_ready") %>"
        data-answer-form-leave-held-value="<%= t("dashboard.exercise.leave_held") %>"
        data-answer-form-reload-now-value="<%= t("dashboard.exercise.reload_now") %>">
-    <div class="progress-sticky">
-      <div class="progress-bar">
-        <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill"></div>
+    <div class="today-main">
+      <div class="progress-sticky">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill"></div>
+        </div>
+        <div class="progress-label" id="progress-label" data-answer-form-target="progressLabel"><%= t("dashboard.exercise.answered_count", answered: 0, total: exercise.active_section_keys.size) %></div>
       </div>
-      <div class="progress-label" id="progress-label" data-answer-form-target="progressLabel"><%= t("dashboard.exercise.answered_count", answered: 0, total: exercise.active_section_keys.size) %></div>
+
+      <%= form_with url: responses_path, method: :post, id: "gym-form",
+            data: { turbo: false, answer_form_target: "form",
+                    action: "submit->answer-form#submit input->answer-form#input change->answer-form#change click->answer-form#rate" } do %>
+        <%= render "responses/sections", exercise: exercise, response: response, submitted: false, pickers: @daily_kind_pickers %>
+
+        <% if exercise.dropped_sections.any? %>
+          <p class="hint"><%= t("dashboard.section_left_out", count: exercise.dropped_sections.size) %></p>
+        <% end %>
+        <% if (coverage_reason = exercise.coverage_shown) %>
+          <p class="hint"><%= t("dashboard.coverage_added.#{coverage_reason}") %></p>
+        <% end %>
+        <% if exercise.shared_concept_shown? %>
+          <p class="hint"><%= t("dashboard.shared_concept", sections: exercise.daily_kinds.map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
+        <% end %>
+      <% end %>
     </div>
-
-    <%= form_with url: responses_path, method: :post, id: "gym-form",
-          data: { turbo: false, answer_form_target: "form",
-                  action: "submit->answer-form#submit input->answer-form#input change->answer-form#change click->answer-form#rate" } do |f| %>
-      <%= render "responses/sections", exercise: exercise, response: response, submitted: false, pickers: @daily_kind_pickers %>
-
-      <% if exercise.dropped_sections.any? %>
-        <p class="hint"><%= t("dashboard.section_left_out", count: exercise.dropped_sections.size) %></p>
-      <% end %>
-      <% if (coverage_reason = exercise.coverage_shown) %>
-        <p class="hint"><%= t("dashboard.coverage_added.#{coverage_reason}") %></p>
-      <% end %>
-      <% if exercise.shared_concept_shown? %>
-        <p class="hint"><%= t("dashboard.shared_concept", sections: exercise.daily_kinds.map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
-      <% end %>
-
+    <div class="today-side">
       <div class="submit-row" id="submit-row">
-        <%= f.hidden_field :submit, value: "1" %>
-        <%# Not type=submit: a click before the module loads would otherwise natively post the whole day. %>
-        <%= f.button t("dashboard.exercise.submit"), type: "button", id: "submit-answers", class: "btn btn-primary",
+        <%= button_tag t("dashboard.exercise.submit"), type: "button", id: "submit-answers", class: "btn btn-primary",
               data: { answer_form_target: "submitButton", action: "answer-form#submit" } %>
         <span class="auto-saved"><%= t("dashboard.exercise.auto_saved") %></span>
         <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge", tabindex: "-1",
                   hidden: submit_blocker.nil?, data: submit_nudges.merge(answer_form_target: "nudge"), aria: { live: "polite" } %>
       </div>
-    <% end %>
+      <%= render "dashboard/regenerate_row", exercise: exercise, response: response %>
+    </div>
   </div>
 <% end %>

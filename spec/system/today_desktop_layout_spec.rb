@@ -21,7 +21,20 @@ RSpec.describe "Today's desktop layout", type: :system do
 
   def side = rect(".today-side")
 
-  def layout_facts = [ main, side, rect("#submit-answers"), rect(".regenerate-row") ]
+  # One call, in page coordinates, so a scroll between measurements can't move them.
+  def layout_facts
+    page.evaluate_script(<<~JS)
+      Object.fromEntries([["main", ".today-main"], ["side", ".today-side"], ["submit", "#submit-answers"],
+                          ["nudge", "#rating-nudge"], ["regenerate", ".regenerate-row"]].map(([name, selector]) => {
+        const r = document.querySelector(selector).getBoundingClientRect();
+        return [name, [r.left + scrollX, r.top + scrollY, r.width, r.height]];
+      }))
+    JS
+  end
+
+  def expect_same_layout(before, after)
+    before.each { |name, box| expect(after[name]).to eq(box), "#{name} moved from #{box} to #{after[name]}" }
+  end
 
   def content_width = container_content.then { |content| content["right"] - content["left"] }
 
@@ -42,7 +55,7 @@ RSpec.describe "Today's desktop layout", type: :system do
     [ 390, 768, 899 ].each do |width|
       it "change nothing at #{width}px" do
         visit_today(width: width)
-        expect(without_desktop_rules { layout_facts }).to eq(layout_facts)
+        expect_same_layout(without_desktop_rules { layout_facts }, layout_facts)
       end
     end
 
@@ -126,6 +139,7 @@ RSpec.describe "Today's desktop layout", type: :system do
     it "keeps the side column on a submitted day, holding the regenerate row" do
       visit_today(width: 1280)
       submit_the_day
+      page.execute_script("window.scrollTo(0, 0)")
 
       expect(side["width"]).to be_within(0.5).of(280)
       expect(side["top"]).to be_within(0.5).of(main["top"])

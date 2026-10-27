@@ -37,9 +37,9 @@ the Submit row change together.
   section are 16px apart. A trial's banner gets its own margin there: its
   wider rule pulls it up into the title block's 2rem margin, which the 16px
   gap would otherwise cancel.
-- **The Submit row.** It stays at the end of the form, with the button full
-  width and 48px tall, and the "saves as you type" note and the nudge
-  centered under it.
+- **The side column.** It ends the page: the Submit row, with the button full
+  width and 48px tall and the "saves as you type" note and the nudge centered
+  under it, then the regenerate row.
 - **No sticky Submit bar.** The phone board drew Submit as a bar stuck above
   the tab bar, and one was built. It was taken out before merge: with the
   progress bar already stuck at the top, a bar and the tab bar at the bottom
@@ -49,3 +49,19 @@ the Submit row change together.
 - **A held submit.** When a submit waits on another save, the answer-form
   controller scrolls its notice into view
   (`docs/code-notes/app/javascript/controllers/answer_form_controller.md`).
+
+## At 900px and wider
+
+- The page takes the 1040px column (`wide_page`). The day is a grid: the
+  answers, then a 280px side column 24px to their right, drawn as a card.
+- The side column stacks Submit, the note and the nudge, then "Generate new
+  set" and "Start over", each full width and at least 44px tall.
+- **Sticky only in a tall window.** In a window at least 640px tall the side
+  column sticks 24px from the top while the answers scroll, so Submit stays in
+  reach. Below that it scrolls with the page, so a short window is never left
+  with a column it can't scroll to the end of. It is a side column, so it
+  takes nothing from the answers' height, unlike the phone bar that was taken
+  out.
+- The progress bar stays in the main column, still stuck to the top, and the
+  featured concept card stays below the day, as the dashboard's code note
+  says.

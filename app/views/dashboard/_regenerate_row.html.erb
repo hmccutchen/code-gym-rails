@@ -1,0 +1,28 @@
+<%# Locals: exercise, response. %>
+<div class="regenerate-row">
+  <div>
+    <% if response.persisted? && response.reviewed? %>
+      <p class="hint"><%= t("dashboard.exercise.reviewed") %></p>
+    <% elsif exercise.regenerated_at.present? %>
+      <p class="hint"><%= t("dashboard.exercise.already_regenerated") %></p>
+    <% elsif exercise.regeneration_offered?(response) %>
+      <% has_progress = response.persisted? && (response.submitted? || response.answers.values.any?(&:present?)) %>
+      <% confirm_msg = has_progress ?
+           t("dashboard.exercise.regenerate_confirm_with_progress") :
+           t("dashboard.exercise.regenerate_confirm") %>
+      <%= button_to t("dashboard.exercise.regenerate"), regenerate_path, method: :post,
+            class: "btn btn-ghost btn-sm", disabled: true,
+            form: { data: loading_form_data(label: t("dashboard.generating_label"),
+                            confirm_message: confirm_msg) } %>
+    <% else %>
+      <%# Nothing: an ended trial cannot regenerate, the banner says so, and #regenerate refuses it too. %>
+    <% end %>
+  </div>
+
+  <% if response.persisted? && !response.reviewed? %>
+    <%= button_to t("dashboard.exercise.start_over"), start_over_response_path(response), method: :delete,
+          class: "btn btn-ghost btn-sm", disabled: true,
+          form: { data: loading_form_data(label: t("dashboard.exercise.starting_over"),
+                          confirm_message: t("dashboard.exercise.start_over_confirm")) } %>
+  <% end %>
+</div>

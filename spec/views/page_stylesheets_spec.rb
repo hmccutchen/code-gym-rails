@@ -8,7 +8,7 @@ RSpec.describe "page stylesheets" do
     "learn" => [ DESKTOP_QUERY ],
     "account" => [ DESKTOP_QUERY ],
     "settings" => [ DESKTOP_QUERY, "@media (forced-colors: active)" ],
-    "today" => [ "@media (prefers-reduced-motion: reduce)", "@media (max-width: 599.98px)" ]
+    "today" => [ DESKTOP_QUERY, "@media (min-height: 640px)", "@media (prefers-reduced-motion: reduce)", "@media (max-width: 599.98px)" ]
   }.freeze
 
   def path_for(page) = Rails.root.join("app/assets/stylesheets/pages/#{page}.css")

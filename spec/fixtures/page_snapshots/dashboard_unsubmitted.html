@@ -554,7 +554,7 @@
     </div>
   </nav>
 
-  <div class="container" data-pull-content>
+  <div class="container container-wide" data-pull-content>
     <main id="main-content" tabindex="-1">
       <div class="flash notice" id="flash-notice">Welcome back, Existing!</div>
 
@@ -570,14 +570,7 @@
   <div id="dashboard-content">
         <form id="daily-kind-swap" hidden></form>
 
-<div class="regenerate-row">
-  <div>
-      <form data-controller="loading-form" data-action="submit-&gt;loading-form#submit pageshow@window-&gt;loading-form#restore" data-loading-form-label-value="Generating…" data-loading-form-confirm-message-value="Generate a new set for today?" class="button_to" method="post" action="/regenerate"><button class="btn btn-ghost btn-sm" disabled="disabled" type="submit">Generate new set</button></form>
-  </div>
-
-</div>
-
-  <div data-controller="answer-form" data-answer-form-answered-sections-value="[]"
+  <div class="today-day" data-controller="answer-form" data-answer-form-answered-sections-value="[]"
        data-answer-form-submit-blocker-value="unanswered"
        data-answer-form-draft-scope-value="900001-1790694000000000"
        data-answer-form-draft-token-value="900001-1790694000000000:new:643d5437104296e2"
@@ -594,15 +587,16 @@
        data-answer-form-controls-not-ready-value="Part of this page didn&#39;t finish loading, so your answers weren&#39;t submitted. Reload the page and submit again."
        data-answer-form-leave-held-value="Another change on this page hasn&#39;t saved, so the page waits for it before moving on. Your answers can&#39;t be edited now, since the server already has them or has a newer set. Retry the change above, or reload now."
        data-answer-form-reload-now-value="Reload now">
-    <div class="progress-sticky">
-      <div class="progress-bar">
-        <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill"></div>
+    <div class="today-main">
+      <div class="progress-sticky">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill"></div>
+        </div>
+        <div class="progress-label" id="progress-label" data-answer-form-target="progressLabel">0 of 3 answered</div>
       </div>
-      <div class="progress-label" id="progress-label" data-answer-form-target="progressLabel">0 of 3 answered</div>
-    </div>
 
-    <form id="gym-form" data-turbo="false" data-answer-form-target="form" data-action="submit-&gt;answer-form#submit input-&gt;answer-form#input change-&gt;answer-form#change click-&gt;answer-form#rate" action="/responses" accept-charset="UTF-8" method="post">
-        <details class="section" open data-slot="1" data-section-fold="code_review">
+      <form id="gym-form" data-turbo="false" data-answer-form-target="form" data-action="submit-&gt;answer-form#submit input-&gt;answer-form#input change-&gt;answer-form#change click-&gt;answer-form#rate" action="/responses" accept-charset="UTF-8" method="post">
+          <details class="section" open data-slot="1" data-section-fold="code_review">
   <summary class="section-label"><h2 class="section-title">  1 — Code Review
 </h2>
     <span class="section-status" data-status-for="code_review"></span>
@@ -950,14 +944,22 @@ What would be easy to get wrong or worth testing:
 
 
 
-
+</form>    </div>
+    <div class="today-side">
       <div class="submit-row" id="submit-row">
-        <input autocomplete="off" value="1" type="hidden" name="submit" id="submit" />
         <button name="button" type="button" id="submit-answers" class="btn btn-primary" data-answer-form-target="submitButton" data-action="answer-form#submit">Submit answers</button>
         <span class="auto-saved">Auto-saved as you type</span>
         <p class="progress-label" id="rating-nudge" tabindex="-1" data-unanswered="Answer at least one section to finish up." data-unrated="Rate each section you answered to finish up." data-answer-form-target="nudge" aria-live="polite">Answer at least one section to finish up.</p>
       </div>
-</form>  </div>
+      <div class="regenerate-row">
+  <div>
+      <form data-controller="loading-form" data-action="submit-&gt;loading-form#submit pageshow@window-&gt;loading-form#restore" data-loading-form-label-value="Generating…" data-loading-form-confirm-message-value="Generate a new set for today?" class="button_to" method="post" action="/regenerate"><button class="btn btn-ghost btn-sm" disabled="disabled" type="submit">Generate new set</button></form>
+  </div>
+
+</div>
+
+    </div>
+  </div>
 
   </div>
 

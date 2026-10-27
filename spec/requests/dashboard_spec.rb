@@ -183,7 +183,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(day["data-controller"]).to be_nil
       expect(day.element_children.map { |child| child["class"] }).to eq(%w[today-main today-side])
       expect(day.at_css(".today-side").element_children.map { |child| child["class"] }).to eq([ "regenerate-row" ])
-      expect(day.at_css(".today-main #ai-review, .today-main .submission")).to be_present
+      expect(day.at_css(".today-main details.section")).to be_present
     end
   end
 

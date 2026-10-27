@@ -362,7 +362,7 @@ export default class extends Controller {
     reload.textContent = this.reloadNowValue
     reload.addEventListener("click", () => window.location.reload())
     notice.append(reload)
-    this.element.append(notice)
+    this.formTarget.after(notice)
     notice.scrollIntoView({ block: "nearest" })
   }
 
