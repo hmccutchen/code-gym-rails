@@ -325,3 +325,5 @@ data.*
   you missed"
 - ReviewPrompt picks a section's review prompt, from the layered review of the
   walkthrough work `#584`
+- a spec pinning the walkthrough prompt and the stripped grade together, from
+  the critical review of the ReviewPrompt work `#586`
