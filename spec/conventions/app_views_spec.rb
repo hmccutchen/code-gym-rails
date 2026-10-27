@@ -80,10 +80,10 @@ RSpec.describe "Conventions held over app/views" do
   end
 
   it "keeps Today's styles out of style attributes in its views" do
-    today = Dir[Rails.root.join("app/views/dashboard/*.erb")] + [ Rails.root.join("app/views/responses/_submission.html.erb").to_s ]
+    today = Dir[Rails.root.join("app/views/{dashboard,responses}/**/*.erb")]
     offenders = today.select { |path| File.read(path).match?(/\bstyle\s*[=:]/) }.map { |path| relative(path) }
 
-    expect(offenders).to be_empty, "#{offenders.join(', ')} carry a style attribute; give the element a class in app/assets/stylesheets/pages/today.css"
+    expect(offenders).to be_empty, "#{offenders.join(', ')} carry a style attribute; give the element a class, styled in pages/today.css or, for a partial History also renders, the layout"
   end
 
   PAGE_SHEET_PARTIALS = { %r{\Aaccounts/} => "app/views/accounts/show.html.erb",

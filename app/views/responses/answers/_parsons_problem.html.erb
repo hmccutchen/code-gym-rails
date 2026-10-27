@@ -35,6 +35,6 @@
     <% end %>
     <p class="parsons-keyhint"><%= t("responses.parsons.key_hint") %></p>
     <p class="parsons-status" aria-live="polite" data-parsons-target="status"></p>
-    <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" data-draft-restore="off" data-parsons-target="field" style="display:none"><%= ExerciseSection::ParsonsProblem.token_answer(answer: response.answers[key], exercise: exercise, key: key, section_data: data) %></textarea>
+    <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" data-draft-restore="off" data-parsons-target="field" hidden><%= ExerciseSection::ParsonsProblem.token_answer(answer: response.answers[key], exercise: exercise, key: key, section_data: data) %></textarea>
   </div>
 <% end %>
