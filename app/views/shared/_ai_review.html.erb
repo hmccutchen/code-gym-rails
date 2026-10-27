@@ -1,6 +1,7 @@
 <%# Design notes: docs/code-notes/app/views/shared/_ai_review.html.md %>
 <% exercise_language = response.daily_exercise.language %>
 <% section_keys = response.daily_exercise.active_section_keys %>
+<% short_version = ReviewShortVersion.new(response, exposures: response.user.concept_exposures) %>
 <% response.ai_review.each do |section, fb| %>
   <% next unless fb.is_a?(Hash) %>
   <% slot = section_keys.index(section)&.succ %>
@@ -33,6 +34,13 @@
         <% if text.present? %>
           <p class="review-item"><strong><%= review_field_label(response, section, key) %>:</strong> <%= glossary_wrap(text) %></p>
         <% end %>
+      <% end %>
+    <% end %>
+    <% if short_version.offered?(section) %>
+      <% concept = response.concept_tags[section] %>
+      <% bucket = ConceptBucket.for(section, exercise_language) %>
+      <% if (reference = concept_reference_for(concept, bucket)) %>
+        <%= render "shared/review_short_version", reference: reference, bucket: bucket, show_pitfalls: short_version.essential_gap?(section) %>
       <% end %>
     <% end %>
     <% improved_code = DailyResponse.improved_code_text(fb["improved_code"]) %>

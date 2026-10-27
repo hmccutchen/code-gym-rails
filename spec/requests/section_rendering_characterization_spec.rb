@@ -199,4 +199,36 @@ RSpec.describe "section rendering", type: :request do
       end
     end
   end
+
+  describe "a reviewed, tagged day that offers the short version" do
+    let(:exercise) { exercise_for(:challenge, :plan_review) }
+
+    before do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "SV-TAGLINE",
+                               explanation: "SV-EXPLANATION", code_example: "SV-CODE", senior_lens: "SV-LENS")
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+        answers: exercise.active_section_keys.index_with { |key| answer_for(key) },
+        concept_tags: exercise.active_section_keys.index_with { |key| PAYLOADS.dig(key, "concept") },
+        ai_review: { "code_review" => { "rating" => "developing", "missed" => [ "REVIEW-MISSED" ], "essential_gaps" => [ 0 ] } }
+      )
+    end
+
+    def page_outside_short_version
+      get root_path
+      Nokogiri::HTML(response.body).tap { |page| page.css("details.review-short-version").each(&:remove) }.text.squish
+    end
+
+    it "adds the block and changes nothing else on the page" do
+      get root_path
+      with_block = page_outside_short_version
+      expect(Nokogiri::HTML(response.body).css("details.review-short-version").size).to eq(1)
+
+      allow_any_instance_of(ReviewShortVersion).to receive(:offered?).and_return(false)
+      without_block = page_outside_short_version
+
+      expect(Nokogiri::HTML(response.body).css("details.review-short-version")).to be_empty
+      expect(with_block).to eq(without_block)
+    end
+  end
 end

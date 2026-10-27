@@ -1,0 +1,19 @@
+<%# Required locals: reference (a ConceptReference), bucket (its Learn bucket), show_pitfalls (true when the section has an essential gap). %>
+<% seen = Set.new %>
+<details class="ref review-short-version">
+  <summary><%= t("review.short_version.summary") %></summary>
+  <div class="ref-body">
+    <p><strong><%= glossary_wrap(reference.tagline, seen: seen) %></strong></p>
+    <% if reference.guide? %>
+      <p><%= glossary_wrap(reference.guide_plain_language, seen: seen) %></p>
+      <%= render "learn/worked_example", text: reference.guide_worked_example, language: bucket, seen: seen %>
+      <% if show_pitfalls %>
+        <p><strong><%= t("learn.pitfalls") %>:</strong> <%= glossary_wrap(reference.guide_pitfalls, seen: seen) %></p>
+      <% end %>
+    <% else %>
+      <p><%= glossary_wrap(reference.explanation, seen: seen) %></p>
+      <pre class="snippet"><%= highlighted_code(reference.code_example, bucket) %></pre>
+    <% end %>
+    <p><%= link_to t("review.short_version.more"), learn_concept_path(bucket, reference.concept) %></p>
+  </div>
+</details>
