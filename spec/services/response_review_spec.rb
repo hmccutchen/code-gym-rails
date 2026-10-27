@@ -221,7 +221,8 @@ RSpec.describe ResponseReview do
 
     it "logs the AI rating paired with the user's self-rating for each reviewed section" do
       daily_response = create_submitted_response
-      daily_response.update!(section_ratings: { "code_review" => "right_level", "pattern" => "too_hard" })
+      daily_response.update!(answers: daily_response.answers.merge("pattern" => "My approach:\n#{"b" * 20}", "challenge" => "c" * 20),
+                             section_ratings: { "code_review" => "right_level", "pattern" => "too_hard" })
       stub_reviewer(
         "code_review" => { ok: true, review: { "rating" => "solid" } },
         "pattern"     => { ok: true, review: { "rating" => "beginner" } },

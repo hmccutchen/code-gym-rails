@@ -38,6 +38,13 @@ class DailyResponse < ApplicationRecord
     I18n.t("review.fields.#{field}", locale: locale)
   end
 
+  def review_field_label(section, field)
+    walkthrough_key = "review.walkthrough_fields.#{field}"
+    return I18n.t(walkthrough_key) if !answered?(section) && I18n.exists?(walkthrough_key)
+
+    self.class.ai_review_label(field)
+  end
+
   def self.self_rating_labels
     SELF_RATINGS.index_with { |rating| I18n.t("self_ratings.#{rating}") }
   end
@@ -225,7 +232,12 @@ class DailyResponse < ApplicationRecord
     self.class.usable_difficulty(ai_review&.dig(section.to_s, "difficulty"))
   end
 
-  def ai_rating_for(section)        = ai_review&.dig(section.to_s, AI_RATING_FIELD)
+  def ai_rating_for(section)
+    return unless answered?(section)
+
+    ai_review&.dig(section.to_s, AI_RATING_FIELD)
+  end
+
   def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))
   def ai_rating_unfavorable?(section) = AI_RATING_UNFAVORABLE.include?(ai_rating_for(section))
 

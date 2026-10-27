@@ -606,11 +606,12 @@ RSpec.describe DailyResponse, type: :model do
 
   describe "#ai_rating_for, #ai_rating_favorable?, and #ai_rating_unfavorable?" do
     it "reads the per-section rating out of ai_review, nil-safe when unreviewed or the section is missing" do
+      answers = { "code_review" => "a" * 20, "pattern" => "My approach:\n#{"b" * 20}" }
       reviewed = user.daily_responses.create!(
-        daily_exercise: exercise, date: Date.current, answers: {},
+        daily_exercise: exercise, date: Date.current, answers: answers,
         ai_review: { "code_review" => { "rating" => "developing" }, "pattern" => { "rating" => "strong" } }
       )
-      unreviewed = user.daily_responses.create!(daily_exercise: next_exercise, date: Date.current + 1, answers: {})
+      unreviewed = user.daily_responses.create!(daily_exercise: next_exercise, date: Date.current + 1, answers: answers)
 
       expect(reviewed.ai_rating_for("code_review")).to eq("developing")
       expect(reviewed.ai_rating_favorable?("code_review")).to be(false)
@@ -627,6 +628,58 @@ RSpec.describe DailyResponse, type: :model do
       expect(unreviewed.ai_rating_for("code_review")).to be_nil
       expect(unreviewed.ai_rating_favorable?("code_review")).to be(false)
       expect(unreviewed.ai_rating_unfavorable?("code_review")).to be(false)
+    end
+  end
+
+  describe "#ai_rating_for on an unanswered section" do
+    let(:scaffold_only) { ExerciseSection.find("plan_review").scaffold_template }
+    let(:plan_exercise) do
+      user.daily_exercises.create!(date: Date.current + 2, generated_at: Time.current,
+                                   problem_set: exercise.problem_set.merge("plan_review" => { "question" => "plan-q" }))
+    end
+
+    {
+      "blank"         => [ "code_review", "" ],
+      "too short"     => [ "code_review", "N+1?" ],
+      "scaffold-only" => [ "plan_review", :scaffold ]
+    }.each do |label, (section, written)|
+      it "is nil for a #{label} answer even with a stored rating" do
+        written = scaffold_only if written == :scaffold
+        response = user.daily_responses.create!(
+          daily_exercise: plan_exercise, date: Date.current + 2, answers: { section => written },
+          ai_review: { section => { "rating" => "strong" } }
+        )
+
+        expect(response.ai_rating_for(section)).to be_nil
+        expect(response.ai_rating_favorable?(section)).to be(false)
+        expect(response.ai_rating_unfavorable?(section)).to be(false)
+      end
+    end
+
+    it "keeps the stored rating for an answered section" do
+      response = user.daily_responses.create!(
+        daily_exercise: exercise, date: Date.current, answers: { "code_review" => "a" * 20, "pattern" => "" },
+        ai_review: { "code_review" => { "rating" => "strong" }, "pattern" => { "rating" => "strong" } }
+      )
+
+      expect(response.ai_rating_for("code_review")).to eq("strong")
+      expect(response.ai_rating_for("pattern")).to be_nil
+    end
+  end
+
+  describe "#review_field_label" do
+    let(:response) { described_class.new(daily_exercise: exercise, answers: { "code_review" => "a" * 20, "pattern" => "" }) }
+
+    it "uses the walkthrough heading for the missed list on an unanswered section" do
+      expect(response.review_field_label("pattern", "missed")).to eq("What a good answer covers")
+    end
+
+    it "uses the graded heading for the missed list on an answered section" do
+      expect(response.review_field_label("code_review", "missed")).to eq("What you missed")
+    end
+
+    it "leaves a field with no walkthrough heading unchanged on an unanswered section" do
+      expect(response.review_field_label("pattern", "next_step")).to eq("Next step")
     end
   end
 
