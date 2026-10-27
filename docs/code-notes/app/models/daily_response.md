@@ -34,9 +34,9 @@ so no question is stored without its answer.
 
 A prompt passes `locale: :en`, so text sent to a provider never follows the request's locale.
 
-## `.self_rating_labels`
+## `#reviewed_by`
 
-The labels are read at render time, so the request's locale chooses the wording.
+The provider that wrote the review, or the user's current provider for a review stored without one. `ReviewHelper#review_provider_label` names it on the page (#588).
 
 ## `.answered_kinds_for`
 

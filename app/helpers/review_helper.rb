@@ -3,6 +3,10 @@ module ReviewHelper
     def graded? = graded
   end
 
+  def review_provider_label(response)
+    AiProvider.label(response.reviewed_by)
+  end
+
   def review_badge(response, section)
     if (rating = response.ai_rating_for(section)).present?
       ReviewBadge.new(text: rating, graded: true)

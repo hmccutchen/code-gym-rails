@@ -38,10 +38,6 @@ class DailyResponse < ApplicationRecord
     I18n.t("review.fields.#{field}", locale: locale)
   end
 
-  def self.self_rating_labels
-    SELF_RATINGS.index_with { |rating| I18n.t("self_ratings.#{rating}") }
-  end
-
   def self.answered_kinds_for(user)
     submitted.where(user: user).where("jsonb_typeof(section_ratings) = 'object'")
              .distinct.pluck(Arel.sql("jsonb_object_keys(section_ratings)")).to_set
@@ -97,7 +93,7 @@ class DailyResponse < ApplicationRecord
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
 
-  def review_provider_label = AiProvider.label(review_provider.presence || user.provider)
+  def reviewed_by = review_provider.presence || user.provider
 
   def replace_blocker
     return :reviewed if reviewed?
@@ -211,7 +207,6 @@ class DailyResponse < ApplicationRecord
 
   def self_rating_for(section) = section_ratings[section.to_s]
   def self_rating_favorable?(section)  = SELF_RATING_FAVORABLE.include?(self_rating_for(section))
-  def self_rating_label(section)       = self.class.self_rating_labels[self_rating_for(section)]
 
   def self.usable_difficulty(assessment)
     return unless assessment.is_a?(Hash) && DIFFICULTY_LEVELS.include?(assessment["level"])

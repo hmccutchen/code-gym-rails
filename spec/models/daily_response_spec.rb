@@ -11,15 +11,15 @@ RSpec.describe DailyResponse, type: :model do
       .to raise_error(ActiveRecord::RecordNotUnique)
   end
 
-  describe "#review_provider_label" do
+  describe "#reviewed_by" do
     let(:user) { User.create!(email: "label@example.com", name: "L", provider: "openai", api_keys: { "openai" => "sk-proj-x" }) }
 
-    it "names the provider that wrote the review" do
-      expect(DailyResponse.new(user: user, review_provider: "anthropic").review_provider_label).to eq("Claude")
+    it "is the provider that wrote the review" do
+      expect(DailyResponse.new(user: user, review_provider: "anthropic").reviewed_by).to eq("anthropic")
     end
 
     it "falls back to the user's provider for a review written before it was recorded" do
-      expect(DailyResponse.new(user: user, review_provider: nil).review_provider_label).to eq("GPT")
+      expect(DailyResponse.new(user: user, review_provider: nil).reviewed_by).to eq("openai")
     end
   end
 
@@ -597,7 +597,6 @@ RSpec.describe DailyResponse, type: :model do
 
       expect(r.self_rating_for("pattern")).to be_nil
       expect(r.self_rating_favorable?("pattern")).to be(false)
-      expect(r.self_rating_label("code_review")).to eq("just right")
     end
   end
 
@@ -727,16 +726,6 @@ RSpec.describe DailyResponse, type: :model do
                  DailyResponse::SELF_RATINGS)
 
       expect(overlap).to be_empty
-    end
-  end
-
-  describe "#self_rating_label" do
-    it "matches the feedback form's copy and is nil when unrated" do
-      right_level = user.daily_responses.create!(daily_exercise: exercise, date: Date.current, answers: {}, section_ratings: { "code_review" => "right_level" })
-      unrated     = user.daily_responses.create!(daily_exercise: next_exercise, date: Date.current + 1, answers: {})
-
-      expect(right_level.self_rating_label("code_review")).to eq("just right")
-      expect(unrated.self_rating_label("code_review")).to be_nil
     end
   end
 

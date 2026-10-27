@@ -98,7 +98,8 @@ What each listed file does.
 - `app/models/worked_example.rb` — `WorkedExample.parts`: a stored `guide_worked_example` split into code and prose runs for the Learn page; pure
 - `app/models/code_highlight.rb` — `CodeHighlight`: Rouge highlighting for a code block, its line formatter, the lexer map and the cache key; `SyntaxHighlightingHelper#highlighted_code` is the one call site views use
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value, so the scaffold rule is stated once rather than per textarea
-- `app/helpers/review_helper.rb` — `ReviewHelper`: the review's grade-or-"Skipped" badge and each field's heading, read by the review partial and, through `helper ReviewHelper`, the review email
+- `app/helpers/review_helper.rb` — `ReviewHelper`: the review's grade-or-"Skipped" badge, each field's heading and the reviewing provider's name, read by the review pages and, through `helper ReviewHelper`, the review email
+- `app/helpers/self_rating_helper.rb` — `SelfRatingHelper`: the self-rating labels for the feedback form, the submission pills, History and the calibration note
 - `app/models/exercise_section/design_comparison.rb` — the second default daily kind: two working pieces, a server-rolled A/B order, the `pick:` answer encoding, its rung-aware vocabulary allowlist, and the judge's blind-solve facets
 - `app/views/responses/bodies/_design_comparison.html.erb` / `answers/_design_comparison.html.erb` — the two pieces in their own disclosures; the pick fieldset and reason textarea, which the `comparison-answer` controller writes into the hidden answer, plus "What decides it" once reviewed
 - `script/glossary_coverage.rb` (+ `script/glossary_coverage_report.rb`) — read-only count of how many of an audit TSV's visible undefined terms the glossary covers, with the twenty most common unmatched; writes nothing and calls no provider

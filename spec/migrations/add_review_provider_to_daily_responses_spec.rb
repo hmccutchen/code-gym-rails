@@ -36,7 +36,7 @@ RSpec.describe AddReviewProviderToDailyResponses do
     rerun_migration
 
     expect(reviewed.reload.review_provider).to eq("unknown")
-    expect(reviewed.review_provider_label).to eq("AI")
+    expect(AiProvider.label(reviewed.reviewed_by)).to eq("AI")
   end
 
   it "keeps the current provider when recorded usage matches it or has no model" do
