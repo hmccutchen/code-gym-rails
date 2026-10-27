@@ -5,7 +5,8 @@ require_relative "review_baseline_export"
 USAGE = <<~TEXT.freeze
   bin/rails runner script/export_review_baseline.rb --user ID [--limit N] > /a/path/outside/the/repo/review_baseline.json
 
-  --user ID   the account whose reviewed answers to export (required)
+  --user ID   the account whose reviewed answers to export (required). A regrade sends these answers to a
+              provider under the runner's own key, so export only an account whose owner has agreed to that.
   --limit N   at most N sections, newest first (default and maximum #{ReviewBaselineExport::MAX_SECTIONS})
 
   The JSON goes to stdout and holds answers and answer keys, so redirect it to a file outside the repository and

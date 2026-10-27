@@ -95,6 +95,10 @@ RSpec.describe ReviewStability do
     expect(out.string).not_to include("%")
   end
 
+  it "stops only on failure kinds ProviderFailure names" do
+    expect(described_class::STOP_FAILURES - ProviderFailure::KINDS).to be_empty
+  end
+
   it "keeps a rating outside the four levels out of the report and counts it as unusable" do
     export_days({ Date.new(2026, 10, 20) => %w[code_review] })
     replies.concat([ "solid", "SENTINEL-PROSE the answer said includes(:customer)" ])

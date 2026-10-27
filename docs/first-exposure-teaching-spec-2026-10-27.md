@@ -95,8 +95,12 @@ structured missing step yet, so no code can tell which pitfall a miss
 matches. Limiting them to sections with an essential gap shows them only
 where something essential was missed.
 
-A section has an essential gap when it was graded (it has a rating; a
-skipped section never shows pitfalls) and either:
+One model method owns this rule: `DailyResponse#essential_gap?(section)`,
+next to `#short_version_offered?`. It reads the gap positions through
+`RubricCheck#essential_gaps`, which already decides when stored positions are
+readable, so neither the view nor a service restates it. A section has an
+essential gap when it was graded (it has a rating; a skipped section never
+shows pitfalls) and either:
 
 - its stored `essential_gaps` is non-empty. When the prose judge reworded
   the review, the positions live in `graded_prose`
@@ -184,7 +188,7 @@ a reference field and checks it renders escaped.
   offers it; on a later exposure with a `solid` section ahead of a
   `developing` one, only the `developing` one offers it.
   `#improved_code_visible?` stays green through the shared count.
-- The pitfalls rule, by table: gaps stored on the review, gaps stored in
+- `#essential_gap?`, by table: gaps stored on the review, gaps stored in
   `graded_prose`, no gaps with `developing`, no gaps with `solid`, a Parsons
   `beginner`, a skipped section, and a `developing` review with an empty
   gap list.
@@ -222,7 +226,7 @@ a reference field and checks it renders escaped.
 
 ## Stop conditions
 
-Stop and come back to you, without building further, if:
+Stop and come back to the owner, without building further, if:
 
 - the predicate needs anything beyond the exposure count and the section's
   own rating, which would put the mastery rule at risk

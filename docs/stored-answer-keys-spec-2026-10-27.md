@@ -69,8 +69,10 @@ can re-wrap JavaScript lines, so a line number written by the provider can
 point at the wrong line by the time anyone reads it.
 
 The shapes separate what is wrong from why it matters and how to fix it on
-purpose, so the first-exposure teaching spec can later show the second and
-third parts without the first (section 9).
+purpose. The grading note judges a different finding's seriousness against
+`why_it_matters`, `exploit` or `pushback` (section 6), and keeping them apart
+also leaves room for a later change to show them without the issue
+(section 9).
 
 An alternative is one field name per kind (`planted_issue`,
 `planted_vulnerability`, `planted_flaws`, `missable_requirements`), the way
@@ -252,8 +254,12 @@ totals.
 
 **Keyed versus unkeyed.** `review_calibration` grades each fixture once, as
 written. The build adds a `--without-keys` pass, which grades the same
-fixtures through `ExerciseSection.without_answer_keys`, so each
-alternative answer is graded both ways.
+fixtures with the new `answer_key` removed from every section of the four
+kinds this spec keys. It keeps `design_comparison`'s `answer_key` and
+`ambiguity_hunt`'s `planted_ambiguities`, which today's grader already
+reads, so the unkeyed pass grades the way today's grader does.
+`ExerciseSection.without_answer_keys` would strip those too, so it is not
+the tool here. Each alternative answer is graded both ways.
 
 **Calls and cost**, at the calibration run's measured $0.013 a grade on
 Sonnet 5.5 ($0.2613 for 20 grades on 2026-10-09):
@@ -286,7 +292,11 @@ judge never sees the key, so nothing in generation checks one.
 One check costs nothing and runs whichever option below is chosen. At
 ingest, each quote in the key (the code in `issue` or `vulnerability`, the
 plan text in `flaw`) is looked for in the formatted snippet or plan, with
-whitespace collapsed. A miss logs `answer_key_quote=missing kind=…` and
+whitespace collapsed. It runs after `ProblemSetIngest#format_code!`, so it
+sees the code as shown, through a per-kind hook beside `.reject_unusable!`.
+That keeps `ProblemSetIngest` free of any branch on kind. Misses travel on
+`ProblemSetIngest::Result`, and `GenerationDiagnostics` logs them as
+`answer_key_quote=missing kind=…`, next to `answer_key=missing`. A miss
 changes nothing. It catches a key that quotes code that isn't there. It
 can't catch a key that quotes the right line and misreads it. Prettier can
 change quotes and semicolons in JavaScript, so a miss there is a lead to
@@ -299,7 +309,7 @@ Options for checking what the quote check can't:
 | Option | Cost | Catches | Can't catch |
 |---|---|---|---|
 | **A. A key-aware check at ingest.** A separate provider call is given the section and its key and asks whether the snippet has the issue the key names and whether the fix works. Its verdict is stored server-side and only logged, or used to drop a bad key; it never feeds the page or any prompt. | One more call per keyed section, about $0.005-0.01 on Sonnet 5.5, so a few cents a day; more time inside the generation deadline. It is also a new pre-submission AI context that sees a key, an exception the isolation rule would have to name. | A key describing a defect the code doesn't have; a fix that doesn't work; a snippet whose worse flaw the key missed. | Mistakes the generator and checker share. A user has one provider key, so in production both calls come from the same provider. |
-| **B. A sampled manual check during Measuring.** Keyed sections already reviewed are read from the read-only export, and each gets one call: key right, key wrong, or key right but the code or plan has a worse flaw. The owner reads the Ruby `code_review` sections. A senior colleague the owner chooses reads `security_review`, `plan_review` and `pseudocode_to_code` (and any `code_review` in another language). | Reading time: about 2-3 minutes a section, so roughly an hour for 5 sections per kind, split between two readers. No build beyond the export, which exists. | Anything a careful reader sees, including a subtly wrong fix or a misread quote. | Everything outside the sample. It measures how often keys are wrong; it never stops a wrong key from grading. |
+| **B. A sampled manual check during Measuring.** Keyed sections already reviewed are read from the read-only export, and each gets one call: key right, key wrong, or key right but the code or plan has a worse flaw. The owner reads the Ruby `code_review` sections. A senior colleague the owner chooses reads `security_review`, `plan_review` and `pseudocode_to_code` (and any `code_review` in another language). | Reading time: about 2-3 minutes a section, so roughly an hour for 5 sections per kind, split between two readers. One build: the `--key-sheet` export option below, added in the build PR. | Anything a careful reader sees, including a subtly wrong fix or a misread quote. | Everything outside the sample. It measures how often keys are wrong; it never stops a wrong key from grading. |
 | **C. Neither.** Trust the generator: it wrote the snippet and the key in one reply. | None. | Nothing. | Everything. The reason to choose this would be that a key wrong as often as today's grader guesses wrong costs no accuracy. Nobody has measured how often either one is wrong, so there is no case for it yet. |
 
 **Recommendation: B, with the free quote check.** A key is new, and the
@@ -334,14 +344,18 @@ or a plan flaw's `pushback`) after submission is a separate decision. Today
 the rule says a key never reaches the page, before or after review, and
 showing these parts would narrow it to "never before review", with
 `section_rendering_characterization_spec` changed to match. The place
-would be the review block, beside or inside the first-exposure short
-version, never the section itself. That feature is specified in
-`docs/first-exposure-teaching-spec-2026-10-27.md`; once built, its reasoning
-lives in `docs/decisions/first-exposure-teaching-in-the-review.md`, which this
-spec's own decision record cites in place of the spec. It would also overlap with `improved_code`, which already
+would be the review block, beside the first-exposure short version, never
+the section itself. The short version itself
+(`docs/first-exposure-teaching-spec-2026-10-27.md`) shows only
+`ConceptReference` fields and doesn't cover keys, so this would be a later
+change of its own. Once both are built,
+`docs/decisions/stored-answer-keys.md` cites
+`docs/decisions/first-exposure-teaching-in-the-review.md` in place of that
+spec. Showing a fix would also overlap with `improved_code`, which already
 shows a corrected version from a concept's second exposure. The field
-shapes in section 1 keep the issue apart from its explanation and fix so
-that spec can use the latter two without revealing more than it needs.
+shapes in section 1 keep the issue apart from its explanation and fix, so
+such a change could show the latter two without revealing more than it
+needs.
 
 ## Measuring
 
@@ -354,10 +368,13 @@ The stability baseline is the before picture. After keys ship and about
 two weeks of keyed days exist:
 
 1. Export keyed sections with the same script.
-2. Regrade each one 5 times with the key, and 5 times with the key removed
-   from the section, the only difference between the two runs. That needs one
-   option on `script/regrade_review_baseline.rb` (`--without-keys`),
-   added in the build PR.
+2. Regrade each one 5 times with the key, and 5 times with the new
+   `answer_key` removed from every section of the four keyed kinds in that
+   day, since the day context shows every section's key, not only the graded
+   one's. The `design_comparison` and `ambiguity_hunt` keys stay, as in the
+   calibration pass. That is the only difference between the two runs. It
+   needs one option on `script/regrade_review_baseline.rb`
+   (`--without-keys`), added in the build PR.
 3. Compare, by kind, how many sections change rating between runs and how
    many move more than one level, with and without the key, and how many
    sections' typical rating differs between the two and in which direction.

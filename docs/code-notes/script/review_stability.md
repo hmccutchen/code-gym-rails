@@ -16,6 +16,11 @@ provider's production `review_response` route, Parsons' fixed rating and
 changes a rating, and writes no `ApiUsage` rows. The run happens inside
 `ReviewBaselineExport.read_only`.
 
+The plan's estimate builds each section's prompt through
+`AiService#build_review_section_prompt`, a private method reached with
+`send`, as the script's other modes reach `route_for`. The plan spec runs
+through it, so a rename fails there rather than at a real run.
+
 A section's runs are made back to back, so the day's context, which is the
 system prompt, is written to the provider's cache once and read on the
 calls after it.

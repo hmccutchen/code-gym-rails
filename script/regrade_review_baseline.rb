@@ -11,6 +11,8 @@ USAGE = <<~TEXT.freeze
   --run        grade every exported section N times on that provider's production review route
   --runs N     grades per section (default #{ReviewStability::RUNS})
   --provider   claude (default), openai or gemini, billed to that provider's own environment key
+
+  Run it against a local database with the schema loaded: it holds one read-only transaction for the whole run.
 TEXT
 
 options = { runs: ReviewStability::RUNS, provider: "claude", run: false }
