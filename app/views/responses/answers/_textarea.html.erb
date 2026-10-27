@@ -1,6 +1,6 @@
 <%# Every kind but parsons_problem. Locals: kind, key, data, exercise, response, submitted. Scaffold helpers no-op when unscaffolded. %>
 <% if submitted %>
-  <% partial = response.partial_answer(key) %><div class="answer-display"><%= response.answer_for(key) || partial || t("responses.answered.skipped") %></div><% if partial && response.answer_for(key).nil? %><p class="answer-note"><%= t("responses.answered.not_counted") %></p><% end %>
+  <% written = response.partial_answer(key) %><div class="answer-display"><%= response.answer_for(key) || written || t("responses.answered.skipped") %></div><%= render "responses/answers/not_counted" if written %>
 <% else %>
   <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" placeholder="<%= t("sections.#{key}.placeholder") %>" maxlength="<%= UserText::MAX_ANSWER_LENGTH %>" data-field="<%= key %>"><%= answer_starting_value(response, key) %></textarea>
 <% end %>

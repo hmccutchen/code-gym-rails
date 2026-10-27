@@ -1,9 +1,9 @@
 <%# Locals: kind, key, data, exercise, response, submitted. %>
 <% if submitted %>
-  <% written = response.answer_for(key) || (response.answers[key] if response.partial_answer(key)) %>
-  <% pick, reason = kind.parse_answer(written) %>
+  <% written = response.partial_answer(key) %>
+  <% pick, reason = kind.parse_answer(response.answer_for(key) || (response.answers[key] if written)) %>
   <div class="answer-display"><% if pick %><strong><%= t("sections.design_comparison.picked", piece: pick.upcase) %></strong>
-<%= reason %><% elsif reason.present? %><%= reason %><% else %><%= t("responses.answered.skipped") %><% end %></div><% if written && response.answer_for(key).nil? %><p class="answer-note"><%= t("responses.answered.not_counted") %></p><% end %>
+<%= reason %><% elsif reason.present? %><%= reason %><% else %><%= t("responses.answered.skipped") %><% end %></div><%= render "responses/answers/not_counted" if written %>
   <% answer_key = data["answer_key"] %>
   <% if response.section_reviewed?(key) && answer_key.is_a?(Hash) %>
     <div class="comparison-key">

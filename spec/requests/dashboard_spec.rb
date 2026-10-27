@@ -1592,6 +1592,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   end
 
   describe "a submitted day with an unanswered section" do
+    let(:difficulty) { { "level" => "demanding", "reason" => "The query hides behind an association." } }
+
     def create_unanswered_day(note: "<b>N+1")
       exercise = create_exercise
       DailyResponse.create!(
@@ -1599,8 +1601,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         answers: { "code_review" => "", "pattern" => note, "challenge" => "c" * 20 },
         submitted_at: Time.current,
         ai_review: {
-          "code_review" => { "rating" => "solid", "missed" => [ "Blank missed point" ] },
-          "pattern" => { "correct" => [ "Short correct point" ], "missed" => [ "Short missed point" ] },
+          "code_review" => { "rating" => "solid", "missed" => [ "Blank missed point" ], "difficulty" => difficulty },
+          "pattern" => { "correct" => [ "Short correct point" ], "missed" => [ "Short missed point" ], "difficulty" => difficulty },
           "challenge" => { "rating" => "strong", "missed" => [ "Answered missed point" ] }
         }
       )
@@ -1619,6 +1621,25 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(blocks["1"].css(".review-rating")).to be_empty
       expect(blocks["2"].css(".review-rating")).to be_empty
       expect(blocks["3"].css(".review-rating").text).to eq("strong")
+      expect(blocks["2"].text).to include("Short correct point")
+    end
+
+    it "labels a scaffold-only section Skipped" do
+      create_unanswered_day(note: "Approach:\nWhy:")
+      DailyExercise.last.update!(problem_set: base_problem_set.deep_merge("pattern" => { "answer_scaffold" => [ "Approach:", "Why:" ] }))
+      get root_path
+
+      expect(blocks["2"].text).to include("Skipped")
+      expect(blocks["2"].text).not_to include("Not graded")
+      expect(blocks["2"].css(".review-rating")).to be_empty
+    end
+
+    it "still shows the difficulty note on each unanswered section" do
+      create_unanswered_day
+      get root_path
+
+      expect(blocks["1"].css(".difficulty-note").text).to include("The query hides behind an association.")
+      expect(blocks["2"].css(".difficulty-note").text).to include("The query hides behind an association.")
     end
 
     {
