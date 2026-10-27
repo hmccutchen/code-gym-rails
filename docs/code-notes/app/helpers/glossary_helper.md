@@ -29,6 +29,13 @@ An input that is already `html_safe` would defeat this, because `html_escape`
 leaves a safe string alone. The helper calls `to_str` first so the escape
 always runs.
 
+Text with no term in it comes back escaped and marked `html_safe` too, so every
+non-blank result is safe HTML, whatever it matched. A view would escape a
+plain string anyway, but a caller that sends the result to a page script for
+`innerHTML` would not; returning one kind of value means no caller has to know
+which case it got. Text that is `blank?` comes back unchanged: `nil`, an empty
+string, and a string of only whitespace, which has nothing to escape.
+
 ## `#glossary_wrap_prose`
 
 A worked example's prose can hold backtick code spans. It splits the text on
@@ -49,8 +56,7 @@ are. Views call the wrapper only for prose fields.
 
 Alternate framings of a concept arrive after the page loads, so no view wraps
 them. `ConceptReferencesController#explain_differently` runs the framing
-through this helper and returns the result as `alternate_html`, escaped again
-because the helper returns plain, unescaped text when no term matches and the
-page inserts the field with `innerHTML`.
+through this helper and returns the result as `alternate_html`, which the page
+inserts with `innerHTML`.
 `docs/code-notes/app/controllers/concept_references_controller.md` has the
 detail. Framings of a reviewed section are still plain text.

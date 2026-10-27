@@ -8,10 +8,9 @@ the HTML, so a framing's terms are underlined like every other prose field of
 a reference. It sends the plain text back as `prior_alternates`, so the
 provider never sees markup and the plain string stays the source of truth.
 
-## Why `alternate_html` escapes again
+## `alternate_html` is already escaped
 
-`glossary_wrap` returns its input unchanged, and not HTML-safe, when it finds
-no glossary term; a view escapes that on output, but the page inserts this
-field with `innerHTML`. `ERB::Util.html_escape` escapes that plain case and
-passes `glossary_wrap`'s own HTML-safe result through untouched, so the field
-is escaped whether or not a term matched. The request spec holds both cases.
+`glossary_wrap` escapes its input and marks the result `html_safe` whether or
+not a term matched, so `alternate_html` is safe to insert with `innerHTML` as
+it comes. The request spec checks markup in a framing stays escaped both with
+and without a glossary term in it.
