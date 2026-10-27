@@ -86,7 +86,7 @@ class ReviewBaselineExport
 
   def stored_section(response, section)
     review = response.ai_review[section]
-    graded = review.merge(review.fetch(ReviewProseVerdict::ORIGINAL_KEY, {}))
+    graded = ReviewProseVerdict.as_graded(review)
     { "kind" => section, "pitched_at" => response.daily_exercise.problem_set.dig(section, "pitched_at"),
       "answer" => response.answer_for(section), "rating" => review["rating"], "essential_gaps" => graded["essential_gaps"] }
   end

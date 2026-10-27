@@ -204,4 +204,28 @@ RSpec.describe ReviewProseVerdict do
       expect(objects_in(described_class.schema)).to all(include("additionalProperties" => false))
     end
   end
+
+  describe ".as_graded" do
+    it "returns a review the judge never reworded as it is" do
+      expect(described_class.as_graded(review)).to eq(review)
+    end
+
+    it "puts the grader's own fields back over the reworded ones, gap positions included" do
+      reworded = review.merge("missed" => [ "Reworded." ], "essential_gaps" => nil,
+                              described_class::ORIGINAL_KEY => { "missed" => review["missed"], "essential_gaps" => [ 1 ] })
+
+      expect(described_class.as_graded(reworded)).to include("missed" => review["missed"], "essential_gaps" => [ 1 ], "rating" => "solid")
+    end
+
+    it "keeps a reworded field the grader's copy doesn't hold" do
+      reworded = review.merge("next_step" => "Reworded.", described_class::ORIGINAL_KEY => { "missed" => review["missed"] })
+
+      expect(described_class.as_graded(reworded)).to include("next_step" => "Reworded.")
+    end
+
+    it "returns nil for a review that isn't a hash" do
+      expect(described_class.as_graded("text")).to be_nil
+      expect(described_class.as_graded(nil)).to be_nil
+    end
+  end
 end
