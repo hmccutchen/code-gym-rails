@@ -358,6 +358,8 @@ data.*
   disclosures; the first qualifying section offers it when two share a
   concept
 - the flaky Submit nudge layout spec, fixed on its own `#591`
-
-*Postponed: running the baseline, until its PR merges and I approve the
-plan's cost*
+- I ran the baseline myself: 14 of 15 sections graded the same all five times
+- two implementation plans, the short version first since it needs no keys
+  `#596 open`
+  **I decided:** two separate plans; every production query, generation and
+  calibration run waits for my approval
