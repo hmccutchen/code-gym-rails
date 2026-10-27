@@ -332,3 +332,5 @@ data.*
   a short answer is still an answer and gets graded, with no character count;
   Parsons keeps showing the correct block order; follow-up chat keeps "What
   you missed"
+- ReviewPrompt picks a section's review prompt, from the layered review of the
+  walkthrough work `#584`
