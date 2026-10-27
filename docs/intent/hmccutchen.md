@@ -352,3 +352,5 @@ data.*
 
 *Postponed: running the baseline, until its PR merges and I approve the
 plan's cost*
+
+*From review: `#595`*
