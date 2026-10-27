@@ -49,4 +49,41 @@ RSpec.describe ReviewPrompt do
     expect(described_class.method(:section_prompt).parameters)
       .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :answer ], [ :keyreq, :rung ] ])
   end
+
+  describe ".walkthrough_prompt" do
+    let(:section) { day_a.first[:section] }
+    let(:nothing_written) { described_class.walkthrough_prompt(key: "code_review", section: section, rung: "senior", written: nil) }
+    let(:short_note) { described_class.walkthrough_prompt(key: "code_review", section: section, rung: "senior", written: "N+1?") }
+
+    it "says no answer was given and asks for no rating when nothing was written" do
+      expect(nothing_written).to include("no answer was given", "must not be rated", "Pitched at: senior")
+      expect(nothing_written).not_to include("\"rating\"", "essential_gaps", "<engineer_text>")
+    end
+
+    it "asks for every walkthrough field when nothing was written" do
+      expect(nothing_written).to include("\"correct\"", "\"missed\"", "\"better_questions\"", "\"next_step\"", "\"improved_code\"")
+    end
+
+    it "gives a short note inside the user-text tags and says it was too short to count" do
+      expect(short_note).to include("<engineer_text>\nN+1?\n</engineer_text>", "too short to count", "must not be rated")
+    end
+
+    it "never calls a short note blank or skipped, and asks for no rating" do
+      expect(short_note).not_to include("blank", "skipped", "no answer was given", "\"rating\"", "essential_gaps")
+    end
+
+    it "asks for what is on the right track in a short note first" do
+      expect(short_note).to match(/"correct".*on the right track/)
+    end
+
+    it "renders each form exactly as recorded" do
+      expect_prompt_snapshot("review__day_a__code_review__walkthrough_nothing_written", nothing_written)
+      expect_prompt_snapshot("review__day_a__code_review__walkthrough_short_note", short_note)
+    end
+
+    it "takes the rung and the written text as values" do
+      expect(described_class.method(:walkthrough_prompt).parameters)
+        .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :rung ], [ :keyreq, :written ] ])
+    end
+  end
 end

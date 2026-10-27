@@ -59,11 +59,45 @@ class ReviewPrompt
     PROMPT
   end
 
+  def self.walkthrough_prompt(key:, section:, rung:, written:)
+    kind = ExerciseSection.for(key)
+
+    <<~PROMPT
+      Walk through the "#{key}" section from the day's context above. #{walkthrough_opening(written)}
+      Pitched at: #{rung} — #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}
+
+      #{kind.grading_note(section: section, answer: nil)}
+
+      Return a single JSON object (NOT wrapped in a "#{key}" key) with:
+      - "correct": array of strings — each entry one distinct thing in what they wrote that is on the right track; an empty array when nothing qualifies
+      - "missed": array of strings — each entry one distinct thing a good answer would cover
+      - "better_questions": array of strings — each entry one question they should have asked themselves
+      - "next_step": string — one specific thing to study
+      - "improved_code": string — #{improved_code_instruction(kind)}
+
+      Each array entry must be ONE self-contained idea in one or two sentences. Never pack
+      several points into one entry, and never number points inside an entry ("1) ... 2) ...")
+      — separate ideas belong in separate entries. Use an empty array when there is nothing to
+      say for that field.
+    PROMPT
+  end
+
+  def self.walkthrough_opening(written)
+    return "The engineer wrote nothing for this section; no answer was given, so it must not be rated." if written.nil?
+
+    <<~OPENING.chomp
+      The engineer wrote only the text below, which is too short to count as an answer, so it must not be rated.
+      The day's context shows no answer for this section because what they wrote was too short to count; here is what they wrote.
+      #{UserText.labelled("What they wrote:", written)}
+      Put what in it is on the right track, if anything, in "correct" first, then walk through what a good answer covers.
+    OPENING
+  end
+
   def self.improved_code_instruction(kind)
     kind.improved_code? ?
       "the #{kind.improved_code_label.downcase} for this section" :
       "must be an empty string for this section"
   end
 
-  private_class_method :improved_code_instruction
+  private_class_method :improved_code_instruction, :walkthrough_opening
 end
