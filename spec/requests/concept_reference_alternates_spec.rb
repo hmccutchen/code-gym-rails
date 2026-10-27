@@ -27,8 +27,33 @@ RSpec.describe "Concept reference alternate framings", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(JSON.parse(response.body)).to eq(
-      "status" => "ok", "alternate" => "Picture a library courier.", "remaining" => 1
+      "status" => "ok", "alternate" => "Picture a library courier.",
+      "alternate_html" => "Picture a library courier.", "remaining" => 1
     )
+  end
+
+  it "marks the glossary terms in the framing's HTML and leaves the plain text alone" do
+    stub_alternate("Eager loading fetches every row in one trip.")
+    login_as(user)
+
+    post_alternate
+
+    body = JSON.parse(response.body)
+    expect(body["alternate"]).to eq("Eager loading fetches every row in one trip.")
+    expect(Nokogiri::HTML.fragment(body["alternate_html"]).at_css(".gloss-term").text).to eq("Eager loading")
+  end
+
+  it "escapes markup in the framing's HTML, with or without a glossary term in it" do
+    login_as(user)
+
+    [ "<img src=x onerror=alert(1)> plain words", "<img src=x onerror=alert(1)> eager loading" ].each do |text|
+      stub_alternate(text)
+      post_alternate
+
+      html = JSON.parse(response.body)["alternate_html"]
+      expect(html).to start_with("&lt;img src=x onerror=alert(1)&gt;")
+      expect(Nokogiri::HTML.fragment(html).css("img")).to be_empty
+    end
   end
 
   it "works with no response — and no exercise — of any kind" do

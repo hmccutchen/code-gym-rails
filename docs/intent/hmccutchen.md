@@ -303,6 +303,6 @@ data.*
 - Account and Settings in their own page sheets, laid out for a desktop `#571`
   **I decided:** Account's paired cards stretch to the same height
 - fuzzy Learn search `#570`
+- glossary terms in alternate framings `#573`
 - Today on phone cards, styles in its own sheet `#572`
-  **I decided:** no sticky Submit bar; with the progress and tab bars the
-  screen felt sandwiched
+  **I decided:** no sticky Submit bar: the screen felt sandwiched

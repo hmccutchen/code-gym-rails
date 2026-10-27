@@ -257,7 +257,7 @@ class FakeService < AiService
   CONCEPT_ALTERNATE_TEXT =
     "Picture a library where every book you request is fetched by a separate courier trip. One trip for one book is " \
     "fine; a hundred trips for a hundred books is the whole afternoon gone. The fix is always the same shape — ask " \
-    "for everything you know you need in one trip."
+    "for everything you know you need in one trip, which Rails calls eager loading."
 
   EXPLAIN_DIFFERENTLY_TEXT =
     "Think of it like a relay race — each service object is one runner, and its only job is to hand off cleanly " \

@@ -116,12 +116,11 @@ differences between two records or systems as well as React's render diff)
 and `throttling` (now covers a device slowing its processor as well as a
 function limited to one call per interval).
 
-Alternate framings of a concept reference are left plain. They arrive after
-the page loads, as plain text the controller returns and the script inserts with
-`textContent`. Wrapping a term in one would need the controller to return
-server-rendered HTML beside the plain text and the script to switch to
-`innerHTML`, which widens the change into the request path and its escaping.
-Issue #557 tracks it. A follow-up change (PR B) covers the backfill of terms in
+Alternate framings of a concept reference were left plain at first, since
+they arrive after the page loads. Issue #557 wrapped them: the controller now
+returns escaped, glossary-wrapped HTML beside the plain text, the script inserts
+the HTML with `innerHTML`, and the plain text stays what goes back as
+`prior_alternates`. A follow-up change (PR B) covers the backfill of terms in
 existing references; this change only wires what renders.
 
 The architecture section's inline reference

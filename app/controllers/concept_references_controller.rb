@@ -26,7 +26,7 @@ class ConceptReferencesController < ApplicationController
       current_user, reference, prior_alternates: prior
     )
 
-    render json: { status: "ok", alternate: alternate,
+    render json: { status: "ok", alternate: alternate, alternate_html: alternate_html(alternate),
                    remaining: MAX_ALTERNATES_PER_CONCEPT - prior.size - 1 }
   rescue ActiveRecord::RecordNotFound
     # A JSON body because the client calls res.json() before checking res.ok.
@@ -41,6 +41,10 @@ class ConceptReferencesController < ApplicationController
   def prior_alternates_param
     Array(params[:prior_alternates]).first(MAX_ALTERNATES_PER_CONCEPT + 1)
                                     .filter_map { |framing| UserText.normalize(framing).presence if framing.is_a?(String) }
+  end
+
+  def alternate_html(alternate)
+    ERB::Util.html_escape(helpers.glossary_wrap(alternate)).to_str
   end
 
   def render_error(message)
