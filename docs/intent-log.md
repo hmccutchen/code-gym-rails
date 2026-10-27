@@ -317,3 +317,4 @@ data.*
   **I decided:** Account's paired cards stretch to the same height
 - fuzzy Learn search `#570`
 - glossary terms in alternate framings `#573`
+- glossary_wrap always returns escaped HTML `#576`
