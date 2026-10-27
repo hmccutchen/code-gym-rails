@@ -8,6 +8,7 @@ Rails.application.configure do
   config.action_controller.perform_caching = true
   config.public_file_server.headers = { "cache-control" => "public, max-age=#{1.year.to_i}" }
   config.active_storage.service = :local
+  config.active_storage.variant_processor = :disabled
   config.assume_ssl = true
   config.force_ssl = true
 
