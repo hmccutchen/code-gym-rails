@@ -283,16 +283,13 @@ data.*
   **why:** the audit showed 730 undefined terms with no glossary match, and
   "memoized" never found the memoization entry
   **I decided:** start with the 47; size a second batch from the post-deploy
-  audit; no new concepts; inflections of a key match but the whole-word rule
+  audit; no new concepts; inflections of a key match, the whole-word rule
   stands otherwise; every noun key gets its plural; one plain sentence per
-  entry with a fact check by an agent that didn't write it; a read-only export
-  of the references and my last 60 days of exercise text, which I approve and
-  read before the PR leaves draft; after deploy only the coverage script
-  re-runs; a 480-or-fewer bar that reports a miss, never blocking the merge;
-  drop `indexes`, `indexed`, `injected` and `inferred` after reading the
-  listing; then `normalize`, `normalized`, `injecting` and `lift it up` from
-  the critical review; the listing tool gets tracked; the pre-submission
-  tooltip question becomes an issue
+  entry, fact-checked by an agent that didn't write it; a read-only export of
+  the references and my last 60 days of exercise text, which I read before the
+  PR leaves draft; a 480-or-fewer bar that reports, never blocks; drop eight
+  forms with a second sense; track the listing tool; the tooltip question
+  becomes an issue
 - Progress on phone cards and the desktop layout, specced first `#565`
   **I decided:** the legend stays a disclosure at every width, with its 7 real
   entries as written; groups two across on a desktop and the full container
@@ -309,16 +306,23 @@ data.*
   **I decided:** refactor the three finished pages first, then build Account
   and Settings into their own sheets; a partial's styles go with the page it
   renders on, or a shared component sheet
-- Account and Settings in their own page sheets, laid out for a desktop `#571`
-  **I decided:** Account's paired cards stretch to the same height
+- Account and Settings page sheets and desktop layout `#571`
+  **I decided:** Account's paired cards share a height
 - fuzzy Learn search `#570`
 - glossary terms in alternate framings `#573`
 - Today on phone cards, styles in its own sheet `#572`
   **I decided:** no sticky Submit bar: the screen felt sandwiched
 - glossary_wrap always returns escaped HTML `#576`
 - glossary terms throughout the review `#577`
-- the layered-design review for cloud sessions, which have no plugins `#580`
-  **why:** a cloud session skipped the layered review
-  **I decided:** keep the plugin locally and let a repo copy fill in on the
-  cloud; copy only the review workflow and the files it links to, with the
-  links to anything left behind rewritten, rather than the whole skill
+- a repo copy of the layered review for cloud sessions `#580`
+  **why:** a cloud session skipped it, having no plugins
+  **I decided:** the plugin stays locally; copy only the review and the files
+  it links to
+
+## Tue Oct 27
+
+- Today on a desktop: the answers beside a side column `#579`
+  **I decided:** one side column after the answers with Submit, Generate new
+  set and Start over, which ends the page on a phone; the progress bar stays in
+  the main column, the featured card below the day, and the column sticks only
+  in a tall window; disable Generate new set and Start over while a submit runs

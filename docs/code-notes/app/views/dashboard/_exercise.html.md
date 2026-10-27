@@ -1,18 +1,17 @@
 # app/views/dashboard/_exercise.html.erb
 
-## Reviewed hint
+## Two columns
 
-Hiding the Generate new set button once the response is reviewed mirrors the
-guard in `DailyExercisesController#regenerate`, which is the one that holds.
-The review is already part of concept tracking, and a new set would discard
-it.
-
-## Generate new set button
-
-`turbo_confirm` would do nothing here, because Turbo JS is not loaded. The
-layout's loading-form script provides the confirmation and the in-flight
-spinner. The request then blocks on the provider (10 to 30 seconds) until the
-redirect lands.
+The day is a main column and a side column after it (`.today-main`,
+`.today-side`). The main column holds the progress bar and the answer form,
+or the submitted day's answers and review. The side column holds the submit
+row and then the regenerate row, or only the regenerate row on a submitted
+day. Coming after the main column keeps Submit after the last answer in tab
+order. On a phone the side column is the end of the page, so nothing renders
+twice and the swap sheet's `.regenerate-row form button` stays the one
+button it means. At 900px and wider it sits beside the answers
+(`docs/code-notes/app/assets/stylesheets/pages/today.md`). The regenerate row
+is `dashboard/_regenerate_row`, rendered once in either state.
 
 ## Progress bar
 
@@ -27,8 +26,9 @@ through fetch.
 
 ## The controller
 
-`data-controller="answer-form"` wraps the progress bar and the form, since the
-two sit beside each other in the markup;
+`data-controller="answer-form"` is on the two-column wrapper, since the
+progress bar and the form are in the main column and the submit button and
+the nudge are in the side column;
 `docs/code-notes/app/javascript/controllers/answer_form_controller.md` covers
 why the form is a target, why the submit button is `type="button"` rather
 than a submit button, and why the input, change and rating listeners are
@@ -108,7 +108,12 @@ the submission is saved and confirmed before the review is requested.
 
 The submit row holds the button, the "saves as you type" note and the
 nudge (`docs/code-notes/app/assets/stylesheets/pages/today.md`). The nudge
-takes the row's full width, so it reads as a line under the button.
+takes the row's full width, so it reads as a line under the button. The row
+sits outside `#gym-form`: the controller builds the payload from the answer
+fields and ratings and sends `submit: "1"` itself, so the form's fields were
+never what Submit posted, and the hidden `submit` field went with the move.
+The form being inert while a submit runs leaves the button out, so the
+controller disables it.
 
 ## Refused submission
 
