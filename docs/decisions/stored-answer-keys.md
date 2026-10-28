@@ -75,13 +75,40 @@ Two checks, neither of which changes a key:
   `quote_missing` in the first 10 drafted Ruby sections of a kind that
   quotes (`code_review`, `security_review`, `plan_review`) stops the work,
   and `missing` is reported beside it (owner's decision, 2026-10-28).
-- **A sampled read.** The owner reads the Ruby `code_review` keys, and a
-  colleague the owner chooses reads the other three kinds, from the key
-  sheet (`export_review_baseline.rb --key-sheet`), which carries the problem
-  and its key and nothing about the owner's answers. About 5 sections a kind
-  are read; a kind with fewer waits. The owner decided on 2026-10-28 to let
-  the rarer kinds come up on their own, so the second PR turns keys on kind
-  by kind.
+- **A sampled read.** The owner reads the Ruby `code_review` keys from real
+  days, through the key sheet (`export_review_baseline.rb --key-sheet`),
+  which carries the problem and its key and nothing about the owner's
+  answers. About 5 sections a kind are read; a kind with fewer waits.
+
+### The rarer kinds are read from drafts
+
+The owner is the app's only user, and their days are mostly two sections, so
+`security_review`, `plan_review` and `pseudocode_to_code` could take months to
+reach 5 keyed sections. Adding those kinds to the owner's own days would
+make progress that isn't real. The owner decided on 2026-10-28:
+
+- **Drafts, not real days.** `script/draft_key_samples.rb` drafts those
+  three kinds through the production retry route, ingest and judge,
+  and writes no day or history. It runs on the owner's machine against a
+  local database, never against production, and every billed run waits for
+  the owner's approval of its call count and cost. It logs no `ApiUsage`
+  row. A logged row couldn't block a real day anyway: only house-key trial
+  checks and the Account page's spend total read those counts.
+- **A colleague reads them.** The owner can't judge those keys reliably, so
+  a colleague the owner chooses reads the drafts. A kind with no available
+  reader stays off in the second PR.
+- **The read is the main check.** For those three kinds, the second PR's
+  calibration fixtures are a guard against a grader misusing a key, and the
+  read decides whether the keys are right.
+- **Real graded sections, if any.** Only sections generated after this PR
+  deployed carry a key. The owner's graded sections of the three kinds,
+  counted with an approved read-only query, get the keyed-against-unkeyed
+  regrade as a small sample if any carry a key. That sample is reported, not
+  held to the systematic-movement rule, since it is too small for it.
+
+Drafts show that the generator plants a correct key for these kinds. They
+don't show that keys hold up on the owner's real days, so the first real
+section of each kind is checked through its `[planted_key]` line.
 
 The stability export (`export_review_baseline.rb` without `--key-sheet`)
 keeps the four keys. It reads only submitted, reviewed days, it already holds

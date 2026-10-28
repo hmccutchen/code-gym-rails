@@ -381,4 +381,16 @@ data.*
   whitespace ignored, cleaning is its own ingest step, and the stop rule
   counts only drafted sections of kinds that quote
 - code review's snippet capped at 40 shown lines at ingest, refused rather
-  than cut `#603 open`
+  than cut `#603`
+- the rarer kinds' keys read from drafted sections, not my days `#606 open`
+  **why:** I'm the only user, and adding those kinds to my days would fake
+  progress
+  **I decided:** a colleague reads the drafts since I can't judge those keys,
+  and a kind with no reader stays off; the read is the main check and the
+  fixtures a guard; any keyed graded section gets the regrade as a sample;
+  every billed run waits for my approval
+- the script that drafts those kinds' sections, plan-only until I approve a
+  run `#607 open`
+  **I decided:** it runs on my machine against a local database, never
+  production, and writes no day, history or usage row; after the reviews,
+  only the three drafted kinds, inside a read-only transaction
