@@ -363,7 +363,7 @@ data.*
 - the flaky Submit nudge layout spec, fixed on its own `#591`
 - I ran the baseline myself: 14 of 15 sections graded the same all five times
 - two implementation plans, the short version first since it needs no keys
-  `#596 open`
+  `#596`
   **I decided:** two separate plans; every production query, generation and
   calibration run waits for my approval; after the plan reviews, the
   exposure count lives on `ConceptExposureIndex`, the short version builds
@@ -376,3 +376,17 @@ data.*
   and level suggestions would read them before the movement check ran
 
 *From review: `#595`*
+
+## Wed Oct 28
+
+- a change review kind: a small change across 2–3 files, the flaw in how
+  they interact `#601`
+  **I decided:** a separate kind, not a code review mode; every rung gets it,
+  with the rung shaping how many files and how visible, since a rung or lock
+  never removes a kind, and any limit would be by track; post-change files
+  with changed lines highlighted; a failed key refuses the section; JavaScript
+  days use only data modeling, a Knex migration and a looser quote match;
+  after the reviews, its grader waits for the stored-keys gating with its own
+  calibration fixture, the shared data-modeling line gains one clause, its
+  first appearance is accepted, and the judge never rejects on rung fit
+- code review's snippet length, capped only by the prompt, left as an issue
