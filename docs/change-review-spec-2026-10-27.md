@@ -317,11 +317,25 @@ both sides with a per-language table, as `CodeFormat::FORMATTERS` keys its
 formatters by language. It can't call `CodeFormat::Javascript`, which is an
 adapter in `app/clients`, so it states its own normalization.
 
-- **Every language: whitespace removed, not collapsed.** RuboCop's `Layout`
-  autocorrect, as `CodeFormat::Ruby` runs it, rewrites spacing inside a line:
-  `foo(a,b)` becomes `foo(a, b)`, `{a: 1}` becomes `{ a: 1 }`, `y=1+2` becomes
-  `y = 1 + 2`. A quote written before formatting only matches the formatted
-  line once all whitespace is removed from both.
+- **Every language: whitespace removed outside string literals.** RuboCop's
+  `Layout` autocorrect, as `CodeFormat::Ruby` runs it, rewrites spacing
+  inside a line: `foo(a,b)` becomes `foo(a, b)`, `{a: 1}` becomes `{ a: 1 }`,
+  `y=1+2` becomes `y = 1 + 2`. A quote written before formatting only matches
+  the formatted line once that whitespace is removed from both.
+- **String literal contents are kept exactly.** Neither formatter changes
+  what is inside a string, and removing whitespace there would let
+  `where(role: "superuser")` match code that only has `"super user"`. So
+  `KeyQuote` splits each side into quoted spans (`"…"`, `'…'`, and on
+  JavaScript `` `…` ``, with backslash escapes) and code between them. It
+  removes whitespace only from the code. A literal it can't split cleanly,
+  such as a Ruby heredoc or `%w[…]`, is compared as code, and a quote that
+  depends on spacing inside one may miss. The quote-miss stop condition
+  counts those.
+- **Every language: a comma at the end of a line or run is ignored.** Both
+  formatters leave a trailing comma on the last item of a multi-line hash,
+  object or argument list, so a changed line quoted as `timeoutMs: 5000`
+  must match the formatted `timeoutMs: 5000,`. The comma is dropped from
+  the end of the quote and of each candidate line or run before comparing.
 - **JavaScript, also:**
   - `'` and `"` treated as the same character
   - a `;` at the end of the quote ignored
@@ -344,7 +358,8 @@ adapter in `app/clients`, so it states its own normalization.
 - **Evidence quotes** match as a substring of the whole normalized file, so
   a quote that Prettier re-wrapped onto several lines still matches. That's
   why each quote needs 12 non-whitespace characters.
-- **Changed lines** use whole-line equality in order, as in section 2.
+- **Changed lines** use whole-line equality, matching exactly one line or
+  run, as in section 2.
 - **`KeyQuote.find(code, quote, language:)`** returns the 1-based line range
   the match spans, or nil. Callers that need only yes or no test for nil.
 
@@ -482,8 +497,17 @@ its own section, and neither line contradicts the other.
 Enforced in `.reject_unusable!`, after `format_code!`, so they count the
 lines as shown:
 
-- 2 or 3 files: `file_1` and `file_2` required, `file_3` optional and
-  ignored unless its path and code are both present.
+- 2 or 3 files: `file_1` and `file_2` required, `file_3` optional.
+  - **Half a third file is refused.** If `file_3_path` or `file_3_code` is
+    present without the other, the section is refused.
+  - **An absent third file leaves nothing behind.** When neither is present,
+    every `file_3_*` field is deleted, so a stray `file_3_changed` can't
+    reach anything.
+
+  `SectionJudgePrompt` sends the judge every field it doesn't strip, and
+  `ChangeReview.files` shows only complete files. Without these two rules, a
+  half-present third file would reach the judge but not the page, the grader
+  or the line caps.
 - Each file at most 15 lines (`MAX_FILE_LINES`), all files at most 40 in
   total (`MAX_TOTAL_LINES`). Blank lines count, since they take room on a
   phone.
@@ -662,8 +686,8 @@ conditions).
 ### Specs, written first
 
 - **`spec/models/exercise_section/change_review_spec.rb`:** `.reject_unusable!`
-  - for file count, each cap, blank and duplicate paths, and `file_3`'s
-    both-or-neither rule
+  - for file count, each cap, blank and duplicate paths, a half-present
+    third file being refused, and an absent one leaving no `file_3_*` field
   - for every type rule: non-string code or path, non-array `file_N_changed`,
     `files` or `evidence`, a non-hash key or evidence entry, and 1 or 5
     evidence entries
@@ -685,6 +709,10 @@ conditions).
     changed quote character and a dropped `;`
   - the `code_format_spec` fixture: `return ids.map(id=>fetch(id))` matching
     Prettier's `return ids.map((id) => fetch(id));`
+  - `where(role: "superuser")` not matching code that has only
+    `where(role: "super user")`
+  - a changed line quoted as `timeoutMs: 5000` matching the formatted
+    `timeoutMs: 5000,` above a closing brace
   - a quote under 12 non-whitespace characters
   - the returned line range for a quote spanning lines
 - **The shared hook signature:** `problem_set_ingest_spec` passes
@@ -711,6 +739,9 @@ conditions).
   `changed` gives byte-identical HTML to today's.
 - **`section_context_spec`:** a `change_review` section renders every
   file's path, changed lines and code.
+- **`section_judge_prompt_spec`:** for a `change_review` section that came
+  with an incomplete or empty third file, the judge's prompt holds exactly
+  the files the page shows.
 - **`section_context_spec`, `section_judge_prompt_spec`,
   `section_rendering_characterization_spec`:** a sentinel in every
   `answer_key` value never renders. The last one adds the key's text to
@@ -798,18 +829,21 @@ Stop and come back to the owner, without building further, if:
   Snapshots
 - the measured generation run truncates, or `change_review` is refused at the
   boundary on both of its first two forced runs
-- in the first 10 delivered `change_review` sections, more than 2 were
-  dropped after the retry. Read `dropped_sections`; each drop costs a day a
-  section.
+- in the first 10 planned `change_review` sections, more than 2 were
+  dropped after the retry. Count over planned sections, delivered ones plus
+  the `change_review` entries in `dropped_sections`, since `JudgedGeneration`
+  removes a dropped section from the set and so no delivered section was
+  ever dropped. Each drop costs a day a section.
 - in a sampled read of the first 10 delivered sections, by the owner, as in
   the stored keys spec's option B, more than 2 had a flaw that one file shows
   on its own. The quote check and the judge are then letting single-file
   flaws through, and the blind solve (section 9) is the next step.
 - any delivered file needs horizontal scrolling at 320px, or a file over 15
   lines reached the page
-- in the first 10 `change_review` sections of either language, more than 2
-  were refused at the boundary for quote misses, which would mean the
-  formatters' rewrites defeat `KeyQuote`
+- in the first 10 planned `change_review` sections of either language, more
+  than 2 were refused at the boundary for quote misses, which would mean the
+  formatters' rewrites defeat `KeyQuote`. Count from the `[unusable_section]`
+  log, since a refused section is never delivered.
 - anything in the build turns out to need a rung or a lock to decide whether
   the kind is offered
 
