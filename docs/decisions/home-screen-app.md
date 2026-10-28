@@ -5,9 +5,11 @@ needs no session) plus the `apple-mobile-web-app-*` meta tags in the layout
 make an iOS home-screen launch open standalone instead of inside Safari's
 chrome. The `apple-` meta tags are not redundant with the manifest — iOS reads
 `display: standalone` only from 17.4. `status-bar-style` is `black`, so
-content stays below the status bar. `viewport-fit=cover` is set for the
-bottom of the screen only: on a phone-width installed app the destinations
-move from the collapsed menu to a bottom tab bar (`shared/_tab_bar`, built
+content stays below the status bar. `viewport-fit=cover` lets the page reach
+under the home indicator and, in landscape, beside the notches, so the layout
+pads by the bottom and side safe-area insets (the nav, `.container` and the
+card pages) and never by the top one. On a phone-width installed app the
+destinations move from the collapsed menu to a bottom tab bar (`shared/_tab_bar`, built
 from `NavigationHelper#nav_destinations`), which pads itself clear of the
 home indicator with `env(safe-area-inset-bottom)`. A browser tab and a
 desktop install keep the top nav. One brand mark, a violet kettlebell

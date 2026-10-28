@@ -41,9 +41,9 @@ the device. The light palette is unscoped, and its `<link>`'s `media`
 logo's `<source>` and a light `theme-color` tag carry the same value, so none
 of the three can disagree. The dark `theme-color` follows as the fallback.
 
-**The nav's collapse is a container query**, `@container (max-width:
-44em)` on `nav`: 704px at the default size, and it moves out as the text
-grows. `mobile_nav_menu_spec` checks that the row fits just above it at the
+**The nav's collapse is a container query** on `nav`, in em so it moves
+out as the text grows; the layout's code note gives its width and how it
+was measured. `mobile_nav_menu_spec` checks that the row fits just above it at the
 smallest and largest text sizes, so adding a destination that crowds it fails. It stays one rule rather than a copy per text size. Containment makes
 `nav` a stacking context, hence its `z-index`. The reading font and line
 spacing apply to prose only (`p`, `li`, `dd` and the named prose
