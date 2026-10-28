@@ -385,5 +385,8 @@ data.*
   with the rung shaping how many files and how visible, since a rung or lock
   never removes a kind, and any limit would be by track; post-change files
   with changed lines highlighted; a failed key refuses the section; JavaScript
-  days use only data modeling, a Knex migration and a looser quote match
+  days use only data modeling, a Knex migration and a looser quote match;
+  after the reviews, its grader waits for the stored-keys gating with its own
+  calibration fixture, the shared data-modeling line gains one clause, its
+  first appearance is accepted, and the judge never rejects on rung fit
 - code review's snippet length, capped only by the prompt, left as an issue

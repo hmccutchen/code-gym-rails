@@ -37,76 +37,41 @@ Since nothing gates the kind, `DailyPlan` keeps its rule that it never
 reads `KindDifficulty` (`.claude/rules/planning.md`, "Difficulty targets and
 locks"), unchanged.
 
-Four questions from the reviews need the owner before the build starts.
-See "Decisions still needed".
+Four questions from the reviews, decided by the owner on 2026-10-28:
 
-## Decisions still needed
-
-1. **When this kind's grader starts reading its key.** The stored answer keys
-   plan (`docs/stored-answer-keys-plan-2026-10-27.md`) splits into PR 1,
-   which stores keys that nothing reads, and PR 2, which lets the grader read
-   them kind by kind. PR 2 turns a kind on only after a sampled human read,
-   calibration fixtures and a keyed-versus-unkeyed movement check. That
-   gating is what lets `RUBRIC_VERSION` stay at 1: no evidence reader sees a
-   keyed grade before the check passes. As written, this spec grades
-   `change_review` against its key from the first section (section 9). Its
-   grades would then feed `CompetencyGate::Evidence` and `LevelSuggestion`
-   through `ReviewedSectionResults`, outside that gating. The options:
-   - **A. Join PR 2's gating (recommended).** The build waits for PR 2, not
-     PR 1. `change_review` joins PR 2's sampled read and gets its own
-     calibration fixture (complete, partial and miss answers, plus a
-     comparable-severity and a lesser alternative). The fixture runs through
-     `review_calibration` before launch. The kind has no unkeyed history, so
-     the movement check doesn't apply to it. The calibration run stands in.
-   - **B. Ship with the key stored and unread**, like PR 1, until PR 2
-     covers it. Grading would guess the interaction across 2–3 files in the
-     meantime, which is the reason section 3 refuses a section with a failed
-     key.
-   - **C. Grade keyed from day one, but keep its grades out of the evidence
-     readers** until a sampled read passes. That needs a new exclusion in
-     `ReviewedSectionResults`.
-2. **The shared data-modeling prompt line.**
+1. **This kind joins the stored answer keys PR 2 gating.** The stored keys
+   plan (`docs/stored-answer-keys-plan-2026-10-27.md`) lets the grader read a
+   kind's key only after a sampled human read and calibration, so that no
+   evidence reader (`CompetencyGate::Evidence`, `LevelSuggestion`, through
+   `ReviewedSectionResults`) sees a keyed grade under an unchanged
+   `RUBRIC_VERSION` before the check passes. So the build waits for PR 2, not
+   PR 1. `change_review` joins PR 2's sampled read and gets its own
+   calibration fixture: complete, partial and miss answers, plus a
+   comparable-severity and a lesser alternative. The fixture runs through
+   `review_calibration` before launch. The kind has no unkeyed history, so the
+   keyed-versus-unkeyed movement check doesn't apply to it, and the
+   calibration run stands in for it.
+2. **One clause joins the shared data-modeling line.**
    `GenerationPrompt::ConceptGuidance#data_modeling_idiom_guidance` says only
-   a schema-review `code_review` presents a schema artifact, and any other
-   host expresses a data-modeling concept in its own idiom. It renders in all
-   263 generation snapshots. `change_review` shows a migration among its
-   files for those concepts, which contradicts the line. The options:
-   - **A. Add one clause to that line (recommended).** The clause names
-     `change_review`'s idiom: a migration and the model or query that depends
-     on it, across files. Every generation snapshot changes by that clause.
-     The build checks that mechanically, as the stored keys plan does for its
-     fragments: a script strips the clause from each diff and asserts nothing
-     else changed.
-   - **B. Leave data modeling out of this kind.** That empties the
-     JavaScript vocabulary, which would need a language gate, against the
-     decisions above.
-3. **A new kind's first appearance.** A kind never seen has the highest
-   staleness (`SectionRotation::LOOKBACK` + 1), so the third slot wins
-   rotation on a 3-section day until `change_review` appears once. Separately,
-   `CoverageException` adds one section to a two-section Automatic day from
-   the optional slots, and a never-seen kind sorts first by gap. So an
-   established Automatic user on two-section days gets a `change_review`
-   added on their next eligible day. `CAP_WEEKDAYS` (4) still limits
-   additions to one in 4 weekdays. The options:
-   - **A. Accept it (recommended).** One early appearance per user, then
-     rotation evens out. It shows each user the new kind soon after launch.
-   - **B. Treat launch day as last seen**, so the kind starts at ordinary
-     staleness. That needs a new mechanism in `SectionRotation` and
-     `CoverageException::History`.
-   - **C. Leave the new kind out of coverage additions** for its first
-     weeks. That needs a new rule in `CoverageException.candidate_kinds`.
-4. **The judge rejecting a section for not fitting its rung.** Section 9's
-   draft asks the judge to reject a junior section whose interaction isn't
-   visible, and a senior section whose interaction is. The judge's system
-   prompt says "Never reject because a section is straightforward" and "You
-   never change difficulty". The options:
-   - **A. Drop the rung-fit rejection (recommended).** The per-rung shape
-     stays prompt guidance only (section 5). The judge still rejects a
-     single-file flaw and an exploit.
-   - **B. Keep it**, as a kind-specific exception to the judge's rule,
-     written into the judge guidance and the decision doc.
+   a schema-review `code_review` presents a schema artifact. It gains one
+   clause naming `change_review`'s idiom: a migration and the model or query
+   that depends on it, across files. All 263 generation snapshots change by
+   that clause. A throwaway script strips the clause from each diff and
+   asserts nothing else changed, as the stored keys plan checks its
+   fragments.
+3. **A new kind's first appearance is accepted.** A never-seen kind has the
+   highest staleness (`SectionRotation::LOOKBACK` + 1), so the third slot wins
+   rotation on a 3-section day until `change_review` first appears. A
+   never-seen kind also sorts first for `CoverageException`'s addition to a
+   two-section Automatic day, which `CAP_WEEKDAYS` (4) limits to one in 4
+   weekdays. Each user sees the new kind once soon after launch, and
+   rotation evens out after that. No new mechanism.
+4. **The judge doesn't reject a section for not fitting its rung.** Its
+   system prompt says "You never change difficulty", so the per-rung shape in
+   section 5 is held by the generation guidance alone. The judge still
+   rejects a single-file flaw and an exploit.
 
-The rest of this spec assumes the recommended option for each.
+Every decision the build needs is made.
 
 ## 1. A rotating third, offered to everyone
 
@@ -131,8 +96,8 @@ The third slot is the right one:
   fourth, and any default daily kind the user swapped out) by its stalest
   kind and fills as many as the day has room for, so a third doesn't always
   appear. The kind adds no section to the day's planned size. The one
-  exception is a coverage addition on a two-section Automatic day (Decision
-  3).
+  exception is a coverage addition on a two-section Automatic day, accepted
+  in decision 3 above.
 
 ### How often it comes up
 
@@ -486,7 +451,7 @@ guidance already receives `rung:`:
   guidance. `.reject_unusable!` receives only the section, and
   `ProblemSetIngest` stamps `pitched_at` after the boundary checks, so the
   boundary enforces only the 2–3 range for every rung (section 7).
-- **The judge doesn't reject on rung fit** (Decision 4). Its system prompt
+- **The judge doesn't reject on rung fit** (decision 4 under Decisions). Its system prompt
   says it never changes difficulty, so the per-rung shape is held by the
   generation guidance alone.
 - **Easing:** a reduced-tier concept can be eased (`eased: true`). That
@@ -636,7 +601,7 @@ interact, and say which files it involves and how to fix it."
   to find". The schema is unchanged, so rejection evidence for this kind
   reads less precisely than a principle of its own would. A new principle is
   a later change if the rejection logs need it.
-- **No rung-fit rejection** (Decision 4).
+- **No rung-fit rejection** (decision 4 under Decisions).
 
 ### The blind solve: not at launch
 
@@ -775,7 +740,7 @@ conditions).
 - **`generation_prompt_pair_coverage_spec`** renders every reachable pair,
   so it gains this kind's pairs, and its "named by kind" check covers them.
 - **Existing generation snapshots:** all 263 change by the one clause
-  Decision 2 adds to the data-modeling line, and by nothing else. A
+  decision 2 adds to the data-modeling line, and by nothing else. A
   throwaway script strips the clause from each diff and asserts nothing else
   changed.
 - **Existing page snapshots:** four change, because each lists every kind:
@@ -853,12 +818,11 @@ Stop and come back to the owner, without building further, if:
 1. Both stored answer keys PRs merge first. PR 1 brings the field shape,
    the quote hook, the strip-site specs and `ANSWER_KEY_MARKERS`. PR 2 brings
    the review-context key line and the gating that keyed grading needs
-   (Decision 1).
+   (decision 1 under Decisions).
 2. The `code_review` length cap (a separate issue) is independent and can
    land at any time. Its `.reject_unusable!` is the same kind of check as
    section 7 here, in another kind.
-3. The owner decides the four questions above.
-4. Then this build: `KeyQuote` and the shared hook signature, the kind and
+3. Then this build: `KeyQuote` and the shared hook signature, the kind and
    its boundary, then its place in rotation,
    then the highlighting, then the page, then the judge and grading, each
    step test-first.
