@@ -730,6 +730,17 @@ RSpec.describe ProblemSetIngest, "formatting code" do
     expect(result.unusable_sections.map(&:key)).to eq([ "design_comparison" ])
   end
 
+  it "counts a code review's snippet after formatting, so code the formatter shortens is kept" do
+    long_before_formatting = Array.new(ExerciseSection::CodeReview::MAX_SNIPPET_LINES + 1, "x = 1").join("\n")
+    allow(CodeFormat).to receive(:all) { |snippets, **| snippets.map { |code| code.lines.first(5).join } }
+    set = { "code_review" => FakeService::EXERCISE_PROBLEM_SET.fetch("code_review").deep_dup.merge("snippet" => long_before_formatting) }
+
+    result = described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: set.keys)
+
+    expect(result.unusable_sections).to be_empty
+    expect(result.problem_set["code_review"]["snippet"].lines.size).to eq(5)
+  end
+
   it "passes nothing when no section carries code" do
     ingested({ "pattern" => FakeService::EXERCISE_PROBLEM_SET.fetch("pattern").deep_dup })
 

@@ -302,4 +302,5 @@ class ExerciseSection
       text.lines.reject { |line| labels.include?(line.strip) }.join.strip
     end
   end
+  private_class_method :shown_lines
 end
