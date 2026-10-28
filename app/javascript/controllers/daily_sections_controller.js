@@ -17,6 +17,8 @@ export default class extends Controller {
 
   // An edit made before this controller connected fires no event of its own, so adopt it against what the server rendered.
   connect() {
+    this.unsent = 0
+    this.latest = null
     const picked = this.checkedCount()
     if (picked && !picked.defaultChecked) this.open(picked)
   }
@@ -75,12 +77,18 @@ export default class extends Controller {
 
   // An Exercise mix edit still waiting to send would post the old layout after this one and lose itself to the reload.
   async send(user, options) {
-    await saveStatus.settled(KEY)
-    const body = { user: user, layout: this.layoutValue, places: this.placesValue }
-    const result = await saveStatus.queue(KEY, "PATCH", this.urlValue, body, options)
+    this.unsent += 1
+    let result
+    try {
+      await saveStatus.settled(KEY)
+      const body = { user: user, layout: this.layoutValue, places: this.placesValue }
+      result = await saveStatus.queue(KEY, "PATCH", this.urlValue, body, options)
+    } finally {
+      this.unsent -= 1
+    }
     const moved = result.status === 409 && result.data && result.data.layout_changed
     if (result.ok) this.adopt(result.data)
-    if (moved || (result.ok && this.layoutMoved(result.data))) {
+    if (moved || (this.unsent === 0 && this.latest && this.layoutMoved(this.latest))) {
       this.reloadForNewLayout()
       return Object.assign({ reloading: true }, result)
     }
@@ -88,6 +96,7 @@ export default class extends Controller {
   }
 
   adopt(data) {
+    this.latest = data
     const saved = data.daily_section_count === null ? "automatic" : String(data.daily_section_count)
     this.countTargets.forEach((radio) => { radio.defaultChecked = radio.value === saved })
     this.choiceTargets.forEach((choice) => { choice.hidden = true })

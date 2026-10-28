@@ -44,6 +44,14 @@ by it), or the server answers 409 with `layout_changed`, the page reloads throug
 page lands first. If one fails, the banner says the daily sections are
 saved and asks for a reload once the other change saves.
 
+Only the reply to the last selection still on its way makes that call, and
+it judges the newest successful reply. A second tap made while the first
+save is in flight waits in `saveStatus.settled`, outside the save queue, so
+`reloadWhenSaved` can't see it; letting the first reply reload would leave
+the page on the first count and drop the second. The controller counts its
+own unsent selections instead of registering them as a `saveStatus` probe,
+since `settled` would then wait on itself.
+
 ## An edit made before the modules load
 
 A radio tapped before `connect()` fires no event this controller hears.

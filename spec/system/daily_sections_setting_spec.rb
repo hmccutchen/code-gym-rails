@@ -135,19 +135,63 @@ RSpec.describe "Daily sections setting", type: :system do
     wait_for { user.reload.section_kind_weights == { "challenge" => KindPreferences::MULTIPLIERS.last } }
   end
 
+  def count_profile_saves
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.beforeReload = true
+      window.profileSaves = 0
+      window.fetch = (url, options) => {
+        const reply = originalFetch(url, options)
+        if (new URL(url, location.href).pathname === "/profile") reply.then(() => { window.profileSaves += 1 })
+        return reply
+      }
+    JS
+  end
+
+  def expect_back_on_automatic_without_a_reload
+    wait_for_js_condition("window.profileSaves === 2 && !CodeGymSaveStatus.pending()")
+    expect(user.reload.daily_section_count).to be_nil
+    expect(page.evaluate_script("window.beforeReload")).to be(true)
+    expect(page.evaluate_script("document.querySelector(\"#daily-sections input[value='automatic']\").checked")).to be(true)
+  end
+
   it "saves a tap back to the saved count made while the first tap's save is still in flight" do
     visit_as(user)
     visit setup_path
     wait_for_js
+    count_profile_saves
 
     page.execute_script(<<~JS)
-      window.beforeReload = true;
       document.querySelector("#daily-sections input[value='2']").click();
       document.querySelector("#daily-sections input[value='automatic']").click();
     JS
 
-    wait_for { page.evaluate_script("window.beforeReload") != true }
-    expect(page).to have_css("#daily-sections input[value='automatic'][checked]", visible: :all)
-    expect(user.reload.daily_section_count).to be_nil
+    expect_back_on_automatic_without_a_reload
+  end
+
+  it "saves a tap back made in a later event while the first tap's reply is still held" do
+    visit_as(user)
+    visit setup_path
+    wait_for_js
+    count_profile_saves
+    page.execute_script(<<~JS)
+      const countingFetch = window.fetch
+      window.heldSaves = []
+      window.releaseEverySave = () => {
+        window.fetch = countingFetch
+        window.heldSaves.forEach((save) => save.release())
+      }
+      window.fetch = (url, options) => {
+        if (new URL(url, location.href).pathname !== "/profile") return countingFetch(url, options)
+        return new Promise((resolve) => window.heldSaves.push({ release: () => resolve(countingFetch(url, options)) }))
+      }
+    JS
+
+    find("#daily-sections .segment", text: "2").click
+    wait_for_js_condition("window.heldSaves.length === 1")
+    find("#daily-sections .segment", text: "Automatic").click
+    page.execute_script("window.releaseEverySave()")
+
+    expect_back_on_automatic_without_a_reload
   end
 end
