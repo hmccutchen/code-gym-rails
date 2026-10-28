@@ -36,6 +36,7 @@ RSpec.describe "Daily sections setting", type: :system do
     end
 
     expect(count_after_save(nil)).to be_nil
+    wait_for { page.has_no_css?("#exercise-mix .mix-unplaced-note", visible: :all) }
 
     visit setup_path
 
