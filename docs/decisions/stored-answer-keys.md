@@ -88,7 +88,7 @@ reach 5 keyed sections. Adding those kinds to the owner's own days would
 make progress that isn't real. The owner decided on 2026-10-28:
 
 - **Drafts, not real days.** `script/draft_key_samples.rb` drafts those
-  three kinds through the production generation prompt, ingest and judge,
+  three kinds through the production retry route, ingest and judge,
   and writes no day or history. It runs on the owner's machine against a
   local database, never against production, and every billed run waits for
   the owner's approval of its call count and cost. It logs no `ApiUsage`

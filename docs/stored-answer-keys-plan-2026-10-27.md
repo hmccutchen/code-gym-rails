@@ -23,7 +23,7 @@ enough to hold a third or fourth section. The owner is the app's only user
 and won't add those kinds to their own days just to collect keys. **The
 owner decided** on 2026-10-28 that the read between the PRs uses drafted
 sections for those three kinds: `script/draft_key_samples.rb` drafts one
-kind at a time through the production generation path, writes no day and
+kind at a time through the production retry route, writes no day and
 no history, and its output goes to the reader (see "Drafted sections for
 the rarer kinds" below). `code_review` is read from real days.
 
@@ -275,16 +275,19 @@ the token measurement, and why `exercise_section.rb` grows by one line.
 in its own PR before the read.
 
 - **The path.** Each draft goes through `AiService#retry_section` with one
-  concept from the kind's vocabulary fixed, so the key is planted, cleaned
-  and quote-checked by the same prompt, ingest and `PlantedKey` code a real
-  day uses. The production judge then judges it on its own route. A
+  concept from the kind's vocabulary fixed, so the key is planted by the
+  retry prompt a real day sends after a rejection, and cleaned and
+  quote-checked by the same ingest and `PlantedKey` code. A day's first
+  drafts come from the whole-set prompt instead, so drafts show whether the
+  generator plants a correct key for the kind without reproducing a first
+  draft. The production judge then judges it on its own route. A
   rejected draft is left out and another is drafted, up to a cap. A draft
   that comes back without a key is left out too, and counted.
 - **Where it runs.** On the owner's machine, against a local database,
   with the owner's Anthropic key in `ANTHROPIC_API_KEY`. It never runs
   against production and never reads the production database. Without
   `--run` it only prints the plan: the number of drafts, the most calls it
-  can make, and an upper-bound cost. With `--run` it makes those calls.
+  can make, and a cost bound with every call at its output cap. With `--run` it makes those calls.
   **Every `--run` needs the owner's approval first,** with that call count
   and cost.
 - **What it writes.** Its output, in the key sheet's shape plus each
