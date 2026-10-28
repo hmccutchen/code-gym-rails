@@ -77,7 +77,10 @@ read it before changing that area.
   `DailyKinds.for` holds as many stored places as the Daily sections
   setting asks for (the pair under Automatic); places past the pair are
   chosen extra sections in every set. The swap control, the shared concept
-  (`DailyKinds.shared_pair`) and the emptied-slot check read the pair alone.
+  (`DailyKinds.shared_pair`) and the emptied-slot check read the pair alone;
+  a swap ignores, and drops on a clash, an extra the setting hides. When a
+  fixed count leaves nothing to rotate (`DailyKinds.rotates?`),
+  `KindPreferences.offered_to` offers only the held kinds.
   `DailyKindSwap` (`PATCH /daily_kinds/:place`) writes a pair place, and
   `ProfileUpdate` writes the whole list with a Daily sections choice. A swap
   refuses a stale version, a repeat, a second fourth or a pair that empties
@@ -93,7 +96,8 @@ read it before changing that area.
   `DaySize.for` returns a fixed count before completion or the gate, and a
   fixed count never gains a coverage section. Setup asks which daily section
   a count of 1 keeps and which kinds a larger count adds, and saves the count
-  and the place list in one `PATCH /profile` (`DailySectionsChoice`).
+  and the place list in one `PATCH /profile` (`DailySectionsChoice`); a count
+  of 3 or 4 without a kind for every place is a 422.
   `ProfileUpdate` accepts only `"automatic"` or a whole number, since Active
   Record's integer cast would misread anything else, and `User` 422s a count
   outside the range. It is not part of the Exercise mix version.

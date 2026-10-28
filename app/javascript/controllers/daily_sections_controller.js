@@ -10,6 +10,7 @@ export default class extends Controller {
   static values = {
     url: String,
     layout: Array,
+    rotates: Boolean,
     strandedText: String
   }
 
@@ -67,7 +68,7 @@ export default class extends Controller {
     const result = await saveStatus.queue(KEY, "PATCH", this.urlValue, { user: user, layout: this.layoutValue }, options)
     const moved = result.status === 409 && result.data && result.data.layout_changed
     if (result.ok) this.adopt(result.data)
-    if (moved || (result.ok && this.layoutMoved(result.data.daily_kinds))) {
+    if (moved || (result.ok && this.layoutMoved(result.data))) {
       this.reloadForNewLayout()
       return Object.assign({ reloading: true }, result)
     }
@@ -80,8 +81,9 @@ export default class extends Controller {
     this.choiceTargets.forEach((choice) => { choice.hidden = true })
   }
 
-  layoutMoved(kinds) {
-    return Array.isArray(kinds) && JSON.stringify(kinds) !== JSON.stringify(this.layoutValue)
+  layoutMoved(data) {
+    const kinds = data.daily_kinds
+    return (Array.isArray(kinds) && JSON.stringify(kinds) !== JSON.stringify(this.layoutValue)) || data.rotates !== this.rotatesValue
   }
 
   // The Exercise mix below is rendered for the old daily kinds, so the page reloads once every other save lands.

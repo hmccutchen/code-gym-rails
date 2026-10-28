@@ -17,6 +17,8 @@ class DailyKinds
   # A fixed setting holds that many places; Automatic holds the pair and lets the gate grow the day.
   def self.held(keys, setting) = normalize(keys).first((setting || COUNT).clamp(FEWEST, MOST))
 
+  def self.rotates?(user) = user.daily_section_count.nil? || self.for(user).size < user.daily_section_count.clamp(FEWEST, MOST)
+
   def self.shared_pair(kinds) = kinds.size < COUNT ? [] : kinds.first(COUNT)
 
   # A row planned before plan_notes carried the pair was planned with the default one.

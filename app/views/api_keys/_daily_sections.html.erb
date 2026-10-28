@@ -2,6 +2,7 @@
 <fieldset class="field-group" id="daily-sections" data-controller="daily-sections"
           data-daily-sections-url-value="<%= profile_path %>"
           data-daily-sections-layout-value="<%= DailyKinds.for(current_user).map(&:key).to_json %>"
+          data-daily-sections-rotates-value="<%= DailyKinds.rotates?(current_user) %>"
           data-daily-sections-stranded-text-value="<%= t("daily_sections.choose.stranded") %>">
   <legend><%= t("daily_sections.legend") %></legend>
   <div class="segmented">

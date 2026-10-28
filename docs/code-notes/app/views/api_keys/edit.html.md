@@ -154,7 +154,10 @@ set. The user's daily kinds (`DailyKinds.for`) share one group because they
 share a promise, that they are in every set. The other groups come from
 `ExerciseSection.optional_slots` for that pair, so a daily kind is never
 offered a weight or an exclusion. Any other single-kind slot appears in some sets only, so it
-gets a group of its own.
+gets a group of its own. When the Daily sections setting leaves nothing to
+rotate (`DailyKinds.rotates?`), every group after the daily one keeps its
+controls but is labelled "not in your sets at this setting", under one note,
+since its settings apply again once the setting changes.
 
 ## Rotating groups
 

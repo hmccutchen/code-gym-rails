@@ -541,6 +541,7 @@ en:
       cancel: "Cancel"
       saving: "Saving…"
       refused: "Choose a different kind for each section, with at most one of %{fourths}."
+      unfilled: "Choose a kind for each extra section before saving %{count} daily sections. If this page was open before an update, reload it first."
       stranded: "Your daily sections are saved. Another change on this page hasn't saved yet, so reload once it does to see your new Exercise mix."
   exercise_mix:
     summary: "Exercise mix"
@@ -551,6 +552,14 @@ en:
     design_comparison_group: "Design comparison section, in some sets"
     third_group: "Rotating third section"
     fourth_group: "Rotating fourth section"
+    unplaced:
+      pattern: "Pattern section"
+      code_review: "Code review section"
+      design_comparison: "Design comparison section"
+      third: "Rotating third section"
+      fourth: "Rotating fourth section"
+    unplaced_suffix: ", not in your sets at this setting"
+    unplaced_note: "Your Daily sections setting is %{count}, and each of those sections is chosen, so nothing below appears in your sets. These settings apply again once you change Daily sections."
     exclude_heading: "Skipping is a stronger, different action than turning a slider down."
     exclude_body_weak: "A slider at Much less means rarely — the section can still come up, and it will if you haven't seen it in a long while, so nothing disappears from your rotation permanently."
     exclude_body_strong: "Skip means never. The section is removed from rotation entirely and will not appear again until you turn Skip off."

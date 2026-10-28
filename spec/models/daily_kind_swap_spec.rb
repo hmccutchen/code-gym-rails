@@ -53,6 +53,16 @@ RSpec.describe DailyKindSwap do
       expect(user.reload.daily_section_kinds).to eq(%w[code_review architecture])
     end
 
+    it "ignores an extra section the setting hides, dropping it when the swap brings in its kind or a second fourth" do
+      user.update!(daily_section_kinds: %w[code_review design_comparison pattern plan_review])
+
+      expect(swap(place: 0, kind: "pattern").status).to eq(:saved)
+      expect(user.reload.daily_section_kinds).to eq(%w[pattern design_comparison plan_review])
+
+      expect(swap(place: 0, kind: "ambiguity_hunt").status).to eq(:saved)
+      expect(user.reload.daily_section_kinds).to eq(%w[ambiguity_hunt design_comparison])
+    end
+
     it "never changes today's set or its response" do
       exercise = todays_set
       response = response_for(exercise, answers: { "code_review" => "x" * 20 })

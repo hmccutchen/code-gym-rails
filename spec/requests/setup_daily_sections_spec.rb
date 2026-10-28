@@ -88,4 +88,26 @@ RSpec.describe "Setup Daily sections control", type: :request do
       .to eq([ name("code_review"), name("design_comparison"), name("challenge") ])
     expect(page_html.at_css("#weight-challenge")).to be_nil
   end
+
+  it "labels every group outside the daily kinds as not in your sets when the setting leaves nothing to rotate" do
+    user.update!(daily_section_count: 1)
+    login_as(user)
+
+    get setup_path
+
+    legends = page_html.css("#exercise-mix .mix-group > legend").map(&:text)
+    expect(legends.first).to eq(I18n.t("exercise_mix.fixed_group"))
+    expect(legends.drop(1)).to all(end_with(I18n.t("exercise_mix.unplaced_suffix")))
+    expect(legends).to include("#{I18n.t("exercise_mix.unplaced.design_comparison")}#{I18n.t("exercise_mix.unplaced_suffix")}")
+    expect(page_html.at_css("#exercise-mix .mix-unplaced-note").text).to eq(I18n.t("exercise_mix.unplaced_note", count: 1))
+  end
+
+  it "keeps the in-some-sets labels and no note while the setting leaves a place to rotate" do
+    login_as(user)
+
+    get setup_path
+
+    expect(page_html.css("#exercise-mix .mix-group > legend").map(&:text)).to include(I18n.t("exercise_mix.pattern_group"))
+    expect(page_html.at_css("#exercise-mix .mix-unplaced-note")).to be_nil
+  end
 end

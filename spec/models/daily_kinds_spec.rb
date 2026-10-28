@@ -48,6 +48,20 @@ RSpec.describe DailyKinds do
     end
   end
 
+  describe ".rotates?" do
+    it "is true under Automatic, and under a fixed count with a place no daily kind holds" do
+      expect(described_class.rotates?(User.new(daily_section_kinds: []))).to be(true)
+      expect(described_class.rotates?(User.new(daily_section_kinds: [], daily_section_count: 3))).to be(true)
+    end
+
+    it "is false under a fixed count whose every place holds a daily kind" do
+      expect(described_class.rotates?(User.new(daily_section_kinds: [], daily_section_count: 1))).to be(false)
+      expect(described_class.rotates?(User.new(daily_section_kinds: [], daily_section_count: 2))).to be(false)
+      expect(described_class.rotates?(User.new(daily_section_kinds: %w[code_review design_comparison pattern],
+                                               daily_section_count: 3))).to be(false)
+    end
+  end
+
   describe ".pair" do
     it "is the first two places whatever the setting, the places a card's swap control changes" do
       user = User.new(daily_section_kinds: %w[design_comparison code_review pattern], daily_section_count: 1)

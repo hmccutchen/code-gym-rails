@@ -33,6 +33,7 @@ class ProfileUpdate
     return full_rule(:daily_section_count, User::DAILY_SECTION_COUNT_RULE) unless daily_section_count_shaped?
     return "Daily section kinds must be a list of strings" unless list_of_strings?(:daily_section_kinds)
     return daily_section_kinds_refusal unless daily_section_kinds_accepted?
+    return I18n.t("daily_sections.choose.unfilled", count: posted_count) if extra_places_unchosen?
     return "Section weights must map each section to a weight" unless object?(:section_kind_weights)
     return "Excluded section kinds must be a list of strings" unless list_of_strings?(:excluded_section_kinds)
     return "Section difficulty must map each section to a level" unless object?(:section_kind_levels)
@@ -57,6 +58,15 @@ class ProfileUpdate
 
   def daily_section_kinds_accepted?
     !posted?(:daily_section_kinds) || DailyKinds.problems_with(@user_params[:daily_section_kinds]).empty?
+  end
+
+  def posted_count = Integer(@user_params[:daily_section_count].to_s, 10, exception: false)
+
+  def extra_places_unchosen?
+    count = posted_count
+    return false unless count && count > DailyKinds::COUNT && User::DAILY_SECTION_COUNTS.cover?(count)
+
+    DailyKinds.normalize(@user_params[:daily_section_kinds]).size < count
   end
 
   def daily_section_kinds_refusal

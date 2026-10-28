@@ -9,9 +9,8 @@ class LadderCoverage
     pairs_by_kind = ConceptHosts.for(user, difficulty: at_rungs).pairs_by_kind
     grounded = laddered_pairs(pairs_by_kind.values.flatten(1).uniq)
 
-    preferences = KindPreferences.for(user)
     new(pairs_by_kind.to_h { |kind, pairs| [ kind, Entry.new(kind: kind, pairs: pairs, grounded: pairs & grounded) ] },
-        offered: preferences.offered(daily: DailyKinds.for(user)))
+        offered: KindPreferences.offered_to(user))
   end
 
   def self.laddered_pairs(pairs)

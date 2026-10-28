@@ -369,10 +369,10 @@ RSpec.describe "Profile", type: :request do
             headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
     end
 
-    it "saves each fixed count and echoes it back" do
+    it "saves each fixed count that holds no extra section, and echoes it back" do
       login_as(user)
 
-      User::DAILY_SECTION_COUNTS.each do |count|
+      User::DAILY_SECTION_COUNTS.select { |count| count <= DailyKinds::COUNT }.each do |count|
         save_daily_sections(count.to_s)
 
         expect(response).to have_http_status(:ok)
@@ -384,10 +384,23 @@ RSpec.describe "Profile", type: :request do
     it "accepts a count sent as a JSON number" do
       login_as(user)
 
-      save_daily_sections(3)
+      save_daily_sections(2)
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.daily_section_count).to eq(3)
+      expect(user.reload.daily_section_count).to eq(2)
+    end
+
+    it "refuses a count with extra sections when no kind is chosen for each, even with extras stored" do
+      user.update!(daily_section_kinds: %w[code_review design_comparison pattern])
+      login_as(user)
+
+      [ 3, "4" ].each do |count|
+        save_daily_sections(count)
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body["error"]).to eq(I18n.t("daily_sections.choose.unfilled", count: count))
+        expect(user.reload.daily_section_count).to be_nil
+      end
     end
 
     it "saves automatic as no fixed count" do
@@ -422,12 +435,17 @@ RSpec.describe "Profile", type: :request do
     end
 
     it "answers with the daily kinds the saved setting holds, so the page can tell its Exercise mix moved" do
-      user.update!(daily_section_kinds: %w[code_review design_comparison pattern])
+      user.update!(daily_section_kinds: %w[code_review design_comparison pattern], daily_section_count: 3)
       login_as(user)
 
-      save_daily_sections(3)
+      save_daily_sections(1)
 
-      expect(response.parsed_body["daily_kinds"]).to eq(%w[code_review design_comparison pattern])
+      expect(response.parsed_body["daily_kinds"]).to eq(%w[code_review])
+      expect(response.parsed_body["rotates"]).to be(false)
+
+      save_daily_sections("automatic")
+
+      expect(response.parsed_body["rotates"]).to be(true)
     end
   end
 
@@ -474,6 +492,13 @@ RSpec.describe "Profile", type: :request do
           .to eq("Choose a different kind for each section, with at most one of Plan Review, Ambiguity Hunt and Pseudocode to Code.")
         expect(user.reload).to have_attributes(daily_section_count: nil, daily_section_kinds: [])
       end
+    end
+
+    it "refuses a list too short for the count" do
+      choose(4, %w[code_review design_comparison pattern])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.daily_section_count).to be_nil
     end
 
     it "refuses kinds that are not a list of names in the words the other shape checks use" do

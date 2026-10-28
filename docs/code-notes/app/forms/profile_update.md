@@ -27,6 +27,11 @@ catch, and leaves which values a field allows to `User`:
   a choice they made there. Posting it is a locked save, so a `layout` the
   page posts with it is checked against another tab's swap, and a list equal
   to the default pair stores as empty (`DailyKinds.stored`).
+- A `daily_section_count` above the pair's size must come with a
+  `daily_section_kinds` list holding a kind for every place. The check reads
+  only the request, so a count stored before the chooser existed keeps
+  rotating its unchosen places, and a stale tab gets a 422 asking it to
+  reload.
 
 The request specs read `User`'s messages for a value outside a list, so
 `User` words them for a person, and the form builds its shape messages for

@@ -21,8 +21,9 @@ builds no list of its own beyond joining those two.
 ## Reloading for the Exercise mix
 
 The Exercise mix below is rendered for the daily kinds the old setting
-held. When the reply's `daily_kinds` differ from the rendered layout, or the
-server answers 409 with `layout_changed`, the page reloads through
+held. When the reply's `daily_kinds` differ from the rendered layout, its
+`rotates` differs from the rendered one (the Exercise mix labels its groups
+by it), or the server answers 409 with `layout_changed`, the page reloads through
 `saveStatus.reloadWhenSaved`, so a save still in flight elsewhere on the
 page lands first. If one fails, the banner says the daily sections are
 saved and asks for a reload once the other change saves.

@@ -24,8 +24,10 @@ A fixed count also decides how many of the user's daily places a set holds
   Setup asks for a kind per extra place before it saves, preselecting the
   stored extras (`DailySectionsChoice`). A chosen extra is in every set and
   no rotation runs for its place, so the Exercise mix lists it under "In
-  every set". A fixed count with no extras stored, such as one saved before
-  this choice existed, still rotates the places it has no kind for.
+  every set". `ProfileUpdate` refuses a count of 3 or 4 unless the same
+  request names a kind for every place, so a tab open from before this
+  change, or a script, cannot save one bare. A count stored bare before
+  then still rotates the places it has no kind for.
 
 Automatic holds the pair whatever is stored, so its floors stay at the
 pair's size (`daily_kinds_floor_spec`); only a fixed setting goes down to
@@ -41,8 +43,10 @@ still drop a section from it.
 reply names the daily kinds the saved setting holds; when they differ from
 the rendered layout, the page reloads once every other save on it has
 landed (`daily_sections_controller`), since the Exercise mix below is drawn
-for the old kinds. Counts that need no choice (Automatic and 2) save on the
-tap, as before.
+for the old kinds. The reply also says whether the setting leaves a place
+to rotate (`rotates`), and a change there reloads too, since the Exercise
+mix labels groups by it. Counts that need no choice (Automatic and 2) save
+on the tap, as before.
 
 **The boundary accepts only listed values.** `ProfileUpdate` takes
 `User::AUTOMATIC_SECTION_COUNT` (`"automatic"`, stored as nil, and the value

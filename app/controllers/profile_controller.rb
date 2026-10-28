@@ -40,7 +40,7 @@ class ProfileController < ApplicationController
   def saved_body
     body = { name: current_user.name, time_zone: current_user.time_zone,
              daily_section_count: current_user.daily_section_count }
-    body[:daily_kinds] = DailyKinds.for(current_user).map(&:key) if daily_sections_update?
+    body.merge!(daily_kinds: DailyKinds.for(current_user).map(&:key), rotates: DailyKinds.rotates?(current_user)) if daily_sections_update?
     return body unless preference_update? || track_update?
 
     body.merge(section_kind_preferences_version: current_user.section_kind_preferences_version,
