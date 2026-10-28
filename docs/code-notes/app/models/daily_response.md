@@ -107,7 +107,7 @@ The zero guard matters: a payload with no Hash sections has no section keys, and
 
 ## `#improved_code_visible?`
 
-Improved code is revealed only from a concept's second exposure onward. A section tagged blank or `"other"` is not gated.
+Improved code is revealed only from a concept's second exposure onward. A section tagged blank or `"other"` is not gated: `ConceptExposureIndex#count_for` returns nil for it, and nil reads as visible.
 
 ## `.reviewed` and `.section_reviewed_condition`
 

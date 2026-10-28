@@ -110,18 +110,12 @@ class ResponseReview
 
     critiqued = @response.critiqued?(section)
     gaps      = ExerciseSection::PseudocodeToCode.normalize_critique(@response.pseudocode_round(section)["critique"]).size
-    missed    = DailyResponse.review_points(graded_missed(@response.ai_review&.dig(section))).size
+    missed    = DailyResponse.review_points(ReviewProseVerdict.as_graded(@response.ai_review&.dig(section))&.dig("missed")).size
 
     Rails.logger.info(
       "[pseudocode] user=#{@response.user_id} date=#{@response.daily_exercise.date} phase=review " \
       "critiqued=#{critiqued} gaps=#{gaps} missed=#{missed} " \
       "disagreement=#{critiqued && gaps.zero? && missed.positive?}"
     )
-  end
-
-  def graded_missed(review)
-    return nil unless review.is_a?(Hash)
-
-    review.dig(ReviewProseVerdict::ORIGINAL_KEY, "missed") || review["missed"]
   end
 end

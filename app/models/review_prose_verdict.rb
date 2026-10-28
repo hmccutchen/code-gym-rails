@@ -19,6 +19,10 @@ class ReviewProseVerdict
     end
   end
 
+  def self.as_graded(review)
+    review.merge(review.fetch(ORIGINAL_KEY, {})) if review.is_a?(Hash)
+  end
+
   def self.parse(raw, projection:)
     raise Invalid, "verdict is not an object" unless raw.is_a?(Hash)
     raise Invalid, "unknown status" unless STATUSES.include?(raw["status"])

@@ -697,6 +697,9 @@ en:
     calibration_note: "You rated this \"%{rating}\" — the review suggests there's more to work on here."
     difficulty_note: "This problem was rated %{level} difficulty, judged from the problem itself rather than from your answer."
     explain_differently: "Explain this differently"
+    short_version:
+      summary: "Show the short version"
+      more: "More on this concept"
     thinking: "Thinking…"
     alternate_added: "A different explanation was added above."
     alternate_added_last: "A different explanation was added above — that was the last one."

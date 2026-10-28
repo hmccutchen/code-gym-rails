@@ -220,6 +220,15 @@ RSpec.describe GlossaryHelper, type: :helper do
       expect(helper.glossary_wrap_prose("<i>plain</i> and `<b>raw</b>`"))
         .to eq("&lt;i&gt;plain&lt;/i&gt; and <code>&lt;b&gt;raw&lt;/b&gt;</code>")
     end
+
+    it "shares a seen set with the prose around it, so a term already underlined there stays plain" do
+      stub_glossary("closure" => "A function with its scope.")
+      seen = Set.new
+      helper.glossary_wrap("A closure first.", seen: seen)
+
+      expect(helper.glossary_wrap_prose("Then a closure again.", seen: seen)).not_to include("gloss-term")
+      expect(helper.glossary_wrap_prose("A fresh closure.")).to include("gloss-term")
+    end
   end
 
   it "no longer defines prose_with_inline_code" do
