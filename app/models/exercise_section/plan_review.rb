@@ -54,6 +54,7 @@ class ExerciseSection::PlanReview < ExerciseSection
     <<~GUIDANCE.chomp
       - The "#{key}" section is a PLAN REVIEW: "plan_excerpt" is a short prose implementation plan, framed as if written by an AI assistant, short enough to review in one sitting (2-4 short paragraphs or a short numbered list, never a full design doc). It must contain 2-3 planted flaws that span levels — one real technical anti-pattern, one scope-creep item, one unflagged behavior change — never three of the same category.
       - Choose the plan_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
+      - "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "title", "question", "scenario", "answer_scaffold" or "teaching_note" — doing so would give away the answer before the engineer reads the plan. Quote the plan text it points at in backticks, never by line number.
     GUIDANCE
   end
 
@@ -66,7 +67,10 @@ class ExerciseSection::PlanReview < ExerciseSection
           "question": "string — what to evaluate before approving this plan",
           "answer_scaffold": ["string — a labelled part of a complete answer to THIS review", "string — another part"],
           "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary"
+          "concept": "string — exactly one concept from the provided vocabulary",
+          "answer_key": {
+            "flaws": [{ "category": "string — #{FLAW_CATEGORIES.join(' | ')}", "flaw": "string — what is wrong, quoting the plan in backticks", "pushback": "string — what a reviewer should ask for" }, "... (one entry per planted flaw)"]
+          }
         }
     SCHEMA
   end

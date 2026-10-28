@@ -27,6 +27,7 @@ Instructions:
 - Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
 - The code_review snippet must be a Rails migration, ~10-15 lines, containing one planted data-modeling flaw. Same question shape as any other code_review ("what's the issue here, and how would you fix it") — the engineer reviews the proposed change, not prose about it.
 - Choose the code_review concept from this vocabulary, exactly one: missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration
+- "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "question", "scenario", "teaching_note" or "diagram" — doing so would give away the answer before the engineer reads the snippet. Quote the code it points at in backticks, never by line number.
 - The "design_comparison" section is a DESIGN COMPARISON: "better_piece" and "other_piece" are two pieces of Ruby/Rails code, 12-15 lines each, that meet the same stated behavior, including its retry and failure cases, and differ on exactly one design principle: the tagged concept. Compare what they cost to change or to run, never correct behavior against a defect; a worse piece that is incorrect turns this into a code review.
 - Surface parity: the pieces behave identically, are about the same length, and are equally clean, named and commented. Any difference other than the tested principle is a defect.
 - This section is pitched at junior: the deciding fact is in the question, in a line or two, and points plainly at one piece.
@@ -38,6 +39,7 @@ Instructions:
 - Choose the parsons_problem concept from this vocabulary, exactly one: n_plus_one, transaction_safety, memoization, service_objects, scope_chaining, idempotency, authorization, background_jobs, caching, validations, callbacks_vs_service, query_objects, policy_objects, indexing, concurrency, error_handling, mass_assignment_protection, sql_injection_prevention, over_mocking, testing_implementation_not_behavior
 - The "plan_review" section is a PLAN REVIEW: "plan_excerpt" is a short prose implementation plan, framed as if written by an AI assistant, short enough to review in one sitting (2-4 short paragraphs or a short numbered list, never a full design doc). It must contain 2-3 planted flaws that span levels — one real technical anti-pattern, one scope-creep item, one unflagged behavior change — never three of the same category.
 - Choose the plan_review concept from this vocabulary, exactly one: unjustified_constant, contradicts_existing_pattern, scope_creep, silent_behavior_change
+- "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "title", "question", "scenario", "answer_scaffold" or "teaching_note" — doing so would give away the answer before the engineer reads the plan. Quote the plan text it points at in backticks, never by line number.
 - The data-modeling concepts (missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration) may be tagged on any section whose own vocabulary list above includes them. Only a schema-review code_review presents a schema artifact to review — anywhere else, express the concept in that section's own idiom: a pattern question about wrong_cardinality asks how the relationship should be modeled and what the wrong shape costs the code that uses it, not for a migration to review; a design_comparison shows two ways to store or query the same data that behave the same, such as with and without an index, and asks which one the stated access pattern should use.
 - The meta-skill concepts (reading_for_intent, spotting_unstated_assumptions, separating_symptom_from_cause) name HOW to reason about a problem, not a topic to write about. A section tagged with one must still contain exactly one specific, findable issue and be gradeable against it — the concept shapes only how the question is framed, never whether there is a right answer. A code_review tagged reading_for_intent plants one real divergence between what the code is evidently for and what it does, and asks the engineer to name both; it never asks an open question about the code's purpose. A challenge tagged separating_symptom_from_cause states a failing behavior whose obvious fix treats the symptom, and is graded on whether the submitted implementation addresses the cause; it never asks for an essay about how to debug. Where no code is shown (pattern), express the concept against the described design instead: what the proposed approach takes for granted, or which layer the real cause sits at.
 - The code-smell concepts (god_object, primitive_obsession, shotgun_surgery, feature_envy) name a shape to recognize, not a single broken line. When one is a section's tagged concept, the code must exhibit it at a scale where it is visible — a class doing four jobs, a change that would touch six call sites — and the answer is naming and locating the smell and saying what it costs, never patching one line. Express it in the host section's own idiom: on a test-file code_review, a god_object is a bloated test class; a design_comparison shows one piece with the smell and one without it, behaving the same, and the scenario states how the code changes, which decides what the smell costs. The challenge section is the exception to the answer shape, since its answer is code: there the exercise is a refactor — starter_code exhibits the smell at that scale and the question asks the engineer to restructure it, so writing the better shape IS the answer rather than describing it.
@@ -70,7 +72,12 @@ Return JSON matching this schema exactly:
     "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
     "concept": "string — exactly one concept from the provided vocabulary",
     "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-    "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help"
+    "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help",
+    "answer_key": {
+      "issue":          "string — what is wrong and where, quoting the code in backticks",
+      "why_it_matters": "string — what goes wrong because of it in this code",
+      "fix":            "string — a fix that works as written"
+    }
   },
   "design_comparison": {
     "title":    "string",
@@ -100,7 +107,10 @@ Return JSON matching this schema exactly:
     "question": "string — what to evaluate before approving this plan",
     "answer_scaffold": ["string — a labelled part of a complete answer to THIS review", "string — another part"],
     "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
-    "concept": "string — exactly one concept from the provided vocabulary"
+    "concept": "string — exactly one concept from the provided vocabulary",
+    "answer_key": {
+      "flaws": [{ "category": "string — technical_anti_pattern | scope_creep | unflagged_behavior_change", "flaw": "string — what is wrong, quoting the plan in backticks", "pushback": "string — what a reviewer should ask for" }, "... (one entry per planted flaw)"]
+    }
   }
 }
 

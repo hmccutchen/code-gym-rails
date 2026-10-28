@@ -81,6 +81,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
       - State the problem in terms of behavior and inputs, never in terms of #{label} APIs: the engineer answers in pseudocode, and naming a framework method would hand them the decomposition.
       - Do NOT include starter code, a function signature, or a worked example. Choosing the decomposition is the whole exercise.
       - Choose the pseudocode_to_code concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
+      - "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "title", "question", "scenario" or "teaching_note" — doing so would give away the answer before the engineer plans.
     GUIDANCE
   end
 
@@ -92,7 +93,10 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
           "problem_statement": "string — a self-contained problem solvable in roughly 15-25 lines of pseudocode, stating at least one requirement an under-specified plan would miss. No starter code, no signature, no worked example.",
           "question": "string — e.g. 'Write pseudocode for this.'",
           "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary"
+          "concept": "string — exactly one concept from the provided vocabulary",
+          "answer_key": {
+            "missable_requirements": ["string — a requirement \\"problem_statement\\" states that a plan could miss, and what a plan that misses it gets wrong", "... (1-3 total)"]
+          }
         }
     SCHEMA
   end

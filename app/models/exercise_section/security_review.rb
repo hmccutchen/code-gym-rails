@@ -27,6 +27,7 @@ class ExerciseSection::SecurityReview < ExerciseSection
       - The "#{key}" section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to #{label}. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
       - Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from #{broader_vocabulary_owner(alongside)} broader vocabulary: #{vocabulary.join(", ")}
       - The security_review snippet should be realistic #{label} code, not a contrived toy example#{snippet_bar(alongside)}.
+      - "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "title", "question", "scenario", "teaching_note" or "reference" — doing so would give away the answer before the engineer reads the snippet. Quote the code it points at in backticks, never by line number.
     GUIDANCE
   end
 
@@ -55,6 +56,11 @@ class ExerciseSection::SecurityReview < ExerciseSection
             "explanation":  "string — 2-3 sentences",
             "code_example": "string — annotated #{label} code, ~15 lines",
             "senior_lens":  "string — when to reach for it / tradeoffs"
+          },
+          "answer_key": {
+            "vulnerability": "string — what it is and where, quoting the code in backticks",
+            "exploit":       "string — how an attacker uses it here",
+            "mitigation":    "string — a change that closes it"
           }
         }
     SCHEMA

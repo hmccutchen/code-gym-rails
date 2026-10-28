@@ -27,6 +27,7 @@ Instructions:
 - Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
 - The code_review snippet must be a Rails migration, ~10-15 lines, containing one planted data-modeling flaw. Same question shape as any other code_review ("what's the issue here, and how would you fix it") — the engineer reviews the proposed change, not prose about it.
 - Choose the code_review concept from this vocabulary, exactly one: missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration
+- "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "question", "scenario", "teaching_note" or "diagram" — doing so would give away the answer before the engineer reads the snippet. Quote the code it points at in backticks, never by line number.
 - The "design_comparison" section is a DESIGN COMPARISON: "better_piece" and "other_piece" are two pieces of Ruby/Rails code, 12-15 lines each, that meet the same stated behavior, including its retry and failure cases, and differ on exactly one design principle: the tagged concept. Compare what they cost to change or to run, never correct behavior against a defect; a worse piece that is incorrect turns this into a code review.
 - Surface parity: the pieces behave identically, are about the same length, and are equally clean, named and commented. Any difference other than the tested principle is a defect.
 - This section is pitched at junior: the deciding fact is in the question, in a line or two, and points plainly at one piece.
@@ -37,6 +38,7 @@ Instructions:
 - The "security_review" section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to Ruby/Rails. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
 - Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from code_review's broader vocabulary: mass_assignment_protection, sql_injection_prevention
 - The security_review snippet should be realistic Ruby/Rails code, not a contrived toy example — the same bar as code_review's snippet.
+- "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "title", "question", "scenario", "teaching_note" or "reference" — doing so would give away the answer before the engineer reads the snippet. Quote the code it points at in backticks, never by line number.
 - The "ambiguity_hunt" section is an AMBIGUITY HUNT: "request" is a vague feature ask, 2-4 sentences, phrased the way a stakeholder or PM would ask for it — not an engineer. It must contain EXACTLY 4 deliberately planted ambiguities, listed in "planted_ambiguities". Each must be a genuine gap — a missing scope boundary, an undefined edge case, no stated success criteria, an unstated data implication, or an undefined permissions model — never something "request" already answers.
 - "planted_ambiguities" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "request", "question", or "teaching_note" — doing so would give away the answer before the engineer reads the request.
 - Choose the ambiguity_hunt concept from this vocabulary, exactly one: undefined_scope_boundary, unspecified_edge_cases, missing_success_criteria, unstated_data_implications, undefined_permissions_model
@@ -72,7 +74,12 @@ Return JSON matching this schema exactly:
     "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
     "concept": "string — exactly one concept from the provided vocabulary",
     "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-    "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help"
+    "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help",
+    "answer_key": {
+      "issue":          "string — what is wrong and where, quoting the code in backticks",
+      "why_it_matters": "string — what goes wrong because of it in this code",
+      "fix":            "string — a fix that works as written"
+    }
   },
   "design_comparison": {
     "title":    "string",
@@ -99,6 +106,11 @@ Return JSON matching this schema exactly:
       "explanation":  "string — 2-3 sentences",
       "code_example": "string — annotated Ruby/Rails code, ~15 lines",
       "senior_lens":  "string — when to reach for it / tradeoffs"
+    },
+    "answer_key": {
+      "vulnerability": "string — what it is and where, quoting the code in backticks",
+      "exploit":       "string — how an attacker uses it here",
+      "mitigation":    "string — a change that closes it"
     }
   },
   "ambiguity_hunt": {
