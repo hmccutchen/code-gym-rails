@@ -371,7 +371,7 @@ data.*
 - the stored keys' rarer kinds get keys as they come up, with no change to
   my daily section count `#600`
 - a change review kind: a small change across 2–3 files, the flaw in how
-  they interact `#601 open`
+  they interact `#601`
   **I decided:** a separate kind, not a code review mode; every rung gets it,
   with the rung shaping how many files and how visible, since a rung or lock
   never removes a kind, and any limit would be by track; post-change files
