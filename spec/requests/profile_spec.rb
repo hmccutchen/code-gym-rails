@@ -369,10 +369,10 @@ RSpec.describe "Profile", type: :request do
             headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
     end
 
-    it "saves each fixed count and echoes it back" do
+    it "saves each fixed count that holds no extra section, and echoes it back" do
       login_as(user)
 
-      User::DAILY_SECTION_COUNTS.each do |count|
+      User::DAILY_SECTION_COUNTS.select { |count| count <= DailyKinds::COUNT }.each do |count|
         save_daily_sections(count.to_s)
 
         expect(response).to have_http_status(:ok)
@@ -384,10 +384,23 @@ RSpec.describe "Profile", type: :request do
     it "accepts a count sent as a JSON number" do
       login_as(user)
 
-      save_daily_sections(3)
+      save_daily_sections(2)
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.daily_section_count).to eq(3)
+      expect(user.reload.daily_section_count).to eq(2)
+    end
+
+    it "refuses a count with extra sections when no kind is chosen for each, even with extras stored" do
+      user.update!(daily_section_kinds: %w[code_review design_comparison pattern])
+      login_as(user)
+
+      [ 3, "4" ].each do |count|
+        save_daily_sections(count)
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body["error"]).to eq(I18n.t("daily_sections.choose.unfilled", count: count))
+        expect(user.reload.daily_section_count).to be_nil
+      end
     end
 
     it "saves automatic as no fixed count" do
@@ -405,7 +418,7 @@ RSpec.describe "Profile", type: :request do
       user.update!(daily_section_count: 3)
       login_as(user)
 
-      [ "abc", "", nil, "1", "5", "2.5", 2.5, 2.0, "2.0", 1, 5, "Automatic", [ 2 ], { "count" => 2 } ].each do |value|
+      [ "abc", "", nil, "0", "5", "2.5", 2.5, 2.0, "2.0", 0, 5, "Automatic", [ 2 ], { "count" => 2 } ].each do |value|
         save_daily_sections(value)
 
         expect(response).to have_http_status(:unprocessable_content), "#{value.inspect} was accepted"
@@ -419,6 +432,104 @@ RSpec.describe "Profile", type: :request do
       login_as(user)
 
       expect { save_daily_sections("2") }.not_to(change { user.reload.section_kind_preferences_version })
+    end
+
+    it "answers with the daily kinds the saved setting holds, so the page can tell its Exercise mix moved" do
+      user.update!(daily_section_kinds: %w[code_review design_comparison pattern], daily_section_count: 3)
+      login_as(user)
+
+      save_daily_sections(1)
+
+      expect(response.parsed_body["daily_kinds"]).to eq(%w[code_review])
+      expect(response.parsed_body["rotates"]).to be(false)
+
+      save_daily_sections("automatic")
+
+      expect(response.parsed_body["rotates"]).to be(true)
+    end
+  end
+
+  describe "PATCH /profile choosing the kinds a Daily sections setting holds" do
+    def choose(count, kinds, layout: DailyKinds.for(user.reload).map(&:key))
+      patch profile_path,
+            params: { user: { daily_section_count: count, daily_section_kinds: kinds }, layout: layout }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+    end
+
+    before { login_as(user) }
+
+    it "saves extra sections with a larger setting, in place order" do
+      choose(4, %w[code_review design_comparison pattern plan_review])
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload).to have_attributes(daily_section_count: 4,
+                                             daily_section_kinds: %w[code_review design_comparison pattern plan_review])
+      expect(response.parsed_body["daily_kinds"]).to eq(%w[code_review design_comparison pattern plan_review])
+    end
+
+    it "saves the kept section first under a setting of 1" do
+      choose(1, %w[design_comparison code_review])
+
+      expect(user.reload).to have_attributes(daily_section_count: 1, daily_section_kinds: %w[design_comparison code_review])
+      expect(response.parsed_body["daily_kinds"]).to eq(%w[design_comparison])
+    end
+
+    it "stores the default pair as empty, so the account reads as untouched" do
+      user.update!(daily_section_kinds: %w[design_comparison code_review], daily_section_count: 1)
+
+      choose(1, %w[code_review design_comparison])
+
+      expect(user.reload.daily_section_kinds).to eq([])
+    end
+
+    it "refuses a repeated kind or a second fourth in words a person can act on, and changes nothing" do
+      [ %w[code_review design_comparison pattern pattern], %w[code_review design_comparison plan_review ambiguity_hunt],
+        %w[code_review design_comparison retired_kind] ].each do |kinds|
+        choose(4, kinds)
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body["error"])
+          .to eq("Choose a different kind for each section, with at most one of Plan Review, Ambiguity Hunt and Pseudocode to Code.")
+        expect(user.reload).to have_attributes(daily_section_count: nil, daily_section_kinds: [])
+      end
+    end
+
+    it "refuses a chooser rendered before another tab swapped a place the setting hides" do
+      user.update!(daily_section_count: 1)
+      rendered = DailyKinds.normalize(user.daily_section_kinds).map(&:key)
+      user.update!(daily_section_kinds: %w[code_review architecture])
+
+      patch profile_path,
+            params: { user: { daily_section_count: 1, daily_section_kinds: %w[design_comparison code_review] },
+                      layout: %w[code_review], places: rendered }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["layout_changed"]).to be(true)
+      expect(user.reload.daily_section_kinds).to eq(%w[code_review architecture])
+    end
+
+    it "refuses a list too short for the count" do
+      choose(4, %w[code_review design_comparison pattern])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.daily_section_count).to be_nil
+    end
+
+    it "refuses kinds that are not a list of names in the words the other shape checks use" do
+      choose(3, "pattern")
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["error"]).to eq("Daily section kinds must be a list of strings")
+      expect(user.reload.daily_section_kinds).to eq([])
+    end
+
+    it "refuses a page rendered before another tab swapped a daily section, and says its layout moved" do
+      choose(3, %w[code_review design_comparison pattern], layout: %w[architecture design_comparison])
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["layout_changed"]).to be(true)
+      expect(user.reload).to have_attributes(daily_section_count: nil, daily_section_kinds: [])
     end
   end
 

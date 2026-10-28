@@ -27,8 +27,12 @@ RSpec.describe DaySize do
     # The model validates the count only when it changes, so an old row can sit outside the current range.
     it "clamps a stored setting outside the current range" do
       expect(size(setting: ExerciseSection::MAX_SECTIONS + 1).count).to eq(ExerciseSection::MAX_SECTIONS)
-      expect(size(setting: SectionCount::FLOOR - 1).count).to eq(SectionCount::FLOOR)
-      expect(size(setting: SectionCount::FLOOR - 1).reason).to eq(:setting)
+      expect(size(setting: DailyKinds::FEWEST - 1).count).to eq(DailyKinds::FEWEST)
+      expect(size(setting: DailyKinds::FEWEST - 1).reason).to eq(:setting)
+    end
+
+    it "plans a single section under a setting of 1, below Automatic's floor" do
+      expect(size(setting: 1, completion: 4, gate: gate(4)).count).to eq(1)
     end
 
     it "is not Automatic, so the coverage exception never applies" do

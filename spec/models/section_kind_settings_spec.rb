@@ -1,10 +1,10 @@
 require "rails_helper"
 
 RSpec.describe SectionKindSettings do
-  def settings(stored: {}, **values)
+  def settings(stored: {}, section_count: nil, **values)
     defaults = { section_kind_weights: {}, excluded_section_kinds: [], section_kind_levels: {}, locked_section_kinds: [],
                  daily_section_kinds: [] }
-    described_class.new(**defaults.merge(values), stored: defaults.merge(stored))
+    described_class.new(**defaults.merge(values), stored: defaults.merge(stored), section_count: section_count)
   end
 
   let(:thirds) { ExerciseSection.thirds.map(&:key) }
@@ -51,6 +51,24 @@ RSpec.describe SectionKindSettings do
       .to eq([ [ :section_kind_weights, "names an unknown section kind: challenge" ] ])
   end
 
+  it "accepts a weight on a stored extra section the setting leaves rotating" do
+    expect(settings(daily_section_kinds: %w[code_review design_comparison challenge], section_count: 2,
+                    section_kind_weights: { "challenge" => 2.0 }).problems).to eq([])
+  end
+
+  it "refuses a weight on an extra section the setting puts in every set" do
+    expect(settings(daily_section_kinds: %w[code_review design_comparison challenge], section_count: 3,
+                    section_kind_weights: { "challenge" => 2.0 }).problems)
+      .to eq([ [ :section_kind_weights, "names an unknown section kind: challenge" ] ])
+  end
+
+  it "checks emptied slots against the pair alone, since rotation fills no place a chosen extra section holds" do
+    pinned = settings(daily_section_kinds: %w[code_review design_comparison challenge], section_count: 3,
+                      excluded_section_kinds: thirds - %w[challenge])
+
+    expect(pinned.problems).to eq([])
+  end
+
   it "refuses an exclusion that empties an optional slot, whether the exclusions or the pair moved" do
     expect(settings(excluded_section_kinds: thirds).problems)
       .to include([ :excluded_section_kinds, "must leave at least one third section in rotation" ])
@@ -85,5 +103,12 @@ RSpec.describe SectionKindSettings do
     expect(hidden.keep_unrendered(section_kind_weights: { "architecture" => 0.5 }, excluded_section_kinds: []))
       .to eq(section_kind_weights: { "challenge" => 2.0, "architecture" => 0.5 }, excluded_section_kinds: %w[parsons_problem])
     expect(hidden.keep_unrendered(name: "Kept")).to eq(name: "Kept")
+  end
+
+  it "keeps the stored weight of an extra section the setting puts in every set, since Setup renders no slider for it" do
+    pinned = settings(daily_section_kinds: %w[code_review design_comparison challenge], section_count: 3,
+                      section_kind_weights: { "challenge" => 2.0 })
+
+    expect(pinned.keep_unrendered(section_kind_weights: {})).to eq(section_kind_weights: { "challenge" => 2.0 })
   end
 end

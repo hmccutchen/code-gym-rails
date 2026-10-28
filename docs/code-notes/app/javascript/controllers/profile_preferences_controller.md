@@ -29,11 +29,12 @@ targets.
 
 ## An edit made before the modules load
 
-Time zone, Daily sections and Skill level are server-rendered and nothing is
+Time zone and Skill level are server-rendered and nothing is
 bound until `connect()`, which waits on the deferred module graph. So
 `connect()` compares each control with what the server rendered — the
-default-selected option for a select, `defaultChecked` for the sections
-radio — and queues the save the missing listener would have sent. Without it
+default-selected option for a select — and queues the save the missing
+listener would have sent. Daily sections does the same in its own
+controller (`daily_sections_controller`). Without it
 the choice sits on screen unsaved until the user touches the control again.
 
 ## A track change hands the Exercise mix the saved state

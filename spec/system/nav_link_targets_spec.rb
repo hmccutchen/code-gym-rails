@@ -11,7 +11,7 @@ RSpec.describe "Nav link targets", type: :system do
 
       expect(page).to have_link("Settings", visible: :visible)
       heights = rects("nav .nav-links a").reject { |r| r["width"].zero? }.map { |r| r["height"] }
-      expect(heights.size).to be >= 5
+      expect(heights.size).to eq(all(".tab-bar a", visible: :all).size)
       expect(heights).to all(be >= 44)
     end
   end

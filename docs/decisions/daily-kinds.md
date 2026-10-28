@@ -35,18 +35,82 @@ that never swaps plans and prompts exactly as before.
 
 `users.daily_section_kinds` is `jsonb`, default `[]`. An empty list means
 the default pair, so an untouched account stores nothing. Order is the
-place: index 0 is the first daily section and index 1 the second. A
-non-empty list must name exactly `COUNT` distinct known kinds, holding at
-most one fourth-slot kind (`SectionKindSettings#daily_kind_problems`).
+place: index 0 is the first daily section and index 1 the second. Places 2
+and 3 hold the extra sections a fixed Daily sections setting of 3 or 4 puts
+in every set (`daily-sections-setting.md`). A non-empty list must name
+`COUNT` to `MOST` distinct known kinds, holding at most one fourth-slot kind
+(`SectionKindSettings#daily_kind_problems`).
 
 ## Normalized on read
 
 `DailyKinds.normalize` makes any stored list fit the current registry
 without rewriting the row:
 
-- the list is cut to `COUNT`, so the first places keep their kinds;
-- a missing place, an unknown key, a repeat, or a second fourth kind falls
-  back to the first `DEFAULT` kind not already held.
+- the list is cut to `MOST`, so the first places keep their kinds;
+- in the pair, a missing place, an unknown key, a repeat, or a second fourth
+  kind falls back to the first `DEFAULT` kind not already held;
+- past the pair, such an entry is dropped rather than filled, and so is an
+  extra that repeats a kind the pair was filled with.
+
+## How many places a set holds
+
+`DailyKinds.for(user)` is the kinds every set holds under the user's
+current setting (`.held`): the pair under Automatic or 2, the first place
+alone under 1, and the pair plus the stored extras under 3 or 4. Every reader
+that plans, renders or validates a day's slots takes this list, so a kind it
+holds is never offered a weight or an exclusion. Three things stay on the
+pair instead:
+
+- The card's swap control. `DailyKinds.pair(user)` reads the first two
+  places whatever the setting, and `Picker.for_day` offers a control only on
+  the recorded pair's cards, so an extra section changes only from Setup and
+  a place a setting of 1 hides keeps its kind. A swap checks conflicts
+  against the places the setting holds (always both pair places), so a kind
+  stored as a hidden extra is not "already daily". A swap writes the whole
+  place list back: held extras survive it, and a hidden extra that repeats
+  the swapped-in kind, or would be a second fourth beside it, is dropped, so
+  the Daily sections chooser asks for that place again when the count goes
+  up. The person who asked for the feature chose this over refusing the swap.
+- The shared concept. `DailyKinds.shared_pair` is the pair a day's kinds
+  open with, or nothing for a one-section day. `DailyPlan`, the prompt line,
+  the dashboard line and the diagnostics read it, so an extra section never
+  joins the shared concept and a single section never claims one.
+- The emptied-slot check (`SectionKindSettings#emptied_slots`). Rotation
+  fills no place an extra holds, so exclusions are checked against the
+  pair's pools, which is what Automatic rotates.
+
+## What is offered under a fixed count
+
+`DailyKinds.rotates?` says whether the setting leaves a place for rotation:
+always under Automatic, and under a fixed count only while fewer daily kinds
+are held than the count. When nothing rotates, `KindPreferences.offered_to`
+offers only the held kinds, so the Progress page, `LadderCoverage` and the
+level-suggestion card stop counting kinds that cannot appear. The Exercise
+mix keeps every control, since its settings apply again when the setting
+changes, and labels each group outside the daily kinds "not in your sets at
+this setting" under one note. This applies at a fixed 2 as well, where every
+optional kind was listed "in some sets" before this change.
+
+## Kept as they are
+
+These were raised in review and kept by the person who asked for the
+feature:
+
+- `CompetencyGate` counts growth from each day's recorded daily kinds, so a
+  fixed day's extras count toward growth like the pair. The gate decides only
+  Automatic days, which hold the pair, so this matters only once a user moves
+  from a fixed count back to Automatic.
+- A chosen extra is a daily kind, so it gets `DailyPlan::DAILY_JUDGE_RETRIES`
+  like the pair. A fixed 4 can make two more judged retries on a bad day than
+  an Automatic 4. `CallProfiles::JUDGED_GENERATION_BUDGET` already allows for
+  the larger count, so only the call count moves.
+- A one-section day has no second section to fall back on. If the judge
+  rejects its section on every retry, `JudgedGeneration` raises
+  `AllSectionsRejectedError` and no set is written, as it does for any day
+  whose every section is dropped.
+- The Daily sections chooser offers a kind the user skips in the Exercise
+  mix and says nothing about it. The chosen kind is in every set anyway, as
+  a swapped-in skipped kind is.
 
 A user's stored list is never rewritten by a count or registry change; the
 next write stores a list of the new length.

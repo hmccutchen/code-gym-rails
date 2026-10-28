@@ -110,6 +110,19 @@ RSpec.describe KindPreferences do
       expect(preferences.offered(daily: daily)).not_to include(ExerciseSection::Challenge)
     end
 
+    it "offers only the daily kinds when the setting leaves no place to rotate" do
+      expect(described_class.none.offered(daily: [ ExerciseSection::CodeReview ], rotates: false))
+        .to eq([ ExerciseSection::CodeReview ])
+    end
+
+    it "reads the user's daily kinds and whether their setting rotates" do
+      user = User.new(daily_section_kinds: [], daily_section_count: 1, section_kind_weights: {}, excluded_section_kinds: [])
+
+      expect(described_class.offered_to(user)).to eq([ ExerciseSection::CodeReview ])
+      expect(described_class.offered_to(User.new(daily_section_kinds: [], section_kind_weights: {}, excluded_section_kinds: [])))
+        .to eq(ExerciseSection.all)
+    end
+
     it "is every kind but the excluded ones for the default pair" do
       preferences = described_class.new(weights: {}, excluded: %w[challenge])
 

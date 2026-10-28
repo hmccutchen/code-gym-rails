@@ -368,30 +368,25 @@ data.*
 
 ## Wed Oct 28
 
-- the stored keys' rarer kinds get keys as they come up, with no change to
-  my daily section count `#600`
-- a change review kind: a small change across 2–3 files, the flaw in how
-  they interact `#601`
-  **I decided:** a separate kind, not a code review mode; every rung gets it,
-  with the rung shaping how many files and how visible, since a rung or lock
-  never removes a kind, and any limit would be by track; post-change files
-  with changed lines highlighted; a failed key refuses the section; JavaScript
-  days use only data modeling, a Knex migration and a looser quote match;
-  after the reviews, its grader waits for the stored-keys gating with its own
-  calibration fixture, the shared data-modeling line gains one clause, its
-  first appearance is accepted, and the judge never rejects on rung fit
-- code review's snippet length, capped only by the prompt, left as an issue
-- answer keys stored for code review, security review, plan review and
-  pseudocode-to-code, read by nothing yet `#602`
-  **why:** the grader has to guess what was planted, and a wrong guess looks
-  like an honest miss
+- the rarer kinds get keys as they come up; my section count stays `#600`
+- a change review kind: the flaw in how a 2–3 file change interacts `#601`
+  **I decided:** its own kind; every rung gets it,
+  scaled in files and visibility, since rungs never remove a kind; changed
+  lines highlighted; a failed key refuses it; JavaScript gets data modeling,
+  Knex and a looser quote match; after the reviews, its grader waits on the
+  stored-keys gating with its own fixture, the data-modeling line gains a
+  clause, its first appearance is accepted, and the judge never rejects on
+  rung fit
+- answer keys stored for the four keyed kinds, read by nothing yet `#602`
+  **why:** the grader guesses what was planted, and a wrong guess looks like
+  an honest miss
   **I decided:** measure the extra tokens from my usage rows after deploy;
-  after the reviews, quotes match ignoring whitespace, cleaning is its own
-  step, and the stop rule counts drafts of quoting kinds
-- code review's snippet capped at 40 shown lines at ingest, refused rather
-  than cut `#603`
+  after the reviews, whitespace-blind quote matching, a separate cleaning
+  step, and a stop rule on drafts of quoting kinds
+- code review's snippet, first left as an issue, capped at 40 shown lines,
+  refused rather than cut `#603`
 - the rarer kinds' keys read from drafts, not my days `#606`
-  **why:** I'm the only user, and adding them to my days would fake progress
+  **why:** I'm the only user; adding them to my days would fake progress
   **I decided:** a colleague reads them, and a kind with no reader stays off;
   the read is the main check; every billed run waits for my approval
 - the script that drafts them, plan-only until I approve a run `#607`
@@ -399,8 +394,14 @@ data.*
   the reviews, only the three drafted kinds
 - a judged retry refused at ingest no longer costs a daily kind its second
   retry `#609`
-  **I decided:** a refused retry spends one retry and the loop goes on;
-  rate limits, timeouts, the deadline, billing and bad replies still drop at
-  once; the retry prompt stays unchanged, left to its own issue
-- the grader turns on code review first, gated on its read and token
-  cost; the drafted kinds join later `#611 open`
+  **I decided:** a refused retry spends one retry and the loop continues;
+  rate limits, timeouts, the deadline, billing and bad replies still drop;
+  the retry prompt stays, left to its own issue
+- the nav counts a landscape notch once, aligning the brand at 932px `#614`
+  **I decided:** only the double count here; the nav left of the page column
+  below 900px is its own issue
+- the open nav menu clears a landscape notch, and Today joins the top nav
+  `#616`
+  **I decided:** Today rides this fix, linking to the app's Today tab route
+- the grader turns on code review first, gated on its read and token cost;
+  drafted kinds join later `#611 open`

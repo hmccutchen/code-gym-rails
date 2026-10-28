@@ -36,6 +36,21 @@ RSpec.describe DailyKindSwap::Picker do
       expect(pickers["design_comparison"].current).to eq(ExerciseSection::Architecture)
     end
 
+    it "gives a chosen extra section's card no control, since Setup's Daily sections setting chooses it" do
+      user.update!(daily_section_count: 3, daily_section_kinds: %w[code_review design_comparison pattern])
+      exercise(daily: %w[code_review design_comparison pattern])
+
+      expect(pickers.keys).to eq(%w[code_review design_comparison])
+    end
+
+    it "reads a place's kind from the stored pair under a setting of 1, so the hidden place still has one" do
+      user.update!(daily_section_count: 1, daily_section_kinds: %w[design_comparison code_review])
+      exercise
+
+      expect(pickers.transform_values(&:current))
+        .to eq("code_review" => ExerciseSection::DesignComparison, "design_comparison" => ExerciseSection::CodeReview)
+    end
+
     it "gives no pickers without a set" do
       expect(described_class.for_day(user, exercise: nil, response: nil)).to eq({})
     end

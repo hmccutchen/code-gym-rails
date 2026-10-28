@@ -4,13 +4,15 @@ class SectionKindSettings
 
   def self.for(user)
     new(**FIELDS.index_with { |field| user.public_send(field) },
-        stored: FIELDS.index_with { |field| user.attribute_in_database(field.to_s) })
+        stored: FIELDS.index_with { |field| user.attribute_in_database(field.to_s) }, section_count: user.daily_section_count)
   end
 
-  def initialize(stored: {}, **values)
+  # section_count is the Daily sections setting, which decides how many daily places Setup renders; it is not a field here.
+  def initialize(stored: {}, section_count: nil, **values)
     values.assert_valid_keys(*FIELDS)
     @values = values
     @stored = stored
+    @section_count = section_count
   end
 
   def changed?(*fields) = (fields.presence || FIELDS).any? { |field| @values[field] != @stored[field] }
@@ -25,14 +27,14 @@ class SectionKindSettings
       *(locks_without_levels if changed?(:section_kind_levels, :locked_section_kinds)) ]
   end
 
-  def emptied_slots(daily: self.daily)
+  def emptied_slots(daily: pair)
     preferences = KindPreferences.new(weights: {}, excluded: Array(excluded))
     ExerciseSection.optional_slots(daily: daily).select do |_slot, kinds|
       kinds.size > 1 && preferences.all_excluded?(kinds)
     end
   end
 
-  # attrs is a save's posted fields; each stored entry for a kind the current pair renders no control for is merged back in.
+  # attrs is a save's posted fields; each stored entry for a kind the current daily places leave without a control is merged back in.
   def keep_unrendered(attrs)
     weighted = ExerciseSection.rotatable(daily: daily).map(&:key)
     shown    = ExerciseSection.pickable(daily: daily).map(&:key)
@@ -43,7 +45,9 @@ class SectionKindSettings
     attrs
   end
 
-  def daily = DailyKinds.normalize(@values[:daily_section_kinds])
+  def daily = DailyKinds.held(@values[:daily_section_kinds], @section_count)
+
+  def pair = DailyKinds.pair_of(@values[:daily_section_kinds])
 
   private
 

@@ -457,7 +457,7 @@ RSpec.describe "Small screen layout", type: :system do
       page.evaluate_script(<<~JS)
         (() => {
           const context = document.createElement("canvas").getContext("2d");
-          return Array.from(document.querySelectorAll(".value-row")).map(row => {
+          return Array.from(document.querySelectorAll(".value-row")).filter(row => row.checkVisibility()).map(row => {
             const value = row.querySelector(".value-row-value");
             const select = row.querySelector("select");
             const card = row.closest(".card");
@@ -555,8 +555,8 @@ RSpec.describe "Small screen layout", type: :system do
           card_edges(count: 4).each { |edges| expect(edges).to all(be_within(0.5).of(16)) }
           expect(card_paddings).to all(eq("16px"))
           expect(card_gaps).to all(be_within(0.5).of(16))
-          expect(heights(".value-row").size).to eq(3)
-          expect(heights(".value-row")).to all(be >= 52)
+          expect(visible_heights(".value-row").size).to eq(3)
+          expect(visible_heights(".value-row")).to all(be >= 52)
           expect(visible_heights(".btn-block").size).to eq(1)
           expect(visible_heights(".btn-block")).to all(be >= 48)
           button_and_card_content_widths.each { |button, content| expect(button).to be_within(1).of(content) }
@@ -708,7 +708,7 @@ RSpec.describe "Small screen layout", type: :system do
           page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
           fail_requests_to(profile_path)
 
-          find("#daily-sections .segment", text: "3").click
+          find("#daily-sections .segment", text: "2").click
           expect(page).to have_css("#save-status", visible: :visible)
 
           banner, focused, viewport = page.evaluate_script(<<~JS)
@@ -732,9 +732,11 @@ RSpec.describe "Small screen layout", type: :system do
         resize(320)
         visit_settings_open(user)
         apply_text_spacing
+        find("#daily-sections .segment", text: "4").click
+        expect(page).to have_css("#daily-sections-choice-4", visible: :visible)
 
         facts = value_row_facts
-        expect(facts.size).to eq(3)
+        expect(facts.size).to eq(5)
         facts.each do |_height, shown, selected, clipped, overflow, too_narrow|
           expect(shown).to eq(selected)
           expect([ clipped, overflow, too_narrow ]).to eq([ false, false, false ])

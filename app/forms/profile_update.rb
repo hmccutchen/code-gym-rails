@@ -7,7 +7,7 @@ class ProfileUpdate
   end
 
   PREFERENCE_KEYS = %i[section_kind_weights excluded_section_kinds section_kind_levels locked_section_kinds].freeze
-  LOCKED_KEYS = %i[choose_track skill_level section_kind_levels].freeze
+  LOCKED_KEYS = %i[choose_track skill_level section_kind_levels daily_section_kinds].freeze
   TRACK_CHOICE_KEYS = %w[choose_track skill_level].freeze
   WHOLE_NUMBER = /\A\d+\z/
 
@@ -31,6 +31,9 @@ class ProfileUpdate
   def shape_error
     return I18n.t("tracks.stale_page") if posted?(:learning_track)
     return full_rule(:daily_section_count, User::DAILY_SECTION_COUNT_RULE) unless daily_section_count_shaped?
+    return "Daily section kinds must be a list of strings" unless list_of_strings?(:daily_section_kinds)
+    return daily_section_kinds_refusal unless daily_section_kinds_accepted?
+    return I18n.t("daily_sections.choose.unfilled", count: posted_count) if extra_places_unchosen?
     return "Section weights must map each section to a weight" unless object?(:section_kind_weights)
     return "Excluded section kinds must be a list of strings" unless list_of_strings?(:excluded_section_kinds)
     return "Section difficulty must map each section to a level" unless object?(:section_kind_levels)
@@ -51,6 +54,24 @@ class ProfileUpdate
 
     value = @user_params[:daily_section_count]
     value.is_a?(Integer) || value == User::AUTOMATIC_SECTION_COUNT || (value.is_a?(String) && value.match?(WHOLE_NUMBER))
+  end
+
+  def daily_section_kinds_accepted?
+    !posted?(:daily_section_kinds) || DailyKinds.problems_with(@user_params[:daily_section_kinds]).empty?
+  end
+
+  def posted_count = Integer(@user_params[:daily_section_count].to_s, 10, exception: false)
+
+  def extra_places_unchosen?
+    count = posted_count
+    return false unless count && count > DailyKinds::COUNT && User::DAILY_SECTION_COUNTS.cover?(count)
+
+    DailyKinds.normalize(@user_params[:daily_section_kinds]).size < count
+  end
+
+  def daily_section_kinds_refusal
+    fourths = ExerciseSection.fourths.map { |kind| I18n.t("sections.#{kind.key}.name") }
+    I18n.t("daily_sections.choose.refused", fourths: fourths.to_sentence(last_word_connector: " and "))
   end
 
   def full_rule(attribute, rule) = "#{User.human_attribute_name(attribute)} #{rule}"
@@ -80,7 +101,7 @@ class ProfileUpdate
   end
 
   def locked_save?
-    !@user_params[:section_kind_preferences_version].nil? || !shown_steps.nil? || !@params[:layout].nil? ||
+    !@user_params[:section_kind_preferences_version].nil? || !shown_steps.nil? || !@params[:layout].nil? || !@params[:places].nil? ||
       (LOCKED_KEYS | PREFERENCE_KEYS).any? { |key| posted?(key) }
   end
 
@@ -116,7 +137,8 @@ class ProfileUpdate
   end
 
   def layout_moved?
-    !@params[:layout].nil? && Array(@params[:layout]) != DailyKinds.for(@user).map(&:key)
+    (!@params[:layout].nil? && Array(@params[:layout]) != DailyKinds.for(@user).map(&:key)) ||
+      (!@params[:places].nil? && Array(@params[:places]) != DailyKinds.normalize(@user.daily_section_kinds).map(&:key))
   end
 
   def unsaved_shown_step?
@@ -143,10 +165,11 @@ class ProfileUpdate
     permitted = @user_params.permit(:name, :time_zone, :daily_section_count, :skill_level, :level_suggestions,
                                     section_kind_weights: {}, excluded_section_kinds: [],
                                     section_kind_levels: {}, locked_section_kinds: [],
-                                    display_preferences: {})
+                                    daily_section_kinds: [], display_preferences: {})
     permitted[:name] = permitted[:name].to_s.strip if permitted.key?(:name)
     permitted[:time_zone] = permitted[:time_zone].to_s.strip.presence if permitted.key?(:time_zone)
     permitted[:daily_section_count] = nil if permitted[:daily_section_count] == User::AUTOMATIC_SECTION_COUNT
+    permitted[:daily_section_kinds] = DailyKinds.stored(permitted[:daily_section_kinds]) if permitted.key?(:daily_section_kinds)
     # permit(x: {}) yields Parameters, which a jsonb column cannot serialize.
     %i[section_kind_weights section_kind_levels display_preferences].each do |key|
       permitted[key] = permitted[key].to_h if permitted.key?(key)

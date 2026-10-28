@@ -42,10 +42,10 @@ class DailyKindSwap
   def pair_refusal
     return :unchanged if current[@place] == @kind
 
-    conflict = DailyKinds.conflict(@kind, current.reject.with_index { |_kind, index| index == @place })
+    conflict = DailyKinds.conflict(@kind, held_places.reject.with_index { |_kind, index| index == @place })
     return CONFLICT_REASONS.fetch(conflict) if conflict
 
-    :empties_a_slot if @user.section_kind_settings.emptied_slots(daily: proposed).any?
+    :empties_a_slot if @user.section_kind_settings.emptied_slots(daily: proposed_pair).any?
   end
 
   def shape_refusal
@@ -57,9 +57,17 @@ class DailyKindSwap
 
   def stale? = @version.to_s != @user.section_kind_preferences_version.to_s
 
-  def current = @current ||= DailyKinds.for(@user)
+  def current = @current ||= DailyKinds.normalize(@user.daily_section_kinds)
 
-  def proposed = current.dup.tap { |kinds| kinds[@place] = @kind }
+  def held_places = current.first([ DailyKinds.for(@user).size, DailyKinds::COUNT ].max)
+
+  # A hidden extra that would clash with the swapped-in kind is dropped; the setting asks for a new one when raised.
+  def proposed
+    kept = held_places.dup.tap { |kinds| kinds[@place] = @kind }
+    kept + current.drop(kept.size).reject { |kind| DailyKinds.conflict(kind, kept) }
+  end
+
+  def proposed_pair = proposed.first(DailyKinds::COUNT)
 
   def save!
     from = current[@place].key
@@ -100,7 +108,7 @@ class DailyKindSwap
   def refusal_details(reason)
     case reason
     when :second_fourth  then { kinds: names(ExerciseSection.fourths) }
-    when :empties_a_slot then { kinds: names(@user.section_kind_settings.emptied_slots(daily: proposed).values.flatten) }
+    when :empties_a_slot then { kinds: names(@user.section_kind_settings.emptied_slots(daily: proposed_pair).values.flatten) }
     else {}
     end
   end

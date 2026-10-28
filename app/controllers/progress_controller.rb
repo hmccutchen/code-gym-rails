@@ -5,7 +5,7 @@ class ProgressController < ApplicationController
   def index
     ledger      = RungLedger.for(current_user)
     hosts       = ConceptHosts.for(current_user)
-    offered     = KindPreferences.for(current_user).offered(daily: DailyKinds.for(current_user))
+    offered     = KindPreferences.offered_to(current_user)
 
     @buckets = learn_buckets.map do |bucket|
       groups = ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)).map do |group, concepts|

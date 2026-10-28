@@ -218,7 +218,7 @@ class GenerationPrompt
   def shared_concept_guidance(concept)
     return "" if concept.nil?
 
-    sections = @plan.daily_kinds.map(&:key).to_sentence
+    sections = DailyKinds.shared_pair(@plan.daily_kinds).map(&:key).to_sentence
     "\n- The #{sections} sections share `#{concept}` as their concept today. It is one concept needing reinforcement, looked at from different sides: each section tests it in its own way and its own scenario, following its own rules above."
   end
 

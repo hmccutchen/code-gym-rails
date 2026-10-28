@@ -33,7 +33,7 @@ RSpec.describe ProfileUpdate, type: :model do
     end
 
     it "accepts a whole number or the word for the daily section count and leaves the range to the user" do
-      expect(save(user: { daily_section_count: "3" }).status).to eq(:saved)
+      expect(save(user: { daily_section_count: "2" }).status).to eq(:saved)
       expect(save(user: { daily_section_count: User::AUTOMATIC_SECTION_COUNT }).status).to eq(:saved)
       expect(user.reload.daily_section_count).to be_nil
 

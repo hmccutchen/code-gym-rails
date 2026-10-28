@@ -40,7 +40,8 @@ RSpec.describe CoverageException, ".expected_gap_weekdays" do
 
       warning = DailyKindSwap::Consequences.for(
         pair: DailyKinds::DEFAULT, place: 0, kind: ExerciseSection::Challenge, preferences: preferences,
-        day: DailyKindSwap::Consequences::Day.new(setting: nil, planned_size: DailyKinds::COUNT, brake: false),
+        day: DailyKindSwap::Consequences::Day.new(setting: nil, planned_size: DailyKinds::COUNT, brake: false,
+                                                     held: DailyKinds::COUNT),
         languages: %w[ruby_rails], pair_shares: false
       ).warning
       weeks = (gaps.first.to_f / DailyKindSwap::Consequences::WEEKDAYS_PER_WEEK).round

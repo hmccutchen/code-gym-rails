@@ -92,7 +92,7 @@
     }
 
     nav { position: relative; z-index: 20; container-type: inline-size; background: var(--nav-bg); border-bottom: 1px solid var(--border); padding: .4rem 0; padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); margin-bottom: 2rem; -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
-    nav .inner { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; }
+    nav .inner { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; padding-inline: calc(var(--container-pad-left) - env(safe-area-inset-left)) calc(var(--container-pad-right) - env(safe-area-inset-right)); }
     nav .brand { display: flex; align-items: center; gap: .4rem; font-weight: 700; font-size: 1.375rem; letter-spacing: -.01em; color: var(--accent-text); white-space: nowrap; flex-shrink: 0; }
     nav .brand:hover { text-decoration: none; }
     nav .brand > picture { display: flex; }
@@ -103,7 +103,7 @@
     nav .name-editor { display: flex; align-items: center; min-width: 0; }
     nav .nav-toggle { display: none; }
 
-    @container (max-width: 40em) {
+    @container (max-width: 45em) {
       nav .nav-toggle {
         display: flex; flex-direction: column; justify-content: center; gap: 4px;
         width: 44px; height: 44px; padding: 0 11px; flex-shrink: 0;
@@ -119,7 +119,7 @@
         display: flex; flex-direction: column; align-items: stretch; gap: .25rem;
         position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
         background: var(--surface); border-bottom: 1px solid var(--border);
-        padding: .5rem .75rem 1rem;
+        padding: .5rem max(.75rem, env(safe-area-inset-right)) 1rem max(.75rem, env(safe-area-inset-left));
         box-shadow: var(--shadow);
       }
       nav .nav-links[data-open] a { padding: .75rem; border-radius: var(--radius-sm); }
@@ -475,7 +475,7 @@
         <% if current_user.time_zone.blank? %>
           <span data-controller="time-zone" data-time-zone-url-value="<%= profile_path %>"></span>
         <% end %>
-        <% nav_destinations.drop(1).each do |destination| %>
+        <% nav_destinations.each do |destination| %>
           <%= link_to destination.label, destination.path, aria: { current: ("page" if nav_current?(destination.path)) } %>
         <% end %>
       </div>

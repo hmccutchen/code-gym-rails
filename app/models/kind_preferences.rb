@@ -11,6 +11,8 @@ class KindPreferences
     new(weights: user.section_kind_weights, excluded: user.excluded_section_kinds)
   end
 
+  def self.offered_to(user) = self.for(user).offered(daily: DailyKinds.for(user), rotates: DailyKinds.rotates?(user))
+
   def initialize(weights:, excluded:)
     @weights  = weights
     @excluded = excluded
@@ -33,8 +35,8 @@ class KindPreferences
 
   def all_excluded?(kinds) = kinds.all? { |kind| excluded?(kind) }
 
-  def offered(daily:)
-    rotating = ExerciseSection.optional_slots(daily: daily).values.flat_map { |kinds| eligible(kinds) }
+  def offered(daily:, rotates: true)
+    rotating = rotates ? ExerciseSection.optional_slots(daily: daily).values.flat_map { |kinds| eligible(kinds) } : []
 
     ExerciseSection.pickable(daily: daily) & (daily + rotating)
   end

@@ -20,6 +20,17 @@ RSpec.describe "Navigation", type: :request do
     expect(current.map(&:text)).to eq(%w[Learn])
   end
 
+  it "lists the same destinations in the top nav as in the tab bar, Today first and current on the dashboard" do
+    get root_path
+
+    html = Nokogiri::HTML(response.body)
+    links = html.css("#nav-links a")
+    expect(links.map(&:text)).to eq(html.css(".tab-bar a").map { |tab| tab.text.strip })
+    expect(links.first).to have_attributes(text: "Today")
+    expect(links.first["href"]).to eq(root_path)
+    expect(links.select { |link| link["aria-current"] == "page" }.map(&:text)).to eq(%w[Today])
+  end
+
   it "renders no tab bar for someone signed out" do
     reset!
     get login_path

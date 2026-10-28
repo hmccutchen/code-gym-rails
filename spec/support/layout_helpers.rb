@@ -15,6 +15,28 @@ module LayoutHelpers
     page.evaluate_script("document.documentElement.scrollWidth - document.documentElement.clientWidth")
   end
 
+  # The narrowest width, in 10px steps, at which the nav shows its links in the row rather than the menu button.
+  def narrowest_uncollapsed_nav_width(height:)
+    width = (320..1400).step(10).find { |candidate|
+      resize(candidate, height: height)
+      page.has_no_css?("#nav-toggle", visible: :visible, wait: 0)
+    }
+    width || raise("The nav showed its menu button at every width up to 1400px")
+  end
+
+  def nav_row_overflow
+    page.evaluate_script(<<~JS)
+      (() => {
+        const inner = document.querySelector("nav .inner"), root = document.documentElement;
+        const contentRight = inner.getBoundingClientRect().right - parseFloat(getComputedStyle(inner).paddingRight);
+        const lastLink = Array.from(document.querySelectorAll("nav .nav-links a")).pop();
+        const pastGutter = Math.max(0, lastLink.getBoundingClientRect().right - contentRight);
+        return { row: inner.scrollWidth - inner.clientWidth, page: root.scrollWidth - root.clientWidth,
+                 past_gutter: Math.round(pastGutter * 10) / 10 };
+      })()
+    JS
+  end
+
   def set_safe_area(left: 0, right: 0, top: 0, bottom: 0)
     page.driver.with_playwright_page do |pw|
       pw.context.new_cdp_session(pw).send_message("Emulation.setSafeAreaInsetsOverride",

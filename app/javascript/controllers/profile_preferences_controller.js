@@ -4,7 +4,7 @@ import saveStatus from "code_gym/save_status"
 import trackReply from "code_gym/track_reply"
 
 export default class extends Controller {
-  static targets = ["timeZone", "dailySections", "skillLevel", "keptOwnLevel"]
+  static targets = ["timeZone", "skillLevel", "keptOwnLevel"]
 
   static values = {
     url: String,
@@ -14,12 +14,6 @@ export default class extends Controller {
   // An edit made before this controller connected fires no event of its own, so adopt it against what the server rendered.
   connect() {
     if (this.timeZoneTarget.value !== this.renderedValue(this.timeZoneTarget)) this.saveTimeZone()
-
-    const sections = this.dailySectionsTarget.querySelector("input[type=radio]:checked")
-    if (sections && !sections.defaultChecked) {
-      this.queueSave("daily_section_count", { daily_section_count: sections.value })
-    }
-
     if (this.skillLevelTarget.value !== this.renderedValue(this.skillLevelTarget)) this.saveSkillLevel()
   }
 
@@ -34,10 +28,6 @@ export default class extends Controller {
 
   saveTimeZone() {
     this.queueSave("time_zone", { time_zone: this.timeZoneTarget.value })
-  }
-
-  saveDailySections(event) {
-    this.queueSave("daily_section_count", { daily_section_count: event.target.value })
   }
 
   async saveSkillLevel() {
