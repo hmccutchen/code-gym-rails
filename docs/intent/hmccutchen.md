@@ -344,7 +344,7 @@ data.*
   at least as serious, plan review included; I read the Ruby code-review
   keys, a colleague reads the rest from a sheet with no answers
 - a closed short version of the concept in the review, on a first exposure
-  or a low grade `#598 open`
+  or a low grade `#598`
   **I decided:** pitfalls only with an essential gap, including a gap on
   another section sharing the concept; keep both reference disclosures; the
   first qualifying section offers it when two share a concept; build it on
