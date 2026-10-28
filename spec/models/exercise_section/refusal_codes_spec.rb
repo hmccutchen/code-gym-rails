@@ -33,14 +33,13 @@ RSpec.describe "Section kind refusal codes" do
     end
   end
 
-  it "lists every code a kind refuses with, and nothing else" do
-    listed = ExerciseSection.all.flat_map { |kind| kind.refusal_codes.map { |code| "#{kind.key}.#{code}" } }
+  it "refuses only through refuse!, each kind using exactly the codes it lists, so every refusal reaches a retry with its code" do
+    ExerciseSection.all.each do |kind|
+      source = Rails.root.join("app/models/exercise_section/#{kind.key}.rb").read
 
-    expect(listed).to contain_exactly(
-      "code_review.snippet_missing", "code_review.snippet_too_long", "design_comparison.piece_missing",
-      "design_comparison.piece_too_long", "design_comparison.answer_key_incomplete",
-      "pseudocode_to_code.problem_statement_missing", "ambiguity_hunt.planted_ambiguities_missing"
-    )
+      expect(source).not_to include("ProviderError::InvalidResponseError"), "#{kind.key} raises a refusal with no code"
+      expect(source.scan(/refuse!\("(\w+)"/).flatten.uniq).to match_array(kind.refusal_codes)
+    end
   end
 
   it "won't refuse with a code its kind doesn't list" do

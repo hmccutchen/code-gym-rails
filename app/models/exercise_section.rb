@@ -143,7 +143,7 @@ class ExerciseSection
     def arrange!(section)
     end
 
-    # Raises ProviderError::InvalidResponseError for an unusable section; ingest then leaves out only that section.
+    # Refuses an unusable section through .refuse! with a code from .refusal_codes; ingest then leaves out only that section.
     def reject_unusable!(section)
     end
 

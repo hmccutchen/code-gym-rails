@@ -144,8 +144,14 @@ class ProblemSetIngest
   def reject_if_unusable(key)
     ExerciseSection.for(key).reject_unusable!(@problem_set[key])
     nil
+  rescue ProviderError::UnusableSectionError => e
+    leave_out(key, e.message, e.code)
   rescue ProviderError::InvalidResponseError => e
-    @unusable_sections << Unusable.new(key: key, concept: usable_concept(key), reason: e.message, code: e.try(:code))
+    leave_out(key, e.message, nil)
+  end
+
+  def leave_out(key, reason, code)
+    @unusable_sections << Unusable.new(key: key, concept: usable_concept(key), reason: reason, code: code)
     @problem_set = @problem_set.except(key)
     ExerciseSection.resolved_key(@problem_set, slot_kinds_for(key))
   end
