@@ -38,11 +38,11 @@ class ProblemSetIngest
     reject_missing_sections!
     warn_unrequested_sections!
     prune_retry_extras!
+    enforce_fixed_concepts!
     prune_unplanned_slots!
     format_code!
     reject_unusable_sections!
     clean_planted_keys!
-    enforce_fixed_concepts!
     normalize_concepts!
     normalize_answer_scaffolds!
     normalize_diagrams!
@@ -135,7 +135,7 @@ class ProblemSetIngest
     end
     return if resolved_keys.any?
 
-    raise ProviderError::InvalidResponseError, "No usable section left: #{@unusable_sections.map(&:reason).join('; ')}"
+    raise ProviderError::UnusableSectionError, "No usable section left: #{@unusable_sections.map(&:reason).join('; ')}"
   end
 
   def reject_if_unusable(key)

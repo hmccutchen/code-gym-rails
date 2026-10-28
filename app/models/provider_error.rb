@@ -67,6 +67,8 @@ class ProviderError < StandardError
     def self.judge_fallback_reason = "invalid_json"
   end
 
+  class UnusableSectionError < InvalidResponseError; end
+
   class TruncatedResponseError < InvalidResponseError
     def self.failure_code = "truncated"
     def self.judge_fallback_reason = "truncated"

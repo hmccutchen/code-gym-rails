@@ -391,7 +391,7 @@ data.*
   counts only drafted sections of kinds that quote
 - code review's snippet capped at 40 shown lines at ingest, refused rather
   than cut `#603`
-- the rarer kinds' keys read from drafted sections, not my days `#606 open`
+- the rarer kinds' keys read from drafted sections, not my days `#606`
   **why:** I'm the only user, and adding those kinds to my days would fake
   progress
   **I decided:** a colleague reads the drafts since I can't judge those keys,
@@ -399,7 +399,12 @@ data.*
   fixtures a guard; any keyed graded section gets the regrade as a sample;
   every billed run waits for my approval
 - the script that drafts those kinds' sections, plan-only until I approve a
-  run `#607 open`
+  run `#607`
   **I decided:** it runs on my machine against a local database, never
   production, and writes no day, history or usage row; after the reviews,
   only the three drafted kinds, inside a read-only transaction
+- a judged retry refused at ingest no longer costs a daily kind its second
+  retry `#609 open`
+  **I decided:** a refused retry spends one retry and the loop goes on;
+  rate limits, timeouts, the deadline, billing and bad replies still drop at
+  once; the retry prompt stays unchanged, left to its own issue

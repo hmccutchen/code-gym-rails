@@ -10,6 +10,7 @@ RSpec.describe ProviderError do
 
   it "keeps the subclass tree the inherited codes follow" do
     expect(ProviderError::TruncatedResponseError.superclass).to eq(ProviderError::InvalidResponseError)
+    expect(ProviderError::UnusableSectionError.superclass).to eq(ProviderError::InvalidResponseError)
     expect(ProviderError::DeadlineError.superclass).to eq(ProviderError::TimeoutError)
     %w[AuthenticationError RateLimitError BillingError TrialEndedError TrialAllowanceError NetworkError TimeoutError
        InvalidResponseError RefusalError UnsupportedRouteError AllSectionsRejectedError].each do |name|
@@ -36,6 +37,7 @@ RSpec.describe ProviderError do
     "ProviderError::DeadlineError"            => [ "other", "timeout", "deadline", "timeout" ],
     "ProviderError::InvalidResponseError"     => [ "invalid_response", "invalid_response", "invalid_json", nil ],
     "ProviderError::TruncatedResponseError"   => [ "invalid_response", "truncated", "truncated", nil ],
+    "ProviderError::UnusableSectionError"     => [ "invalid_response", "invalid_response", "invalid_json", nil ],
     "ProviderError::RefusalError"             => [ "other", "refusal", "refusal", nil ],
     "ProviderError::UnsupportedRouteError"    => [ "other", "provider_error", nil, nil ],
     "ProviderError::AllSectionsRejectedError" => [ "other", "provider_error", nil, nil ]

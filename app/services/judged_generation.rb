@@ -9,6 +9,8 @@ class JudgedGeneration
 
   REFUSAL_DETAIL_LIMIT = 300
 
+  UNUSABLE_RETRY = :unusable_retry
+
   def self.call(user:, draft:, providers:, finish:)
     new(user, draft, providers, finish).call
   end
@@ -152,10 +154,18 @@ class JudgedGeneration
       retried = retry_section(kind, concept)
       return drop(outcome) if retried.nil?
 
-      section, outcome, settled = rejudge(kind, retried, outcome)
-      return [ section, outcome ] if settled
+      if retried == UNUSABLE_RETRY
+        outcome = spent_on_unusable(outcome)
+      else
+        section, outcome, settled = rejudge(kind, retried, outcome)
+        return [ section, outcome ] if settled
+      end
     end
     drop(outcome)
+  end
+
+  def spent_on_unusable(outcome)
+    outcome.merge(unusable_retries: outcome.fetch(:unusable_retries, 0) + 1)
   end
 
   def rejudge(kind, retried, outcome)
@@ -245,6 +255,9 @@ class JudgedGeneration
 
   def retry_section(kind, concept)
     @providers.call.retry_section.call(@draft, kind, concept)
+  rescue ProviderError::UnusableSectionError => e
+    Rails.logger.warn("[judge_retry_unusable] user=#{@user.id} section=#{kind.key}: #{e.message}")
+    UNUSABLE_RETRY
   rescue ProviderError, *AiService::INFRASTRUCTURE_ERRORS => e
     Rails.logger.warn("[judge_retry_failed] user=#{@user.id} section=#{kind.key}: #{e.message}")
     nil
