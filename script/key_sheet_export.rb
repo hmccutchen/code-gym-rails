@@ -7,6 +7,11 @@ class KeySheetExport
     @per_kind = per_kind
   end
 
+  def self.entry(kind, language, section)
+    { "kind" => kind, "language" => language, "scenario" => section["scenario"], "question" => section["question"],
+      "shown" => section.slice(*ExerciseSection.for(kind).key_context_fields), "answer_key" => section[PlantedKey::FIELD] }
+  end
+
   def call
     ReviewBaselineExport.read_only { { "sections" => sections } }
   end
@@ -21,7 +26,7 @@ class KeySheetExport
         next if taken[[ kind, language ]] >= @per_kind
 
         taken[[ kind, language ]] += 1
-        entries << entry(kind, language, section)
+        entries << self.class.entry(kind, language, section)
       end
     end
   end
@@ -35,10 +40,5 @@ class KeySheetExport
       ExerciseSection.find(kind)&.planted_key? && section.is_a?(Hash) && section.key?(PlantedKey::FIELD) &&
         response.section_reviewed?(kind)
     end
-  end
-
-  def entry(kind, language, section)
-    { "kind" => kind, "language" => language, "scenario" => section["scenario"], "question" => section["question"],
-      "shown" => section.slice(*ExerciseSection.for(kind).key_context_fields), "answer_key" => section[PlantedKey::FIELD] }
   end
 end
