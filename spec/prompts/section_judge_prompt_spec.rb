@@ -26,6 +26,17 @@ RSpec.describe SectionJudgePrompt do
     end
   end
 
+  it "never shows the judge a planted key, for any kind that plants one" do
+    ExerciseSection.all.select(&:planted_key?).each do |kind|
+      section = FakeService::EXERCISE_PROBLEM_SET.fetch(kind.key).deep_dup
+      section["answer_key"] = section.fetch("answer_key").deep_transform_values { |_| "SENTINEL-PLANTED" }
+
+      request = described_class.generate(kind: kind, section: section, rung: "junior", locked: false)
+
+      expect(request.values.to_json).not_to include("SENTINEL"), "#{kind.key} leaked its key"
+    end
+  end
+
   it "sees one section and nothing about the day, the engineer or their history" do
     expect(described_class.method(:generate).parameters)
       .to eq([ [ :keyreq, :kind ], [ :keyreq, :section ], [ :keyreq, :rung ], [ :keyreq, :locked ] ])

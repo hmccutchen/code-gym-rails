@@ -8,7 +8,8 @@ RSpec.describe "section rendering", type: :request do
   PAYLOADS = {
     "code_review" => {
       "question" => "CR-QUESTION", "snippet" => "CR-SNIPPET", "scenario" => "CR-SCENARIO",
-      "teaching_note" => "CR-HINT", "concept" => "n_plus_one"
+      "teaching_note" => "CR-HINT", "concept" => "n_plus_one",
+      "answer_key" => { "issue" => "CR-SECRET-ISSUE", "why_it_matters" => "CR-SECRET-WHY", "fix" => "CR-SECRET-FIX" }
     },
     "pattern" => {
       "title" => "PAT-TITLE", "why" => "PAT-WHY", "question" => "PAT-QUESTION",
@@ -29,7 +30,8 @@ RSpec.describe "section rendering", type: :request do
     },
     "security_review" => {
       "title" => "SEC-TITLE", "question" => "SEC-QUESTION", "snippet" => "SEC-SNIPPET",
-      "scenario" => "SEC-SCENARIO", "teaching_note" => "SEC-HINT", "concept" => "sql_injection_prevention"
+      "scenario" => "SEC-SCENARIO", "teaching_note" => "SEC-HINT", "concept" => "sql_injection_prevention",
+      "answer_key" => { "vulnerability" => "SEC-SECRET-VULN", "exploit" => "SEC-SECRET-EXPLOIT", "mitigation" => "SEC-SECRET-FIX" }
     },
     "parsons_problem" => {
       "title" => "PB-TITLE", "question" => "PB-QUESTION", "scenario" => "PB-SCENARIO",
@@ -39,7 +41,8 @@ RSpec.describe "section rendering", type: :request do
     },
     "plan_review" => {
       "title" => "PR-TITLE", "question" => "PR-QUESTION", "scenario" => "PR-SCENARIO",
-      "plan_excerpt" => "PR-EXCERPT", "teaching_note" => "PR-HINT", "concept" => "scope_creep"
+      "plan_excerpt" => "PR-EXCERPT", "teaching_note" => "PR-HINT", "concept" => "scope_creep",
+      "answer_key" => { "flaws" => [ { "category" => "scope_creep", "flaw" => "PR-SECRET-FLAW", "pushback" => "PR-SECRET-PUSHBACK" } ] }
     },
     "ambiguity_hunt" => {
       "title" => "AH-TITLE", "question" => "AH-QUESTION", "scenario" => "AH-SCENARIO",
@@ -50,7 +53,8 @@ RSpec.describe "section rendering", type: :request do
     "pseudocode_to_code" => {
       "title" => "P2C-TITLE", "question" => "P2C-QUESTION", "scenario" => "P2C-SCENARIO",
       "problem_statement" => "P2C-PROBLEM",
-      "teaching_note" => "P2C-HINT", "concept" => "unhandled_empty_input"
+      "teaching_note" => "P2C-HINT", "concept" => "unhandled_empty_input",
+      "answer_key" => { "missable_requirements" => [ "P2C-SECRET-REQUIREMENT" ] }
     }
   }.freeze
 
@@ -79,7 +83,10 @@ RSpec.describe "section rendering", type: :request do
     "pseudocode_to_code" => [ "P2C-PROBLEM" ]
   }.freeze
 
-  ANSWER_KEY_MARKERS = %w[AH-SECRET-ONE AH-SECRET-TWO].freeze
+  ANSWER_KEY_MARKERS = %w[
+    AH-SECRET-ONE AH-SECRET-TWO CR-SECRET-ISSUE CR-SECRET-WHY CR-SECRET-FIX SEC-SECRET-VULN SEC-SECRET-EXPLOIT SEC-SECRET-FIX
+    PR-SECRET-FLAW PR-SECRET-PUSHBACK P2C-SECRET-REQUIREMENT
+  ].freeze
 
   # The read-only render replays blocks in the stored order, so assert on the blocks, not the answer string.
   PARSONS_ANSWER = "order:0,2,1".freeze
@@ -188,10 +195,15 @@ RSpec.describe "section rendering", type: :request do
         end
 
         # The planted list is grading data and must not reach any render; see ExerciseSection.all_answer_key_fields.
-        it "never renders the answer key, in any of the three renders" do
+        it "never renders the answer key, in any of the renders, the reviewed one included" do
+          reviewed = lambda do
+            exercise.daily_response.update!(ai_review: exercise.active_section_keys.index_with { { "rating" => "developing", "missed" => [ "m" ] } })
+            get root_path
+          end
           [ -> { exercise and get root_path },
             -> { submit!(exercise) and get root_path },
-            -> { get history_path } ].each do |render|
+            -> { get history_path },
+            reviewed ].each do |render|
             render.call
             ANSWER_KEY_MARKERS.each { |secret| expect(response.body).not_to include(secret) }
           end
