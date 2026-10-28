@@ -138,10 +138,17 @@ that kind alone through the same renderer and the same ingest —
 and `ProblemSetIngest`'s `fixed_concepts:` enforces it through
 `enforce_fixed_concepts!` at the boundary. The concept is fixed because the
 plan placed it: a retry free to choose again could drop a due retention
-check. Each retry is judged again. Rejecting the last retry, or a retry
-generation that fails for any reason (`[judge_retry_failed]`), drops the
-section. The outcome's `retry_principle`, `retry_issues`, `retry_evidence`
-and `retry_reason` are lists with one entry per judged retry, in order.
+check. Each retry is judged again. Rejecting the last retry drops the
+section. A retry whose reply ingest refuses as unusable, such as a code
+review snippet past its line cap (`ProviderError::UnusableSectionError`,
+logged as `[judge_retry_unusable]`), spends one retry, and the next one
+starts if any are left (#605). A retry generation that fails for any other
+reason (`[judge_retry_failed]`) drops the section at once, since a rate
+limit, a bad key or the deadline would most likely stop the next call too.
+The outcome's `retry_principle`, `retry_issues`, `retry_evidence` and
+`retry_reason` are lists with one entry per judged retry, in order;
+`retries` counts the refused ones too, and `unusable_retries`, present only
+when one was refused, says how many.
 
 **A drop removes the key after ingest**, so no placeholder exists and every
 downstream count still derives from `active_section_keys`. The dropped keys

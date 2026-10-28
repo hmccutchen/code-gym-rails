@@ -183,7 +183,7 @@ RSpec.describe ProblemSetIngest do
     it "reports nothing at all when the set is rejected" do
       set = { "ambiguity_hunt" => { "concept" => "invented_concept", "planted_ambiguities" => [] } }
 
-      expect { ingest(set) }.to raise_error(ProviderError::InvalidResponseError, /No usable section left/)
+      expect { ingest(set) }.to raise_error(ProviderError::UnusableSectionError, /No usable section left/)
     end
 
     describe "a section its kind refuses" do

@@ -135,7 +135,7 @@ class ProblemSetIngest
     end
     return if resolved_keys.any?
 
-    raise ProviderError::InvalidResponseError, "No usable section left: #{@unusable_sections.map(&:reason).join('; ')}"
+    raise ProviderError::UnusableSectionError, "No usable section left: #{@unusable_sections.map(&:reason).join('; ')}"
   end
 
   def reject_if_unusable(key)

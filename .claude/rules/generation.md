@@ -46,7 +46,9 @@ read it before changing that area.
   matched against the section text. A rejection buys
   `DailyPlan::Result#judge_retries` retries (two for a daily kind, one
   otherwise) with the concept fixed, then a drop recorded in
-  `dropped_sections`; a judge failure keeps the draft; a day with every section dropped raises
+  `dropped_sections`; a retry ingest refuses as unusable spends one retry
+  and the loop goes on, while any other retry failure drops at once; a
+  judge failure keeps the draft; a day with every section dropped raises
   `AllSectionsRejectedError` and writes no row. A dropped kind still counts as
   scheduled, and nothing in the rotation compensates, on purpose; a day's
   credit never exceeds the sections it delivered. The judge sees one section
