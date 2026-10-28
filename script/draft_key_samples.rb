@@ -9,7 +9,7 @@ USAGE = <<~TEXT.freeze
   KIND        a kind read from drafts: #{KeySampleDrafts::KINDS.map(&:key).join(', ')}
   OUT_PATH    a new file outside the repository, created before any call and written after each kept section;
               it holds answer keys, so delete it after the read
-  (no --run)  plan only: drafts, the most calls and an upper-bound cost, with no provider call
+  (no --run)  plan only: drafts, the most calls and a cost bound at the output cap, with no provider call
   --run       draft and judge on the production routes, billed to ANTHROPIC_API_KEY
   --count N   sections to keep, 1 to 10 (default 6: the read needs 5, plus one spare)
   --language  #{LanguagePrompts::ALL.keys.join(' or ')} (default ruby_rails)
