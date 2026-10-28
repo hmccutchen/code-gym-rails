@@ -13,7 +13,7 @@ paths:
   - "app/clients/code_format/**"
   - "app/jobs/{generate_daily_exercises_job,regenerate_exercise_job}.rb"
   - "app/views/responses/bodies/**"
-  - "script/{compare_models,model_comparison,forced_concept_drafts,solve_agreement,report_answer_positions,answer_position_balance,key_sheet_export}.rb"
+  - "script/{compare_models,model_comparison,forced_concept_drafts,solve_agreement,report_answer_positions,answer_position_balance,key_sheet_export,key_sample_drafts,draft_key_samples}.rb"
   - "spec/fixtures/judge/**"
   - "spec/**/*{ai_service,judged_generation,exercise_draft,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt,problem_set_ingest,exercise_section,real_source,judge_verdict,code_format,concept_vocabulary,generate_daily_exercises,regenerate_exercise}*"
   - "app/models/{daily_plan,section_rotation,section_count,day_hosts}.rb"
