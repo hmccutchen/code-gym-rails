@@ -14,9 +14,9 @@ No thread writes to the set. Each thread returns `[key, outcome, section]` from 
 
 ## `#resolve_rejections`
 
-Returns one `[key, section_or_nil, outcome]` per rejected key. `#resolve_rejection` returns `[section_or_nil, outcome]`, where nil means a drop. Its `retries` count includes every retry the judge judged, plus every retry ingest refused as unusable, which `unusable_retries` also counts. A retry that failed for any other reason is not counted.
+Returns one `[key, section_or_nil, outcome]` per rejected key. `#resolve_rejection` returns `[section_or_nil, outcome]`, where nil means a drop. Its `retries` count includes only retries that the judge actually judged, so it matches the length of each retry list and a judge solve's `attempt` never skips a number. `unusable_retries`, present only when one happened, counts the retries ingest refused.
 
-A retry ingest refused (`ProviderError::UnusableSectionError`, which `#retry_section` turns into `UNUSABLE_RETRY` and logs as `[judge_retry_unusable]`) spends one retry and the loop goes on, since the provider answered and the next try may not repeat the problem (#605). Any other failure, such as a rate limit, a bad key or the deadline, still drops the section at once, because a second call would most likely fail the same way.
+A retry whose section failed its kind's `.reject_unusable!` (`ProviderError::UnusableSectionError`, which `#retry_section` turns into `UNUSABLE_RETRY` and logs as `[judge_retry_unusable]`) spends one retry and the loop goes on, since the provider answered and the next try may not repeat the problem (#605). Every other failure still drops the section at once. That covers a rate limit, a bad key, the deadline and invalid JSON, which would most likely stop a second call too, and also a reply that left the section out or carried another concept, which ingest raises as a plain `InvalidResponseError`. The owner chose to keep those two with the drops.
 
 ## `#rejudge`
 

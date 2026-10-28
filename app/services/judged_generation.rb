@@ -165,7 +165,7 @@ class JudgedGeneration
   end
 
   def spent_on_unusable(outcome)
-    outcome.merge(retries: outcome[:retries] + 1, unusable_retries: outcome.fetch(:unusable_retries, 0) + 1)
+    outcome.merge(unusable_retries: outcome.fetch(:unusable_retries, 0) + 1)
   end
 
   def rejudge(kind, retried, outcome)
