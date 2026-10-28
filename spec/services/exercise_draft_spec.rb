@@ -68,6 +68,7 @@ RSpec.describe ExerciseDraft do
     keyed = draft.problem_set.keys.select { |key| ExerciseSection.find(key).planted_key? }
     expect(keyed).not_to be_empty
     expect(lines.map { |line| line[/kind=(\w+)/, 1] }).to match_array(keyed)
+    expect(lines).to all(include("attempt=draft"))
   end
 
   it "logs the key note of a retried section, and still returns only the section" do
@@ -76,8 +77,23 @@ RSpec.describe ExerciseDraft do
     section = nil
     lines = planted_key_lines { section = described_class.retry_section(draft, ExerciseSection::CodeReview, "n_plus_one", provider: provider) }
 
-    expect(lines).to eq([ "[planted_key] answer_key=ok kind=code_review language=ruby_rails user=#{user.id}" ])
+    expect(lines.sole).to start_with("[planted_key] answer_key=ok kind=code_review language=ruby_rails attempt=retry code_review_mode=")
     expect(section).to include("answer_key", "snippet")
+  end
+
+  it "checks a retried migration section's key against the schema the server stamps" do
+    draft = described_class.call(user, language: "ruby_rails", provider: provider)
+    migration = instance_double(RealSource::Migration, scenario: "s", id: "db/migrate/1_add_owner.rb",
+                                                       current_schema: %(create_table "things" do |t|\n  t.bigint "owner_id"\nend\n))
+    draft = draft.with(plan: draft.plan.with(code_review_source: migration, code_review_mode: :schema_review))
+    reply.replace("code_review" => FakeService::EXERCISE_PROBLEM_SET["code_review"].deep_dup.merge(
+      "snippet" => "add_column :things, :owner_id, :bigint",
+      "answer_key" => { "issue" => '`t.bigint "owner_id"` has no index', "why_it_matters" => "w", "fix" => "f" }
+    ))
+
+    lines = planted_key_lines { described_class.retry_section(draft, ExerciseSection::CodeReview, "n_plus_one", provider: provider) }
+
+    expect(lines.sole).to start_with("[planted_key] answer_key=ok kind=code_review language=ruby_rails attempt=retry code_review_mode=schema_review")
   end
 
   it "refuses an unsupported language before it plans or calls" do

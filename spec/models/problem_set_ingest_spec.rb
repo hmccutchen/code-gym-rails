@@ -64,6 +64,27 @@ RSpec.describe ProblemSetIngest do
       expect(result.key_notes.map(&:key)).to eq([ "code_review" ])
     end
 
+    it "matches a key quoting the provider's own Ruby against the code the real formatter re-spaced" do
+      allow(CodeFormat).to receive(:all).and_call_original
+      section = code_review.merge("snippet" => "def total\n  {a: 1}.sum { |k,v| v+1 }\nend",
+                                  "answer_key" => code_review["answer_key"].merge("issue" => "`{a: 1}.sum { |k,v| v+1 }` sums one pair"))
+
+      expect(ingest({ "code_review" => section }).problem_set["code_review"]["snippet"]).to include("{ a: 1 }")
+      expect(notes({ "code_review" => section }).map { |note| note[:outcome] }).to eq([ "ok" ])
+    end
+
+    it "checks a migration day's key against the schema the server stamped, not the provider's" do
+      migration = instance_double(RealSource::Migration, scenario: "s", id: "db/migrate/1_add_owner.rb",
+                                                         current_schema: %(create_table "things" do |t|\n  t.bigint "owner_id"\nend\n))
+      section = code_review.merge("current_schema" => "invented", "snippet" => "add_column :things, :owner_id, :bigint",
+                                  "answer_key" => code_review["answer_key"].merge("issue" => '`t.bigint "owner_id"` has no index'))
+
+      result = described_class.call({ "code_review" => section }, language: "ruby_rails", daily: DailyKinds::DEFAULT,
+                                    expected_keys: [ "code_review" ], code_review_source: migration)
+
+      expect(result.key_notes.map(&:outcome)).to eq([ "ok" ])
+    end
+
     it "notes no section whose kind plants no key" do
       expect(notes({ "pattern" => { "concept" => "service_objects", "question" => "q" } })).to eq([])
     end

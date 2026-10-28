@@ -2,8 +2,6 @@
 require_relative "review_baseline_export"
 
 class KeySheetExport
-  SHOWN_FIELDS = %w[snippet current_schema plan_excerpt problem_statement].freeze
-
   def initialize(user_id:, per_kind: ReviewBaselineExport::PER_KIND)
     @user_id  = user_id
     @per_kind = per_kind
@@ -40,6 +38,6 @@ class KeySheetExport
 
   def entry(kind, section)
     { "kind" => kind, "scenario" => section["scenario"], "question" => section["question"],
-      "shown" => section.slice(*SHOWN_FIELDS), "answer_key" => section[PlantedKey::FIELD] }
+      "shown" => section.slice(*ExerciseSection.for(kind).key_context_fields), "answer_key" => section[PlantedKey::FIELD] }
   end
 end

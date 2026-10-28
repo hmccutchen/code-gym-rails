@@ -1,5 +1,7 @@
 # Design notes: docs/code-notes/app/models/exercise_section/pseudocode_to_code.md
 class ExerciseSection::PseudocodeToCode < ExerciseSection
+  extend PlantedKey::Kind
+
   MAX_CRITIQUE_POINTS = 3
 
   MAX_CRITIQUE_POINT_LENGTH = 300
@@ -23,12 +25,11 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     end
 
     section["problem_statement"] = statement.truncate(MAX_PROBLEM_STATEMENT_LENGTH)
-    super
   end
 
-  def self.planted_key? = true
+  def self.key_context_fields = %w[problem_statement]
 
-  def self.unquoted_key_parts(_section) = []
+  def self.quoted_key_texts(_key) = []
 
   def self.normalize_planted_key(section)
     raw = section[PlantedKey::FIELD]

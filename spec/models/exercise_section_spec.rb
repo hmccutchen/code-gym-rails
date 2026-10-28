@@ -625,6 +625,12 @@ RSpec.describe ExerciseSection do
         .map(&:answer_key_fields)).to all(eq([]))
     end
 
+    it "never lets the judge rewrite a key: no kind's prose fields include one of its key fields" do
+      described_class.all.each do |kind|
+        expect(kind.prose_fields & kind.answer_key_fields).to be_empty, kind.key
+      end
+    end
+
     it "lists answer_key for every kind that plants one, so the two can't disagree" do
       expect(described_class.all.select(&:planted_key?).map(&:answer_key_fields)).to all(include(PlantedKey::FIELD))
     end

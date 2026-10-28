@@ -1,11 +1,13 @@
 class ExerciseSection::CodeReview < ExerciseSection
+  extend PlantedKey::Kind
+
   KEY_FIELDS = %w[issue why_it_matters fix].freeze
 
-  def self.planted_key? = true
+  def self.key_context_fields = %w[snippet current_schema]
+
+  def self.quoted_key_texts(key) = [ key&.dig("issue") ]
 
   def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
-
-  def self.unquoted_key_parts(section) = PlantedKey.unquoted_parts([ section.dig(PlantedKey::FIELD, "issue") ], within: section.values_at("snippet", "current_schema"))
 
   def self.diagrammable?
     true

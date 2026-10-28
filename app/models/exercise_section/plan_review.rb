@@ -1,5 +1,7 @@
 # Scaffolded because the answer has two predictable parts: what's wrong, and what to push back on.
 class ExerciseSection::PlanReview < ExerciseSection
+  extend PlantedKey::Kind
+
   DEFAULT_SCAFFOLD = [
     "What's wrong:",
     "What you'd push back on before approving:"
@@ -14,16 +16,14 @@ class ExerciseSection::PlanReview < ExerciseSection
     DEFAULT_SCAFFOLD
   end
 
-  def self.planted_key? = true
+  def self.key_context_fields = %w[plan_excerpt]
+
+  def self.quoted_key_texts(key) = Array(key&.dig("flaws")).map { |flaw| flaw["flaw"] }
 
   def self.normalize_planted_key(section)
     raw   = section[PlantedKey::FIELD]
     flaws = PlantedKey.list(raw.is_a?(Hash) ? raw["flaws"] : nil, max: MAX_PLANTED_FLAWS) { |flaw| normalize_flaw(flaw) }
     { "flaws" => flaws } if flaws.any?
-  end
-
-  def self.unquoted_key_parts(section)
-    PlantedKey.unquoted_parts(Array(section.dig(PlantedKey::FIELD, "flaws")).map { |flaw| flaw["flaw"] }, within: section.values_at("plan_excerpt"))
   end
 
   def self.normalize_flaw(flaw)

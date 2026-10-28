@@ -1,12 +1,14 @@
 # Restricted to the language's security subset, which is what makes interleaving with code_review deliberate.
 class ExerciseSection::SecurityReview < ExerciseSection
+  extend PlantedKey::Kind
+
   KEY_FIELDS = %w[vulnerability exploit mitigation].freeze
 
-  def self.planted_key? = true
+  def self.key_context_fields = %w[snippet]
+
+  def self.quoted_key_texts(key) = [ key&.dig("vulnerability") ]
 
   def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
-
-  def self.unquoted_key_parts(section) = PlantedKey.unquoted_parts([ section.dig(PlantedKey::FIELD, "vulnerability") ], within: section.values_at("snippet"))
 
   def self.vocabulary_key
     :security_concepts

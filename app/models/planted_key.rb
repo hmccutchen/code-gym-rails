@@ -6,6 +6,8 @@ module PlantedKey
 
   QUOTE = /`([^`]+)`/
 
+  MIN_QUOTE_LENGTH = 3
+
   def self.text(value)
     value.strip.truncate(MAX_LENGTH).presence if value.is_a?(String)
   end
@@ -23,14 +25,16 @@ module PlantedKey
 
   # A text with no quote at all counts as one miss: the key is asked to quote, so a paraphrase is a lead to read.
   def self.unquoted_parts(texts, within:)
-    shown = collapse(within.compact.join("\n"))
+    shown = unspaced(within.compact.join)
     texts.compact.flat_map do |text|
       quotes = text.scan(QUOTE).flatten
-      quotes.empty? ? [ text ] : quotes.reject { |quote| shown.include?(collapse(quote)) }
+      next [ text ] if quotes.empty?
+
+      quotes.select { |quote| unspaced(quote).length >= MIN_QUOTE_LENGTH && shown.exclude?(unspaced(quote)) }
     end
   end
 
-  def self.collapse(text) = text.gsub(/\s+/, " ").strip
+  def self.unspaced(text) = text.gsub(/\s+/, "")
 
   def self.store!(section, cleaned)
     cleaned ? section[FIELD] = cleaned : section.delete(FIELD)

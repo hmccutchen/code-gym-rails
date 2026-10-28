@@ -5,7 +5,7 @@ RSpec.describe "The answer key each discovery kind plants" do
 
   def cleaned(kind, key, section = {})
     section = section.merge(PlantedKey::FIELD => key)
-    kind.reject_unusable!(section)
+    PlantedKey.store!(section, kind.normalize_planted_key(section))
     section
   end
 
@@ -81,7 +81,8 @@ RSpec.describe "The answer key each discovery kind plants" do
     end
 
     it "still refuses a section with no problem statement" do
-      expect { cleaned(kind, { "missable_requirements" => [ "a" ] }) }.to raise_error(ProviderError::InvalidResponseError)
+      expect { kind.reject_unusable!(PlantedKey::FIELD => { "missable_requirements" => [ "a" ] }) }
+        .to raise_error(ProviderError::InvalidResponseError)
     end
   end
 
@@ -116,6 +117,39 @@ RSpec.describe "The answer key each discovery kind plants" do
 
     it "quotes nothing for pseudocode to code, so nothing is unquoted" do
       expect(unquoted(ExerciseSection::PseudocodeToCode, PlantedKey::FIELD => { "missable_requirements" => [ "Empty input." ] })).to eq([])
+    end
+  end
+
+  describe "every kind that plants a key" do
+    let(:planted) { ExerciseSection.all.select(&:planted_key?) }
+
+    it "answers every key hook, so a new keyed kind fails here before ingest" do
+      planted.each do |kind|
+        section = FakeService::EXERCISE_PROBLEM_SET.fetch(kind.key).deep_dup
+        expect(kind.normalize_planted_key(section)).to be_a(Hash), kind.key
+        expect(kind.unquoted_key_parts(section)).to eq([]), kind.key
+        expect(kind.key_context_fields).to all(be_a(String)), kind.key
+      end
+    end
+
+    it "keeps every section through ingest whatever junk its key holds, and notes the key missing" do
+      [ "a string", [ 1 ], 7, nil, { "unknown" => "field" } ].each do |junk|
+        planted.each do |kind|
+          section = FakeService::EXERCISE_PROBLEM_SET.fetch(kind.key).deep_dup.merge("answer_key" => junk)
+          result = ProblemSetIngest.call({ kind.key => section }, language: "ruby_rails", daily: DailyKinds::DEFAULT,
+                                         expected_keys: [ kind.key ])
+
+          expect(result.problem_set).to have_key(kind.key), "#{kind.key} dropped over #{junk.inspect}"
+          expect(result.key_notes.map(&:outcome)).to eq([ "missing" ]), "#{kind.key} with #{junk.inspect}"
+        end
+      end
+    end
+
+    it "shows the key sheet only fields the section really has" do
+      planted.each do |kind|
+        section = FakeService::EXERCISE_PROBLEM_SET.fetch(kind.key)
+        expect(section.slice(*kind.key_context_fields)).not_to be_empty, kind.key
+      end
     end
   end
 

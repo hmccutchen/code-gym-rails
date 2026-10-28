@@ -37,3 +37,9 @@ log line count is the denominator the quote threshold needs. A key problem
 is a note, not an `Unusable`: `unusable_sections` feeds the "No usable
 section left" error and lists dropped sections, and a key problem never drops
 a section.
+
+## `#clean_planted_keys!`
+
+A step of its own, right after `reject_unusable_sections!`, over the
+winning sections only. Inside `.reject_unusable!` it would rely on every
+overriding kind calling `super`; here no kind can skip it.

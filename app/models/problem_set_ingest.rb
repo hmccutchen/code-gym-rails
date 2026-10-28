@@ -41,6 +41,7 @@ class ProblemSetIngest
     prune_unplanned_slots!
     format_code!
     reject_unusable_sections!
+    clean_planted_keys!
     enforce_fixed_concepts!
     normalize_concepts!
     normalize_answer_scaffolds!
@@ -56,6 +57,13 @@ class ProblemSetIngest
   end
 
   private
+
+  def clean_planted_keys!
+    resolved_keys.each do |key|
+      kind = ExerciseSection.for(key)
+      PlantedKey.store!(@problem_set[key], kind.normalize_planted_key(@problem_set[key])) if kind.planted_key?
+    end
+  end
 
   # Last, so the quote check reads the code as formatted and the schema the server stamped; winners only, the ones cleaned.
   def key_notes

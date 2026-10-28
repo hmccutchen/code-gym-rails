@@ -37,7 +37,8 @@ RSpec.describe GenerationDiagnostics do
       diagnostics = described_class.new(user)
       diagnostics.set_size(size)
       diagnostics.unusable_sections([ Struct.new(:key, :reason).new("pattern", "too short") ])
-      diagnostics.key_notes([ ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "quote_missing") ])
+      diagnostics.key_notes([ ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "quote_missing") ],
+                            attempt: "draft", code_review_mode: :application_code)
       diagnostics.finished("ruby_rails", draft, problem_set, dropped_concepts: { "challenge" => "caching" })
     end
 
@@ -50,10 +51,10 @@ RSpec.describe GenerationDiagnostics do
     notes = [ ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "ok"),
               ProblemSetIngest::KeyNote.new(key: "plan_review", language: "javascript", outcome: "missing") ]
 
-    lines = logged_lines { described_class.new(user).key_notes(notes) }
+    lines = logged_lines { described_class.new(user).key_notes(notes, attempt: "draft", code_review_mode: :test_file) }
 
-    expect(lines).to eq([ "[planted_key] answer_key=ok kind=code_review language=ruby_rails user=#{user.id}",
-                          "[planted_key] answer_key=missing kind=plan_review language=javascript user=#{user.id}" ])
+    expect(lines).to eq([ "[planted_key] answer_key=ok kind=code_review language=ruby_rails attempt=draft code_review_mode=test_file user=#{user.id}",
+                          "[planted_key] answer_key=missing kind=plan_review language=javascript attempt=draft code_review_mode=test_file user=#{user.id}" ])
   end
 
   it "keeps the judge's pick, the answer key and the solves out of the payload a judged generation logs" do

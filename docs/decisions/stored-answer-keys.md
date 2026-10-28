@@ -45,9 +45,13 @@ anyone reads it.
 
 ## An unusable key keeps the section
 
-`ExerciseSection.reject_unusable!` stores the key cleaned through
-`PlantedKey`, or deletes an unusable one, and never refuses the section over
-it. The key only helps grading, and the grader falls back to today's
+`ProblemSetIngest#clean_planted_keys!`, right after the unusable check,
+stores each winning section's key cleaned through its kind's
+`.normalize_planted_key`, or deletes an unusable one, and never refuses the
+section over it. Cleaning is its own step, not part of `.reject_unusable!`,
+so a kind that overrides that hook can't skip it by forgetting `super`
+(owner's decision, 2026-10-28). A keyed kind extends `PlantedKey::Kind`,
+whose hooks raise until the kind answers them. The key only helps grading, and the grader falls back to today's
 behavior for a section without one, so dropping a section or spending a
 retry over a field the engineer never sees would cost more than it saves.
 
@@ -57,13 +61,19 @@ Two checks, neither of which changes a key:
 
 - **The quote check at ingest.** Each backticked quote in a code review's
   `issue`, a security review's `vulnerability` or a plan review's `flaw` must
-  appear in the code or plan as shown, whitespace collapsed. A key with no
-  quote at all counts as a miss (owner's decision, 2026-10-27). It catches a
-  key that quotes code that isn't there, not one that quotes the right line
-  and misreads it. Every keyed section logs one `[planted_key]` line with its
-  kind, language and outcome (`ok`, `missing` or `quote_missing`), and the
-  threshold is counted from those lines: more than 2 misses in the first 10
-  keyed Ruby sections stops the work.
+  appear in the code or plan as shown, with all whitespace removed on both
+  sides, since the Ruby formatter adds spaces the provider never wrote. A
+  quote under three characters is left unchecked, and a backtick inside a
+  quote (a JavaScript template literal) splits it, a known limit. A key with
+  no quote at all counts as a miss (owner's decision, 2026-10-27). It
+  catches a key that quotes code that isn't there, not one that quotes the
+  right line and misreads it. Every keyed winning section logs one
+  `[planted_key]` line with its kind, language, outcome (`ok`, `missing` or
+  `quote_missing`), `attempt` (`draft` or `retry`) and the day's
+  `code_review_mode`. The threshold is counted from those lines: more than 2
+  `quote_missing` in the first 10 drafted Ruby sections of a kind that
+  quotes (`code_review`, `security_review`, `plan_review`) stops the work,
+  and `missing` is reported beside it (owner's decision, 2026-10-28).
 - **A sampled read.** The owner reads the Ruby `code_review` keys, and a
   colleague the owner chooses reads the other three kinds, from the key
   sheet (`export_review_baseline.rb --key-sheet`), which carries the problem

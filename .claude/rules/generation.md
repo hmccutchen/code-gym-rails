@@ -3,6 +3,7 @@ paths:
   - "app/clients/{ai_service,fake_service,caller_zone_thread}.rb"
   - "app/prompts/{generation_prompt,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt}.rb"
   - "app/models/{problem_set_ingest,planted_key}.rb"
+  - "app/models/planted_key/**"
   - "app/services/{judged_generation,exercise_draft}.rb"
   - "app/prompts/generation_prompt/**"
   - "app/services/judged_generation/**"
@@ -139,12 +140,14 @@ read it before changing that area.
 - **Stored answer keys** (`docs/decisions/stored-answer-keys.md`):
   `code_review`, `security_review`, `plan_review` and `pseudocode_to_code`
   plant a key under `answer_key` (`.planted_key?`), each in its own shape,
-  quoting code or plan text in backticks. `ExerciseSection.reject_unusable!`
-  stores it cleaned through `PlantedKey`, or deletes an unusable one and
-  keeps the section. Nothing reads it yet: not the grader, the page, the
+  quoting code or plan text in backticks. A keyed kind extends
+  `PlantedKey::Kind`. `ProblemSetIngest#clean_planted_keys!`, its own step
+  after the unusable check, stores each winner's key cleaned or deletes an
+  unusable one and keeps the section. Nothing reads it yet: not the grader, the page, the
   judge or any prompt, and specs pin each place. `ProblemSetIngest` notes
   every keyed section last, as `ok`, `missing` or `quote_missing` (a quote
   the shown code or plan doesn't contain; the key stays), and
-  `GenerationDiagnostics` logs one `[planted_key]` line per note with no key
-  text. Strip sites read `ExerciseSection.all_answer_key_fields`, which
+  `GenerationDiagnostics` logs one `[planted_key]` line per note, with its
+  attempt and the day's `code_review_mode` and no key text. The quote match
+  ignores all whitespace. Strip sites read `ExerciseSection.all_answer_key_fields`, which
   stays at two entries.

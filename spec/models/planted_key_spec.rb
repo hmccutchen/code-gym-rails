@@ -48,6 +48,15 @@ RSpec.describe PlantedKey do
       end
     end
 
+    it "ignores whitespace entirely, since formatting adds spaces the provider never wrote" do
+      expect(described_class.unquoted_parts([ "`{a: 1}` and `x+1`" ], within: [ "{ a: 1 }\ny = x + 1" ])).to eq([])
+    end
+
+    it "leaves a quote under three non-space characters unchecked, so a stray `.` neither passes nor fails" do
+      expect(described_class.unquoted_parts([ "`.` then `ab`" ], within: [ "nothing here" ])).to eq([])
+      expect(described_class.unquoted_parts([ "`.` then `abc`" ], within: [ "nothing here" ])).to eq([ "abc" ])
+    end
+
     it "counts a text with no backticked quote as one unquoted part" do
       expect(described_class.unquoted_parts([ "The update assigns everything.", "`current_user`" ], within: [ code ]).size).to eq(1)
     end

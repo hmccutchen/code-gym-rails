@@ -23,8 +23,9 @@ class ExerciseDraft
       pitched_at: difficulty.rungs(skill_level: user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
     )
 
-    GenerationDiagnostics.new(user).unusable_sections(ingested.unusable_sections)
-    GenerationDiagnostics.new(user).key_notes(ingested.key_notes)
+    diagnostics = GenerationDiagnostics.new(user)
+    diagnostics.unusable_sections(ingested.unusable_sections)
+    diagnostics.key_notes(ingested.key_notes, attempt: "draft", code_review_mode: plan.code_review_mode)
     Draft.new(user: user, language: language, problem_set: ingested.problem_set, plan: plan, kinds: kinds,
               difficulty: difficulty, ladders: ladders, history: history,
               suggested_concepts: ingested.suggested_concepts, unusable_sections: ingested.unusable_sections)
@@ -45,7 +46,7 @@ class ExerciseDraft
       pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
       eased_for: eased_concepts_for(draft.plan, draft.difficulty).slice(kind.key)
     )
-    GenerationDiagnostics.new(user).key_notes(ingested.key_notes)
+    GenerationDiagnostics.new(user).key_notes(ingested.key_notes, attempt: "retry", code_review_mode: draft.plan.code_review_mode)
     ingested.problem_set[kind.key]
   end
 
