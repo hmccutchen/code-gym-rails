@@ -5,10 +5,14 @@ The key sheet for the sampled read of planted keys
 `script/export_review_baseline.rb --key-sheet`.
 
 Each entry is one reviewed section whose kind plants a key and whose stored
-section carries one: the kind, scenario, question, the code or plan the key
+section carries one: the kind, the day's language, scenario, question, the code or plan the key
 quotes (`snippet` and `current_schema`, `plan_excerpt`, or
 `problem_statement`), and the `answer_key`. A reader judges whether the key
 names the real flaw from those alone.
+
+The per-kind limit applies to each kind and language pair, newest first. The
+owner reads the Ruby `code_review` keys, and the stop rule counts Ruby
+sections, so JavaScript days can't crowd Ruby ones out of the sample.
 
 It holds no answer, rating, review, self-rating or date on purpose. The
 colleague who reads three of the four kinds sees the problem and its key,

@@ -9,8 +9,8 @@ RSpec.describe KeySheetExport do
       "current_schema" => "t.bigint :customer_id", "concept" => "n_plus_one", "answer_key" => key }
   end
 
-  def day(date, sections, reviews: sections.keys, submitted: true)
-    exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails", problem_set: sections)
+  def day(date, sections, reviews: sections.keys, submitted: true, language: "ruby_rails")
+    exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: language, problem_set: sections)
     DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: (Time.current if submitted),
                           answers: sections.keys.index_with { "ANSWER-SENTINEL" },
                           section_ratings: sections.keys.index_with { "right_level" },
@@ -22,7 +22,8 @@ RSpec.describe KeySheetExport do
 
     sheet = described_class.new(user_id: user.id).call
 
-    expect(sheet["sections"]).to eq([ { "kind" => "code_review", "scenario" => "orders page", "question" => "What is wrong?",
+    expect(sheet["sections"]).to eq([ { "kind" => "code_review", "language" => "ruby_rails", "scenario" => "orders page",
+                                        "question" => "What is wrong?",
                                         "shown" => { "snippet" => code_review["snippet"], "current_schema" => "t.bigint :customer_id" },
                                         "answer_key" => key } ])
     expect(sheet.to_json).not_to include("SENTINEL", "2026-10-20", "right_level")
@@ -49,6 +50,16 @@ RSpec.describe KeySheetExport do
     expect(sections.map { |entry| [ entry["kind"], entry["question"] ] })
       .to eq([ %w[code_review newest], %w[code_review middle], %w[plan_review Approve?] ])
     expect(sections.last["shown"]).to eq("plan_excerpt" => "Cache for `300` seconds.")
+  end
+
+  it "samples each language separately, so newer days in one can't crowd out the other" do
+    day(Date.new(2026, 10, 18), { "code_review" => code_review.merge("question" => "ruby") })
+    day(Date.new(2026, 10, 19), { "code_review" => code_review.merge("question" => "js one") }, language: "javascript")
+    day(Date.new(2026, 10, 20), { "code_review" => code_review.merge("question" => "js two") }, language: "javascript")
+
+    sections = described_class.new(user_id: user.id, per_kind: 1).call["sections"]
+
+    expect(sections.map { |entry| entry.values_at("language", "question") }).to eq([ [ "javascript", "js two" ], %w[ruby_rails ruby] ])
   end
 
   it "reads inside the read-only transaction" do

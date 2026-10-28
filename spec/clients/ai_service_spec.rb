@@ -4965,6 +4965,18 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     end
   end
 
+  it "cleans a planned keyed section's key even when an unplanned section wins its slot, since the judged day ships it" do
+    user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :security_review, fourth: nil)
+    reply = FakeService::EXERCISE_PROBLEM_SET.deep_dup.tap { |set| set["security_review"]["answer_key"] = "a raw string" }
+    stub_const("FakeService::REPLIES", FakeService::REPLIES.merge("generate_exercise" => reply.to_json))
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.problem_set).to include("security_review")
+    expect(judged.problem_set["security_review"]).not_to have_key("answer_key")
+  end
+
   it "hands back no solves from an unjudged generation" do
     expect(FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails").solves).to eq([])
   end

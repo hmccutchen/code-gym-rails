@@ -59,13 +59,13 @@ class ProblemSetIngest
   private
 
   def clean_planted_keys!
-    resolved_keys.each do |key|
-      kind = ExerciseSection.for(key)
-      PlantedKey.store!(@problem_set[key], kind.normalize_planted_key(@problem_set[key])) if kind.planted_key?
+    @problem_set.each do |key, section|
+      kind = ExerciseSection.find(key)
+      PlantedKey.store!(section, kind.normalize_planted_key(section)) if kind&.planted_key? && section.is_a?(Hash)
     end
   end
 
-  # Last, so the quote check reads the code as formatted and the schema the server stamped; winners only, the ones cleaned.
+  # Last, so the quote check reads the code as formatted and the schema the server stamped; winners only, the sample measured.
   def key_notes
     resolved_keys.filter_map do |key|
       kind = ExerciseSection.for(key)

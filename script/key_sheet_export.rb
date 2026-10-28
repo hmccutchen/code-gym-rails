@@ -16,11 +16,12 @@ class KeySheetExport
   def sections
     taken = Hash.new(0)
     responses.each_with_object([]) do |response, entries|
+      language = response.daily_exercise.language
       keyed_sections(response).each do |kind, section|
-        next if taken[kind] >= @per_kind
+        next if taken[[ kind, language ]] >= @per_kind
 
-        taken[kind] += 1
-        entries << entry(kind, section)
+        taken[[ kind, language ]] += 1
+        entries << entry(kind, language, section)
       end
     end
   end
@@ -36,8 +37,8 @@ class KeySheetExport
     end
   end
 
-  def entry(kind, section)
-    { "kind" => kind, "scenario" => section["scenario"], "question" => section["question"],
+  def entry(kind, language, section)
+    { "kind" => kind, "language" => language, "scenario" => section["scenario"], "question" => section["question"],
       "shown" => section.slice(*ExerciseSection.for(kind).key_context_fields), "answer_key" => section[PlantedKey::FIELD] }
   end
 end

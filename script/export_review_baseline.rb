@@ -9,9 +9,9 @@ USAGE = <<~TEXT.freeze
   --user ID     the account whose reviewed answers to export (required). A regrade sends these answers to a
                 provider under the runner's own key, so export only an account whose owner has agreed to that.
   --per-kind N  at most N sections of each kind, newest first (default and maximum #{ReviewBaselineExport::PER_KIND})
-  --key-sheet   instead, the key sheet for reading planted keys: each reviewed keyed section's scenario, question,
-                the code or plan it shows, and its answer_key, with no answer, rating, review or date. It is its
-                own export and needs its own approval.
+  --key-sheet   instead, the key sheet for reading planted keys: each reviewed keyed section's language, scenario,
+                question, the code or plan it shows, and its answer_key, with no answer, rating, review or date,
+                and N for each kind in each language. It is its own export and needs its own approval.
 
   The JSON goes to stdout and holds answers and answer keys, so redirect it to a file outside the repository and
   delete the file when the run that reads it is done. The counts line goes to stderr.

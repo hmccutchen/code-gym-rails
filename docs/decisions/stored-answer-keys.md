@@ -46,9 +46,10 @@ anyone reads it.
 ## An unusable key keeps the section
 
 `ProblemSetIngest#clean_planted_keys!`, right after the unusable check,
-stores each winning section's key cleaned through its kind's
+stores each keyed section's key cleaned through its kind's
 `.normalize_planted_key`, or deletes an unusable one, and never refuses the
-section over it. Cleaning is its own step, not part of `.reject_unusable!`,
+section over it. It cleans a section that lost its slot too, since a judged
+day keeps every planned kind and can ship one an unplanned section beat. Cleaning is its own step, not part of `.reject_unusable!`,
 so a kind that overrides that hook can't skip it by forgetting `super`
 (owner's decision, 2026-10-28). A keyed kind extends `PlantedKey::Kind`,
 whose hooks raise until the kind answers them. The key only helps grading, and the grader falls back to today's

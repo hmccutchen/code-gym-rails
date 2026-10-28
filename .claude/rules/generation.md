@@ -142,10 +142,11 @@ read it before changing that area.
   plant a key under `answer_key` (`.planted_key?`), each in its own shape,
   quoting code or plan text in backticks. A keyed kind extends
   `PlantedKey::Kind`. `ProblemSetIngest#clean_planted_keys!`, its own step
-  after the unusable check, stores each winner's key cleaned or deletes an
-  unusable one and keeps the section. Nothing reads it yet: not the grader, the page, the
+  after the unusable check, stores every keyed section's key cleaned (a slot's loser
+  too, since a judged day can ship it) or deletes an unusable one and keeps
+  the section. Nothing reads it yet: not the grader, the page, the
   judge or any prompt, and specs pin each place. `ProblemSetIngest` notes
-  every keyed section last, as `ok`, `missing` or `quote_missing` (a quote
+  every keyed section that won its slot, last, as `ok`, `missing` or `quote_missing` (a quote
   the shown code or plan doesn't contain; the key stays), and
   `GenerationDiagnostics` logs one `[planted_key]` line per note, with its
   attempt and the day's `code_review_mode` and no key text. The quote match

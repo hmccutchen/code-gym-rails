@@ -56,12 +56,13 @@ RSpec.describe ProblemSetIngest do
       expect(notes({ "code_review" => section }).map { |note| note[:outcome] }).to eq([ "ok" ])
     end
 
-    it "notes only the section that won its slot, leaving a losing alternative's key alone" do
+    it "notes only the section that won its slot, but cleans a losing alternative's key, since a judged day can still ship it" do
       security = { "concept" => "sql_injection_prevention", "snippet" => "User.find(id)", "answer_key" => "not a key" }
       result = ingest({ "code_review" => code_review, "architecture" => { "concept" => "service_boundaries", "question" => "q" },
                         "security_review" => security })
 
       expect(result.key_notes.map(&:key)).to eq([ "code_review" ])
+      expect(result.problem_set["security_review"]).not_to have_key("answer_key")
     end
 
     it "matches a key quoting the provider's own Ruby against the code the real formatter re-spaced" do
