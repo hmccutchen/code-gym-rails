@@ -73,10 +73,7 @@ RSpec.describe "Mobile nav menu", type: :system do
       resize(narrowest_uncollapsed_nav_width(height: 800), height: 800)
 
       expect(page).to have_link("Settings", visible: :visible)
-      overflow = page.evaluate_script(<<~JS)
-        [document.querySelector("nav .inner"), document.documentElement].map(el => el.scrollWidth - el.clientWidth)
-      JS
-      expect(overflow).to eq([ 0, 0 ])
+      expect(nav_row_overflow).to eq("row" => 0, "page" => 0, "past_gutter" => 0)
     end
   end
 end

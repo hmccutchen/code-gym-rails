@@ -400,6 +400,10 @@ data.*
   rate limits, timeouts, the deadline, billing and bad replies still drop at
   once; the retry prompt stays unchanged, left to its own issue
 - the nav counts a landscape phone's notch once, so the brand lines up with
-  the page at 932px `#614 open`
+  the page at 932px `#614`
   **I decided:** only the double count in this PR; the nav sitting left of
   the 800px page column below 900px, notch or not, is its own issue
+- the open nav menu's links kept clear of a landscape notch, and Today added
+  to the top nav `#616 open`
+  **I decided:** Today goes in this bug fix, linking to the same route as the
+  home-screen app's Today tab
