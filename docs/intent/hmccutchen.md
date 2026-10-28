@@ -394,3 +394,5 @@ data.*
   **I decided:** it runs on my machine against a local database, never
   production, and writes no day, history or usage row; after the reviews,
   only the three drafted kinds, inside a read-only transaction
+- the grader turns on code review first, gated on its read and the token
+  cost; the drafted kinds join later `#611 open`
