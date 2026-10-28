@@ -1,4 +1,10 @@
 class ExerciseSection::CodeReview < ExerciseSection
+  KEY_FIELDS = %w[issue why_it_matters fix].freeze
+
+  def self.planted_key? = true
+
+  def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
+
   def self.diagrammable?
     true
   end

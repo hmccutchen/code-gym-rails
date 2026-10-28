@@ -8,6 +8,8 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
 
   MAX_PSEUDOCODE_LENGTH = 6_000
 
+  MAX_MISSABLE_REQUIREMENTS = 3
+
   def self.vocabulary_key
     :pseudocode_to_code
   end
@@ -21,6 +23,15 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     end
 
     section["problem_statement"] = statement.truncate(MAX_PROBLEM_STATEMENT_LENGTH)
+    super
+  end
+
+  def self.planted_key? = true
+
+  def self.normalize_planted_key(section)
+    raw = section[PlantedKey::FIELD]
+    requirements = PlantedKey.list(raw.is_a?(Hash) ? raw["missable_requirements"] : nil, max: MAX_MISSABLE_REQUIREMENTS) { |entry| PlantedKey.text(entry) }
+    { "missable_requirements" => requirements } if requirements.any?
   end
 
   def self.judge_task

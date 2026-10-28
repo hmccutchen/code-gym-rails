@@ -5,9 +5,29 @@ class ExerciseSection::PlanReview < ExerciseSection
     "What you'd push back on before approving:"
   ].freeze
 
+  FLAW_CATEGORIES = %w[technical_anti_pattern scope_creep unflagged_behavior_change].freeze
+
+  # Only the runaway case needs bounding: the generator is asked for 2-3.
+  MAX_PLANTED_FLAWS = 4
+
   def self.default_scaffold
     DEFAULT_SCAFFOLD
   end
+
+  def self.planted_key? = true
+
+  def self.normalize_planted_key(section)
+    raw   = section[PlantedKey::FIELD]
+    flaws = PlantedKey.list(raw.is_a?(Hash) ? raw["flaws"] : nil, max: MAX_PLANTED_FLAWS) { |flaw| normalize_flaw(flaw) }
+    { "flaws" => flaws } if flaws.any?
+  end
+
+  def self.normalize_flaw(flaw)
+    cleaned = PlantedKey.fields(flaw, %w[flaw pushback])
+    category = flaw["category"] if cleaned && FLAW_CATEGORIES.include?(flaw["category"])
+    category ? { "category" => category }.merge(cleaned) : cleaned
+  end
+  private_class_method :normalize_flaw
 
   def self.vocabulary_key
     :plan_review

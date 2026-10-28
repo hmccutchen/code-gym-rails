@@ -621,8 +621,12 @@ RSpec.describe ExerciseSection do
   describe ".all_answer_key_fields" do
     it "is the union of every kind's answer key" do
       expect(described_class.all_answer_key_fields).to match_array(%w[answer_key planted_ambiguities])
-      expect((described_class.all - [ ExerciseSection::AmbiguityHunt, ExerciseSection::DesignComparison ])
+      expect([ ExerciseSection::Pattern, ExerciseSection::Challenge, ExerciseSection::Architecture, ExerciseSection::ParsonsProblem ]
         .map(&:answer_key_fields)).to all(eq([]))
+    end
+
+    it "lists answer_key for every kind that plants one, so the two can't disagree" do
+      expect(described_class.all.select(&:planted_key?).map(&:answer_key_fields)).to all(include(PlantedKey::FIELD))
     end
   end
 

@@ -130,8 +130,10 @@ class ExerciseSection
       vocabulary
     end
 
+    def planted_key? = false
+
     def answer_key_fields
-      []
+      planted_key? ? [ PlantedKey::FIELD ] : []
     end
 
     def code_fields
@@ -143,6 +145,7 @@ class ExerciseSection
 
     # Raises ProviderError::InvalidResponseError for an unusable section; ingest then leaves out only that section.
     def reject_unusable!(section)
+      PlantedKey.store!(section, normalize_planted_key(section)) if planted_key?
     end
 
     # Indentation is part of the contract: first line unindented, fields at 4, closing brace at 2.
