@@ -477,7 +477,7 @@ class ModelComparison
         next unless review.is_a?(Hash) && ExerciseSection.keys.include?(section)
 
         { label: "#{response.date} #{section}", kind: ExerciseSection.for(section), coach: coach,
-          review: review.merge(review.fetch(ReviewProseVerdict::ORIGINAL_KEY, {})) }
+          review: ReviewProseVerdict.as_graded(review) }
       end
     end
   end

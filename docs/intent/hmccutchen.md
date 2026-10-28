@@ -343,11 +343,12 @@ data.*
   unkeyed run on the same sections; a different finding counts only if it is
   at least as serious, plan review included; I read the Ruby code-review
   keys, a colleague reads the rest from a sheet with no answers
-- a spec for a closed short version of the concept in the review, on a
-  first exposure or a low grade
-  **I decided:** pitfalls only with an essential gap; keep both reference
-  disclosures; the first qualifying section offers it when two share a
-  concept
+- a closed short version of the concept in the review, on a first exposure
+  or a low grade `#598 open`
+  **I decided:** pitfalls only with an essential gap, including a gap on
+  another section sharing the concept; keep both reference disclosures; the
+  first qualifying section offers it when two share a concept; build it on
+  its own branch once 4 of 4 concepts I'd seen had a guide
 - the flaky Submit nudge layout spec, fixed on its own `#591`
 
 *Postponed: running the baseline until I approve the plan's cost*

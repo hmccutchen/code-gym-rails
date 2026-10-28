@@ -1,4 +1,4 @@
-# Log-only: nothing rewrites a rating from this.
+# Never rewrites a rating; its gap list also decides whether the review's short version shows pitfalls.
 class RubricCheck
   GAP_FREE_RATINGS = DailyResponse::AI_RATING_FAVORABLE
   GAPPED_RATINGS   = DailyResponse::AI_RATING_UNFAVORABLE

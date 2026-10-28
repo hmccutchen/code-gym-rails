@@ -30,8 +30,7 @@ module GlossaryHelper
     result.html_safe
   end
 
-  def glossary_wrap_prose(text)
-    seen = Set.new
+  def glossary_wrap_prose(text, seen: Set.new)
     segments = text.to_str.split(SyntaxHighlightingHelper::INLINE_CODE).each_with_index.map do |segment, index|
       index.odd? ? content_tag(:code, segment) : glossary_wrap(segment, seen: seen)
     end

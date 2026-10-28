@@ -764,6 +764,14 @@ RSpec.describe DailyResponse, type: :model do
       expect(r.improved_code_visible?("code_review")).to be(true)
     end
 
+    it "is ungated for a section with no concept tag" do
+      ex = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => {} })
+      r = user.daily_responses.create!(daily_exercise: ex, date: Date.current, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20 }, concept_tags: {})
+      expect(r.improved_code_visible?("code_review")).to be(true)
+    end
+
     def submit_pattern(concept:, date:)
       ex = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
         problem_set: { "pattern" => { "concept" => concept } })
