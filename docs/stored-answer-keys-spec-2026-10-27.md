@@ -9,8 +9,12 @@ today's grader to compare against.
 
 - **An unusable key:** the section is kept, without a key (section 3).
 - **`RUBRIC_VERSION`:** unchanged (section 6). This holds only if Measuring
-  shows no systematic rating movement between keyed and unkeyed grading. If
-  it does, the decision is reopened before keys feed any evidence reader.
+  shows no systematic rating movement between keyed and unkeyed grading.
+  Measuring runs on the keyed days the store-only PR collects, with the
+  grading PR's code from its branch, before that PR merges. So no evidence
+  reader sees a keyed grade until the check has passed. If it shows
+  movement, the grading PR waits while the decision is reopened. The
+  timing was decided by the owner on 2026-10-27, after review.
 - **A different finding:** it meets the main point only when it is at least
   as serious as the keyed one in this code; a lesser real finding is
   credited and the keyed point stays an essential gap (section 6).
@@ -25,6 +29,11 @@ today's grader to compare against.
   read. The owner reads the Ruby `code_review` sections, and a senior
   colleague the owner chooses reads the other three kinds (section 8,
   option B).
+- **Quotes in a key:** a key puts the code or plan text it quotes in
+  backticks, and a key with no backticked quote counts as a quote miss.
+  Every keyed section is logged with its kind, language and outcome (`ok`,
+  `missing` or `quote_missing`), so the quote threshold is counted straight
+  from the logs. Decided by the owner on 2026-10-27, after the plan review.
 
 ## Why
 
@@ -118,8 +127,9 @@ owner before making it.
 The section stays because the key only helps grading, and the grader falls
 back to today's behavior for a keyless section. Rejecting would spend a
 retry, or drop the section, over a field the engineer never sees.
-`GenerationDiagnostics` logs `answer_key=missing kind=…` (no content) so the
-miss rate is visible. If it turns out high, revisit.
+`GenerationDiagnostics` logs one `answer_key=<outcome> kind=… language=…`
+line per keyed section (no content), so the miss rate and its denominator
+are visible. If it turns out high, revisit.
 
 ### 4. The section judge never sees a key
 
@@ -298,8 +308,8 @@ plan text in `flaw`) is looked for in the formatted snippet or plan, with
 whitespace collapsed. It runs after `ProblemSetIngest#format_code!`, so it
 sees the code as shown, through a per-kind hook beside `.reject_unusable!`.
 That keeps `ProblemSetIngest` free of any branch on kind. Misses travel on
-`ProblemSetIngest::Result`, and `GenerationDiagnostics` logs them as
-`answer_key_quote=missing kind=…`, next to `answer_key=missing`. A miss
+`ProblemSetIngest::Result`, and `GenerationDiagnostics` logs them as the
+outcome `quote_missing` on the same per-section line. A miss
 changes nothing. It catches a key that quotes code that isn't there. It
 can't catch a key that quotes the right line and misreads it. Prettier can
 change quotes and semicolons in JavaScript, so a miss there is a lead to
@@ -344,8 +354,9 @@ the counts of calls go into the build PR.
 Out of scope for this PR. Whether the review may show the key's
 `why_it_matters` and `fix` (or a vulnerability's `exploit` and `mitigation`,
 or a plan flaw's `pushback`) after submission is a separate decision. Today
-the rule says a key never reaches the page, before or after review, and
-showing these parts would narrow it to "never before review", with
+the four new keys never reach the page, before or after review. Only
+`design_comparison` shows its `answer_key` once reviewed. Showing these
+parts would narrow the rule for the four kinds to "never before review", with
 `section_rendering_characterization_spec` changed to match. The place
 would be the review block, beside the first-exposure short version, never
 the section itself. The short version itself
@@ -367,11 +378,32 @@ times running. The stability runs show whether a key makes grading more
 consistent; the validity check (section 8, option B) shows whether the keys
 are right. Both are needed before the `RUBRIC_VERSION` decision stands.
 
-The stability baseline is the before picture. After keys ship and about
-two weeks of keyed days exist:
+The stability baseline is the before picture. It ran on 2026-10-27 over
+the owner's 15 most recent graded sections (8 `code_review`, 7
+`design_comparison`, all at junior, all stored by Claude), 5 runs each on
+`claude-sonnet-5-5`, for $0.81:
+
+- **Stability:** 14 of 15 sections gave the same rating on all 5 runs. One
+  `code_review` section gave `solid` once and `developing` four times. No
+  section moved more than one level, and no grade failed.
+- **Drift from the stored rating:** 69 of 75 grades matched. Five of the six
+  mismatches are one `design_comparison` section, stored `beginner` on
+  2026-10-11 and graded `developing` on every run now; the sixth is the
+  one-off `solid` above.
+
+So run-to-run noise on these two kinds is about one grade in 75, one level
+apart. That is well under the movement threshold below, which is measured
+against the unkeyed run on the same sections, not against this baseline. The baseline
+covers no `security_review`, `plan_review` or `pseudocode_to_code`
+section, because every day in the sample had two sections. Those three
+kinds have no before picture yet.
+
+Once the keys are stored, about two weeks of keyed days exist, and before
+the grader reads keys in production:
 
 1. Export keyed sections with the same script.
-2. Regrade each one 5 times with the key, and 5 times with the new
+2. Regrade each one 5 times with the key, using the grading PR's code on
+   its branch, and 5 times with the new
    `answer_key` removed from every section of the four keyed kinds in that
    day, since the day context shows every section's key, not only the graded
    one's. The `design_comparison` and `ambiguity_hunt` keys stay, as in the
@@ -412,7 +444,7 @@ arm, not the stability baseline, because it covers the same sections, model
 and day, with only the key different. The baseline is an older sample of
 unkeyed sections, with only a few rows of each rotating kind. It stays a
 general measure of today's grader, not this threshold's reference. If that happens, say so on the build PR and reopen the
-`RUBRIC_VERSION` decision.
+`RUBRIC_VERSION` decision before that PR merges.
 
 **Handling production data.**
 
