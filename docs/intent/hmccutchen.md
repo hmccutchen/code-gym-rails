@@ -395,7 +395,11 @@ data.*
   production, and writes no day, history or usage row; after the reviews,
   only the three drafted kinds, inside a read-only transaction
 - a judged retry refused at ingest no longer costs a daily kind its second
-  retry `#609 open`
+  retry `#609`
   **I decided:** a refused retry spends one retry and the loop goes on;
   rate limits, timeouts, the deadline, billing and bad replies still drop at
   once; the retry prompt stays unchanged, left to its own issue
+- the nav counts a landscape phone's notch once, so the brand lines up with
+  the page at 932px `#614 open`
+  **I decided:** only the double count in this PR; the nav sitting left of
+  the 800px page column below 900px, notch or not, is its own issue
