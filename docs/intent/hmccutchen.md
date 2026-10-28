@@ -365,3 +365,16 @@ data.*
   and level suggestions would read them before the movement check ran
 
 *From review: `#595`*
+
+## Wed Oct 28
+
+- the stored keys' rarer kinds get keys as they come up, with no change to
+  my daily section count `#600`
+- answer keys stored for code review, security review, plan review and
+  pseudocode-to-code, read by nothing yet `#602 open`
+  **why:** the grader has to guess what was planted, and a wrong guess looks
+  like an honest miss
+  **I decided:** measure the extra tokens from my usage rows after deploy,
+  not with billed calls; after the reviews, quotes match with all
+  whitespace ignored, cleaning is its own ingest step, and the stop rule
+  counts only drafted sections of kinds that quote
