@@ -23,6 +23,7 @@ class DailyKindSwap::Consequences
 
   def initialize(pair:, place:, kind:, preferences:, day:, languages:, pair_shares:)
     @kind        = kind
+    @place       = place
     @outgoing    = pair[place]
     @proposed    = pair.dup.tap { |kinds| kinds[place] = kind }
     @preferences = preferences
@@ -62,6 +63,7 @@ class DailyKindSwap::Consequences
 
   # Suppression outranks size: neither a larger day nor coverage brings back a kind a daily fourth or an exclusion keeps out.
   def warning
+    return [ line(:hidden_place, count: @day.setting, kind: name(@kind)) ] if hidden_place?
     return [ line(:outgoing_one_fourth, outgoing: name(@outgoing), kind: name(@kind)) ] if @outgoing.fourth? && @kind.fourth?
     return [ outgoing_excluded ] if rotation_skips_outgoing?
     return [ line(:outgoing_fixed, count: @day.setting, outgoing: name(@outgoing)) ] if fixed_without_rotation?
@@ -75,6 +77,8 @@ class DailyKindSwap::Consequences
   def outgoing_excluded = line(:outgoing_excluded, outgoing: name(@outgoing))
 
   def fixed_without_rotation? = !@day.setting.nil? && @day.setting <= @day.held
+
+  def hidden_place? = @place >= @day.held
 
   def rotation_skips_outgoing?
     group = ExerciseSection.optional_slots(daily: @proposed).values.find { |kinds| kinds.include?(@outgoing) }

@@ -31,6 +31,7 @@ class ProfileUpdate
   def shape_error
     return I18n.t("tracks.stale_page") if posted?(:learning_track)
     return full_rule(:daily_section_count, User::DAILY_SECTION_COUNT_RULE) unless daily_section_count_shaped?
+    return "Daily section kinds must be a list of strings" unless list_of_strings?(:daily_section_kinds)
     return daily_section_kinds_refusal unless daily_section_kinds_accepted?
     return "Section weights must map each section to a weight" unless object?(:section_kind_weights)
     return "Excluded section kinds must be a list of strings" unless list_of_strings?(:excluded_section_kinds)
@@ -55,8 +56,7 @@ class ProfileUpdate
   end
 
   def daily_section_kinds_accepted?
-    !posted?(:daily_section_kinds) ||
-      (list_of_strings?(:daily_section_kinds) && DailyKinds.problems_with(@user_params[:daily_section_kinds]).empty?)
+    !posted?(:daily_section_kinds) || DailyKinds.problems_with(@user_params[:daily_section_kinds]).empty?
   end
 
   def daily_section_kinds_refusal

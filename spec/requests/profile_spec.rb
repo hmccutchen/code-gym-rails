@@ -476,10 +476,11 @@ RSpec.describe "Profile", type: :request do
       end
     end
 
-    it "refuses kinds that are not a list of names" do
+    it "refuses kinds that are not a list of names in the words the other shape checks use" do
       choose(3, "pattern")
 
       expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["error"]).to eq("Daily section kinds must be a list of strings")
       expect(user.reload.daily_section_kinds).to eq([])
     end
 

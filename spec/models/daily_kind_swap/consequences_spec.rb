@@ -59,6 +59,11 @@ RSpec.describe DailyKindSwap::Consequences do
         .to eq([ t(:outgoing_fixed, count: 3, outgoing: "Code Review") ])
     end
 
+    it "says a place the setting hides changes nothing until the setting is raised, not that the outgoing kind disappears" do
+      expect(consequences("challenge", place: 1, setting: 1, planned_size: 2, held: 1).warning)
+        .to eq([ t(:hidden_place, count: 1, kind: "Coding Challenge") ])
+    end
+
     it "warns of nothing under a larger setting with a place left to rotate" do
       expect(consequences("challenge", setting: 3, planned_size: 3, held: 2).warning).to be_empty
     end

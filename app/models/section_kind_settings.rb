@@ -34,7 +34,7 @@ class SectionKindSettings
     end
   end
 
-  # attrs is a save's posted fields; each stored entry for a kind the current pair renders no control for is merged back in.
+  # attrs is a save's posted fields; each stored entry for a kind the current daily places leave without a control is merged back in.
   def keep_unrendered(attrs)
     weighted = ExerciseSection.rotatable(daily: daily).map(&:key)
     shown    = ExerciseSection.pickable(daily: daily).map(&:key)

@@ -523,6 +523,7 @@ en:
         excluded_incoming: "You skip %{kind} in Exercise mix. As a daily section it will be in every set anyway. The setting applies again if you swap it out."
         outgoing_one_fourth: "A set holds only one of %{outgoing} and %{kind}, so after this swap %{outgoing} won't appear at all. Swap it back to see it again."
         outgoing_excluded: "You skip %{outgoing} in Exercise mix, so after this swap it won't appear at all. Swap it back, or turn Skip off for it, to see it."
+        hidden_place: "Your Daily sections setting is %{count}, so this daily section isn't in your sets. %{kind} appears here once you raise the setting in Setup."
         outgoing_fixed: "Your Daily sections setting is %{count}, so after this swap %{outgoing} won't appear at all. Swap it back, or change the setting in Setup, to see it again."
         outgoing_weeks: "Your sets have two sections right now, so after this swap %{outgoing} will appear about once every %{weeks} weeks, as an extra section. Swap it back to have it every day."
         outgoing_braked: "Your sets have two sections right now, so after this swap %{outgoing} will rarely appear until your sets grow. Swap it back to have it every day."
@@ -530,10 +531,10 @@ en:
   daily_sections:
     legend: "Daily sections"
     automatic: "Automatic"
-    hint: "Automatic gives you shorter sets after days you don't finish, and longer ones once you finish more and your reviewed answers go well. A number sets how many sections each day is planned with, though a section that fails a quality check can still be left out. %{fewest} gives you one of %{fixed_sections}, the one you choose, and %{pair} gives you both. A larger number adds sections you choose, and they appear in every set."
+    hint: "Automatic gives you shorter sets after days you don't finish, and longer ones once you finish more and your reviewed answers go well. A number sets how many sections each day is planned with, though a section that fails a quality check can still be left out. %{fewest} gives you one of %{fixed_sections}, the one you choose, and %{pair} gives you each of them. A larger number adds sections you choose, and they appear in every set."
     choose:
       single_legend: "Which daily section should each set hold?"
-      single_note: "The other one won't appear until you choose %{pair} or more again."
+      single_note: "The other daily section comes back when you choose Automatic or %{pair} or more."
       extras_note: "Choose a kind for each extra section. It appears in every set until you change it here."
       extra_label: "Extra section %{number}"
       save: "Save"

@@ -25,7 +25,7 @@ RSpec.describe "Setup Daily sections control", type: :request do
     get setup_path
 
     hint = page_html.css("#daily-sections > .card-note").last.text
-    expect(hint).to include("1 gives you one of #{name("architecture")} and #{name("code_review")}, the one you choose, and 2 gives you both.")
+    expect(hint).to include("1 gives you one of #{name("architecture")} and #{name("code_review")}, the one you choose, and 2 gives you each of them.")
     expect(hint).to include("A larger number adds sections you choose, and they appear in every set.")
   end
 
