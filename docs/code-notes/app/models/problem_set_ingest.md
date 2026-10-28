@@ -6,7 +6,7 @@
 
 ## `Unusable`
 
-`concept` is nil when the refused section's tag is off-vocabulary, so a retry is only asked for a concept the plan could have placed.
+`concept` is nil when the refused section's tag is off-vocabulary, so a retry is only asked for a concept the plan could have placed. `code` is the `<kind>.<check>` code the kind refused with (`ExerciseSection.refusal_codes`), and the "No usable section left" error carries it too when exactly one section was refused, which is always the case for a one-kind retry. A retry's prompt reads it to say why the section was turned down (#610).
 
 ## `.call`
 

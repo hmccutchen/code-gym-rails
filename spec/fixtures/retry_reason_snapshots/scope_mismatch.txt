@@ -1,0 +1,1 @@
+- This section replaces one that was turned down. Its concept must be exactly `service_objects`, which the day's plan already placed here. It was turned down because answering it correctly did not need the tagged concept, or the question asked for something the concept does not cover. Write a new section for the same concept.

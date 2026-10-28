@@ -195,7 +195,8 @@ RSpec.describe ProblemSetIngest do
         expect(result.problem_set.keys).to eq([ "code_review" ])
         expect(result.unusable_sections).to eq([
           described_class::Unusable.new(key: "ambiguity_hunt", concept: "missing_success_criteria",
-                                        reason: "Ambiguity hunt returned no usable planted_ambiguities to grade coverage against")
+                                        reason: "Ambiguity hunt returned no usable planted_ambiguities to grade coverage against",
+                                        code: "ambiguity_hunt.planted_ambiguities_missing")
         ])
       end
 
@@ -830,6 +831,25 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
 
     expect(result["code_review"]).not_to have_key("pitched_at")
     expect(result["code_review"]).not_to have_key("eased")
+  end
+end
+
+RSpec.describe ProblemSetIngest, "refusal codes" do
+  let(:comparison) { FakeService::EXERCISE_PROBLEM_SET.fetch("design_comparison").deep_dup }
+
+  def ingest(set)
+    described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: set.keys)
+  end
+
+  it "records the code of each section it refuses" do
+    result = ingest("code_review" => { "concept" => "n_plus_one", "snippet" => " " }, "design_comparison" => comparison)
+
+    expect(result.unusable_sections.sole).to have_attributes(key: "code_review", code: "code_review.snippet_missing")
+  end
+
+  it "raises with the refused section's code when nothing usable is left" do
+    expect { ingest("code_review" => { "concept" => "n_plus_one", "snippet" => " " }) }
+      .to raise_error(ProviderError::UnusableSectionError) { |error| expect(error.code).to eq("code_review.snippet_missing") }
   end
 end
 

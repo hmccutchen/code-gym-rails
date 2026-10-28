@@ -31,11 +31,11 @@ class ExerciseDraft
               suggested_concepts: ingested.suggested_concepts, unusable_sections: ingested.unusable_sections)
   end
 
-  def self.retry_section(draft, kind, concept, provider:, deadline: GenerationDeadline::NONE)
+  def self.retry_section(draft, kind, concept, cause: nil, provider:, deadline: GenerationDeadline::NONE)
     user, language = draft.user, draft.language
     prompt = provider.prompt.call(user, language, plan: draft.plan, history: draft.history, difficulty: draft.difficulty,
                                   ladders: retry_ladders(draft, kind))
-    reply = provider.generate.call(user, "retry_section", language, prompt.render(only: kind, fixed_concept: concept),
+    reply = provider.generate.call(user, "retry_section", language, prompt.render(only: kind, fixed_concept: concept, retry_cause: cause),
                                    subject: "#{kind.key} retry",
                                    deadline: deadline.leaving(CallProfiles.worst_case_seconds_for("judge_section")))
 

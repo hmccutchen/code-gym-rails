@@ -1,6 +1,6 @@
 # Design notes: docs/code-notes/app/services/judged_generation.md
 class JudgedGeneration
-  # judge_section(user, kind, section, rung:, locked:), retry_section(draft, kind, concept); both raise. judge_identity is a value.
+  # judge_section(user, kind, section, rung:, locked:), retry_section(draft, kind, concept, cause); both raise. judge_identity is a value.
   Provider = Data.define(:judge_section, :retry_section, :judge_identity)
 
   REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL = false
@@ -9,7 +9,7 @@ class JudgedGeneration
 
   REFUSAL_DETAIL_LIMIT = 300
 
-  UNUSABLE_RETRY = :unusable_retry
+  RefusedRetry = Data.define(:cause)
 
   def self.call(user:, draft:, providers:, finish:)
     new(user, draft, providers, finish).call
@@ -150,18 +150,25 @@ class JudgedGeneration
     outcome = outcome.merge(retries: 0, **retry_fields.index_with { [] })
     return drop(outcome) if concept.nil? || concept == "other"
 
+    cause = draft_cause(kind, outcome)
     @draft.plan.judge_retries(kind).times do
-      retried = retry_section(kind, concept)
+      retried = retry_section(kind, concept, cause)
       return drop(outcome) if retried.nil?
 
-      if retried == UNUSABLE_RETRY
-        outcome = spent_on_unusable(outcome)
+      if retried.is_a?(RefusedRetry)
+        outcome, cause = spent_on_unusable(outcome), retried.cause
       else
         section, outcome, settled = rejudge(kind, retried, outcome)
         return [ section, outcome ] if settled
+
+        cause = outcome[:retry_principle].last
       end
     end
     drop(outcome)
+  end
+
+  def draft_cause(kind, outcome)
+    outcome[:principle] || Array(@draft.unusable_sections).find { |section| section.key == kind.key }&.code
   end
 
   def spent_on_unusable(outcome)
@@ -253,11 +260,11 @@ class JudgedGeneration
     error.message.truncate(REFUSAL_DETAIL_LIMIT) if error.is_a?(JudgeVerdict::Invalid)
   end
 
-  def retry_section(kind, concept)
-    @providers.call.retry_section.call(@draft, kind, concept)
+  def retry_section(kind, concept, cause)
+    @providers.call.retry_section.call(@draft, kind, concept, cause)
   rescue ProviderError::UnusableSectionError => e
     Rails.logger.warn("[judge_retry_unusable] user=#{@user.id} section=#{kind.key}: #{e.message}")
-    UNUSABLE_RETRY
+    RefusedRetry.new(cause: e.code)
   rescue ProviderError, *AiService::INFRASTRUCTURE_ERRORS => e
     Rails.logger.warn("[judge_retry_failed] user=#{@user.id} section=#{kind.key}: #{e.message}")
     nil

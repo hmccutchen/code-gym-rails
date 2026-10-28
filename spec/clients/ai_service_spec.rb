@@ -1472,7 +1472,7 @@ RSpec.describe AiService do
 
       expect(section).to include("concept" => "memoization", "pitched_at" => "senior")
       expect(schema_keys(prompt)).to eq([ "challenge" ])
-      expect(prompt).to include("This section's concept must be exactly `memoization`")
+      expect(prompt).to include("Its concept must be exactly `memoization`")
       expect(prompt).not_to include("as their concept today")
       expect(prompt).to include("Concepts needing reinforcement right now: caching (standard)", "2026-09-01: 1/3 answered")
       expect(prompt).to include("Sections at senior: challenge", "Locked (challenge)", "- memoization: a fresh senior rung")
@@ -4922,7 +4922,7 @@ RSpec.describe AiService, "single-section retry prompt" do
                                only: ExerciseSection::Challenge, fixed_concept: "memoization")
     expect(prompt).to include('"challenge": {')
     expect(prompt).not_to include('"code_review": {')
-    expect(prompt).to include("This section's concept must be exactly `memoization`")
+    expect(prompt).to include("Its concept must be exactly `memoization`")
   end
 end
 
@@ -5191,7 +5191,8 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     svc.generate_judged_exercise(user, language: "ruby_rails")
 
-    expect(prompts.last).to include('"challenge": {').and include("This section's concept must be exactly `memoization`")
+    expect(prompts.last).to include('"challenge": {').and include("Its concept must be exactly `memoization`")
+    expect(prompts.last).to include("It was turned down because #{GenerationPrompt::RetryReasons::LINES.fetch('scope_mismatch')}")
     expect(prompts.last).not_to include('"code_review": {')
   end
 
@@ -5291,7 +5292,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     expect(generate_calls).to eq(1)
     expect(prompts.one?).to be(true)
-    expect(prompts.first).not_to include("This section's concept must be exactly")
+    expect(prompts.first).not_to include("Its concept must be exactly")
     expect(judged.dropped_sections).to eq([ "challenge" ])
   end
 
@@ -5522,7 +5523,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
 
-    expect(retry_prompts.sole).to include("This section's concept must be exactly `open_closed`")
+    expect(retry_prompts.sole).to include("Its concept must be exactly `open_closed`")
     expect(judged.problem_set["design_comparison"]).to include("piece_a", "piece_b")
     expect(judged.outcomes["design_comparison"]).to include(unusable: true, retries: 1, dropped: false)
   end

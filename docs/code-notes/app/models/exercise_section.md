@@ -97,3 +97,7 @@ Returning nil drops the section from the payload, rather than storing something 
 ## `.substantive_answer`
 
 Scaffold labels are matched against whole stripped lines, so a label the user edited becomes their own text and counts toward the answer.
+
+## `.refusal_codes` and `.refuse!`
+
+A kind's `.reject_unusable!` refuses through `.refuse!(code, message)`, which raises `ProviderError::UnusableSectionError` with the code `<kind>.<code>`. `.refuse!` raises `ArgumentError` for a code the kind's `.refusal_codes` doesn't list, so the list is every way the kind can refuse. Ingest keeps the code on its `Unusable` entry, and a retry's prompt maps it to a fixed line (`GenerationPrompt::RetryReasons`, #610). A new check needs a code in the list and a line in that table; `generation_prompt_retry_reasons_spec` fails until both exist.

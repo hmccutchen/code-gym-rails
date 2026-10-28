@@ -25,6 +25,7 @@ RSpec.describe JudgedGeneration do
   let(:finish) { ->(set, **logs) { finished << [ set, logs ] } }
   let(:judged_calls) { [] }
   let(:retry_calls) { [] }
+  let(:retry_causes) { [] }
   let(:verdicts) { Hash.new { |hash, key| hash[key] = [ { "status" => "keep" } ] } }
   let(:retried_sections) { {} }
 
@@ -38,8 +39,9 @@ RSpec.describe JudgedGeneration do
 
           JudgeVerdict.parse(reply, kind: kind)
         },
-        retry_section: lambda { |retry_draft, kind, concept|
+        retry_section: lambda { |retry_draft, kind, concept, cause|
           retry_calls << [ retry_draft, kind.key, concept ]
+          retry_causes << cause
           reply = retried_sections.fetch(kind.key) { drafted[kind.key].merge("question" => "Retried") }
           reply = reply.length > 1 ? reply.shift : reply.first if reply.is_a?(Array)
           raise reply if reply.is_a?(Exception)
@@ -193,6 +195,42 @@ RSpec.describe JudgedGeneration do
     expect(judged.dropped_sections).to eq([ "challenge" ])
     expect(judged.outcomes["challenge"]).to include(retries: 0, dropped: true)
     expect(Rails.logger).to have_received(:warn).with(/\[judge_retry_failed\] user=42 section=challenge/)
+  end
+
+  describe "the cause each retry is handed" do
+    let(:daily_kinds) { [ ExerciseSection::Pattern, ExerciseSection::CodeReview ] }
+
+    def refused(code) = ProviderError::UnusableSectionError.new("No usable section left", code: code)
+
+    before { allow(Rails.logger).to receive(:warn) }
+
+    it "hands the first retry the judge's principle, and the next one the principle that turned down the retry" do
+      verdicts["pattern"] = [ reject("scope_mismatch"), reject("underdetermined"), { "status" => "keep" } ]
+
+      run
+
+      expect(retry_causes).to eq(%w[scope_mismatch underdetermined])
+    end
+
+    it "hands the next retry the code of a retry ingest refused" do
+      verdicts["pattern"] = [ reject("scope_mismatch"), { "status" => "keep" } ]
+      retried_sections["pattern"] = [ refused("code_review.snippet_too_long"), drafted["pattern"].merge("question" => "Retried") ]
+
+      run
+
+      expect(retry_causes).to eq(%w[scope_mismatch code_review.snippet_too_long])
+    end
+
+    it "hands a retry of a section the draft refused that refusal's code, or nothing when none was recorded" do
+      retried_sections["challenge"] = drafted.delete("challenge").merge("question" => "Retried")
+      draft.unusable_sections = [ ProblemSetIngest::Unusable.new(key: "challenge", concept: "memoization", reason: "bad",
+                                                                   code: "code_review.snippet_missing") ]
+      run
+      draft.unusable_sections = [ ProblemSetIngest::Unusable.new(key: "challenge", concept: "memoization", reason: "bad") ]
+      run
+
+      expect(retry_causes).to eq([ "code_review.snippet_missing", nil ])
+    end
   end
 
   describe "a retry ingest refused as unusable" do
@@ -722,7 +760,7 @@ RSpec.describe JudgedGeneration do
         verdicts["design_comparison"] = [ rejection, rejection, solve("keep", "b") ]
         received = []
         retrying = lambda do
-          providers.call.with(retry_section: lambda { |retry_draft, kind, concept|
+          providers.call.with(retry_section: lambda { |retry_draft, kind, concept, _cause|
             received << [ retry_draft, kind, concept ]
             comparison.merge("question" => "Retry #{received.size}", "piece_a" => "REJECTED-RETRY-#{received.size}")
           })
