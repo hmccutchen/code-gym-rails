@@ -313,56 +313,47 @@ data.*
 ## Tue Oct 27
 
 - Today on a desktop: the answers beside a side column `#579`
-  **I decided:** one side column after the answers with Submit, Generate new
-  set and Start over, which ends the page on a phone; the progress bar stays in
-  the main column, the featured card below the day, and the column sticks only
-  in a tall window; disable Generate new set and Start over while a submit runs
+  **I decided:** Submit, Generate new set and Start over in one side column,
+  which ends the page on a phone; the column sticks only in a tall window;
+  both regenerate buttons disabled while a submit runs
 - a skipped section reviewed as a walkthrough with no grade `#581`
   **why:** an unanswered section was graded like an answer
-  **I decided:** keep its review; "What a good answer covers" heads its list;
-  a short answer is still an answer and gets graded, with no character count;
-  Parsons keeps showing the correct block order; follow-up chat keeps "What
-  you missed"
-- ReviewPrompt picks a section's review prompt, from the layered review of the
-  walkthrough work `#584`
-- a spec pinning the walkthrough prompt and the stripped grade together, from
-  the critical review of the ReviewPrompt work `#586`
+  **I decided:** "What a good answer covers" heads its list; a short answer
+  is still graded; Parsons keeps showing the correct order
+- ReviewPrompt picks a section's review prompt, from the layered review
+  `#584`
+- a spec pinning the walkthrough prompt and the stripped grade, from the
+  critical review `#586`
 - the review badge and headings moved off DailyResponse into a view helper
   `#587`
+- the self-rating labels and reviewing provider name moved to view helpers too
+  `#589 open`
 - a read-only baseline of how stable grading is: export my graded answers,
   regrade each five times `#590`
-  **why:** I'm considering grading by an answer's route instead of a key,
-  and wanted a measurement first
-  **I decided:** every production export read-only, approved by me, kept
-  outside the repo and deleted after; 10 sections per kind, not 50 overall;
-  gap positions without the review's text; drift apart from stability
+  **why:** I'm weighing grading by an answer's route, and wanted a
+  measurement first
+  **I decided:** every production export read-only, approved by me and
+  deleted after; 10 sections per kind; drift reported apart from stability
 - a spec for storing what code review, security review, plan review and
   pseudocode-to-code planted
-  **I decided:** an unusable key keeps the section, without a key;
-  `RUBRIC_VERSION` stays unless keyed grading moves ratings beyond the
-  unkeyed run on the same sections; a different finding counts only if it is
-  at least as serious, plan review included; I read the Ruby code-review
-  keys, a colleague reads the rest from a sheet with no answers
+  **I decided:** an unusable key keeps the section; `RUBRIC_VERSION` stays
+  unless keyed grading moves ratings; a different finding counts only if at
+  least as serious; I read the Ruby keys, a colleague the rest
 - a closed short version of the concept in the review, on a first exposure
   or a low grade `#598`
-  **I decided:** pitfalls only with an essential gap, including a gap on
-  another section sharing the concept; keep both reference disclosures; the
-  first qualifying section offers it when two share a concept; build it on
-  its own branch once 4 of 4 concepts I'd seen had a guide
+  **I decided:** pitfalls only with an essential gap on any section sharing
+  the concept; the first qualifying section offers it
 - the flaky Submit nudge layout spec, fixed on its own `#591`
 - I ran the baseline myself: 14 of 15 sections graded the same all five times
 - two implementation plans, the short version first since it needs no keys
-  `#596 open`
-  **I decided:** two separate plans; every production query, generation and
-  calibration run waits for my approval; after the plan reviews, the
-  exposure count lives on `ConceptExposureIndex`, the short version builds
-  #592's single `graded_prose` reader first, every keyed section is logged
-  with its kind, language and outcome, and a key quotes in backticks, with no
-  quote counted as a miss
-- keyed grading measured on the stored-key days before the grader reads keys
-  in production, from Copilot's review
-  **why:** keyed grades keep today's `RUBRIC_VERSION`, so the competency gate
-  and level suggestions would read them before the movement check ran
+  `#596`
+  **I decided:** every production query and billed run waits for my approval;
+  one exposure count and one graded-review reader; every keyed section
+  logged; keys quote in backticks
+- keyed grading measured before the grader reads keys in production, from
+  Copilot's review
+  **why:** otherwise the competency gate and level suggestions would read
+  keyed grades before the movement check
 
 *From review: `#595`*
 
@@ -370,6 +361,17 @@ data.*
 
 - the stored keys' rarer kinds get keys as they come up, with no change to
   my daily section count `#600`
+- a change review kind: a small change across 2–3 files, the flaw in how
+  they interact `#601 open`
+  **I decided:** a separate kind, not a code review mode; every rung gets it,
+  with the rung shaping how many files and how visible, since a rung or lock
+  never removes a kind, and any limit would be by track; post-change files
+  with changed lines highlighted; a failed key refuses the section; JavaScript
+  days use only data modeling, a Knex migration and a looser quote match;
+  after the reviews, its grader waits for the stored-keys gating with its own
+  calibration fixture, the shared data-modeling line gains one clause, its
+  first appearance is accepted, and the judge never rejects on rung fit
+- code review's snippet length, capped only by the prompt, left as an issue
 - answer keys stored for code review, security review, plan review and
   pseudocode-to-code, read by nothing yet `#602 open`
   **why:** the grader has to guess what was planted, and a wrong guess looks
