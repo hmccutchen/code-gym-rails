@@ -387,3 +387,8 @@ data.*
   and a kind with no reader stays off; the read is the main check and the
   fixtures a guard; any keyed graded section gets the regrade as a sample;
   every billed run waits for my approval
+- the script that drafts those kinds' sections, plan-only until I approve a
+  run `#607 open`
+  **I decided:** it runs on my machine against a local database, never
+  production, and writes no day, history or usage row; after the reviews,
+  only the three drafted kinds, inside a read-only transaction
