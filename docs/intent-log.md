@@ -382,7 +382,7 @@ data.*
   first appearance is accepted, and the judge never rejects on rung fit
 - code review's snippet length, capped only by the prompt, left as an issue
 - answer keys stored for code review, security review, plan review and
-  pseudocode-to-code, read by nothing yet `#602 open`
+  pseudocode-to-code, read by nothing yet `#602`
   **why:** the grader has to guess what was planted, and a wrong guess looks
   like an honest miss
   **I decided:** measure the extra tokens from my usage rows after deploy,
