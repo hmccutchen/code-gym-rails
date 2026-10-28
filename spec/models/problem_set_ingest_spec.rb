@@ -56,6 +56,14 @@ RSpec.describe ProblemSetIngest do
       expect(notes({ "code_review" => section }).map { |note| note[:outcome] }).to eq([ "ok" ])
     end
 
+    it "notes only the section that won its slot, leaving a losing alternative's key alone" do
+      security = { "concept" => "sql_injection_prevention", "snippet" => "User.find(id)", "answer_key" => "not a key" }
+      result = ingest({ "code_review" => code_review, "architecture" => { "concept" => "service_boundaries", "question" => "q" },
+                        "security_review" => security })
+
+      expect(result.key_notes.map(&:key)).to eq([ "code_review" ])
+    end
+
     it "notes no section whose kind plants no key" do
       expect(notes({ "pattern" => { "concept" => "service_objects", "question" => "q" } })).to eq([])
     end

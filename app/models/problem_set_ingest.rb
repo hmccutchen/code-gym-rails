@@ -57,13 +57,11 @@ class ProblemSetIngest
 
   private
 
-  # Last, so the quote check reads the code as formatted and the schema the server stamped.
+  # Last, so the quote check reads the code as formatted and the schema the server stamped; winners only, the ones cleaned.
   def key_notes
-    @problem_set.filter_map do |key, section|
-      kind = ExerciseSection.find(key)
-      next unless section.is_a?(Hash) && kind&.planted_key?
-
-      KeyNote.new(key: key, language: @language, outcome: key_outcome(kind, section))
+    resolved_keys.filter_map do |key|
+      kind = ExerciseSection.for(key)
+      KeyNote.new(key: key, language: @language, outcome: key_outcome(kind, @problem_set[key])) if kind.planted_key?
     end
   end
 
