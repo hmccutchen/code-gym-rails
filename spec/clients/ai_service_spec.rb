@@ -2098,6 +2098,7 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
+      allow(Rails.logger).to receive(:info).with(/\[planted_key\]/)
       expect(Rails.logger).to receive(:info).with(/\[set_size\]/)
       expect(Rails.logger).to receive(:info).with(/\[retention\].*offered=memoization.*honored=memoization/)
       expect(Rails.logger).to receive(:info).with(/\[difficulty_diagnostics\]/)
@@ -2110,6 +2111,7 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
+      allow(Rails.logger).to receive(:info).with(/\[planted_key\]/)
       expect(Rails.logger).to receive(:info).with(/\[set_size\]/)
       expect(Rails.logger).to receive(:info).with(/\[retention\].*offered=memoization.*honored=-.*tagged=n_plus_one/)
       expect(Rails.logger).to receive(:info).with(/\[difficulty_diagnostics\]/)

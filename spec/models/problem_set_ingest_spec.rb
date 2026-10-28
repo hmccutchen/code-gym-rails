@@ -13,6 +13,54 @@ RSpec.describe ProblemSetIngest do
     described_class.call(problem_set, language: language, daily: DailyKinds::DEFAULT, expected_keys: problem_set.keys)
   end
 
+  describe "key notes" do
+    let(:code_review) do
+      { "concept" => "n_plus_one", "snippet" => "orders.each do |order|\n  order.customer.name\nend",
+        "answer_key" => { "issue" => "`order.customer.name` per row", "why_it_matters" => "one query each", "fix" => "Preload." } }
+    end
+    let(:plan_review) do
+      { "concept" => "scope_creep", "plan_excerpt" => "Cache it for exactly 300 seconds.",
+        "answer_key" => { "flaws" => [ { "flaw" => "`exactly 300 seconds` has no reason", "pushback" => "Why 300?" },
+                                       { "flaw" => "`an admin endpoint` grew the scope", "pushback" => "Split it." } ] } }
+    end
+
+    def notes(problem_set, language: "ruby_rails") = ingest(problem_set, language: language).key_notes.map(&:to_h)
+
+    it "notes each keyed section once, with its language and outcome" do
+      expect(notes({ "code_review" => code_review })).to eq([ { key: "code_review", language: "ruby_rails", outcome: "ok" } ])
+    end
+
+    it "notes a dropped key or one the provider never sent as missing, and keeps the section" do
+      result = ingest({ "code_review" => code_review.merge("answer_key" => { "issue" => " " }),
+                        "security_review" => { "concept" => "sql_injection_prevention", "snippet" => "User.find(id)" } })
+
+      expect(result.key_notes.map(&:to_h)).to contain_exactly(
+        { key: "code_review", language: "ruby_rails", outcome: "missing" },
+        { key: "security_review", language: "ruby_rails", outcome: "missing" }
+      )
+      expect(result.problem_set.keys).to include("code_review", "security_review")
+      expect(result.problem_set["code_review"]).not_to have_key("answer_key")
+    end
+
+    it "notes a key quoting text the plan doesn't contain as quote_missing, and keeps the key" do
+      result = ingest({ "plan_review" => plan_review })
+
+      expect(result.key_notes.map(&:outcome)).to eq([ "quote_missing" ])
+      expect(result.problem_set["plan_review"]["answer_key"]["flaws"].size).to eq(2)
+    end
+
+    it "checks quotes against the code as formatted, so a key quoting the reformatted code still matches" do
+      allow(CodeFormat).to receive(:all) { |snippets, **| snippets.map { |code| code.tr("'", '"') } }
+      section = code_review.merge("snippet" => "name = 'x'", "answer_key" => code_review["answer_key"].merge("issue" => '`name = "x"` is read in a loop'))
+
+      expect(notes({ "code_review" => section }).map { |note| note[:outcome] }).to eq([ "ok" ])
+    end
+
+    it "notes no section whose kind plants no key" do
+      expect(notes({ "pattern" => { "concept" => "service_objects", "question" => "q" } })).to eq([])
+    end
+  end
+
   describe "grounding a code_review in real source" do
     let(:excerpt) { RealSource::APPLICATION_CODE.first }
 

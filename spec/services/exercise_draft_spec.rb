@@ -54,6 +54,32 @@ RSpec.describe ExerciseDraft do
     expect(draft.problem_set.keys).to match_array(draft.kinds.map(&:key))
   end
 
+  def planted_key_lines
+    lines = []
+    allow(Rails.logger).to receive(:info) { |message| lines << message.to_s if message.to_s.start_with?("[planted_key]") }
+    yield
+    lines
+  end
+
+  it "logs a key note for each keyed section of the drafted day" do
+    draft = nil
+    lines = planted_key_lines { draft = described_class.call(user, language: "ruby_rails", provider: provider) }
+
+    keyed = draft.problem_set.keys.select { |key| ExerciseSection.find(key).planted_key? }
+    expect(keyed).not_to be_empty
+    expect(lines.map { |line| line[/kind=(\w+)/, 1] }).to match_array(keyed)
+  end
+
+  it "logs the key note of a retried section, and still returns only the section" do
+    draft = described_class.call(user, language: "ruby_rails", provider: provider)
+
+    section = nil
+    lines = planted_key_lines { section = described_class.retry_section(draft, ExerciseSection::CodeReview, "n_plus_one", provider: provider) }
+
+    expect(lines).to eq([ "[planted_key] answer_key=ok kind=code_review language=ruby_rails user=#{user.id}" ])
+    expect(section).to include("answer_key", "snippet")
+  end
+
   it "refuses an unsupported language before it plans or calls" do
     expect { described_class.call(user, language: "cobol", provider: provider) }.to raise_error(SetupError)
     expect(generated).to be_empty

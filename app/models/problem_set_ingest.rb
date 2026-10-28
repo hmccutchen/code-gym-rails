@@ -5,7 +5,9 @@ class ProblemSetIngest
 
   Unusable = Data.define(:key, :concept, :reason)
 
-  Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections)
+  KeyNote = Data.define(:key, :language, :outcome)
+
+  Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections, :key_notes)
 
   def self.call(problem_set, language:, expected_keys:, daily:, code_review_source: nil, pitched_at: nil, eased_for: {},
                 fixed_concepts: {})
@@ -49,10 +51,27 @@ class ProblemSetIngest
     ground_code_review!
     stamp_pitched_rungs!
 
-    Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts, unusable_sections: @unusable_sections)
+    Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts, unusable_sections: @unusable_sections,
+               key_notes: key_notes)
   end
 
   private
+
+  # Last, so the quote check reads the code as formatted and the schema the server stamped.
+  def key_notes
+    @problem_set.filter_map do |key, section|
+      kind = ExerciseSection.find(key)
+      next unless section.is_a?(Hash) && kind&.planted_key?
+
+      KeyNote.new(key: key, language: @language, outcome: key_outcome(kind, section))
+    end
+  end
+
+  def key_outcome(kind, section)
+    return "missing" unless section.key?(PlantedKey::FIELD)
+
+    kind.unquoted_key_parts(section).empty? ? "ok" : "quote_missing"
+  end
 
   def format_code!
     fields = @problem_set.flat_map do |key, section|
