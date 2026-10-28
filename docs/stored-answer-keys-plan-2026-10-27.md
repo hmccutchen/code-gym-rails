@@ -19,12 +19,11 @@ A wrong key that no grade has used yet costs nothing.
 **One limit from the baseline.** The owner's recent days all had two
 sections, `code_review` and `design_comparison`. So `security_review`,
 `plan_review` and `pseudocode_to_code` will produce keys only on days long
-enough to hold a third or fourth section. **Owner decides,** before PR 1
-merges, whether to:
-- wait for those kinds to come up,
-- raise the daily section count for a while, or
-- measure the four keyed kinds on `code_review` alone and read the others
-  as directional.
+enough to hold a third or fourth section. **The owner decided** on
+2026-10-28 to wait for those kinds to come up, with no change to the daily
+section count. They may take many weeks to reach the 5 keyed sections a
+kind needs for the read between the PRs, so PR 2 turns keys on kind by kind
+as each one gets there.
 
 **Departure from the spec, which PR 2's description must state:** the
 keyed-against-unkeyed calibration is a new mode,
