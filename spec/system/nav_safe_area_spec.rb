@@ -19,7 +19,7 @@ RSpec.describe "Nav in a notched landscape phone", type: :system do
     expect(content["left"]).to be_within(0.5).of(59)
   end
 
-  it "keeps the brand one notch from the edge below 900px, not two" do
+  it "puts the brand and the last link one notch from the edge at 844px" do
     visit_learn_with_notch(width: 844, height: 390, inset: 44)
 
     expect(edges("nav .brand").sole.first).to be_within(0.5).of(44)
@@ -32,11 +32,7 @@ RSpec.describe "Nav in a notched landscape phone", type: :system do
       user.update!(display_preferences: { "text_size" => text_size })
       visit_learn_with_notch(width: 1400, height: 430, inset: 59)
 
-      narrowest_row = (320..1400).step(10).find { |width|
-        resize(width, height: 430)
-        page.has_no_css?("#nav-toggle", visible: :visible, wait: 0)
-      }
-      resize(narrowest_row, height: 430)
+      resize(narrowest_uncollapsed_nav_width(height: 430), height: 430)
 
       expect(page).to have_link("Settings", visible: :visible)
       expect(edges("nav .brand").sole.first).to be_within(0.5).of(59)

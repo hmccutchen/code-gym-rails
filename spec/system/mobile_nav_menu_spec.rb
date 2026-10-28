@@ -70,11 +70,7 @@ RSpec.describe "Mobile nav menu", type: :system do
       visit_as(user)
       visit learn_path
 
-      narrowest_row = (320..1400).step(10).find { |width|
-        page.current_window.resize_to(width, 800)
-        page.has_no_css?("#nav-toggle", visible: :visible, wait: 0)
-      }
-      page.current_window.resize_to(narrowest_row, 800)
+      resize(narrowest_uncollapsed_nav_width(height: 800), height: 800)
 
       expect(page).to have_link("Settings", visible: :visible)
       overflow = page.evaluate_script(<<~JS)

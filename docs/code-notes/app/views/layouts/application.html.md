@@ -105,9 +105,12 @@ still spans the full width while a page's column stops at 800px, so at
 844px the brand sits about 22px left of the content, notch or not.
 
 `desktop.css` caps `nav .inner` at 1040px plus `--container-pad-*`, which
-still include the inset. On a window with side insets the nav's content
-would be wider than the page's 1040px by both insets, but the cap only
-applies past 1040px plus the gutters, wider than any phone in landscape.
+still include the inset, while `.inner` pads by less. So on a window with
+side insets the nav stops lining up with a wide page once the page's cap
+binds, at 1040px plus both gutters, and from 1040px plus both gutters and
+both insets its content is wider than the page's by both insets. That is
+wider than any phone in landscape (1158px and 1276px at a 59px inset), so
+the shared cap formula is left alone; `desktop.md` says the same.
 
 ## Palette tokens beyond the base colors
 
