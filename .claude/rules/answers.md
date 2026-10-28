@@ -3,7 +3,7 @@ paths:
   - "app/controllers/{responses,dashboard,daily_exercises}_controller.rb"
   - "app/models/{daily_response,daily_exercise,concept_exposure_index}.rb"
   - "app/models/exercise_section/**"
-  - "app/helpers/{answer_scaffolds,section_status}_helper.rb"
+  - "app/helpers/{answer_scaffolds,section_status,self_rating}_helper.rb"
   - "app/views/responses/**"
   - "app/views/dashboard/**"
   - "app/javascript/controllers/{answer_form,parsons,comparison_answer,pseudocode_round,duck_thread,generating}_controller.js"

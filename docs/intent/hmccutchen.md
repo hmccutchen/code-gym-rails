@@ -327,7 +327,7 @@ data.*
 - the review badge and headings moved off DailyResponse into a view helper
   `#587`
 - the self-rating labels and reviewing provider name moved to view helpers too
-  `#589 open`
+  `#589`
 - a read-only baseline of how stable grading is: export my graded answers,
   regrade each five times `#590`
   **why:** I'm weighing grading by an answer's route, and wanted a
