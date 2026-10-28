@@ -31,9 +31,9 @@ the rarer kinds" below). `code_review` is read from real days.
 keyed-against-unkeyed calibration is a new mode,
 `script/compare_models.rb review_calibration_keys`, where the spec describes
 a `--without-keys` pass on `review_calibration`. The new mode grades only
-the two extra answers per fixture both ways, so it costs 48 calls where
-re-running the whole calibration without keys would cost another 40 plus
-the extras, and `review_calibration` itself stays as it is.
+the two extra answers per fixture both ways, so it costs 12 calls for each
+turned-on kind (48 with all four) where re-running the whole calibration
+without keys would cost another 40 plus the extras, and `review_calibration` itself stays as it is.
 
 ## PR 1. Store the keys, used by nothing yet
 
@@ -359,12 +359,16 @@ on only for the kinds that pass.
 
 ### Step 4. Calibration fixtures
 
+Steps 4 to 7 cover only the kinds being turned on. A kind left off, for
+want of a reader or of keyed sections, gets no fixture, check or run, and
+doesn't hold up the others.
+
 For `code_review`, the fixtures sit beside the Measuring step on real days.
 For the three drafted kinds they are a guard, not the main check: the key
 read between the PRs is. A fixture catches a grader that misreads a key it
 has, and the read decides whether the keys are right at all.
 
-- Four new files in `spec/fixtures/review_calibration/`, one per kind, each
+- One new file in `spec/fixtures/review_calibration/` per turned-on kind, each
   with a key, the `complete`, `partial` and `miss` answers, and the two
   extra answers from the spec's table: one comparable in severity, one
   clearly lesser, each with its expected rating.
@@ -373,8 +377,8 @@ has, and the read decides whether the keys are right at all.
 ### Step 5. Checking the fixtures
 
 Before anything is run (spec section 6), the owner checks the `code_review`
-fixture and the colleague checks the other three, for the same reason the
-colleague reads those keys:
+fixture and the colleague checks the other turned-on kinds', for the same
+reason the colleague reads those keys:
 - both alternative flaws really exist in the snippet or plan
 - the comparable one really is as serious as the keyed one
 
@@ -386,7 +390,8 @@ before step 7.
 - **`script/compare_models.rb review_calibration_keys`:** grades each
   extra answer 3 times as written and 3 times through
   `without_planted_keys`, then prints each answer's ratings both ways. That
-  is 48 calls. One normal `review_calibration` run is 40.
+  is 12 calls for each turned-on kind, 48 with all four. One normal
+  `review_calibration` run is 40.
 - **`script/regrade_review_baseline.rb --without-keys`:** applies
   `without_planted_keys` to every day before grading, for step 8.
 - **`script/export_review_baseline.rb --keyed-only`:** keeps only sections
@@ -404,7 +409,8 @@ before step 7.
 
 ### Step 7. Running the calibration
 
-- **Ask the owner first.** It is 88 calls on the owner's key, about $1.15.
+- **Ask the owner first,** with the call count and cost for the kinds being
+  turned on. With all four it is 88 calls on the owner's key, about $1.15.
 - Run `review_calibration`, then `review_calibration_keys`.
 
 **Stop and come back to the owner if:**
