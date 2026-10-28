@@ -2,8 +2,9 @@
 
 Built from `docs/stored-answer-keys-spec-2026-10-27.md`, which keeps the full
 reasoning, and its plan, `docs/stored-answer-keys-plan-2026-10-27.md`. This
-record covers the first of two PRs: the keys are stored and read by nothing.
-The second PR lets the grader read them, and its half is added here when it
+record covers the first PR: the keys are stored and read by nothing. The
+second PR lets the grader read `code_review`'s keys, and later PRs turn on the
+other three kinds one at a time; each kind's half is added here when it
 merges.
 
 ## Why
@@ -96,15 +97,24 @@ make progress that isn't real. The owner decided on 2026-10-28:
   checks and the Account page's spend total read those counts.
 - **A colleague reads them.** The owner can't judge those keys reliably, so
   a colleague the owner chooses reads the drafts. A kind with no available
-  reader stays off in the second PR.
-- **The read is the main check.** For those three kinds, the second PR's
-  calibration fixtures are a guard against a grader misusing a key, and the
+  reader stays off.
+- **The read is the main check.** For those three kinds, the calibration
+  fixtures are a guard against a grader misusing a key, and the
   read decides whether the keys are right.
 - **Real graded sections, if any.** Only sections generated after this PR
   deployed carry a key. The owner's graded sections of the three kinds,
   counted with an approved read-only query, get the keyed-against-unkeyed
   regrade as a small sample if any carry a key. That sample is reported, not
   held to the systematic-movement rule, since it is too small for it.
+
+### The grader turns kinds on one at a time
+
+The second PR turns on `code_review` alone, so it doesn't wait on the three
+drafted kinds (owner's decision, 2026-10-28). It starts once the
+`code_review` read between the PRs is done and the token cost below has been
+measured. `security_review`, `plan_review` and `pseudocode_to_code` stay off
+until their drafts are read, and each joins in a PR of its own, with its own
+calibration fixture and the small graded-section sample above.
 
 Drafts show that the generator plants a correct key for these kinds. They
 don't show that keys hold up on the owner's real days, so the first real
@@ -134,4 +144,5 @@ The second PR changes grading, so these hold from now:
 About 60-150 more output tokens per keyed section on the generation route,
 by the spec's estimate. The owner decided on 2026-10-28 to measure it from
 the `generate_exercise` usage rows of the week before and the week after this
-PR deploys, rather than with extra billed calls.
+PR deploys, rather than with extra billed calls. The second PR waits for that
+measurement.

@@ -11,8 +11,13 @@ once keys exist on real sections.
   page, not any prompt. Keys pile up on real days while grading stays
   exactly as it is today.
 - **Between the PRs,** the owner and a colleague read a sample.
-- **PR 2** lets the grader read them, only if that read says the keys are
-  right often enough.
+- **PR 2** lets the grader read `code_review`'s keys, only if that read says
+  they are right often enough. It turns kinds on one at a time and starts
+  with `code_review` alone (owner's decision, 2026-10-28), so it doesn't
+  wait on the three rarer kinds.
+- **Later PRs** turn on `security_review`, `plan_review` and
+  `pseudocode_to_code`, one kind each, once that kind's drafts have been
+  read (see "Later PRs: the drafted kinds join").
 
 A wrong key that no grade has used yet costs nothing.
 
@@ -314,22 +319,39 @@ in its own PR before the read.
    `plan_review` and `pseudocode_to_code` sections, since the owner can't
    judge those keys reliably. The spec's option B asks for about 5 per kind.
    A kind with fewer than 5 keyed sections isn't read yet. **If no reader is
-   available for a kind, that kind stays off in PR 2.** Each section gets
+   available for a kind, that kind stays off.** Each section gets
    one call: key right, key wrong, or key right but the code or plan has a
    worse flaw. For the three drafted kinds, this read is the main check.
-4. **Delete the sheet.** Record only the counts, in PR 2's description.
+4. **Delete the sheet.** Record only the counts, in the description of the
+   PR that turns that kind on.
 
 **Owner decides,** kind by kind, whether the counts are good enough for the
 grader to read that kind's key. The spec sets no number, and none is set
-here before the read. `.review_context` is per kind, so PR 2 can turn keys
-on only for the kinds that pass.
+here before the read. `.review_context` is per kind, so each kind is turned
+on by itself: `code_review` in PR 2, and each drafted kind in its own later
+PR.
 
 ## PR 2. The grader reads the keys
 
+PR 2 turns on `code_review` only. `security_review`, `plan_review` and
+`pseudocode_to_code` stay off in it, whatever their drafts' state, and join
+in later PRs. Where a step below says "turned-on kinds", in PR 2 that is
+`code_review` alone.
+
 ### Step 0. Before writing code
 
-- Branch from `main`, after PR 1 and the read above.
-- Put the read's counts, and the kinds the owner turned on, in the PR
+PR 2 starts only when both of these hold:
+- **The `code_review` read is done:** the quote threshold has passed on the
+  first 10 drafted Ruby sections of the quoting kinds, the owner has read
+  about 5 real `code_review` keys, and the owner has judged the counts good
+  enough.
+- **The token cost is measured:** PR 1's step 7 comparison of the owner's
+  `generate_exercise` usage rows, the week before against the week after
+  PR 1 deployed, is done and its counts recorded.
+
+Then:
+- Branch from `main`.
+- Put the `code_review` read's counts and the token-cost counts in the PR
   description draft now, so they can't be forgotten.
 
 ### Step 1. The review context line
@@ -449,19 +471,13 @@ has passed (owner's decision, after review).
    `RUBRIC_VERSION` decision is reopened with the owner.
 5. **Delete every export.** Only the counts go into the PR description.
 
-**The drafted kinds.** Alongside the export in item 1, count the owner's graded sections of
-`security_review`, `plan_review` and `pseudocode_to_code`, all and those
-that carry a key, with a read-only query the owner approves. Only sections
-generated after PR 1 deployed carry a key, so older ones can't be regraded
-keyed. If any keyed graded section exists, it gets the same keyed-against-
-unkeyed regrade as a small sample, and its counts go in the PR description.
-It is too few for the systematic-movement rule, so it is reported, not
-ruled on. If none exists, the PR description says so.
-
-A kind with too few keyed sections for a reading stays off in PR 2 until it
-has them, as in the read between the PRs.
+In PR 2 this measures `code_review` only. The three drafted kinds' own
+check is in their later PRs.
 
 ### Step 9. Docs, checks and the PR
+
+The docs below name `code_review` as the one kind turned on, and say the
+other three are off until their later PRs.
 
 **Docs:**
 - `docs/decisions/stored-answer-keys.md`: the grading half, with the
@@ -482,3 +498,23 @@ counts, the Measuring counts, the departure above, and that `RUBRIC_VERSION`
 is unchanged and why.
 
 **Intent log:** the entry, then `compose.rb` and `check.rb`.
+
+## Later PRs: the drafted kinds join
+
+Each of `security_review`, `plan_review` and `pseudocode_to_code` is turned
+on in a PR of its own, after PR 2 has merged. A kind's PR starts only when:
+- its drafts have been read: the colleague the owner chose has read about 5
+  drafted sections of it (see "Between the PRs"), and the owner has judged
+  the counts good enough. A kind with no available reader stays off.
+
+That PR repeats PR 2's steps 1 and 2 for the one kind, its steps 4 to 7 with
+that kind's fixture and its keyed calibration (12 calls), and the docs in
+step 9. Steps 3 and 6's scripts already exist from PR 2.
+
+**Real graded sections, in place of step 8.** Count the owner's graded
+sections of the kind, all and those that carry a key, with a read-only query
+the owner approves. Only sections generated after PR 1 deployed carry a key,
+so older ones can't be regraded keyed. If any keyed graded section exists, it
+gets the same keyed-against-unkeyed regrade as a small sample, and its counts
+go in the PR description. It is too few for the systematic-movement rule, so
+it is reported, not ruled on. If none exists, the PR description says so.
