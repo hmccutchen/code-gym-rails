@@ -1,0 +1,54 @@
+<% choice = DailySectionsChoice.new(current_user) %>
+<fieldset class="field-group" id="daily-sections" data-controller="daily-sections"
+          data-daily-sections-url-value="<%= profile_path %>"
+          data-daily-sections-layout-value="<%= DailyKinds.for(current_user).map(&:key).to_json %>"
+          data-daily-sections-rotates-value="<%= DailyKinds.rotates?(current_user) %>"
+          data-daily-sections-places-value="<%= DailyKinds.normalize(current_user.daily_section_kinds).map(&:key).to_json %>"
+          data-daily-sections-stranded-text-value="<%= t("daily_sections.choose.stranded") %>">
+  <legend><%= t("daily_sections.legend") %></legend>
+  <div class="segmented">
+    <label class="segment"><input type="radio" name="daily_section_count" value="<%= User::AUTOMATIC_SECTION_COUNT %>" <%= "checked" if current_user.daily_section_count.nil? %>
+                                  data-daily-sections-target="count" data-action="change->daily-sections#pick click->daily-sections#reopen"><%= t("daily_sections.automatic") %></label>
+    <% User::DAILY_SECTION_COUNTS.each do |count| %>
+      <label class="segment"><input type="radio" name="daily_section_count" value="<%= count %>" <%= "checked" if current_user.daily_section_count == count %>
+                                    data-daily-sections-target="count" data-action="change->daily-sections#pick click->daily-sections#reopen"><%= count %></label>
+    <% end %>
+  </div>
+  <% choice.counts.each do |count| %>
+    <div class="daily-sections-choice" id="daily-sections-choice-<%= count %>" hidden
+         data-daily-sections-target="choice" data-count="<%= count %>" data-pair="<%= choice.pair.map(&:key).to_json %>">
+      <% if choice.single?(count) %>
+        <fieldset class="field-group">
+          <legend><%= t("daily_sections.choose.single_legend") %></legend>
+          <% choice.pair.each_with_index do |kind, place| %>
+            <label class="daily-sections-option">
+              <input type="radio" name="daily_section_keep_<%= count %>" value="<%= choice.keeping(kind).to_json %>" <%= "checked" if place.zero? %>>
+              <span><%= t("sections.#{kind.key}.name") %></span>
+            </label>
+          <% end %>
+        </fieldset>
+        <p class="card-note"><%= t("daily_sections.choose.single_note", pair: DailyKinds::COUNT) %></p>
+      <% else %>
+        <p class="card-note"><%= t("daily_sections.choose.extras_note") %></p>
+        <% choice.extras_for(count).each.with_index(1) do |selected, number| %>
+          <div class="value-row" data-controller="value-row">
+            <label for="daily-extra-<%= count %>-<%= number %>"><%= t("daily_sections.choose.extra_label", number: number) %></label>
+            <span class="value-row-value" aria-hidden="true" data-value-row-target="value"><%= t("sections.#{selected.key}.name") %></span>
+            <%= select_tag "daily_extra_#{count}_#{number}",
+                  options_for_select(choice.options.map { |kind| [ t("sections.#{kind.key}.name"), kind.key ] }, selected.key),
+                  id: "daily-extra-#{count}-#{number}", autocomplete: "off",
+                  data: { daily_sections_extra: true, action: "change->value-row#show" } %>
+          </div>
+        <% end %>
+      <% end %>
+      <p class="card-note daily-sections-error" role="status" data-daily-sections-error></p>
+      <div class="daily-sections-actions">
+        <button type="button" class="btn btn-primary" data-action="daily-sections#save"
+                data-saving-text="<%= t("daily_sections.choose.saving") %>"><%= t("daily_sections.choose.save") %></button>
+        <button type="button" class="btn" data-action="daily-sections#cancel"><%= t("daily_sections.choose.cancel") %></button>
+      </div>
+    </div>
+  <% end %>
+  <p class="card-note"><%= t("daily_sections.hint", fewest: DailyKinds::FEWEST, pair: DailyKinds::COUNT,
+                            fixed_sections: DailyKinds.pair(current_user).map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
+</fieldset>

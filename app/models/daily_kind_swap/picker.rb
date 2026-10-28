@@ -14,7 +14,7 @@ class DailyKindSwap::Picker
     return {} if exercise.nil?
 
     delivered = exercise.active_section_keys
-    cards     = exercise.daily_kinds.each_with_index.select { |kind, _place| delivered.include?(kind.key) }
+    cards     = exercise.daily_kinds.first(DailyKinds::COUNT).each_with_index.select { |kind, _place| delivered.include?(kind.key) }
     hint_at   = cards.first&.last if hint?(user, response)
 
     cards.to_h { |kind, place| [ kind.key, new(user, place: place, exercise: exercise, hint: place == hint_at) ] }
@@ -33,7 +33,7 @@ class DailyKindSwap::Picker
     @place     = place
     @exercise  = exercise
     @hint      = hint
-    @pair      = DailyKinds.for(user)
+    @pair      = DailyKinds.pair(user)
     @current   = @pair[place]
     @card_kind = exercise.daily_kinds[place]
     @closed    = closing_message
@@ -101,7 +101,7 @@ class DailyKindSwap::Picker
 
   def day
     @day ||= DailyKindSwap::Consequences::Day.new(setting: @user.daily_section_count, planned_size: @exercise.planned_size,
-                                                  brake: @exercise.planned_under_brake?)
+                                                  brake: @exercise.planned_under_brake?, held: DailyKinds.for(@user).size)
   end
 
   def pair_shares?

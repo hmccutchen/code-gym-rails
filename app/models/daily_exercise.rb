@@ -57,8 +57,10 @@ class DailyExercise < ApplicationRecord
 
   def daily_kinds = DailyKinds.recorded(plan_notes)
 
+  def shared_pair = DailyKinds.shared_pair(daily_kinds)
+
   def shared_concept_shown?
-    ExerciseSection.daily_sections_share?(problem_set, plan_notes["shared_concept"], daily: daily_kinds)
+    ExerciseSection.daily_sections_share?(problem_set, plan_notes["shared_concept"], daily: shared_pair)
   end
 
   # The single authority for section counts; never problem_set.keys, which can hold unrendered alternates.

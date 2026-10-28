@@ -28,7 +28,7 @@ The registry states which kinds form the default pair, and `DailyKinds::DEFAULT`
 
 ## `.pickable`
 
-The kinds a plan can ever hold for a pair: the pair plus every kind in its optional slots, in registry order. A daily fourth's siblings are in no slot, so they are left out. For the default pair it is every kind. `KindPreferences#offered` takes it and removes excluded optional kinds; `LadderCoverage`, the Progress page and the level-suggestion card read that answer.
+The kinds a plan can ever hold for a pair: the pair plus every kind in its optional slots, in registry order. A daily fourth's siblings are in no slot, so they are left out. For the default pair it is every kind. `KindPreferences#offered` takes it and removes excluded optional kinds, and keeps only the daily kinds when the Daily sections setting leaves nothing to rotate; `LadderCoverage`, the Progress page and the level-suggestion card read that answer through `KindPreferences.offered_to`.
 
 ## `.rotatable`
 

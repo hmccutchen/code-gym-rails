@@ -1,7 +1,7 @@
 <%# One level suggestion. Local: proposal (LevelSuggestion::Proposal). %>
 <% name = ->(key) { t("sections.#{key}.name") } %>
 <% level_name = ->(level) { t("exercise_mix.levels.#{level}").downcase } %>
-<% in_place = current_user.applies_level_suggestions_in_place? || (proposal.steps.map(&:kind) - KindPreferences.for(current_user).offered(daily: DailyKinds.for(current_user)).map(&:key)).any? %>
+<% in_place = current_user.applies_level_suggestions_in_place? || (proposal.steps.map(&:kind) - KindPreferences.offered_to(current_user).map(&:key)).any? %>
 <%= tag.div id: "level-suggestion", class: "mix-note level-suggestion",
       data: { controller: "level-suggestion",
               level_suggestion_levels_value: current_user.section_kind_levels.to_json,

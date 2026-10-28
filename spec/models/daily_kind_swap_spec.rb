@@ -39,6 +39,30 @@ RSpec.describe DailyKindSwap do
       expect(user.reload.daily_section_kinds).to eq([])
     end
 
+    it "keeps the chosen extra sections in their places" do
+      user.update!(daily_section_count: 4, daily_section_kinds: %w[code_review design_comparison pattern plan_review])
+
+      expect(swap(place: 1, kind: "architecture").status).to eq(:saved)
+      expect(user.reload.daily_section_kinds).to eq(%w[code_review architecture pattern plan_review])
+    end
+
+    it "swaps a place a setting of 1 hides, keeping the pair whole" do
+      user.update!(daily_section_count: 1)
+
+      expect(swap(place: 1, kind: "architecture").status).to eq(:saved)
+      expect(user.reload.daily_section_kinds).to eq(%w[code_review architecture])
+    end
+
+    it "ignores an extra section the setting hides, dropping it when the swap brings in its kind or a second fourth" do
+      user.update!(daily_section_kinds: %w[code_review design_comparison pattern plan_review])
+
+      expect(swap(place: 0, kind: "pattern").status).to eq(:saved)
+      expect(user.reload.daily_section_kinds).to eq(%w[pattern design_comparison plan_review])
+
+      expect(swap(place: 0, kind: "ambiguity_hunt").status).to eq(:saved)
+      expect(user.reload.daily_section_kinds).to eq(%w[ambiguity_hunt design_comparison])
+    end
+
     it "never changes today's set or its response" do
       exercise = todays_set
       response = response_for(exercise, answers: { "code_review" => "x" * 20 })
@@ -155,6 +179,13 @@ RSpec.describe DailyKindSwap do
     it "refuses the kind already in the place, and the other daily kind" do
       expect_refused(:unchanged, place: 0, kind: "code_review")
       expect_refused(:already_daily, place: 0, kind: "design_comparison")
+    end
+
+    it "refuses a kind already chosen as an extra section, or a second fourth beside one" do
+      user.update!(daily_section_count: 4, daily_section_kinds: %w[code_review design_comparison pattern plan_review])
+
+      expect_refused(:already_daily, place: 0, kind: "pattern")
+      expect_refused(:second_fourth, place: 0, kind: "ambiguity_hunt")
     end
 
     it "refuses a second fourth kind, naming the three" do

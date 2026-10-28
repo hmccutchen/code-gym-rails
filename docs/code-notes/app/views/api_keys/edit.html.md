@@ -109,7 +109,8 @@ snapshot, taken for an account with a key, doesn't carry the guide.
   status line under the switch (`save_switch_controller`).
 - The time zone, Daily sections, Track, exercise mix and Display controls say
   nothing when a save works. A failure shows in the fixed `#save-status`
-  banner.
+  banner, except a Daily sections choice the server refuses, which shows
+  inside the open chooser so the person can change it there.
 - Save key, the provider choice and the language redirect with a flash
   notice, because they go through a full form post.
 
@@ -138,6 +139,8 @@ a minimum height. The rules sit with the markup that needs them:
   class.
 - Display's option labels are 44px, in `api_keys/_display_preferences`.
 - The Daily sections labels are `.segment`s, which carry their own 44px height.
+  The chooser's keep options are `label.daily-sections-option` rows, 48px
+  like the difficulty options, and its extra-section selects are value rows.
 
 48px is the size the other cards use for a row. The About summary and the
 slider are secondary controls, so they stay at 44px, shorter than a switch
@@ -151,7 +154,10 @@ set. The user's daily kinds (`DailyKinds.for`) share one group because they
 share a promise, that they are in every set. The other groups come from
 `ExerciseSection.optional_slots` for that pair, so a daily kind is never
 offered a weight or an exclusion. Any other single-kind slot appears in some sets only, so it
-gets a group of its own.
+gets a group of its own. When the Daily sections setting leaves nothing to
+rotate (`DailyKinds.rotates?`), every group after the daily one keeps its
+controls but is labelled "not in your sets at this setting", under one note,
+since its settings apply again once the setting changes.
 
 ## Rotating groups
 
@@ -162,11 +168,13 @@ without an edit here.
 
 ## Where the behavior lives
 
-This page carries no script. Its controls are wired by three Stimulus
+This page carries no script. Its controls are wired by four Stimulus
 controllers, each with a note of its own:
 
-- `profile_preferences_controller` — the time zone, Daily sections and Skill
-  level controls, and the skill-level labels inside the difficulty fieldsets.
+- `profile_preferences_controller` — the time zone and Skill level controls,
+  and the skill-level labels inside the difficulty fieldsets.
+- `daily_sections_controller` — the Daily sections radios and their
+  choosers, rendered by `api_keys/_daily_sections`.
 - `exercise_mix_controller` — the sliders, exclusions, difficulty radios,
   locks, the preferences version and the ladder-preparation button.
 - `display_preferences_controller` — the Display disclosure, rendered by

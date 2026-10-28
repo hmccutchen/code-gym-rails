@@ -1,6 +1,8 @@
 class SharedConcept
   # Pairs only when every other reinforcement entry and due check still gets a distinct kind, so nothing is displaced.
   def self.pick(reinforcement, due_checks, hosts, kinds:, daily:)
+    return nil if daily.empty?
+
     remaining = kinds.reject(&:fourth?) - daily
     checks    = due_checks.map { |cm| [ cm.concept, cm.language ] }
 

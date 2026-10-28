@@ -35,6 +35,16 @@
 .display-group label { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 0; color: var(--text); }
 .display-hint { flex-basis: 100%; margin-top: 0; }
 
+#daily-sections > legend { color: var(--text); font-size: inherit; }
+.daily-sections-choice { margin-top: .75rem; }
+.daily-sections-option { display: flex; align-items: center; gap: .75rem; min-height: 48px; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.daily-sections-option + .daily-sections-option { margin-top: .25rem; }
+.daily-sections-option:has(:checked) { border: 2px solid var(--accent); padding: calc(.5rem - 1px) calc(.75rem - 1px); font-weight: 600; }
+.daily-sections-option:has(:focus-visible) { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+@media (forced-colors: active) { .daily-sections-option:has(:checked) { border-color: Highlight; } }
+.daily-sections-error:empty { display: none; }
+.daily-sections-actions { display: flex; gap: .5rem; margin: .75rem 0; }
+
 @media (min-width: 900px) {
   .settings-page { max-width: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
   .settings-page > h1, .settings-page > details.card { grid-column: 1 / -1; }

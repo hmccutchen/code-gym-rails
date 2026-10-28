@@ -74,18 +74,30 @@ read it before changing that area.
   from `CoverageException.expected_gap_weekdays` (pinned to the real planner
   by `coverage_exception_cadence_spec`), and whether coverage runs from
   `CoverageException.applies_to_day?` with the row's `brake` note.
-  `DailyKindSwap` (`PATCH /daily_kinds/:place`) is the one writer of a
-  non-default pair: it refuses a stale version, a repeat, a second fourth or a
-  pair that empties an optional slot, saves under the user-row lock and writes
-  one `DailyKindSwapEvent`. An Exercise mix save keeps every stored setting
+  `DailyKinds.for` holds as many stored places as the Daily sections
+  setting asks for (the pair under Automatic); places past the pair are
+  chosen extra sections in every set. The swap control, the shared concept
+  (`DailyKinds.shared_pair`) and the emptied-slot check read the pair alone;
+  a swap ignores, and drops on a clash, an extra the setting hides. When a
+  fixed count leaves nothing to rotate (`DailyKinds.rotates?`),
+  `KindPreferences.offered_to` offers only the held kinds.
+  `DailyKindSwap` (`PATCH /daily_kinds/:place`) writes a pair place, and
+  `ProfileUpdate` writes the whole list with a Daily sections choice. A swap
+  refuses a stale version, a repeat, a second fourth or a pair that empties
+  an optional slot, saves under the user-row lock and writes one
+  `DailyKindSwapEvent`. An Exercise mix save keeps every stored setting
   Setup does not render under the current pair: weights and exclusions
   outside `ExerciseSection.rotatable`, targets and locks outside `.pickable`
   (`SectionKindSettings#keep_unrendered`). A 409 tells a page rendered for
   another pair to reload (`layout_changed`).
 - **Daily sections setting** (`docs/decisions/daily-sections-setting.md`):
   `User#daily_section_count` is Automatic (nil) or a count in
-  `User::DAILY_SECTION_COUNTS`. `DaySize.for` returns a fixed count before
-  completion or the gate, and a fixed count never gains a coverage section.
+  `User::DAILY_SECTION_COUNTS` (1 to 4; Automatic's floors stay at the pair).
+  `DaySize.for` returns a fixed count before completion or the gate, and a
+  fixed count never gains a coverage section. Setup asks which daily section
+  a count of 1 keeps and which kinds a larger count adds, and saves the count
+  and the place list in one `PATCH /profile` (`DailySectionsChoice`); a count
+  of 3 or 4 without a kind for every place is a 422.
   `ProfileUpdate` accepts only `"automatic"` or a whole number, since Active
   Record's integer cast would misread anything else, and `User` 422s a count
   outside the range. It is not part of the Exercise mix version.

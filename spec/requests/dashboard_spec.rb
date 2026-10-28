@@ -1877,6 +1877,16 @@ RSpec.describe "Dashboard lines about what the plan did", type: :request do
     expect(response.body).to include(shared_line)
   end
 
+  it "names only the pair in the shared-concept line on a day that also holds a chosen extra section" do
+    pattern = { "question" => "Which pattern?", "concept" => "open_closed" }
+    exercise_with({ "code_review" => code_review, "design_comparison" => comparison, "pattern" => pattern },
+                  plan_notes: { "shared_concept" => "n_plus_one", "daily_kinds" => %w[code_review design_comparison pattern] })
+
+    get root_path
+
+    expect(response.body).to include(shared_line)
+  end
+
   it "says nothing about a shared concept the model placed in one section only" do
     exercise_with({ "code_review" => code_review, "design_comparison" => comparison.merge("concept" => "open_closed") },
                   plan_notes: { "shared_concept" => "n_plus_one" })

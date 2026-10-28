@@ -72,7 +72,7 @@ class GenerationDiagnostics
 
     Rails.logger.info(
       "[shared_concept] user=#{@user.id} concept=#{concept} reason=reduced_tier " \
-      "honored=#{ExerciseSection.daily_sections_share?(problem_set, concept, daily: plan.daily_kinds)}"
+      "honored=#{ExerciseSection.daily_sections_share?(problem_set, concept, daily: DailyKinds.shared_pair(plan.daily_kinds))}"
     )
   end
 

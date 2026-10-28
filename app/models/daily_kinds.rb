@@ -4,9 +4,22 @@ class DailyKinds
 
   COUNT = DEFAULT.size
 
-  def self.for(user)
-    normalize(user.daily_section_kinds)
-  end
+  FEWEST = 1
+
+  MOST = ExerciseSection::MAX_SECTIONS
+
+  def self.for(user) = held(user.daily_section_kinds, user.daily_section_count)
+
+  def self.pair(user) = pair_of(user.daily_section_kinds)
+
+  def self.pair_of(keys) = normalize(keys).first(COUNT)
+
+  # A fixed setting holds that many places; Automatic holds the pair and lets the gate grow the day.
+  def self.held(keys, setting) = normalize(keys).first((setting || COUNT).clamp(FEWEST, MOST))
+
+  def self.rotates?(user) = user.daily_section_count.nil? || self.for(user).size < user.daily_section_count.clamp(FEWEST, MOST)
+
+  def self.shared_pair(kinds) = kinds.size < COUNT ? [] : kinds.first(COUNT)
 
   # A row planned before plan_notes carried the pair was planned with the default one.
   def self.recorded(plan_notes)
@@ -16,19 +29,20 @@ class DailyKinds
   end
 
   def self.normalize(keys)
-    kept  = Array(keys).first(COUNT).each_with_object([]) { |key, list| list << fitting(ExerciseSection.find(key), list) }
-    kept += [ nil ] * (COUNT - kept.size)
-    spare = DEFAULT - kept
+    kept  = Array(keys).first(MOST).each_with_object([]) { |key, list| list << fitting(ExerciseSection.find(key), list) }
+    pair  = kept.first(COUNT) + [ nil ] * (COUNT - kept.size).clamp(0, COUNT)
+    spare = DEFAULT - pair
+    pair  = pair.map { |kind| kind || spare.shift }
 
-    kept.map { |kind| kind || spare.shift }.freeze
+    (pair + (kept.drop(COUNT).compact - pair)).freeze
   end
 
   def self.problems_with(keys)
     return [ "must be a list" ] unless keys.is_a?(Array)
     return [] if keys.empty?
-    return [] if keys.all?(String) && keys.size == COUNT && normalize(keys).map(&:key) == keys
+    return [] if keys.all?(String) && (COUNT..MOST).cover?(keys.size) && normalize(keys).map(&:key) == keys
 
-    [ "must name #{COUNT} different section kinds, at most one of them from #{ExerciseSection.fourths.map(&:key).join(", ")}" ]
+    [ "must name #{COUNT} to #{MOST} different section kinds, at most one of them from #{ExerciseSection.fourths.map(&:key).join(", ")}" ]
   end
 
   def self.place?(place) = place.is_a?(Integer) && (0...COUNT).cover?(place)

@@ -127,7 +127,7 @@ class DailyPlan
     slots         = 1 if slots.zero? && overdue_retention_check_pending?(due, kinds: kinds, hosts: hosts, reinforcement: reinforcement)
     reinforcement = reinforcement.first(capacity - slots)
     due_checks    = retention_checks_for(due, kinds: kinds, hosts: hosts, slots: slots, reinforcement: reinforcement)
-    shared        = SharedConcept.pick(reinforcement, due_checks, hosts, kinds: kinds, daily: daily)
+    shared        = SharedConcept.pick(reinforcement, due_checks, hosts, kinds: kinds, daily: DailyKinds.shared_pair(daily))
 
     { reinforcement: reinforcement, due_checks: due_checks, shared_concept: shared&.fetch(:concept),
       established: established_concepts_for(user, language, kinds: kinds,
@@ -244,7 +244,7 @@ class DailyPlan
   private_class_method :established_concepts_for
 
   def self.established_in_buckets(user, buckets)
-    buckets.map { |bucket| established_in_bucket(user, bucket) }.reduce(:or)
+    buckets.map { |bucket| established_in_bucket(user, bucket) }.reduce(:or) || user.concept_masteries.none
   end
   private_class_method :established_in_buckets
 

@@ -24,7 +24,7 @@ class User < ApplicationRecord
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
 
-  DAILY_SECTION_COUNTS = (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
+  DAILY_SECTION_COUNTS = (DailyKinds::FEWEST..ExerciseSection::MAX_SECTIONS)
   AUTOMATIC_SECTION_COUNT = "automatic".freeze
   SKILL_LEVEL_RULE = "must be one of #{SKILL_LEVELS.join(', ')}".freeze
   DAILY_SECTION_COUNT_RULE = "must be #{AUTOMATIC_SECTION_COUNT} or one of #{DAILY_SECTION_COUNTS.to_a.join(', ')}".freeze

@@ -30,6 +30,12 @@ RSpec.describe SharedConcept do
     expect(described_class.pick(list, [], hosts, kinds: daily + [ ExerciseSection::Pattern ], daily: daily)).to be_nil
   end
 
+  it "takes nothing for a day with no pair, since one section shares a concept with nothing" do
+    list = [ entry("n_plus_one", tier: "reduced") ]
+
+    expect(described_class.pick(list, [], hosts, kinds: [ ExerciseSection::CodeReview ], daily: [])).to be_nil
+  end
+
   it "takes nothing when the day left no host free" do
     expect(pick([ entry("n_plus_one", tier: "reduced"), entry("memoization") ], kinds: fixed)).to be_nil
   end
