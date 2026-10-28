@@ -21,6 +21,12 @@ catch, and leaves which values a field allows to `User`:
   means Automatic, and `"2.5"` as 2. The range is `User`'s.
 - `level_suggestions` must be a JSON boolean, since the cast reads `"yes"` as
   true.
+- `daily_section_kinds` must be a list of strings that
+  `DailyKinds.problems_with` accepts. A refusal is worded for the person at
+  Setup's Daily sections chooser, since a repeated kind or a second fourth is
+  a choice they made there. Posting it is a locked save, so a `layout` the
+  page posts with it is checked against another tab's swap, and a list equal
+  to the default pair stores as empty (`DailyKinds.stored`).
 
 The request specs read `User`'s messages for a value outside a list, so
 `User` words them for a person, and the form builds its shape messages for

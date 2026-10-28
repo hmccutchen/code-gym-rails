@@ -1495,17 +1495,17 @@ RSpec.describe User, type: :model do
     end
 
     it "accepts every count a day can hold" do
-      (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS).each do |count|
+      (DailyKinds::FEWEST..ExerciseSection::MAX_SECTIONS).each do |count|
         expect(user.update(daily_section_count: count)).to be(true)
       end
     end
 
-    it "derives its choices from the floor and the largest day" do
-      expect(User::DAILY_SECTION_COUNTS).to eq(SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
+    it "derives its choices from the fewest daily places a set can hold and the largest day" do
+      expect(User::DAILY_SECTION_COUNTS).to eq(DailyKinds::FEWEST..ExerciseSection::MAX_SECTIONS)
     end
 
-    it "refuses a count below the floor or above the largest day" do
-      [ SectionCount::FLOOR - 1, ExerciseSection::MAX_SECTIONS + 1 ].each do |count|
+    it "refuses a count below one section or above the largest day" do
+      [ DailyKinds::FEWEST - 1, ExerciseSection::MAX_SECTIONS + 1 ].each do |count|
         user.daily_section_count = count
 
         expect(user).not_to be_valid

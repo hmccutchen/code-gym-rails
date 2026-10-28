@@ -525,6 +525,55 @@ RSpec.describe DailyPlan do
       expect(plan.rotation.values.compact.size).to eq(optional_slots)
     end
 
+    it "plans a single daily section under a setting of 1, the one the user kept" do
+      user = User.create!(email: "single@example.com", name: "Single", daily_section_count: 1,
+                          daily_section_kinds: %w[design_comparison code_review])
+
+      plan = described_class.for(user, language: "ruby_rails")
+
+      expect(plan.kinds).to eq([ ExerciseSection::DesignComparison ])
+      expect(plan.notes["daily_kinds"]).to eq(%w[design_comparison])
+      expect(plan.shared_concept).to be_nil
+    end
+
+    it "puts the chosen extra sections in every set and rotates none" do
+      user = User.create!(email: "chosen@example.com", name: "Chosen", daily_section_count: 4,
+                          daily_section_kinds: %w[code_review design_comparison pattern plan_review])
+
+      plan = described_class.for(user, language: "ruby_rails")
+
+      expect(plan.kinds).to contain_exactly(ExerciseSection::CodeReview, ExerciseSection::DesignComparison,
+                                            ExerciseSection::Pattern, ExerciseSection::PlanReview)
+      expect(plan.rotation.values.compact).to eq([])
+      expect(plan.notes["daily_kinds"]).to eq(%w[code_review design_comparison pattern plan_review])
+    end
+
+    it "offers the shared concept to the pair alone when extra sections are chosen" do
+      user = User.create!(email: "shared-extra@example.com", name: "Shared", daily_section_count: 3,
+                          daily_section_kinds: %w[code_review design_comparison pattern])
+      expect(SharedConcept).to receive(:pick).with(anything, anything, anything, hash_including(daily: DailyKinds::DEFAULT))
+                                             .and_call_original
+
+      described_class.for(user, language: "ruby_rails")
+    end
+
+    it "offers no shared concept to a single section" do
+      user = User.create!(email: "shared-single@example.com", name: "Single", daily_section_count: 1)
+      expect(SharedConcept).to receive(:pick).with(anything, anything, anything, hash_including(daily: [])).and_call_original
+
+      described_class.for(user, language: "ruby_rails")
+    end
+
+    it "rotates a place a larger setting adds when no extra section was chosen for it" do
+      user = User.create!(email: "unchosen@example.com", name: "Unchosen", daily_section_count: 4,
+                          daily_section_kinds: %w[code_review design_comparison pattern])
+
+      plan = described_class.for(user, language: "ruby_rails")
+
+      expect(plan.kinds.size).to eq(4)
+      expect(plan.rotation.values.compact.size).to eq(1)
+    end
+
     it "leaves sizing Automatic for a user who never chose" do
       user = User.create!(email: "auto@example.com", name: "Auto")
       expect(DaySize).to receive(:for).with(hash_including(setting: nil)).and_call_original

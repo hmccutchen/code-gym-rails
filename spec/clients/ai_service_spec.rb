@@ -5980,6 +5980,14 @@ RSpec.describe AiService, "the shared concept" do
     expect(line).not_to match(/tier|reduced|struggl/i)
   end
 
+  it "names only the pair when the day also holds a chosen extra section" do
+    prompt = render_generation_prompt(user, "ruby_rails", daily_kinds: DailyKinds::DEFAULT + [ ExerciseSection::Pattern ],
+                                      rotation: { third: nil, fourth: nil }, shared_concept: "n_plus_one")
+
+    line = prompt.lines.find { |l| l.include?("as their concept today") }
+    expect(line).to include("- The code_review and design_comparison sections share `n_plus_one` as their concept today.")
+  end
+
   it "renders no line without a shared concept, and none on a single-section retry" do
     without = render_generation_prompt(user, "ruby_rails", third: nil, pattern: nil, fourth: nil)
     retry_prompt = render_generation_prompt(user, "ruby_rails", third: nil, pattern: nil, fourth: nil,

@@ -291,7 +291,9 @@ advisory signal; it is not evidence that anything was verified.
   which builds the day's set from the user's recent performance. A dashboard
   opened with no set generates one on demand and polls `GET /dashboard/status`.
 - A day holds 2-4 sections: `code_review` and `design_comparison` always planned, and
-  `DaySize` and `SectionRotation` fill the rest.
+  `DaySize` and `SectionRotation` fill the rest. A fixed Daily sections
+  setting holds 1-4: one of the pair, the pair, or the pair plus extra
+  sections the user chose, which then appear in every set.
 - `ResponsesController#create` autosaves answers and ratings; a successful
   submit chains into `#review` (`ResponseReview`), which lands back on the
   submitted dashboard with the review in place.

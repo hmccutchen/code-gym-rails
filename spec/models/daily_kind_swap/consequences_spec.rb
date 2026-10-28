@@ -4,10 +4,10 @@ RSpec.describe DailyKindSwap::Consequences do
   def kind(key) = ExerciseSection.find(key)
 
   def consequences(kind_key, place: 0, pair: DailyKinds::DEFAULT, weights: {}, excluded: [], setting: nil, planned_size: 3,
-                   brake: false, languages: %w[ruby_rails])
+                   brake: false, held: DailyKinds::COUNT, languages: %w[ruby_rails])
     described_class.for(pair: pair, place: place, kind: kind(kind_key),
                         preferences: KindPreferences.new(weights: weights, excluded: excluded),
-                        day: described_class::Day.new(setting: setting, planned_size: planned_size, brake: brake),
+                        day: described_class::Day.new(setting: setting, planned_size: planned_size, brake: brake, held: held),
                         languages: languages, pair_shares: described_class.shares_a_concept?(pair, languages))
   end
 
@@ -49,7 +49,18 @@ RSpec.describe DailyKindSwap::Consequences do
     end
 
     it "says a fixed setting of two keeps the outgoing kind out for good" do
-      expect(consequences("challenge", setting: 2, planned_size: 3).warning).to eq([ t(:outgoing_fixed_two, outgoing: "Code Review") ])
+      expect(consequences("challenge", setting: 2, planned_size: 3).warning).to eq([ t(:outgoing_fixed, count: 2, outgoing: "Code Review") ])
+    end
+
+    it "says the same of any fixed setting whose every place holds a daily kind, since nothing is left to rotate" do
+      expect(consequences("challenge", setting: 1, planned_size: 1, held: 1).warning)
+        .to eq([ t(:outgoing_fixed, count: 1, outgoing: "Code Review") ])
+      expect(consequences("challenge", setting: 3, planned_size: 3, held: 3).warning)
+        .to eq([ t(:outgoing_fixed, count: 3, outgoing: "Code Review") ])
+    end
+
+    it "warns of nothing under a larger setting with a place left to rotate" do
+      expect(consequences("challenge", setting: 3, planned_size: 3, held: 2).warning).to be_empty
     end
 
     it "gives an Automatic two-section day the coverage estimate and the gate sentence" do

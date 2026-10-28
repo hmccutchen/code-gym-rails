@@ -29,6 +29,7 @@
     "controllers/concept_alternates_controller": "/assets/controllers/concept_alternates_controller-DIGEST.js",
     "controllers/copy_text_controller": "/assets/controllers/copy_text_controller-DIGEST.js",
     "controllers/daily_kind_swap_controller": "/assets/controllers/daily_kind_swap_controller-DIGEST.js",
+    "controllers/daily_sections_controller": "/assets/controllers/daily_sections_controller-DIGEST.js",
     "controllers/display_preferences_controller": "/assets/controllers/display_preferences_controller-DIGEST.js",
     "controllers/duck_thread_controller": "/assets/controllers/duck_thread_controller-DIGEST.js",
     "controllers/exercise_mix_controller": "/assets/controllers/exercise_mix_controller-DIGEST.js",
@@ -72,6 +73,7 @@
 <link rel="modulepreload" href="/assets/controllers/concept_alternates_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/copy_text_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/daily_kind_swap_controller-DIGEST.js" nonce="NONCE">
+<link rel="modulepreload" href="/assets/controllers/daily_sections_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/display_preferences_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/duck_thread_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/exercise_mix_controller-DIGEST.js" nonce="NONCE">
@@ -616,17 +618,103 @@
     </div>
     <p class="card-note">Sets when your day rolls over and when your 8am exercise set is generated. Leave on &quot;detect automatically&quot; to use your browser&#39;s zone.</p>
 
-    <fieldset class="field-group" id="daily-sections"
-              data-profile-preferences-target="dailySections" data-action="change->profile-preferences#saveDailySections">
-      <legend>Daily sections</legend>
-      <div class="segmented">
-        <label class="segment"><input type="radio" name="daily_section_count" value="automatic" checked>Automatic</label>
-          <label class="segment"><input type="radio" name="daily_section_count" value="2" >2</label>
-          <label class="segment"><input type="radio" name="daily_section_count" value="3" >3</label>
-          <label class="segment"><input type="radio" name="daily_section_count" value="4" >4</label>
+    <fieldset class="field-group" id="daily-sections" data-controller="daily-sections"
+          data-daily-sections-url-value="/profile"
+          data-daily-sections-layout-value="[&quot;code_review&quot;,&quot;design_comparison&quot;]"
+          data-daily-sections-stranded-text-value="Your daily sections are saved. Another change on this page hasn&#39;t saved yet, so reload once it does to see your new Exercise mix.">
+  <legend>Daily sections</legend>
+  <div class="segmented">
+    <label class="segment"><input type="radio" name="daily_section_count" value="automatic" checked
+                                  data-daily-sections-target="count" data-action="change->daily-sections#pick">Automatic</label>
+      <label class="segment"><input type="radio" name="daily_section_count" value="1" 
+                                    data-daily-sections-target="count" data-action="change->daily-sections#pick">1</label>
+      <label class="segment"><input type="radio" name="daily_section_count" value="2" 
+                                    data-daily-sections-target="count" data-action="change->daily-sections#pick">2</label>
+      <label class="segment"><input type="radio" name="daily_section_count" value="3" 
+                                    data-daily-sections-target="count" data-action="change->daily-sections#pick">3</label>
+      <label class="segment"><input type="radio" name="daily_section_count" value="4" 
+                                    data-daily-sections-target="count" data-action="change->daily-sections#pick">4</label>
+  </div>
+    <div class="daily-sections-choice" id="daily-sections-choice-1" hidden
+         data-daily-sections-target="choice" data-count="1" data-pair="[&quot;code_review&quot;,&quot;design_comparison&quot;]">
+        <fieldset class="field-group">
+          <legend>Which daily section should each set hold?</legend>
+            <label class="daily-sections-option">
+              <input type="radio" name="daily_section_keep_1" value="[&quot;code_review&quot;,&quot;design_comparison&quot;]" checked>
+              <span>Code Review</span>
+            </label>
+            <label class="daily-sections-option">
+              <input type="radio" name="daily_section_keep_1" value="[&quot;design_comparison&quot;,&quot;code_review&quot;]" >
+              <span>Design Comparison</span>
+            </label>
+        </fieldset>
+        <p class="card-note">The other one won&#39;t appear until you choose 2 or more again.</p>
+      <p class="card-note daily-sections-error" role="status" data-daily-sections-error></p>
+      <div class="daily-sections-actions">
+        <button type="button" class="btn btn-primary" data-action="daily-sections#save"
+                data-saving-text="Saving…">Save</button>
+        <button type="button" class="btn" data-action="daily-sections#cancel">Cancel</button>
       </div>
-      <p class="card-note">Automatic gives you shorter sets after days you don&#39;t finish, and longer ones once you finish more and your reviewed answers go well. A number sets how many sections each day is planned with, though a section that fails a quality check can still be left out. 2 gives you only Code Review and Design Comparison.</p>
-    </fieldset>
+    </div>
+    <div class="daily-sections-choice" id="daily-sections-choice-3" hidden
+         data-daily-sections-target="choice" data-count="3" data-pair="[&quot;code_review&quot;,&quot;design_comparison&quot;]">
+        <p class="card-note">Choose a kind for each extra section. It appears in every set until you change it here.</p>
+          <div class="value-row" data-controller="value-row">
+            <label for="daily-extra-3-1">Extra section 1</label>
+            <span class="value-row-value" aria-hidden="true" data-value-row-target="value">Pattern of the Month</span>
+            <select name="daily_extra_3_1" id="daily-extra-3-1" autocomplete="off" data-daily-sections-extra="true" data-action="change-&gt;value-row#show"><option selected="selected" value="pattern">Pattern of the Month</option>
+<option value="challenge">Coding Challenge</option>
+<option value="architecture">Architecture Decision</option>
+<option value="security_review">Security Review</option>
+<option value="parsons_problem">Parsons Problem</option>
+<option value="plan_review">Plan Review</option>
+<option value="ambiguity_hunt">Ambiguity Hunt</option>
+<option value="pseudocode_to_code">Pseudocode to Code</option></select>
+          </div>
+      <p class="card-note daily-sections-error" role="status" data-daily-sections-error></p>
+      <div class="daily-sections-actions">
+        <button type="button" class="btn btn-primary" data-action="daily-sections#save"
+                data-saving-text="Saving…">Save</button>
+        <button type="button" class="btn" data-action="daily-sections#cancel">Cancel</button>
+      </div>
+    </div>
+    <div class="daily-sections-choice" id="daily-sections-choice-4" hidden
+         data-daily-sections-target="choice" data-count="4" data-pair="[&quot;code_review&quot;,&quot;design_comparison&quot;]">
+        <p class="card-note">Choose a kind for each extra section. It appears in every set until you change it here.</p>
+          <div class="value-row" data-controller="value-row">
+            <label for="daily-extra-4-1">Extra section 1</label>
+            <span class="value-row-value" aria-hidden="true" data-value-row-target="value">Pattern of the Month</span>
+            <select name="daily_extra_4_1" id="daily-extra-4-1" autocomplete="off" data-daily-sections-extra="true" data-action="change-&gt;value-row#show"><option selected="selected" value="pattern">Pattern of the Month</option>
+<option value="challenge">Coding Challenge</option>
+<option value="architecture">Architecture Decision</option>
+<option value="security_review">Security Review</option>
+<option value="parsons_problem">Parsons Problem</option>
+<option value="plan_review">Plan Review</option>
+<option value="ambiguity_hunt">Ambiguity Hunt</option>
+<option value="pseudocode_to_code">Pseudocode to Code</option></select>
+          </div>
+          <div class="value-row" data-controller="value-row">
+            <label for="daily-extra-4-2">Extra section 2</label>
+            <span class="value-row-value" aria-hidden="true" data-value-row-target="value">Coding Challenge</span>
+            <select name="daily_extra_4_2" id="daily-extra-4-2" autocomplete="off" data-daily-sections-extra="true" data-action="change-&gt;value-row#show"><option value="pattern">Pattern of the Month</option>
+<option selected="selected" value="challenge">Coding Challenge</option>
+<option value="architecture">Architecture Decision</option>
+<option value="security_review">Security Review</option>
+<option value="parsons_problem">Parsons Problem</option>
+<option value="plan_review">Plan Review</option>
+<option value="ambiguity_hunt">Ambiguity Hunt</option>
+<option value="pseudocode_to_code">Pseudocode to Code</option></select>
+          </div>
+      <p class="card-note daily-sections-error" role="status" data-daily-sections-error></p>
+      <div class="daily-sections-actions">
+        <button type="button" class="btn btn-primary" data-action="daily-sections#save"
+                data-saving-text="Saving…">Save</button>
+        <button type="button" class="btn" data-action="daily-sections#cancel">Cancel</button>
+      </div>
+    </div>
+  <p class="card-note">Automatic gives you shorter sets after days you don&#39;t finish, and longer ones once you finish more and your reviewed answers go well. A number sets how many sections each day is planned with, though a section that fails a quality check can still be left out. 1 gives you one of Code Review and Design Comparison, the one you choose, and 2 gives you both. A larger number adds sections you choose, and they appear in every set.</p>
+</fieldset>
+
 
     <div class="value-row" data-controller="value-row">
       <label for="skill-level">Track</label>

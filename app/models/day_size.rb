@@ -13,7 +13,7 @@ class DaySize
   end
 
   def self.for(setting:, completion:, gate:)
-    decision = Decision.new(count: setting&.clamp(SectionCount::FLOOR, ExerciseSection::MAX_SECTIONS),
+    decision = Decision.new(count: setting&.clamp(User::DAILY_SECTION_COUNTS),
                             reason: :setting, setting: setting, completion: completion, gate: gate)
     return decision if setting
 

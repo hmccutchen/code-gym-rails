@@ -40,6 +40,7 @@ class ProfileController < ApplicationController
   def saved_body
     body = { name: current_user.name, time_zone: current_user.time_zone,
              daily_section_count: current_user.daily_section_count }
+    body[:daily_kinds] = DailyKinds.for(current_user).map(&:key) if daily_sections_update?
     return body unless preference_update? || track_update?
 
     body.merge(section_kind_preferences_version: current_user.section_kind_preferences_version,
@@ -47,6 +48,8 @@ class ProfileController < ApplicationController
   end
 
   def track_update? = params.require(:user).key?(:skill_level)
+
+  def daily_sections_update? = params.require(:user).slice(:daily_section_count, :daily_section_kinds).present?
 
   def track_body
     return {} unless track_update?

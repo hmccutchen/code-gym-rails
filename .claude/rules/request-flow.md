@@ -33,10 +33,11 @@ User opens dashboard:
   └→ DashboardController#show
        shows today's DailyExercise, or triggers on-demand generation if missing
        (weekdays only; weekends offer a manual "generate anyway" button)
-       2-4 sections, sized from recent completion and the competency gate
-       unless the user fixed a count in Setup's Daily sections: the user's daily
-       kinds (DailyKinds; Code Review and Design Comparison by default) are
-       always present; Pattern of the Month, a rotating third
+       2-4 sections, sized from recent completion and the competency gate,
+       unless the user fixed a count from 1 to 4 in Setup's Daily sections: the
+       user's daily kinds (DailyKinds; Code Review and Design Comparison by
+       default, one of them under a count of 1, plus any extra sections the
+       user chose for a count of 3 or 4) are always present; Pattern of the Month, a rotating third
        (Coding Challenge / Architecture Decision / Security Review / Parsons
        Problem), and a rotating fourth (Plan Review / Ambiguity Hunt /
        Pseudocode to Code) compete for the remaining slots, which today's

@@ -76,19 +76,7 @@
     </div>
     <p class="card-note"><%= t("api_keys.edit.time_zone_hint") %></p>
 
-    <fieldset class="field-group" id="daily-sections"
-              data-profile-preferences-target="dailySections" data-action="change->profile-preferences#saveDailySections">
-      <legend><%= t("daily_sections.legend") %></legend>
-      <div class="segmented">
-        <label class="segment"><input type="radio" name="daily_section_count" value="<%= User::AUTOMATIC_SECTION_COUNT %>" <%= "checked" if current_user.daily_section_count.nil? %>><%= t("daily_sections.automatic") %></label>
-        <% User::DAILY_SECTION_COUNTS.each do |count| %>
-          <label class="segment"><input type="radio" name="daily_section_count" value="<%= count %>" <%= "checked" if current_user.daily_section_count == count %>><%= count %></label>
-        <% end %>
-      </div>
-      <p class="card-note"><%= t("daily_sections.hint",
-                                lowest: User::DAILY_SECTION_COUNTS.first,
-                                fixed_sections: DailyKinds.for(current_user).map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
-    </fieldset>
+    <%= render "api_keys/daily_sections" %>
 
     <% skill_level_options = User::SKILL_LEVELS.map { |level| [ t("exercise_mix.levels.#{level}"), level ] } %>
     <div class="value-row" data-controller="value-row">
