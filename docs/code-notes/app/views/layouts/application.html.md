@@ -100,7 +100,10 @@ and the last link then sit `max(1.5rem, inset)` from the screen edge
 (`max(2rem, inset)` from 1024px), the same as a full-width page, and a
 Pro Max in landscape lines up with the page at 932px (#553). Dropping the
 nav's padding instead would have widened the measured box by both notches
-and left the links less room at the collapse point. Below 900px the nav row
+and left the links less room at the collapse point. The open menu hangs from `nav`'s
+padding box, which runs under both notches so its background reaches the
+screen edge, and pads its links by `max(.75rem, inset)` on each side so they
+start clear of the notch (#615). Below 900px the nav row
 still spans the full width while a page's column stops at 800px, so at
 844px the brand sits about 22px left of the content, notch or not.
 
@@ -203,14 +206,16 @@ a browser default below 16px, the minimum lifts both to 44px.
 The image's alt text names the link, which is why the wordmark beside it is
 hidden from screen readers.
 
-## `@container (max-width: 40em)`
+## `@container (max-width: 44em)`
 
-Below this width the row cannot hold the brand and the five destinations at
-once, so the destinations fold behind the button and the brand stays on one
-line. The width is in em against the nav's own text, so a larger text size
-moves the fold out with it: 40em is 640px at the default size. It was 37.5em
-until Settings joined the row, which overflowed it by 22px at the default text
-size.
+Below this width the row cannot hold the brand, the name field and the six
+destinations at once, so the destinations fold behind the button and the
+brand stays on one line. The width is in em against the nav's own text, so a
+larger text size moves the fold out with it: 44em is 704px at the default
+size. It was 37.5em until Settings joined the row, which overflowed it by
+22px at the default text size, and 40em until Today joined it (#615), when
+the row needed 690px at the default size. The tab bar lists the same
+destinations, Today included, from the same `nav_destinations`.
 
 ## `nav .nav-toggle`
 

@@ -42,4 +42,20 @@ RSpec.describe "Nav in a notched landscape phone", type: :system do
       expect(overflow).to eq([ 0, 0 ])
     end
   end
+  [ [ 44, "100" ], [ 59, "100" ], [ 59, "140" ] ].each do |inset, text_size|
+    it "keeps the open menu's links and name field clear of a #{inset}px notch, with its background to the edge, at #{text_size}% text" do
+      user.update!(display_preferences: { "text_size" => text_size })
+      visit_learn_with_notch(width: 1400, height: 430, inset: inset)
+      resize(narrowest_uncollapsed_nav_width(height: 430) - 10, height: 430)
+
+      find("#nav-toggle").click
+      expect(page).to have_link("Settings", visible: :visible)
+
+      edges("nav .nav-links[data-open] a, nav .nav-links[data-open] .name-editor-input").each do |left, right|
+        expect([ left, right ]).to all(be >= inset - 0.5)
+      end
+      expect(edges("nav .nav-links[data-open]").sole).to all(be_within(0.5).of(0))
+      expect(sideways_overflow).to eq(0)
+    end
+  end
 end

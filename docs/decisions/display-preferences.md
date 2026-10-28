@@ -42,7 +42,7 @@ logo's `<source>` and a light `theme-color` tag carry the same value, so none
 of the three can disagree. The dark `theme-color` follows as the fallback.
 
 **The nav's collapse is a container query**, `@container (max-width:
-40em)` on `nav`: 640px at the default size, and it moves out as the text
+44em)` on `nav`: 704px at the default size, and it moves out as the text
 grows. `mobile_nav_menu_spec` checks that the row fits just above it at the
 smallest and largest text sizes, so adding a destination that crowds it fails. It stays one rule rather than a copy per text size. Containment makes
 `nav` a stacking context, hence its `z-index`. The reading font and line

@@ -184,7 +184,7 @@
     nav .name-editor { display: flex; align-items: center; min-width: 0; }
     nav .nav-toggle { display: none; }
 
-    @container (max-width: 40em) {
+    @container (max-width: 44em) {
       nav .nav-toggle {
         display: flex; flex-direction: column; justify-content: center; gap: 4px;
         width: 44px; height: 44px; padding: 0 11px; flex-shrink: 0;
@@ -200,7 +200,7 @@
         display: flex; flex-direction: column; align-items: stretch; gap: .25rem;
         position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
         background: var(--surface); border-bottom: 1px solid var(--border);
-        padding: .5rem .75rem 1rem;
+        padding: .5rem max(.75rem, env(safe-area-inset-right)) 1rem max(.75rem, env(safe-area-inset-left));
         box-shadow: var(--shadow);
       }
       nav .nav-links[data-open] a { padding: .75rem; border-radius: var(--radius-sm); }
@@ -546,6 +546,7 @@
           <span id="nav-name-status" class="name-editor-status" aria-live="polite"
                 data-name-editor-target="status"></span>
         </span>
+          <a href="/">Today</a>
           <a aria-current="page" href="/learn">Learn</a>
           <a href="/progress">Progress</a>
           <a href="/history">History</a>
