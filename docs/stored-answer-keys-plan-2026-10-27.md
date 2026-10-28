@@ -19,19 +19,21 @@ A wrong key that no grade has used yet costs nothing.
 **One limit from the baseline.** The owner's recent days all had two
 sections, `code_review` and `design_comparison`. So `security_review`,
 `plan_review` and `pseudocode_to_code` will produce keys only on days long
-enough to hold a third or fourth section. **The owner decided** on
-2026-10-28 to wait for those kinds to come up, with no change to the daily
-section count. They may take many weeks to reach the 5 keyed sections a
-kind needs for the read between the PRs, so PR 2 turns keys on kind by kind
-as each one gets there.
+enough to hold a third or fourth section. The owner is the app's only user
+and won't add those kinds to their own days just to collect keys. **The
+owner decided** on 2026-10-28 that the read between the PRs uses drafted
+sections for those three kinds: `script/draft_key_samples.rb` drafts one
+kind at a time through the production retry route, writes no day and
+no history, and its output goes to the reader (see "Drafted sections for
+the rarer kinds" below). `code_review` is read from real days.
 
 **Departure from the spec, which PR 2's description must state:** the
 keyed-against-unkeyed calibration is a new mode,
 `script/compare_models.rb review_calibration_keys`, where the spec describes
 a `--without-keys` pass on `review_calibration`. The new mode grades only
-the two extra answers per fixture both ways, so it costs 48 calls where
-re-running the whole calibration without keys would cost another 40 plus
-the extras, and `review_calibration` itself stays as it is.
+the two extra answers per fixture both ways, so it costs 12 calls for each
+turned-on kind (48 with all four) where re-running the whole calibration
+without keys would cost another 40 plus the extras, and `review_calibration` itself stays as it is.
 
 ## PR 1. Store the keys, used by nothing yet
 
@@ -266,18 +268,55 @@ the token measurement, and why `exercise_section.rb` grows by one line.
 
 ## Between the PRs: is the key right?
 
+### Drafted sections for the rarer kinds
+
+`script/draft_key_samples.rb KIND OUT_PATH` drafts `security_review`,
+`plan_review` or `pseudocode_to_code` sections for the key read. It is built
+in its own PR before the read.
+
+- **The path.** Each draft goes through `AiService#retry_section` with one
+  concept from the kind's vocabulary fixed, so the key is planted by the
+  retry prompt a real day sends after a rejection, and cleaned and
+  quote-checked by the same ingest and `PlantedKey` code. A day's first
+  drafts come from the whole-set prompt instead, so drafts show whether the
+  generator plants a correct key for the kind without reproducing a first
+  draft. The production judge then judges it on its own route. A
+  rejected draft is left out and another is drafted, up to a cap. A draft
+  that comes back without a key is left out too, and counted.
+- **Where it runs.** On the owner's machine, against a local database,
+  with the owner's Anthropic key in `ANTHROPIC_API_KEY`. It never runs
+  against production and never reads the production database. Without
+  `--run` it only prints the plan: the number of drafts, the most calls it
+  can make, and a cost bound with every call at its output cap. With `--run` it makes those calls.
+  **Every `--run` needs the owner's approval first,** with that call count
+  and cost.
+- **What it writes.** Its output, in the key sheet's shape plus each
+  draft's judge outcome, goes to a file outside the repository, which is
+  deleted after the read like the key sheet. It writes no `DailyExercise`,
+  response or concept history, and no `ApiUsage` row: the script's service
+  keeps usage in memory, for its cost line, instead of logging it. Even a
+  logged row couldn't block a real day: `ApiUsage` counts are read only by
+  `TrialAllowance`, which runs only for house-key calls, and by the Account
+  page's spend total. `ProviderCallLimits` counts in the cache, and
+  own-key accounts skip it.
+- **What it doesn't prove.** That the rarer kinds' keys hold up on real
+  days. The first real section of each still logs its `[planted_key]` line,
+  and those lines are checked when they appear.
+
 1. **Wait.** Keys accumulate on real days. The quote threshold applies from
    the first keyed day: count only `attempt=draft` lines of the kinds that quote (`code_review`, `security_review`, `plan_review`) with `language=ruby_rails` (owner's decision, 2026-10-28). More than 2
    `quote_missing` in the first 10 stops the work, and the owner decides
    what's next. Report the `missing` count beside it.
 2. **Export the key sheet,** with the owner's approval for that export. Keep
    it outside the repository.
-3. **Read.** The owner reads the Ruby `code_review` sections. The colleague
-   the owner chooses reads the other three kinds. The spec's option B asks
-   for about 5 per kind. A kind with fewer than 5 keyed sections isn't read
-   yet: the owner either waits for it or leaves it out of PR 2. Each section
-   gets one call: key right, key wrong, or key right but the code or plan
-   has a worse flaw.
+3. **Read.** The owner reads the Ruby `code_review` sections from real days.
+   The colleague the owner chooses reads the drafted `security_review`,
+   `plan_review` and `pseudocode_to_code` sections, since the owner can't
+   judge those keys reliably. The spec's option B asks for about 5 per kind.
+   A kind with fewer than 5 keyed sections isn't read yet. **If no reader is
+   available for a kind, that kind stays off in PR 2.** Each section gets
+   one call: key right, key wrong, or key right but the code or plan has a
+   worse flaw. For the three drafted kinds, this read is the main check.
 4. **Delete the sheet.** Record only the counts, in PR 2's description.
 
 **Owner decides,** kind by kind, whether the counts are good enough for the
@@ -323,7 +362,16 @@ on only for the kinds that pass.
 
 ### Step 4. Calibration fixtures
 
-- Four new files in `spec/fixtures/review_calibration/`, one per kind, each
+Steps 4 to 7 cover only the kinds being turned on. A kind left off, for
+want of a reader or of keyed sections, gets no fixture, check or run, and
+doesn't hold up the others.
+
+For `code_review`, the fixtures sit beside the Measuring step on real days.
+For the three drafted kinds they are a guard, not the main check: the key
+read between the PRs is. A fixture catches a grader that misreads a key it
+has, and the read decides whether the keys are right at all.
+
+- One new file in `spec/fixtures/review_calibration/` per turned-on kind, each
   with a key, the `complete`, `partial` and `miss` answers, and the two
   extra answers from the spec's table: one comparable in severity, one
   clearly lesser, each with its expected rating.
@@ -331,8 +379,9 @@ on only for the kinds that pass.
 
 ### Step 5. Checking the fixtures
 
-Before anything is run (spec section 6), the owner or the colleague checks
-each new fixture:
+Before anything is run (spec section 6), the owner checks the `code_review`
+fixture and the colleague checks the other turned-on kinds', for the same
+reason the colleague reads those keys:
 - both alternative flaws really exist in the snippet or plan
 - the comparable one really is as serious as the keyed one
 
@@ -344,7 +393,8 @@ before step 7.
 - **`script/compare_models.rb review_calibration_keys`:** grades each
   extra answer 3 times as written and 3 times through
   `without_planted_keys`, then prints each answer's ratings both ways. That
-  is 48 calls. One normal `review_calibration` run is 40.
+  is 12 calls for each turned-on kind, 48 with all four. One normal
+  `review_calibration` run is 40.
 - **`script/regrade_review_baseline.rb --without-keys`:** applies
   `without_planted_keys` to every day before grading, for step 8.
 - **`script/export_review_baseline.rb --keyed-only`:** keeps only sections
@@ -362,7 +412,8 @@ before step 7.
 
 ### Step 7. Running the calibration
 
-- **Ask the owner first.** It is 88 calls on the owner's key, about $1.15.
+- **Ask the owner first,** with the call count and cost for the kinds being
+  turned on. With all four it is 88 calls on the owner's key, about $1.15.
 - Run `review_calibration`, then `review_calibration_keys`.
 
 **Stop and come back to the owner if:**
@@ -397,6 +448,15 @@ has passed (owner's decision, after review).
    those sections. If that happens, stop: PR 2 doesn't merge, and the
    `RUBRIC_VERSION` decision is reopened with the owner.
 5. **Delete every export.** Only the counts go into the PR description.
+
+**The drafted kinds.** Alongside the export in item 1, count the owner's graded sections of
+`security_review`, `plan_review` and `pseudocode_to_code`, all and those
+that carry a key, with a read-only query the owner approves. Only sections
+generated after PR 1 deployed carry a key, so older ones can't be regraded
+keyed. If any keyed graded section exists, it gets the same keyed-against-
+unkeyed regrade as a small sample, and its counts go in the PR description.
+It is too few for the systematic-movement rule, so it is reported, not
+ruled on. If none exists, the PR description says so.
 
 A kind with too few keyed sections for a reading stays off in PR 2 until it
 has them, as in the read between the PRs.
