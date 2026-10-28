@@ -220,13 +220,24 @@ numbers:
   other. On a JavaScript day a quoted line may equal a run of consecutive
   formatted lines joined, since Prettier can re-wrap one line onto several.
   Every line of that run is marked.
-- **In order.** The provider lists changed lines in file order, and each one
-  must match after the previous match. A repeated line such as `end`, `}` or a
-  second `validates` resolves to the occurrence after the last one resolved,
-  never to the first one in the file.
-- A quoted line that matches nothing is dropped and counted. The section is
-  refused when no file has a resolved changed line, since then nothing marks
-  the change. `file_N_changed` isn't added to
+- **Exactly one match, or none.** A quoted changed line resolves only when
+  it equals exactly one line in its file (on a JavaScript day, exactly one
+  run). One that equals several, such as `end`, `}` or a `record.save!` that
+  appears in two methods when only the second was added, is dropped and
+  counted, never guessed. An unmarked changed line is a smaller fault than a
+  marked unchanged one. The guidance asks the provider to make each changed
+  line distinct within its file, so a drop is rare.
+- A quoted line that matches nothing is dropped and counted too. The section
+  is refused when no file has a resolved changed line, since then nothing
+  marks the change.
+
+**A change always adds or edits a line.** Changed lines mark only lines the
+change added or edited, since a removed line isn't in the post-change code.
+A deletion-only change would have nothing to mark and always be refused. So
+the guidance requires every `change_review` to add or edit at least one line
+in some file, and shows a removed call through the line that changed around
+it. For example, a `before_action :authorize_order!` edited to gain
+`except: :export`, never the `before_action` line simply gone. `file_N_changed` isn't added to
 `ProblemSetIngest::SERVER_STAMPS`. That list is stripped after
 `reject_unusable!` runs (`strip_server_stamps!`), so a stamp there would
 erase the resolved numbers. `.reject_unusable!` replacing the provider's
@@ -350,11 +361,21 @@ adapter in `app/clients`, so it states its own normalization.
   - `'` and `"` treated as the same character
   - a `;` at the end of the quote ignored
   - a comma just before `)`, `]` or `}` removed
+  - parentheses around a single bare arrow parameter removed: `(id)=>`
+    becomes `id=>`
 
   Prettier re-wraps a long call onto several lines and adds a trailing
   comma, so `fn(a, b);` can come back as `fn(` with one argument per line
-  and `b,` before the `)`. With line breaks and whitespace removed and that
-  comma dropped, the two sides match again.
+  and `b,` before the `)`. It also wraps a lone arrow parameter: the
+  existing `code_format_spec` fixture turns `ids.map(id=>fetch(id))` into
+  `ids.map((id) => fetch(id));`. With these rules applied to both sides, the
+  two match again.
+
+  The guidance also asks for JavaScript already written in Prettier's style
+  (semicolons, double quotes, parentheses around arrow parameters, trailing
+  commas), so most quotes match before any rule applies. Any other Prettier
+  rewrite, such as parentheses it adds around mixed `&&` and `||`, is a miss
+  that refuses the section. The quote-miss stop condition counts those.
 - **Evidence quotes** match as a substring of the whole normalized file, so
   a quote that Prettier re-wrapped onto several lines still matches. That's
   why each quote needs 12 non-whitespace characters.
@@ -436,8 +457,9 @@ framing differs as well:
 - A `security_review` asks for a vulnerability and its exploit: one snippet,
   one attack.
 - An `authorization` `change_review` asks what a change broke between files.
-  For example, a controller that stops calling a policy another file assumes
-  it calls, or a new caller that skips a check every other caller makes. The
+  For example, a controller whose `before_action` is edited so one action
+  skips a policy check another file assumes it ran, or a new caller that
+  skips a check every other caller makes. The
   question is "what does this change break", never "how would an attacker
   use this".
 
@@ -682,8 +704,11 @@ conditions).
     evidence entries
   - for changed-line resolution: a line that resolves after Ruby
     re-indentation, one that matches nothing, no resolved line in any file,
-    a repeated `end` resolving in order rather than to its first occurrence,
+    a changed line that appears twice in its file (a repeated `end`, or a
+    `record.save!` in two methods) being dropped rather than marking either,
     and a line that merely contains a changed line not matching it
+  - a section whose only change is a deletion being refused, and the
+    guidance line requiring an added or edited line
   - for every answer-key rule in section 3: a quote from the wrong file,
     quotes covering one file, a path in `files` that isn't a section path,
     blank fields, and a key written back sliced to its five fields
@@ -693,6 +718,8 @@ conditions).
     code
   - a JavaScript quote against a Prettier re-wrap with a trailing comma, a
     changed quote character and a dropped `;`
+  - the `code_format_spec` fixture: `return ids.map(id=>fetch(id))` matching
+    Prettier's `return ids.map((id) => fetch(id));`
   - a quote under 12 non-whitespace characters
   - the returned line range for a quote spanning lines
 - **The shared hook signature:** `problem_set_ingest_spec` passes
