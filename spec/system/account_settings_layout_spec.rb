@@ -160,9 +160,13 @@ RSpec.describe "Account and Settings layout", type: :system do
     it "keeps every target its phone size" do
       visit_page(setup_path, width: 1280)
       open_settings
+      find("#daily-sections .segment", text: "4").click
+      expect(page).to have_css("#daily-sections-choice-4", visible: :visible)
       expect(rects(".settings-page .btn-block, .settings-page .switch-row, .settings-page details.card > summary, .settings-page .mix-level").map { |r| r["height"] }).to all(be >= 48)
       expect(rects(".settings-page .segment").map { |r| r["height"] }).to all(be >= 44)
-      expect(rects(".settings-page .value-row").map { |r| r["height"] }).to all(be >= 52)
+      visible_rows = rects(".settings-page .value-row").map { |r| r["height"] }.reject(&:zero?)
+      expect(visible_rows.size).to eq(5)
+      expect(visible_rows).to all(be >= 52)
     end
   end
 
