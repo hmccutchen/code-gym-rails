@@ -83,6 +83,11 @@ Two checks, neither of which changes a key:
   the rarer kinds come up on their own, so the second PR turns keys on kind
   by kind.
 
+The stability export (`export_review_baseline.rb` without `--key-sheet`)
+keeps the four keys. It reads only submitted, reviewed days, it already holds
+the answers and the older keys, and the second PR's measuring regrades from
+it with and without the key (owner's decision, 2026-10-28).
+
 ## Before the grader reads them
 
 The second PR changes grading, so these hold from now:
