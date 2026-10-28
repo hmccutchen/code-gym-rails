@@ -17,6 +17,10 @@ module ReviewHelper
                      learn_link: ConceptBucket.slice_for(response.user.language).include?(bucket))
   end
 
+  def review_provider_label(response)
+    AiProvider.label(response.review_provider_key)
+  end
+
   def review_badge(response, section)
     if (rating = response.ai_rating_for(section)).present?
       ReviewBadge.new(text: rating, graded: true)

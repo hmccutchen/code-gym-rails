@@ -133,10 +133,13 @@ read it before changing that area.
   (`docs/decisions/exercise-code-is-re-indented-once-at-ingest.md`):
   `ProblemSetIngest#format_code!` runs each kind's `.code_fields` through
   `CodeFormat.all` once, before the boundary checks, so bounds and every
-  reader see the shown layout. Ruby uses whitespace-only RuboCop `Layout` cops
-  so a planted defect survives; JavaScript uses Prettier. Unparseable code or
-  a formatter that cannot run comes back unchanged, and Parsons blocks are
-  never formatted.
+  reader see the shown layout, such as the `code_review` snippet's cap
+  (`CodeReview::MAX_SNIPPET_LINES`, which is `RealSource::MAX_LINES`): a longer
+  snippet is refused, never cut, and design comparison's piece bound counts
+  lines the same way (`ExerciseSection.shown_lines`). Ruby uses
+  whitespace-only RuboCop `Layout` cops so a planted defect survives;
+  JavaScript uses Prettier. Unparseable code or a formatter that cannot run
+  comes back unchanged, and Parsons blocks are never formatted.
 - **Stored answer keys** (`docs/decisions/stored-answer-keys.md`):
   `code_review`, `security_review`, `plan_review` and `pseudocode_to_code`
   plant a key under `answer_key` (`.planted_key?`), each in its own shape,

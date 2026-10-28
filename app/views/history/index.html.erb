@@ -33,7 +33,7 @@
         <% end %>
       </span>
       <% daily_response.section_ratings.each do |section, value| %>
-        <span class="history-pill"><%= t("history.index.rating", section: section.humanize, rating: DailyResponse.self_rating_labels[value]) %></span>
+        <span class="history-pill"><%= t("history.index.rating", section: section.humanize, rating: self_rating_labels[value]) %></span>
       <% end %>
       <% daily_response.concept_tags.values.compact.uniq.each do |tag| %>
         <span class="history-tag"><%= tag.humanize %></span>
@@ -48,7 +48,7 @@
 
     <% if daily_response.reviewed? %>
       <details class="review" <%= "open" if i.zero? && @pagy.page == 1 %>>
-        <summary><%= t("review.history_summary", provider: daily_response.review_provider_label) %></summary>
+        <summary><%= t("review.history_summary", provider: review_provider_label(daily_response)) %></summary>
         <%= render "shared/ai_review", response: daily_response %>
       </details>
     <% else %>

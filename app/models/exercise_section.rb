@@ -147,6 +147,8 @@ class ExerciseSection
     def reject_unusable!(section)
     end
 
+    def shown_lines(code) = code.lines.count { |line| line.strip.present? }
+
     # Indentation is part of the contract: first line unindented, fields at 4, closing brace at 2.
     def schema_fragment(label:)
       raise NotImplementedError, "#{self} must implement .schema_fragment"
@@ -300,4 +302,5 @@ class ExerciseSection
       text.lines.reject { |line| labels.include?(line.strip) }.join.strip
     end
   end
+  private_class_method :shown_lines
 end

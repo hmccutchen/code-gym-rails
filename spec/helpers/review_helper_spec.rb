@@ -7,6 +7,18 @@ RSpec.describe ReviewHelper, type: :helper do
                           problem_set: { "code_review" => { "question" => "q" }, "pattern" => { "question" => "p" } })
   end
 
+  describe "#review_provider_label" do
+    let(:openai_user) { User.create!(email: "label@example.com", name: "L", provider: "openai", api_keys: { "openai" => "sk-proj-x" }) }
+
+    it "names the provider that wrote the review" do
+      expect(helper.review_provider_label(DailyResponse.new(user: openai_user, review_provider: "anthropic"))).to eq("Claude")
+    end
+
+    it "names the user's provider for a review written before it was recorded" do
+      expect(helper.review_provider_label(DailyResponse.new(user: openai_user, review_provider: nil))).to eq("GPT")
+    end
+  end
+
   describe "#review_badge" do
     {
       "the rating on an answered section"                 => [ "a" * 20, { "rating" => "strong" }, [ "strong", true ] ],

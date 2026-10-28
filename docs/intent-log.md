@@ -336,7 +336,7 @@ data.*
 - the review badge and headings moved off DailyResponse into a view helper
   `#587`
 - the self-rating labels and reviewing provider name moved to view helpers too
-  `#589 open`
+  `#589`
 - a read-only baseline of how stable grading is: export my graded answers,
   regrade each five times `#590`
   **why:** I'm weighing grading by an answer's route, and wanted a
@@ -389,6 +389,8 @@ data.*
   not with billed calls; after the reviews, quotes match with all
   whitespace ignored, cleaning is its own ingest step, and the stop rule
   counts only drafted sections of kinds that quote
+- code review's snippet capped at 40 shown lines at ingest, refused rather
+  than cut `#603`
 - the rarer kinds' keys read from drafted sections, not my days `#606 open`
   **why:** I'm the only user, and adding those kinds to my days would fake
   progress
