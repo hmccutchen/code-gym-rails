@@ -30,6 +30,7 @@ RSpec.describe ExerciseSection::CodeReview do
     end
 
     it "accepts every curated real-source excerpt as formatted, since a grounded snippet keeps its excerpt's shape" do
+      allow(CodeFormat).to receive(:all).and_call_original
       formatted = CodeFormat.all(RealSource.all.map(&:text), language: RealSource::LANGUAGE)
 
       formatted.each { |snippet| expect { described_class.reject_unusable!("snippet" => snippet) }.not_to raise_error }

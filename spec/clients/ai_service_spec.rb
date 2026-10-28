@@ -1760,28 +1760,31 @@ RSpec.describe AiService do
         .with(hash_including(name: "First Invention!!")).and_raise(StandardError, "db down")
 
       svc = double_class.new(canned_text: full_problem_set(
-        "code_review" => { "question" => "q", "concept" => "First Invention!!" },
+        "code_review" => { "snippet" => "x = 1", "question" => "q", "concept" => "First Invention!!" },
         "pattern"     => { "title" => "t", "concept" => "Second Invention!!" }
       ).to_json)
 
       allow(Rails.logger).to receive(:warn)
 
       expect { svc.generate_exercise(user) }.to change(SuggestedConcept, :count).by(1)
+      expect(SuggestedConcept).to have_received(:record!).with(hash_including(name: "First Invention!!"))
       expect(SuggestedConcept.last.display_name).to eq("Second Invention!!")
     end
 
     it "records each suggestion through #record_suggested_concept, so a script's service can keep its runs from recording" do
-      quiet = Class.new(double_class) { define_method(:record_suggested_concept) { |_suggestion| } }
+      handed = []
+      quiet = Class.new(double_class) { define_method(:record_suggested_concept) { |suggestion| handed << suggestion } }
       svc = quiet.new(canned_text: full_problem_set(
-        "code_review" => { "question" => "q", "concept" => "Invented Concept!!" }
+        "code_review" => { "snippet" => "x = 1", "question" => "q", "concept" => "Invented Concept!!" }
       ).to_json)
 
       expect { svc.generate_exercise(user) }.not_to change(SuggestedConcept, :count)
+      expect(handed.map(&:name)).to eq([ "Invented Concept!!" ])
     end
 
     it "propagates an ingest rejection as a generation failure" do
       svc = double_class.new(canned_text: {
-        "code_review"    => { "question" => "q", "concept" => "n_plus_one" },
+        "code_review"    => { "snippet" => "x = 1", "question" => "q", "concept" => "n_plus_one" },
         "ambiguity_hunt" => { "request" => "vague", "planted_ambiguities" => [] }
       }.to_json)
 
@@ -1798,7 +1801,7 @@ RSpec.describe AiService do
 
     it "writes no suggestion when ingest rejects the set" do
       svc = double_class.new(canned_text: {
-        "code_review"    => { "question" => "q", "concept" => "Invented Concept!!" },
+        "code_review"    => { "snippet" => "x = 1", "question" => "q", "concept" => "Invented Concept!!" },
         "ambiguity_hunt" => { "request" => "vague", "planted_ambiguities" => [] }
       }.to_json)
 
