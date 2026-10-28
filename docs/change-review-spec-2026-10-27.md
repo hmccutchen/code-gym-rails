@@ -37,7 +37,76 @@ Since nothing gates the kind, `DailyPlan` keeps its rule that it never
 reads `KindDifficulty` (`.claude/rules/planning.md`, "Difficulty targets and
 locks"), unchanged.
 
-Every decision the build needs is made.
+Four questions from the reviews need the owner before the build starts.
+See "Decisions still needed".
+
+## Decisions still needed
+
+1. **When this kind's grader starts reading its key.** The stored answer keys
+   plan (`docs/stored-answer-keys-plan-2026-10-27.md`) splits into PR 1,
+   which stores keys that nothing reads, and PR 2, which lets the grader read
+   them kind by kind. PR 2 turns a kind on only after a sampled human read,
+   calibration fixtures and a keyed-versus-unkeyed movement check. That
+   gating is what lets `RUBRIC_VERSION` stay at 1: no evidence reader sees a
+   keyed grade before the check passes. As written, this spec grades
+   `change_review` against its key from the first section (section 9). Its
+   grades would then feed `CompetencyGate::Evidence` and `LevelSuggestion`
+   through `ReviewedSectionResults`, outside that gating. The options:
+   - **A. Join PR 2's gating (recommended).** The build waits for PR 2, not
+     PR 1. `change_review` joins PR 2's sampled read and gets its own
+     calibration fixture (complete, partial and miss answers, plus a
+     comparable-severity and a lesser alternative). The fixture runs through
+     `review_calibration` before launch. The kind has no unkeyed history, so
+     the movement check doesn't apply to it. The calibration run stands in.
+   - **B. Ship with the key stored and unread**, like PR 1, until PR 2
+     covers it. Grading would guess the interaction across 2–3 files in the
+     meantime, which is the reason section 3 refuses a section with a failed
+     key.
+   - **C. Grade keyed from day one, but keep its grades out of the evidence
+     readers** until a sampled read passes. That needs a new exclusion in
+     `ReviewedSectionResults`.
+2. **The shared data-modeling prompt line.**
+   `GenerationPrompt::ConceptGuidance#data_modeling_idiom_guidance` says only
+   a schema-review `code_review` presents a schema artifact, and any other
+   host expresses a data-modeling concept in its own idiom. It renders in all
+   263 generation snapshots. `change_review` shows a migration among its
+   files for those concepts, which contradicts the line. The options:
+   - **A. Add one clause to that line (recommended).** The clause names
+     `change_review`'s idiom: a migration and the model or query that depends
+     on it, across files. Every generation snapshot changes by that clause.
+     The build checks that mechanically, as the stored keys plan does for its
+     fragments: a script strips the clause from each diff and asserts nothing
+     else changed.
+   - **B. Leave data modeling out of this kind.** That empties the
+     JavaScript vocabulary, which would need a language gate, against the
+     decisions above.
+3. **A new kind's first appearance.** A kind never seen has the highest
+   staleness (`SectionRotation::LOOKBACK` + 1), so the third slot wins
+   rotation on a 3-section day until `change_review` appears once. Separately,
+   `CoverageException` adds one section to a two-section Automatic day from
+   the optional slots, and a never-seen kind sorts first by gap. So an
+   established Automatic user on two-section days gets a `change_review`
+   added on their next eligible day. `CAP_WEEKDAYS` (4) still limits
+   additions to one in 4 weekdays. The options:
+   - **A. Accept it (recommended).** One early appearance per user, then
+     rotation evens out. It shows each user the new kind soon after launch.
+   - **B. Treat launch day as last seen**, so the kind starts at ordinary
+     staleness. That needs a new mechanism in `SectionRotation` and
+     `CoverageException::History`.
+   - **C. Leave the new kind out of coverage additions** for its first
+     weeks. That needs a new rule in `CoverageException.candidate_kinds`.
+4. **The judge rejecting a section for not fitting its rung.** Section 9's
+   draft asks the judge to reject a junior section whose interaction isn't
+   visible, and a senior section whose interaction is. The judge's system
+   prompt says "Never reject because a section is straightforward" and "You
+   never change difficulty". The options:
+   - **A. Drop the rung-fit rejection (recommended).** The per-rung shape
+     stays prompt guidance only (section 5). The judge still rejects a
+     single-file flaw and an exploit.
+   - **B. Keep it**, as a kind-specific exception to the judge's rule,
+     written into the judge guidance and the decision doc.
+
+The rest of this spec assumes the recommended option for each.
 
 ## 1. A rotating third, offered to everyone
 
@@ -57,9 +126,13 @@ The third slot is the right one:
 - The fourth slot is for language-independent kinds with their own
   vocabularies and buckets (`docs/decisions/the-fourth-slot.md`).
   `change_review` uses the language vocabulary, so it doesn't belong there.
-- The third slot fills only on a day of 3 or more sections (`DaySize`), so a
-  two-section day never gets it. Adding the kind doesn't make any day longer.
-  On a day with a third section, it can replace another third.
+- The third slot can fill only on a day of 3 or more sections (`DaySize`).
+  Even then, `SectionRotation.for` ranks every optional slot (pattern, third,
+  fourth, and any default daily kind the user swapped out) by its stalest
+  kind and fills as many as the day has room for, so a third doesn't always
+  appear. The kind adds no section to the day's planned size. The one
+  exception is a coverage addition on a two-section Automatic day (Decision
+  3).
 
 ### How often it comes up
 
@@ -81,7 +154,11 @@ longer for `security_review` rather than read a smaller sample.
 kind need no change: `SectionRotation`, `CoverageException.candidate_kinds`,
 `KindPreferences` and Setup's Exercise mix, `SectionKindSettings`,
 `DailyKindSwap` (a user may make it a daily kind like any other), `DayHosts`
-and `ConceptHosts`. None of them reads a rung, and this kind doesn't add one.
+and `ConceptHosts`. Some of them hold per-kind rungs: `ConceptHosts` offers
+vocabularies per rung, and `SectionKindSettings` validates levels and locks.
+None of them uses a rung to decide whether a kind is offered, and this kind
+doesn't add such a use. Like any kind, it gets a level, a lock and level
+suggestions in Setup.
 
 ### A future option: limiting availability by track
 
@@ -118,6 +195,8 @@ non-blank string, and skips the rest.
 ```
 
 - `.code_fields` returns `%w[file_1_code file_2_code file_3_code]`.
+  `format_code!` formats only a string value, so a non-string code value
+  skips formatting. `.reject_unusable!` refuses it (section 7).
 - `.prose_fields` returns `%w[title scenario question teaching_note]`.
 - Paths and changed lines are not prose, so the judge can't rewrite them.
 - `.diagrammable?` is false. 2–3 files already show the structure, and a
@@ -131,16 +210,23 @@ Ruby (whitespace-only RuboCop `Layout` cops), and those cops can add or
 remove blank lines, so a number written before formatting can point at the
 wrong line.
 
-`.reject_unusable!` runs after `format_code!`. It resolves each quoted line
-with the same matcher as the answer key's quotes (section 3) and replaces
-`file_N_changed` with the sorted unique 1-based line numbers:
+`.reject_unusable!` runs after `format_code!`. It resolves the quoted lines
+with `KeyQuote` (section 3), using whole-line equality rather than a
+substring search, and replaces `file_N_changed` with the sorted 1-based line
+numbers:
 
-- On a Ruby day, each quoted line resolves to the first formatted line that
-  matches it.
-- On a JavaScript day, Prettier may have re-wrapped a changed line onto
-  several lines, so every formatted line its match spans is marked. A quoted line that matches nothing is dropped and counted. The
-section is refused when no file has a resolved changed line, since then
-nothing marks the change. `file_N_changed` isn't added to
+- **Whole lines only.** A quoted line matches a formatted line only when the
+  two are equal after normalization, never when one merely contains the
+  other. On a JavaScript day a quoted line may equal a run of consecutive
+  formatted lines joined, since Prettier can re-wrap one line onto several.
+  Every line of that run is marked.
+- **In order.** The provider lists changed lines in file order, and each one
+  must match after the previous match. A repeated line such as `end`, `}` or a
+  second `validates` resolves to the occurrence after the last one resolved,
+  never to the first one in the file.
+- A quoted line that matches nothing is dropped and counted. The section is
+  refused when no file has a resolved changed line, since then nothing marks
+  the change. `file_N_changed` isn't added to
 `ProblemSetIngest::SERVER_STAMPS`. That list is stripped after
 `reject_unusable!` runs (`strip_server_stamps!`), so a stamp there would
 erase the resolved numbers. `.reject_unusable!` replacing the provider's
@@ -206,6 +292,8 @@ different pair of files. So a key that fails refuses the section.
 
 A key is refused when any of these fails:
 
+- `answer_key` is a Hash. `files` is an Array of Strings. `evidence` is an
+  Array of 2 to 4 Hashes, each with a String `file` and a String `quote`.
 - `issue`, `why_it_matters` and `fix` are non-blank strings. Each is
   stripped and truncated to the stored keys spec's bound (about 500
   characters).
@@ -218,10 +306,22 @@ A key is refused when any of these fails:
   `}` or `end` can't pass the check by appearing anywhere.
 - The matched quotes cover at least 2 different files.
 
+A key that passes is written back cleaned and sliced to its five fields
+(`issue`, `why_it_matters`, `fix`, `files`, `evidence`). Any other field the
+provider sent is dropped, as `DesignComparison.arrange!` slices its key to
+`PROVIDER_KEY_FIELDS`.
+
 **How this fits the stored keys plan
 (`docs/stored-answer-keys-plan-2026-10-27.md`).**
-- `ChangeReview.planted_key?` is true, and `.unquoted_key_parts(section)`
-  returns the `evidence` quotes not found in their named file.
+- `ChangeReview.planted_key?` is true, and `.unquoted_key_parts(section,
+  language:)` returns the `evidence` quotes not found in their named file.
+- **The language reaches the hooks as a keyword.** `.reject_unusable!` and
+  `.unquoted_key_parts` receive only the section today, and a section carries
+  no language. The build changes both shared signatures to take `language:`.
+  `ProblemSetIngest` passes its `@language`, and every other kind absorbs the
+  keyword with `**`, as `.generation_guidance` already does. That touches the
+  base class, the three existing overrides (`DesignComparison`,
+  `AmbiguityHunt`, `PseudocodeToCode`) and the ingest call site.
 - That plan's kinds only report a miss: `ProblemSetIngest` records the
   outcome `quote_missing` in a `KeyNote`, and `GenerationDiagnostics` logs it
   as `answer_key=quote_missing`.
@@ -233,26 +333,45 @@ A key is refused when any of these fails:
 - A delivered `change_review` section therefore always gets the note `ok`.
 - What a refusal costs is in section 10.
 
-**Matching rules, one matcher for quotes and changed lines.**
+**One matcher: `KeyQuote`.** A pure model, `app/models/key_quote.rb`, is
+the one home for matching provider-quoted text against formatted code. The
+evidence check, the changed-line resolver and the stored keys plan's
+`.unquoted_key_parts` all call it, so the rule is stated once. It normalizes
+both sides with a per-language table, as `CodeFormat::FORMATTERS` keys its
+formatters by language. It can't call `CodeFormat::Javascript`, which is an
+adapter in `app/clients`, so it states its own normalization.
 
-- **Ruby:** a quote matches when, with whitespace collapsed, it is found
-  within one formatted line. The RuboCop `Layout` cops ingest runs never
-  re-wrap a line (`Layout/LineLength` is excluded), so a line written on one
-  line stays on one line.
-- **JavaScript:** Prettier rewrites more than whitespace, so a miss would
-  otherwise refuse sections whose key was right. Before comparing, both the
-  quote and the file's formatted code are normalized:
-  - all whitespace collapsed, line breaks included, so a quote Prettier
-    re-wrapped onto two or more lines still matches the text it spans
+- **Every language: whitespace removed, not collapsed.** RuboCop's `Layout`
+  autocorrect, as `CodeFormat::Ruby` runs it, rewrites spacing inside a line:
+  `foo(a,b)` becomes `foo(a, b)`, `{a: 1}` becomes `{ a: 1 }`, `y=1+2` becomes
+  `y = 1 + 2`. A quote written before formatting only matches the formatted
+  line once all whitespace is removed from both.
+- **JavaScript, also:**
   - `'` and `"` treated as the same character
   - a `;` at the end of the quote ignored
+  - a comma just before `)`, `]` or `}` removed
 
-  The comparison runs against the whole normalized file, not one line at a
-  time, since a re-wrapped quote crosses lines.
+  Prettier re-wraps a long call onto several lines and adds a trailing
+  comma, so `fn(a, b);` can come back as `fn(` with one argument per line
+  and `b,` before the `)`. With line breaks and whitespace removed and that
+  comma dropped, the two sides match again.
+- **Evidence quotes** match as a substring of the whole normalized file, so
+  a quote that Prettier re-wrapped onto several lines still matches. That's
+  why each quote needs 12 non-whitespace characters.
+- **Changed lines** use whole-line equality in order, as in section 2.
+- **`KeyQuote.find(code, quote, language:)`** returns the 1-based line range
+  the match spans, or nil. Callers that need only yes or no test for nil.
+
+This is a change to the stored keys plan. Its step 3 checks quotes with
+whitespace collapsed, which has the same RuboCop spacing gap. Under this
+build, `.unquoted_key_parts` for the four keyed kinds calls `KeyQuote` too.
+Their quotes then match more often, never less, so a `quote_missing` note
+they would have logged may become `ok`. If PR 1 has already shipped
+collapse-only matching, this build replaces it and says so on the PR.
 
 The stored keys spec counts its quote threshold on Ruby only, because of
-these same Prettier rewrites. Here a miss refuses the section, so the
-JavaScript refusal rate gets its own stop condition (section 10).
+these same Prettier rewrites. Here a miss refuses the section, so both
+languages' refusal rates get stop conditions (section 10).
 
 ## 4. Concepts, and staying out of `security_review`'s way
 
@@ -277,9 +396,8 @@ host, which is how every shared concept already works.
 ### Concepts repeat on JavaScript days, and nothing trips
 
 On a JavaScript day `change_review` draws from 5 concepts, so the same
-concept comes back more often than in any other code kind. I checked
-everything that reacts to a concept recurring. None of it blocks a repeat or
-misbehaves:
+concept comes back more often than in any other code kind. Nothing that
+reacts to a concept recurring blocks a repeat or misbehaves:
 
 - **Rotation and starvation count kinds, not concepts.** `SectionRotation`'s
   staleness, `STARVATION_LIMIT` and `CoverageException`'s gaps all read
@@ -346,8 +464,9 @@ guidance already receives `rung:`:
   guidance. `.reject_unusable!` receives only the section, and
   `ProblemSetIngest` stamps `pitched_at` after the boundary checks, so the
   boundary enforces only the 2–3 range for every rung (section 7).
-- **The judge checks the fit.** It sees the rung ("Pitched at:") and judges
-  whether the section fits it (section 9).
+- **The judge doesn't reject on rung fit** (Decision 4). Its system prompt
+  says it never changes difficulty, so the per-rung shape is held by the
+  generation guidance alone.
 - **Easing:** a reduced-tier concept can be eased (`eased: true`). That
   changes the concept's tier in the prompt, never the rung or the file range,
   so an eased section still spans at least 2 files.
@@ -360,8 +479,16 @@ guidance already receives `rung:`:
 No `RealSource` entry and no `source` stamp. `ProblemSetIngest#ground_code_review!`
 reads `code_review` only and is unchanged. The scenario is the provider's,
 under the day's scenario flavor, as for every other kind. Every file is in
-the day's language: Ruby, or JavaScript with a Knex-style migration, never a
-Prisma schema. So `highlighted_code` uses the day's lexer for each file.
+the day's language, so `highlighted_code` uses the day's lexer for each file.
+
+**Where the migration wording lives.** `LanguagePrompts` is the one authority
+for what each language's artifacts look like. Its `schema_artifact` for
+JavaScript is a Prisma schema change, which `code_review`'s `schema_review`
+mode keeps. A new field, `change_migration`, names this kind's migration:
+"a Rails migration" for Ruby, and "a Knex migration file" for JavaScript. The
+kind's guidance reads it. It never says "never Prisma", so a day with both a
+JavaScript `schema_review` and a `change_review` asks for each artifact in
+its own section, and neither line contradicts the other.
 
 ## 7. Caps
 
@@ -373,6 +500,9 @@ lines as shown:
 - Each file at most 15 lines (`MAX_FILE_LINES`), all files at most 40 in
   total (`MAX_TOTAL_LINES`). Blank lines count, since they take room on a
   phone.
+- Each present file's path and code are Strings, and its `file_N_changed`
+  is an Array of Strings. A non-string code value is refused here, since
+  `format_code!` skipped it.
 - Paths are non-blank, at most 120 characters (`MAX_PATH_LENGTH`) and
   different from each other.
 
@@ -393,10 +523,21 @@ flaw out of it.
 <% end %>
 ```
 
-- **`ChangeReview.files(section)`** returns the present files as small
-  values (`path`, `code`, `changed`), in order. It is the one reader of the
-  `file_N_*` fields, and the duck, the grader, the judge and the page all use
-  it.
+- **`ChangeReview.files(section)`** returns the present files as
+  `ChangeReview::File` values (`path`, `code`, `changed`), in order. It is the
+  one reader of the `file_N_*` fields. The page, the grader's
+  `.review_context` and `SectionContext` use it.
+- **`SectionContext.render`** gains one entry that lists each file from
+  `ChangeReview.files(data)`: its path, its changed line numbers and its
+  code. It already calls into a kind class for Parsons. The duck and the
+  difficulty assessment read sections only through `SectionContext`, so
+  without this entry they would see no code. `answer_key` stays out, since
+  `SectionContext` renders named fields only. The judge needs nothing: it
+  reads the whole section as JSON, minus answer keys and server stamps.
+- **`changed_lines_label`** lives in a new `ChangeReviewHelper`. It
+  compresses line numbers into ranges ("changed lines 3–5, 9") through the
+  locale key `sections.change_review.changed_lines`. It's the only signal
+  besides color, so it gets its own helper spec.
 - **The summary** gets design comparison's 44px row. A long path wraps,
   because it's text, not code.
 - **The answer** is the shared `responses/answers/textarea` partial.
@@ -452,22 +593,28 @@ interact, and say which files it involves and how to fix it."
 `.judge_guidance`:
 
 > This section shows 2–3 files after one change, with the changed lines
-> listed. Solve it before judging: find the planted problem and list which
-> files you had to read to see it. Reject as scope_mismatch if one file alone
-> shows the problem, since that makes this a code review. Reject as
-> scope_mismatch if the section doesn't fit its rung: at junior the
-> interaction must be visible from the changed lines, and above mid_level it
-> must not be. Reject as
-> scope_mismatch if the problem is an exploit rather than a broken contract
-> between files. Reject as underdetermined if more than one interaction
-> problem is equally plausible. When you edit, you may reword the title,
-> scenario, question and teaching note; never change a path, a file's code
-> or the changed lines.
+> listed. Solve it before judging: work out the planted problem and which
+> files it takes to see it. Reject as scope_mismatch if one file alone shows
+> the problem, since that makes this a code review. Reject as scope_mismatch
+> if the problem is an exploit rather than a broken contract between files.
+> Reject as underdetermined if more than one interaction problem is equally
+> plausible. When you edit, you may reword the title, scenario, question and
+> teaching note; never change a path, a file's code or the changed lines.
 
-The judge never sees the key (`SectionJudgePrompt` strips `answer_key`). So
-it checks "takes more than one file" on its own, from the code. The
-`scope_mismatch` and `underdetermined` principles already exist in
-`JudgeVerdict::PRINCIPLES`, so its schema is unchanged.
+- **The judge solves silently.** Its system prompt says to work through the
+  checks internally and reply with the JSON verdict only, and the verdict
+  schema has no field for the files it read. So the guidance asks it to work
+  the files out, not to list them.
+- **The judge never sees the key** (`SectionJudgePrompt` strips
+  `answer_key`), so it checks "takes more than one file" on its own, from the
+  code.
+- **It stretches `scope_mismatch` on purpose.** That principle is defined as
+  concept fit. Using it for "one file shows it" and "an exploit" follows
+  `DesignComparison`'s judge guidance, which uses it for "restates a defect
+  to find". The schema is unchanged, so rejection evidence for this kind
+  reads less precisely than a principle of its own would. A new principle is
+  a later change if the rejection logs need it.
+- **No rung-fit rejection** (Decision 4).
 
 ### The blind solve: not at launch
 
@@ -530,12 +677,27 @@ conditions).
 - **`spec/models/exercise_section/change_review_spec.rb`:** `.reject_unusable!`
   - for file count, each cap, blank and duplicate paths, and `file_3`'s
     both-or-neither rule
-  - for changed-line resolution: a quoted line that resolves after Ruby
-    re-indentation, one that matches nothing, and no resolved line in any file
+  - for every type rule: non-string code or path, non-array `file_N_changed`,
+    `files` or `evidence`, a non-hash key or evidence entry, and 1 or 5
+    evidence entries
+  - for changed-line resolution: a line that resolves after Ruby
+    re-indentation, one that matches nothing, no resolved line in any file,
+    a repeated `end` resolving in order rather than to its first occurrence,
+    and a line that merely contains a changed line not matching it
   - for every answer-key rule in section 3: a quote from the wrong file,
     quotes covering one file, a path in `files` that isn't a section path,
-    and blank fields
+    blank fields, and a key written back sliced to its five fields
   - that a refusal message holds none of a sentinel planted in the key
+- **`spec/models/key_quote_spec.rb`,** as a table per language:
+  - a Ruby quote written as `foo(a,b)` or `{a: 1}` against RuboCop-formatted
+    code
+  - a JavaScript quote against a Prettier re-wrap with a trailing comma, a
+    changed quote character and a dropped `;`
+  - a quote under 12 non-whitespace characters
+  - the returned line range for a quote spanning lines
+- **The shared hook signature:** `problem_set_ingest_spec` passes
+  `language:` through to `.reject_unusable!`, and the three existing kinds'
+  specs still pass.
 - **`exercise_section_spec`:** thirds, registry order, `.answer_key_fields`,
   `.code_fields`, and the vocabulary in each language: 8 concepts on Ruby,
   the 5 data-modeling concepts on JavaScript, never empty.
@@ -545,16 +707,18 @@ conditions).
   no `KindDifficulty`.
 - **Generation guidance:** one line per rung, stating the file range from
   section 5, checked through the snapshots below.
-- **The JavaScript matcher:** a quote that differs from the formatted code
-  only by `'`/`"`, a trailing `;` or a line break Prettier added matches; a
-  changed line Prettier re-wrapped marks every line it spans; a quote under
-  12 non-whitespace characters is refused.
+- **`change_review_helper_spec`:** `changed_lines_label` for one line, a
+  run and a mix of both.
+- **`daily_kind_swap/picker_spec` and `consequences_spec`:** the new option
+  on the swap sheet.
 - **Repeated concepts on JavaScript days:** a `section_rotation_spec`
   example where history repeats one data-modeling concept shows the third
   slot still rotating by kind, with nothing refused.
 - **`code_highlight_spec`:** the changed class on the right lines; the same
   code with different `changed` gives different HTML (cache key); no
   `changed` gives byte-identical HTML to today's.
+- **`section_context_spec`:** a `change_review` section renders every
+  file's path, changed lines and code.
 - **`section_context_spec`, `section_judge_prompt_spec`,
   `section_rendering_characterization_spec`:** a sentinel in every
   `answer_key` value never renders. The last one adds the key's text to
@@ -578,14 +742,24 @@ conditions).
 - **New** review prompt snapshots: the section prompt and the day context
   with a `change_review` section.
 - **New** section judge prompt snapshot for this kind.
+- **New** duck and difficulty-assessment snapshots for a `change_review`
+  section, beside the existing `duck__*` and `difficulty__*` snapshots in
+  `spec/fixtures/family_prompt_snapshots`.
 - **`generation_prompt_pair_coverage_spec`** renders every reachable pair,
   so it gains this kind's pairs, and its "named by kind" check covers them.
-- **Unchanged:** every existing snapshot. A default account's prompt, page
-  and request snapshots must stay byte-identical (`planning.md`, "Daily
-  kinds"). Any other snapshot diff is a stop condition.
-- **The one existing page that changes** is Setup's Exercise mix, which lists
-  every kind, so the new kind appears there. That diff is expected and
-  reviewed by hand.
+- **Existing generation snapshots:** all 263 change by the one clause
+  Decision 2 adds to the data-modeling line, and by nothing else. A
+  throwaway script strips the clause from each diff and asserts nothing else
+  changed.
+- **Existing page snapshots:** four change, because each lists every kind:
+  - `setup.html`, through the Exercise mix
+  - `dashboard_unsubmitted.html`, `dashboard_submitted.html` and
+    `dashboard_swapped_pair.html`, through the swap sheet
+    (`DailyKindSwap::Picker` builds its options from `ExerciseSection.all`)
+
+  Each diff is the new kind's row and nothing else, read by hand.
+- **Every other existing snapshot is unchanged.** Any other diff is a stop
+  condition.
 
 ### Docs and rules
 
@@ -611,16 +785,25 @@ conditions).
     changed lines are quoted, not numbered; why a failed key refuses the
     section
   - `docs/code-notes/app/models/code_highlight.md` (new): the cache key
-- **`docs/file-map.md`:** the new kind and the body partial.
+- **`docs/file-map.md`:** the new kind, `ChangeReview::File`, `KeyQuote`,
+  `ChangeReviewHelper` and the body partial.
 - **`config/locales/en.yml`:** `sections.change_review.name` ("Change
-  Review") and the placeholder.
+  Review"), the placeholder and `sections.change_review.changed_lines`.
+- **`LanguagePrompts`:** the new `change_migration` field (section 6).
+- **`docs/stored-answer-keys-plan-2026-10-27.md`:** step 3 notes that
+  `.unquoted_key_parts` takes `language:` and calls `KeyQuote`.
+- **Size:** `ChangeReview` keeps the registry answers and the prompt text,
+  under 300 lines. The matching lives in `KeyQuote` and the file value in
+  `ChangeReview::File`. If the boundary checks push the kind class over 300
+  lines, they move to a pure `ChangeReview::Boundary` that
+  `.reject_unusable!` calls.
 
 ### Stop conditions
 
 Stop and come back to the owner, without building further, if:
 
-- an existing prompt, page or request snapshot changes, other than Setup's
-  Exercise mix
+- an existing snapshot changes beyond the expected diffs listed under
+  Snapshots
 - the measured generation run truncates, or `change_review` is refused at the
   boundary on both of its first two forced runs
 - in the first 10 delivered `change_review` sections, more than 2 were
@@ -632,21 +815,23 @@ Stop and come back to the owner, without building further, if:
   flaws through, and the blind solve (section 9) is the next step.
 - any delivered file needs horizontal scrolling at 320px, or a file over 15
   lines reached the page
-- in the first 10 delivered JavaScript `change_review` sections, more than 2
-  were refused at the boundary for quote misses, which would mean Prettier's
-  rewrites defeat the quote check
+- in the first 10 `change_review` sections of either language, more than 2
+  were refused at the boundary for quote misses, which would mean the
+  formatters' rewrites defeat `KeyQuote`
 - anything in the build turns out to need a rung or a lock to decide whether
   the kind is offered
 
 ## 11. Ordering
 
-1. The stored answer keys build merges first. This kind reuses its
-   `answer_key` field shape for `code_review`, its quote check, its strip-site
-   specs and `ANSWER_KEY_MARKERS`, and its review-context key line. Building
-   `change_review` first would mean writing those pieces twice.
+1. Both stored answer keys PRs merge first. PR 1 brings the field shape,
+   the quote hook, the strip-site specs and `ANSWER_KEY_MARKERS`. PR 2 brings
+   the review-context key line and the gating that keyed grading needs
+   (Decision 1).
 2. The `code_review` length cap (a separate issue) is independent and can
    land at any time. Its `.reject_unusable!` is the same kind of check as
    section 7 here, in another kind.
-3. Then this build: the kind and its boundary, then its place in rotation,
+3. The owner decides the four questions above.
+4. Then this build: `KeyQuote` and the shared hook signature, the kind and
+   its boundary, then its place in rotation,
    then the highlighting, then the page, then the judge and grading, each
    step test-first.
