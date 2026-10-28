@@ -138,10 +138,23 @@ that kind alone through the same renderer and the same ingest —
 and `ProblemSetIngest`'s `fixed_concepts:` enforces it through
 `enforce_fixed_concepts!` at the boundary. The concept is fixed because the
 plan placed it: a retry free to choose again could drop a due retention
-check. Each retry is judged again. Rejecting the last retry, or a retry
-generation that fails for any reason (`[judge_retry_failed]`), drops the
-section. The outcome's `retry_principle`, `retry_issues`, `retry_evidence`
-and `retry_reason` are lists with one entry per judged retry, in order.
+check. Each retry is judged again. Rejecting the last retry drops the
+section. A retry whose section fails its kind's boundary check
+(`.reject_unusable!`), such as a code review snippet past its line cap,
+leaves ingest no usable section; ingest raises
+`ProviderError::UnusableSectionError`, logged as `[judge_retry_unusable]`,
+and that retry is spent and the next one starts if any are left (#605). A
+retry generation that fails for any other reason (`[judge_retry_failed]`)
+drops the section at once: a rate limit, a bad key, the deadline, invalid
+JSON, a reply that leaves the section out, or one tagged with a concept
+other than the fixed one. The owner chose to keep the last two with the
+drops. `enforce_fixed_concepts!` runs before formatting and the boundary
+checks, so a reply with both a wrong concept and an unusable section is
+refused for its concept and drops too. The outcome's `retries` counts judged retries, and
+`retry_principle`, `retry_issues`, `retry_evidence` and `retry_reason`
+are lists with one entry per judged retry, in order, so a judge solve's
+`attempt` never skips a number. `unusable_retries`, present only when a
+retry was refused, counts the refused ones.
 
 **A drop removes the key after ingest**, so no placeholder exists and every
 downstream count still derives from `active_section_keys`. The dropped keys

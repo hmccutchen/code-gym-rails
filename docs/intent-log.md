@@ -385,23 +385,22 @@ data.*
   pseudocode-to-code, read by nothing yet `#602`
   **why:** the grader has to guess what was planted, and a wrong guess looks
   like an honest miss
-  **I decided:** measure the extra tokens from my usage rows after deploy,
-  not with billed calls; after the reviews, quotes match with all
-  whitespace ignored, cleaning is its own ingest step, and the stop rule
-  counts only drafted sections of kinds that quote
+  **I decided:** measure the extra tokens from my usage rows after deploy;
+  after the reviews, quotes match ignoring whitespace, cleaning is its own
+  step, and the stop rule counts drafts of quoting kinds
 - code review's snippet capped at 40 shown lines at ingest, refused rather
   than cut `#603`
-- the rarer kinds' keys read from drafted sections, not my days `#606`
-  **why:** I'm the only user, and adding those kinds to my days would fake
-  progress
-  **I decided:** a colleague reads the drafts since I can't judge those keys,
-  and a kind with no reader stays off; the read is the main check and the
-  fixtures a guard; any keyed graded section gets the regrade as a sample;
-  every billed run waits for my approval
-- the script that drafts those kinds' sections, plan-only until I approve a
-  run `#607`
-  **I decided:** it runs on my machine against a local database, never
-  production, and writes no day, history or usage row; after the reviews,
-  only the three drafted kinds, inside a read-only transaction
-- the grader turns on code review first, gated on its read and the token
+- the rarer kinds' keys read from drafts, not my days `#606`
+  **why:** I'm the only user, and adding them to my days would fake progress
+  **I decided:** a colleague reads them, and a kind with no reader stays off;
+  the read is the main check; every billed run waits for my approval
+- the script that drafts them, plan-only until I approve a run `#607`
+  **I decided:** my machine and a local database only, writing no row; after
+  the reviews, only the three drafted kinds
+- a judged retry refused at ingest no longer costs a daily kind its second
+  retry `#609`
+  **I decided:** a refused retry spends one retry and the loop goes on;
+  rate limits, timeouts, the deadline, billing and bad replies still drop at
+  once; the retry prompt stays unchanged, left to its own issue
+- the grader turns on code review first, gated on its read and token
   cost; the drafted kinds join later `#611 open`

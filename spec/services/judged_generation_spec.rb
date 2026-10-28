@@ -41,6 +41,7 @@ RSpec.describe JudgedGeneration do
         retry_section: lambda { |retry_draft, kind, concept|
           retry_calls << [ retry_draft, kind.key, concept ]
           reply = retried_sections.fetch(kind.key) { drafted[kind.key].merge("question" => "Retried") }
+          reply = reply.length > 1 ? reply.shift : reply.first if reply.is_a?(Array)
           raise reply if reply.is_a?(Exception)
 
           reply
@@ -192,6 +193,63 @@ RSpec.describe JudgedGeneration do
     expect(judged.dropped_sections).to eq([ "challenge" ])
     expect(judged.outcomes["challenge"]).to include(retries: 0, dropped: true)
     expect(Rails.logger).to have_received(:warn).with(/\[judge_retry_failed\] user=42 section=challenge/)
+  end
+
+  describe "a retry ingest refused as unusable" do
+    def refused = ProviderError::UnusableSectionError.new("No usable section left: Code review snippet runs 52 lines, past 40")
+
+    before { allow(Rails.logger).to receive(:warn) }
+
+    it "spends one retry, logs the refusal, and drops a kind with no retry left" do
+      verdicts["challenge"] = [ reject ]
+      retried_sections["challenge"] = refused
+
+      judged = run
+
+      expect(retry_calls.size).to eq(1)
+      expect(judged.dropped_sections).to eq([ "challenge" ])
+      expect(judged.outcomes["challenge"]).to include(retries: 0, unusable_retries: 1, dropped: true, retry_principle: [])
+      expect(Rails.logger).to have_received(:warn).with(/\[judge_retry_unusable\] user=42 section=challenge: No usable section left/)
+    end
+
+    context "when the kind is one of the plan's daily kinds" do
+      let(:daily_kinds) { [ ExerciseSection::Pattern, ExerciseSection::CodeReview ] }
+
+      it "tries again with the retry it has left, and ships a kept one" do
+        verdicts["pattern"] = [ reject, { "status" => "keep" } ]
+        retried_sections["pattern"] = [ refused, drafted["pattern"].merge("question" => "Retried") ]
+
+        judged = run
+
+        expect(retry_calls.map { |call| call[1..] }).to eq([ %w[pattern service_objects] ] * 2)
+        expect(judged.problem_set["pattern"]).to include("question" => "Retried")
+        expect(judged.outcomes["pattern"]).to include(status: :keep, retries: 1, unusable_retries: 1, dropped: false,
+                                                      retry_principle: [ nil ])
+      end
+
+      it "still drops at once when the retry's reply ingest turned down for another reason, such as a wrong concept" do
+        verdicts["pattern"] = [ reject ]
+        retried_sections["pattern"] = [ ProviderError::InvalidResponseError.new("Retry for pattern returned concept \"x\", not \"service_objects\""),
+                                        drafted["pattern"] ]
+
+        judged = run
+
+        expect(retry_calls.size).to eq(1)
+        expect(judged.outcomes["pattern"]).to include(retries: 0, dropped: true)
+        expect(judged.outcomes["pattern"]).not_to have_key(:unusable_retries)
+      end
+
+      it "still drops at once when a retry fails for a provider reason" do
+        verdicts["pattern"] = [ reject ]
+        retried_sections["pattern"] = [ ProviderError::RateLimitError.new("slow down"), drafted["pattern"] ]
+
+        judged = run
+
+        expect(retry_calls.size).to eq(1)
+        expect(judged.outcomes["pattern"]).to include(retries: 0, dropped: true)
+        expect(judged.outcomes["pattern"]).not_to have_key(:unusable_retries)
+      end
+    end
   end
 
   it "keeps the draft and records the reason when the judge cannot answer" do
@@ -583,6 +641,14 @@ RSpec.describe JudgedGeneration do
 
         expect(visibility(solves)).to eq([ [ 0, false, false, "section_dropped" ], [ 1, false, false, "section_dropped" ] ])
         expect(solves.last).to have_attributes(unsolved_reason: "deadline", judge_pick: nil)
+      end
+
+      it "numbers a judged retry after a refused one as the first retry, so attempts never skip" do
+        verdicts["design_comparison"] = [ rejection, solve("keep", "b") ]
+        retried_sections["design_comparison"] = [ ProviderError::UnusableSectionError.new("No usable section left"),
+                                                  drafted["design_comparison"].merge("question" => "Retried") ]
+
+        expect(visibility(run.solves)).to eq([ [ 0, false, false, "replaced_by_retry" ], [ 1, false, true, nil ] ])
       end
 
       it "marks the draft dropped when its retry could not be generated" do

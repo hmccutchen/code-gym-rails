@@ -183,7 +183,7 @@ RSpec.describe ProblemSetIngest do
     it "reports nothing at all when the set is rejected" do
       set = { "ambiguity_hunt" => { "concept" => "invented_concept", "planted_ambiguities" => [] } }
 
-      expect { ingest(set) }.to raise_error(ProviderError::InvalidResponseError, /No usable section left/)
+      expect { ingest(set) }.to raise_error(ProviderError::UnusableSectionError, /No usable section left/)
     end
 
     describe "a section its kind refuses" do
@@ -844,6 +844,12 @@ RSpec.describe ProblemSetIngest, "fixed concepts on a retry" do
 
     expect { described_class.call(mismatch, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "n_plus_one" }) }
       .to raise_error(ProviderError::InvalidResponseError, /n_plus_one/)
+  end
+  it "refuses a wrong concept as such even when the section is also unusable, so the retry is not spent and tried again" do
+    both = { "code_review" => { "question" => "q", "snippet" => "", "concept" => "memoization" } }
+
+    expect { described_class.call(both, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: [ "code_review" ], fixed_concepts: { "code_review" => "n_plus_one" }) }
+      .to raise_error(an_instance_of(ProviderError::InvalidResponseError).and(having_attributes(message: /n_plus_one/)))
   end
   it "drops sections the retry did not ask for instead of keeping them" do
     extra = set.merge("pattern" => { "question" => "q", "concept" => "memoization" })
