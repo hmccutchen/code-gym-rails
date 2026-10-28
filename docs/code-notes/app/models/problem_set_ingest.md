@@ -27,3 +27,22 @@ A refused section is removed on its own. The next shape in its slot then resolve
 ## `#normalize_diagrams!`
 
 A diagram is rendered into an HTML data attribute, so it is held to `MermaidSource`. An unusable diagram is deleted rather than repaired.
+
+## `#key_notes`
+
+Runs last, after `ground_code_review!` has stamped the server's own
+`current_schema`, so the quote check reads the code as formatted and the
+schema as shown. Every winning section whose kind plants a key gets one note, so the
+log line count is the denominator the quote threshold needs. A key problem
+is a note, not an `Unusable`: `unusable_sections` feeds the "No usable
+section left" error and lists dropped sections, and a key problem never drops
+a section.
+
+## `#clean_planted_keys!`
+
+A step of its own, right after `reject_unusable_sections!`, over every keyed
+section in the set, including one that lost its slot. `#key_notes` reads
+winners only, but `JudgedGeneration` keeps every planned kind
+(`prune_to_expected_keys`), so a planned section an unplanned one beat still
+ships, and its key has to be clean too. Inside `.reject_unusable!` it would rely on every
+overriding kind calling `super`; here no kind can skip it.

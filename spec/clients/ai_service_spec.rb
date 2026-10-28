@@ -2098,6 +2098,7 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
+      allow(Rails.logger).to receive(:info).with(/\[planted_key\]/)
       expect(Rails.logger).to receive(:info).with(/\[set_size\]/)
       expect(Rails.logger).to receive(:info).with(/\[retention\].*offered=memoization.*honored=memoization/)
       expect(Rails.logger).to receive(:info).with(/\[difficulty_diagnostics\]/)
@@ -2110,6 +2111,7 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
+      allow(Rails.logger).to receive(:info).with(/\[planted_key\]/)
       expect(Rails.logger).to receive(:info).with(/\[set_size\]/)
       expect(Rails.logger).to receive(:info).with(/\[retention\].*offered=memoization.*honored=-.*tagged=n_plus_one/)
       expect(Rails.logger).to receive(:info).with(/\[difficulty_diagnostics\]/)
@@ -4961,6 +4963,18 @@ RSpec.describe AiService, "#generate_judged_exercise" do
                                                     judge_pick: "b", key_better: better, matched: matched, shipped: true)
       expect(judged.solves.sole.judged_section).to eq(judged.problem_set["design_comparison"])
     end
+  end
+
+  it "cleans a planned keyed section's key even when an unplanned section wins its slot, since the judged day ships it" do
+    user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :security_review, fourth: nil)
+    reply = FakeService::EXERCISE_PROBLEM_SET.deep_dup.tap { |set| set["security_review"]["answer_key"] = "a raw string" }
+    stub_const("FakeService::REPLIES", FakeService::REPLIES.merge("generate_exercise" => reply.to_json))
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.problem_set).to include("security_review")
+    expect(judged.problem_set["security_review"]).not_to have_key("answer_key")
   end
 
   it "hands back no solves from an unjudged generation" do

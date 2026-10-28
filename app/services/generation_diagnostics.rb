@@ -18,6 +18,13 @@ class GenerationDiagnostics
     end
   end
 
+  def key_notes(notes, attempt:, code_review_mode:)
+    notes.each do |note|
+      Rails.logger.info("[planted_key] answer_key=#{note.outcome} kind=#{note.key} language=#{note.language} " \
+                        "attempt=#{attempt} code_review_mode=#{code_review_mode} user=#{@user.id}")
+    end
+  end
+
   def finished(language, draft, problem_set, dropped_concepts: {}, judge: nil, unhosted: [])
     plan = draft.plan
     fourth_dropped, language_dropped = dropped_concepts

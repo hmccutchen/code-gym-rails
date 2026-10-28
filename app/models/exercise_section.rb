@@ -130,8 +130,10 @@ class ExerciseSection
       vocabulary
     end
 
+    def planted_key? = false
+
     def answer_key_fields
-      []
+      planted_key? ? [ PlantedKey::FIELD ] : []
     end
 
     def code_fields

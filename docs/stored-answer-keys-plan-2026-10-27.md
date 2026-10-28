@@ -207,6 +207,12 @@ fact.
 
 ### Step 7. Measuring the generation's added cost
 
+**The owner decided** on 2026-10-28 to measure it from usage rows instead of
+extra calls: after PR 1 deploys, a read-only query the owner approves
+compares the output tokens on the owner's `generate_exercise` usage rows
+from the week before and the week after. The plan below is kept for the
+record.
+
 - One real generation per language on the owner's key, run with
   `script/compare_models.rb generate USER_ID`. It prints problem sets
   without keys and the token counts.
@@ -261,9 +267,9 @@ the token measurement, and why `exercise_section.rb` grows by one line.
 ## Between the PRs: is the key right?
 
 1. **Wait.** Keys accumulate on real days. The quote threshold applies from
-   the first keyed day: count the `answer_key=` lines with
-   `language=ruby_rails` and a quoting kind. More than 2 `quote_missing` in
-   the first 10 stops the work, and the owner decides what's next.
+   the first keyed day: count only `attempt=draft` lines of the kinds that quote (`code_review`, `security_review`, `plan_review`) with `language=ruby_rails` (owner's decision, 2026-10-28). More than 2
+   `quote_missing` in the first 10 stops the work, and the owner decides
+   what's next. Report the `missing` count beside it.
 2. **Export the key sheet,** with the owner's approval for that export. Keep
    it outside the repository.
 3. **Read.** The owner reads the Ruby `code_review` sections. The colleague

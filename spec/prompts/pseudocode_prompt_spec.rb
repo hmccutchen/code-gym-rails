@@ -21,6 +21,12 @@ RSpec.describe PseudocodePrompt do
     expect_prompt_snapshot("pseudocode_translate__prompt", request[:prompt])
   end
 
+  it "takes only the problem statement and the pseudocode, so no section field such as its answer key can reach either request" do
+    expect(described_class.method(:critique).parameters).to eq([ %i[keyreq problem_statement], %i[keyreq pseudocode] ])
+    expect(described_class.method(:translate).parameters)
+      .to eq([ %i[keyreq problem_statement], %i[keyreq pseudocode], %i[keyreq language_label] ])
+  end
+
   it "forbids every form of silent correction in the translation's system prompt" do
     expect(described_class::TRANSLATE_SYSTEM).to match(/omits an edge case, the code omits it too/i)
       .and match(/implement the wrong thing/i)

@@ -23,7 +23,12 @@ class FakeService < AiService
       "teaching_note" => "Look at what happens to the database each time this method runs inside the loop.",
       "concept" => "n_plus_one",
       "scenario" => "a nightly loyalty-tier recalculation job",
-      "diagram" => "flowchart TD\n  A[\"Nightly job\"] --> B[\"loyalty_tier\"]\n  B --> C[(\"orders\")]"
+      "diagram" => "flowchart TD\n  A[\"Nightly job\"] --> B[\"loyalty_tier\"]\n  B --> C[(\"orders\")]",
+      "answer_key" => {
+        "issue" => "`customer.orders.sum(&:total_cents)` loads every order for each customer inside the loop.",
+        "why_it_matters" => "The nightly job runs one orders query per customer, so it slows down as the customer list grows.",
+        "fix" => "Sum the totals in one grouped query, or preload the orders before the loop."
+      }
     },
     "design_comparison" => {
       "title" => "Where shipping rates come from",
@@ -138,6 +143,11 @@ class FakeService < AiService
           end
         RUBY
         "senior_lens" => "Permit an explicit allowlist, never an inferred one."
+      },
+      "answer_key" => {
+        "vulnerability" => "`current_user.update(params[:user])` assigns every submitted attribute.",
+        "exploit" => "A user adds an admin flag to the form post and grants themselves admin rights.",
+        "mitigation" => "Update from strong params that permit only the profile fields."
       }
     },
     "parsons_problem" => {
@@ -167,7 +177,17 @@ class FakeService < AiService
       "answer_scaffold" => [
         "What's wrong:",
         "What you'd push back on before approving:"
-      ]
+      ],
+      "answer_key" => {
+        "flaws" => [
+          { "category" => "technical_anti_pattern", "flaw" => "`exactly 300 seconds` is a magic number with no stated reason.",
+            "pushback" => "Ask what staleness the page can tolerate, and name the constant after it." },
+          { "category" => "scope_creep", "flaw" => "`also add an admin-only endpoint` grows the change past the ask.",
+            "pushback" => "Ask for the endpoint as its own change, if it is needed at all." },
+          { "category" => "unflagged_behavior_change", "flaw" => "`Skip cache invalidation on profile update` shows stale data after a save.",
+            "pushback" => "Ask for invalidation on update, or for the stale window to be flagged to users." }
+        ]
+      }
     },
     "ambiguity_hunt" => {
       "title" => "Add a leaderboard to the dashboard",
@@ -189,7 +209,13 @@ class FakeService < AiService
       "problem_statement" => "Given a list of [start, end] ranges in no particular order, return the smallest list of ranges covering exactly the same span, merging any that overlap or touch. The list may be empty.",
       "question" => "Write pseudocode for this, then translate it.",
       "teaching_note" => "Think about what has to be true about the order of the ranges before any merging step can work.",
-      "concept" => "unhandled_empty_input"
+      "concept" => "unhandled_empty_input",
+      "answer_key" => {
+        "missable_requirements" => [
+          "An empty list returns an empty list; a plan that reads the first range first fails on it.",
+          "Ranges that touch merge; a plan that merges only strict overlaps leaves them apart."
+        ]
+      }
     }
   }.freeze
 

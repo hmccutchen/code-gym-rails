@@ -1,13 +1,37 @@
 # Scaffolded because the answer has two predictable parts: what's wrong, and what to push back on.
 class ExerciseSection::PlanReview < ExerciseSection
+  extend PlantedKey::Kind
+
   DEFAULT_SCAFFOLD = [
     "What's wrong:",
     "What you'd push back on before approving:"
   ].freeze
 
+  FLAW_CATEGORIES = %w[technical_anti_pattern scope_creep unflagged_behavior_change].freeze
+
+  # Only the runaway case needs bounding: the generator is asked for 2-3.
+  MAX_PLANTED_FLAWS = 4
+
   def self.default_scaffold
     DEFAULT_SCAFFOLD
   end
+
+  def self.key_context_fields = %w[plan_excerpt]
+
+  def self.quoted_key_texts(key) = Array(key&.dig("flaws")).map { |flaw| flaw["flaw"] }
+
+  def self.normalize_planted_key(section)
+    raw   = section[PlantedKey::FIELD]
+    flaws = PlantedKey.list(raw.is_a?(Hash) ? raw["flaws"] : nil, max: MAX_PLANTED_FLAWS) { |flaw| normalize_flaw(flaw) }
+    { "flaws" => flaws } if flaws.any?
+  end
+
+  def self.normalize_flaw(flaw)
+    cleaned = PlantedKey.fields(flaw, %w[flaw pushback])
+    category = flaw["category"] if cleaned && FLAW_CATEGORIES.include?(flaw["category"])
+    category ? { "category" => category }.merge(cleaned) : cleaned
+  end
+  private_class_method :normalize_flaw
 
   def self.vocabulary_key
     :plan_review
@@ -34,6 +58,7 @@ class ExerciseSection::PlanReview < ExerciseSection
     <<~GUIDANCE.chomp
       - The "#{key}" section is a PLAN REVIEW: "plan_excerpt" is a short prose implementation plan, framed as if written by an AI assistant, short enough to review in one sitting (2-4 short paragraphs or a short numbered list, never a full design doc). It must contain 2-3 planted flaws that span levels — one real technical anti-pattern, one scope-creep item, one unflagged behavior change — never three of the same category.
       - Choose the plan_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
+      - "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "title", "question", "scenario", "answer_scaffold" or "teaching_note" — doing so would give away the answer before the engineer reads the plan. Quote the plan text it points at in backticks, never by line number.
     GUIDANCE
   end
 
@@ -46,7 +71,10 @@ class ExerciseSection::PlanReview < ExerciseSection
           "question": "string — what to evaluate before approving this plan",
           "answer_scaffold": ["string — a labelled part of a complete answer to THIS review", "string — another part"],
           "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary"
+          "concept": "string — exactly one concept from the provided vocabulary",
+          "answer_key": {
+            "flaws": [{ "category": "string — #{FLAW_CATEGORIES.join(' | ')}", "flaw": "string — what is wrong, quoting the plan in backticks", "pushback": "string — what a reviewer should ask for" }, "... (one entry per planted flaw)"]
+          }
         }
     SCHEMA
   end

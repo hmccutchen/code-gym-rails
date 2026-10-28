@@ -23,6 +23,20 @@ RSpec.describe ReviewPrompt do
 
   def day_sections(entries) = entries.map { |entry| entry.slice(:key, :section, :answer, :rating).merge(section: entry[:section].merge("rounds" => {})) }
 
+  it "renders a keyed section's review exactly as it renders the same section without its key, for every kind that plants one" do
+    ExerciseSection.all.select(&:planted_key?).each do |kind|
+      keyed = FakeService::EXERCISE_PROBLEM_SET.fetch(kind.key).deep_dup.merge("rounds" => {})
+      keyless = keyed.except("answer_key")
+      render = lambda do |section|
+        [ described_class.day_system(coach: "Rails", sections: [ { key: kind.key, section: section, answer: long, rating: "right_level" } ]),
+          described_class.section_prompt(key: kind.key, section: section, answer: long, rung: "senior"),
+          described_class.walkthrough_prompt(key: kind.key, section: section, rung: "senior") ]
+      end
+
+      expect(render.call(keyed)).to eq(render.call(keyless)), "#{kind.key} changed its review once keyed"
+    end
+  end
+
   it "renders a four-section day's system prompt exactly as recorded" do
     expect_prompt_snapshot("review__day_a__system", described_class.day_system(coach: "Rails", sections: day_sections(day_a)))
   end

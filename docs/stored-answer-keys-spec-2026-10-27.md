@@ -305,7 +305,9 @@ judge never sees the key, so nothing in generation checks one.
 One check costs nothing and runs whichever option below is chosen. At
 ingest, each quote in the key (the code in `issue` or `vulnerability`, the
 plan text in `flaw`) is looked for in the formatted snippet or plan, with
-whitespace collapsed. It runs after `ProblemSetIngest#format_code!`, so it
+all whitespace removed on both sides, since the formatter adds spaces the
+provider never wrote (`{a: 1}` becomes `{ a: 1 }`); a quote under three
+characters is left unchecked. It runs after `ProblemSetIngest#format_code!`, so it
 sees the code as shown, through a per-kind hook beside `.reject_unusable!`.
 That keeps `ProblemSetIngest` free of any branch on kind. Misses travel on
 `ProblemSetIngest::Result`, and `GenerationDiagnostics` logs them as the
@@ -314,8 +316,13 @@ changes nothing. It catches a key that quotes code that isn't there. It
 can't catch a key that quotes the right line and misreads it. Prettier can
 change quotes and semicolons in JavaScript, so a miss there is a lead to
 read, not proof the key is wrong, and the threshold below counts Ruby
-sections only. More than 2 misses in the first 10 keyed Ruby sections is a
-stop condition: it would mean keys routinely quote code that isn't there.
+sections only. More than 2 misses in the first 10 is a stop condition: it
+would mean keys routinely quote code that isn't there. The count takes only
+draft lines (`attempt=draft`, so a retry doesn't count a section twice) of
+the kinds that quote, `code_review`, `security_review` and `plan_review`:
+`pseudocode_to_code` quotes nothing, so its key always passes. `missing` is
+reported beside it and doesn't stop the work. Decided by the owner on
+2026-10-28, after the build review.
 
 Options for checking what the quote check can't:
 
@@ -495,5 +502,6 @@ Stop and come back to the owner, without building further, if:
   `pseudocode_to_code`, where the keyed requirement is an essential piece
   and `solid` would mean nothing essential was missed. That would mean the
   severity rule isn't holding.
-- the quote check logs a miss on more than 2 of the first 10 keyed Ruby
-  sections, which would mean keys routinely quote code that isn't there
+- the quote check logs a miss on more than 2 of the first 10 drafted Ruby
+  sections of a quoting kind, which would mean keys routinely quote code
+  that isn't there

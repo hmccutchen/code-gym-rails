@@ -5,7 +5,9 @@ class ProblemSetIngest
 
   Unusable = Data.define(:key, :concept, :reason)
 
-  Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections)
+  KeyNote = Data.define(:key, :language, :outcome)
+
+  Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections, :key_notes)
 
   def self.call(problem_set, language:, expected_keys:, daily:, code_review_source: nil, pitched_at: nil, eased_for: {},
                 fixed_concepts: {})
@@ -39,6 +41,7 @@ class ProblemSetIngest
     prune_unplanned_slots!
     format_code!
     reject_unusable_sections!
+    clean_planted_keys!
     enforce_fixed_concepts!
     normalize_concepts!
     normalize_answer_scaffolds!
@@ -49,10 +52,32 @@ class ProblemSetIngest
     ground_code_review!
     stamp_pitched_rungs!
 
-    Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts, unusable_sections: @unusable_sections)
+    Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts, unusable_sections: @unusable_sections,
+               key_notes: key_notes)
   end
 
   private
+
+  def clean_planted_keys!
+    @problem_set.each do |key, section|
+      kind = ExerciseSection.find(key)
+      PlantedKey.store!(section, kind.normalize_planted_key(section)) if kind&.planted_key? && section.is_a?(Hash)
+    end
+  end
+
+  # Last, so the quote check reads the code as formatted and the schema the server stamped; winners only, the sample measured.
+  def key_notes
+    resolved_keys.filter_map do |key|
+      kind = ExerciseSection.for(key)
+      KeyNote.new(key: key, language: @language, outcome: key_outcome(kind, @problem_set[key])) if kind.planted_key?
+    end
+  end
+
+  def key_outcome(kind, section)
+    return "missing" unless section.key?(PlantedKey::FIELD)
+
+    kind.unquoted_key_parts(section).empty? ? "ok" : "quote_missing"
+  end
 
   def format_code!
     fields = @problem_set.flat_map do |key, section|

@@ -331,6 +331,17 @@ RSpec.describe JudgedGeneration do
     end
   end
 
+  it "keeps a code review's planted key unchanged through a prose edit" do
+    key = FakeService::EXERCISE_PROBLEM_SET.dig("code_review", "answer_key")
+    drafted["code_review"] = drafted["code_review"].merge("answer_key" => key)
+    verdicts["code_review"] = [ { "status" => "edit", "issues" => [ { "type" => "padding", "evidence" => "x" } ],
+                                  "fields" => { "question" => "Edited question?" } } ]
+
+    judged = run
+
+    expect(judged.problem_set["code_review"]).to include("question" => "Edited question?", "answer_key" => key)
+  end
+
   it "leaves the draft's own problem set untouched" do
     verdicts["pattern"] = [ reject, reject ]
 

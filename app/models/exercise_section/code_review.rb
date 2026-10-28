@@ -1,4 +1,14 @@
 class ExerciseSection::CodeReview < ExerciseSection
+  extend PlantedKey::Kind
+
+  KEY_FIELDS = %w[issue why_it_matters fix].freeze
+
+  def self.key_context_fields = %w[snippet current_schema]
+
+  def self.quoted_key_texts(key) = [ key&.dig("issue") ]
+
+  def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
+
   def self.diagrammable?
     true
   end
@@ -32,6 +42,7 @@ class ExerciseSection::CodeReview < ExerciseSection
     <<~GUIDANCE.chomp
       #{source ? source.instruction : content_instruction(label, mode, artifact, test_framework)}
       - Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
+      - "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "question", "scenario", "teaching_note" or "diagram" — doing so would give away the answer before the engineer reads the snippet. Quote the code it points at in backticks, never by line number.
     GUIDANCE
   end
 
@@ -56,7 +67,12 @@ class ExerciseSection::CodeReview < ExerciseSection
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary",
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-          "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help"
+          "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help",
+          "answer_key": {
+            "issue":          "string — what is wrong and where, quoting the code in backticks",
+            "why_it_matters": "string — what goes wrong because of it in this code",
+            "fix":            "string — a fix that works as written"
+          }
         }
     SCHEMA
   end
