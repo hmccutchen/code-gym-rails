@@ -91,6 +91,24 @@ container so the collapse can measure the nav in its own text size.
 Containment makes `nav` a stacking context, and the `z-index` keeps the open
 menu above the dashboard's sticky progress bar.
 
+`nav` pads itself by the side safe-area insets, so the box the collapse
+measures is the width beside a landscape phone's notches. Its `.inner` is a
+`.container`, whose padding already counts the inset, so `.inner` subtracts
+it again: its padding is `--container-pad-left` minus the inset, which is
+the container's own gutter less whatever the nav already padded. The brand
+and the last link then sit `max(1.5rem, inset)` from the screen edge
+(`max(2rem, inset)` from 1024px), the same as a full-width page, and a
+Pro Max in landscape lines up with the page at 932px (#553). Dropping the
+nav's padding instead would have widened the measured box by both notches
+and left the links less room at the collapse point. Below 900px the nav row
+still spans the full width while a page's column stops at 800px, so at
+844px the brand sits about 22px left of the content, notch or not.
+
+`desktop.css` caps `nav .inner` at 1040px plus `--container-pad-*`, which
+still include the inset. On a window with side insets the nav's content
+would be wider than the page's 1040px by both insets, but the cap only
+applies past 1040px plus the gutters, wider than any phone in landscape.
+
 ## Palette tokens beyond the base colors
 
 `--surface-raised` is the fill for a hovered or current nav link and for a
