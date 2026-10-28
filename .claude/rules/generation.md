@@ -2,7 +2,7 @@
 paths:
   - "app/clients/{ai_service,fake_service,caller_zone_thread}.rb"
   - "app/prompts/{generation_prompt,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt}.rb"
-  - "app/models/problem_set_ingest.rb"
+  - "app/models/{problem_set_ingest,planted_key}.rb"
   - "app/services/{judged_generation,exercise_draft}.rb"
   - "app/prompts/generation_prompt/**"
   - "app/services/judged_generation/**"
@@ -12,7 +12,7 @@ paths:
   - "app/clients/code_format/**"
   - "app/jobs/{generate_daily_exercises_job,regenerate_exercise_job}.rb"
   - "app/views/responses/bodies/**"
-  - "script/{compare_models,model_comparison,forced_concept_drafts,solve_agreement,report_answer_positions,answer_position_balance}.rb"
+  - "script/{compare_models,model_comparison,forced_concept_drafts,solve_agreement,report_answer_positions,answer_position_balance,key_sheet_export}.rb"
   - "spec/fixtures/judge/**"
   - "spec/**/*{ai_service,judged_generation,exercise_draft,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt,problem_set_ingest,exercise_section,real_source,judge_verdict,code_format,concept_vocabulary,generate_daily_exercises,regenerate_exercise}*"
   - "app/models/{daily_plan,section_rotation,section_count,day_hosts}.rb"
@@ -136,3 +136,15 @@ read it before changing that area.
   so a planted defect survives; JavaScript uses Prettier. Unparseable code or
   a formatter that cannot run comes back unchanged, and Parsons blocks are
   never formatted.
+- **Stored answer keys** (`docs/decisions/stored-answer-keys.md`):
+  `code_review`, `security_review`, `plan_review` and `pseudocode_to_code`
+  plant a key under `answer_key` (`.planted_key?`), each in its own shape,
+  quoting code or plan text in backticks. `ExerciseSection.reject_unusable!`
+  stores it cleaned through `PlantedKey`, or deletes an unusable one and
+  keeps the section. Nothing reads it yet: not the grader, the page, the
+  judge or any prompt, and specs pin each place. `ProblemSetIngest` notes
+  every keyed section last, as `ok`, `missing` or `quote_missing` (a quote
+  the shown code or plan doesn't contain; the key stays), and
+  `GenerationDiagnostics` logs one `[planted_key]` line per note with no key
+  text. Strip sites read `ExerciseSection.all_answer_key_fields`, which
+  stays at two entries.

@@ -207,6 +207,12 @@ fact.
 
 ### Step 7. Measuring the generation's added cost
 
+**The owner decided** on 2026-10-28 to measure it from usage rows instead of
+extra calls: after PR 1 deploys, a read-only query the owner approves
+compares the output tokens on the owner's `generate_exercise` usage rows
+from the week before and the week after. The plan below is kept for the
+record.
+
 - One real generation per language on the owner's key, run with
   `script/compare_models.rb generate USER_ID`. It prints problem sets
   without keys and the token counts.

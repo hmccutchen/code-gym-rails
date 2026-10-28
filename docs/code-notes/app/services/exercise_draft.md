@@ -36,3 +36,10 @@ here never breaks generation. Each write goes through the provider's
 so a script's service subclass can override that method to keep a comparison
 run from writing `SuggestedConcept` rows (`script/model_comparison.rb`,
 `script/concept_reference_calibration.rb`).
+
+## Key notes on a retry
+
+`.retry_section` returns only the retried section, so it logs the ingest
+result's key notes itself before returning. Otherwise a retried keyed
+section would go missing from the `[planted_key]` lines the quote threshold
+is counted from.
