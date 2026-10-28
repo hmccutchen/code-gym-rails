@@ -23,3 +23,6 @@ It reads inside `ReviewBaselineExport.read_only`, and its output, like the
 baseline export's, is saved outside the repository and deleted after the
 read. The key sheet is its own export with its own approval: approving the
 baseline export doesn't cover it.
+
+`.entry` is a class method so `KeySampleDrafts` writes drafted sections in the
+same shape, and the reader gets one format from either source.
