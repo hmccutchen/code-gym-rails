@@ -100,20 +100,20 @@ RSpec.describe ProblemSetIngest do
     end
 
     it "stamps the server's scenario over whatever the provider wrote" do
-      set = grounded({ "code_review" => { "concept" => "memoization", "scenario" => "inventory restocking service" } },
+      set = grounded({ "code_review" => { "snippet" => "x = 1", "concept" => "memoization", "scenario" => "inventory restocking service" } },
                      source: excerpt)
 
       expect(set["code_review"]["scenario"]).to eq(excerpt.scenario)
     end
 
     it "leaves the trace the next pick reads" do
-      set = grounded({ "code_review" => { "concept" => "memoization" } }, source: excerpt)
+      set = grounded({ "code_review" => { "snippet" => "x = 1", "concept" => "memoization" } }, source: excerpt)
 
       expect(set["code_review"]["source"]).to eq(excerpt.id)
     end
 
     it "leaves the provider's scenario alone on a toy day" do
-      set = grounded({ "code_review" => { "concept" => "memoization", "scenario" => "inventory restocking service" } },
+      set = grounded({ "code_review" => { "snippet" => "x = 1", "concept" => "memoization", "scenario" => "inventory restocking service" } },
                      source: nil)
 
       expect(set["code_review"]["scenario"]).to eq("inventory restocking service")
@@ -121,7 +121,7 @@ RSpec.describe ProblemSetIngest do
     end
 
     it "strips a provider-supplied source on a toy day, so a set that never showed an excerpt cannot mark it seen" do
-      set = grounded({ "code_review" => { "concept" => "memoization", "source" => excerpt.id } }, source: nil)
+      set = grounded({ "code_review" => { "snippet" => "x = 1", "concept" => "memoization", "source" => excerpt.id } }, source: nil)
 
       expect(set["code_review"]).not_to have_key("source")
     end
@@ -135,27 +135,27 @@ RSpec.describe ProblemSetIngest do
       end
 
       it "stamps the server's own on a grounded migration day" do
-        set = grounded({ "code_review" => { "concept" => "wrong_cardinality", "current_schema" => "invented" } },
+        set = grounded({ "code_review" => { "snippet" => "x = 1", "concept" => "wrong_cardinality", "current_schema" => "invented" } },
                        source: migration)
 
         expect(set["code_review"]["current_schema"]).to eq(migration.current_schema)
       end
 
       it "strips a provider-supplied one on a toy day" do
-        set = grounded({ "code_review" => { "concept" => "memoization", "current_schema" => "invented" } }, source: nil)
+        set = grounded({ "code_review" => { "snippet" => "x = 1", "concept" => "memoization", "current_schema" => "invented" } }, source: nil)
 
         expect(set["code_review"]).not_to have_key("current_schema")
       end
 
       it "strips a provider-supplied one on a method day, which has no table" do
-        set = grounded({ "code_review" => { "concept" => "memoization", "current_schema" => "invented" } },
+        set = grounded({ "code_review" => { "snippet" => "x = 1", "concept" => "memoization", "current_schema" => "invented" } },
                        source: excerpt)
 
         expect(set["code_review"]).not_to have_key("current_schema")
       end
 
       it "strips a provider-supplied one from every other section, leaving the stamp alone" do
-        set = grounded({ "code_review" => { "concept" => "wrong_cardinality" },
+        set = grounded({ "code_review" => { "snippet" => "x = 1", "concept" => "wrong_cardinality" },
                          "pattern" => { "concept" => "memoization", "current_schema" => "invented" } },
                        source: migration)
 
@@ -167,7 +167,7 @@ RSpec.describe ProblemSetIngest do
 
   describe ".call" do
     it "returns the cleaned problem set and the concepts it could not place" do
-      result = ingest({ "code_review" => { "concept" => "not_a_real_concept" } })
+      result = ingest({ "code_review" => { "snippet" => "x = 1", "concept" => "not_a_real_concept" } })
 
       expect(result.problem_set["code_review"]["concept"]).to eq("other")
       expect(result.suggested_concepts.map(&:name)).to eq([ "not_a_real_concept" ])
@@ -175,7 +175,7 @@ RSpec.describe ProblemSetIngest do
     end
 
     it "reports no suggestions when every concept is on its vocabulary" do
-      result = ingest({ "code_review" => { "concept" => "n_plus_one" } })
+      result = ingest({ "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" } })
 
       expect(result.suggested_concepts).to be_empty
     end
@@ -188,7 +188,7 @@ RSpec.describe ProblemSetIngest do
 
     describe "a section its kind refuses" do
       it "leaves only that section out and reports it with its concept and the check's reason" do
-        hunt = { "code_review" => { "concept" => "n_plus_one" },
+        hunt = { "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" },
                  "ambiguity_hunt" => { "concept" => "missing_success_criteria", "planted_ambiguities" => [] } }
         result = ingest(hunt)
 
@@ -200,7 +200,7 @@ RSpec.describe ProblemSetIngest do
       end
 
       it "checks the lower-precedence shape that takes a refused section's slot" do
-        pseudo = { "code_review" => { "concept" => "n_plus_one" },
+        pseudo = { "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" },
                    "ambiguity_hunt" => { "concept" => "missing_success_criteria", "planted_ambiguities" => [] },
                    "pseudocode_to_code" => { "concept" => "x", "problem_statement" => " " } }
         result = ingest(pseudo)
@@ -210,7 +210,7 @@ RSpec.describe ProblemSetIngest do
       end
 
       it "keeps a requested, usable lower-precedence shape when an unrequested one above it is refused" do
-        pseudo = { "code_review" => { "concept" => "n_plus_one" },
+        pseudo = { "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" },
                    "ambiguity_hunt" => { "concept" => "missing_success_criteria", "planted_ambiguities" => [] },
                    "pseudocode_to_code" => { "concept" => "x", "problem_statement" => "Write the function" } }
         result = described_class.call(pseudo, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review pseudocode_to_code])
@@ -220,7 +220,7 @@ RSpec.describe ProblemSetIngest do
       end
 
       it "reports no concept when the refused section's tag is off its vocabulary" do
-        result = ingest({ "code_review" => { "concept" => "n_plus_one" },
+        result = ingest({ "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" },
                           "pseudocode_to_code" => { "concept" => "invented", "problem_statement" => "" } })
 
         expect(result.unusable_sections.sole.concept).to be_nil
@@ -232,12 +232,12 @@ RSpec.describe ProblemSetIngest do
       end
 
       it "reports nothing for a set with nothing to refuse" do
-        expect(ingest({ "code_review" => { "concept" => "n_plus_one" } }).unusable_sections).to eq([])
+        expect(ingest({ "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" } }).unusable_sections).to eq([])
       end
     end
 
     it "writes no SuggestedConcept rows of its own" do
-      expect { ingest({ "code_review" => { "concept" => "invented_concept" } }) }
+      expect { ingest({ "code_review" => { "snippet" => "x = 1", "concept" => "invented_concept" } }) }
         .not_to change(SuggestedConcept, :count)
     end
   end
@@ -253,7 +253,7 @@ RSpec.describe ProblemSetIngest do
   describe ".prune_to_expected_keys" do
     it "returns a deep-duped set containing only the expected keys" do
       drafted = {
-        "code_review" => { "concept" => "n_plus_one" },
+        "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" },
         "parsons_problem" => {
           "concept" => "memoization",
           "blocks" => [ "one", "two", "three", "four" ],
@@ -328,7 +328,7 @@ RSpec.describe ProblemSetIngest do
       end
 
       def refusal_of(hunt)
-        ingest({ "code_review" => { "concept" => "n_plus_one" } }.merge(hunt)).unusable_sections.map(&:reason)
+        ingest({ "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" } }.merge(hunt)).unusable_sections.map(&:reason)
       end
 
       it "leaves the hunt out when the field is missing entirely" do
@@ -394,7 +394,7 @@ RSpec.describe ProblemSetIngest do
 
       it "leaves the section out when the statement is blank or not a string" do
         [ nil, "   ", 42, [ "merge ranges" ] ].each do |statement|
-          result = ingest({ "code_review" => { "concept" => "n_plus_one" } }.merge(pseudocode(statement)))
+          result = ingest({ "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" } }.merge(pseudocode(statement)))
 
           expect(result.problem_set).not_to have_key("pseudocode_to_code")
           expect(result.unusable_sections.map(&:reason)).to contain_exactly(/no usable problem_statement/)
@@ -434,7 +434,7 @@ RSpec.describe ProblemSetIngest do
     describe "concepts" do
       it "keeps on-list concepts and maps off-list ones to 'other'" do
         set = {
-          "code_review" => { "concept" => "n_plus_one" },
+          "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" },
           "pattern" => { "concept" => "N+1 Queries!!" },
           "challenge" => { "question" => "no concept key" }
         }
@@ -446,7 +446,7 @@ RSpec.describe ProblemSetIngest do
 
       it "validates against the JS vocabulary when language is javascript" do
         set = {
-          "code_review" => { "concept" => "closures" },
+          "code_review" => { "snippet" => "x = 1", "concept" => "closures" },
           "pattern" => { "concept" => "n_plus_one" }
         }
         out = step(set, language: "javascript")
@@ -463,7 +463,7 @@ RSpec.describe ProblemSetIngest do
       end
 
       it "reports no suggestion for an on-list concept" do
-        expect(ingest({ "code_review" => { "concept" => "n_plus_one" } }).suggested_concepts).to be_empty
+        expect(ingest({ "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" } }).suggested_concepts).to be_empty
       end
 
       it "reports no suggestion for a section with no concept key" do
@@ -472,7 +472,7 @@ RSpec.describe ProblemSetIngest do
 
       it "validates the architecture section against ARCHITECTURE_CONCEPTS regardless of language" do
         set = {
-          "code_review"  => { "concept" => "n_plus_one" },
+          "code_review"  => { "snippet" => "x = 1", "concept" => "n_plus_one" },
           "architecture" => { "concept" => "service_boundaries" }
         }
         out = step(set, language: "javascript")
@@ -497,7 +497,7 @@ RSpec.describe ProblemSetIngest do
 
       it "validates the security_review section against that language's security_concepts, not the full vocabulary" do
         set = {
-          "code_review"     => { "concept" => "memoization" },
+          "code_review"     => { "snippet" => "x = 1", "concept" => "memoization" },
           "security_review" => { "concept" => "sql_injection_prevention" }
         }
         out = step(set, language: "ruby_rails")
@@ -559,7 +559,7 @@ RSpec.describe ProblemSetIngest do
       end
 
       it "strips a scaffold the model volunteered for an unscaffolded section" do
-        set = { "code_review" => { "answer_scaffold" => [ "Nope:" ] } }
+        set = { "code_review" => { "snippet" => "x = 1", "answer_scaffold" => [ "Nope:" ] } }
 
         expect(step(set)["code_review"]).not_to have_key("answer_scaffold")
       end
@@ -573,7 +573,7 @@ RSpec.describe ProblemSetIngest do
 
     describe "diagrams" do
       it "keeps a usable diagram on a diagrammable section" do
-        set = { "code_review" => { "diagram" => "  flowchart TD\n  A[Job] --> B[(DB)]  " } }
+        set = { "code_review" => { "snippet" => "x = 1", "diagram" => "  flowchart TD\n  A[Job] --> B[(DB)]  " } }
 
         expect(step(set)["code_review"]["diagram"])
           .to eq("flowchart TD\n  A[Job] --> B[(DB)]")
@@ -617,7 +617,7 @@ RSpec.describe ProblemSetIngest do
   describe "the intended set as a contract" do
     let(:full_set) do
       {
-        "code_review" => { "concept" => "n_plus_one" },
+        "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" },
         "pattern"     => { "concept" => "memoization" }
       }
     end
@@ -728,6 +728,17 @@ RSpec.describe ProblemSetIngest, "formatting code" do
     result = described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: set.keys)
 
     expect(result.unusable_sections.map(&:key)).to eq([ "design_comparison" ])
+  end
+
+  it "counts a code review's snippet after formatting, so code the formatter shortens is kept" do
+    long_before_formatting = Array.new(ExerciseSection::CodeReview::MAX_SNIPPET_LINES + 1, "x = 1").join("\n")
+    allow(CodeFormat).to receive(:all) { |snippets, **| snippets.map { |code| code.lines.first(5).join } }
+    set = { "code_review" => FakeService::EXERCISE_PROBLEM_SET.fetch("code_review").deep_dup.merge("snippet" => long_before_formatting) }
+
+    result = described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: set.keys)
+
+    expect(result.unusable_sections).to be_empty
+    expect(result.problem_set["code_review"]["snippet"].lines.size).to eq(5)
   end
 
   it "passes nothing when no section carries code" do
@@ -877,7 +888,7 @@ RSpec.describe ProblemSetIngest, "with the second fixed kind" do
 
     it "leaves the comparison out when a piece or the answer key is unusable" do
       { comparison("other_piece" => "") => /other_piece/, comparison("answer_key" => {}) => /answer key/ }.each do |section, reason|
-        result = described_class.call({ "code_review" => { "concept" => "n_plus_one" }, "design_comparison" => section },
+        result = described_class.call({ "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" }, "design_comparison" => section },
                                       language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: %w[code_review design_comparison])
 
         expect(result.problem_set.keys).to eq([ "code_review" ])
@@ -924,7 +935,7 @@ RSpec.describe ProblemSetIngest, "with the second fixed kind" do
     end
 
     it "keeps an unrequested extra when the day still has room" do
-      set = { "code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" } }
+      set = { "code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" } }
       result = described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: [ "code_review" ]).problem_set
 
       expect(result.keys).to eq(%w[code_review pattern])

@@ -1706,7 +1706,7 @@ RSpec.describe AiService do
 
     it "runs on generation, so a bad diagram never reaches a persisted problem set" do
       svc = double_class.new(canned_text: full_problem_set(
-        "code_review" => { "question" => "q", "concept" => "n_plus_one", "diagram" => "x" * 5_000 },
+        "code_review" => { "snippet" => "x = 1", "question" => "q", "concept" => "n_plus_one", "diagram" => "x" * 5_000 },
         "pattern"     => { "question" => "q", "concept" => "memoization", "diagram" => "flowchart TD\n  A --> B" }
       ).to_json)
 
@@ -1718,7 +1718,7 @@ RSpec.describe AiService do
 
     it "drops a section ingest refused on the single-stage path, records it, and logs the reason only" do
       broken = design_comparison_section.merge("other_piece" => "", "scenario" => "SECRET scenario text")
-      svc = double_class.new(canned_text: full_problem_set("code_review" => { "concept" => "n_plus_one" },
+      svc = double_class.new(canned_text: full_problem_set("code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" },
                                                            "design_comparison" => broken).to_json)
       logged = []
       allow(Rails.logger).to receive(:warn) { |message| logged << message }
@@ -1735,7 +1735,7 @@ RSpec.describe AiService do
 
     it "writes the SuggestedConcept rows ingest reports" do
       svc = double_class.new(canned_text: full_problem_set(
-        "code_review" => { "question" => "q", "concept" => "Invented Concept!!" }
+        "code_review" => { "snippet" => "x = 1", "question" => "q", "concept" => "Invented Concept!!" }
       ).to_json)
 
       expect { svc.generate_exercise(user) }.to change(SuggestedConcept, :count).by(1)
@@ -1746,7 +1746,7 @@ RSpec.describe AiService do
     it "swallows a recording failure and still returns the problem set" do
       allow(SuggestedConcept).to receive(:record!).and_raise(StandardError, "db down")
       svc = double_class.new(canned_text: full_problem_set(
-        "code_review" => { "question" => "q", "concept" => "Invented Concept!!" }
+        "code_review" => { "snippet" => "x = 1", "question" => "q", "concept" => "Invented Concept!!" }
       ).to_json)
 
       allow(Rails.logger).to receive(:warn)
@@ -1760,28 +1760,31 @@ RSpec.describe AiService do
         .with(hash_including(name: "First Invention!!")).and_raise(StandardError, "db down")
 
       svc = double_class.new(canned_text: full_problem_set(
-        "code_review" => { "question" => "q", "concept" => "First Invention!!" },
+        "code_review" => { "snippet" => "x = 1", "question" => "q", "concept" => "First Invention!!" },
         "pattern"     => { "title" => "t", "concept" => "Second Invention!!" }
       ).to_json)
 
       allow(Rails.logger).to receive(:warn)
 
       expect { svc.generate_exercise(user) }.to change(SuggestedConcept, :count).by(1)
+      expect(SuggestedConcept).to have_received(:record!).with(hash_including(name: "First Invention!!"))
       expect(SuggestedConcept.last.display_name).to eq("Second Invention!!")
     end
 
     it "records each suggestion through #record_suggested_concept, so a script's service can keep its runs from recording" do
-      quiet = Class.new(double_class) { define_method(:record_suggested_concept) { |_suggestion| } }
+      handed = []
+      quiet = Class.new(double_class) { define_method(:record_suggested_concept) { |suggestion| handed << suggestion } }
       svc = quiet.new(canned_text: full_problem_set(
-        "code_review" => { "question" => "q", "concept" => "Invented Concept!!" }
+        "code_review" => { "snippet" => "x = 1", "question" => "q", "concept" => "Invented Concept!!" }
       ).to_json)
 
       expect { svc.generate_exercise(user) }.not_to change(SuggestedConcept, :count)
+      expect(handed.map(&:name)).to eq([ "Invented Concept!!" ])
     end
 
     it "propagates an ingest rejection as a generation failure" do
       svc = double_class.new(canned_text: {
-        "code_review"    => { "question" => "q", "concept" => "n_plus_one" },
+        "code_review"    => { "snippet" => "x = 1", "question" => "q", "concept" => "n_plus_one" },
         "ambiguity_hunt" => { "request" => "vague", "planted_ambiguities" => [] }
       }.to_json)
 
@@ -1798,7 +1801,7 @@ RSpec.describe AiService do
 
     it "writes no suggestion when ingest rejects the set" do
       svc = double_class.new(canned_text: {
-        "code_review"    => { "question" => "q", "concept" => "Invented Concept!!" },
+        "code_review"    => { "snippet" => "x = 1", "question" => "q", "concept" => "Invented Concept!!" },
         "ambiguity_hunt" => { "request" => "vague", "planted_ambiguities" => [] }
       }.to_json)
 
@@ -1947,7 +1950,7 @@ RSpec.describe AiService do
     end
 
     it "logs usage and normalizes concepts from the provider's response using the resolved language" do
-      set = full_problem_set("code_review" => { "concept" => "bogus" })
+      set = full_problem_set("code_review" => { "snippet" => "x = 1", "concept" => "bogus" })
       svc = double_class.new(canned_text: set.to_json, input_tokens: 5, output_tokens: 7)
 
       result = svc.generate_exercise(user)
@@ -1960,7 +1963,7 @@ RSpec.describe AiService do
     end
 
     it "normalizes against the JS vocabulary when an explicit javascript language is passed" do
-      set = full_problem_set("code_review" => { "concept" => "closures" })
+      set = full_problem_set("code_review" => { "snippet" => "x = 1", "concept" => "closures" })
       svc = double_class.new(canned_text: set.to_json)
 
       result = svc.generate_exercise(user, language: "javascript")
@@ -1970,7 +1973,7 @@ RSpec.describe AiService do
 
     it "defaults language to the user's language_for_today when not passed explicitly" do
       user.update!(language: "javascript")
-      set = full_problem_set("code_review" => { "concept" => "closures" })
+      set = full_problem_set("code_review" => { "snippet" => "x = 1", "concept" => "closures" })
       svc = double_class.new(canned_text: set.to_json)
 
       result = svc.generate_exercise(user)
@@ -2094,7 +2097,7 @@ RSpec.describe AiService do
 
     it "logs offered and honored when the model used the due concept" do
       due_mastery
-      set = full_problem_set("code_review" => { "concept" => "memoization" })
+      set = full_problem_set("code_review" => { "snippet" => "x = 1", "concept" => "memoization" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
@@ -2107,7 +2110,7 @@ RSpec.describe AiService do
 
     it "logs an empty honored list when the model ignored the due concept" do
       due_mastery
-      set = full_problem_set("code_review" => { "concept" => "n_plus_one" })
+      set = full_problem_set("code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
@@ -2160,7 +2163,7 @@ RSpec.describe AiService do
 
     it "logs what was requested and what was delivered on every generation" do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
-      set = full_problem_set("code_review" => { "concept" => "memoization", "title" => "t", "question" => "q" })
+      set = full_problem_set("code_review" => { "snippet" => "x = 1", "concept" => "memoization", "title" => "t", "question" => "q" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "reduced" } ])
 
@@ -2292,7 +2295,7 @@ RSpec.describe AiService do
       allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:real)
       excerpt = RealSource::APPLICATION_CODE.first
 
-      set = full_problem_set("code_review" => { "concept" => "memoization", "scenario" => "inventory restocking service" })
+      set = full_problem_set("code_review" => { "snippet" => "x = 1", "concept" => "memoization", "scenario" => "inventory restocking service" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 

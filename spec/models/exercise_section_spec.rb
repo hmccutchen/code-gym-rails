@@ -666,11 +666,18 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".shown_lines" do
+    it "is for the kinds' own boundary checks, not a question the registry answers" do
+      expect(described_class.private_methods).to include(:shown_lines)
+      expect(ExerciseSection::CodeReview.respond_to?(:shown_lines)).to be(false)
+    end
+  end
+
   describe ".reject_unusable!" do
     it "leaves a section of a kind with nothing to refuse untouched" do
       section = { "question" => "" }
 
-      (described_class.all - [ ExerciseSection::AmbiguityHunt, ExerciseSection::PseudocodeToCode,
+      (described_class.all - [ ExerciseSection::AmbiguityHunt, ExerciseSection::PseudocodeToCode, ExerciseSection::CodeReview,
                                ExerciseSection::DesignComparison ]).each do |kind|
         expect { kind.reject_unusable!(section) }.not_to change { section }
       end

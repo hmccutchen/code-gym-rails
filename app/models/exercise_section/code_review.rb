@@ -1,13 +1,26 @@
+# Design notes: docs/code-notes/app/models/exercise_section/code_review.md
 class ExerciseSection::CodeReview < ExerciseSection
   extend PlantedKey::Kind
 
   KEY_FIELDS = %w[issue why_it_matters fix].freeze
+
+  MAX_SNIPPET_LINES = RealSource::MAX_LINES
 
   def self.key_context_fields = %w[snippet current_schema]
 
   def self.quoted_key_texts(key) = [ key&.dig("issue") ]
 
   def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
+
+  def self.reject_unusable!(section)
+    snippet = section["snippet"]
+    raise ProviderError::InvalidResponseError, "Code review returned no usable snippet" unless snippet.is_a?(String) && snippet.strip.present?
+
+    lines = shown_lines(snippet)
+    return if lines <= MAX_SNIPPET_LINES
+
+    raise ProviderError::InvalidResponseError, "Code review snippet runs #{lines} lines, past #{MAX_SNIPPET_LINES}"
+  end
 
   def self.diagrammable?
     true
