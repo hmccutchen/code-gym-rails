@@ -389,3 +389,10 @@ data.*
   not with billed calls; after the reviews, quotes match with all
   whitespace ignored, cleaning is its own ingest step, and the stop rule
   counts only drafted sections of kinds that quote
+- the rarer kinds' keys read from drafted sections, not my days `#606 open`
+  **why:** I'm the only user, and adding those kinds to my days would fake
+  progress
+  **I decided:** a colleague reads the drafts since I can't judge those keys,
+  and a kind with no reader stays off; the read is the main check and the
+  fixtures a guard; any keyed graded section gets the regrade as a sample;
+  every billed run waits for my approval
