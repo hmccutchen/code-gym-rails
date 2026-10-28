@@ -1,5 +1,7 @@
 require_relative "solve_agreement"
 require_relative "forced_concept_drafts"
+require_relative "review_baseline_export"
+require_relative "review_stability"
 
 # Design notes: docs/code-notes/script/model_comparison.md
 class ModelComparison
@@ -30,6 +32,8 @@ class ModelComparison
     "gemini" => { service: GeminiService, key_variable: "GEMINI_API_KEY" }
   }.freeze
   JUDGE_SHAPE_OUTCOMES = %i[invalid_output truncated solved other_error].freeze
+
+  APPROX_CHARS_PER_TOKEN = 4
 
   CALIBRATION_EXPECTED = {
     "complete" => %w[solid strong],
@@ -145,6 +149,24 @@ class ModelComparison
       @out.puts "=== review_calibration: #{route[:model]} ==="
       rows = fixtures.map { |fixture| calibration_row(route, user, fixture) }
       print_calibration_summary(route, rows)
+    end
+  end
+
+  def review_stability(path, runs: ReviewStability::RUNS, provider: "claude", run: false)
+    entries       = ReviewBaselineExport.entries(JSON.parse(File.read(path)))
+    service_class = JUDGE_SHAPE_PROVIDERS.fetch(provider)[:service]
+    route         = service_class.new(@api_key).send(:route_for, "review_response")
+    usage         = []
+    service       = pinned_service(route, usage, provider: service_class)
+    report        = ReviewStability.new(out: @out)
+
+    ReviewBaselineExport.read_only do
+      next report.print_plan(entries, runs: runs, route: route, estimate: stability_estimate(service, route, entries, runs)) unless run
+
+      rows, stopped = stability_rows(service, entries, runs)
+      report.print_report(rows, runs: runs, route: route, regrade_provider: service_class.provider_key,
+                                cost_line: stability_cost_line(service, route, usage))
+      @out.puts "stopped early, after #{rows.size} of #{entries.size} sections: #{stopped}" if stopped
     end
   end
 
@@ -455,7 +477,7 @@ class ModelComparison
         next unless review.is_a?(Hash) && ExerciseSection.keys.include?(section)
 
         { label: "#{response.date} #{section}", kind: ExerciseSection.for(section), coach: coach,
-          review: review.merge(review.fetch(ReviewProseVerdict::ORIGINAL_KEY, {})) }
+          review: ReviewProseVerdict.as_graded(review) }
       end
     end
   end
@@ -608,12 +630,74 @@ class ModelComparison
   end
 
   def graded_review(service, response, exercise, section)
+    result = grade_result(service, response, exercise, section)
+    result[:ok] ? result[:review] : failed_grade(result)
+  end
+
+  def grade_result(service, response, exercise, section)
     provider = service.review_grading_provider
     coach    = LanguagePrompts.for(exercise.language)[:coach]
-    _, result = ReviewGrading.grade_section(section, context: provider.day_context.call(coach, exercise, response), user: response.user,
-                                            exercise: exercise, response: response, coach: coach, provider: provider)
+    ReviewGrading.grade_section(section, context: provider.day_context.call(coach, exercise, response), user: response.user,
+                                exercise: exercise, response: response, coach: coach, provider: provider).last
+  end
 
-    result[:ok] ? result[:review] : failed_grade(result)
+  def stability_rows(service, entries, runs)
+    rows = []
+    entries.each { |entry| rows << stability_row(service, entry, runs) }
+    [ rows, nil ]
+  rescue ReviewStability::Stop => e
+    [ rows, e.message ]
+  end
+
+  def stability_row(service, entry, runs)
+    ratings = Array.new(runs) { stability_grade(service, entry) }.map { |result| ReviewStability.usable_rating(result[:review]) }
+    ReviewStability::Row.new(date: entry.date, section: entry.section, rung: entry.rung, stored_rating: entry.stored_rating,
+                             stored_provider: entry.review_provider, ratings: ratings, failures: ratings.count(nil))
+  end
+
+  def stability_grade(service, entry)
+    result = grade_result(service, entry.response, entry.exercise, entry.section)
+    raise ReviewStability::Stop, failed_grade(result) if !result[:ok] && ReviewStability::STOP_FAILURES.include?(result[:failure].to_s)
+
+    result
+  end
+
+  def stability_estimate(service, route, entries, runs)
+    return "nothing to grade" if entries.empty?
+
+    tokens = entries.group_by(&:response).values.map { |day| stability_day_tokens(service, day, runs) }
+                    .reduce { |total, day| total.merge(day) { |_, a, b| a + b } }
+    calls  = entries.size * runs
+    line   = "estimate, at about #{APPROX_CHARS_PER_TOKEN} characters a token and #{ReviewStability::MEAN_OUTPUT_TOKENS} output tokens a call, " \
+             "with each day's context cached after its first call: #{tokens[:input]} in / #{tokens[:cache_write]} cache write / " \
+             "#{tokens[:cache_read]} cache read / #{calls * ReviewStability::MEAN_OUTPUT_TOKENS} out"
+    return "#{line} · unpriced (#{service.class.superclass.name} has no price list)" unless service.class.prices_usage?
+
+    cap   = CallProfiles.fetch("review_response")[:max_tokens] || service.class::MAX_TOKENS
+    worst = estimated_cost(route, input: tokens[:input] + tokens[:cache_write] + tokens[:cache_read], output: calls * cap)
+    "#{line} · $#{format('%.2f', estimated_cost(route, **tokens.slice(:input, :cache_write, :cache_read), output: calls * ReviewStability::MEAN_OUTPUT_TOKENS))}\n" \
+      "worst case, with no caching and every call at the #{cap}-token output cap: $#{format('%.2f', worst)}"
+  end
+
+  def stability_day_tokens(service, day, runs)
+    first   = day.first
+    coach   = LanguagePrompts.for(first.exercise.language)[:coach]
+    system  = approx_tokens(service.review_grading_provider.day_context.call(coach, first.exercise, first.response))
+    prompts = day.sum { |entry| approx_tokens(service.send(:build_review_section_prompt, entry.exercise, entry.response, entry.section)) }
+    calls   = day.size * runs
+    { input: prompts * runs, cache_write: system, cache_read: system * (calls - 1) }
+  end
+
+  def approx_tokens(text) = (text.length / APPROX_CHARS_PER_TOKEN.to_f).ceil
+
+  def estimated_cost(route, input:, output:, cache_write: 0, cache_read: 0)
+    fixture_cost(route[:model], input, output, cache_write: cache_write, cache_read: cache_read)
+  end
+
+  def stability_cost_line(service, route, usage)
+    return "#{usage.sum { |call| call[:tokens_in] }} in / #{usage.sum { |call| call[:tokens_out] }} out · unpriced" unless service.class.prices_usage?
+
+    usage_cost_line(route, usage)
   end
 
   def failed_grade(result)

@@ -94,8 +94,12 @@ RSpec.describe "Today's phone layout", type: :system do
       visit_today
       click_button "Submit answers"
 
-      expect(page).to have_css("#rating-nudge", visible: true)
-      expect(rect("#rating-nudge")["top"]).to be >= rect("#submit-answers")["bottom"]
+      # The nudge is already visible before submit, so its focus is what says the refusal has landed.
+      expect(page).to have_css("#rating-nudge:focus", visible: true)
+      nudge, button = page.evaluate_script(<<~JS)
+        ["#rating-nudge", "#submit-answers"].map((selector) => document.querySelector(selector).getBoundingClientRect().toJSON())
+      JS
+      expect(nudge["top"]).to be >= button["bottom"]
     end
 
     it "brings a held submit's notice on screen" do

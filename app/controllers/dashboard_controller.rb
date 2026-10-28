@@ -11,7 +11,7 @@ class DashboardController < ApplicationController
       current_user.carry_held_set_forward!
       @exercise = current_user.daily_exercises.for_date.first
     end
-    @response = @exercise&.daily_response ||
+    @response = @exercise&.daily_response&.tap { |stored| stored.user = current_user } ||
                 @exercise && DailyResponse.new(user: current_user, daily_exercise: @exercise, date: Date.current)
     @level_suggestion = LevelSuggestion.for(current_user) if current_user.suggests_level_moves? && @response&.submitted?
     @size_change = SizeForecast.for(current_user, @exercise) if @response&.submitted?

@@ -1,8 +1,8 @@
-<%# Required locals: text (a guide_worked_example), language (the concept's bucket, which picks the lexer). %>
+<%# Required locals: text (a guide_worked_example), language (the concept's bucket, which picks the lexer); optional seen, a glossary Set shared with nearby prose. %>
 <% WorkedExample.parts(text).each do |part| %>
   <% if part.kind == :code %>
     <pre class="snippet"><%= highlighted_code(part.text, language) %></pre>
   <% else %>
-    <p class="learn-worked-example"><%= glossary_wrap_prose(part.text) %></p>
+    <p class="learn-worked-example"><%= glossary_wrap_prose(part.text, seen: local_assigns.fetch(:seen) { Set.new }) %></p>
   <% end %>
 <% end %>

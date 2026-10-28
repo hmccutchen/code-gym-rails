@@ -35,6 +35,9 @@
         <% end %>
       <% end %>
     <% end %>
+    <% if (short_version = review_short_version(response, section)) %>
+      <%= render "shared/review_short_version", reference: short_version.reference, bucket: short_version.bucket, show_pitfalls: short_version.show_pitfalls, learn_link: short_version.learn_link %>
+    <% end %>
     <% improved_code = DailyResponse.improved_code_text(fb["improved_code"]) %>
     <% if improved_code.present? && response.improved_code_visible?(section) %>
       <% kind = ExerciseSection.for(section) %>

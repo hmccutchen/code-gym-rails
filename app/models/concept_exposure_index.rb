@@ -6,11 +6,17 @@ class ConceptExposureIndex
         .pluck(:date, :concept_tags, "daily_exercises.language")
         .each do |date, tags, language|
       (tags || {}).each do |section, concept|
-        next if concept.blank? || concept == "other"
-        dates[[ concept, ConceptBucket.for(section, language) ]] << date
+        key = key_for(section, concept, language)
+        dates[key] << date if key
       end
     end
     new(dates)
+  end
+
+  def self.counted?(concept) = concept.present? && concept != "other"
+
+  def self.key_for(section, concept, language)
+    [ concept, ConceptBucket.for(section, language) ] if counted?(concept)
   end
 
   def initialize(dates)
@@ -19,6 +25,11 @@ class ConceptExposureIndex
 
   def count(concept, bucket, on_or_before:)
     dates_for(concept, bucket).count { |date| date <= on_or_before }
+  end
+
+  def count_for(section, concept, language, on_or_before:)
+    key = self.class.key_for(section, concept, language)
+    count(*key, on_or_before: on_or_before) if key
   end
 
   def last_seen(concept, bucket)

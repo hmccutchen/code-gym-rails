@@ -303,11 +303,8 @@ class DailyResponse < ApplicationRecord
     kind = ExerciseSection.find(section)
     return false if kind && !kind.improved_code?
 
-    concept = concept_tags[section.to_s]
-    return true if concept.blank? || concept == "other"
-    # Must match ConceptExposureIndex's keys, or plan_review's revised plan never becomes visible.
-    bucket = ConceptBucket.for(section, daily_exercise.language)
-    user.concept_exposures.count(concept, bucket, on_or_before: date) >= 2
+    count = user.concept_exposures.count_for(section, concept_tags[section.to_s], daily_exercise.language, on_or_before: date)
+    count.nil? || count >= 2
   end
 
   private

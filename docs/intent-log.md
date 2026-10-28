@@ -340,3 +340,39 @@ data.*
   `#587`
 - the self-rating labels and reviewing provider name moved to view helpers too
   `#589`
+- a read-only baseline of how stable grading is: export my graded answers,
+  regrade each five times `#590`
+  **why:** I'm considering grading by an answer's route instead of a key,
+  and wanted a measurement first
+  **I decided:** every production export read-only, approved by me, kept
+  outside the repo and deleted after; 10 sections per kind, not 50 overall;
+  gap positions without the review's text; drift apart from stability
+- a spec for storing what code review, security review, plan review and
+  pseudocode-to-code planted
+  **I decided:** an unusable key keeps the section, without a key;
+  `RUBRIC_VERSION` stays unless keyed grading moves ratings beyond the
+  unkeyed run on the same sections; a different finding counts only if it is
+  at least as serious, plan review included; I read the Ruby code-review
+  keys, a colleague reads the rest from a sheet with no answers
+- a closed short version of the concept in the review, on a first exposure
+  or a low grade `#598`
+  **I decided:** pitfalls only with an essential gap, including a gap on
+  another section sharing the concept; keep both reference disclosures; the
+  first qualifying section offers it when two share a concept; build it on
+  its own branch once 4 of 4 concepts I'd seen had a guide
+- the flaky Submit nudge layout spec, fixed on its own `#591`
+- I ran the baseline myself: 14 of 15 sections graded the same all five times
+- two implementation plans, the short version first since it needs no keys
+  `#596 open`
+  **I decided:** two separate plans; every production query, generation and
+  calibration run waits for my approval; after the plan reviews, the
+  exposure count lives on `ConceptExposureIndex`, the short version builds
+  #592's single `graded_prose` reader first, every keyed section is logged
+  with its kind, language and outcome, and a key quotes in backticks, with no
+  quote counted as a miss
+- keyed grading measured on the stored-key days before the grader reads keys
+  in production, from Copilot's review
+  **why:** keyed grades keep today's `RUBRIC_VERSION`, so the competency gate
+  and level suggestions would read them before the movement check ran
+
+*From review: `#595`*

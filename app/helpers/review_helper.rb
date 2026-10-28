@@ -3,6 +3,20 @@ module ReviewHelper
     def graded? = graded
   end
 
+  ShortVersion = Data.define(:reference, :bucket, :show_pitfalls, :learn_link)
+
+  def review_short_version(response, section)
+    short_version = short_version_for(response)
+    return unless short_version.offered?(section)
+
+    concept, bucket = short_version.key(section)
+    reference = concept_reference_for(concept, bucket)
+    return unless reference
+
+    ShortVersion.new(reference: reference, bucket: bucket, show_pitfalls: short_version.pitfalls?(section),
+                     learn_link: ConceptBucket.slice_for(response.user.language).include?(bucket))
+  end
+
   def review_provider_label(response)
     AiProvider.label(response.review_provider_key)
   end
@@ -20,5 +34,12 @@ module ReviewHelper
     return t(walkthrough_key) if !response.answered?(section) && I18n.exists?(walkthrough_key)
 
     DailyResponse.ai_review_label(field)
+  end
+
+  private
+
+  def short_version_for(response)
+    @short_versions ||= {}.compare_by_identity
+    @short_versions[response] ||= ReviewShortVersion.new(response, exposures: response.user.concept_exposures)
   end
 end
