@@ -148,7 +148,9 @@ retry generation that fails for any other reason (`[judge_retry_failed]`)
 drops the section at once: a rate limit, a bad key, the deadline, invalid
 JSON, a reply that leaves the section out, or one tagged with a concept
 other than the fixed one. The owner chose to keep the last two with the
-drops. The outcome's `retries` counts judged retries, and
+drops. `enforce_fixed_concepts!` runs before formatting and the boundary
+checks, so a reply with both a wrong concept and an unusable section is
+refused for its concept and drops too. The outcome's `retries` counts judged retries, and
 `retry_principle`, `retry_issues`, `retry_evidence` and `retry_reason`
 are lists with one entry per judged retry, in order, so a judge solve's
 `attempt` never skips a number. `unusable_retries`, present only when a

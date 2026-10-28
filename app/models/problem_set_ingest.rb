@@ -38,11 +38,11 @@ class ProblemSetIngest
     reject_missing_sections!
     warn_unrequested_sections!
     prune_retry_extras!
+    enforce_fixed_concepts!
     prune_unplanned_slots!
     format_code!
     reject_unusable_sections!
     clean_planted_keys!
-    enforce_fixed_concepts!
     normalize_concepts!
     normalize_answer_scaffolds!
     normalize_diagrams!
