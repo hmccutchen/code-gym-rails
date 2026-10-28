@@ -244,7 +244,7 @@ class DailyPlan
   private_class_method :established_concepts_for
 
   def self.established_in_buckets(user, buckets)
-    buckets.map { |bucket| established_in_bucket(user, bucket) }.reduce(:or)
+    buckets.map { |bucket| established_in_bucket(user, bucket) }.reduce(:or) || user.concept_masteries.none
   end
   private_class_method :established_in_buckets
 

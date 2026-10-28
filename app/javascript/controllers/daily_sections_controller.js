@@ -11,6 +11,7 @@ export default class extends Controller {
     url: String,
     layout: Array,
     rotates: Boolean,
+    places: Array,
     strandedText: String
   }
 
@@ -24,10 +25,16 @@ export default class extends Controller {
     this.open(event.target)
   }
 
+  // A tap on the saved count fires no change event, so this is the only way back into its chooser.
+  reopen(event) {
+    if (event.target.defaultChecked) this.open(event.target)
+  }
+
   open(radio) {
     const panel = this.choiceTargets.find((choice) => choice.dataset.count === radio.value)
     this.choiceTargets.forEach((choice) => { choice.hidden = choice !== panel })
     if (panel) return this.showError(panel, "")
+    if (radio.defaultChecked) return
 
     this.send({ daily_section_count: radio.value })
   }
@@ -64,8 +71,11 @@ export default class extends Controller {
     return JSON.parse(panel.dataset.pair).concat(extras)
   }
 
+  // An Exercise mix edit still waiting to send would post the old layout after this one and lose itself to the reload.
   async send(user, options) {
-    const result = await saveStatus.queue(KEY, "PATCH", this.urlValue, { user: user, layout: this.layoutValue }, options)
+    await saveStatus.settled(KEY)
+    const body = { user: user, layout: this.layoutValue, places: this.placesValue }
+    const result = await saveStatus.queue(KEY, "PATCH", this.urlValue, body, options)
     const moved = result.status === 409 && result.data && result.data.layout_changed
     if (result.ok) this.adopt(result.data)
     if (moved || (result.ok && this.layoutMoved(result.data))) {

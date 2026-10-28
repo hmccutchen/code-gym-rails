@@ -622,19 +622,20 @@
           data-daily-sections-url-value="/profile"
           data-daily-sections-layout-value="[&quot;code_review&quot;,&quot;design_comparison&quot;]"
           data-daily-sections-rotates-value="true"
+          data-daily-sections-places-value="[&quot;code_review&quot;,&quot;design_comparison&quot;]"
           data-daily-sections-stranded-text-value="Your daily sections are saved. Another change on this page hasn&#39;t saved yet, so reload once it does to see your new Exercise mix.">
   <legend>Daily sections</legend>
   <div class="segmented">
     <label class="segment"><input type="radio" name="daily_section_count" value="automatic" checked
-                                  data-daily-sections-target="count" data-action="change->daily-sections#pick">Automatic</label>
+                                  data-daily-sections-target="count" data-action="change->daily-sections#pick click->daily-sections#reopen">Automatic</label>
       <label class="segment"><input type="radio" name="daily_section_count" value="1" 
-                                    data-daily-sections-target="count" data-action="change->daily-sections#pick">1</label>
+                                    data-daily-sections-target="count" data-action="change->daily-sections#pick click->daily-sections#reopen">1</label>
       <label class="segment"><input type="radio" name="daily_section_count" value="2" 
-                                    data-daily-sections-target="count" data-action="change->daily-sections#pick">2</label>
+                                    data-daily-sections-target="count" data-action="change->daily-sections#pick click->daily-sections#reopen">2</label>
       <label class="segment"><input type="radio" name="daily_section_count" value="3" 
-                                    data-daily-sections-target="count" data-action="change->daily-sections#pick">3</label>
+                                    data-daily-sections-target="count" data-action="change->daily-sections#pick click->daily-sections#reopen">3</label>
       <label class="segment"><input type="radio" name="daily_section_count" value="4" 
-                                    data-daily-sections-target="count" data-action="change->daily-sections#pick">4</label>
+                                    data-daily-sections-target="count" data-action="change->daily-sections#pick click->daily-sections#reopen">4</label>
   </div>
     <div class="daily-sections-choice" id="daily-sections-choice-1" hidden
          data-daily-sections-target="choice" data-count="1" data-pair="[&quot;code_review&quot;,&quot;design_comparison&quot;]">

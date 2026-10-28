@@ -101,7 +101,7 @@ class ProfileUpdate
   end
 
   def locked_save?
-    !@user_params[:section_kind_preferences_version].nil? || !shown_steps.nil? || !@params[:layout].nil? ||
+    !@user_params[:section_kind_preferences_version].nil? || !shown_steps.nil? || !@params[:layout].nil? || !@params[:places].nil? ||
       (LOCKED_KEYS | PREFERENCE_KEYS).any? { |key| posted?(key) }
   end
 
@@ -137,7 +137,8 @@ class ProfileUpdate
   end
 
   def layout_moved?
-    !@params[:layout].nil? && Array(@params[:layout]) != DailyKinds.for(@user).map(&:key)
+    (!@params[:layout].nil? && Array(@params[:layout]) != DailyKinds.for(@user).map(&:key)) ||
+      (!@params[:places].nil? && Array(@params[:places]) != DailyKinds.normalize(@user.daily_section_kinds).map(&:key))
   end
 
   def unsaved_shown_step?

@@ -100,4 +100,38 @@ RSpec.describe "Daily sections setting", type: :system do
     end
     expect(user.reload.daily_section_count).to be_nil
   end
+
+  it "reopens the saved count's chooser when its segment is tapped again, so its kinds can change" do
+    user.update!(daily_section_count: 3, daily_section_kinds: %w[code_review design_comparison pattern])
+    visit_as(user)
+    visit setup_path
+    wait_for_js
+
+    find("#daily-sections .segment", text: "3").click
+    within("#daily-sections-choice-3") do
+      select name("challenge"), from: "Extra section 1", visible: :all
+      click_button "Save"
+    end
+
+    wait_for { user.reload.daily_section_kinds == %w[code_review design_comparison challenge] }
+    expect(user.reload.daily_section_count).to eq(3)
+  end
+
+  it "lands an Exercise mix edit still waiting to send before the layout change it would otherwise lose to a reload" do
+    visit_as(user)
+    visit setup_path
+    wait_for_js
+    page.execute_script("document.querySelector('#exercise-mix').open = true")
+
+    page.execute_script(<<~JS)
+      const slider = document.getElementById("weight-challenge");
+      slider.value = "4";
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+      document.querySelector("#daily-sections input[value='1']").click();
+      document.querySelector("#daily-sections-choice-1 [data-action~='daily-sections#save']").click();
+    JS
+
+    wait_for { user.reload.daily_section_count == 1 }
+    wait_for { user.reload.section_kind_weights == { "challenge" => KindPreferences::MULTIPLIERS.last } }
+  end
 end

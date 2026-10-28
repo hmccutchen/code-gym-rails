@@ -494,6 +494,21 @@ RSpec.describe "Profile", type: :request do
       end
     end
 
+    it "refuses a chooser rendered before another tab swapped a place the setting hides" do
+      user.update!(daily_section_count: 1)
+      rendered = DailyKinds.normalize(user.daily_section_kinds).map(&:key)
+      user.update!(daily_section_kinds: %w[code_review architecture])
+
+      patch profile_path,
+            params: { user: { daily_section_count: 1, daily_section_kinds: %w[design_comparison code_review] },
+                      layout: %w[code_review], places: rendered }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["layout_changed"]).to be(true)
+      expect(user.reload.daily_section_kinds).to eq(%w[code_review architecture])
+    end
+
     it "refuses a list too short for the count" do
       choose(4, %w[code_review design_comparison pattern])
 

@@ -3,14 +3,15 @@
           data-daily-sections-url-value="<%= profile_path %>"
           data-daily-sections-layout-value="<%= DailyKinds.for(current_user).map(&:key).to_json %>"
           data-daily-sections-rotates-value="<%= DailyKinds.rotates?(current_user) %>"
+          data-daily-sections-places-value="<%= DailyKinds.normalize(current_user.daily_section_kinds).map(&:key).to_json %>"
           data-daily-sections-stranded-text-value="<%= t("daily_sections.choose.stranded") %>">
   <legend><%= t("daily_sections.legend") %></legend>
   <div class="segmented">
     <label class="segment"><input type="radio" name="daily_section_count" value="<%= User::AUTOMATIC_SECTION_COUNT %>" <%= "checked" if current_user.daily_section_count.nil? %>
-                                  data-daily-sections-target="count" data-action="change->daily-sections#pick"><%= t("daily_sections.automatic") %></label>
+                                  data-daily-sections-target="count" data-action="change->daily-sections#pick click->daily-sections#reopen"><%= t("daily_sections.automatic") %></label>
     <% User::DAILY_SECTION_COUNTS.each do |count| %>
       <label class="segment"><input type="radio" name="daily_section_count" value="<%= count %>" <%= "checked" if current_user.daily_section_count == count %>
-                                    data-daily-sections-target="count" data-action="change->daily-sections#pick"><%= count %></label>
+                                    data-daily-sections-target="count" data-action="change->daily-sections#pick click->daily-sections#reopen"><%= count %></label>
     <% end %>
   </div>
   <% choice.counts.each do |count| %>

@@ -536,6 +536,16 @@ RSpec.describe DailyPlan do
       expect(plan.shared_concept).to be_nil
     end
 
+    it "plans a single fourth-slot section, with no main-track section to hold language concepts" do
+      user = User.create!(email: "single-fourth@example.com", name: "Single", daily_section_count: 1,
+                          daily_section_kinds: %w[plan_review code_review])
+
+      plan = described_class.for(user, language: "ruby_rails")
+
+      expect(plan.kinds).to eq([ ExerciseSection::PlanReview ])
+      expect(plan.established).to be_empty
+    end
+
     it "puts the chosen extra sections in every set and rotates none" do
       user = User.create!(email: "chosen@example.com", name: "Chosen", daily_section_count: 4,
                           daily_section_kinds: %w[code_review design_comparison pattern plan_review])

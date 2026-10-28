@@ -25,7 +25,9 @@ catch, and leaves which values a field allows to `User`:
   `DailyKinds.problems_with` accepts. A refusal is worded for the person at
   Setup's Daily sections chooser, since a repeated kind or a second fourth is
   a choice they made there. Posting it is a locked save, so a `layout` the
-  page posts with it is checked against another tab's swap, and a list equal
+  page posts with it is checked against another tab's swap (as is `places`,
+  the whole stored list, which also catches a swap of a place the setting
+  hides), and a list equal
   to the default pair stores as empty (`DailyKinds.stored`).
 - A `daily_section_count` above the pair's size must come with a
   `daily_section_kinds` list holding a kind for every place. The check reads
