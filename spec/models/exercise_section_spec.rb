@@ -670,7 +670,7 @@ RSpec.describe ExerciseSection do
     it "leaves a section of a kind with nothing to refuse untouched" do
       section = { "question" => "" }
 
-      (described_class.all - [ ExerciseSection::AmbiguityHunt, ExerciseSection::PseudocodeToCode,
+      (described_class.all - [ ExerciseSection::AmbiguityHunt, ExerciseSection::PseudocodeToCode, ExerciseSection::CodeReview,
                                ExerciseSection::DesignComparison ]).each do |kind|
         expect { kind.reject_unusable!(section) }.not_to change { section }
       end

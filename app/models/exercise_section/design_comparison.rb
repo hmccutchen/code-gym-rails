@@ -207,7 +207,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
 
     def reject_unusable_piece!(field, piece)
       raise ProviderError::InvalidResponseError, "Design comparison returned no usable #{field}" unless usable_text?(piece)
-      return if piece.lines.count { |line| line.strip.present? } <= MAX_PIECE_LINES
+      return if shown_lines(piece) <= MAX_PIECE_LINES
 
       raise ProviderError::InvalidResponseError, "Design comparison #{field} runs past #{MAX_PIECE_LINES} lines"
     end
