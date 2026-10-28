@@ -381,4 +381,9 @@ data.*
   whitespace ignored, cleaning is its own ingest step, and the stop rule
   counts only drafted sections of kinds that quote
 - code review's snippet capped at 40 shown lines at ingest, refused rather
-  than cut `#603 open`
+  than cut `#603`
+- a judged retry refused at ingest no longer costs a daily kind its second
+  retry `#609 open`
+  **I decided:** a refused retry spends one retry and the loop goes on;
+  rate limits, timeouts, the deadline, billing and bad replies still drop at
+  once; the retry prompt stays unchanged, left to its own issue
