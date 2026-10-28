@@ -32,9 +32,13 @@ gutters are unchanged.
 
 The same rule caps `nav .inner`, the nav's own `.container`, so the brand and
 links line up with a wide page's content, and the formula stays in one place.
-With a side safe-area inset they line up only once the window is wider than
-1040px plus four times the inset, because the nav counts the inset twice
-(#553).
+With a side safe-area inset, `nav .inner` pads by its gutter less the inset
+the nav already padded (#553), so the two line up until the page's cap binds
+at 1040px plus both gutters. Past that the nav's row is still wider, and
+from 1040px plus both gutters and both insets its content is 1040px plus both
+insets, so the brand sits one inset left of the page's content. No phone in
+landscape is that wide; a window that wide with side insets would need the
+cap to subtract them too.
 It applies on every page, wide or not, so the nav doesn't move between pages.
 The layout's `nav .inner` rule sets `max-width: 1200px` with the same
 specificity, and this file loads after the layout's `<style>`, so the 1040px
