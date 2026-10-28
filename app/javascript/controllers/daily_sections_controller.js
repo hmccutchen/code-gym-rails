@@ -27,16 +27,18 @@ export default class extends Controller {
 
   // A tap on the saved count fires no change event, so this is the only way back into its chooser.
   reopen(event) {
-    if (event.target.defaultChecked) this.open(event.target)
+    if (event.target.defaultChecked) this.showChoice(event.target)
   }
 
   open(radio) {
+    if (!this.showChoice(radio)) this.send({ daily_section_count: radio.value })
+  }
+
+  showChoice(radio) {
     const panel = this.choiceTargets.find((choice) => choice.dataset.count === radio.value)
     this.choiceTargets.forEach((choice) => { choice.hidden = choice !== panel })
-    if (panel) return this.showError(panel, "")
-    if (radio.defaultChecked) return
-
-    this.send({ daily_section_count: radio.value })
+    if (panel) this.showError(panel, "")
+    return Boolean(panel)
   }
 
   async save(event) {

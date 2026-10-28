@@ -134,4 +134,20 @@ RSpec.describe "Daily sections setting", type: :system do
     wait_for { user.reload.daily_section_count == 1 }
     wait_for { user.reload.section_kind_weights == { "challenge" => KindPreferences::MULTIPLIERS.last } }
   end
+
+  it "saves a tap back to the saved count made while the first tap's save is still in flight" do
+    visit_as(user)
+    visit setup_path
+    wait_for_js
+
+    page.execute_script(<<~JS)
+      window.beforeReload = true;
+      document.querySelector("#daily-sections input[value='2']").click();
+      document.querySelector("#daily-sections input[value='automatic']").click();
+    JS
+
+    wait_for { page.evaluate_script("window.beforeReload") != true }
+    expect(page).to have_css("#daily-sections input[value='automatic'][checked]", visible: :all)
+    expect(user.reload.daily_section_count).to be_nil
+  end
 end

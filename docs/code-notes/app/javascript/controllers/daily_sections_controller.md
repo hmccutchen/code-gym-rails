@@ -11,7 +11,10 @@ chooser and checks the saved count again, using `defaultChecked`, which the
 controller moves on every successful save. A tap on the saved count fires no
 `change`, so a `click` on a radio that is already the saved one reopens its
 chooser; that is how a person changes the kept kind or the extras without
-picking another count first.
+picking another count first. That click only opens a chooser and never saves:
+`change` fires only when the selection moves, so a change always saves, even
+back to a count that still reads as saved while an earlier save is in
+flight.
 
 ## What a choice posts
 
