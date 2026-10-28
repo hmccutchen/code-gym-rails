@@ -6,6 +6,8 @@ class ExerciseSection::SecurityReview < ExerciseSection
 
   def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
 
+  def self.unquoted_key_parts(section) = PlantedKey.unquoted_parts([ section.dig(PlantedKey::FIELD, "vulnerability") ], within: section.values_at("snippet"))
+
   def self.vocabulary_key
     :security_concepts
   end

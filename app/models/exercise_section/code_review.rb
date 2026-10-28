@@ -5,6 +5,8 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
 
+  def self.unquoted_key_parts(section) = PlantedKey.unquoted_parts([ section.dig(PlantedKey::FIELD, "issue") ], within: section.values_at("snippet", "current_schema"))
+
   def self.diagrammable?
     true
   end

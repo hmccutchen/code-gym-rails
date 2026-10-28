@@ -85,6 +85,40 @@ RSpec.describe "The answer key each discovery kind plants" do
     end
   end
 
+  describe ".unquoted_key_parts" do
+    def unquoted(kind, section) = kind.unquoted_key_parts(section)
+
+    it "checks a code review's issue against its snippet and any current schema" do
+      kind = ExerciseSection::CodeReview
+      section = { "snippet" => "orders.each do |order|\n  order.customer.name\nend", "current_schema" => "t.bigint :customer_id",
+                  PlantedKey::FIELD => { "issue" => "`order.customer.name` per row, with no index on `t.bigint :customer_id`" } }
+
+      expect(unquoted(kind, section)).to eq([])
+      expect(unquoted(kind, section.merge(PlantedKey::FIELD => { "issue" => "`order.user` per row" }))).to eq([ "order.user" ])
+      expect(unquoted(kind, section.merge(PlantedKey::FIELD => { "issue" => "A query per row." })).size).to eq(1)
+    end
+
+    it "checks a security review's vulnerability against its snippet" do
+      kind = ExerciseSection::SecurityReview
+      section = { "snippet" => "User.where(\"name = '\#{name}'\")", PlantedKey::FIELD => { "vulnerability" => "`User.where(\"name = '\#{name}'\")` interpolates input" } }
+
+      expect(unquoted(kind, section)).to eq([])
+      expect(unquoted(kind, section.merge("snippet" => "User.find(id)")).size).to eq(1)
+    end
+
+    it "checks each plan review flaw against the plan, and counts a flaw with no quote" do
+      kind = ExerciseSection::PlanReview
+      flaws = [ { "flaw" => "`exactly 300 seconds` has no reason" }, { "flaw" => "Scope grew." }, { "flaw" => "`never written`" } ]
+      section = { "plan_excerpt" => "Cache it for exactly 300\nseconds.", PlantedKey::FIELD => { "flaws" => flaws } }
+
+      expect(unquoted(kind, section)).to eq([ "Scope grew.", "never written" ])
+    end
+
+    it "quotes nothing for pseudocode to code, so nothing is unquoted" do
+      expect(unquoted(ExerciseSection::PseudocodeToCode, PlantedKey::FIELD => { "missable_requirements" => [ "Empty input." ] })).to eq([])
+    end
+  end
+
   it "gives each of the four kinds the answer_key field, and marks only them as planting a key" do
     planted = [ ExerciseSection::CodeReview, ExerciseSection::SecurityReview, ExerciseSection::PlanReview, ExerciseSection::PseudocodeToCode ]
 

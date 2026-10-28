@@ -22,6 +22,10 @@ class ExerciseSection::PlanReview < ExerciseSection
     { "flaws" => flaws } if flaws.any?
   end
 
+  def self.unquoted_key_parts(section)
+    PlantedKey.unquoted_parts(Array(section.dig(PlantedKey::FIELD, "flaws")).map { |flaw| flaw["flaw"] }, within: section.values_at("plan_excerpt"))
+  end
+
   def self.normalize_flaw(flaw)
     cleaned = PlantedKey.fields(flaw, %w[flaw pushback])
     category = flaw["category"] if cleaned && FLAW_CATEGORIES.include?(flaw["category"])

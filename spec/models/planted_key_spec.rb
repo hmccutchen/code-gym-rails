@@ -37,6 +37,26 @@ RSpec.describe PlantedKey do
     end
   end
 
+  describe ".unquoted_parts" do
+    let(:code) { "def update\n  current_user.update(params[:user])\nend" }
+
+    it "returns each backticked quote not found in the text, with whitespace collapsed on both sides" do
+      aggregate_failures do
+        expect(described_class.unquoted_parts([ "`current_user.update(params[:user])` assigns everything" ], within: [ code ])).to eq([])
+        expect(described_class.unquoted_parts([ "`current_user.update(   params[:user])`" ], within: [ "current_user.update(\n params[:user])" ])).to eq([])
+        expect(described_class.unquoted_parts([ "`update!(params)` and `current_user`" ], within: [ code ])).to eq([ "update!(params)" ])
+      end
+    end
+
+    it "counts a text with no backticked quote as one unquoted part" do
+      expect(described_class.unquoted_parts([ "The update assigns everything.", "`current_user`" ], within: [ code ]).size).to eq(1)
+    end
+
+    it "reads every text it is given, and ignores a missing one" do
+      expect(described_class.unquoted_parts([ "`nope`", nil ], within: [ code, nil ])).to eq([ "nope" ])
+    end
+  end
+
   describe ".store!" do
     it "writes a cleaned key back to the section, or deletes the key and keeps the section" do
       section = { "snippet" => "code", described_class::FIELD => { "issue" => " raw " } }

@@ -28,6 +28,8 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
 
   def self.planted_key? = true
 
+  def self.unquoted_key_parts(_section) = []
+
   def self.normalize_planted_key(section)
     raw = section[PlantedKey::FIELD]
     requirements = PlantedKey.list(raw.is_a?(Hash) ? raw["missable_requirements"] : nil, max: MAX_MISSABLE_REQUIREMENTS) { |entry| PlantedKey.text(entry) }
