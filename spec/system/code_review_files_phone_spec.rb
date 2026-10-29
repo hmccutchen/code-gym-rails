@@ -43,6 +43,18 @@ RSpec.describe "A multi-file code review on a phone", type: :system do
     end
   end
 
+  it "wraps a long path with no spaces instead of scrolling sideways" do
+    long_path = "app/services/#{"subscription_renewal" * 5}.rb"
+    files["file_2_path"] = long_path
+
+    travel_to(a_weekday) do
+      open_dashboard(create_fake_provider_user)
+
+      expect(page).to have_css("details.comparison-piece summary", text: long_path)
+      expect(sideways_overflow).to eq(0)
+    end
+  end
+
   it "hides a wrapped line's alignment padding again after the file is folded and reopened" do
     travel_to(a_weekday) do
       open_dashboard(create_fake_provider_user)

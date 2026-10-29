@@ -12,7 +12,7 @@
 <% files.each do |file| %>
   <% label = changed_lines_label(file.changed) %>
   <details class="comparison-piece" open>
-    <summary><%= file.path %><%= " — #{label}" if label.present? %></summary>
+    <summary><span class="file-summary"><%= file.path %><%= " — #{label}" if label.present? %></span></summary>
     <pre class="snippet"><%= highlighted_code(file.code, exercise.language, changed: file.changed) %></pre>
   </details>
 <% end %>
