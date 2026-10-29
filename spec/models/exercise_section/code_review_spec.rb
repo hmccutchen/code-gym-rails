@@ -214,6 +214,15 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
       expect(section).to eq(original)
       expect(code_for({ "snippet" => " " }, file_range: 1..1)).to eq("code_review.snippet_missing")
     end
+
+    it "leaves no file field on a single-file range, so the section never reads as multi-file" do
+      section = { "snippet" => numbered("x", 5) }.merge(two_files, third_file)
+
+      described_class.reject_unusable!(section, language: "ruby_rails", file_range: 1..1)
+
+      expect(section.keys).to eq([ "snippet" ])
+      expect(described_class.files(section)).to eq([])
+    end
   end
 
   describe ".arrange!" do
@@ -226,6 +235,31 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
 
       expect(multi).not_to have_key("diagram")
       expect(single["diagram"]).to eq("graph TD; A-->B")
+    end
+  end
+
+  describe ".review_context" do
+    it "lists each file under its path, with its changed lines and code, in place of the snippet" do
+      section = { "question" => "What breaks?",
+                  "file_1_path" => "app/models/order.rb", "file_1_code" => "a = 1\nb = 2", "file_1_changed" => [ 2 ],
+                  "file_2_path" => "app/models/item.rb", "file_2_code" => "c = 3", "file_2_changed" => [],
+                  "answer_key" => { "issue" => "ANSWER-KEY-SENTINEL" } }
+
+      expect(described_class.review_context(section: section, answer: "The total.", rating: "right_level")).to eq(<<~CONTEXT.chomp)
+        Code Review question: What breaks?
+        File: app/models/order.rb
+        Changed lines: 2
+        a = 1
+        b = 2
+        File: app/models/item.rb
+        Changed lines: none
+        c = 3
+        Their answer:
+        <engineer_text>
+        The total.
+        </engineer_text>
+        Their self-rating: right_level
+      CONTEXT
     end
   end
 

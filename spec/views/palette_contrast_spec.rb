@@ -92,6 +92,14 @@ RSpec.describe "palette contrast" do
       expect(colors.transform_values { |color| contrast(color, code_background).round(2) }.values).to all(be >= 4.5), colors.inspect
     end
 
+    it "keeps code text and every highlighting color at 4.5:1 or more on a changed line" do
+      colors = rules.select { |rule| rule.selectors.any? { |selector| selector.start_with?("code.highlight") } }
+        .filter_map { |rule| rule.declaration("color") }.uniq
+        .to_h { |color| [ color, vars.fetch(color[/\Avar\(--([\w-]+)\)\z/, 1], color) ] }
+
+      expect(colors.transform_values { |color| contrast(color, vars.fetch("code-changed-bg")).round(2) }.values).to all(be >= 4.5), colors.inspect
+    end
+
     it "keeps white text at 4.5:1 or more on the button fill, at rest and on hover" do
       expect(contrast("#ffffff", vars["button-bg"])).to be >= 4.5
       expect(contrast("#ffffff", vars["button-bg-hover"])).to be >= 4.5

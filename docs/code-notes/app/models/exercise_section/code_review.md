@@ -25,3 +25,11 @@ Each file may show at most `MAX_FILE_LINES` (15) lines, about a screen and a hal
 ## Why changed lines are quoted, and resolved after formatting
 
 The provider can't count lines reliably, and formatting moves them anyway: RuboCop re-indents Ruby and Prettier rewraps JavaScript. So the provider quotes each changed line's text, and `.reject_unusable!`, which ingest runs after `format_code!`, resolves each quote against the formatted code with `KeyQuote.line`, by whole-line equality with whitespace ignored. A quote matching exactly one line resolves; on JavaScript a quote can also match one run of lines Prettier wrapped, and every line of the run is marked. A quote matching several lines, such as `end`, or none is dropped instead of guessed. The field is replaced with the sorted, unique 1-based line numbers. A section where no file keeps a changed line is refused, since the page would have nothing to mark as the change.
+
+## A single-file range drops every file field
+
+On a range whose top is 1, `.reject_unusable!` also deletes every `file_N_*` field once the snippet passes. `.files` decides the shape for the page, the review context and `.arrange!`, so a stray file field on a single-file day would otherwise turn it into a multi-file section with a snippet nobody shows.
+
+## How files reach a prompt
+
+`CodeReview::File#prompt_text` is the one way a file reads in a prompt: its path, its changed line numbers (or "none") and its code. `.files_context` joins them, and both `.review_context` (in place of the `Code snippet:` line) and `SectionContext` (for the duck and the difficulty assessment) use it, so the two can't describe files differently. A single-file section has no files, so both render as before. Neither reads `answer_key`.

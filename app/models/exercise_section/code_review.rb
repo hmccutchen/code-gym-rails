@@ -32,8 +32,13 @@ class ExerciseSection::CodeReview < ExerciseSection
     end
   end
 
+  def self.files_context(section) = files(section).map(&:prompt_text).join("\n").presence
+
   def self.reject_unusable!(section, language: nil, file_range: 1..1, **)
-    return reject_unusable_snippet!(section) if file_range.max == 1
+    if file_range.max == 1
+      reject_unusable_snippet!(section)
+      return drop_file_fields!(section)
+    end
 
     FILE_SLOTS.each { |number| reject_incomplete_file!(section, number) }
     shown = files(section)
@@ -105,12 +110,17 @@ class ExerciseSection::CodeReview < ExerciseSection
     end
   end
 
+  def self.drop_file_fields!(section)
+    FILE_SLOTS.each { |number| FILE_PARTS.each { |part| section.delete("file_#{number}_#{part}") } }
+  end
+
   def self.file_parts(section, number) = FILE_PARTS.map { |part| section["file_#{number}_#{part}"] }
 
   def self.list_of?(value, type) = value.is_a?(Array) && value.all?(type)
 
   private_class_method :reject_unusable_snippet!, :reject_incomplete_file!, :reject_wrong_file_count!, :reject_long_files!,
-                       :reject_invalid_paths!, :resolve_changed_lines!, :drop_absent_files!, :file_parts, :list_of?
+                       :reject_invalid_paths!, :resolve_changed_lines!, :drop_absent_files!, :drop_file_fields!, :file_parts,
+                       :list_of?
 
   def self.arrange!(section)
     section.delete("diagram") if files(section).any?
@@ -192,7 +202,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.review_context(section:, answer:, rating:)
     [
       "Code Review question: #{section["question"]}",
-      "Code snippet: #{section["snippet"]}",
+      files_context(section) || "Code snippet: #{section["snippet"]}",
       current_schema_lines(section["current_schema"]),
       answer_lines(answer, rating)
     ].compact.join("\n")

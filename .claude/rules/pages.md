@@ -42,7 +42,10 @@ read it before changing that area.
   the one place code becomes HTML; only Rouge's escaped output is marked safe.
   Output is cached per process in `CodeHighlight::CACHE`, never `Rails.cache`
   or a row. No page loads a browser highlighter, and the `code-lines`
-  controller only decides wrapping.
+  controller only decides wrapping. `changed:` marks 1-based lines with
+  `code-line-changed` (a background and an inset bar, never padding or a
+  border, so wrapping measures the same), and the cache key carries those
+  lines, so a block with none renders as it always has.
 - **Home-screen app** (`docs/decisions/home-screen-app.md`): Standalone iOS
   launch via `GET /manifest.json` and `apple-mobile-web-app-*` meta tags, a
   phone-width bottom tab bar, and pull-to-refresh. Link icons through
