@@ -66,6 +66,14 @@ RSpec.describe KeyQuote do
       expect(described_class.line(wrapped, quote, language: "javascript")).to eq(1..6)
     end
 
+    it "builds runs only between non-blank lines, so blank-line padding stays cheap" do
+      padded = "const total = sum(\n#{"\n" * 1_000}  items,\n);"
+      allow(described_class).to receive(:normalize).and_call_original
+
+      expect(described_class.line(padded, "const total = sum(items);", language: "javascript")).to eq(1..1_003)
+      expect(described_class).to have_received(:normalize).at_most(1_100).times
+    end
+
     it "never matches a blank line, and never counts a run twice by padding it with one" do
       expect(described_class.line("a\n\n", "", language: "ruby_rails")).to be_nil
       expect(described_class.line("x();\n\nreturnValue();\n", "returnValue()", language: "javascript")).to eq(3..3)

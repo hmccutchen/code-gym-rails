@@ -48,8 +48,11 @@ semicolon-free quote.
 line. It compares the normalized quote with each normalized source line,
 and on JavaScript also with each run of two or more lines joined, up to the
 whole code, since Prettier puts each argument of a long call on its own line
-and a statement can wrap onto five lines or more. A file is at most 15 shown
-lines, so trying every run stays cheap. It answers only when exactly one
+and a statement can wrap onto five lines or more. Runs are built only
+between lines that have content, since blank lines don't count toward the
+15-shown-line cap: a file padded with a thousand blank lines still has at most
+15 endpoints, so at most 120 runs to try, instead of one run for every pair of
+physical lines. It answers only when exactly one
 line or run matches. Two matches mean the quote doesn't say which line it
 means (a bare `end` or `}`), so it returns nil rather than guess. A blank
 line never matches, and a run never starts or ends on a line that

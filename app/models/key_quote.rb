@@ -11,17 +11,18 @@ module KeyQuote
     return if wanted.empty?
 
     source = code.lines
-    matches = candidate_ranges(source.size, language).select do |range|
-      edges = [ source[range.begin - 1], source[range.end - 1] ]
-      edges.all? { |edge| normalize(edge, language: language).present? } &&
-        normalize(source[(range.begin - 1)..(range.end - 1)].join, language: language) == wanted
+    matches = candidate_ranges(source, language).select do |range|
+      normalize(source[(range.begin - 1)..(range.end - 1)].join, language: language) == wanted
     end
     matches.sole if matches.one?
   end
 
-  def self.candidate_ranges(line_count, language)
-    sizes = language == "javascript" ? (1..line_count) : [ 1 ]
-    sizes.flat_map { |size| (1..(line_count - size + 1)).map { |first| first..(first + size - 1) } }
+  # Runs start and end on lines with content, so blank padding adds no runs and can't pad one into a second match.
+  def self.candidate_ranges(source, language)
+    ends = source.each_index.select { |index| normalize(source[index], language: language).present? }.map(&:succ)
+    return ends.map { |number| number..number } unless language == "javascript"
+
+    ends.each_with_index.flat_map { |first, index| ends.drop(index).map { |last| first..last } }
   end
 
   def self.normalized_with_lines(text, language:)
