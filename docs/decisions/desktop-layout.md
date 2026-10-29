@@ -40,7 +40,8 @@ link, in its note about kinds left out of the mix, is 15px tall.
 
 ## The desktop column is per page
 
-`.container` itself doesn't change: a page widens by calling `wide_page`,
+`.container`'s width doesn't change (it only exposes its cap as
+`--container-max`, which the nav reads below 900px, #612): a page widens by calling `wide_page`,
 which gives its container a second class, `container-wide`. Widening
 `.container` for every page would reach the sign-in, welcome, admin and
 concept pages, none of which have a desktop layout. The column is 1040px of
@@ -71,8 +72,10 @@ was ruled out too: the sign-in, welcome, admin and concept pages stay plain
 by decision, so that day never comes. A plain page's content sits 92px inside
 the brand at 1280px, where it sat 140px inside before, and lines up once
 that page moves to `wide_page`. The collapse into the menu button is an
-`@container` query on `nav` itself, not on `.inner`, so the cap doesn't move
-it.
+`@container` query on `.inner`'s content box at 42em (#612). From 900px the
+1040px cap is wider than 42em at every text size (940.8px at 140%), so the
+cap doesn't move it there; below 900px the page column's cap does, on
+purpose, so the row folds before the cap pinches its links.
 
 The `100vw` break-out was rejected: `100vw` includes a classic scrollbar's
 width, so it scrolls the page sideways on Windows and Linux.

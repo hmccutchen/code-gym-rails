@@ -13,19 +13,15 @@ RSpec.describe "Nav in a notched landscape phone", type: :system do
   it "lines the brand and the last link up with the page content on a Pro Max in landscape" do
     visit_learn_with_notch(width: 932, height: 430, inset: 59)
 
-    content = container_content
-    expect(rect("nav .brand")["left"]).to be_within(0.5).of(content["left"])
-    expect(rects("nav .nav-links a").last["right"]).to be_within(0.5).of(content["right"])
-    expect(content["left"]).to be_within(0.5).of(59)
+    expect_nav_on_the_column
+    expect(container_content["left"]).to be_within(0.5).of(59)
   end
 
   it "lines the brand and the last link up with the page column at 844px, one notch inside it" do
     visit_learn_with_notch(width: 844, height: 390, inset: 44)
 
-    content = container_content
-    expect(rect("nav .brand")["left"]).to be_within(0.5).of(content["left"])
-    expect(rects("nav .nav-links a").last["right"]).to be_within(0.5).of(content["right"])
-    expect(content["left"]).to be_within(0.5).of(22 + 44)
+    expect_nav_on_the_column
+    expect(container_content["left"]).to be_within(0.5).of(22 + 44)
     expect(sideways_overflow).to eq(0)
   end
 

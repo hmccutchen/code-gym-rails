@@ -86,21 +86,17 @@ when it does not know one vendor pseudo-element.
 
 ## `nav`
 
-The nav is positioned because the collapsed menu hangs off it. It is a query
-container so the collapse can measure the nav in its own text size.
-Containment makes `nav` a stacking context, and the `z-index` keeps the open
-menu above the dashboard's sticky progress bar.
+The nav is positioned because the collapsed menu hangs off it, and the
+`z-index` keeps the open menu above the dashboard's sticky progress bar.
 
-`nav` pads itself by the side safe-area insets, so the box the collapse
-measures is the width beside a landscape phone's notches. Its `.inner` is a
+`nav` pads itself by the side safe-area insets, so `.inner` sits beside a
+landscape phone's notches. Its `.inner` is a
 `.container`, whose padding already counts the inset, so `.inner` subtracts
 it again: its padding is `--container-pad-left` minus the inset, which is
 the container's own gutter less whatever the nav already padded. The brand
 and the last link then sit `max(1.5rem, inset)` from the screen edge
 (`max(2rem, inset)` from 1024px), the same as a full-width page, and a
-Pro Max in landscape lines up with the page at 932px (#553). Dropping the
-nav's padding instead would have widened the measured box by both notches
-and left the links less room at the collapse point.
+Pro Max in landscape lines up with the page at 932px (#553).
 
 The open menu hangs from `nav`'s padding box, which runs under both notches
 so its background reaches the screen edge, and pads its links by
@@ -110,9 +106,19 @@ side insets (#612). The insets come off because `nav` pads them outside
 `.inner`, while a page's `.container` takes them inside its own cap. So from
 800px to 899px the brand starts and the last link ends with the page
 content, notch or not: 46px at 844px, or 66px with a 44px notch, where it
-used to sit at 24px and 44px. The collapse still measures `nav`, so the cap
-narrows the row only above the width where the links fit; at 112% text the
-row collapses at about 807px and the capped row still holds every link.
+used to sit at 24px and 44px. `--container-max` is the plain column's cap:
+from 900px a wide page sets its `max-width` directly, so the property
+doesn't describe it.
+
+The collapse measures `.inner`'s content box, not `nav` (see the
+`@container` section), so it follows the cap: wherever the capped row has
+less than 42em, the links fold behind the button. Measured on `nav`, the row
+stayed open while the cap left it too narrow, and the last link ran up to
+47px past the gutter: at 112% text with a 44px notch from 895px, or with an
+18px or 19px browser font from 811px or 856px. The owner chose the earlier
+fold over a row that leaves the column. It costs one case where the links
+would fit: at 112% text with no notch the capped row is 746px against 42em's
+752px, so from about 807px to 899px it shows the menu button.
 
 `desktop.css` caps `nav .inner` at 1040px plus `--container-pad-*`, which
 still include the inset, while `.inner` pads by less. So on a window with
@@ -213,18 +219,21 @@ a browser default below 16px, the minimum lifts both to 44px.
 The image's alt text names the link, which is why the wordmark beside it is
 hidden from screen readers.
 
-## `@container (max-width: 45em)`
+## `@container (max-width: 42em)`
 
 Below this width the row cannot hold the brand, the name field and the six
 destinations at once, so the destinations fold behind the button and the
-brand stays on one line. The width is in em against the nav's own text, so a
-larger text size moves the fold out with it: 45em is 720px at the default
-size. It was 37.5em until Settings joined the row, which overflowed it by
-22px at the default text size, and 40em until Today joined it (#615). With
-Today the row needs 713px at the default size before the last link stops
-running into the row's right gutter (`nav_row_overflow`'s `past_gutter`),
-and less at 140% text in em; the name field shrinks to its padding just
-above the fold, so the user's name doesn't change it. The tab bar lists the
+brand stays on one line. `nav .inner` is the query container, so the width
+is measured inside its padding, in em against its own text, and a larger
+text size moves the fold out with it. Until #612 the query measured `nav` at
+45em; 42em is that less the two 1.5rem gutters, so the fold sits at the
+same window width wherever the row isn't capped: 720px at the default size.
+It was 37.5em on `nav` until Settings joined the row, which overflowed it by
+22px at the default text size, and 40em until Today joined it (#615). The
+links themselves need about 38em at the default size and 37.6em at 112%
+(measured with the fold switched off), so the spare room goes to the name
+field, which shrinks to its padding just above the fold; the user's name
+doesn't change where it falls. The tab bar lists the
 same destinations, Today included, from the same `nav_destinations`.
 
 ## `nav .nav-toggle`

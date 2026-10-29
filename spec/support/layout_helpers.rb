@@ -38,10 +38,22 @@ module LayoutHelpers
   end
 
   def set_safe_area(left: 0, right: 0, top: 0, bottom: 0)
-    page.driver.with_playwright_page do |pw|
-      pw.context.new_cdp_session(pw).send_message("Emulation.setSafeAreaInsetsOverride",
-                                                  params: { insets: { left: left, right: right, top: top, bottom: bottom } })
-    end
+    cdp_session.send_message("Emulation.setSafeAreaInsetsOverride",
+                             params: { insets: { left: left, right: right, top: top, bottom: bottom } })
+  end
+
+  def set_default_font_size(px)
+    cdp_session.send_message("Page.setFontSizes", params: { fontSizes: { standard: px } })
+  end
+
+  def cdp_session
+    @cdp_session ||= page.driver.with_playwright_page { |pw| pw.context.new_cdp_session(pw) }
+  end
+
+  def expect_nav_on_the_column
+    content = container_content
+    expect(rect("nav .brand")["left"]).to be_within(0.5).of(content["left"])
+    expect(rects("nav .nav-links a").last["right"]).to be_within(0.5).of(content["right"])
   end
 
   # The WCAG 1.4.12 text-spacing override, the harshest case these pages meet.
