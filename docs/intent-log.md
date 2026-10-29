@@ -438,7 +438,7 @@ data.*
   reviews, share only the usable-text test across the three kinds, each
   kind keeping its own refusals
 - a concept's Learn page shows its explanation, guide and pitfalls again
-  when its stored lesson is the string "None" `#620 open`
+  when its stored lesson is the string "None" `#620`
   **why:** four production references stored "None", which counted as a
   lesson, so their pages hid everything but the tagline, code and senior
   lens, and offered no way to write a lesson
@@ -446,3 +446,9 @@ data.*
   both a read-side guard, so a stored value with nothing to show counts as
   no lesson, and a one-time migration clearing every lesson that isn't an
   object
+- the nav lined up with the page column from 800 to 899px `#621 open`
+  **why:** below 900px the nav ran full width while the page stopped at
+  800px, so the brand sat up to 50px left of the content
+  **I decided:** after a probe showed no link overflowing at any text size,
+  cap the nav at the page column less the side insets, so it lines up with
+  a landscape notch too
