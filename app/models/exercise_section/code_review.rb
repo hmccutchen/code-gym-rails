@@ -177,13 +177,13 @@ class ExerciseSection::CodeReview < ExerciseSection
   # A RealSource excerpt's own instruction replaces the mode's toy line.
   def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil,
                                file_range: 1..1, code_style: nil, **)
-    shared_lines = [ "- Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}", HIDDEN_KEY_LINE ]
+    vocabulary_line = "- Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}"
     if file_range.max > 1
       return MultiFile.guidance(file_range: file_range, label: label, mode: mode, artifact: artifact, test_framework: test_framework,
-                                rung: rung, code_style: code_style, shared_lines: shared_lines)
+                                rung: rung, code_style: code_style, shared_lines: [ vocabulary_line, MultiFile::HIDDEN_KEY_LINE ])
     end
 
-    [ source ? source.instruction : content_instruction(label, mode, artifact, test_framework), *shared_lines ].join("\n")
+    [ source ? source.instruction : content_instruction(label, mode, artifact, test_framework), vocabulary_line, HIDDEN_KEY_LINE ].join("\n")
   end
 
   def self.content_instruction(label, mode, artifact, test_framework)

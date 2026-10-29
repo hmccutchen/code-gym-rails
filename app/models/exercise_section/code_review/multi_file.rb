@@ -1,4 +1,8 @@
 module ExerciseSection::CodeReview::MultiFile
+  HIDDEN_KEY_LINE = '- "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "question", ' \
+                    '"scenario" or "teaching_note" — doing so would give away the answer before the engineer reads the files. ' \
+                    "Quote the code it points at in backticks, never by line number."
+
   SUBTLETY = {
     "mid_level"          => "- Nothing in the question or the code points at the problem; reading the second file closely finds it.",
     "senior"             => "- The broken assumption sits in a file the change didn't touch.",
