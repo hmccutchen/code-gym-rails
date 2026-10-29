@@ -144,7 +144,7 @@ class ExerciseSection
     end
 
     # Refuses an unusable section through .refuse! with a code from .refusal_codes; ingest then leaves out only that section.
-    def reject_unusable!(section)
+    def reject_unusable!(section, **)
     end
 
     def refusal_codes = []

@@ -78,7 +78,7 @@ class ProblemSetIngest
   def key_outcome(kind, section)
     return "missing" unless section.key?(PlantedKey::FIELD)
 
-    kind.unquoted_key_parts(section).empty? ? "ok" : "quote_missing"
+    kind.unquoted_key_parts(section, language: @language).empty? ? "ok" : "quote_missing"
   end
 
   def format_code!
@@ -142,7 +142,7 @@ class ProblemSetIngest
   end
 
   def reject_if_unusable(key)
-    ExerciseSection.for(key).reject_unusable!(@problem_set[key])
+    ExerciseSection.for(key).reject_unusable!(@problem_set[key], language: @language)
     nil
   rescue ProviderError::UnusableSectionError => e
     leave_out(key, e.message, e.code)

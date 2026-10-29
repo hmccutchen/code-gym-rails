@@ -8,7 +8,7 @@ module PlantedKey::Kind
 
   def quoted_key_texts(_key) = raise(NotImplementedError, "#{self} must implement .quoted_key_texts")
 
-  def unquoted_key_parts(section)
-    PlantedKey.unquoted_parts(quoted_key_texts(section[PlantedKey::FIELD]), within: section.values_at(*key_context_fields))
+  def unquoted_key_parts(section, language:)
+    PlantedKey.unquoted_parts(quoted_key_texts(section[PlantedKey::FIELD]), within: section.values_at(*key_context_fields), language: language)
   end
 end

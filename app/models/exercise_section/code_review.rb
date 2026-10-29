@@ -14,7 +14,7 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.refusal_codes = %w[snippet_missing snippet_too_long]
 
-  def self.reject_unusable!(section)
+  def self.reject_unusable!(section, **)
     snippet = section["snippet"]
     refuse!("snippet_missing", "Code review returned no usable snippet") unless usable_text?(snippet)
 

@@ -425,8 +425,8 @@ RSpec.describe ProblemSetIngest do
 
         step(set)
 
-        expect(ExerciseSection::Architecture).to have_received(:reject_unusable!).with(set["architecture"])
-        expect(ExerciseSection::PlanReview).to have_received(:reject_unusable!).with(set["plan_review"])
+        expect(ExerciseSection::Architecture).to have_received(:reject_unusable!).with(set["architecture"], language: "ruby_rails")
+        expect(ExerciseSection::PlanReview).to have_received(:reject_unusable!).with(set["plan_review"], language: "ruby_rails")
         expect(ExerciseSection::Challenge).not_to have_received(:reject_unusable!)
         expect(ExerciseSection::AmbiguityHunt).not_to have_received(:reject_unusable!)
       end
