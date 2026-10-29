@@ -60,7 +60,9 @@ than the cap (1040px plus the gutters) the brand sat left of a wide page's
 content: at 1280px and the default text size it was at x=72 and History's
 content at x=120. Below that width nothing changes, since the cap is wider
 than the window: 1104px at the default text size, 1129.6px at 140%, where
-the 2rem gutters are larger.
+the 2rem gutters are larger. Below 900px the nav takes the page column's
+800px cap less the side insets (#612), so it lines up with every page there,
+plain or wide.
 
 The nav doesn't follow the page. It uses the 1040px cap on every page, wide
 or not, because a nav that matched the page would jump 48px each time someone

@@ -105,9 +105,14 @@ and left the links less room at the collapse point.
 The open menu hangs from `nav`'s padding box, which runs under both notches
 so its background reaches the screen edge, and pads its links by
 `max(.75rem, inset)` on each side so they start clear of the notch (#615).
-Below 900px the nav row still spans the full width while a page's column
-stops at 800px, so at 844px the brand sits about 22px left of the content,
-notch or not.
+Below 900px `.inner` caps at the page column, `--container-max` less both
+side insets (#612). The insets come off because `nav` pads them outside
+`.inner`, while a page's `.container` takes them inside its own cap. So from
+800px to 899px the brand starts and the last link ends with the page
+content, notch or not: 46px at 844px, or 66px with a 44px notch, where it
+used to sit at 24px and 44px. The collapse still measures `nav`, so the cap
+narrows the row only above the width where the links fit; at 112% text the
+row collapses at about 807px and the capped row still holds every link.
 
 `desktop.css` caps `nav .inner` at 1040px plus `--container-pad-*`, which
 still include the inset, while `.inner` pads by less. So on a window with
@@ -160,10 +165,10 @@ line renders empty.
 
 ## `nav .inner`
 
-Its 1200px cap lifts it over `.container`'s 800px and 920px, so below 900px
-the brand sits apart from the links instead of crowding them inside the page
-column. From 900px `desktop.css` replaces the cap with the wide page's 1040px
-column, so the brand lines up with that column's left edge.
+Below 900px it takes the page column's cap through `--container-max`, which
+`.container` sets and `.inner` inherits by being one, so the 800px lives in
+one place. From 900px `desktop.css` replaces the cap with the wide page's
+1040px column, so the brand lines up with that column's left edge.
 
 ## `nav .brand`
 

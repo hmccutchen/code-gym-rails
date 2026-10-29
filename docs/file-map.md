@@ -276,6 +276,7 @@ What each listed file does.
 - `spec/views/page_stylesheets_spec.rb` — holds each page sheet to its own media queries and, for a page with desktop rules, its one 900px block last, and the Learn sheet's desktop rules off the elements the filter hides
 - `spec/requests/page_stylesheets_spec.rb` — each page links its own sheet, between `desktop` and the display sheets, and other pages link none
 - `spec/requests/wide_pages_spec.rb` — lists the pages whose container is not wide, so a page widens only by calling `wide_page`
+- `spec/system/nav_column_alignment_spec.rb` — the nav row lined up with the page column from 800 to 899px at 100% and 112% text, and at the phone gutter below 800px
 - `spec/system/nav_safe_area_spec.rb` — the nav in a notched landscape phone: the side inset counted once, the brand and last link lined up with the page at 932px, and every link fitting just above the collapse width with a notch at each text size, and the open menu's links clear of the notch with its background to the edge
 - `spec/system/history_layout_spec.rb` — History at every layout width: no sideways scroll, phone cards and safe-area edges, the full-width column from 600px, the desktop rail, and that its 900px rules change nothing below 900px
 - `spec/system/today_phone_layout_spec.rb` — Today under 600px: inset section cards 16px apart and clear of a side inset, a trial banner 16px under the title, the Submit row after the last section with a full-width 48px button and the nudge under it, a held submit's notice on screen, and the 599/600px boundary

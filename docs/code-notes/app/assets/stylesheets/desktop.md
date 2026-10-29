@@ -40,6 +40,6 @@ insets, so the brand sits one inset left of the page's content. No phone in
 landscape is that wide; a window that wide with side insets would need the
 cap to subtract them too.
 It applies on every page, wide or not, so the nav doesn't move between pages.
-The layout's `nav .inner` rule sets `max-width: 1200px` with the same
+The layout's `nav .inner` rule sets its own `max-width`, the page column less the side insets, with the same
 specificity, and this file loads after the layout's `<style>`, so the 1040px
 cap wins. `desktop_stylesheet_spec` holds that order. `container_gutter_spec` holds both selectors to the one rule.

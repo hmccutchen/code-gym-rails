@@ -19,11 +19,13 @@ RSpec.describe "Nav in a notched landscape phone", type: :system do
     expect(content["left"]).to be_within(0.5).of(59)
   end
 
-  it "puts the brand and the last link one notch from the edge at 844px" do
+  it "lines the brand and the last link up with the page column at 844px, one notch inside it" do
     visit_learn_with_notch(width: 844, height: 390, inset: 44)
 
-    expect(edges("nav .brand").sole.first).to be_within(0.5).of(44)
-    expect(client_width - rects("nav .nav-links a").last["right"]).to be_within(0.5).of(44)
+    content = container_content
+    expect(rect("nav .brand")["left"]).to be_within(0.5).of(content["left"])
+    expect(rects("nav .nav-links a").last["right"]).to be_within(0.5).of(content["right"])
+    expect(content["left"]).to be_within(0.5).of(22 + 44)
     expect(sideways_overflow).to eq(0)
   end
 
@@ -35,7 +37,7 @@ RSpec.describe "Nav in a notched landscape phone", type: :system do
       resize(narrowest_uncollapsed_nav_width(height: 430), height: 430)
 
       expect(page).to have_link("Settings", visible: :visible)
-      expect(edges("nav .brand").sole.first).to be_within(0.5).of(59)
+      expect(rect("nav .brand")["left"]).to be_within(0.5).of(container_content["left"])
       expect(nav_row_overflow).to eq("row" => 0, "page" => 0, "past_gutter" => 0)
     end
   end
