@@ -17,6 +17,14 @@ RSpec.describe KeyQuote do
         expect(described_class.normalize("(a, b) => a", language: "javascript")).to eq("(a,b)=>a")
       end
     end
+
+    it "misses a JavaScript quote that stops before a bare arrow parameter's arrow, which whitespace alone would match" do
+      code = "const done = (order) => order.paid;"
+      quote = "done = (order)"
+
+      expect(described_class.normalize(code, language: "javascript")).not_to include(described_class.normalize(quote, language: "javascript"))
+      expect(code.gsub(/\s/, "")).to include(quote.gsub(/\s/, ""))
+    end
   end
 
   describe ".line" do

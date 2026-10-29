@@ -25,6 +25,14 @@ can't disagree about a quote (design spec section 4, 2026-10-29).
   parameter are removed, so `(id)=>` reads as `id=>`. Prettier changes all
   four, and a provider usually quotes the code it wrote, before formatting.
   Ruby keeps its quotes, since `'` and `"` differ there.
+
+  These rules mostly let more quotes match, but the arrow-parameter rule
+  can make one miss that whitespace alone would match. It reads the
+  parentheses only when `=>` follows them, so a quote that stops before
+  the arrow keeps them while the code loses them: `done = (order)` misses
+  against `const done = (order) => order.paid;`. A stored key quote that
+  matched under the old rule can now log `quote_missing`. `key_quote_spec`
+  pins the case.
 - **Every language:** one comma at the very end is dropped. Both formatters
   add one to the last item of a list they wrap, so a quote of
   `timeoutMs: 5000` should equal the line `timeoutMs: 5000,`.

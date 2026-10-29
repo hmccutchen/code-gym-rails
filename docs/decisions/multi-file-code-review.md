@@ -30,7 +30,10 @@ breaks in another. This replaces the separate `change_review` kind that
 - **One matcher.** `KeyQuote` holds the quote-matching rule for stored keys
   and changed lines alike. It keeps the stored keys rule (all whitespace
   ignored) and adds the comma and JavaScript rules that undo the formatters'
-  rewrites.
+  rewrites. Those rules mostly let more quotes match, but not always: a
+  JavaScript quote that stops just before an arrow, such as
+  `done = (order)` against `const done = (order) => order.paid;`, now
+  misses (`docs/code-notes/app/models/key_quote.md`).
 - **No diagram** on a multi-file section, and the judge solve stays off.
 
 ## Launch in two steps
