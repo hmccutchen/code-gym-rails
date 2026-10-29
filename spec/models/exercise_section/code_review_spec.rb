@@ -338,10 +338,11 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file generation" do
       expect(guidance).to include("at most #{described_class::MAX_FILE_LINES} lines", "#{described_class::MAX_SNIPPET_LINES} lines together")
     end
 
-    it "keeps the vocabulary and hidden answer key lines, and separates authorization from an exploit" do
-      single_lines = guidance(file_range: 1..1).lines.drop(1)
+    it "keeps the vocabulary line, hides the key without naming fields it lacks, and separates authorization from an exploit" do
+      vocabulary_line = guidance(file_range: 1..1).lines.second.chomp
 
-      expect(guidance).to include(*single_lines.map(&:chomp))
+      expect(guidance).to include(vocabulary_line, described_class::MultiFile::HIDDEN_KEY_LINE)
+      expect(described_class::MultiFile::HIDDEN_KEY_LINE).not_to include("diagram", "snippet")
       expect(guidance).to include("An `authorization` flaw here is a broken contract between files, never an injection or mass-assignment exploit.")
     end
 
