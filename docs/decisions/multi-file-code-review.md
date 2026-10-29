@@ -27,6 +27,9 @@ breaks in another. This replaces the separate `change_review` kind that
 - **Changed lines** are quoted by the provider and resolved to line numbers
   after formatting through `KeyQuote`, since formatting can move lines. A
   quote that matches several lines, or none, is dropped rather than guessed.
+  The numbers go in `file_N_changed_lines` and the quotes stay in
+  `file_N_changed`, so the check gives the same result if it runs again
+  (#623).
 - **One matcher.** `KeyQuote` holds the quote-matching rule for stored keys
   and changed lines alike. It keeps the stored keys rule (all whitespace
   ignored) and adds the comma and JavaScript rules that undo the formatters'

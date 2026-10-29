@@ -10,8 +10,8 @@ RSpec.describe "A multi-file code review on a phone", type: :system do
   RUBY
 
   let(:files) do
-    { "file_1_path" => "app/models/order.rb", "file_1_code" => ORDER_CODE, "file_1_changed" => [ 2 ],
-      "file_2_path" => "app/models/line_item.rb", "file_2_code" => "def price\n  0\nend", "file_2_changed" => [] }
+    { "file_1_path" => "app/models/order.rb", "file_1_code" => ORDER_CODE, "file_1_changed_lines" => [ 2 ],
+      "file_2_path" => "app/models/line_item.rb", "file_2_code" => "def price\n  0\nend", "file_2_changed_lines" => [] }
   end
 
   def open_dashboard(user)

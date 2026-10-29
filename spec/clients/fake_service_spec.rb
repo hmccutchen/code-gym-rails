@@ -83,7 +83,7 @@ RSpec.describe FakeService do
 
       expect(judged.dropped_sections).to be_empty
       expect(ExerciseSection::CodeReview.files(section).map(&:path)).to eq(%w[app/models/customer.rb app/jobs/loyalty_report_job.rb])
-      expect(section["file_1_changed"]).to be_present.and(all(be_an(Integer)))
+      expect(section["file_1_changed_lines"]).to be_present.and(all(be_an(Integer)))
     end
   end
 

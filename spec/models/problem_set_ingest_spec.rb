@@ -999,7 +999,7 @@ RSpec.describe ProblemSetIngest, "multi-file code reviews" do
     kept = result.problem_set.fetch("code_review")
 
     expect(result.unusable_sections).to be_empty
-    expect(kept.values_at("file_1_changed", "file_2_changed")).to eq([ [ 3 ], [ 2 ] ])
+    expect(kept.values_at("file_1_changed_lines", "file_2_changed_lines")).to eq([ [ 3 ], [ 2 ] ])
     expect(ExerciseSection::CodeReview.files(kept).map(&:path)).to eq(%w[app/models/order.rb app/models/item.rb])
   end
 
@@ -1018,7 +1018,7 @@ RSpec.describe ProblemSetIngest, "the canned multi-file code review" do
 
     expect(result.unusable_sections).to be_empty
     expect(ExerciseSection::CodeReview.files(kept).size).to eq(2)
-    expect(kept["file_1_changed"]).to be_present.and(all(be_an(Integer)))
+    expect(kept["file_1_changed_lines"]).to be_present.and(all(be_an(Integer)))
     expect(kept).not_to have_key("snippet")
   end
   it "checks its key's quote against the files" do

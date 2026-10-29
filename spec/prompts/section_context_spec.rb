@@ -30,8 +30,8 @@ RSpec.describe SectionContext do
 
   describe "a multi-file code review" do
     let(:files) do
-      { "question" => "Q", "file_1_path" => "app/models/order.rb", "file_1_code" => "a = 1\nb = 2", "file_1_changed" => [ 2 ],
-        "file_2_path" => "app/models/item.rb", "file_2_code" => "c = 3", "file_2_changed" => [] }
+      { "question" => "Q", "file_1_path" => "app/models/order.rb", "file_1_code" => "a = 1\nb = 2", "file_1_changed_lines" => [ 2 ],
+        "file_2_path" => "app/models/item.rb", "file_2_code" => "c = 3", "file_2_changed_lines" => [] }
     end
 
     it "lists each file's path, changed lines and code" do

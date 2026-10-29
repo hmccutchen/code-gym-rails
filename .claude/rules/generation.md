@@ -70,7 +70,8 @@ read it before changing that area.
   own `scenario` and `source`, plus `current_schema` for a migration excerpt,
   and `RealSource` entries are appended, never inserted. A multi-file day
   (`docs/decisions/multi-file-code-review.md`)
-  shows 2 or 3 files (`file_N_path`, `file_N_code`, `file_N_changed`) in
+  shows 2 or 3 files (`file_N_path`, `file_N_code`, `file_N_changed` quotes,
+  resolved into the server's `file_N_changed_lines`) in
   place of the snippet and diagram, in a range `CodeReview.file_range` sets
   from `DailyPlan::Result#code_review_files` and the rung, and a range of one
   keeps today's prompt byte for byte. `GenerationPrompt` passes the range to

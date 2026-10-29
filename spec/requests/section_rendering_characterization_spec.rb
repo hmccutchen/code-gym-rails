@@ -215,8 +215,8 @@ RSpec.describe "section rendering", type: :request do
   describe "a multi-file code review" do
     let(:files) do
       { "file_1_path" => "app/models/cr_order.rb", "file_1_code" => "cr_order_a = 1\ncr_order_b = 2\ncr_order_c = 3",
-        "file_1_changed" => [ 2, 3 ],
-        "file_2_path" => "app/models/cr_item.rb", "file_2_code" => "cr_item_a = 1", "file_2_changed" => [] }
+        "file_1_changed_lines" => [ 2, 3 ],
+        "file_2_path" => "app/models/cr_item.rb", "file_2_code" => "cr_item_a = 1", "file_2_changed_lines" => [] }
     end
     let(:exercise) do
       code_review = PAYLOADS.fetch("code_review").except("snippet").merge(files)
