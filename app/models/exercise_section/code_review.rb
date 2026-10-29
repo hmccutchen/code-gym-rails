@@ -169,7 +169,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   end
 
   def self.code_fields
-    %w[snippet file_1_code file_2_code file_3_code]
+    [ "snippet", *FILE_CODE_FIELDS ]
   end
 
   def self.prose_fields
