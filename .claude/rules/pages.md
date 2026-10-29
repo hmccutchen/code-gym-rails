@@ -78,10 +78,13 @@ read it before changing that area.
   (`app_views_spec`); a rule more than one page uses stays shared.
 - **Desktop layout** (`docs/decisions/desktop-layout.md`): at 900px and wider
   a page that calls `wide_page` gets a centered column up to 1040px, built
-  from `.container`'s gutter properties; a page widens only that way, and
-  the `.container` rule itself is not edited. The nav's `.inner` takes the
-  same cap from the same rule on every page, so it never moves between
-  pages. `desktop.css` holds only that shared rule, inside its one
+  from `.container`'s gutter properties; a page widens only that way, never
+  by widening the `.container` rule, which exposes its plain cap as
+  `--container-max`. The nav's `.inner` takes the same 1040px cap from the
+  same rule on every page, so it never moves between pages; below 900px it
+  caps at `--container-max` less the side insets, lining up with the page
+  column, and the nav's collapse measures `.inner` so the row folds before
+  the cap pinches its links (#612). `desktop.css` holds only that shared rule, inside its one
   `@media (min-width: 900px)` block (`desktop_stylesheet_spec`); it loads
   after the layout's `<style>`, so the nav's cap wins a tie with the layout's
   own `nav .inner` rule. A page's own desktop rules sit at the end of its page
