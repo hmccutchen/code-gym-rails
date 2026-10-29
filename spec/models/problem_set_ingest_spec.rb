@@ -499,7 +499,7 @@ RSpec.describe ProblemSetIngest do
       it "validates the security_review section against that language's security_concepts, not the full vocabulary" do
         set = {
           "code_review"     => { "snippet" => "x = 1", "concept" => "memoization" },
-          "security_review" => { "concept" => "sql_injection_prevention" }
+          "security_review" => { "snippet" => "x = 1", "concept" => "sql_injection_prevention" }
         }
         out = step(set, language: "ruby_rails")
         expect(out["code_review"]["concept"]).to eq("memoization")
@@ -507,7 +507,7 @@ RSpec.describe ProblemSetIngest do
       end
 
       it "maps an on-language-vocabulary but off-security-list concept in security_review to 'other'" do
-        set = { "security_review" => { "concept" => "memoization" } }
+        set = { "security_review" => { "snippet" => "x = 1", "concept" => "memoization" } }
         result = ingest(set, language: "ruby_rails")
 
         expect(result.problem_set["security_review"]["concept"]).to eq("other")
@@ -589,7 +589,7 @@ RSpec.describe ProblemSetIngest do
       end
 
       it "strips a diagram the model volunteered for a non-diagrammable section" do
-        set = { "security_review" => { "diagram" => "flowchart TD\n  A --> B" } }
+        set = { "security_review" => { "snippet" => "x = 1", "diagram" => "flowchart TD\n  A --> B" } }
 
         expect(step(set)["security_review"]).not_to have_key("diagram")
       end

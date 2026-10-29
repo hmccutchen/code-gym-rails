@@ -141,7 +141,8 @@ read it before changing that area.
   `ProblemSetIngest#format_code!` runs each kind's `.code_fields` through
   `CodeFormat.all` once, before the boundary checks, so bounds and every
   reader see the shown layout, such as the `code_review` snippet's cap
-  (`CodeReview::MAX_SNIPPET_LINES`, which is `RealSource::MAX_LINES`): a longer
+  (`CodeReview::MAX_SNIPPET_LINES`, which is `RealSource::MAX_LINES` and which
+  `SecurityReview` shares): a longer
   snippet is refused, never cut, and design comparison's piece bound counts
   lines the same way (`ExerciseSection.shown_lines`). Ruby uses
   whitespace-only RuboCop `Layout` cops so a planted defect survives;

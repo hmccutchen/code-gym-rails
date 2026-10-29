@@ -7,6 +7,8 @@ module GenerationPrompt::RetryReasons
     "reasoning_failure" => "its wording gave away where the problem was or what the solution is, or made the task impossible as set.",
     "code_review.snippet_missing" => "it had no code snippet.",
     "code_review.snippet_too_long" => "its code snippet ran past #{ExerciseSection::CodeReview::MAX_SNIPPET_LINES} lines.",
+    "security_review.snippet_missing" => "it had no code snippet.",
+    "security_review.snippet_too_long" => "its code snippet ran past #{ExerciseSection::SecurityReview::MAX_SNIPPET_LINES} lines.",
     "design_comparison.piece_missing" => "one of its two pieces of code was missing.",
     "design_comparison.piece_too_long" => "one of its two pieces of code ran past #{ExerciseSection::DesignComparison::MAX_PIECE_LINES} lines.",
     "design_comparison.answer_key_incomplete" => "its answer_key was missing one of its fields.",
