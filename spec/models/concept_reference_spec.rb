@@ -100,6 +100,24 @@ RSpec.describe ConceptReference do
       expect(row).to be_fully_written
     end
 
+    it "counts a stored lesson only when it has a part the page can show" do
+      row = reference(**full_ladder)
+
+      [ "None", 42, [ "definition" ], {}, { "situations" => "not a list" } ].each do |stored|
+        row.lesson = stored
+        expect(row).not_to be_lesson, "counted #{stored.inspect} as a lesson"
+        expect(row.usable_lesson).to be_nil
+        expect(row).not_to be_fully_written
+      end
+    end
+
+    it "hands the page the stored lesson with unusable parts dropped" do
+      row = reference(lesson: { "definition" => "d", "situations" => "not a list", "habits" => [ { "habit" => "h" } ] })
+
+      expect(row).to be_lesson
+      expect(row.usable_lesson).to eq("definition" => "d")
+    end
+
     it "defaults historical rows to no completed generation and keeps unrelated updates out of the counter" do
       row = reference(**full_ladder)
       expect(row.generation_version).to eq(0)

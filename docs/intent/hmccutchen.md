@@ -421,10 +421,19 @@ data.*
 ## Thu Oct 29
 
 - a security_review snippet that is missing or past 40 lines refused at
-  ingest `#619 open`
+  ingest `#619`
   **why:** its prompt asks for about 10 to 15 lines, but nothing checked the
   reply, so a snippet of any length, or none, shipped
   **I decided:** share code_review's 40-line cap rather than a tighter one
   of its own, since nothing measures what providers return; after the
   reviews, share only the usable-text test across the three kinds, each
   kind keeping its own refusals
+- a concept's Learn page shows its explanation, guide and pitfalls again
+  when its stored lesson is the string "None" `#620 open`
+  **why:** four production references stored "None", which counted as a
+  lesson, so their pages hid everything but the tagline, code and senior
+  lens, and offered no way to write a lesson
+  **I decided:** after an explanation of each option with a real example,
+  both a read-side guard, so a stored value with nothing to show counts as
+  no lesson, and a one-time migration clearing every lesson that isn't an
+  object

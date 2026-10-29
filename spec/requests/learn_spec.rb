@@ -849,27 +849,33 @@ RSpec.describe "Learn", type: :request do
       end
     end
 
-    describe "a row whose lesson is not a hash (pinned as it renders today)" do
-      before do
-        guided_reference(lesson: "None", explanation: "hiddenprose closure", guide_plain_language: "hiddenprose closure",
-                         guide_pitfalls: "hiddenprose closure", senior_lens: "A senior view.",
-                         guide_worked_example: "a = 1\nb = 2")
+    describe "a row whose lesson is not a hash" do
+      def stored_lesson(value)
+        guided_reference(explanation: "shownprose closure", guide_plain_language: "plainprose closure",
+                         guide_pitfalls: "pitfallprose closure", ladder_junior: "j", ladder_mid_level: "m",
+                         ladder_senior: "s", ladder_principal_engineer: "p")
+        ConceptReference.where(concept: "n_plus_one").update_all(lesson: value)
       end
 
-      it "renders an empty lesson block and hides the explanation and guide prose, without raising" do
+      it "shows the explanation, guide and pitfalls, and offers the short lesson, when the lesson is the string None" do
+        stored_lesson("None")
         doc = page_at(path)
 
         expect(response).to have_http_status(:ok)
-        expect(doc.css("div.learn-lesson").size).to eq(1)
-        expect(doc.css("div.learn-lesson").text.strip).to eq("")
-        expect(doc.css("div.learn-lesson .gloss-term")).to be_empty
-        expect(response.body).not_to include("hiddenprose")
-        wrapped = doc.css("p").select { |p| p.at_css(".gloss-term") }
-        expect(wrapped.map { |p| p.at_css("strong") ? :tagline : p.text }).to eq([ :tagline ])
+        expect(doc.css("div.learn-lesson")).to be_empty
+        expect(response.body).to include("shownprose", "plainprose", "pitfallprose")
+        expect(response.body).to include(I18n.t("learn.write_lesson"))
       end
 
-      it "still wraps the tagline" do
-        expect(page_at(path).css("p > strong .gloss-term").size).to eq(1)
+      it "still renders when the lesson is a number or a list" do
+        [ 42, [ "definition" ] ].each do |value|
+          stored_lesson(value)
+          page_at(path)
+
+          expect(response).to have_http_status(:ok), "failed on #{value.inspect}"
+          expect(response.body).to include("shownprose")
+          ConceptReference.delete_all
+        end
       end
     end
 
