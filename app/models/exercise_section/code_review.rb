@@ -68,12 +68,14 @@ class ExerciseSection::CodeReview < ExerciseSection
       return drop_file_fields!(section)
     end
 
+    raise ArgumentError, "missing keyword: :language" if language.nil?
+
     FILE_SLOTS.each { |number| reject_incomplete_file!(section, number) }
     shown = files(section)
     reject_wrong_file_count!(section, shown.size, file_range)
     reject_long_files!(shown)
     reject_invalid_paths!(shown)
-    resolve_changed_lines!(section, language || "ruby_rails")
+    resolve_changed_lines!(section, language)
     drop_absent_files!(section)
   end
 

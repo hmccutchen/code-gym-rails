@@ -160,6 +160,12 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
   end
 
   describe "resolving changed lines" do
+    it "needs the language on a multi-file range, since the quotes are matched by its rules" do
+      expect { described_class.reject_unusable!(two_files, file_range: 2..2) }.to raise_error(ArgumentError, "missing keyword: :language")
+      expect { described_class.reject_unusable!(two_files, language: nil, file_range: 2..2) }
+        .to raise_error(ArgumentError, "missing keyword: :language")
+    end
+
     def resolved(section, language: "ruby_rails", file_range: 2..2)
       described_class.reject_unusable!(section, language: language, file_range: file_range)
       section.values_at("file_1_changed", "file_2_changed")
