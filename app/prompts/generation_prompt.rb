@@ -23,7 +23,7 @@ class GenerationPrompt
     @retention_annotation = retention_annotation
   end
 
-  def render(only: nil, fixed_concept: nil)
+  def render(only: nil, fixed_concept: nil, retry_cause: nil)
     kinds = kinds_for(only)
     rungs = @difficulty.rungs_for(kinds, skill_level: @user.skill_level)
 
@@ -65,7 +65,7 @@ class GenerationPrompt
       #{domain_modeling_guidance}
       - Reduced-tier concepts: for any concept whose annotation includes `reduced` (alone or as `(reduced, drilled)`), keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
-      - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.#{fixed_concept_line(fixed_concept)}#{shared_concept_line(only)}
+      - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.#{fixed_concept_line(fixed_concept, retry_cause)}#{shared_concept_line(only)}
       #{retention_block(kinds, rungs)}
       #{established_block}
       #{fourth_retention_block(kinds)}
@@ -205,10 +205,13 @@ class GenerationPrompt
     "- If a section's tagged concept is one of #{ConceptVocabulary::TYPESCRIPT_FLAVORED_CONCEPTS.join(", ")}, write that section's code using real TypeScript syntax and type annotations. Every other section stays plain JavaScript — do not switch the whole set to TypeScript just because one section calls for it.\n"
   end
 
-  def fixed_concept_line(fixed_concept)
+  def fixed_concept_line(fixed_concept, retry_cause)
     return "" unless fixed_concept
 
-    "\n- This section's concept must be exactly `#{fixed_concept}`: it replaces a section that was rejected on wording alone, and the day's plan already placed this concept here."
+    reason = RetryReasons.line(retry_cause)
+    turned_down = reason ? " It was turned down because #{reason}" : ""
+    "\n- This section replaces one that was turned down. Its concept must be exactly `#{fixed_concept}`, which the day's plan " \
+      "already placed here.#{turned_down} Write a new section for the same concept."
   end
 
   def shared_concept_line(only)

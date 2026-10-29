@@ -3,7 +3,9 @@ class ProblemSetIngest
 
   Suggestion = Data.define(:bucket, :name)
 
-  Unusable = Data.define(:key, :concept, :reason)
+  Unusable = Data.define(:key, :concept, :reason, :code) do
+    def initialize(key:, concept:, reason:, code: nil) = super
+  end
 
   KeyNote = Data.define(:key, :language, :outcome)
 
@@ -135,14 +137,21 @@ class ProblemSetIngest
     end
     return if resolved_keys.any?
 
-    raise ProviderError::UnusableSectionError, "No usable section left: #{@unusable_sections.map(&:reason).join('; ')}"
+    raise ProviderError::UnusableSectionError.new("No usable section left: #{@unusable_sections.map(&:reason).join('; ')}",
+                                                  code: @unusable_sections.one? ? @unusable_sections.sole.code : nil)
   end
 
   def reject_if_unusable(key)
     ExerciseSection.for(key).reject_unusable!(@problem_set[key])
     nil
+  rescue ProviderError::UnusableSectionError => e
+    leave_out(key, e.message, e.code)
   rescue ProviderError::InvalidResponseError => e
-    @unusable_sections << Unusable.new(key: key, concept: usable_concept(key), reason: e.message)
+    leave_out(key, e.message, nil)
+  end
+
+  def leave_out(key, reason, code)
+    @unusable_sections << Unusable.new(key: key, concept: usable_concept(key), reason: reason, code: code)
     @problem_set = @problem_set.except(key)
     ExerciseSection.resolved_key(@problem_set, slot_kinds_for(key))
   end

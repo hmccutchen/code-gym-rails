@@ -12,14 +12,16 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
 
+  def self.refusal_codes = %w[snippet_missing snippet_too_long]
+
   def self.reject_unusable!(section)
     snippet = section["snippet"]
-    raise ProviderError::InvalidResponseError, "Code review returned no usable snippet" unless snippet.is_a?(String) && snippet.strip.present?
+    refuse!("snippet_missing", "Code review returned no usable snippet") unless snippet.is_a?(String) && snippet.strip.present?
 
     lines = shown_lines(snippet)
     return if lines <= MAX_SNIPPET_LINES
 
-    raise ProviderError::InvalidResponseError, "Code review snippet runs #{lines} lines, past #{MAX_SNIPPET_LINES}"
+    refuse!("snippet_too_long", "Code review snippet runs #{lines} lines, past #{MAX_SNIPPET_LINES}")
   end
 
   def self.diagrammable?

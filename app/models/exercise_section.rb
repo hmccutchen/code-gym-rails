@@ -143,11 +143,19 @@ class ExerciseSection
     def arrange!(section)
     end
 
-    # Raises ProviderError::InvalidResponseError for an unusable section; ingest then leaves out only that section.
+    # Refuses an unusable section through .refuse! with a code from .refusal_codes; ingest then leaves out only that section.
     def reject_unusable!(section)
     end
 
+    def refusal_codes = []
+
     def shown_lines(code) = code.lines.count { |line| line.strip.present? }
+
+    def refuse!(code, message)
+      raise ArgumentError, "#{code} is not one of #{name}'s refusal codes" unless refusal_codes.include?(code)
+
+      raise ProviderError::UnusableSectionError.new(message, code: "#{key}.#{code}")
+    end
 
     # Indentation is part of the contract: first line unindented, fields at 4, closing brace at 2.
     def schema_fragment(label:)
@@ -302,5 +310,5 @@ class ExerciseSection
       text.lines.reject { |line| labels.include?(line.strip) }.join.strip
     end
   end
-  private_class_method :shown_lines
+  private_class_method :shown_lines, :refuse!
 end

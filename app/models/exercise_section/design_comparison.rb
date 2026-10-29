@@ -110,6 +110,8 @@ class ExerciseSection::DesignComparison < ExerciseSection
         ConceptVocabulary::TYPESCRIPT_FLAVORED_CONCEPTS + HOSTED_CONCEPTS
     end
 
+    def refusal_codes = %w[piece_missing piece_too_long answer_key_incomplete]
+
     def reject_unusable!(section)
       CANONICAL_PIECES.each { |field| reject_unusable_piece!(field, section[field]) }
 
@@ -117,7 +119,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
       unusable = PROVIDER_KEY_FIELDS.reject { |field| key.is_a?(Hash) && usable_text?(key[field]) }
       return if unusable.empty?
 
-      raise ProviderError::InvalidResponseError, "Design comparison answer key has no usable #{unusable.join(', ')}"
+      refuse!("answer_key_incomplete", "Design comparison answer key has no usable #{unusable.join(', ')}")
     end
 
     def arrange!(section)
@@ -206,10 +208,10 @@ class ExerciseSection::DesignComparison < ExerciseSection
     private
 
     def reject_unusable_piece!(field, piece)
-      raise ProviderError::InvalidResponseError, "Design comparison returned no usable #{field}" unless usable_text?(piece)
+      refuse!("piece_missing", "Design comparison returned no usable #{field}") unless usable_text?(piece)
       return if shown_lines(piece) <= MAX_PIECE_LINES
 
-      raise ProviderError::InvalidResponseError, "Design comparison #{field} runs past #{MAX_PIECE_LINES} lines"
+      refuse!("piece_too_long", "Design comparison #{field} runs past #{MAX_PIECE_LINES} lines")
     end
 
     def usable_text?(value)

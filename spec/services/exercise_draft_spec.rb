@@ -6,8 +6,8 @@ RSpec.describe ExerciseDraft do
   let(:rendered) { [] }
   let(:prompt) do
     Struct.new(:rendered) do
-      def render(only: nil, fixed_concept: nil)
-        rendered << { only: only&.key, fixed_concept: fixed_concept }
+      def render(only: nil, fixed_concept: nil, retry_cause: nil)
+        rendered << { only: only&.key, fixed_concept: fixed_concept }.merge(retry_cause ? { retry_cause: retry_cause } : {})
         "rendered prompt"
       end
     end.new(rendered)
@@ -39,7 +39,7 @@ RSpec.describe ExerciseDraft do
   it "takes the provider calls as callables and the draft as its only retry context" do
     expect(described_class::Provider.members).to eq(%i[prompt generate record_suggestion])
     expect(described_class.method(:retry_section).parameters)
-      .to eq([ %i[req draft], %i[req kind], %i[req concept], %i[keyreq provider], %i[key deadline] ])
+      .to eq([ %i[req draft], %i[req kind], %i[req concept], %i[keyreq provider], %i[key cause], %i[key deadline] ])
   end
 
   it "drafts the day through one generate_exercise call and returns the ingested set" do
@@ -115,6 +115,16 @@ RSpec.describe ExerciseDraft do
     expect(generated.sole).to include(user: user, purpose: "retry_section", language: "ruby_rails", subject: "pattern retry")
     expect(generated.sole[:deadline].ends_at).to eq(ends_at - CallProfiles.worst_case_seconds_for("judge_section"))
     expect(section).to include("concept" => "service_objects", "pitched_at" => "senior")
+  end
+
+  it "hands the retry prompt the recorded cause of the rejection, when there is one" do
+    draft = described_class.call(user, language: "ruby_rails", provider: provider)
+    rendered.clear
+    reply.replace("pattern" => FakeService::EXERCISE_PROBLEM_SET["pattern"].deep_dup)
+
+    described_class.retry_section(draft, ExerciseSection::Pattern, "service_objects", cause: "scope_mismatch", provider: provider)
+
+    expect(rendered).to eq([ { only: "pattern", fixed_concept: "service_objects", retry_cause: "scope_mismatch" } ])
   end
 
   it "renders a retry prompt carrying none of the rejected section's text, so the retry starts from fresh pieces" do
