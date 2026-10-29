@@ -6,15 +6,45 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   MAX_SNIPPET_LINES = RealSource::MAX_LINES
 
+  MAX_FILE_LINES = 15
+
+  MAX_PATH_LENGTH = 120
+
+  FILE_SLOTS = 1..3
+
+  FILE_PARTS = %w[path code changed].freeze
+
   def self.key_context_fields = %w[snippet current_schema]
 
   def self.quoted_key_texts(key) = [ key&.dig("issue") ]
 
   def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
 
-  def self.refusal_codes = %w[snippet_missing snippet_too_long]
+  def self.refusal_codes = %w[snippet_missing snippet_too_long file_count_wrong file_incomplete file_too_long path_invalid
+                              changed_lines_unresolved]
 
-  def self.reject_unusable!(section, **)
+  def self.files(section)
+    FILE_SLOTS.filter_map do |number|
+      path, code, changed = file_parts(section, number)
+      next unless usable_text?(path) && usable_text?(code)
+
+      File.new(path: path, code: code, changed: list_of?(changed, Integer) ? changed : [])
+    end
+  end
+
+  def self.reject_unusable!(section, language: nil, file_range: 1..1, **)
+    return reject_unusable_snippet!(section) if file_range.max == 1
+
+    FILE_SLOTS.each { |number| reject_incomplete_file!(section, number) }
+    shown = files(section)
+    reject_wrong_file_count!(section, shown.size, file_range)
+    reject_long_files!(shown)
+    reject_invalid_paths!(shown)
+    resolve_changed_lines!(section, language || "ruby_rails")
+    drop_absent_files!(section)
+  end
+
+  def self.reject_unusable_snippet!(section)
     snippet = section["snippet"]
     refuse!("snippet_missing", "Code review returned no usable snippet") unless usable_text?(snippet)
 
@@ -22,6 +52,68 @@ class ExerciseSection::CodeReview < ExerciseSection
     return if lines <= MAX_SNIPPET_LINES
 
     refuse!("snippet_too_long", "Code review snippet runs #{lines} lines, past #{MAX_SNIPPET_LINES}")
+  end
+
+  def self.reject_incomplete_file!(section, number)
+    path, code, changed = file_parts(section, number)
+    given = [ path, code ].reject(&:nil?)
+    complete = given.empty? || (given.size == 2 && given.all? { |text| usable_text?(text) })
+    return if complete && (changed.nil? || list_of?(changed, String))
+
+    refuse!("file_incomplete", "Code review file #{number} is incomplete or has a field of the wrong type")
+  end
+
+  def self.reject_wrong_file_count!(section, count, file_range)
+    return if section["snippet"].nil? && file_range.cover?(count)
+
+    refuse!("file_count_wrong", "Code review has #{count} complete files and #{section["snippet"].nil? ? 'no' : 'a'} snippet, " \
+                                "where #{file_range.min} to #{file_range.max} files were asked for")
+  end
+
+  def self.reject_long_files!(shown)
+    counts = shown.map { |file| shown_lines(file.code) }
+    longest = counts.max.to_i
+    refuse!("file_too_long", "A code review file runs #{longest} lines, past #{MAX_FILE_LINES}") if longest > MAX_FILE_LINES
+    return if counts.sum <= MAX_SNIPPET_LINES
+
+    refuse!("file_too_long", "Code review files run #{counts.sum} lines together, past #{MAX_SNIPPET_LINES}")
+  end
+
+  def self.reject_invalid_paths!(shown)
+    longest = shown.map { |file| file.path.length }.max.to_i
+    refuse!("path_invalid", "A code review path runs #{longest} characters, past #{MAX_PATH_LENGTH}") if longest > MAX_PATH_LENGTH
+    return if shown.map(&:path).uniq.size == shown.size
+
+    refuse!("path_invalid", "Two code review files share a path")
+  end
+
+  def self.resolve_changed_lines!(section, language)
+    resolved = FILE_SLOTS.to_h do |number|
+      _, code, changed = file_parts(section, number)
+      lines = usable_text?(code) ? Array(changed).filter_map { |quote| KeyQuote.line(code, quote, language: language) } : []
+      [ number, lines.flat_map(&:to_a).uniq.sort ]
+    end
+    refuse!("changed_lines_unresolved", "No code review file has a changed line its quotes resolve to") if resolved.values.all?(&:empty?)
+
+    resolved.each { |number, lines| section["file_#{number}_changed"] = lines if usable_text?(section["file_#{number}_code"]) }
+  end
+
+  def self.drop_absent_files!(section)
+    FILE_SLOTS.each do |number|
+      path, code, = file_parts(section, number)
+      FILE_PARTS.each { |part| section.delete("file_#{number}_#{part}") } if path.nil? && code.nil?
+    end
+  end
+
+  def self.file_parts(section, number) = FILE_PARTS.map { |part| section["file_#{number}_#{part}"] }
+
+  def self.list_of?(value, type) = value.is_a?(Array) && value.all?(type)
+
+  private_class_method :reject_unusable_snippet!, :reject_incomplete_file!, :reject_wrong_file_count!, :reject_long_files!,
+                       :reject_invalid_paths!, :resolve_changed_lines!, :drop_absent_files!, :file_parts, :list_of?
+
+  def self.arrange!(section)
+    section.delete("diagram") if files(section).any?
   end
 
   def self.diagrammable?
@@ -45,7 +137,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   end
 
   def self.code_fields
-    %w[snippet]
+    %w[snippet file_1_code file_2_code file_3_code]
   end
 
   def self.prose_fields

@@ -11,24 +11,25 @@ class ProblemSetIngest
 
   Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections, :key_notes)
 
-  def self.call(problem_set, language:, expected_keys:, daily:, code_review_source: nil, pitched_at: nil, eased_for: {},
-                fixed_concepts: {})
+  def self.call(problem_set, language:, expected_keys:, daily:, code_review_source: nil, code_review_files: 1..1, pitched_at: nil,
+                eased_for: {}, fixed_concepts: {})
     new(problem_set, language: language, expected_keys: expected_keys, daily: daily, code_review_source: code_review_source,
-        pitched_at: pitched_at, eased_for: eased_for, fixed_concepts: fixed_concepts).call
+        code_review_files: code_review_files, pitched_at: pitched_at, eased_for: eased_for, fixed_concepts: fixed_concepts).call
   end
 
   def self.prune_to_expected_keys(problem_set, expected_keys:)
     problem_set.deep_dup.slice(*expected_keys)
   end
 
-  def initialize(problem_set, language:, expected_keys:, daily:, code_review_source: nil, pitched_at: nil, eased_for: {},
-                 fixed_concepts: {})
+  def initialize(problem_set, language:, expected_keys:, daily:, code_review_source: nil, code_review_files: 1..1, pitched_at: nil,
+                 eased_for: {}, fixed_concepts: {})
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
     @daily              = daily
     @layout             = ExerciseSection.layout(daily: daily)
     @code_review_source = code_review_source
+    @code_review_files  = code_review_files
     @pitched_at         = pitched_at
     @eased_for          = eased_for
     @fixed_concepts     = fixed_concepts
@@ -142,7 +143,7 @@ class ProblemSetIngest
   end
 
   def reject_if_unusable(key)
-    ExerciseSection.for(key).reject_unusable!(@problem_set[key], language: @language)
+    ExerciseSection.for(key).reject_unusable!(@problem_set[key], language: @language, file_range: @code_review_files)
     nil
   rescue ProviderError::UnusableSectionError => e
     leave_out(key, e.message, e.code)
