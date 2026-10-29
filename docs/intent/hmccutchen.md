@@ -425,4 +425,6 @@ data.*
   **why:** its prompt asks for about 10 to 15 lines, but nothing checked the
   reply, so a snippet of any length, or none, shipped
   **I decided:** share code_review's 40-line cap rather than a tighter one
-  of its own, since nothing measures what providers return
+  of its own, since nothing measures what providers return; after the
+  reviews, share only the usable-text test across the three kinds, each
+  kind keeping its own refusals
