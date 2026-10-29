@@ -404,6 +404,16 @@ data.*
   **I decided:** only the double count in this PR; the nav sitting left of
   the 800px page column below 900px, notch or not, is its own issue
 - the open nav menu's links kept clear of a landscape notch, and Today added
-  to the top nav `#616 open`
+  to the top nav `#616`
   **I decided:** Today goes in this bug fix, linking to the same route as the
   home-screen app's Today tab
+- a judged retry told why its section was turned down, when that cause is
+  recorded `#617 open`
+  **why:** every retry was told it was "rejected on wording alone", whatever
+  the real cause
+  **I decided:** a reason only when one is recorded, never one it doesn't
+  have; one fixed line per judge principle or boundary check in one table,
+  a snapshot per cause; with no cause, only "write a new section for the
+  same concept"; never the rejected draft or the judge's own words; first a
+  report of what each retry path records, and a read of the production logs,
+  which held too few retries to measure

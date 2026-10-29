@@ -49,8 +49,12 @@ read it before changing that area.
   `dropped_sections`; a retry whose section fails `.reject_unusable!`
   (`UnusableSectionError`) spends one retry and the loop goes on, while any
   other retry failure, a wrong concept or a missing section included, drops
-  at once; a judge failure keeps the draft; a day with every section dropped raises
-  `AllSectionsRejectedError` and writes no row. A dropped kind still counts as
+  at once; a retry's prompt names the recorded cause (the judge's principle
+  or the refusal code) through one fixed line in
+  `GenerationPrompt::RetryReasons`, or no reason when none is recorded, and
+  never the draft or the judge's own words; a judge failure keeps the draft;
+  a day with every section dropped raises `AllSectionsRejectedError` and
+  writes no row. A dropped kind still counts as
   scheduled, and nothing in the rotation compensates, on purpose; a day's
   credit never exceeds the sections it delivered. The judge sees one section
   with no concept history, answer keys or `SERVER_STAMPS`.

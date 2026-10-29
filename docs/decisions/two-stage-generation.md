@@ -156,6 +156,21 @@ are lists with one entry per judged retry, in order, so a judge solve's
 `attempt` never skips a number. `unusable_retries`, present only when a
 retry was refused, counts the refused ones.
 
+**A retry is told why its section was turned down only when the cause is
+recorded** (#610). The cause is a code: the judge's `principle`, or the
+`<kind>.<check>` code a kind's `.reject_unusable!` raises with
+(`ExerciseSection.refusal_codes`, carried on `UnusableSectionError#code` and
+`ProblemSetIngest::Unusable#code`). The first retry gets the draft's cause,
+and each later one the cause that turned down the retry before it.
+`GenerationPrompt::RetryReasons` maps each code to one fixed plain-language
+line; with no recorded cause, or one missing from the table, the prompt
+names no reason and only asks for a new section for the same concept. The
+prompt never carries the rejected draft or the judge's own `reason` and
+`evidence`, which are model-written and can quote the draft. A spec holds
+the table to exactly the judge principles and the kinds' refusal codes, and
+each line has its own snapshot. A provider failure on a retry still drops
+the section, so no cause is passed for it.
+
 **A drop removes the key after ingest**, so no placeholder exists and every
 downstream count still derives from `active_section_keys`. The dropped keys
 persist on `daily_exercises.dropped_sections` (jsonb), and the dashboard

@@ -1,0 +1,1 @@
+- This section replaces one that was turned down. Its concept must be exactly `service_objects`, which the day's plan already placed here. It was turned down because its answer_key was missing one of its fields. Write a new section for the same concept.

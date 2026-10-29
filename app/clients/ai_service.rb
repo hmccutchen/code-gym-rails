@@ -288,7 +288,7 @@ class AiService
   def judged_generation_provider(deadline = GenerationDeadline::NONE)
     JudgedGeneration::Provider.new(
       judge_section: ->(*args, **options) { judge_section(*args, **options, deadline: deadline) },
-      retry_section: ->(draft, kind, concept) { retry_section(draft, kind, concept, deadline: deadline) },
+      retry_section: ->(draft, kind, concept, cause) { retry_section(draft, kind, concept, cause, deadline: deadline) },
       judge_identity: { judge_provider: self.class.provider_key, judge_model: model_for("judge_section") }
     )
   end
@@ -299,8 +299,8 @@ class AiService
     ExerciseDraft.call(user, language: language, blocking: blocking, deadline: deadline, provider: exercise_draft_provider)
   end
 
-  def retry_section(draft, kind, concept, deadline: GenerationDeadline::NONE)
-    ExerciseDraft.retry_section(draft, kind, concept, deadline: deadline, provider: exercise_draft_provider)
+  def retry_section(draft, kind, concept, cause = nil, deadline: GenerationDeadline::NONE)
+    ExerciseDraft.retry_section(draft, kind, concept, cause: cause, deadline: deadline, provider: exercise_draft_provider)
   end
 
   def exercise_draft_provider

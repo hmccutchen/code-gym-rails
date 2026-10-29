@@ -23,11 +23,11 @@ module GenerationPromptHelpers
   end
 
   def render_generation_prompt(user, language = "ruby_rails", history: [], difficulty: KindDifficulty.none,
-                        ladders: {}, only: nil, fixed_concept: nil, **plan_overrides)
+                        ladders: {}, only: nil, fixed_concept: nil, retry_cause: nil, **plan_overrides)
     GenerationPrompt.new(user, language, plan: plan_for(**plan_overrides), history: history,
                          difficulty: difficulty, ladders: ladders,
                          retention_annotation: generation_retention_annotation)
-                    .render(only: only, fixed_concept: fixed_concept)
+                    .render(only: only, fixed_concept: fixed_concept, retry_cause: retry_cause)
   end
 
   def generation_schema(user, language = "ruby_rails", only: nil, **plan_overrides)

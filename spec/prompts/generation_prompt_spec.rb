@@ -112,7 +112,7 @@ RSpec.describe GenerationPrompt do
       prompt = build
       retried = retry_render(prompt)
 
-      expect(retried).to include("This section's concept must be exactly `memoization`")
+      expect(retried).to include("Its concept must be exactly `memoization`")
       expect(retried).not_to include("as their concept today")
       expect(prompt.render).to eq(build.render)
       expect(prompt.render).to include("as their concept today")
