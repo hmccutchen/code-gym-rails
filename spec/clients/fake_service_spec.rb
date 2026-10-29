@@ -73,7 +73,7 @@ RSpec.describe FakeService do
     before do
       user.update!(skill_level: "mid_level")
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).and_return(:multi)
-      set = described_class::EXERCISE_PROBLEM_SET.merge("code_review" => described_class::CODE_REVIEW_MULTI_FILE)
+      set = described_class::EXERCISE_PROBLEM_SET.merge("code_review" => CodeReviewMultiFile::SECTION)
       stub_const("FakeService::REPLIES", described_class::REPLIES.merge("generate_exercise" => set.to_json))
     end
 

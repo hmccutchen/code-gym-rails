@@ -117,7 +117,7 @@ RSpec.describe ExerciseDraft do
     it "holds a retry to the same range as its draft" do
       user.update!(section_kind_levels: { "code_review" => "senior" })
       draft = described_class.call(user, language: "ruby_rails", provider: provider)
-      reply.replace("code_review" => FakeService::CODE_REVIEW_MULTI_FILE.deep_dup)
+      reply.replace("code_review" => CodeReviewMultiFile::SECTION.deep_dup)
 
       section = described_class.retry_section(draft, ExerciseSection::CodeReview, "n_plus_one", provider: provider)
 

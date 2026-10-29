@@ -1010,9 +1010,9 @@ RSpec.describe ProblemSetIngest, "multi-file code reviews" do
   end
 end
 
-RSpec.describe ProblemSetIngest, "FakeService's multi-file code review" do
+RSpec.describe ProblemSetIngest, "the canned multi-file code review" do
   it "comes through ingest on a two-file day with its changed lines resolved to line numbers" do
-    result = described_class.call({ "code_review" => FakeService::CODE_REVIEW_MULTI_FILE.deep_dup }, language: "ruby_rails",
+    result = described_class.call({ "code_review" => CodeReviewMultiFile::SECTION.deep_dup }, language: "ruby_rails",
                                   daily: DailyKinds::DEFAULT, expected_keys: %w[code_review], code_review_files: 2..2)
     kept = result.problem_set.fetch("code_review")
 
