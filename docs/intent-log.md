@@ -453,10 +453,18 @@ data.*
   cap the nav at the page column less the side insets, so it lines up with
   a landscape notch too
 - code review can show 2–3 files at higher rungs, built with its weight at 0
-  `#622 open`
+  `#622`
   **why:** a code review shouldn't need its own kind to show a change across
   files
   **I decided:** a shape of code review, not a new kind; junior 1 file,
   mid-level 2, senior and principal 2–3; half of non-RealSource days once on;
   after the reviews, the judge line waits for launch B, the key checks the
   files now, and KeyQuote's whole-file search waits for its caller
+- a multi-file code review's check made safe to run twice, keeping the
+  provider's quoted lines beside the line numbers they resolve to
+  `#624 open`
+  **why:** the check overwrote the quotes with line numbers, so a second
+  run would refuse a good section
+  **I decided:** keep the two in separate fields rather than accept
+  numbers as already resolved, so a provider can never skip the quote
+  match by sending numbers
