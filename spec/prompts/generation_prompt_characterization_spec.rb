@@ -118,11 +118,14 @@ RSpec.describe "generation prompt characterization" do
 
   MULTI_FILE_FIXTURES = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys, MULTI_FILE_RUNGS.keys)
     .to_h { |language, mode, rung|
+      authorization = ConceptVocabulary.selectable_for_section("code_review", language, mode: mode, rung: rung).include?("authorization")
+      contract_line = "a broken contract between files"
       [ "case__#{language}__multi_file_#{mode}_#{rung}",
         { render:   -> { render_case(language, pattern: :pattern, code_review_mode: mode, code_review_files: :multi,
                                      difficulty: KindDifficulty.new(levels: { "code_review" => rung }, locked: [])) },
-          includes: [ MULTI_FILE_RUNGS.fetch(rung).first, '"file_2_changed"', "a broken contract between files" ],
-          excludes: [ MULTI_FILE_RUNGS.fetch(rung).last, "The code_review snippet must be", '"snippet":  "string — ~10-15 lines' ] } ]
+          includes: [ MULTI_FILE_RUNGS.fetch(rung).first, '"file_2_changed"', *(contract_line if authorization) ],
+          excludes: [ MULTI_FILE_RUNGS.fetch(rung).last, "The code_review snippet must be", '"snippet":  "string — ~10-15 lines',
+                      *(contract_line unless authorization) ] } ]
     }.merge(
       "case__retry__javascript__code_review_multi_file" => {
         render:   -> { render_case("javascript", pattern: :pattern, code_review_mode: :application_code, code_review_files: :multi,

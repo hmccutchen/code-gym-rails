@@ -7,7 +7,7 @@ module ExerciseSection::CodeReview::MultiFile
     "principal_engineer" => "- The broken assumption is implicit, such as a callback, a default or a database constraint, and every fix has a cost on each side."
   }.freeze
 
-  def self.guidance(file_range:, label:, mode:, artifact:, test_framework:, rung:, code_style:, shared_lines:)
+  def self.guidance(file_range:, label:, mode:, artifact:, test_framework:, rung:, code_style:, vocabulary:, shared_lines:)
     [
       shape_line(mode, file_count(file_range), label, artifact, test_framework),
       SUBTLETY[rung],
@@ -18,7 +18,8 @@ module ExerciseSection::CodeReview::MultiFile
       "- Copy each changed line exactly as it reads in its file, and make sure it appears only once in its file, so it marks one line.",
       ("- Write each file in #{code_style}." if code_style),
       *shared_lines,
-      "- An `authorization` flaw here is a broken contract between files, never an injection or mass-assignment exploit."
+      ("- An `authorization` flaw here is a broken contract between files, never an injection or mass-assignment exploit." if
+        vocabulary.include?("authorization"))
     ].compact.join("\n")
   end
 

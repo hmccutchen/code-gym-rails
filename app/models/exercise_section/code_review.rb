@@ -188,7 +188,8 @@ class ExerciseSection::CodeReview < ExerciseSection
     vocabulary_line = "- Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}"
     if file_range.max > 1
       return MultiFile.guidance(file_range: file_range, label: label, mode: mode, artifact: artifact, test_framework: test_framework,
-                                rung: rung, code_style: code_style, shared_lines: [ vocabulary_line, MultiFile::HIDDEN_KEY_LINE ])
+                                rung: rung, code_style: code_style, vocabulary: vocabulary,
+                                shared_lines: [ vocabulary_line, MultiFile::HIDDEN_KEY_LINE ])
     end
 
     [ source ? source.instruction : content_instruction(label, mode, artifact, test_framework), vocabulary_line, HIDDEN_KEY_LINE ].join("\n")

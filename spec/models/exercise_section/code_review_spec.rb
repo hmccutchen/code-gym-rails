@@ -303,8 +303,8 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file generation" do
     end
   end
 
-  def guidance(mode: :application_code, file_range: 2..3, rung: "senior", **options)
-    described_class.generation_guidance(vocabulary: %w[n_plus_one authorization], label: "Ruby/Rails", mode: mode,
+  def guidance(mode: :application_code, file_range: 2..3, rung: "senior", vocabulary: %w[n_plus_one authorization], **options)
+    described_class.generation_guidance(vocabulary: vocabulary, label: "Ruby/Rails", mode: mode,
                                         artifact: "a Rails migration", test_framework: "an RSpec-style",
                                         rung: rung, file_range: file_range, **options)
   end
@@ -344,6 +344,10 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file generation" do
       expect(guidance).to include(vocabulary_line, described_class::MultiFile::HIDDEN_KEY_LINE)
       expect(described_class::MultiFile::HIDDEN_KEY_LINE).not_to include("diagram", "snippet")
       expect(guidance).to include("An `authorization` flaw here is a broken contract between files, never an injection or mass-assignment exploit.")
+    end
+
+    it "separates authorization from an exploit only when the vocabulary offers authorization" do
+      expect(guidance(vocabulary: %w[n_plus_one missing_index])).not_to include("authorization")
     end
 
     it "asks for the language's own code style only when it has one" do
