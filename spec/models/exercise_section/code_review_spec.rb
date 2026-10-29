@@ -369,11 +369,4 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file generation" do
       expect(fragment(2..2).keys).not_to include("file_3_path")
     end
   end
-
-  describe ".judge_guidance" do
-    it "asks the judge to solve a section with files and hold it to one interaction across files" do
-      expect(described_class.judge_guidance).to start_with("When the section lists files (file_1_path and the rest), solve it before judging")
-      expect(described_class.judge_guidance).to include("Never change a path, a file's code or the changed lines.")
-    end
-  end
 end

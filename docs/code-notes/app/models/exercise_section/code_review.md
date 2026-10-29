@@ -48,6 +48,6 @@ On a wider range `CodeReview::MultiFile` writes both. The guidance replaces the 
 
 A `RealSource` day is always single-file, so the multi-file guidance never meets an excerpt's own instruction.
 
-## `.judge_guidance`
+## The judge
 
-The judge sees the whole section and `.judge_guidance` is class-level, so one paragraph covers both shapes: it applies only "when the section lists files". The judge solves a multi-file section before judging, rejects it as `scope_mismatch` when one file alone shows the problem or the problem is an exploit, and as `underdetermined` when two interaction problems are equally plausible. It never changes a path, a file's code or the changed lines, which are part of the artifact like the snippet. The blind solve stays off for `code_review`.
+Launch A gives the judge no paragraph about files: `code_review` keeps the base `.judge_guidance`, which is nil, so the judge prompt is unchanged. The paragraph that asks the judge to solve a multi-file section and reject one that a single file explains arrives with launch B, when real days first ask for files (`docs/decisions/multi-file-code-review.md`). The blind solve stays off for `code_review`.

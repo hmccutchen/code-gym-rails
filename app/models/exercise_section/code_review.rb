@@ -215,13 +215,6 @@ class ExerciseSection::CodeReview < ExerciseSection
     SCHEMA
   end
 
-  def self.judge_guidance
-    "When the section lists files (file_1_path and the rest), solve it before judging: work out the planted problem and which " \
-      "files it takes. Reject as scope_mismatch if one file alone shows the problem, or if it is an exploit rather than a broken " \
-      "contract between files. Reject as underdetermined if more than one interaction problem is equally plausible. Never change " \
-      "a path, a file's code or the changed lines."
-  end
-
   def self.grading_note(section:, answer:)
     "Main point: the one planted issue — the defect in the snippet, the smell in the test file, or the flaw in the migration.\n" \
     "Essential pieces: why it is a problem in this code, and a fix that would work as written."

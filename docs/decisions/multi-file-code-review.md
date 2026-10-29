@@ -43,6 +43,9 @@ breaks in another. This replaces the separate `change_review` kind that
   - the key gains `files` and `evidence`, and a multi-file key that fails
     refuses its section
   - the grading note gets its multi-file branch
+  - the judge gets a paragraph for sections with files: solve the section
+    first, reject it when one file alone shows the problem or it is an
+    exploit, and never change a path, a file's code or the changed lines
   - a multi-file calibration fixture
   - a read-only script that splits `code_review` results by shape
   - then the weight goes to `{ single: 0.5, multi: 0.5 }`

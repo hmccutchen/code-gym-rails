@@ -695,8 +695,8 @@ RSpec.describe ExerciseSection do
   end
 
   describe ".judge_guidance" do
-    it "is absent for every kind but design_comparison and code_review" do
-      expect((described_class.all - [ ExerciseSection::DesignComparison, ExerciseSection::CodeReview ]).map(&:judge_guidance)).to all(be_nil)
+    it "is absent for every kind but design_comparison" do
+      expect((described_class.all - [ ExerciseSection::DesignComparison ]).map(&:judge_guidance)).to all(be_nil)
       expect(ExerciseSection::DesignComparison.judge_guidance).to include("Solve it before judging")
     end
   end
