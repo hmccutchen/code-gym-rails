@@ -4,11 +4,25 @@ class ExerciseSection::SecurityReview < ExerciseSection
 
   KEY_FIELDS = %w[vulnerability exploit mitigation].freeze
 
+  MAX_SNIPPET_LINES = ExerciseSection::CodeReview::MAX_SNIPPET_LINES
+
   def self.key_context_fields = %w[snippet]
 
   def self.quoted_key_texts(key) = [ key&.dig("vulnerability") ]
 
   def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
+
+  def self.refusal_codes = %w[snippet_missing snippet_too_long]
+
+  def self.reject_unusable!(section)
+    snippet = section["snippet"]
+    refuse!("snippet_missing", "Security review returned no usable snippet") unless usable_text?(snippet)
+
+    lines = shown_lines(snippet)
+    return if lines <= MAX_SNIPPET_LINES
+
+    refuse!("snippet_too_long", "Security review snippet runs #{lines} lines, past #{MAX_SNIPPET_LINES}")
+  end
 
   def self.vocabulary_key
     :security_concepts

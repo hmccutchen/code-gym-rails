@@ -16,7 +16,7 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.reject_unusable!(section)
     snippet = section["snippet"]
-    refuse!("snippet_missing", "Code review returned no usable snippet") unless snippet.is_a?(String) && snippet.strip.present?
+    refuse!("snippet_missing", "Code review returned no usable snippet") unless usable_text?(snippet)
 
     lines = shown_lines(snippet)
     return if lines <= MAX_SNIPPET_LINES

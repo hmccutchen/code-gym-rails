@@ -15,6 +15,10 @@ RSpec.describe "Section kind refusal codes" do
     "code_review.snippet_too_long" => lambda {
       [ ExerciseSection::CodeReview, { "snippet" => Array.new(ExerciseSection::CodeReview::MAX_SNIPPET_LINES + 1, "x = 1").join("\n") } ]
     },
+    "security_review.snippet_missing" => -> { [ ExerciseSection::SecurityReview, { "snippet" => nil } ] },
+    "security_review.snippet_too_long" => lambda {
+      [ ExerciseSection::SecurityReview, { "snippet" => Array.new(ExerciseSection::SecurityReview::MAX_SNIPPET_LINES + 1, "x = 1").join("\n") } ]
+    },
     "design_comparison.piece_missing" => -> { [ ExerciseSection::DesignComparison, comparison.merge("other_piece" => "") ] },
     "design_comparison.piece_too_long" => lambda {
       [ ExerciseSection::DesignComparison,
