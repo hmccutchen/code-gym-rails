@@ -114,6 +114,26 @@ RSpec.describe "generation prompt characterization" do
     "mid_level" => { "n_plus_one" => "a mid_level n_plus_one rung" }
   }.freeze
 
+  MULTI_FILE_RUNGS = { "mid_level" => [ "2 files", '"file_3_path"' ], "senior" => [ "2 or 3 files", "the structure this snippet describes" ] }.freeze
+
+  MULTI_FILE_FIXTURES = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys, MULTI_FILE_RUNGS.keys)
+    .to_h { |language, mode, rung|
+      [ "case__#{language}__multi_file_#{mode}_#{rung}",
+        { render:   -> { render_case(language, pattern: :pattern, code_review_mode: mode, code_review_files: :multi,
+                                     difficulty: KindDifficulty.new(levels: { "code_review" => rung }, locked: [])) },
+          includes: [ MULTI_FILE_RUNGS.fetch(rung).first, '"file_2_changed"', "a broken contract between files" ],
+          excludes: [ MULTI_FILE_RUNGS.fetch(rung).last, "The code_review snippet must be", '"snippet":  "string — ~10-15 lines' ] } ]
+    }.merge(
+      "case__retry__javascript__code_review_multi_file" => {
+        render:   -> { render_case("javascript", pattern: :pattern, code_review_mode: :application_code, code_review_files: :multi,
+                                   only: ExerciseSection::CodeReview, fixed_concept: "closures", retry_cause: "code_review.file_too_long",
+                                   difficulty: KindDifficulty.new(levels: { "code_review" => "senior" }, locked: [])) },
+        includes: [ "Its concept must be exactly `closures`", "one of its files ran past", '"file_3_changed"', "Prettier's style" ],
+        excludes: [ '"design_comparison": {', "The code_review snippet must be" ],
+        schema:   %w[code_review]
+      }
+    ).freeze
+
   # Each entry renders through the one builder with explicit inputs and pins the lines those inputs must produce.
   CASE_FIXTURES = {
     "case__ruby_rails__established" => {
@@ -286,7 +306,7 @@ RSpec.describe "generation prompt characterization" do
       excludes: [ "as their concept today", "Retention checks due today", '"challenge": {' ],
       schema:   %w[pseudocode_to_code]
     }
-  }.freeze
+  }.merge(MULTI_FILE_FIXTURES).freeze
 
   def render_case(language, as: user, **plan)
     render_generation_prompt(as, language, **BARE_PLAN.merge(plan))
@@ -362,7 +382,7 @@ RSpec.describe "generation prompt characterization" do
     it "pins every retry case to a one-section schema" do
       retries = CASE_FIXTURES.select { |name, _| name.start_with?("case__retry__") }
 
-      expect(retries.size).to eq(3)
+      expect(retries.size).to eq(4)
       expect(retries.values.map { |fixture| fixture.fetch(:schema).size }).to all(eq(1))
     end
   end

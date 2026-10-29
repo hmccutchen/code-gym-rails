@@ -99,7 +99,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       GUIDANCE
     end
 
-    def schema_fragment(label:)
+    def schema_fragment(label:, **)
       <<~SCHEMA.chomp
         "parsons_problem": {
             "title":    "string",

@@ -1009,3 +1009,16 @@ RSpec.describe ProblemSetIngest, "multi-file code reviews" do
     expect(result.unusable_sections.map(&:code)).to eq([ "code_review.snippet_missing" ])
   end
 end
+
+RSpec.describe ProblemSetIngest, "FakeService's multi-file code review" do
+  it "comes through ingest on a two-file day with its changed lines resolved to line numbers" do
+    result = described_class.call({ "code_review" => FakeService::CODE_REVIEW_MULTI_FILE.deep_dup }, language: "ruby_rails",
+                                  daily: DailyKinds::DEFAULT, expected_keys: %w[code_review], code_review_files: 2..2)
+    kept = result.problem_set.fetch("code_review")
+
+    expect(result.unusable_sections).to be_empty
+    expect(ExerciseSection::CodeReview.files(kept).size).to eq(2)
+    expect(kept["file_1_changed"]).to be_present.and(all(be_an(Integer)))
+    expect(kept).not_to have_key("snippet")
+  end
+end

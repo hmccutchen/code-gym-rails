@@ -705,6 +705,35 @@ RSpec.describe DailyPlan do
     end
   end
 
+  describe "#code_review_files on the plan" do
+    let(:user) { User.create!(email: "files@example.com", name: "Files") }
+
+    def plan(source_roll: :toy, files_roll: :multi)
+      pin_code_review_mode(:application_code)
+      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(source_roll)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).and_return(files_roll)
+      DailyPlan.for(user, language: "ruby_rails")
+    end
+
+    it "keeps every day single-file until the multi-file weight is raised" do
+      expect(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).to eq(single: 1.0, multi: 0.0)
+    end
+
+    it "carries the files roll on a toy day" do
+      expect(plan.code_review_files).to eq(:multi)
+      expect(plan(files_roll: :single).code_review_files).to eq(:single)
+    end
+
+    it "is single, without rolling, on a day grounded in a real excerpt" do
+      expect(WeightedRoll).not_to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS)
+
+      grounded = plan(source_roll: :real)
+
+      expect(grounded.code_review_source).to be_present
+      expect(grounded.code_review_files).to eq(:single)
+    end
+  end
+
   describe "stated rotation preferences" do
     it "hands the user's stated preferences to the rotation" do
       user = create_fake_provider_user
@@ -911,7 +940,7 @@ end
 
 RSpec.describe DailyPlan::Result, "#notes" do
   def result(**overrides)
-    defaults = DailyPlan::Result.members.index_with { nil }.merge(daily_kinds: DailyKinds::DEFAULT)
+    defaults = DailyPlan::Result.members.index_with { nil }.merge(daily_kinds: DailyKinds::DEFAULT, code_review_files: :single)
     DailyPlan::Result.new(**defaults, **overrides)
   end
 

@@ -68,7 +68,13 @@ read it before changing that area.
   Ruby `application_code` or `schema_review` day may be grounded in a
   `RealSource` excerpt; `test_file` has no pool. Ingest stamps the server's
   own `scenario` and `source`, plus `current_schema` for a migration excerpt,
-  and `RealSource` entries are appended, never inserted.
+  and `RealSource` entries are appended, never inserted. A multi-file day
+  shows 2 or 3 files (`file_N_path`, `file_N_code`, `file_N_changed`) in
+  place of the snippet and diagram, in a range `CodeReview.file_range` sets
+  from `DailyPlan::Result#code_review_files` and the rung, and a range of one
+  keeps today's prompt byte for byte. `GenerationPrompt` passes the range to
+  every kind as `file_range:`, and `ExerciseDraft` hands the same range to
+  ingest, whose `.reject_unusable!` refuses a section outside it.
 - **Design comparison, the second fixed section**
   (`docs/decisions/design-comparison-the-second-fixed-section.md`): The second
   default daily kind (`ExerciseSection::DesignComparison`): two working pieces that

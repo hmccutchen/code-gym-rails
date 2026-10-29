@@ -24,6 +24,10 @@ The capacity count (every non-fourth kind) is deliberately approximate: on some 
 
 The real-source choice is a second roll inside the mode, so `CODE_REVIEW_MODE_WEIGHTS`' three-way split stays exact.
 
+## `CODE_REVIEW_FILE_WEIGHTS`
+
+The files roll says only whether today's `code_review` may show several files; it gives no count. The count depends on the rung `code_review` is pitched at, which `DailyPlan` never reads (it reads no `KindDifficulty`), so `ExerciseSection::CodeReview.file_range` turns the roll and the rung into a range later, in `GenerationPrompt` and `ExerciseDraft`. A day grounded in a `RealSource` excerpt is always `:single` and skips the roll, so an excerpt is never split into files. The weight stays at `multi: 0.0` until keyed grading for `code_review` is in place, so no real day asks for files yet; `spec/support/code_review_files_default.rb` pins the roll to `:single` for every example, so specs stay deterministic once the weight is raised.
+
 ## `.hostable_buckets`
 
 Only `.established_concepts_for` reads this bucket list. Established concepts are optional prompt annotations, not concepts the prompt demands, so the looser bucket rule is enough there; reinforcement and retention checks use `DayHosts` instead. The buckets come from the day's non-fourth kinds, through `ConceptBucket.for`, rather than always including the language, so a pair whose only regular section is architecture never lists a language concept. For the default pair the list is unchanged: the language first, then `architecture` when that kind is planned.

@@ -7,6 +7,8 @@ Level meaning: the concept alongside a realistic constraint or a second interact
 Prose fields you may rewrite: scenario, question, teaching_note
 Every other field is the artifact and must not change.
 
+When the section lists files (file_1_path and the rest), solve it before judging: work out the planted problem and which files it takes. Reject as scope_mismatch if one file alone shows the problem, or if it is an exploit rather than a broken contract between files. Reject as underdetermined if more than one interaction problem is equally plausible. Never change a path, a file's code or the changed lines.
+
 The section as delivered:
 {
   "question": "What is wrong?",

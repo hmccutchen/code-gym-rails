@@ -60,7 +60,7 @@ class ExerciseSection::SecurityReview < ExerciseSection
   end
   private_class_method :snippet_bar
 
-  def self.schema_fragment(label:)
+  def self.schema_fragment(label:, **)
     <<~SCHEMA.chomp
       "security_review": {
           "title":        "string",

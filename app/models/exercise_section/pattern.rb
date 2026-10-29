@@ -29,7 +29,7 @@ class ExerciseSection::Pattern < ExerciseSection
     GUIDANCE
   end
 
-  def self.schema_fragment(label:)
+  def self.schema_fragment(label:, **)
     <<~SCHEMA.chomp
       "pattern": {
           "title":    "string — pattern name",

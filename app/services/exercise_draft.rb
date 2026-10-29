@@ -20,7 +20,7 @@ class ExerciseDraft
                                    subject: "problem set", blocking: blocking, deadline: deadline)
     ingested = ProblemSetIngest.call(
       reply, language: language, expected_keys: kinds.map(&:key), daily: plan.daily_kinds, code_review_source: plan.code_review_source,
-      pitched_at: difficulty.rungs(skill_level: user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
+      code_review_files: code_review_files(plan, difficulty, user), pitched_at: difficulty.rungs(skill_level: user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
     )
 
     diagnostics = GenerationDiagnostics.new(user)
@@ -42,7 +42,7 @@ class ExerciseDraft
     ingested = ProblemSetIngest.call(
       reply, language: language,
       expected_keys: [ kind.key ], daily: draft.plan.daily_kinds, fixed_concepts: { kind.key => concept },
-      code_review_source: draft.plan.code_review_source,
+      code_review_source: draft.plan.code_review_source, code_review_files: code_review_files(draft.plan, draft.difficulty, user),
       pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
       eased_for: eased_concepts_for(draft.plan, draft.difficulty).slice(kind.key)
     )
@@ -55,6 +55,11 @@ class ExerciseDraft
     GenerationDiagnostics.new(draft.user).finished(draft.language, draft, set,
                                                    dropped_concepts: dropped_concepts, judge: judge, unhosted: unhosted)
   end
+
+  def self.code_review_files(plan, difficulty, user)
+    ExerciseSection::CodeReview.day_file_range(plan: plan, difficulty: difficulty, skill_level: user.skill_level)
+  end
+  private_class_method :code_review_files
 
   def self.retry_ladders(draft, kind)
     GenerationLadders.for(draft.difficulty.rungs_for([ kind ], skill_level: draft.user.skill_level), draft.language,

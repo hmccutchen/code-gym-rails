@@ -33,3 +33,21 @@ On a range whose top is 1, `.reject_unusable!` also deletes every `file_N_*` fie
 ## How files reach a prompt
 
 `CodeReview::File#prompt_text` is the one way a file reads in a prompt: its path, its changed line numbers (or "none") and its code. `.files_context` joins them, and both `.review_context` (in place of the `Code snippet:` line) and `SectionContext` (for the duck and the difficulty assessment) use it, so the two can't describe files differently. A single-file section has no files, so both render as before. Neither reads `answer_key`.
+
+## `.file_range`: the one place the file count is decided
+
+`.file_range(files:, rung:)` turns the day's files roll (`DailyPlan::Result#code_review_files`) and the rung `code_review` is pitched at into the range of files the day asks for. A `:single` day is `1..1` at every rung. A `:multi` day is `1..1` at `junior`, `2..2` at `mid_level` and `2..3` at `senior` and `principal_engineer`; an unknown or missing rung reads as `junior`. The two top rungs share a count and differ in how subtle the problem is, which keeps the 40-line total in reach. `MULTI_FILE_RANGES` is keyed by every `KindDifficulty::LEVELS` entry, and a spec holds both that and its widest range to `FILE_SLOTS`.
+
+`.day_file_range(plan:, difficulty:, skill_level:)` reads the rung with `KindDifficulty#rung_for`, the same rung the generation prompt's difficulty block and `pitched_at` use. `GenerationPrompt` calls it to shape the prompt and `ExerciseDraft` calls it to hold ingest to the same range, on the draft and on a retry, so the prompt and the boundary check can't disagree. A retry keeps its draft's plan and difficulty, so it gets the same range. Easing changes a concept's tier, never the rung, so an eased section keeps its range too.
+
+## How the prompt asks for files
+
+`GenerationPrompt` passes `file_range:` (and the language's `code_style:` from `LanguagePrompts`) to every kind's `.generation_guidance` and `.schema_fragment`, and every other kind absorbs them with `**`, so the prompt needs no branch on kind. On a range whose top is 1 both methods render exactly what they rendered before files existed; the prompt snapshots hold that byte for byte.
+
+On a wider range `CodeReview::MultiFile` writes both. The guidance replaces the mode's snippet line with a line for that mode's files (a change and its caller, a change and its test, a schema change and the code that depends on it), states the rung's subtlety, gives the line caps, asks that every change add or edit at least one line and that each changed line appear only once in its file (so `KeyQuote.line` can resolve it), and on JavaScript asks for Prettier's style, whose rewrites `KeyQuote` undoes. It keeps the vocabulary line and the hidden `answer_key` line word for word, and adds that an `authorization` flaw here is a broken contract between files, so it stays out of `security_review`'s way. The fragment drops `snippet` and `diagram`, asks for `file_1` and `file_2`, offers `file_3` only when the range allows three, and keeps the same `answer_key` object (`ANSWER_KEY_SCHEMA`, shared with the single-file fragment). The key's `files` and `evidence` come with keyed grading, later.
+
+A `RealSource` day is always single-file, so the multi-file guidance never meets an excerpt's own instruction.
+
+## `.judge_guidance`
+
+The judge sees the whole section and `.judge_guidance` is class-level, so one paragraph covers both shapes: it applies only "when the section lists files". The judge solves a multi-file section before judging, rejects it as `scope_mismatch` when one file alone shows the problem or the problem is an exploit, and as `underdetermined` when two interaction problems are equally plausible. It never changes a path, a file's code or the changed lines, which are part of the artifact like the snippet. The blind solve stays off for `code_review`.

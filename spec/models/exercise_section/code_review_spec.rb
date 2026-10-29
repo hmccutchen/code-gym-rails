@@ -267,3 +267,112 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
     expect(described_class.code_fields).to eq(%w[snippet file_1_code file_2_code file_3_code])
   end
 end
+
+RSpec.describe ExerciseSection::CodeReview, "multi-file generation" do
+  describe ".file_range" do
+    {
+      "junior" => [ 1..1, 1..1 ], "mid_level" => [ 1..1, 2..2 ],
+      "senior" => [ 1..1, 2..3 ], "principal_engineer" => [ 1..1, 2..3 ]
+    }.each do |rung, (single, multi)|
+      it "gives #{single} on a single-file day and #{multi} on a multi-file day at #{rung}" do
+        expect(described_class.file_range(files: :single, rung: rung)).to eq(single)
+        expect(described_class.file_range(files: :multi, rung: rung)).to eq(multi)
+      end
+    end
+
+    it "treats an unknown or missing rung as junior" do
+      expect(described_class.file_range(files: :multi, rung: "wizard")).to eq(1..1)
+      expect(described_class.file_range(files: :multi, rung: nil)).to eq(1..1)
+    end
+
+    it "has a range for every level, none wider than the file slots" do
+      expect(described_class::MULTI_FILE_RANGES.keys).to eq(KindDifficulty::LEVELS)
+      expect(described_class::MULTI_FILE_RANGES.values.map(&:max).max).to eq(described_class::FILE_SLOTS.max)
+    end
+  end
+
+  describe ".day_file_range" do
+    it "reads the plan's files roll at the rung code_review is pitched at" do
+      plan = Data.define(:code_review_files).new(code_review_files: :multi)
+      difficulty = KindDifficulty.new(levels: { "code_review" => "senior" }, locked: [])
+
+      expect(described_class.day_file_range(plan: plan, difficulty: difficulty, skill_level: "junior")).to eq(2..3)
+      expect(described_class.day_file_range(plan: plan, difficulty: KindDifficulty.none, skill_level: "mid_level")).to eq(2..2)
+      expect(described_class.day_file_range(plan: plan.with(code_review_files: :single), difficulty: difficulty,
+                                            skill_level: "junior")).to eq(1..1)
+    end
+  end
+
+  def guidance(mode: :application_code, file_range: 2..3, rung: "senior", **options)
+    described_class.generation_guidance(vocabulary: %w[n_plus_one authorization], label: "Ruby/Rails", mode: mode,
+                                        artifact: "a Rails migration", test_framework: "an RSpec-style",
+                                        rung: rung, file_range: file_range, **options)
+  end
+
+  def fragment(file_range) = JSON.parse("{#{described_class.schema_fragment(label: 'Ruby/Rails', file_range: file_range)}}").fetch("code_review")
+
+  describe ".generation_guidance" do
+    it "renders exactly the single-file guidance on a one-file range" do
+      expect(guidance(file_range: 1..1)).to eq(guidance(file_range: 1..1, rung: "principal_engineer", code_style: "STYLE"))
+      expect(guidance(file_range: 1..1)).to eq(
+        described_class.generation_guidance(vocabulary: %w[n_plus_one authorization], label: "Ruby/Rails", mode: :application_code,
+                                            artifact: "a Rails migration", test_framework: "an RSpec-style")
+      )
+    end
+
+    it "replaces the mode's snippet line with a file line for that mode" do
+      expect(guidance).not_to include("The code_review snippet must be")
+      expect(guidance).to include("2 or 3 files of realistic Ruby/Rails code")
+      expect(guidance(mode: :test_file, file_range: 2..2)).to include("2 files", "an RSpec-style test file", "still passes")
+      expect(guidance(mode: :schema_review)).to include("a Rails migration", "the model or query code that depends on it")
+    end
+
+    it "states the rung's subtlety" do
+      expect(guidance(rung: "mid_level", file_range: 2..2)).to include("reading the second file closely")
+      expect(guidance(rung: "senior")).to include("in a file the change didn't touch")
+      expect(guidance(rung: "principal_engineer")).to include("a callback, a default or a database constraint")
+    end
+
+    it "asks for changed lines that each add or edit a line and are distinct within their file" do
+      expect(guidance).to include("at least one line", "appears only once in its file")
+      expect(guidance).to include("at most #{described_class::MAX_FILE_LINES} lines", "#{described_class::MAX_SNIPPET_LINES} lines together")
+    end
+
+    it "keeps the vocabulary and hidden answer key lines, and separates authorization from an exploit" do
+      single_lines = guidance(file_range: 1..1).lines.drop(1)
+
+      expect(guidance).to include(*single_lines.map(&:chomp))
+      expect(guidance).to include("An `authorization` flaw here is a broken contract between files, never an injection or mass-assignment exploit.")
+    end
+
+    it "asks for the language's own code style only when it has one" do
+      expect(guidance(code_style: "Prettier's style")).to include("Write each file in Prettier's style.")
+      expect(guidance).not_to include("Write each file in")
+    end
+  end
+
+  describe ".schema_fragment" do
+    it "renders exactly the single-file fragment on a one-file range" do
+      expect(described_class.schema_fragment(label: "Ruby/Rails", file_range: 1..1)).to eq(described_class.schema_fragment(label: "Ruby/Rails"))
+    end
+
+    it "asks for files in place of a snippet and a diagram, with today's answer key" do
+      expect(fragment(2..2).keys).to eq(%w[question teaching_note concept scenario file_1_path file_1_code file_1_changed
+                                           file_2_path file_2_code file_2_changed answer_key])
+      expect(fragment(2..2)["file_1_changed"]).to be_an(Array)
+      expect(fragment(2..2)["answer_key"]).to eq(fragment(1..1)["answer_key"])
+    end
+
+    it "offers a third file only when the range allows three" do
+      expect(fragment(2..3).keys).to include("file_3_path", "file_3_code", "file_3_changed")
+      expect(fragment(2..2).keys).not_to include("file_3_path")
+    end
+  end
+
+  describe ".judge_guidance" do
+    it "asks the judge to solve a section with files and hold it to one interaction across files" do
+      expect(described_class.judge_guidance).to start_with("When the section lists files (file_1_path and the rest), solve it before judging")
+      expect(described_class.judge_guidance).to include("Never change a path, a file's code or the changed lines.")
+    end
+  end
+end

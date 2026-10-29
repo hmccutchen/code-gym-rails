@@ -14,6 +14,26 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   FILE_PARTS = %w[path code changed].freeze
 
+  MULTI_FILE_RANGES = { "junior" => 1..1, "mid_level" => 2..2, "senior" => 2..3, "principal_engineer" => 2..3 }.freeze
+
+  HIDDEN_KEY_LINE = '- "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "question", "scenario", "teaching_note" or "diagram" — doing so would give away the answer before the engineer reads the snippet. Quote the code it points at in backticks, never by line number.'
+
+  ANSWER_KEY_SCHEMA = <<~SCHEMA.chomp
+    "answer_key": {
+          "issue":          "string — what is wrong and where, quoting the code in backticks",
+          "why_it_matters": "string — what goes wrong because of it in this code",
+          "fix":            "string — a fix that works as written"
+        }
+  SCHEMA
+
+  def self.file_range(files:, rung:)
+    files == :multi ? MULTI_FILE_RANGES.fetch(rung, MULTI_FILE_RANGES.fetch("junior")) : 1..1
+  end
+
+  def self.day_file_range(plan:, difficulty:, skill_level:)
+    file_range(files: plan.code_review_files, rung: difficulty.rung_for(self, skill_level: skill_level))
+  end
+
   def self.key_context_fields = %w[snippet current_schema]
 
   def self.quoted_key_texts(key) = [ key&.dig("issue") ]
@@ -155,12 +175,15 @@ class ExerciseSection::CodeReview < ExerciseSection
   end
 
   # A RealSource excerpt's own instruction replaces the mode's toy line.
-  def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, **)
-    <<~GUIDANCE.chomp
-      #{source ? source.instruction : content_instruction(label, mode, artifact, test_framework)}
-      - Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
-      - "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "question", "scenario", "teaching_note" or "diagram" — doing so would give away the answer before the engineer reads the snippet. Quote the code it points at in backticks, never by line number.
-    GUIDANCE
+  def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil,
+                               file_range: 1..1, code_style: nil, **)
+    shared_lines = [ "- Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}", HIDDEN_KEY_LINE ]
+    if file_range.max > 1
+      return MultiFile.guidance(file_range: file_range, label: label, mode: mode, artifact: artifact, test_framework: test_framework,
+                                rung: rung, code_style: code_style, shared_lines: shared_lines)
+    end
+
+    [ source ? source.instruction : content_instruction(label, mode, artifact, test_framework), *shared_lines ].join("\n")
   end
 
   def self.content_instruction(label, mode, artifact, test_framework)
@@ -176,7 +199,9 @@ class ExerciseSection::CodeReview < ExerciseSection
   private_class_method :content_instruction
 
   # Keep the snippet's language out of here: the instruction line above is its one authoritative statement.
-  def self.schema_fragment(label:)
+  def self.schema_fragment(label:, file_range: 1..1, **)
+    return MultiFile.schema_fragment(file_range: file_range, answer_key: ANSWER_KEY_SCHEMA) if file_range.max > 1
+
     <<~SCHEMA.chomp
       "code_review": {
           "question": "string — what to find/fix",
@@ -185,13 +210,16 @@ class ExerciseSection::CodeReview < ExerciseSection
           "concept": "string — exactly one concept from the provided vocabulary",
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help",
-          "answer_key": {
-            "issue":          "string — what is wrong and where, quoting the code in backticks",
-            "why_it_matters": "string — what goes wrong because of it in this code",
-            "fix":            "string — a fix that works as written"
-          }
+          #{ANSWER_KEY_SCHEMA}
         }
     SCHEMA
+  end
+
+  def self.judge_guidance
+    "When the section lists files (file_1_path and the rest), solve it before judging: work out the planted problem and which " \
+      "files it takes. Reject as scope_mismatch if one file alone shows the problem, or if it is an exploit rather than a broken " \
+      "contract between files. Reject as underdetermined if more than one interaction problem is equally plausible. Never change " \
+      "a path, a file's code or the changed lines."
   end
 
   def self.grading_note(section:, answer:)

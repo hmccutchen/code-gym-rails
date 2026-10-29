@@ -43,7 +43,7 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
     GUIDANCE
   end
 
-  def self.schema_fragment(label:)
+  def self.schema_fragment(label:, **)
     <<~SCHEMA.chomp
       "ambiguity_hunt": {
           "title":    "string",

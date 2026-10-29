@@ -3,20 +3,13 @@ require "rails_helper"
 RSpec.describe ExerciseSection do
   it "names only code fields that appear in each kind's schema, since any other name would go unformatted silently" do
     described_class.all.each do |kind|
-      (kind.code_fields - multi_file_fields_without_a_fragment).each do |field|
-        expect(kind.schema_fragment(label: "Ruby")).to include(%("#{field}")), "#{kind.key}: #{field}"
+      fragments = [ 1..1, 2..3 ].map { |file_range| kind.schema_fragment(label: "Ruby", file_range: file_range) }.join
+
+      kind.code_fields.each do |field|
+        expect(fragments).to include(%("#{field}")), "#{kind.key}: #{field}"
       end
     end
   end
-
-  it "lists code_review's file fields before the multi-file schema fragment exists, and only until then" do
-    fragment = ExerciseSection::CodeReview.schema_fragment(label: "Ruby")
-
-    expect(ExerciseSection::CodeReview.code_fields).to include(*multi_file_fields_without_a_fragment)
-    multi_file_fields_without_a_fragment.each { |field| expect(fragment).not_to include(%("#{field}")) }
-  end
-
-  def multi_file_fields_without_a_fragment = %w[file_1_code file_2_code file_3_code]
 
   describe ".keys" do
     it "lists every section kind in the order the app has always enumerated them" do
@@ -702,8 +695,8 @@ RSpec.describe ExerciseSection do
   end
 
   describe ".judge_guidance" do
-    it "is absent for every kind but design_comparison" do
-      expect((described_class.all - [ ExerciseSection::DesignComparison ]).map(&:judge_guidance)).to all(be_nil)
+    it "is absent for every kind but design_comparison and code_review" do
+      expect((described_class.all - [ ExerciseSection::DesignComparison, ExerciseSection::CodeReview ]).map(&:judge_guidance)).to all(be_nil)
       expect(ExerciseSection::DesignComparison.judge_guidance).to include("Solve it before judging")
     end
   end
