@@ -417,7 +417,7 @@ data.*
   **I decided:** Today goes in this bug fix, linking to the same route as the
   home-screen app's Today tab
 - a judged retry told why its section was turned down, when that cause is
-  recorded `#617 open`
+  recorded `#617`
   **why:** every retry was told it was "rejected on wording alone", whatever
   the real cause
   **I decided:** a reason only when one is recorded, never one it doesn't
@@ -426,3 +426,12 @@ data.*
   same concept"; never the rejected draft or the judge's own words; first a
   report of what each retry path records, and a read of the production logs,
   which held too few retries to measure
+
+## Thu Oct 29
+
+- a security_review snippet that is missing or past 40 lines refused at
+  ingest `#619 open`
+  **why:** its prompt asks for about 10 to 15 lines, but nothing checked the
+  reply, so a snippet of any length, or none, shipped
+  **I decided:** share code_review's 40-line cap rather than a tighter one
+  of its own, since nothing measures what providers return
