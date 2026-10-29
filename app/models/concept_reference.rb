@@ -23,7 +23,11 @@ class ConceptReference < ApplicationRecord
 
   # Kept out of complete? so the ladder poll and LadderCoverage never wait on a lesson.
   def lesson?
-    lesson.present?
+    usable_lesson.present?
+  end
+
+  def usable_lesson
+    ConceptLesson.from_provider(lesson)
   end
 
   def fully_written?

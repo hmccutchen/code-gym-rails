@@ -8,7 +8,7 @@
   <%# Reference fields render for any row, guide or not; only the three guide fields check guide?. %>
   <p><strong><%= glossary_wrap(@reference.tagline) %></strong></p>
   <% if @reference.lesson? %>
-    <%= render "learn/lesson", lesson: @reference.lesson %>
+    <%= render "learn/lesson", lesson: @reference.usable_lesson %>
   <% else %>
     <p><%= glossary_wrap(@reference.explanation) %></p>
   <% end %>

@@ -32,7 +32,8 @@ carries `ladder_junior`, `ladder_mid_level`, `ladder_senior`,
 authority for "does this row carry the difficulty ladder"; `#complete?` is
 `guide? && ladder?`. It also carries `lesson` (nullable jsonb): the short
 lesson the Learn page shows, in `ConceptLesson`'s shape. `#lesson?` says
-whether a row has one and stays out of `#complete?`, so the ladder poll and
+whether a row has one, read through `#usable_lesson` so a stored value with
+no part the page can show counts as none, and stays out of `#complete?`, so the ladder poll and
 `LadderCoverage` never wait on it; `#fully_written?` is `complete? &&
 lesson?`, the check `GenerateConceptReferenceJob` skips a row on.
 
