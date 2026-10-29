@@ -151,6 +151,8 @@ class ExerciseSection
 
     def shown_lines(code) = code.lines.count { |line| line.strip.present? }
 
+    def usable_text?(value) = value.is_a?(String) && value.strip.present?
+
     def refuse!(code, message)
       raise ArgumentError, "#{code} is not one of #{name}'s refusal codes" unless refusal_codes.include?(code)
 
@@ -310,5 +312,5 @@ class ExerciseSection
       text.lines.reject { |line| labels.include?(line.strip) }.join.strip
     end
   end
-  private_class_method :shown_lines, :refuse!
+  private_class_method :shown_lines, :usable_text?, :refuse!
 end

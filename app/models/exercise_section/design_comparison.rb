@@ -214,10 +214,6 @@ class ExerciseSection::DesignComparison < ExerciseSection
       refuse!("piece_too_long", "Design comparison #{field} runs past #{MAX_PIECE_LINES} lines")
     end
 
-    def usable_text?(value)
-      value.is_a?(String) && value.strip.present?
-    end
-
     def code_review_overlap_line(alongside)
       return "" unless alongside.include?(ExerciseSection::CodeReview.key)
 

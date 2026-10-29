@@ -673,6 +673,14 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".usable_text?" do
+    it "accepts only a string with something besides whitespace, for the kinds' own boundary checks" do
+      expect(described_class.private_methods).to include(:usable_text?)
+      expect(ExerciseSection::CodeReview.respond_to?(:usable_text?)).to be(false)
+      expect([ "x", nil, "  \n ", 42 ].map { |value| described_class.send(:usable_text?, value) }).to eq([ true, false, false, false ])
+    end
+  end
+
   describe ".reject_unusable!" do
     it "leaves a section of a kind with nothing to refuse untouched" do
       section = { "question" => "" }

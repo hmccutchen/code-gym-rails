@@ -4,7 +4,7 @@
 
 The prompt asks for a snippet of about 10 to 15 lines, but until issue #599 nothing checked the reply, and a long snippet costs the most on a phone, where every extra line is more scrolling before the question.
 
-The cap is `RealSource::MAX_LINES` (40) rather than a tighter number. A grounded day asks for a modified copy of a curated excerpt that keeps its shape, and an excerpt can be up to 40 lines, so a lower cap would refuse legitimate grounded sections. A spec runs every curated excerpt through the formatter and the check to hold that. A tighter cap for the toy modes would need a measurement of what providers actually return first.
+The cap is `RealSource::MAX_LINES` (40) rather than a tighter number. A grounded day asks for a modified copy of a curated excerpt that keeps its shape, and an excerpt can be up to 40 lines, so a lower cap would refuse legitimate grounded sections. A spec runs every curated excerpt through the formatter and the check to hold that. A tighter cap for the toy modes would need a measurement of what providers actually return first. `SecurityReview::MAX_SNIPPET_LINES` reads this constant (#604), so changing it for grounding reasons also moves security_review's cap and its retry line.
 
 Lines are counted after `ProblemSetIngest#format_code!`, so the cap measures the code as shown, and blank lines don't count, the same rule design comparison's `MAX_PIECE_LINES` uses (`ExerciseSection.shown_lines`).
 
