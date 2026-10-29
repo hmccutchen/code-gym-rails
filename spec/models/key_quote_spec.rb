@@ -59,6 +59,13 @@ RSpec.describe KeyQuote do
       expect(described_class.line("foo(\n  a,\n)", "foo(a)", language: "javascript")).to eq(1..3)
     end
 
+    it "matches a JavaScript statement Prettier wrapped onto more than four lines" do
+      wrapped = "const order = await createOrder(\n  customerId,\n  lineItems,\n  shippingAddress,\n  couponCode,\n);\nreturn order;"
+      quote = "const order = await createOrder(customerId, lineItems, shippingAddress, couponCode);"
+
+      expect(described_class.line(wrapped, quote, language: "javascript")).to eq(1..6)
+    end
+
     it "never matches a blank line, and never counts a run twice by padding it with one" do
       expect(described_class.line("a\n\n", "", language: "ruby_rails")).to be_nil
       expect(described_class.line("x();\n\nreturnValue();\n", "returnValue()", language: "javascript")).to eq(3..3)

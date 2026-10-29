@@ -46,8 +46,10 @@ semicolon-free quote.
 
 `.line(code, quote, language:)` is whole-line equality, for naming a changed
 line. It compares the normalized quote with each normalized source line,
-and on JavaScript also with each run of two to four lines joined, since
-Prettier can wrap one line onto several. It answers only when exactly one
+and on JavaScript also with each run of two or more lines joined, up to the
+whole code, since Prettier puts each argument of a long call on its own line
+and a statement can wrap onto five lines or more. A file is at most 15 shown
+lines, so trying every run stays cheap. It answers only when exactly one
 line or run matches. Two matches mean the quote doesn't say which line it
 means (a bare `end` or `}`), so it returns nil rather than guess. A blank
 line never matches, and a run never starts or ends on a line that

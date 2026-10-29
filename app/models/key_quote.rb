@@ -1,7 +1,5 @@
 # Design notes: docs/code-notes/app/models/key_quote.md
 module KeyQuote
-  JOINED_LINES = 2..4
-
   CLOSER_COMMA = /,(?=[)\]}])/
 
   BARE_ARROW_PARAMETER = /(\()[A-Za-z_$][\w$]*(\))=>/
@@ -22,7 +20,7 @@ module KeyQuote
   end
 
   def self.candidate_ranges(line_count, language)
-    sizes = language == "javascript" ? [ 1, *JOINED_LINES ] : [ 1 ]
+    sizes = language == "javascript" ? (1..line_count) : [ 1 ]
     sizes.flat_map { |size| (1..(line_count - size + 1)).map { |first| first..(first + size - 1) } }
   end
 
