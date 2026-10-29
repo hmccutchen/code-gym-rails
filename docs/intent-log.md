@@ -446,3 +446,11 @@ data.*
   both a read-side guard, so a stored value with nothing to show counts as
   no lesson, and a one-time migration clearing every lesson that isn't an
   object
+- code review can show 2–3 files at higher rungs, built with its weight at 0
+  `#622 open`
+  **why:** a code review shouldn't need its own kind to show a change across
+  files
+  **I decided:** a shape of code review, not a new kind; junior 1 file,
+  mid-level 2, senior and principal 2–3; half of non-RealSource days once on;
+  after the reviews, the judge line waits for launch B, the key checks the
+  files now, and KeyQuote's whole-file search waits for its caller
