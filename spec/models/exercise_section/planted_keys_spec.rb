@@ -81,13 +81,13 @@ RSpec.describe "The answer key each discovery kind plants" do
     end
 
     it "still refuses a section with no problem statement" do
-      expect { kind.reject_unusable!(PlantedKey::FIELD => { "missable_requirements" => [ "a" ] }) }
+      expect { kind.reject_unusable!({ PlantedKey::FIELD => { "missable_requirements" => [ "a" ] } }) }
         .to raise_error(ProviderError::InvalidResponseError)
     end
   end
 
   describe ".unquoted_key_parts" do
-    def unquoted(kind, section) = kind.unquoted_key_parts(section)
+    def unquoted(kind, section) = kind.unquoted_key_parts(section, language: "ruby_rails")
 
     it "checks a code review's issue against its snippet and any current schema" do
       kind = ExerciseSection::CodeReview
@@ -127,7 +127,7 @@ RSpec.describe "The answer key each discovery kind plants" do
       planted.each do |kind|
         section = FakeService::EXERCISE_PROBLEM_SET.fetch(kind.key).deep_dup
         expect(kind.normalize_planted_key(section)).to be_a(Hash), kind.key
-        expect(kind.unquoted_key_parts(section)).to eq([]), kind.key
+        expect(kind.unquoted_key_parts(section, language: "ruby_rails")).to eq([]), kind.key
         expect(kind.key_context_fields).to all(be_a(String)), kind.key
       end
     end

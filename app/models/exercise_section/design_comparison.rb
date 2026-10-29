@@ -112,7 +112,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
 
     def refusal_codes = %w[piece_missing piece_too_long answer_key_incomplete]
 
-    def reject_unusable!(section)
+    def reject_unusable!(section, **)
       CANONICAL_PIECES.each { |field| reject_unusable_piece!(field, section[field]) }
 
       key = section[ANSWER_KEY_FIELD]
@@ -187,7 +187,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
       GUIDANCE
     end
 
-    def schema_fragment(label:)
+    def schema_fragment(label:, **)
       <<~SCHEMA.chomp
         "design_comparison": {
             "title":    "string",

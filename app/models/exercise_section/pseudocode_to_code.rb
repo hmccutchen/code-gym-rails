@@ -19,7 +19,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
   def self.refusal_codes = %w[problem_statement_missing]
 
   # Rejects rather than repairs: the statement is the whole task, and a non-string raises in glossary_wrap.
-  def self.reject_unusable!(section)
+  def self.reject_unusable!(section, **)
     statement = section["problem_statement"].is_a?(String) ? section["problem_statement"].strip : ""
     refuse!("problem_statement_missing", "Pseudocode section returned no usable problem_statement to plan against") if statement.empty?
 
@@ -87,7 +87,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     GUIDANCE
   end
 
-  def self.schema_fragment(label:)
+  def self.schema_fragment(label:, **)
     <<~SCHEMA.chomp
       "pseudocode_to_code": {
           "title":    "string — short name for the problem",

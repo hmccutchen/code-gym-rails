@@ -3,8 +3,10 @@ require "rails_helper"
 RSpec.describe ExerciseSection do
   it "names only code fields that appear in each kind's schema, since any other name would go unformatted silently" do
     described_class.all.each do |kind|
+      fragments = [ 1..1, 2..3 ].map { |file_range| kind.schema_fragment(label: "Ruby", file_range: file_range) }.join
+
       kind.code_fields.each do |field|
-        expect(kind.schema_fragment(label: "Ruby")).to include(%("#{field}")), "#{kind.key}: #{field}"
+        expect(fragments).to include(%("#{field}")), "#{kind.key}: #{field}"
       end
     end
   end

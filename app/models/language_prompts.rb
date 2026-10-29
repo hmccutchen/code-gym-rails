@@ -12,6 +12,7 @@ module LanguagePrompts
       coach:             "JavaScript/React",
       test_framework:    "a Jest/Vitest-style",
       schema_artifact:   "a Prisma schema change, with the migration it generates",
+      code_style:        "Prettier's style: semicolons, double quotes, parentheses around arrow parameters, and trailing commas",
       focus:             "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
     },
     "architecture" => {

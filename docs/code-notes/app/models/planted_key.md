@@ -24,11 +24,15 @@ that added keys. hmccutchen/code-gym-rails#597 moves them here.
 
 ## The quote match
 
-`.unquoted_parts` compares with all whitespace removed on both sides. The
-Ruby formatter's Layout cops add spaces the provider never wrote
-(`{a: 1}` becomes `{ a: 1 }`, `x+1` becomes `x + 1`), so a quote of the
-provider's own snippet would otherwise miss against the code as shown. A
-quote under `MIN_QUOTE_LENGTH` characters is left out, since a lone `.`
-matches anything. A backtick inside a quote, such as a JavaScript template
-literal, splits it into fragments; the check is a diagnostic, so that limit
-is accepted.
+`.unquoted_parts` compares the quote with the shown text through
+`KeyQuote.normalize`, given the set's language, and counts a quote missing
+when its normalized form isn't a substring of the normalized text
+(`docs/code-notes/app/models/key_quote.md`). The Ruby formatter's Layout
+cops add spaces the provider never wrote (`{a: 1}` becomes `{ a: 1 }`, `x+1`
+becomes `x + 1`), and both formatters add a trailing comma to the last item
+of a wrapped list, so a quote of the provider's own snippet would otherwise
+miss against the code as shown. A quote whose normalized form is under
+`MIN_QUOTE_LENGTH` characters is left out, since a lone `.` matches
+anything. A backtick inside a quote, such as a JavaScript template literal,
+splits it into fragments; the check is a diagnostic, so that limit is
+accepted.

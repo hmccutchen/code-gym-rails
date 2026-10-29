@@ -43,7 +43,10 @@ read it before changing that area.
   through `KindDifficulty#rung_for`. A lock suppresses `(reduced)` easing and
   both rating adjustments, first exposure included. Targets and locks change
   prompt text only: `DailyPlan`, `ConceptMastery` and `User#concepts_*` never
-  read `KindDifficulty`. Weights and difficulty share
+  read `KindDifficulty`. `DailyPlan` rolls `code_review_files`
+  (`CODE_REVIEW_FILE_WEIGHTS`, `:single` on a `RealSource` day) without
+  reading `KindDifficulty`; `CodeReview.file_range` turns it into a count
+  with the rung later. Weights and difficulty share
   `section_kind_preferences_version`. `POST /learn/prepare_ladders` is the one
   scoped exception to Learn's no-bulk-rewrite rule, reaches every teammate
   through the shared `ConceptReference`, and is never offered to a trial

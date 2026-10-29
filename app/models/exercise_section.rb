@@ -144,7 +144,7 @@ class ExerciseSection
     end
 
     # Refuses an unusable section through .refuse! with a code from .refusal_codes; ingest then leaves out only that section.
-    def reject_unusable!(section)
+    def reject_unusable!(section, **)
     end
 
     def refusal_codes = []
@@ -160,7 +160,7 @@ class ExerciseSection
     end
 
     # Indentation is part of the contract: first line unindented, fields at 4, closing brace at 2.
-    def schema_fragment(label:)
+    def schema_fragment(label:, file_range: 1..1)
       raise NotImplementedError, "#{self} must implement .schema_fragment"
     end
 
@@ -182,7 +182,8 @@ class ExerciseSection
     end
 
     # Every kind gets the same context and states only its own vocabulary (#81); absorb unread values with `**`.
-    def generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil, alongside: [])
+    def generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil, alongside: [],
+                            file_range: 1..1, code_style: nil)
       raise NotImplementedError, "#{self} must implement .generation_guidance"
     end
 

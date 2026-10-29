@@ -425,8 +425,8 @@ RSpec.describe ProblemSetIngest do
 
         step(set)
 
-        expect(ExerciseSection::Architecture).to have_received(:reject_unusable!).with(set["architecture"])
-        expect(ExerciseSection::PlanReview).to have_received(:reject_unusable!).with(set["plan_review"])
+        expect(ExerciseSection::Architecture).to have_received(:reject_unusable!).with(set["architecture"], language: "ruby_rails", file_range: 1..1)
+        expect(ExerciseSection::PlanReview).to have_received(:reject_unusable!).with(set["plan_review"], language: "ruby_rails", file_range: 1..1)
         expect(ExerciseSection::Challenge).not_to have_received(:reject_unusable!)
         expect(ExerciseSection::AmbiguityHunt).not_to have_received(:reject_unusable!)
       end
@@ -966,5 +966,65 @@ RSpec.describe ProblemSetIngest, "with the second fixed kind" do
 
       expect(result.keys).to eq(%w[code_review pattern])
     end
+  end
+end
+
+RSpec.describe ProblemSetIngest, "multi-file code reviews" do
+  let(:section) do
+    { "concept" => "n_plus_one", "question" => "q", "scenario" => "s", "teaching_note" => "t",
+      "file_1_path" => "app/models/order.rb", "file_1_code" => "a = 1\nb = 2", "file_1_changed" => [ "b = 2" ],
+      "file_2_path" => "app/models/item.rb", "file_2_code" => "c = 3", "file_2_changed" => [ "c = 3" ] }
+  end
+
+  def ingest(set, code_review_files:)
+    described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: set.keys,
+                              code_review_files: code_review_files)
+  end
+
+  it "hands the planned file range to every kind's boundary check" do
+    allow(ExerciseSection::CodeReview).to receive(:reject_unusable!)
+    allow(ExerciseSection::Pattern).to receive(:reject_unusable!)
+    set = { "code_review" => section, "pattern" => { "concept" => "memoization", "question" => "q" } }
+
+    ingest(set, code_review_files: 2..3)
+
+    expect(ExerciseSection::CodeReview).to have_received(:reject_unusable!).with(set["code_review"], language: "ruby_rails", file_range: 2..3)
+    expect(ExerciseSection::Pattern).to have_received(:reject_unusable!).with(set["pattern"], language: "ruby_rails", file_range: 2..3)
+  end
+
+  it "keeps a multi-file section with its changed lines resolved against the formatted code" do
+    allow(CodeFormat).to receive(:all) { |snippets, **| snippets.map { |code| "z = 0\n#{code}" } }
+
+    result = ingest({ "code_review" => section }, code_review_files: 2..2)
+    kept = result.problem_set.fetch("code_review")
+
+    expect(result.unusable_sections).to be_empty
+    expect(kept.values_at("file_1_changed", "file_2_changed")).to eq([ [ 3 ], [ 2 ] ])
+    expect(ExerciseSection::CodeReview.files(kept).map(&:path)).to eq(%w[app/models/order.rb app/models/item.rb])
+  end
+
+  it "refuses a multi-file section on a single-file day" do
+    result = ingest({ "code_review" => section, "pattern" => { "concept" => "memoization", "question" => "q" } }, code_review_files: 1..1)
+
+    expect(result.unusable_sections.map(&:code)).to eq([ "code_review.snippet_missing" ])
+  end
+end
+
+RSpec.describe ProblemSetIngest, "the canned multi-file code review" do
+  it "comes through ingest on a two-file day with its changed lines resolved to line numbers" do
+    result = described_class.call({ "code_review" => CodeReviewMultiFile::SECTION.deep_dup }, language: "ruby_rails",
+                                  daily: DailyKinds::DEFAULT, expected_keys: %w[code_review], code_review_files: 2..2)
+    kept = result.problem_set.fetch("code_review")
+
+    expect(result.unusable_sections).to be_empty
+    expect(ExerciseSection::CodeReview.files(kept).size).to eq(2)
+    expect(kept["file_1_changed"]).to be_present.and(all(be_an(Integer)))
+    expect(kept).not_to have_key("snippet")
+  end
+  it "checks its key's quote against the files" do
+    result = described_class.call({ "code_review" => CodeReviewMultiFile::SECTION.deep_dup }, language: "ruby_rails",
+                                  daily: DailyKinds::DEFAULT, expected_keys: %w[code_review], code_review_files: 2..2)
+
+    expect(result.key_notes.map(&:outcome)).to eq([ "ok" ])
   end
 end

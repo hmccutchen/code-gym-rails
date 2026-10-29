@@ -1,0 +1,1 @@
+- This section replaces one that was turned down. Its concept must be exactly `service_objects`, which the day's plan already placed here. It was turned down because one of its file paths ran past 120 characters, or two of its files had the same path. Write a new section for the same concept.

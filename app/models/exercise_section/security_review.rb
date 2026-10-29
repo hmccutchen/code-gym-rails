@@ -14,7 +14,7 @@ class ExerciseSection::SecurityReview < ExerciseSection
 
   def self.refusal_codes = %w[snippet_missing snippet_too_long]
 
-  def self.reject_unusable!(section)
+  def self.reject_unusable!(section, **)
     snippet = section["snippet"]
     refuse!("snippet_missing", "Security review returned no usable snippet") unless usable_text?(snippet)
 
@@ -60,7 +60,7 @@ class ExerciseSection::SecurityReview < ExerciseSection
   end
   private_class_method :snippet_bar
 
-  def self.schema_fragment(label:)
+  def self.schema_fragment(label:, **)
     <<~SCHEMA.chomp
       "security_review": {
           "title":        "string",

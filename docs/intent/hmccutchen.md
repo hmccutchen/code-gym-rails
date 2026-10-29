@@ -437,9 +437,17 @@ data.*
   both a read-side guard, so a stored value with nothing to show counts as
   no lesson, and a one-time migration clearing every lesson that isn't an
   object
-- the nav lined up with the page column from 800 to 899px `#621 open`
+- the nav lined up with the page column from 800 to 899px `#621`
   **why:** below 900px the nav ran full width while the page stopped at
   800px, so the brand sat up to 50px left of the content
   **I decided:** after a probe showed no link overflowing at any text size,
   cap the nav at the page column less the side insets, so it lines up with
   a landscape notch too
+- code review can show 2–3 files at higher rungs, built with its weight at 0
+  `#622 open`
+  **why:** a code review shouldn't need its own kind to show a change across
+  files
+  **I decided:** a shape of code review, not a new kind; junior 1 file,
+  mid-level 2, senior and principal 2–3; half of non-RealSource days once on;
+  after the reviews, the judge line waits for launch B, the key checks the
+  files now, and KeyQuote's whole-file search waits for its caller

@@ -28,6 +28,24 @@ RSpec.describe SectionContext do
     expect(described_class.render("blocks" => [ 2, "a", 1 ])).to eq("Blocks (order withheld):\n- 1\n- 2\n- a")
   end
 
+  describe "a multi-file code review" do
+    let(:files) do
+      { "question" => "Q", "file_1_path" => "app/models/order.rb", "file_1_code" => "a = 1\nb = 2", "file_1_changed" => [ 2 ],
+        "file_2_path" => "app/models/item.rb", "file_2_code" => "c = 3", "file_2_changed" => [] }
+    end
+
+    it "lists each file's path, changed lines and code" do
+      expect_prompt_snapshot("section_context__code_review_files", described_class.render(files))
+    end
+
+    it "never shows the answer key" do
+      keyed = files.merge("answer_key" => { "issue" => "ANSWER-KEY-SENTINEL" })
+
+      expect(described_class.render(keyed)).not_to include("ANSWER-KEY-SENTINEL")
+      expect(described_class.render(keyed)).to eq(described_class.render(files))
+    end
+  end
+
   it "describes a missing or empty section as nothing" do
     expect(described_class.render(nil)).to eq("")
     expect(described_class.render({})).to eq("")

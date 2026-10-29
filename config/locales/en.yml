@@ -633,6 +633,10 @@ en:
       name: "Code Review"
       placeholder: "What's the issue and how would you fix it?"
       current_schema: "Current schema (db/schema.rb)"
+      changed_lines:
+        one: "changed line %{lines}"
+        other: "changed lines %{lines}"
+      changed_range: "%{first}–%{last}"
     design_comparison:
       name: "Design Comparison"
       placeholder: "Name the fact from the scenario or question, and the principle it settles…"
