@@ -14,7 +14,9 @@ A snippet over the cap is refused, never cut, since cutting code could cut out t
 
 A `code_review` section comes in one of two shapes. The single-file shape is the `snippet` described above. The multi-file shape replaces it with up to three files in flat fields, `file_N_path`, `file_N_code` and `file_N_changed` for N from 1 to 3, so the problem can sit in how files of one change fit together. A multi-file section has no `snippet` and no diagram: two or three files already show the structure, and a diagram of how they connect would point at the flaw, so `.arrange!` deletes one a provider sends.
 
-`.files(section)` is the one reader of the `file_N_*` fields. It returns a `CodeReview::File` for each file with both a path and code, in order, and an empty list for a single-file section, so the page, the review context and later the key check all read files the same way.
+`.files(section)` is the one reader of the `file_N_*` fields. It returns a `CodeReview::File` for each file with both a path and code, in order, and an empty list for a single-file section, so the page and the review context read files the same way.
+
+`.key_context_fields` lists every file slot's code field (`FILE_CODE_FIELDS`) beside `snippet` and `current_schema`, so ingest's quote check reads a multi-file key's quotes against its files, and the key sheet shows them. A single-file section has no file fields, so its check and its sheet entry are unchanged.
 
 Ingest tells `.reject_unusable!` the file range the day planned (`file_range:`, from `ProblemSetIngest`'s `code_review_files:`). A range whose top is 1 runs exactly the snippet checks above. Any other range runs the multi-file checks, in this order: an incomplete file or a field of the wrong type (`file_incomplete`) first, so half a third file reads as incomplete rather than as a wrong count; then a `snippet` or a file count outside the range (`file_count_wrong`); then length (`file_too_long`); then paths (`path_invalid`); then changed lines (`changed_lines_unresolved`). A passing section loses every field of a file slot that has neither path nor code, so a stray `file_3_changed` reaches nothing.
 

@@ -1021,4 +1021,10 @@ RSpec.describe ProblemSetIngest, "the canned multi-file code review" do
     expect(kept["file_1_changed"]).to be_present.and(all(be_an(Integer)))
     expect(kept).not_to have_key("snippet")
   end
+  it "checks its key's quote against the files" do
+    result = described_class.call({ "code_review" => CodeReviewMultiFile::SECTION.deep_dup }, language: "ruby_rails",
+                                  daily: DailyKinds::DEFAULT, expected_keys: %w[code_review], code_review_files: 2..2)
+
+    expect(result.key_notes.map(&:outcome)).to eq([ "ok" ])
+  end
 end

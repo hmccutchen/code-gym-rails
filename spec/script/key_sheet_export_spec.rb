@@ -29,6 +29,13 @@ RSpec.describe KeySheetExport do
     expect(sheet.to_json).not_to include("SENTINEL", "2026-10-20", "right_level")
   end
 
+  it "shows a multi-file code review's files, the code its key quotes" do
+    section = CodeReviewMultiFile::SECTION
+
+    expect(described_class.entry("code_review", "ruby_rails", section)["shown"])
+      .to eq(section.slice("file_1_code", "file_2_code"))
+  end
+
   it "leaves out unreviewed, unsubmitted, keyless and non-keyed sections" do
     day(Date.new(2026, 10, 18), { "code_review" => code_review }, reviews: [])
     day(Date.new(2026, 10, 19), { "code_review" => code_review }, submitted: false)

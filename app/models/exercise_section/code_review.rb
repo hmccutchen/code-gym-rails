@@ -14,6 +14,8 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   FILE_PARTS = %w[path code changed].freeze
 
+  FILE_CODE_FIELDS = FILE_SLOTS.map { |number| "file_#{number}_code" }.freeze
+
   MULTI_FILE_RANGES = { "junior" => 1..1, "mid_level" => 2..2, "senior" => 2..3, "principal_engineer" => 2..3 }.freeze
 
   HIDDEN_KEY_LINE = '- "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "question", "scenario", "teaching_note" or "diagram" — doing so would give away the answer before the engineer reads the snippet. Quote the code it points at in backticks, never by line number.'
@@ -34,7 +36,7 @@ class ExerciseSection::CodeReview < ExerciseSection
     file_range(files: plan.code_review_files, rung: difficulty.rung_for(self, skill_level: skill_level))
   end
 
-  def self.key_context_fields = %w[snippet current_schema]
+  def self.key_context_fields = [ "snippet", "current_schema", *FILE_CODE_FIELDS ]
 
   def self.quoted_key_texts(key) = [ key&.dig("issue") ]
 
