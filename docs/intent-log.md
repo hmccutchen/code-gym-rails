@@ -368,64 +368,42 @@ data.*
 
 ## Wed Oct 28
 
-- the stored keys' rarer kinds get keys as they come up, with no change to
-  my daily section count `#600`
-- a change review kind: a small change across 2–3 files, the flaw in how
-  they interact `#601`
-  **I decided:** a separate kind, not a code review mode; every rung gets it,
-  with the rung shaping how many files and how visible, since a rung or lock
-  never removes a kind, and any limit would be by track; post-change files
-  with changed lines highlighted; a failed key refuses the section; JavaScript
-  days use only data modeling, a Knex migration and a looser quote match;
-  after the reviews, its grader waits for the stored-keys gating with its own
-  calibration fixture, the shared data-modeling line gains one clause, its
-  first appearance is accepted, and the judge never rejects on rung fit
-- code review's snippet length, capped only by the prompt, left as an issue
-- answer keys stored for code review, security review, plan review and
-  pseudocode-to-code, read by nothing yet `#602`
-  **why:** the grader has to guess what was planted, and a wrong guess looks
-  like an honest miss
-  **I decided:** measure the extra tokens from my usage rows after deploy,
-  not with billed calls; after the reviews, quotes match with all
-  whitespace ignored, cleaning is its own ingest step, and the stop rule
-  counts only drafted sections of kinds that quote
-- code review's snippet capped at 40 shown lines at ingest, refused rather
-  than cut `#603`
-- the rarer kinds' keys read from drafted sections, not my days `#606`
-  **why:** I'm the only user, and adding those kinds to my days would fake
-  progress
-  **I decided:** a colleague reads the drafts since I can't judge those keys,
-  and a kind with no reader stays off; the read is the main check and the
-  fixtures a guard; any keyed graded section gets the regrade as a sample;
+- the rarer kinds get keys as they come up; my section count stays `#600`
+- a change review kind: the flaw in how a 2–3 file change interacts `#601`
+  **I decided:** its own kind at every rung, scaled in files and visibility;
+  changed lines highlighted; a failed key refuses it; JavaScript gets data
+  modeling, Knex and a looser quote match; after the reviews, its grader
+  waits on key gating with its own fixture, its first appearance
+  is accepted, and the judge never rejects on rung fit
+- answer keys stored for four kinds, read by nothing yet `#602`
+  **why:** the grader guesses the plant, so a wrong guess looks like a miss
+  **I decided:** measure the extra tokens from usage rows after deploy; after
+  the reviews, whitespace-blind quotes, a separate cleaning step, and a stop
+  rule on drafts of quoting kinds
+- code review's snippet capped at 40 shown lines, refused not cut `#603`
+- the rarer kinds' keys read from drafts, not my days `#606`
+  **why:** I'm the only user; adding them to my days would fake progress
+  **I decided:** a colleague reads them; a kind without a reader stays off;
   every billed run waits for my approval
-- the script that drafts those kinds' sections, plan-only until I approve a
-  run `#607`
-  **I decided:** it runs on my machine against a local database, never
-  production, and writes no day, history or usage row; after the reviews,
-  only the three drafted kinds, inside a read-only transaction
-- a judged retry refused at ingest no longer costs a daily kind its second
-  retry `#609`
-  **I decided:** a refused retry spends one retry and the loop goes on;
-  rate limits, timeouts, the deadline, billing and bad replies still drop at
-  once; the retry prompt stays unchanged, left to its own issue
-- the nav counts a landscape phone's notch once, so the brand lines up with
-  the page at 932px `#614`
-  **I decided:** only the double count in this PR; the nav sitting left of
-  the 800px page column below 900px, notch or not, is its own issue
-- the open nav menu's links kept clear of a landscape notch, and Today added
-  to the top nav `#616`
-  **I decided:** Today goes in this bug fix, linking to the same route as the
-  home-screen app's Today tab
-- a judged retry told why its section was turned down, when that cause is
-  recorded `#617`
-  **why:** every retry was told it was "rejected on wording alone", whatever
-  the real cause
-  **I decided:** a reason only when one is recorded, never one it doesn't
-  have; one fixed line per judge principle or boundary check in one table,
-  a snapshot per cause; with no cause, only "write a new section for the
-  same concept"; never the rejected draft or the judge's own words; first a
-  report of what each retry path records, and a read of the production logs,
-  which held too few retries to measure
+- the script that drafts them, plan-only until I approve `#607`
+  **I decided:** local only, writing no row; after the reviews, only the three
+  drafted kinds
+- a judged retry refused at ingest no longer costs a second retry `#609`
+  **I decided:** a refused retry spends one retry and continues; other
+  failures still drop; the retry prompt stays, left to its own issue
+- the nav counts a landscape notch once, aligning the brand at 932px `#614`
+  **I decided:** only the double count; the offset below 900px is its own
+  issue
+- the nav menu clears a landscape notch; Today joins the top nav `#616`
+  **I decided:** Today rides this fix, on its tab's route
+- a judged retry told why its section was turned down, when recorded `#617`
+  **why:** every retry heard "rejected on wording alone"
+  **I decided:** a reason only when recorded; one fixed line per principle
+  or boundary check, a snapshot each; otherwise "write a new section for the
+  same concept"; never the draft or the judge's words; a report of what
+  each retry path records
+- the grader starts with code review, gated on its read and token cost;
+  drafted kinds join later `#611`
 
 ## Thu Oct 29
 
@@ -472,6 +450,12 @@ data.*
 
 ## Fri Oct 30
 
+- a blind-solve triage added to the plan: about 30 drafted code review
+  keys solved blind, compared in Ruby
+  **why:** to find the keys worth reading first
+  **I decided:** agreement only screens, and the real-day read stays the
+  gate; I approve each run's call count and cost first; the disagreements
+  and three agreements go to a key sheet outside the repo
 - the section judge shown a multi-file code review's marked line numbers,
   not the provider's quotes `#629`
   **why:** a quote that matched no line marks nothing on the page, so the
