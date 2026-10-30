@@ -322,6 +322,11 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
 
       expect(lines.values_at(2, 11)).to eq([ " 1 | x_0 = 0", "10 | x_9 = 9" ])
     end
+
+    it "keeps a line's trailing whitespace, which can be part of a string literal's value" do
+      expect(text("msg = <<~TEXT\n  total:  \n  \nTEXT").lines(chomp: true).drop(2))
+        .to eq([ "1 | msg = <<~TEXT", "2 |   total:  ", "3 |   ", "4 | TEXT" ])
+    end
   end
 
   it "formats each file's code alongside the snippet" do

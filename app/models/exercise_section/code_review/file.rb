@@ -4,6 +4,10 @@ ExerciseSection::CodeReview::File = Data.define(:path, :code, :changed) do
   def numbered_code
     lines = code.lines(chomp: true)
     width = lines.size.to_s.length
-    lines.each.with_index(1).map { |line, number| "#{number.to_s.rjust(width)} | #{line}".rstrip }.join("\n")
+    lines.each.with_index(1).map { |line, number| numbered_line(line, number.to_s.rjust(width)) }.join("\n")
   end
+
+  private
+
+  def numbered_line(line, number) = line.empty? ? "#{number} |" : "#{number} | #{line}"
 end
