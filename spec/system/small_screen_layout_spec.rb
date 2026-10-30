@@ -678,10 +678,14 @@ RSpec.describe "Small screen layout", type: :system do
             expect(facts["tag"]["left"]).to be >= facts["content"][0] - 0.5
             expect(facts["tag"]["right"]).to be <= facts["content"][1] + 0.5
             expect(facts["tag_overflows"]).to be(false)
+            beside = (facts["tag"]["top"] - facts["h2"]["top"]).abs <= facts["h2"]["line"]
+            below = facts["tag"]["top"] >= facts["h2"]["bottom"] - 0.5
             if spacing
-              expect(facts["tag"]["top"]).to be >= facts["h2"]["bottom"] - 0.5
+              expect(below).to be(true)
+            elsif prefs.any?
+              expect(beside || below).to be(true), "the tag overlaps the heading instead of sitting beside or under it"
             else
-              expect((facts["tag"]["top"] - facts["h2"]["top"]).abs).to be <= facts["h2"]["line"]
+              expect(beside).to be(true)
             end
           end
         end
