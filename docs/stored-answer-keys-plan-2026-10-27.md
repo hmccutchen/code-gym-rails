@@ -354,16 +354,18 @@ and the real-day read in step 3 stays PR 2's gate.
   - **Terminal:** agree, disagree and unlocated counts, overall and by mode,
     with no section text.
   - **The key sheet file outside the repository:** every disagreement and
-    unlocated section, plus 3 agreements (one per mode). Each entry holds the
-    section as shown, the key, and the solver's issue and fix. The file is
-    deleted after the read, like every key sheet.
+    unlocated section, plus up to 3 agreements (one per mode). A mode with
+    no agreement gets none, the terminal names it, and the run makes no
+    extra calls to fill it. Each entry holds the section as shown, the key,
+    and the solver's issue and fix. The file is deleted after the read, like
+    every key sheet.
 - **What the owner reads.** The disagreements first. Each gets one call:
   - the key is wrong
   - the solver is wrong
   - both name a real flaw, and the key's is the planted one
   - both name a real flaw, and the solver's is worse
 
-  The 3 agreements are read too, to check that agreement means what it
+  The agreements are read too, to check that agreement means what it
   seems to. Only the counts go into PR 2's description.
 
 **Which model solves.** Any Claude model with a price in
@@ -411,7 +413,8 @@ this:
 - `code_review` refused without `--triage`.
 - The plan printing the solve calls without making one.
 - The sentinel spec above.
-- The sheet holding every disagreement and exactly 3 agreements.
+- The sheet holding every disagreement and one agreement per mode that has
+  one, and a mode with none named without an extra call.
 - `KeyQuote.find` returning with its spec.
 
 1. **Wait.** Keys accumulate on real days. The quote threshold applies from
@@ -421,7 +424,7 @@ this:
 2. **Export the key sheet,** with the owner's approval for that export. Keep
    it outside the repository.
 3. **Read.** The owner reads the Ruby `code_review` sections from real days,
-   and, separately, the triage sheet's disagreements and 3 agreements.
+   and, separately, the triage sheet's disagreements and agreements.
    The colleague the owner chooses reads the drafted `security_review`,
    `plan_review` and `pseudocode_to_code` sections, since the owner can't
    judge those keys reliably. The spec's option B asks for about 5 per kind.

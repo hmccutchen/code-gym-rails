@@ -131,8 +131,8 @@ The owner decided on 2026-10-30 to add a triage step for `code_review`.
 About 30 sections are drafted with the drafts script, toy and single-file,
 cycling through the three modes. Each one is solved by a separate call that
 never sees the key, and the script compares the solver's quoted lines with
-the key's in Ruby: agree, disagree or unlocated. The disagreements and three
-agreements go to the key sheet outside the repository for the owner to read.
+the key's in Ruby: agree, disagree or unlocated. The disagreements and up to
+three agreements, one per mode that has one, go to the key sheet outside the repository for the owner to read.
 Every run waits for the owner's approval of its call count and cost.
 
 - **Agreement is screening only.** A solver that finds the same lines as the
