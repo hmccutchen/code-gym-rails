@@ -1,8 +1,8 @@
 Question: Q
 File: app/models/order.rb
 Changed lines: 2
-a = 1
-b = 2
+1 | a = 1
+2 | b = 2
 File: app/models/item.rb
 Changed lines: none
-c = 3
+1 | c = 3

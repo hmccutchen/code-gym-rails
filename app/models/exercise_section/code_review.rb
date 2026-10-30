@@ -67,7 +67,12 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.files_context(section) = files(section).map(&:prompt_text).join("\n").presence
 
-  def self.judge_hidden_fields = FILE_SLOTS.map { |number| "file_#{number}_#{CHANGED_PART}" }
+  def self.judge_hidden_fields = FILE_SLOTS.flat_map { |number| FILE_FIELDS.map { |field| "file_#{number}_#{field}" } }
+
+  def self.judge_attachment(section)
+    files = files_context(section)
+    "The section's files, every line numbered, with \"Changed lines\" naming the lines the page marks as the change:\n#{files}" if files
+  end
 
   def self.reject_unusable!(section, language: nil, file_range: 1..1, **)
     if file_range.max == 1
