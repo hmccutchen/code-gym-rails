@@ -73,6 +73,17 @@ RSpec.describe "Today's phone layout", type: :system do
   end
 
 
+  [ 320, 390 ].each do |width|
+    it "starts code 25px from the screen edge at #{width}px, inside the code box's 8px side padding" do
+      visit_today(width: width)
+
+      expect(computed_style(".today-page pre.snippet", "paddingLeft")).to eq("8px")
+      expect(computed_style(".today-page pre.snippet", "paddingRight")).to eq("8px")
+      expect(rect(".today-page pre.snippet code")["left"]).to be_within(0.5).of(25)
+      expect(sideways_overflow).to eq(0)
+    end
+  end
+
   describe "the Submit row" do
     it "comes after the last section, with a button lined up with the cards' text, in a browser tab and the home-screen app" do
       set_safe_area(bottom: 34)

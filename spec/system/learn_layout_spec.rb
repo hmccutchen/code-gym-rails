@@ -87,6 +87,7 @@ RSpec.describe "Learn layout", type: :system do
 
         edges(card_selector).each { |pair| expect(pair).to all(be_within(0.5).of(0)) }
         expect(computed_style(".learn-group-block", "borderTopLeftRadius")).to eq("0px")
+        expect(computed_style(".featured-concept", "paddingLeft")).to eq("16px")
         grouped_cards.each_cons(2) { |above, below| expect(below["top"] - above["bottom"]).to be_within(0.5).of(16) }
         expect(rect(".learn-filter")["top"] - rect(".featured-concept")["bottom"]).to be_within(0.5).of(16)
         expect_targets

@@ -300,6 +300,10 @@ phones instead of forcing horizontal scroll. `overflow-wrap` breaks a token too
 long for the line. The text-size-adjust rules stop iOS enlarging code text on
 its own in landscape.
 
+Below 600px a `pre.snippet` keeps its border and pads its sides by 8px, not
+16px, so code text starts 25px from the screen edge inside a full-width
+section. The 8px is in pixels so the largest text size doesn't widen it back.
+
 ## `code.highlight .code-line`
 
 `CodeHighlight` renders each line as a `.code-line` and sets `--indent` to its
