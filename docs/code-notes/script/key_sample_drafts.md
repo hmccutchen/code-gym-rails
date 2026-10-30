@@ -5,15 +5,17 @@ as `script/draft_key_samples.rb KIND OUT_PATH`. The owner is the app's only
 user and their days rarely hold `security_review`, `plan_review` or
 `pseudocode_to_code`, so those three kinds are read from drafts
 (`docs/decisions/stored-answer-keys.md`, "The rarer kinds are read from
-drafts"). `KINDS` lists them. `code_review` is read from real days, and is
-drafted only with `--triage` (`docs/code-notes/script/key_triage.md`). A
-plain drafted `code_review` wouldn't match a real one: its fixed concept
-could contradict the plan's rolled content mode, and its judge edit would
-skip the scenario restore `JudgedGeneration` does for a `RealSource`
-section. The triage drafts fix both: each kept section takes the next mode
-in `KeyTriage::MODES`, its concept comes from that mode's vocabulary, and
-`.plan_for` gives the draft a plan with that mode, no `RealSource` and one
-file, since multi-file waits for launch B.
+drafts"). `KINDS` lists them. `code_review` (`TRIAGE_KIND`) is drafted too,
+with or without `--triage`, which adds only the blind solve
+(`docs/code-notes/script/key_triage.md`). A `code_review` drafted like the
+other kinds wouldn't match a real one: its fixed concept could contradict
+the plan's rolled content mode, and its judge edit would skip the scenario
+restore `JudgedGeneration` does for a `RealSource` section. So each kept
+`code_review` takes the next mode in `KeyTriage::MODES`, its concept comes
+from that mode's vocabulary, and `.plan_for` gives the draft a plan with
+that mode, no `RealSource` and one file, since multi-file waits for launch
+B. The owner asked on 2026-10-30 for a smaller `code_review` set without
+the solve, which is why drafting and solving are separate.
 
 ## The path
 
@@ -64,6 +66,21 @@ repository, resolving symlinks in the directory. The file is rewritten after
 each kept section and once more when the run ends, even on Ctrl-C, so an
 interrupted run keeps what it paid for. It holds answer keys, so it is
 deleted after the read, like the key sheet.
+
+## The spend cap
+
+`--max-cost DOLLARS` is required with `--run`, and builds a `SpendCap`
+(`docs/code-notes/script/spend_cap.md`) that `.service` hands to two
+overrides. Before every call, `call_and_log` checks the call's worst case,
+`.request_bound`: its input at three characters a token, fewer than the
+plan's four so the guard errs high, plus its full output cap, at its route's
+price. After every call, `log_usage` adds the reported usage's cost and
+prints the running total. When the next call could pass the cap,
+`SpendCap::Reached` ends the run before that call is sent: the sections
+already kept stay in the file, and the tally's `stopped` line, printed and
+written, says what the run stopped on. A retry the client makes on a 429 or
+5xx goes through no override, so it isn't checked again; a failed request
+is rarely billed.
 
 ## The plan
 

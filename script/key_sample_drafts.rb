@@ -2,6 +2,7 @@
 require_relative "key_sheet_export"
 require_relative "forced_concept_drafts"
 require_relative "key_triage"
+require_relative "spend_cap"
 
 class KeySampleDrafts
   KINDS = [ ExerciseSection::SecurityReview, ExerciseSection::PlanReview, ExerciseSection::PseudocodeToCode ].freeze
@@ -9,11 +10,12 @@ class KeySampleDrafts
   COUNTS = { drafts: { default: 6, most: 10 }, triage: { default: 30, most: 30 } }.freeze
   ATTEMPTS_PER_SECTION = 2
   APPROX_CHARS_PER_TOKEN = 4
+  CAP_CHARS_PER_TOKEN = 3
   RESCUED = [ ProviderError, SetupError, JudgeVerdict::Invalid, *AiService::INFRASTRUCTURE_ERRORS ].freeze
 
-  Tally = Struct.new(:entries, :rejected, :keyless, :failed)
+  Tally = Struct.new(:entries, :rejected, :keyless, :failed, :stopped)
 
-  def self.service(api_key, usage, solver_model: KeyTriage::DEFAULT_SOLVER_MODEL)
+  def self.service(api_key, usage, solver_model: KeyTriage::DEFAULT_SOLVER_MODEL, cap: nil)
     unless KeyTriage::SOLVER_MODELS.include?(solver_model)
       raise ArgumentError, "#{solver_model} isn't a solver model: #{KeyTriage::SOLVER_MODELS.join(', ')}"
     end
@@ -23,14 +25,31 @@ class KeySampleDrafts
       define_method(:log_usage) do |_user, result, purpose:|
         usage << { purpose: purpose, tokens_in: result[:input_tokens].to_i, tokens_out: result[:output_tokens].to_i,
                    cache_read: result[:cache_read_tokens].to_i, cache_write: result[:cache_write_tokens].to_i }
+        cap&.record(KeySampleDrafts.call_cost(usage.last, routed_model(purpose)).to_f, purpose)
+      end
+      define_method(:call_and_log) do |user, request, **options|
+        cap&.check!(KeySampleDrafts.request_bound(request, routed_model(request.purpose)))
+        super(user, request, **options)
       end
       define_method(:route_for) { |purpose| purpose == KeyTriage::PURPOSE ? solver_route : super(purpose) }
       define_method(:solve_section) do |user, kind, section|
         result = call_and_log(user, AiService::Request.build(purpose: KeyTriage::PURPOSE, **KeyTriage.solve_prompt(kind, section)))
         KeyTriage.reply(parse_json_object(result[:text], subject: "#{kind.key} solve", log_raw: false))
       end
-      private :log_usage, :route_for
+      private :log_usage, :route_for, :call_and_log
     end.new(api_key)
+  end
+
+  def self.call_cost(call, model)
+    ClaudeService.cost_usd(model: model, input_tokens: call[:tokens_in], output_tokens: call[:tokens_out],
+                           cache_read_tokens: call[:cache_read], cache_write_tokens: call[:cache_write])
+  end
+
+  # Counts input at fewer characters a token than the plan does, so the guard errs high.
+  def self.request_bound(request, model)
+    text  = [ request.system, request.prompt, request.response_schema&.to_json, *request.history.map { |turn| turn[:content] } ]
+    input = text.compact.sum(&:size) / CAP_CHARS_PER_TOKEN
+    call_cost({ tokens_in: input, tokens_out: request.max_tokens || ClaudeService::MAX_TOKENS, cache_read: 0, cache_write: 0 }, model).to_f
   end
 
   def self.refuse_production!(env = Rails.env)
@@ -52,7 +71,8 @@ class KeySampleDrafts
   end
 
   def initialize(kind:, language:, count:, service:, out:, triage: false)
-    raise ArgumentError, "#{kind.key} isn't drafted for the key read: #{KINDS.map(&:key).join(', ')}" unless triage || KINDS.include?(kind)
+    drafted = [ *KINDS, TRIAGE_KIND ]
+    raise ArgumentError, "#{kind.key} isn't drafted for the key read: #{drafted.map(&:key).join(', ')}" unless drafted.include?(kind)
     raise ArgumentError, "--triage drafts #{TRIAGE_KIND.key} only" if triage && kind != TRIAGE_KIND
 
     @triage   = triage
@@ -72,7 +92,7 @@ class KeySampleDrafts
   end
 
   def call(path)
-    tally = Tally.new([], 0, 0, [])
+    tally = Tally.new([], 0, 0, [], nil)
     ReviewBaselineExport.read_only do
       attempts.times do |attempt|
         break if tally.entries.size >= @count
@@ -80,6 +100,9 @@ class KeySampleDrafts
         draft_one(attempt, tally, path)
       end
     end
+    tally
+  rescue SpendCap::Reached => e
+    tally.stopped = "Stopped: #{e.message}"
     tally
   ensure
     write(tally, path) if tally
@@ -90,10 +113,7 @@ class KeySampleDrafts
   def cost_line(usage)
     return "no calls made" if usage.empty?
 
-    costs = usage.map do |call|
-      ClaudeService.cost_usd(model: @service.model_for(call[:purpose]), input_tokens: call[:tokens_in], output_tokens: call[:tokens_out],
-                             cache_read_tokens: call[:cache_read], cache_write_tokens: call[:cache_write])
-    end
+    costs = usage.map { |call| self.class.call_cost(call, @service.model_for(call[:purpose])) }
     price = costs.all? ? "$#{format('%.2f', costs.sum)}" : "unpriced"
     "#{usage.size} calls · #{usage.sum { |call| call[:tokens_in] }} in / #{usage.sum { |call| call[:tokens_out] }} out · #{price}"
   end
@@ -104,7 +124,7 @@ class KeySampleDrafts
 
   def solves = @triage ? attempts : 0
 
-  def mode_for(kept) = (KeyTriage::MODES[kept % KeyTriage::MODES.size] if @triage)
+  def mode_for(kept) = (KeyTriage::MODES[kept % KeyTriage::MODES.size] if @kind == TRIAGE_KIND)
 
   def rung_for(kept) = KindDifficulty::LEVELS[kept % KindDifficulty::LEVELS.size]
 
@@ -145,7 +165,7 @@ class KeySampleDrafts
   def write(tally, path)
     sections = @triage ? KeyTriage.sheet_sections(tally.entries) : tally.entries
     File.write(path, JSON.pretty_generate("sections" => sections, "summary" => summary(tally), "rejected" => tally.rejected,
-                                          "keyless" => tally.keyless, "failed" => tally.failed))
+                                          "keyless" => tally.keyless, "failed" => tally.failed, "stopped" => tally.stopped))
   end
 
   def draft_for(rung, mode)

@@ -327,8 +327,10 @@ and the real-day read in step 3 stays PR 2's gate.
 
 - **Drafting.** `script/draft_key_samples.rb code_review OUT_PATH --triage`
   drafts `code_review` sections through the same retry and judge path as the
-  drafted kinds, up to `--count 30`. `code_review` is accepted only with
-  `--triage`; the colleague's read of the three rarer kinds doesn't change.
+  drafted kinds, up to `--count 30`. Since 2026-10-30 `code_review` is
+  also drafted without `--triage`, the same way but with no solve, for a
+  smaller set (owner's decision); the colleague's read of the three rarer
+  kinds doesn't change.
   The earlier review found two ways a drafted `code_review` wouldn't match
   a real day, so the triage drafts fix both:
   - **The concept follows the mode.** The drafts cycle through
