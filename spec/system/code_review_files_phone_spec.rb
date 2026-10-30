@@ -43,6 +43,60 @@ RSpec.describe "A multi-file code review on a phone", type: :system do
     end
   end
 
+  def gutter_numbers
+    page.evaluate_script(<<~JS)
+      (() => {
+        const code = document.querySelectorAll("details.comparison-piece")[1].querySelector("code.numbered")
+        const blockLeft = code.parentElement.getBoundingClientRect().left
+        const lines = [...code.querySelectorAll(".code-line")].map((line) => {
+          const number = getComputedStyle(line, "::before")
+          const numberLeft = line.getBoundingClientRect().left + parseFloat(number.left)
+          return {
+            counted: number.content.includes("counter(code-line)") && getComputedStyle(line).counterIncrement === "code-line 1",
+            left_of_code: parseFloat(number.left) < 0,
+            inside_block: numberLeft >= blockLeft,
+            one_row: parseFloat(number.height) <= line.getBoundingClientRect().height
+          }
+        })
+        return { restarts: getComputedStyle(code).counterReset === "code-line 0", lines }
+      })()
+    JS
+  end
+
+  def copied_text
+    page.evaluate_script(<<~JS)
+      (() => {
+        const range = document.createRange()
+        range.selectNodeContents(document.querySelectorAll("details.comparison-piece")[1].querySelector("code"))
+        getSelection().removeAllRanges()
+        getSelection().addRange(range)
+        return getSelection().toString()
+      })()
+    JS
+  end
+
+  it "numbers every line in a gutter left of the code, and copies the code without the numbers" do
+    travel_to(a_weekday) do
+      open_dashboard(create_fake_provider_user)
+
+      numbered_line = { "counted" => true, "left_of_code" => true, "inside_block" => true, "one_row" => true }
+      expect(gutter_numbers).to eq("restarts" => true, "lines" => Array.new(3, numbered_line))
+      expect(copied_text).to eq("def price\n  0\nend")
+      expect(sideways_overflow).to eq(0)
+    end
+  end
+
+  it "widens the gutter for a file whose blank lines carry it past line 99" do
+    files["file_2_code"] = "def price#{"\n" * 101}end"
+
+    travel_to(a_weekday) do
+      open_dashboard(create_fake_provider_user)
+
+      expect(gutter_numbers["lines"].last).to eq("counted" => true, "left_of_code" => true, "inside_block" => true, "one_row" => true)
+      expect(sideways_overflow).to eq(0)
+    end
+  end
+
   it "wraps a long path with no spaces instead of scrolling sideways" do
     long_path = "app/services/#{"subscription_renewal" * 5}.rb"
     files["file_2_path"] = long_path

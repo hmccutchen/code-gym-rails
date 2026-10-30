@@ -476,3 +476,10 @@ data.*
   **I decided:** build it now rather than skip it, since it doesn't gate
   PR 2; fix the plan's review finding on short agreement samples before
   merging #611; no run until I approve its call count and cost
+- a multi-file code review's lines numbered on the page, and the grader and
+  duck told the `N | ` prefix is not code `#637 open`
+  **why:** since #633 the prompts number every line but the page showed
+  none, so a review citing line 4 pointed at nothing the engineer could see,
+  and the grader could copy the prefix into its improved code
+  **I decided:** a gutter on the page plus one prompt rule, rather than the
+  prompt rule alone, so a cited line number stays usable

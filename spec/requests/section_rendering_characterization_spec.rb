@@ -234,6 +234,8 @@ RSpec.describe "section rendering", type: :request do
           .to eq([ "app/models/cr_order.rb — changed lines 2–3", "app/models/cr_item.rb" ])
         expect(file_pieces.first.css(".code-line-changed").map(&:text)).to eq([ "cr_order_b = 2", "cr_order_c = 3" ])
         expect(file_pieces.last.css(".code-line-changed")).to be_empty
+        expect(file_pieces.map { |piece| piece.at_css("pre.snippet > code.highlight.numbered")["style"] })
+          .to eq([ "--number-width: 1", "--number-width: 1" ])
         expect(page_text).to include("cr_item_a = 1")
         %w[CR-SECRET-ISSUE CR-SECRET-WHY CR-SECRET-FIX].each { |secret| expect(response.body).not_to include(secret) }
       end

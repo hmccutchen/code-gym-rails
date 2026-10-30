@@ -1,4 +1,5 @@
 Question: Q
+The page numbers each file's lines the way they are numbered here. The "N | " before each line is not part of the code, so never copy it into code you write.
 File: app/models/order.rb
 Changed lines: 2
 1 | a = 1

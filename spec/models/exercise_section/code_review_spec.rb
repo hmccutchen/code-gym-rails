@@ -294,6 +294,7 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
 
       expect(described_class.review_context(section: section, answer: "The total.", rating: "right_level")).to eq(<<~CONTEXT.chomp)
         Code Review question: What breaks?
+        The page numbers each file's lines the way they are numbered here. The "N | " before each line is not part of the code, so never copy it into code you write.
         File: app/models/order.rb
         Changed lines: 2
         1 | a = 1
@@ -310,6 +311,18 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
     end
   end
 
+  describe ".judge_attachment" do
+    it "numbers the files without the note on copying code, since the judge writes none" do
+      section = { "file_1_path" => "app/models/order.rb", "file_1_code" => "a = 1", "file_1_changed_lines" => [ 1 ],
+                  "file_2_path" => "app/models/item.rb", "file_2_code" => "c = 3", "file_2_changed_lines" => [] }
+
+      attachment = described_class.judge_attachment(section)
+
+      expect(attachment).to include("1 | a = 1")
+      expect(attachment).not_to include("never copy")
+    end
+  end
+
   describe "File#prompt_text" do
     def text(code) = described_class::File.new(path: "app/models/order.rb", code: code, changed: [ 10 ]).prompt_text
 
@@ -321,6 +334,13 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
       lines = text(Array.new(10) { |index| "x_#{index} = #{index}" }.join("\n")).lines(chomp: true)
 
       expect(lines.values_at(2, 11)).to eq([ " 1 | x_0 = 0", "10 | x_9 = 9" ])
+    end
+
+    it "sizes its numbers by every line, blank ones included, which the page's gutter reads too" do
+      file = described_class::File.new(path: "a.rb", code: "a = 1#{"\n" * 100}b = 2", changed: [])
+
+      expect(file.number_width).to eq(3)
+      expect(file.prompt_text.lines(chomp: true).last).to eq("101 | b = 2")
     end
 
     it "keeps a line's trailing whitespace, which can be part of a string literal's value" do

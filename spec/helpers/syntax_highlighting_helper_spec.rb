@@ -18,6 +18,13 @@ RSpec.describe SyntaxHighlightingHelper, type: :helper do
         .to eq(helper.content_tag(:code, CodeHighlight.html("a = 1\nb = 2", lexer: "ruby"), class: "highlight"))
     end
 
+    it "numbers the lines in a gutter as wide as the number width it is given" do
+      code = Nokogiri::HTML.fragment(helper.highlighted_code("a = 1", "ruby_rails", number_width: 3)).at_css("code")
+
+      expect(code["class"]).to eq("highlight numbered")
+      expect(code["style"]).to eq("--number-width: 3")
+    end
+
     it "leaves no hook for a browser highlighter" do
       expect(helper.highlighted_code("puts 1", "ruby_rails")).not_to include("data-hljs")
     end
