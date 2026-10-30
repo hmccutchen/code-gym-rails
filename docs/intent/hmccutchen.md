@@ -453,9 +453,19 @@ data.*
   files now, and KeyQuote's whole-file search waits for its caller
 - a multi-file code review's check made safe to run twice, keeping the
   provider's quoted lines beside the line numbers they resolve to
-  `#624 open`
+  `#624`
   **why:** the check overwrote the quotes with line numbers, so a second
   run would refuse a good section
   **I decided:** keep the two in separate fields rather than accept
   numbers as already resolved, so a provider can never skip the quote
   match by sending numbers
+
+## Fri Oct 30
+
+- the section judge shown a multi-file code review's marked line numbers,
+  not the provider's quotes `#629 open`
+  **why:** a quote that matched no line marks nothing on the page, so the
+  judge could read a change the engineer never sees, and nothing pinned
+  what the judge sees for files
+  **I decided:** numbers only, hidden through a per-kind hook rather than a
+  branch in the judge prompt

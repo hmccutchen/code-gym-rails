@@ -1,0 +1,24 @@
+Section kind: code_review
+The learner's task for this kind: Find the one planted issue in the snippet and say how to fix it.
+This is a discovery task: wording that names where the issue is defeats it.
+Tagged concept: n_plus_one
+Pitched at: senior
+Level meaning: the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
+Prose fields you may rewrite: scenario, question, teaching_note
+Every other field is the artifact and must not change.
+
+The section as delivered:
+{
+  "question": "This change makes a customer's lifetime total a method instead of a stored column. What does it break, and how would you fix it?",
+  "teaching_note": "Look at where the job calls the new method, and count the queries one run makes.",
+  "concept": "n_plus_one",
+  "scenario": "a monthly loyalty report emailed to every customer",
+  "file_1_path": "app/models/customer.rb",
+  "file_1_code": "class Customer < ApplicationRecord\n  has_many :orders\n\n  def lifetime_total_cents\n    orders.sum(:total_cents)\n  end\nend",
+  "file_2_path": "app/jobs/loyalty_report_job.rb",
+  "file_2_code": "class LoyaltyReportJob < ApplicationJob\n  def perform\n    Customer.find_each do |customer|\n      LoyaltyMailer.with(customer: customer, total: customer.lifetime_total_cents).report.deliver_later\n    end\n  end\nend",
+  "file_1_changed_lines": [
+    4
+  ],
+  "file_2_changed_lines": []
+}

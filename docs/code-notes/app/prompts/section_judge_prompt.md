@@ -4,7 +4,7 @@ The prompt for the judge that checks one generated section before an engineer se
 
 ## `.generate`
 
-It strips every answer-key field and every `ProblemSetIngest::SERVER_STAMPS` field before rendering, so the judge sees one section as the engineer will, with no concept history. It returns the kind's verdict schema as `response_schema:`.
+It strips every answer-key field, every `ProblemSetIngest::SERVER_STAMPS` field and the kind's `.judge_hidden_fields` before rendering, so the judge sees one section as the engineer will, with no concept history. It returns the kind's verdict schema as `response_schema:`.
 
 ## `PRINCIPLE_GUIDANCE`
 
