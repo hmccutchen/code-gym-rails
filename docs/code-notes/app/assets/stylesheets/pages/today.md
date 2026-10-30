@@ -33,7 +33,8 @@ the Submit row change together.
 
 - **Cards.** `.today-page` takes the phone gutter from `phone_cards.css`, so
   each section is a full-width card that runs to the safe area, as on the
-  card pages, while the title block and the controls keep the 16px gutter.
+  card pages, while the title block and the controls keep the phone gutter,
+  16px in from the safe area.
   The title block, the progress bar and each section are 16px apart. A trial's banner gets its own margin there: its
   wider rule pulls it up into the title block's 2rem margin, which the 16px
   gap would otherwise cancel.

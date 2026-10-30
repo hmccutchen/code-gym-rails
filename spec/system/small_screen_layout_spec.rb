@@ -409,7 +409,7 @@ RSpec.describe "Small screen layout", type: :system do
       expect(page_width).to eq(390)
     end
 
-    it "stops Account's cards at a 20px inset on that side only" do
+    it "stops Account's cards at a 20px inset on that side only, with the heading on their text" do
       resize(390)
       set_safe_area(left: 20, right: 0)
       visit_account_with_every_card
@@ -418,6 +418,7 @@ RSpec.describe "Small screen layout", type: :system do
         expect(left).to be_within(0.5).of(20)
         expect(right).to be_within(0.5).of(0)
       end
+      expect(rect(".phone-page h1")["left"]).to be_within(0.5).of(36)
     end
 
     it "keeps Account's cards 480px wide and centered in landscape with a notch" do

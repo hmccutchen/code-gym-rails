@@ -75,6 +75,17 @@ RSpec.describe "Today's phone layout", type: :system do
     end
   end
 
+  it "keeps a full-width, unclipped Submit on the cards' text at 320px with a 44px inset on each side" do
+    set_safe_area(left: 44, right: 44)
+    visit_today(width: 320)
+
+    edges(".today-page .section").each { |pair| expect(pair).to all(be_within(0.5).of(44)) }
+    expect(rect("#submit-answers")["left"]).to be_within(0.5).of(60)
+    expect(rect("#submit-answers")["right"]).to be_within(0.5).of(260)
+    expect(page.evaluate_script(%(document.querySelector("#submit-answers").scrollWidth <= document.querySelector("#submit-answers").clientWidth))).to be(true)
+    expect(sideways_overflow).to eq(0)
+  end
+
   [ 320, 390 ].each do |width|
     it "starts code 25px from the screen edge at #{width}px, inside the code box's 8px side padding" do
       visit_today(width: width)
