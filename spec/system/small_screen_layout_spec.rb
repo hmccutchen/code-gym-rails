@@ -355,14 +355,14 @@ RSpec.describe "Small screen layout", type: :system do
     end
 
     [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
-      it "lays Account out in 16px-margined cards with 48px buttons at #{width}px#{' with the largest text' if prefs.any?}" do
+      it "lays Account out in full-width cards with 48px buttons at #{width}px#{' with the largest text' if prefs.any?}" do
         user.update!(display_preferences: prefs)
         resize(width)
         visit_account_with_every_card
         apply_text_spacing if prefs.any?
 
         expect(page_width).to eq(width)
-        card_edges(count: 7).each { |edges| expect(edges).to all(be_within(0.5).of(16)) }
+        card_edges(count: 7).each { |edges| expect(edges).to all(be_within(0.5).of(0)) }
         expect(visible_heights(".btn-block").size).to eq(6)
         expect(visible_heights(".btn-block")).to all(be >= 48)
         button_and_card_content_widths.each { |button, content| expect(button).to be_within(1).of(content) }
@@ -409,14 +409,14 @@ RSpec.describe "Small screen layout", type: :system do
       expect(page_width).to eq(390)
     end
 
-    it "puts Account's cards at a 20px inset, not at 16px" do
+    it "stops Account's cards at a 20px inset on that side only" do
       resize(390)
       set_safe_area(left: 20, right: 0)
       visit_account_with_every_card
 
       card_edges(count: 7).each do |left, right|
         expect(left).to be_within(0.5).of(20)
-        expect(right).to be_within(0.5).of(16)
+        expect(right).to be_within(0.5).of(0)
       end
     end
 
@@ -552,7 +552,7 @@ RSpec.describe "Small screen layout", type: :system do
           apply_text_spacing if prefs.any?
 
           expect(page_width).to eq(width)
-          card_edges(count: 4).each { |edges| expect(edges).to all(be_within(0.5).of(16)) }
+          card_edges(count: 4).each { |edges| expect(edges).to all(be_within(0.5).of(0)) }
           expect(card_paddings).to all(eq("16px"))
           expect(card_gaps).to all(be_within(0.5).of(16))
           expect(visible_heights(".value-row").size).to eq(3)
@@ -677,7 +677,7 @@ RSpec.describe "Small screen layout", type: :system do
             expect(facts["tag"]["left"]).to be >= facts["content"][0] - 0.5
             expect(facts["tag"]["right"]).to be <= facts["content"][1] + 0.5
             expect(facts["tag_overflows"]).to be(false)
-            if prefs.any?
+            if spacing
               expect(facts["tag"]["top"]).to be >= facts["h2"]["bottom"] - 0.5
             else
               expect((facts["tag"]["top"] - facts["h2"]["top"]).abs).to be <= facts["h2"]["line"]

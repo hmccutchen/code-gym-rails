@@ -3,8 +3,8 @@
 ## Layout
 
 The page is a `.card-page` (`phone_cards.css`) and calls `wide_page`. On a
-phone the legend and each group are cards `max(16px, inset)` from the screen
-edge, 16px apart. From 600 to 899px they take the container's full width. At
+phone the legend and each group are full-width cards that run to the safe
+area, 16px apart. From 600 to 899px they take the container's full width. At
 900px and wider the page's sheet puts the groups two across. Every rule lives
 in `pages/progress.css` (`docs/code-notes/app/assets/stylesheets/pages/progress.md`),
 linked by `page_stylesheet "progress"`, with the desktop rules last.

@@ -4,8 +4,15 @@
 }
 @media (max-width: 599.98px) {
   .phone-page, .card-page, .today-page {
-    margin-left: calc(max(16px, env(safe-area-inset-left)) - var(--container-pad-left));
-    margin-right: calc(max(16px, env(safe-area-inset-right)) - var(--container-pad-right));
+    --page-gutter-left: max(16px, env(safe-area-inset-left));
+    --page-gutter-right: max(16px, env(safe-area-inset-right));
+    margin-left: calc(var(--page-gutter-left) - var(--container-pad-left));
+    margin-right: calc(var(--page-gutter-right) - var(--container-pad-right));
+  }
+  :is(.phone-page, .card-page, .today-page) :is(.card, .section, .history-entry, .featured-concept, .progress-group):not(:is(.card, .section, .history-entry, .featured-concept, .progress-group) *) {
+    margin-inline: calc(env(safe-area-inset-left) - var(--page-gutter-left)) calc(env(safe-area-inset-right) - var(--page-gutter-right));
+    border-inline: 0;
+    border-radius: 0;
   }
 }
 

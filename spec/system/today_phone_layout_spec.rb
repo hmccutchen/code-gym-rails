@@ -31,17 +31,17 @@ RSpec.describe "Today's phone layout", type: :system do
   describe "the section cards" do
     [ 320, 390 ].each do |width|
       [ {}, LayoutHelpers::LARGEST_TEXT ].each do |prefs|
-        it "insets each section as a card 16px from the edges, 16px apart, at #{width}px#{' with the largest text' if prefs.any?}" do
+        it "runs each section as a full-width card, 16px apart, at #{width}px#{' with the largest text' if prefs.any?}" do
           visit_today(width: width, prefs: prefs)
 
           expect(cards.size).to eq(ExerciseSection::MAX_SECTIONS)
           edges(".today-page .section").each do |left, right|
-            expect(left).to be_within(0.5).of(16)
-            expect(right).to be_within(0.5).of(16)
+            expect(left).to be_within(0.5).of(0)
+            expect(right).to be_within(0.5).of(0)
           end
           cards.each_cons(2) { |upper, lower| expect(lower["top"] - upper["bottom"]).to be_within(0.5).of(16) }
-          expect(computed_style(".today-page .section", "borderLeftWidth")).to eq("1px")
-          expect(computed_style(".today-page .section", "borderTopLeftRadius")).not_to eq("0px")
+          expect(computed_style(".today-page .section", "borderLeftWidth")).to eq("0px")
+          expect(computed_style(".today-page .section", "borderTopLeftRadius")).to eq("0px")
           expect(sideways_overflow).to eq(0)
         end
       end
@@ -74,15 +74,15 @@ RSpec.describe "Today's phone layout", type: :system do
 
 
   describe "the Submit row" do
-    it "comes after the last section, with a button as wide as the cards, in a browser tab and the home-screen app" do
+    it "comes after the last section, with a button lined up with the cards' text, in a browser tab and the home-screen app" do
       set_safe_area(bottom: 34)
       visit_today
 
       expect(row_position).to eq("static")
       expect(submit_row["top"]).to be > cards.last["bottom"]
       button = rect("#submit-answers")
-      expect(button["left"]).to be_within(0.5).of(cards.first["left"])
-      expect(button["right"]).to be_within(0.5).of(cards.first["right"])
+      expect(button["left"]).to be_within(0.5).of(cards.first["left"] + 16)
+      expect(button["right"]).to be_within(0.5).of(cards.first["right"] - 16)
       expect(button["height"]).to be >= 48
 
       force_standalone
@@ -131,10 +131,10 @@ RSpec.describe "Today's phone layout", type: :system do
     end
   end
 
-  it "applies the phone rules below 600px, with the cards' gutter, and not at 600px" do
+  it "applies the phone rules below 600px, with full-width cards, and not at 600px" do
     visit_today(width: 599)
-    expect(edges(".today-page .section").first.first).to be_within(0.5).of(16)
-    expect(rect("#submit-answers")["width"]).to be_within(0.5).of(cards.first["width"])
+    expect(edges(".today-page .section").first.first).to be_within(0.5).of(0)
+    expect(rect("#submit-answers")["width"]).to be_within(0.5).of(cards.first["width"] - 32)
 
     resize(600)
     expect(edges(".today-page .section").first.first).to be_within(0.5).of(24)
