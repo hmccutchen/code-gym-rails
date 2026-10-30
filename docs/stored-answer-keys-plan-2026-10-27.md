@@ -54,13 +54,13 @@ without keys would cost another 40 plus the extras, and `review_calibration` its
 **File:** `app/models/planted_key.rb`. A small pure module for the four new
 keys:
 - **`PlantedKey::MAX_LENGTH = 500`**, the bound on one key field.
-- **`PlantedKey.text(value)`**: a stripped string, truncated to
-  `MAX_LENGTH`, or nil when blank or not a string.
-
   Superseded on 2026-10-30: the limit is 1,500, `.text` no longer cuts, and a
   field past the limit drops the whole key with a `too_long` note
   (`docs/decisions/stored-answer-keys.md`, "A key past the length limit is
   dropped").
+- **`PlantedKey.text(value)`**: a stripped string, truncated to
+  `MAX_LENGTH`, or nil when blank or not a string. Since 2026-10-30 it only
+  strips.
 - **`PlantedKey.list(value, max:, &entry)`**: maps each entry through the
   block, drops nils and keeps at most `max`.
 
@@ -151,6 +151,9 @@ splitting the file isn't this PR's job.
     the hook, so `.reject_unusable!` needs no new return value.
   - `quote_missing`: a key whose `.unquoted_key_parts` isn't empty.
   - `ok`: otherwise.
+  - `too_long` (added 2026-10-30): a cleaned key with a field past
+    `PlantedKey::MAX_LENGTH`, dropped whole. It is checked before the
+    others, so a too-long key never reaches the quote check.
 - `ProblemSetIngest#reject_if_unusable` already runs after `#format_code!`,
   so the quote check sees the code as shown. `ProblemSetIngest` asks
   `.planted_key?` and names no kind.
@@ -439,7 +442,11 @@ this:
 1. **Wait.** Keys accumulate on real days. The quote threshold applies from
    the first keyed day: count only `attempt=draft` lines of the kinds that quote (`code_review`, `security_review`, `plan_review`) with `language=ruby_rails` (owner's decision, 2026-10-28). More than 2
    `quote_missing` in the first 10 stops the work, and the owner decides
-   what's next. Report the `missing` count beside it.
+   what's next. Report the `missing` count beside it. A `too_long` line
+   doesn't count toward the 10, since its key never reached the quote
+   check. Separately, more than 2 `too_long` in the first 10 drafted Ruby
+   sections of a keyed kind stops the work too (owner's decision,
+   2026-10-30).
 2. **Export the key sheet,** with the owner's approval for that export. Keep
    it outside the repository.
 3. **Read.** The owner reads the Ruby `code_review` sections from real days,

@@ -67,9 +67,10 @@ class ProblemSetIngest
       kind = ExerciseSection.find(key)
       next unless kind&.planted_key? && section.is_a?(Hash)
 
-      cleaned = kind.normalize_planted_key(section)
-      @too_long_keys << key if PlantedKey.too_long?(cleaned)
-      PlantedKey.store!(section, (cleaned unless @too_long_keys.include?(key)))
+      cleaned  = kind.normalize_planted_key(section)
+      too_long = PlantedKey.too_long?(cleaned)
+      @too_long_keys << key if too_long
+      PlantedKey.store!(section, (cleaned unless too_long))
     end
   end
 

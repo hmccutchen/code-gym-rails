@@ -82,6 +82,17 @@ RSpec.describe ProblemSetIngest do
       expect(result.problem_set["security_review"]).not_to have_key("answer_key")
     end
 
+    it "drops a losing alternative's too-long key as well, with no note, since only winners are noted" do
+      long_key = %w[vulnerability exploit mitigation].index_with { |field| "`User.find(id)` #{field}" }
+                                                       .merge("mitigation" => "x" * (PlantedKey::MAX_LENGTH + 1))
+      security = { "concept" => "sql_injection_prevention", "snippet" => "User.find(id)", "answer_key" => long_key }
+      result = ingest({ "code_review" => code_review, "architecture" => { "concept" => "service_boundaries", "question" => "q" },
+                        "security_review" => security })
+
+      expect(result.key_notes.map(&:to_h)).to eq([ { key: "code_review", language: "ruby_rails", outcome: "ok" } ])
+      expect(result.problem_set["security_review"]).not_to have_key("answer_key")
+    end
+
     it "matches a key quoting the provider's own Ruby against the code the real formatter re-spaced" do
       allow(CodeFormat).to receive(:all).and_call_original
       section = code_review.merge("snippet" => "def total\n  {a: 1}.sum { |k,v| v+1 }\nend",

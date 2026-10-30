@@ -34,7 +34,8 @@ four kept sections cover every rung. Concepts cycle through the kind's
 selectable vocabulary, without `other`, shifted once per pass through the
 rungs so each concept meets each rung.
 
-A rejected draft, a draft whose key ingest dropped, and a provider, verdict
+A rejected draft, a draft whose key ingest dropped (never sent, unusable or
+too long; the `[planted_key] attempt=retry` log line says which), and a provider, verdict
 or connection failure are counted, not kept, and another draft is made, up to
 `ATTEMPTS_PER_SECTION` drafts for each section asked for. A section ingest
 refuses raises `ProviderError::InvalidResponseError` and counts as a failure.

@@ -68,16 +68,21 @@ The owner decided on 2026-10-30, after the first triage run:
   the stored keys can't show how long the provider wrote. The fields that
   weren't cut ran 373 to 467 characters. The solver's replies on the same
   sections were never cut, and ran 359 to 770, the longest a fix that wrote
-  a migration in full. 1,500 is about twice the longest uncut field seen, so
-  a few sentences with inline code fit, and a field past it is no longer a
-  few sentences.
+  a migration in full. 1,500 is about twice the solver's longest reply and
+  about three times the longest uncut key field, so a few sentences with
+  inline code fit, and a field past it is no longer a few sentences. Four
+  uncut fields is a small sample, so the fresh triage set drafted under the
+  new limit is also the check on it.
 - **The guidance asks for a few sentences a field,** in each keyed kind's
   schema line.
 - **A field past the limit drops the whole key.** A cut field can lose the
   part grading needs, such as the second gap a key names. The section keeps
   today's keyless grading, and its key note reads `too_long`, logged with no
   key text. A list key (`plan_review`'s flaws, `pseudocode_to_code`'s
-  requirements) is dropped whole when one entry is too long. The multi-file
+  requirements) is dropped whole when one entry that survives cleaning is
+  too long. An entry cleaning already removes (a flaw with no pushback, an
+  entry past the list's cap) is never measured, and the key keeps the
+  rest. The multi-file
   key's `evidence` entries, which arrive in launch B, follow the same rule.
 - **Keys stored at the old limit are recognisable.** `String#truncate(500)`
   wrote a field of exactly 500 characters ending in `...`, and a field that
@@ -103,7 +108,12 @@ Two checks, neither of which changes a key:
   `code_review_mode`. The threshold is counted from those lines: more than 2
   `quote_missing` in the first 10 drafted Ruby sections of a kind that
   quotes (`code_review`, `security_review`, `plan_review`) stops the work,
-  and `missing` is reported beside it (owner's decision, 2026-10-28).
+  and `missing` is reported beside it (owner's decision, 2026-10-28). A
+  `too_long` line never reached the quote check, so it doesn't count toward
+  those 10. It has a rule of its own: more than 2 `too_long` in the first 10
+  drafted Ruby sections of a keyed kind also stops the work, and the owner
+  decides between raising the limit, tightening the guidance and accepting
+  the rate (owner's decision, 2026-10-30).
 - **A sampled read.** The owner reads the Ruby `code_review` keys from real
   days, through the key sheet (`export_review_baseline.rb --key-sheet`),
   which carries the problem and its key and nothing about the owner's
