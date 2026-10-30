@@ -458,28 +458,31 @@ data.*
   and three agreements go to a key sheet outside the repo
 - the section judge shown a multi-file code review's marked line numbers,
   not the provider's quotes `#629`
-  **why:** a quote that matched no line marks nothing on the page, so the
-  judge could read a change the engineer never sees, and nothing pinned
-  what the judge sees for files
+  **why:** a quote matching no line marks nothing on the page, so the
+  judge could read a change the engineer never sees
   **I decided:** numbers only, hidden through a per-kind hook rather than a
   branch in the judge prompt
 - every line of a multi-file code review's files numbered in its prompts,
   and the judge shown the files that way `#633`
-  **why:** the judge got the code as one escaped string and the grader got
-  it unnumbered, so both had to count lines to find a changed line
+  **why:** the judge and grader had to count lines to find a changed line
   **I decided:** number lines in every prompt, through the one file format
   the grader already uses, rather than for the judge alone
 - the blind-solve triage built as a `--triage` mode of the drafts script
-  `#635 open`
-  **why:** real code review keys arrive about one a weekday, and the triage
-  shows about 30 before the real-day read is done, without slowing PR 2
-  **I decided:** build it now rather than skip it, since it doesn't gate
-  PR 2; fix the plan's review finding on short agreement samples before
-  merging #611; no run until I approve its call count and cost
+  `#635`
+  **why:** real keys arrive about one a weekday; the triage shows about 30
+  sooner without slowing PR 2
+  **I decided:** build it now, since it doesn't gate PR 2; fix #611's
+  review finding before merging it; no run until I approve its cost
 - a multi-file code review's lines numbered on the page, and the grader and
-  duck told the `N | ` prefix is not code `#637 open`
-  **why:** since #633 the prompts number every line but the page showed
-  none, so a review citing line 4 pointed at nothing the engineer could see,
-  and the grader could copy the prefix into its improved code
+  duck told the `N | ` prefix is not code `#637`
+  **why:** a review citing line 4 pointed at nothing the page showed, and
+  the grader could copy the prefix into its code
   **I decided:** a gutter on the page plus one prompt rule, rather than the
   prompt rule alone, so a cited line number stays usable
+- a stored key with a field past 1,500 characters dropped whole, not cut,
+  and noted `too_long` `#640 open`
+  **why:** the triage showed keys cut mid-sentence at 500 characters, and a
+  cut key can lose the part grading needs
+  **I decided:** 1,500 from the run's lengths; a few sentences a field;
+  PR 2 grades keys cut at the old limit as keyless; more than 2 too_long in
+  10 stops the work; a fresh triage set before my key read
