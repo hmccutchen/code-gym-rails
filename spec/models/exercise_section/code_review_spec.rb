@@ -311,10 +311,6 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
     end
   end
 
-  it "keeps a file short enough for the page's two-digit line-number gutter" do
-    expect(described_class::MAX_FILE_LINES.to_s.length).to be <= 2
-  end
-
   describe ".judge_attachment" do
     it "numbers the files without the note on copying code, since the judge writes none" do
       section = { "file_1_path" => "app/models/order.rb", "file_1_code" => "a = 1", "file_1_changed_lines" => [ 1 ],
@@ -338,6 +334,13 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
       lines = text(Array.new(10) { |index| "x_#{index} = #{index}" }.join("\n")).lines(chomp: true)
 
       expect(lines.values_at(2, 11)).to eq([ " 1 | x_0 = 0", "10 | x_9 = 9" ])
+    end
+
+    it "sizes its numbers by every line, blank ones included, which the page's gutter reads too" do
+      file = described_class::File.new(path: "a.rb", code: "a = 1#{"\n" * 100}b = 2", changed: [])
+
+      expect(file.number_width).to eq(3)
+      expect(file.prompt_text.lines(chomp: true).last).to eq("101 | b = 2")
     end
 
     it "keeps a line's trailing whitespace, which can be part of a string literal's value" do

@@ -317,8 +317,13 @@ wrapped continuation starts two columns past that indentation.
 then shows as one space while the rest stays in the text, so a copy keeps the
 original line.
 
-A multi-file code review's `pre.snippet.numbered` numbers each line in a gutter
-three columns wide: two digits and a space, which `MAX_FILE_LINES` stays within (`code_review_spec` holds it). The number is a CSS counter on
+A multi-file code review's `code.highlight.numbered` numbers each line in a
+gutter one column wider than its largest line number. `highlighted_code` sets
+`--number-width` from `CodeReview::File#number_width`, the digit count of the
+file's last line number, which also right-aligns the prompt's numbers. It
+counts every line, blank ones included, so it can't come from
+`MAX_FILE_LINES`, which counts only lines with text: 15 lines of code with 90
+blank lines between them reach line 105. The number is a CSS counter on
 `.code-line::before`, placed left of the line's box, so the hanging indent and
 the wrap padding never move it and a copy never includes it. The second
 `content` declaration hides the number from screen readers, and a browser that

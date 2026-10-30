@@ -259,9 +259,9 @@
     code.highlight .code-line { display: block; padding-left: calc((var(--indent, 0) + 2) * 1ch); text-indent: calc((var(--indent, 0) + 2) * -1ch); }
     code.highlight[data-wraps] .code-align-extra { font-size: 0; }
     code.highlight .code-line-changed { background: var(--code-changed-bg); box-shadow: inset 3px 0 0 var(--accent); }
-    pre.snippet.numbered > code.highlight { display: block; margin-left: 3ch; counter-reset: code-line; }
-    pre.snippet.numbered .code-line { position: relative; counter-increment: code-line; }
-    pre.snippet.numbered .code-line::before { content: counter(code-line); content: counter(code-line) / ""; position: absolute; left: -3ch; width: 2ch; text-align: right; text-indent: 0; color: var(--muted); }
+    code.highlight.numbered { display: block; margin-left: calc((var(--number-width) + 1) * 1ch); counter-reset: code-line; }
+    code.highlight.numbered .code-line { position: relative; counter-increment: code-line; }
+    code.highlight.numbered .code-line::before { content: counter(code-line); content: counter(code-line) / ""; position: absolute; left: calc((var(--number-width) + 1) * -1ch); width: calc(var(--number-width) * 1ch); text-align: right; text-indent: 0; color: var(--muted); }
     .plan-excerpt { background: var(--code-bg); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
     .problem-statement { background: var(--code-bg); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
     .pseudocode-rounds { margin-top: .75rem; }
