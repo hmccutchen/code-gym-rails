@@ -12,7 +12,9 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   FILE_SLOTS = 1..3
 
-  FILE_PARTS = %w[path code changed].freeze
+  CHANGED_PART = "changed"
+
+  FILE_PARTS = [ "path", "code", CHANGED_PART ].freeze
 
   FILE_FIELDS = (FILE_PARTS + %w[changed_lines]).freeze
 
@@ -65,7 +67,7 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.files_context(section) = files(section).map(&:prompt_text).join("\n").presence
 
-  def self.judge_hidden_fields = FILE_SLOTS.map { |number| "file_#{number}_changed" }
+  def self.judge_hidden_fields = FILE_SLOTS.map { |number| "file_#{number}_#{CHANGED_PART}" }
 
   def self.reject_unusable!(section, language: nil, file_range: 1..1, **)
     if file_range.max == 1
