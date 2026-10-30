@@ -474,3 +474,9 @@ data.*
   and the grader could copy the prefix into its improved code
   **I decided:** a gutter on the page plus one prompt rule, rather than the
   prompt rule alone, so a cited line number stays usable
+- a multi-file code review's improved code asked to name each file it
+  changes, under a `File: <path>` line `#641 open`
+  **why:** the review showed the improved code as one block with no path,
+  so the engineer had to guess which of the files each part replaced
+  **I decided:** a prompt rule rather than a per-file shape, so the improved
+  code stays one string and nothing that reads it changes
