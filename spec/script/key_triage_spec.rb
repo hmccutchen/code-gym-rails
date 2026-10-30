@@ -78,6 +78,16 @@ RSpec.describe KeyTriage do
       expect(described_class.reply("issue" => " a ", "fix" => "b", "extra" => 1)).to eq("issue" => "a", "fix" => "b")
       expect { described_class.reply("issue" => "a") }.to raise_error(ProviderError::InvalidResponseError)
       expect { described_class.reply([]) }.to raise_error(ProviderError::InvalidResponseError)
+      expect { described_class.reply("issue" => " ", "fix" => "b") }.to raise_error(ProviderError::InvalidResponseError)
+    end
+
+    it "keeps a long reply whole, so a quote past the stored key's length cap is still compared" do
+      issue = "#{'x' * PlantedKey::MAX_LENGTH} then `total = customer.orders.sum(&:total_cents)`"
+
+      reply = described_class.reply("issue" => issue, "fix" => "f" * (PlantedKey::MAX_LENGTH + 1))
+
+      expect(reply["fix"].length).to eq(PlantedKey::MAX_LENGTH + 1)
+      expect(described_class.compare(kind, section, reply["issue"], language: "ruby_rails")["triage"]).to eq("agree")
     end
   end
 

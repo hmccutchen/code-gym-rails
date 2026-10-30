@@ -28,7 +28,8 @@ module KeyTriage
   end
 
   def self.reply(raw)
-    PlantedKey.fields(raw, REPLY_FIELDS) or raise ProviderError::InvalidResponseError, "The solve reply needs a text issue and fix"
+    fields = REPLY_FIELDS.index_with { |name| raw[name].strip.presence if raw.is_a?(Hash) && raw[name].is_a?(String) }
+    fields.values.all? ? fields : raise(ProviderError::InvalidResponseError, "The solve reply needs a text issue and fix")
   end
 
   def self.compare(kind, section, solver_issue, language:)
