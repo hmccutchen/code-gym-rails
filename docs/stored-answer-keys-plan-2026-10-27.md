@@ -388,7 +388,9 @@ this:
   `ExerciseSection.all_answer_key_fields` and
   `ProblemSetIngest::SERVER_STAMPS` removed, through the same helper the
   judge's prompt uses (`SectionJudgePrompt`'s `visible` step, made public
-  and shared), so the rule lives in one place.
+  and shared), so the rule lives in one place. Since #629 that step also
+  drops the kind's `judge_hidden_fields`, so the solver sees the marked
+  line numbers, not the provider's quotes, as the page does.
 - **Spec.** A sentinel is planted in every answer-key field. The spec stubs
   the provider over Faraday and asserts that no request body contains the
   sentinel, on the draft call, the judge call or the solve call.
