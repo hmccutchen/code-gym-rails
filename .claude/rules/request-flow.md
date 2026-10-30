@@ -26,8 +26,7 @@ User logs in (address, then an emailed 6-digit code or, once it is on, an authen
          saves: DailyExercise { problem_set: jsonb, language } on success, or
          persists last_generation_error(_date) on the user on failure — the
          dashboard learns the outcome by polling GET /dashboard/status and
-         reloading (this app loads no Turbo JS, so a live push has
-         no subscriber)
+         reloading
 
 User opens dashboard:
   └→ DashboardController#show

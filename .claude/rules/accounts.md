@@ -5,7 +5,6 @@ paths:
   - "app/models/{invite_code,pending_trial,provider_credential,trial_allowance,trial_mode,trial_status,house_keys,user}.rb"
   - "app/models/concerns/signed_in_sessions.rb"
   - "app/models/user/authenticator.rb"
-  - "app/channels/application_cable/connection.rb"
   - "app/clients/{preview_environment,preview_mail,lazy_cache_store}.rb"
   - "app/services/preview_seed.rb"
   - "app/views/{sessions,trials,user_mailer,second_factor_challenges,authenticators,recovery_codes}/**"
@@ -47,10 +46,9 @@ read it before changing that area.
   names `text/html`.
 - **Session validity**: every sign-in path writes `session[:signed_in_at]`
   with `User.session_stamp`, and a session counts only while that stamp is at
-  or after `users.sessions_valid_after`. `current_user` and the cable
-  connection both resolve the user through `User.signed_in_through`, never a
-  lookup of their own, and pass it the two session values rather than the
-  session. No model reads the session or takes it as an argument
+  or after `users.sessions_valid_after`. `current_user` resolves the user
+  through `User.signed_in_through`, never a lookup of its own, and passes it
+  the two session values rather than the session. No model reads the session or takes it as an argument
   (`app_source_spec`). `User.session_time` is the one reader of a stamp. A new sign-in path that skips the stamp signs its
   users out on their next request.
 - **Second factor** (`docs/decisions/passwordless-sign-in.md`): an optional
@@ -102,8 +100,7 @@ read it before changing that area.
   beats an injected value. On a preview app (`PREVIEW_APP` set) the order
   inverts, because a PR environment inherits its base environment's variables
   and therefore arrives carrying production's `APP_HOST` — honoring it there
-  would give the preview app `default_url_options` and an ActionCable origin
-  check pointed at production's host instead of its own. `AppHost` reads that
+  would give the preview app `default_url_options` pointed at production's host instead of its own. `AppHost` reads that
   variable directly rather than through `PreviewEnvironment`, which is not
   loadable during `Rails.application.configure`; a spec asserts the two names
   agree.

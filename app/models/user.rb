@@ -65,7 +65,7 @@ class User < ApplicationRecord
     LOGIN_CODE_EXPIRY.inspect
   end
 
-  # Scoped to `active` so an anonymized user's open session, in another tab or on the cable, stops resolving.
+  # Scoped to `active` so an anonymized user's open session, in another tab, stops resolving.
   def self.signed_in(user_id) = active.find_by(id: user_id)
 
   def self.login_pending?(email:, requested_at:)

@@ -6,9 +6,9 @@ Turning the authenticator on or off has to end every other signed-in browser. A 
 
 A session with no stamp, or one that doesn't parse, is rejected. That signs out every session from before this change once, which is the safe direction.
 
-## One lookup for pages and the cable
+## One lookup for pages
 
-`ApplicationController#current_user` and `ApplicationCable::Connection` both call `User.signed_in_through`. It finds the account through `User.signed_in`, which keeps the rule that only an active account resolves, and then checks the stamp. If the cable kept its own lookup, a websocket opened by an ended session would keep connecting after the pages had signed it out.
+`ApplicationController#current_user` calls `User.signed_in_through`. It finds the account through `User.signed_in`, which keeps the rule that only an active account resolves, and then checks the stamp. Any other reader of the session, such as a websocket connection, must call it too, or an ended session would keep working there after the pages had signed it out.
 
 ## Who writes the stamp
 
