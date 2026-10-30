@@ -360,8 +360,6 @@ class AiService
     text
   end
 
-  def error_code_for(error) = self.class.error_code_for(error)
-
   def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs)
     hosts = kinds.filter_map do |kind|
       mode = code_review_mode if kind == ExerciseSection::CodeReview

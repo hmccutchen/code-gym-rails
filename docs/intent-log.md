@@ -455,3 +455,10 @@ data.*
   **I decided:** agreement only screens, and the real-day read stays the
   gate; I approve each run's call count and cost first; the disagreements
   and three agreements go to a key sheet outside the repo
+- the section judge shown a multi-file code review's marked line numbers,
+  not the provider's quotes `#629 merged`
+  **why:** a quote that matched no line marks nothing on the page, so the
+  judge could read a change the engineer never sees, and nothing pinned
+  what the judge sees for files
+  **I decided:** numbers only, hidden through a per-kind hook rather than a
+  branch in the judge prompt

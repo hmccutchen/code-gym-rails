@@ -53,3 +53,5 @@ A `RealSource` day is always single-file, so the multi-file guidance never meets
 ## The judge
 
 Launch A gives the judge no paragraph about files: `code_review` keeps the base `.judge_guidance`, which is nil, so the judge prompt is unchanged. The paragraph that asks the judge to solve a multi-file section and reject one that a single file explains arrives with launch B, when real days first ask for files (`docs/decisions/multi-file-code-review.md`). The blind solve stays off for `code_review`.
+
+The judge sees each file's changed lines as `file_N_changed_lines`, the numbers the page marks, and never the provider's quotes: `.judge_hidden_fields` names `file_N_changed`, which `SectionJudgePrompt` leaves out (#625). A quote that matched no line, or several, marks nothing on the page, so showing it would describe a change the engineer never sees. Launch B's paragraph should name `file_N_changed_lines` when it tells the judge never to change the changed lines. `section_judge_prompt_spec` snapshots the prompt for an ingested multi-file section.

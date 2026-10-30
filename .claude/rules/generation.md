@@ -57,7 +57,8 @@ read it before changing that area.
   writes no row. A dropped kind still counts as
   scheduled, and nothing in the rotation compensates, on purpose; a day's
   credit never exceeds the sections it delivered. The judge sees one section
-  with no concept history, answer keys or `SERVER_STAMPS`.
+  with no concept history, answer keys, `SERVER_STAMPS` or the kind's
+  `.judge_hidden_fields`.
 - **JSONB problem sets**: `problem_set` column stores `{ code_review: {...}, pattern: {...}, challenge: {...} }`. Accessed via convenience methods on `DailyExercise`.
 - **Closed concept vocabulary**: each section is tagged with one concept from a fixed per-language list (`ConceptVocabulary::RAILS_CONCEPTS` / `JS_CONCEPTS`), narrowed further at generation time for a schema-review `code_review` day (see below); anything a provider invents is normalized to `"other"` so concept history stays aggregatable.
 - **`code_review` content modes**

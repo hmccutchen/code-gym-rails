@@ -211,6 +211,8 @@ class ExerciseSection
       nil
     end
 
+    def judge_hidden_fields = []
+
     def rejudge_edits?
       false
     end

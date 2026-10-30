@@ -68,7 +68,7 @@ The base class raises because a kind that returned nothing would produce a revie
 
 ## Judge facets
 
-`.judge_task`, `.discovery?`, `.prose_fields`, `.judge_guidance`, `.rejudge_edits?`, `.judge_solve_options` and `.solve_matches_key?` are read only by the judge (`AiService#judge_section`), never by the draft prompt or by grading. How many retries a rejection buys is a plan fact (`DailyPlan::Result#judge_retries`), not a kind facet.
+`.judge_task`, `.discovery?`, `.prose_fields`, `.judge_guidance`, `.judge_hidden_fields`, `.rejudge_edits?`, `.judge_solve_options` and `.solve_matches_key?` are read only by the judge (`AiService#judge_section`), never by the draft prompt or by grading. How many retries a rejection buys is a plan fact (`DailyPlan::Result#judge_retries`), not a kind facet.
 
 ## `.improved_code_label` and `.improved_code_prose?`
 
