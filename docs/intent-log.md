@@ -460,11 +460,11 @@ data.*
   mid-level 2, senior and principal 2–3; half of non-RealSource days once on;
   after the reviews, the judge line waits for launch B, the key checks the
   files now, and KeyQuote's whole-file search waits for its caller
-- a multi-file code review's check made safe to run twice, keeping the
-  provider's quoted lines beside the line numbers they resolve to
-  `#624 open`
+- a multi-file code review's check made safe to run twice `#624`
   **why:** the check overwrote the quotes with line numbers, so a second
   run would refuse a good section
   **I decided:** keep the two in separate fields rather than accept
   numbers as already resolved, so a provider can never skip the quote
   match by sending numbers
+- cards on the phone run to the screen edge, so code wraps less `#631`
+  **why:** narrow cards hurt how code was laid out and read
