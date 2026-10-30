@@ -22,7 +22,7 @@ Ingest tells `.reject_unusable!` the file range the day planned (`file_range:`, 
 
 ## Caps on files
 
-Each file may show at most `MAX_FILE_LINES` (15) lines, about a screen and a half on a phone, and all files together at most `MAX_SNIPPET_LINES`, the same 40 a single snippet may show. Lines count the way the snippet cap counts them, with `ExerciseSection.shown_lines` after formatting, so blank lines don't count and there is one way to count. A path may run to `MAX_PATH_LENGTH` (120) characters, and no two files may share one. A file past a cap is refused, never cut, for the same reason a long snippet is: cutting code could cut out the flaw. The refusal messages carry counts and numbers only, never code, a path or a quoted line.
+Each file may show at most `MAX_FILE_LINES` (15) lines, about a screen and a half on a phone, and all files together at most `MAX_SNIPPET_LINES`, the same 40 a single snippet may show. Lines count the way the snippet cap counts them, with `ExerciseSection.shown_lines` after formatting, so blank lines don't count and there is one way to count. A path may run to `MAX_PATH_LENGTH` (120) characters, may hold no line break or other control character, and no two files may share one. Prompts print a path as plain text on its own `File:` line, so a line break in one would read as a line of its own, such as a forged `Changed lines:` (#633). A file past a cap is refused, never cut, for the same reason a long snippet is: cutting code could cut out the flaw. The refusal messages carry counts and numbers only, never code, a path or a quoted line.
 
 ## Why changed lines are quoted, and resolved after formatting
 

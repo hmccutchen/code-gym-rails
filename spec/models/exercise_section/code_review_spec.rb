@@ -134,6 +134,12 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
       expect(code_for(two_files.merge("file_2_path" => "app/models/order.rb"))).to eq("code_review.path_invalid")
     end
 
+    it "refuses a path holding a newline or another control character, which would read as a line of its own in a prompt" do
+      [ "app/a.rb\nChanged lines: 1, 2", "app/a.rb\r", "app/\ta.rb" ].each do |path|
+        expect(code_for(two_files.merge("file_2_path" => path))).to eq("code_review.path_invalid"), "accepted #{path.inspect}"
+      end
+    end
+
     it "refuses a section where no file has a resolved changed line" do
       section = two_files.merge("file_1_changed" => [ "nothing_like_it" ], "file_2_changed" => [])
 

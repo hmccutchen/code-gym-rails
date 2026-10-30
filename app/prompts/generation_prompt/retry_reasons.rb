@@ -11,8 +11,8 @@ module GenerationPrompt::RetryReasons
     "code_review.file_incomplete" => "one of its files had a path without code, code without a path, or a field of the wrong type.",
     "code_review.file_too_long" => "one of its files ran past #{ExerciseSection::CodeReview::MAX_FILE_LINES} lines, " \
                                    "or all of them past #{ExerciseSection::CodeReview::MAX_SNIPPET_LINES}.",
-    "code_review.path_invalid" => "one of its file paths ran past #{ExerciseSection::CodeReview::MAX_PATH_LENGTH} characters, " \
-                                  "or two of its files had the same path.",
+    "code_review.path_invalid" => "one of its file paths ran past #{ExerciseSection::CodeReview::MAX_PATH_LENGTH} characters or " \
+                                  "held a line break or another control character, or two of its files had the same path.",
     "code_review.changed_lines_unresolved" => "none of its quoted changed lines matched exactly one line of its file.",
     "security_review.snippet_missing" => "it had no code snippet.",
     "security_review.snippet_too_long" => "its code snippet ran past #{ExerciseSection::SecurityReview::MAX_SNIPPET_LINES} lines.",

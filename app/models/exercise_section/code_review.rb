@@ -129,6 +129,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.reject_invalid_paths!(shown)
     longest = shown.map { |file| file.path.length }.max.to_i
     refuse!("path_invalid", "A code review path runs #{longest} characters, past #{MAX_PATH_LENGTH}") if longest > MAX_PATH_LENGTH
+    refuse!("path_invalid", "A code review path holds a control character") if shown.any? { |file| file.path.match?(/[[:cntrl:]]/) }
     return if shown.map(&:path).uniq.size == shown.size
 
     refuse!("path_invalid", "Two code review files share a path")
