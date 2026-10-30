@@ -440,8 +440,7 @@ data.*
 - a concept's Learn page shows its explanation, guide and pitfalls again
   when its stored lesson is the string "None" `#620`
   **why:** four production references stored "None", which counted as a
-  lesson, so their pages hid everything but the tagline, code and senior
-  lens, and offered no way to write a lesson
+  lesson and hid most of their pages
   **I decided:** after an explanation of each option with a real example,
   both a read-side guard, so a stored value with nothing to show counts as
   no lesson, and a one-time migration clearing every lesson that isn't an
@@ -468,3 +467,5 @@ data.*
   match by sending numbers
 - cards on the phone run to the screen edge, so code wraps less `#631`
   **why:** narrow cards hurt how code was laid out and read
+  **I decided:** after the reviews, tighten the code box too; notices stay
+  inset
