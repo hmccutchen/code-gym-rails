@@ -403,7 +403,7 @@ data.*
   same concept"; never the draft or the judge's words; a report of what
   each retry path records
 - the grader starts with code review, gated on its read and token cost;
-  drafted kinds join later `#611 open`
+  drafted kinds join later `#611 merged`
 
 ## Thu Oct 29
 
@@ -450,7 +450,7 @@ data.*
 ## Fri Oct 30
 
 - a blind-solve triage for drafted code review keys added to the plan:
-  about 30 drafts solved without their keys, compared in Ruby `#611 open`
+  about 30 drafts solved without their keys, compared in Ruby `#611 merged`
   **why:** to find the keys worth reading first
   **I decided:** agreement only screens, and the real-day read stays the
   gate; I approve each run's call count and cost first; the disagreements
@@ -462,3 +462,10 @@ data.*
   what the judge sees for files
   **I decided:** numbers only, hidden through a per-kind hook rather than a
   branch in the judge prompt
+- the blind-solve triage built as a `--triage` mode of the drafts script
+  `#635 open`
+  **why:** real code review keys arrive about one a weekday, and the triage
+  shows about 30 before the real-day read is done, without slowing PR 2
+  **I decided:** build it now rather than skip it, since it doesn't gate
+  PR 2; fix the plan's review finding on short agreement samples before
+  merging #611; no run until I approve its call count and cost
