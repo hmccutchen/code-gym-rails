@@ -2,8 +2,9 @@
 
 Built from `docs/stored-answer-keys-spec-2026-10-27.md`, which keeps the full
 reasoning, and its plan, `docs/stored-answer-keys-plan-2026-10-27.md`. This
-record covers the first of two PRs: the keys are stored and read by nothing.
-The second PR lets the grader read them, and its half is added here when it
+record covers the first PR: the keys are stored and read by nothing. The
+second PR lets the grader read `code_review`'s keys, and later PRs turn on the
+other three kinds one at a time; each kind's half is added here when it
 merges.
 
 ## Why
@@ -96,15 +97,24 @@ make progress that isn't real. The owner decided on 2026-10-28:
   checks and the Account page's spend total read those counts.
 - **A colleague reads them.** The owner can't judge those keys reliably, so
   a colleague the owner chooses reads the drafts. A kind with no available
-  reader stays off in the second PR.
-- **The read is the main check.** For those three kinds, the second PR's
-  calibration fixtures are a guard against a grader misusing a key, and the
+  reader stays off.
+- **The read is the main check.** For those three kinds, the calibration
+  fixtures are a guard against a grader misusing a key, and the
   read decides whether the keys are right.
 - **Real graded sections, if any.** Only sections generated after this PR
   deployed carry a key. The owner's graded sections of the three kinds,
   counted with an approved read-only query, get the keyed-against-unkeyed
   regrade as a small sample if any carry a key. That sample is reported, not
   held to the systematic-movement rule, since it is too small for it.
+
+### The grader turns kinds on one at a time
+
+The second PR turns on `code_review` alone, so it doesn't wait on the three
+drafted kinds (owner's decision, 2026-10-28). It starts once the
+`code_review` read between the PRs is done and the token cost below has been
+measured. `security_review`, `plan_review` and `pseudocode_to_code` stay off
+until their drafts are read, and each joins in a PR of its own, with its own
+calibration fixture and the small graded-section sample above.
 
 Drafts show that the generator plants a correct key for these kinds. They
 don't show that keys hold up on the owner's real days, so the first real
@@ -114,6 +124,38 @@ The stability export (`export_review_baseline.rb` without `--key-sheet`)
 keeps the four keys. It reads only submitted, reviewed days, it already holds
 the answers and the older keys, and the second PR's measuring regrades from
 it with and without the key (owner's decision, 2026-10-28).
+
+### A blind solve screens the `code_review` drafts
+
+The owner decided on 2026-10-30 to add a triage step for `code_review`.
+About 30 sections are drafted with the drafts script, toy and single-file,
+cycling through the three modes. Each one is solved by a separate call that
+never sees the key, and the script compares the solver's quoted lines with
+the key's in Ruby: agree, disagree or unlocated. The disagreements and up to
+three agreements, one per mode that has one, go to the key sheet outside the repository for the owner to read.
+Every run waits for the owner's approval of its call count and cost.
+
+- **Agreement is screening only.** A solver that finds the same lines as the
+  key doesn't show the key is right. The generator and the solver can share
+  a mistake, the more so within one model family, and the judge (Sonnet 5.5,
+  the default solver too) has already kept each section. A disagreement
+  doesn't show the key is wrong either: the solver may have found a second
+  flaw, or misread the code. Triage only says which keys to read first. The
+  quote threshold and the owner's read of real-day keys stay the gate for the
+  second PR.
+- **The solver may run on a different model than the generator.** It can use
+  any priced Claude model on the owner's own key, Sonnet 5.5 by default
+  against the generator's Opus 5.5. It can use another provider only with a
+  key the owner holds for that provider.
+- **The key never reaches the solve.** The solve is a pre-submission AI
+  context, so its prompt is built from the section with every answer-key
+  field and server stamp removed, through the same step as the judge's
+  prompt. A sentinel spec checks every request body. The comparison never
+  puts the key and the reply in one prompt. The reply is never stored or
+  sent on, and the prompt lives in `script/`, out of the app's reach.
+- **This is not the judge's blind solve.** The judge solves only design
+  comparisons, live (`JudgeSolve`). This triage is an offline script, and
+  turns nothing on.
 
 ## Before the grader reads them
 
@@ -134,4 +176,5 @@ The second PR changes grading, so these hold from now:
 About 60-150 more output tokens per keyed section on the generation route,
 by the spec's estimate. The owner decided on 2026-10-28 to measure it from
 the `generate_exercise` usage rows of the week before and the week after this
-PR deploys, rather than with extra billed calls.
+PR deploys, rather than with extra billed calls. The second PR waits for that
+measurement.

@@ -11,8 +11,13 @@ once keys exist on real sections.
   page, not any prompt. Keys pile up on real days while grading stays
   exactly as it is today.
 - **Between the PRs,** the owner and a colleague read a sample.
-- **PR 2** lets the grader read them, only if that read says the keys are
-  right often enough.
+- **PR 2** lets the grader read `code_review`'s keys, only if that read says
+  they are right often enough. It turns kinds on one at a time and starts
+  with `code_review` alone (owner's decision, 2026-10-28), so it doesn't
+  wait on the three rarer kinds.
+- **Later PRs** turn on `security_review`, `plan_review` and
+  `pseudocode_to_code`, one kind each, once that kind's drafts have been
+  read (see "Later PRs: the drafted kinds join").
 
 A wrong key that no grade has used yet costs nothing.
 
@@ -303,33 +308,160 @@ in its own PR before the read.
   days. The first real section of each still logs its `[planted_key]` line,
   and those lines are checked when they appear.
 
+### Blind-solve triage for `code_review` drafts
+
+Added by the owner on 2026-10-30. A second model, which never sees the key,
+solves about 30 drafted `code_review` sections, and the script compares what
+it finds with each key. Disagreements tell the owner which keys to read
+first. **Agreement is screening only:** it never shows that a key is right,
+and the real-day read in step 3 stays PR 2's gate.
+
+- **Drafting.** `script/draft_key_samples.rb code_review OUT_PATH --triage`
+  drafts `code_review` sections through the same retry and judge path as the
+  drafted kinds, up to `--count 30`. `code_review` is accepted only with
+  `--triage`; the colleague's read of the three rarer kinds doesn't change.
+  The earlier review found two ways a drafted `code_review` wouldn't match
+  a real day, so the triage drafts fix both:
+  - **The concept follows the mode.** The drafts cycle through
+    `application_code`, `test_file` and `schema_review` in turn (10 of each
+    in 30). Each concept comes from
+    `ConceptVocabulary.selectable_for_section(..., mode:, rung:)`, so a
+    data-modeling concept never lands on an application-code draft.
+  - **Toy code only, single-file only.** The draft's plan has
+    `code_review_source: nil`, since a `RealSource` excerpt would need the
+    scenario restore that `JudgedGeneration` does on an edit, and
+    `code_review_files: :single`, since multi-file waits for launch B.
+- **The plan comes first.** Without `--run`, the script prints the drafts,
+  the judge calls and the solve calls, the most calls in total, and a cost
+  bound with every call at its output cap. **Every `--run` needs the
+  owner's approval of those numbers first.** Like the rest of the script, it
+  runs on the owner's machine against a local database, inside a read-only
+  transaction, and writes no day, history or `ApiUsage` row.
+- **The solve.** One extra call per kept section. The solver gets the section
+  as an engineer sees it before submitting, and is asked for the one planted
+  issue, quoting the code it points at in backticks, and a fix. Its reply
+  schema is `{ "issue", "fix" }`.
+- **The comparison is done in Ruby, never by a model.** Each backtick quote
+  in the solver's `issue` and in the key's `issue` is located in the
+  formatted snippet with `KeyQuote.find`. That is the whole-file search that
+  launch A removed until it had a caller; this step is that caller, so it
+  returns here. A section is:
+  - **agree** when any solver quote's line range overlaps any key quote's
+    line range
+  - **disagree** when the solver quotes lines that don't overlap
+  - **unlocated** when either side has no quote the code contains
+- **What it writes.**
+  - **Terminal:** agree, disagree and unlocated counts, overall and by mode,
+    with no section text.
+  - **The key sheet file outside the repository:** every disagreement and
+    unlocated section, plus up to 3 agreements (one per mode). A mode with
+    no agreement gets none, the terminal names it, and the run makes no
+    extra calls to fill it. Each entry holds the section as shown, the key,
+    and the solver's issue and fix. The file is deleted after the read, like
+    every key sheet.
+- **What the owner reads.** The disagreements first. Each gets one call:
+  - the key is wrong
+  - the solver is wrong
+  - both name a real flaw, and the key's is the planted one
+  - both name a real flaw, and the solver's is worse
+
+  The agreements are read too, to check that agreement means what it
+  seems to. Only the counts go into PR 2's description.
+
+**Which model solves.** Any Claude model with a price in
+`ClaudeService::PRICE_PER_MILLION` can solve, on the owner's own Anthropic
+key, chosen with `--solver-model`. Today those are Opus 5.5, Sonnet 5.5 and
+Haiku 4.5. The default is Sonnet 5.5, so the solver isn't the generator's
+model: generation and retries run on Opus 5.5
+(`MODEL_FOR_PURPOSE["generate_exercise"]`). Sonnet 5.5 is also the judge's
+model, and the judge has already kept every section it sees, so the two
+checks aren't independent. Models from one family can share a blind spot,
+which is a second reason agreement only screens. Another provider (OpenAI,
+Gemini) can solve only with a key the owner holds for that provider, read
+from its own environment variable, as `regrade_review_baseline.rb --provider`
+does. The script never uses a house key or anyone else's.
+
+**Keeping the key out of the solve.** The solve is an AI call on a section
+nobody has answered yet, so CLAUDE.md's rule applies to it: answer-key
+fields never reach a pre-submission AI context. The build holds that like
+this:
+
+- **Input.** The solve prompt is built only from the section with
+  `ExerciseSection.all_answer_key_fields` and
+  `ProblemSetIngest::SERVER_STAMPS` removed, through the same helper the
+  judge's prompt uses (`SectionJudgePrompt`'s `visible` step, made public
+  and shared), so the rule lives in one place. Since #629 that step also
+  drops the kind's `judge_hidden_fields`, so the solver sees the marked
+  line numbers, not the provider's quotes, as the page does.
+- **Spec.** A sentinel is planted in every answer-key field. The spec stubs
+  the provider over Faraday and asserts that no request body contains the
+  sentinel, on the draft call, the judge call or the solve call.
+- **The key and the reply never meet in a prompt.** The comparison runs in
+  Ruby, so no call ever holds both.
+- **The reply is triage data only.** It is never written back to the
+  section, never stored (the run is read-only), never sent to another
+  prompt, and parsed with `log_raw: false`. It goes only to the key sheet
+  file.
+- **The solve prompt lives in the script.** Its text is in `script/`, not
+  `app/prompts`, so no path in the app can send it. Drafts are never shown
+  to an engineer, so no real day ever meets a solved section.
+
+**Specs.**
+- The three outcomes, on fixtures with known quotes.
+- Modes cycled across a 30-section run.
+- The `code_review` concept drawn from the mode's vocabulary.
+- `code_review` refused without `--triage`.
+- The plan printing the solve calls without making one.
+- The sentinel spec above.
+- The sheet holding every disagreement and one agreement per mode that has
+  one, and a mode with none named without an extra call.
+- `KeyQuote.find` returning with its spec.
+
 1. **Wait.** Keys accumulate on real days. The quote threshold applies from
    the first keyed day: count only `attempt=draft` lines of the kinds that quote (`code_review`, `security_review`, `plan_review`) with `language=ruby_rails` (owner's decision, 2026-10-28). More than 2
    `quote_missing` in the first 10 stops the work, and the owner decides
    what's next. Report the `missing` count beside it.
 2. **Export the key sheet,** with the owner's approval for that export. Keep
    it outside the repository.
-3. **Read.** The owner reads the Ruby `code_review` sections from real days.
+3. **Read.** The owner reads the Ruby `code_review` sections from real days,
+   and, separately, the triage sheet's disagreements and agreements.
    The colleague the owner chooses reads the drafted `security_review`,
    `plan_review` and `pseudocode_to_code` sections, since the owner can't
    judge those keys reliably. The spec's option B asks for about 5 per kind.
    A kind with fewer than 5 keyed sections isn't read yet. **If no reader is
-   available for a kind, that kind stays off in PR 2.** Each section gets
+   available for a kind, that kind stays off.** Each section gets
    one call: key right, key wrong, or key right but the code or plan has a
    worse flaw. For the three drafted kinds, this read is the main check.
-4. **Delete the sheet.** Record only the counts, in PR 2's description.
+4. **Delete the sheet.** Record only the counts, in the description of the
+   PR that turns that kind on.
 
 **Owner decides,** kind by kind, whether the counts are good enough for the
 grader to read that kind's key. The spec sets no number, and none is set
-here before the read. `.review_context` is per kind, so PR 2 can turn keys
-on only for the kinds that pass.
+here before the read. `.review_context` is per kind, so each kind is turned
+on by itself: `code_review` in PR 2, and each drafted kind in its own later
+PR.
 
 ## PR 2. The grader reads the keys
 
+PR 2 turns on `code_review` only. `security_review`, `plan_review` and
+`pseudocode_to_code` stay off in it, whatever their drafts' state, and join
+in later PRs. Where a step below says "turned-on kinds", in PR 2 that is
+`code_review` alone.
+
 ### Step 0. Before writing code
 
-- Branch from `main`, after PR 1 and the read above.
-- Put the read's counts, and the kinds the owner turned on, in the PR
+PR 2 starts only when both of these hold:
+- **The `code_review` read is done:** the quote threshold has passed on the
+  first 10 drafted Ruby sections of the quoting kinds, the owner has read
+  about 5 real `code_review` keys, and the owner has judged the counts good
+  enough.
+- **The token cost is measured:** PR 1's step 7 comparison of the owner's
+  `generate_exercise` usage rows, the week before against the week after
+  PR 1 deployed, is done and its counts recorded.
+
+Then:
+- Branch from `main`.
+- Put the `code_review` read's counts and the token-cost counts in the PR
   description draft now, so they can't be forgotten.
 
 ### Step 1. The review context line
@@ -449,19 +581,13 @@ has passed (owner's decision, after review).
    `RUBRIC_VERSION` decision is reopened with the owner.
 5. **Delete every export.** Only the counts go into the PR description.
 
-**The drafted kinds.** Alongside the export in item 1, count the owner's graded sections of
-`security_review`, `plan_review` and `pseudocode_to_code`, all and those
-that carry a key, with a read-only query the owner approves. Only sections
-generated after PR 1 deployed carry a key, so older ones can't be regraded
-keyed. If any keyed graded section exists, it gets the same keyed-against-
-unkeyed regrade as a small sample, and its counts go in the PR description.
-It is too few for the systematic-movement rule, so it is reported, not
-ruled on. If none exists, the PR description says so.
-
-A kind with too few keyed sections for a reading stays off in PR 2 until it
-has them, as in the read between the PRs.
+In PR 2 this measures `code_review` only. The three drafted kinds' own
+check is in their later PRs.
 
 ### Step 9. Docs, checks and the PR
+
+The docs below name `code_review` as the one kind turned on, and say the
+other three are off until their later PRs.
 
 **Docs:**
 - `docs/decisions/stored-answer-keys.md`: the grading half, with the
@@ -482,3 +608,23 @@ counts, the Measuring counts, the departure above, and that `RUBRIC_VERSION`
 is unchanged and why.
 
 **Intent log:** the entry, then `compose.rb` and `check.rb`.
+
+## Later PRs: the drafted kinds join
+
+Each of `security_review`, `plan_review` and `pseudocode_to_code` is turned
+on in a PR of its own, after PR 2 has merged. A kind's PR starts only when:
+- its drafts have been read: the colleague the owner chose has read about 5
+  drafted sections of it (see "Between the PRs"), and the owner has judged
+  the counts good enough. A kind with no available reader stays off.
+
+That PR repeats PR 2's steps 1 and 2 for the one kind, its steps 4 to 7 with
+that kind's fixture and its keyed calibration (12 calls), and the docs in
+step 9. Steps 3 and 6's scripts already exist from PR 2.
+
+**Real graded sections, in place of step 8.** Count the owner's graded
+sections of the kind, all and those that carry a key, with a read-only query
+the owner approves. Only sections generated after PR 1 deployed carry a key,
+so older ones can't be regraded keyed. If any keyed graded section exists, it
+gets the same keyed-against-unkeyed regrade as a small sample, and its counts
+go in the PR description. It is too few for the systematic-movement rule, so
+it is reported, not ruled on. If none exists, the PR description says so.
