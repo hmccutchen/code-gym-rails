@@ -30,6 +30,9 @@ RSpec.describe "container gutter" do
     margins = phone_cards.select { |rule| rule.selectors.include?(".phone-page") }.filter_map { |rule| rule.declaration("margin-left") }
 
     expect(margins).to eq([ "calc(var(--page-gutter-left) - var(--container-pad-left))" ])
+    gutter = phone_cards.find { |rule| rule.declaration("--page-gutter-left") }
+    expect(gutter.declaration("--page-gutter-left")).to eq("calc(env(safe-area-inset-left) + 16px)")
+    expect(gutter.declaration("--page-gutter-right")).to eq("calc(env(safe-area-inset-right) + 16px)")
     expect(File.read(Rails.root.join("app/assets/stylesheets/phone_cards.css"))).not_to include("1.5rem")
   end
 

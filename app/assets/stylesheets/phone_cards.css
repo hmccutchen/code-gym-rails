@@ -4,8 +4,8 @@
 }
 @media (max-width: 599.98px) {
   .phone-page, .card-page, .today-page {
-    --page-gutter-left: max(16px, env(safe-area-inset-left));
-    --page-gutter-right: max(16px, env(safe-area-inset-right));
+    --page-gutter-left: calc(env(safe-area-inset-left) + 16px);
+    --page-gutter-right: calc(env(safe-area-inset-right) + 16px);
     margin-left: calc(var(--page-gutter-left) - var(--container-pad-left));
     margin-right: calc(var(--page-gutter-right) - var(--container-pad-right));
   }

@@ -60,7 +60,7 @@ RSpec.describe "Today's phone layout", type: :system do
       expect(rect(".trial-banner")["top"] - rect(".today-page .page-header")["bottom"]).to be_within(0.5).of(16)
     end
 
-    it "moves the cards in to a side inset wider than 16px" do
+    it "moves the cards in to a side inset wider than 16px, keeping the heading and Submit on the cards' text" do
       set_safe_area(left: 20, right: 20)
       visit_today
 
@@ -69,9 +69,11 @@ RSpec.describe "Today's phone layout", type: :system do
         expect(left).to be_within(0.5).of(20)
         expect(right).to be_within(0.5).of(20)
       end
+      expect(rect(".today-page .page-header h1")["left"]).to be_within(0.5).of(cards.first["left"] + 16)
+      expect(rect("#submit-answers")["left"]).to be_within(0.5).of(cards.first["left"] + 16)
+      expect(rect("#submit-answers")["right"]).to be_within(0.5).of(cards.first["right"] - 16)
     end
   end
-
 
   [ 320, 390 ].each do |width|
     it "starts code 25px from the screen edge at #{width}px, inside the code box's 8px side padding" do

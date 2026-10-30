@@ -9,8 +9,7 @@ Progress, Learn, Account and Settings, and Today.
 ## The breakpoints
 
 - **Under 600px:** the phone layout. Card pages and Today keep their text
-  `max(16px, inset)` from the screen edge and run each card out to the
-  safe area (`phone_cards.css`); Today's
+  16px in from the safe area and run each card out to the safe area (`phone_cards.css`); Today's
   Submit and regenerate controls end the page
   (`docs/code-notes/app/assets/stylesheets/pages/today.md`).
 - **600 to 899px:** one column. Account and Settings stay a centered 480px
