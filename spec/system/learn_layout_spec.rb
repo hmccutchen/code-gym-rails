@@ -148,6 +148,7 @@ RSpec.describe "Learn layout", type: :system do
         content = container_content
         expect(content["right"] - content["left"]).to be_within(0.5).of([ 1040, width - 48 ].min)
         expect(content["left"]).to be_within(1).of(client_width - content["right"])
+        expect(computed_style(".featured-concept", "paddingLeft")).to eq("16px")
       end
     end
 

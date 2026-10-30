@@ -300,9 +300,13 @@ phones instead of forcing horizontal scroll. `overflow-wrap` breaks a token too
 long for the line. The text-size-adjust rules stop iOS enlarging code text on
 its own in landscape.
 
-Below 600px a `pre.snippet` keeps its border and pads its sides by 8px, not
-16px, so code text starts 25px from the screen edge inside a full-width
-section. The 8px is in pixels so the largest text size doesn't widen it back.
+Below 600px every `pre.snippet` keeps its border and pads its sides by 8px,
+not 16px, on any page, including Learn's concept and lesson pages and a
+concept reference's code inside its own padded box. In an outermost Today
+section at the default text size its code then starts 25px from the screen
+edge. The 8px is in pixels so the largest text size doesn't widen it back,
+though the section's own `1rem` padding still grows. Parsons blocks keep
+their own padding, through a more specific rule.
 
 ## `code.highlight .code-line`
 
