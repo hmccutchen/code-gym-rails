@@ -5,11 +5,15 @@ as `script/draft_key_samples.rb KIND OUT_PATH`. The owner is the app's only
 user and their days rarely hold `security_review`, `plan_review` or
 `pseudocode_to_code`, so those three kinds are read from drafts
 (`docs/decisions/stored-answer-keys.md`, "The rarer kinds are read from
-drafts"). `KINDS` lists them, and `code_review` is left out because it is read
-from real days. A drafted `code_review` would also not match a real one: its
-fixed concept could contradict the plan's rolled content mode, and its judge
-edit would skip the scenario restore `JudgedGeneration` does for a
-`RealSource` section.
+drafts"). `KINDS` lists them. `code_review` is read from real days, and is
+drafted only with `--triage` (`docs/code-notes/script/key_triage.md`). A
+plain drafted `code_review` wouldn't match a real one: its fixed concept
+could contradict the plan's rolled content mode, and its judge edit would
+skip the scenario restore `JudgedGeneration` does for a `RealSource`
+section. The triage drafts fix both: each kept section takes the next mode
+in `KeyTriage::MODES`, its concept comes from that mode's vocabulary, and
+`.plan_for` gives the draft a plan with that mode, no `RealSource` and one
+file, since multi-file waits for launch B.
 
 ## The path
 
@@ -35,6 +39,15 @@ or connection failure are counted, not kept, and another draft is made, up to
 `ATTEMPTS_PER_SECTION` drafts for each section asked for. A section ingest
 refuses raises `ProviderError::InvalidResponseError` and counts as a failure.
 
+## The triage solve
+
+With `--triage`, each kept section gets one more call after its judge,
+`solve_section`, which `.service` adds beside the drafting routes. A solve
+that fails counts as a failure, and its section is left out like a rejected
+draft. The entry gains the mode, the outcome and the solver's reply, and the
+file holds only `KeyTriage.sheet_sections`, every disagreement and unlocated
+section and one agreement per mode, plus the summary.
+
 ## What it writes
 
 The draft user is an unsaved `User`, so `DailyPlan` and `recent_performance`
@@ -56,7 +69,9 @@ deleted after the read, like the key sheet.
 Without `--run` it prints the most calls it can make, before
 `ClaudeService`'s own retries on a connection error, 429 or 5xx, and a bound
 with every call at its output cap (`ClaudeService::MAX_TOKENS` for the retry,
-`CallProfiles::JUDGE_MAX_TOKENS` for the judge) and no caching. The retry's
+`CallProfiles::JUDGE_MAX_TOKENS` for the judge, the same `MAX_TOKENS` for
+a solve, which sets no cap of its own) and no caching. With `--triage` the
+plan adds one solve per section asked for. The retry's
 input is measured from the prompt a real retry sends, ladders included, by a
 service that stops at the provider call. The judge's input is measured over
 `FakeService`'s canned section, at four characters a token. Real drafts write

@@ -310,7 +310,8 @@ in its own PR before the read.
 
 ### Blind-solve triage for `code_review` drafts
 
-Added by the owner on 2026-10-30. A second model, which never sees the key,
+Added by the owner on 2026-10-30, and built in `script/key_triage.rb`
+(`docs/code-notes/script/key_triage.md`). A second model, which never sees the key,
 solves about 30 drafted `code_review` sections, and the script compares what
 it finds with each key. Disagreements tell the owner which keys to read
 first. **Agreement is screening only:** it never shows that a key is right,
@@ -377,9 +378,10 @@ model: generation and retries run on Opus 5.5
 model, and the judge has already kept every section it sees, so the two
 checks aren't independent. Models from one family can share a blind spot,
 which is a second reason agreement only screens. Another provider (OpenAI,
-Gemini) can solve only with a key the owner holds for that provider, read
+Gemini) could solve only with a key the owner holds for that provider, read
 from its own environment variable, as `regrade_review_baseline.rb --provider`
-does. The script never uses a house key or anyone else's.
+does; that path isn't built. The script never uses a house key or anyone
+else's.
 
 **Keeping the key out of the solve.** The solve is an AI call on a section
 nobody has answered yet, so CLAUDE.md's rule applies to it: answer-key
@@ -392,7 +394,9 @@ this:
   judge's prompt uses (`SectionJudgePrompt`'s `visible` step, made public
   and shared), so the rule lives in one place. Since #629 that step also
   drops the kind's `judge_hidden_fields`, so the solver sees the marked
-  line numbers, not the provider's quotes, as the page does.
+  line numbers, not the provider's quotes, as the page does. The solve also
+  drops `concept`, which the page doesn't show before review and which
+  would point at the flaw.
 - **Spec.** A sentinel is planted in every answer-key field. The spec stubs
   the provider over Faraday and asserts that no request body contains the
   sentinel, on the draft call, the judge call or the solve call.

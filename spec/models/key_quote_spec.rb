@@ -27,6 +27,36 @@ RSpec.describe KeyQuote do
     end
   end
 
+  describe ".find" do
+    {
+      "ruby_rails" => [
+        [ "foo(a,b)", "x = 1\nfoo(a, b)\n", 2..2 ],
+        [ "{a: 1}", "opts = { a: 1 }", 1..1 ],
+        [ "foo(a,b)", "foo(a, c)", nil ]
+      ],
+      "javascript" => [
+        [ "return fetchJson('/api/orders/' + orderId)", "async function load(orderId) {\n  return fetchJson(\n    \"/api/orders/\" + orderId,\n  );\n}", 2..4 ],
+        [ "return ids.map(id=>fetch(id))", "return ids.map((id) => fetch(id));", 1..1 ]
+      ]
+    }.each do |language, cases|
+      cases.each do |quote, code, range|
+        it "finds #{quote.inspect} in #{language} code at #{range.inspect}" do
+          expect(described_class.find(code, quote, language: language)).to eq(range)
+        end
+      end
+    end
+
+    it "spans every source line the match touches" do
+      code = "def total\n  items.sum do |item|\n    item.price\n  end\nend"
+
+      expect(described_class.find(code, "do |item| item.price end", language: "ruby_rails")).to eq(2..4)
+    end
+
+    it "finds nothing for a quote that normalizes to nothing" do
+      expect(described_class.find("a,\nb", " , ", language: "ruby_rails")).to be_nil
+    end
+  end
+
   describe ".line" do
     let(:options) { "const options = {\n  retries: 3,\n  timeoutMs: 5000,\n};" }
 

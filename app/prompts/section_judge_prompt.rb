@@ -40,8 +40,12 @@ class SectionJudgePrompt
     {"status":"reject","principle":"...","evidence":"<quoted text>","reason":"<one or two sentences>"}
   PROMPT
 
+  def self.visible(kind, section)
+    section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS, *kind.judge_hidden_fields)
+  end
+
   def self.generate(kind:, section:, rung:, locked:)
-    visible = section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS, *kind.judge_hidden_fields)
+    visible = visible(kind, section)
 
     { response_schema: JudgeVerdict.schema_for(kind), system: SYSTEM, prompt: <<~PROMPT }
       Section kind: #{kind.key}

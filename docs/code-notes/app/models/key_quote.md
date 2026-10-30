@@ -2,9 +2,9 @@
 
 The one home for matching text a provider quoted against the code as the
 page shows it, after `CodeFormat` has reformatted it. The stored keys' quote
-check (`PlantedKey.unquoted_parts`) and the multi-file code review's
-changed-line resolver call it today, and launch B's evidence check will
-too. One matcher means one rule for what counts as "the same code", so two checks
+check (`PlantedKey.unquoted_parts`), the multi-file code review's
+changed-line resolver and the blind-solve triage script (`KeyTriage`) call
+it today, and launch B's evidence check will too. One matcher means one rule for what counts as "the same code", so two checks
 can't disagree about a quote (design spec section 4, 2026-10-29).
 
 ## The rules
@@ -42,7 +42,7 @@ JavaScript call Prettier wrapped onto three lines with a trailing comma
 normalizes to the same text as the provider's one-line, single-quoted,
 semicolon-free quote.
 
-## The lookup
+## The lookups
 
 `.line(code, quote, language:)` is whole-line equality, for naming a changed
 line. It compares the normalized quote with each normalized source line,
@@ -59,7 +59,10 @@ line never matches, and a run never starts or ends on a line that
 normalizes to nothing, so a padded run can't count as a second match of the
 line inside it. It returns nil for a quote that normalizes to nothing.
 
-`.find(code, quote, language:)`, a substring search that returns the range
-of lines a quote spans, arrives with launch B's evidence check
-(`docs/decisions/multi-file-code-review.md`), its first caller.
-`normalized_with_lines` already keeps each character's source line for it.
+`.find(code, quote, language:)` is a substring search of the normalized
+quote in the normalized whole code. Each normalized character remembers the
+source line it came from, so the result is the 1-based range of lines the
+first match spans. It suits a quote that may be part of a line or several,
+and returns nil for a quote that normalizes to nothing. The triage script is
+its first caller; launch B's evidence check
+(`docs/decisions/multi-file-code-review.md`) will be the second.
