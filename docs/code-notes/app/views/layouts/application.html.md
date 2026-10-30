@@ -377,12 +377,15 @@ no slot keeps `--accent-text`.
 
 ## `.section` below 600px
 
-A section keeps its border and radius on a phone and only tightens its
-padding and drops its shadow. It used to run to the screen edge, with no side
-borders; Today's phone layout made every section an inset card, which put
-History's own override and the `-1.5rem` coupling to `.container`'s padding
-out of use. A page that wants its cards nearer the edge than the container's
-gutter says so itself, as Today does with `.today-page` in `phone_cards.css`.
+This rule only tightens a section's padding and drops its shadow on a phone.
+Where a section sits is set by the page: inside `.phone-page`, `.card-page` or
+`.today-page`, an outermost section runs to the safe area and loses its side
+borders and radius, through the full-width card rule in `phone_cards.css`. A
+section nested in another card, such as one inside a History entry, keeps its
+border, radius and inset. Sections ran to the edge once before, through a
+History override and a `-1.5rem` coupling to `.container`'s padding; Today's
+phone layout replaced that with inset cards, and the `phone_cards.css` rule
+brought the bleed back, reading the page gutter rather than a copy of it.
 The two admin index pages lost 25px of table width with the bleed; their
 tables were already wider than a phone and still scroll sideways.
 

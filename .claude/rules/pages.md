@@ -69,7 +69,9 @@ read it before changing that area.
   Account and Settings pages; it loads on every
   page, so a new rule in it stays scoped to its own class. `.card-page` is
   the full-width card page (History, Progress, Learn), with the same phone
-  gutter, which `.today-page` takes too.
+  gutter, which `.today-page` takes too. Below 600px the outermost card on
+  those pages runs to the safe area while text keeps the gutter; the rule
+  names each page's card class, so a new card class joins its list.
 - **Page stylesheets** (`docs/decisions/page-stylesheets.md`): a page with
   styles of its own keeps them in `app/assets/stylesheets/pages/<page>.css`,
   phone rules first and its 900px rules in one block at the end

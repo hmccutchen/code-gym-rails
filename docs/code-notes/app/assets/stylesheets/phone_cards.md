@@ -24,7 +24,7 @@ The card, full-width button, switch, value row, segmented control and card headi
 
 ## Side margins and the safe area
 
-The page's content edge sits `max(16px, inset)` from the screen edge on each side, where `inset` is that side's `env(safe-area-inset-*)`. `.container` pads each side by `--container-pad-left` and `--container-pad-right`, which are `max(1.5rem, inset)` under 1024px. Under 600px `.phone-page` and `.card-page` set each side's margin, in one rule, to the difference, reading those properties, so it never restates `.container`'s padding. `spec/views/container_gutter_spec.rb` fails if it does.
+The page's content edge sits `max(16px, inset)` from the screen edge on each side, where `inset` is that side's `env(safe-area-inset-*)`. `.container` pads each side by `--container-pad-left` and `--container-pad-right`, which are `max(1.5rem, inset)` under 1024px. Under 600px `.phone-page`, `.card-page` and `.today-page` set each side's margin, in one rule, to the difference, reading those properties, so it never restates `.container`'s padding. `spec/views/container_gutter_spec.rb` fails if it does.
 
 | Inset | `.container` pads | Margin | Content edge from screen |
 |---|---|---|---|

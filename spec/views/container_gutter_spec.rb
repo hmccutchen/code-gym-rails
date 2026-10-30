@@ -51,6 +51,14 @@ RSpec.describe "container gutter" do
     expect(bleed.first.declaration("border-inline")).to eq("0")
   end
 
+  it "bleeds and skips the same card classes, so a nested card keeps its inset" do
+    source = File.read(Rails.root.join("app/assets/stylesheets/phone_cards.css"))
+    matched, skipped = source.match(/:is\(([^)]*)\):not\(:is\(([^)]*)\) \*\)/).captures.map { |list| list.split(",").map(&:strip) }
+
+    expect(matched).to include(".card", ".section")
+    expect(skipped).to eq(matched)
+  end
+
   it "widens a wide page and the nav to 1040px of content in one rule, built from the gutter properties" do
     desktop = ViewStyles.stylesheet_rules(Rails.root.join("app/assets/stylesheets/desktop.css"))
     wide = desktop.select { |rule| rule.selectors.include?(".container.container-wide") }
