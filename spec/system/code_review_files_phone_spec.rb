@@ -45,10 +45,20 @@ RSpec.describe "A multi-file code review on a phone", type: :system do
 
   def gutter_numbers
     page.evaluate_script(<<~JS)
-      [...document.querySelectorAll("details.comparison-piece")[1].querySelectorAll(".code-line")].map((line) => {
-        const counter = getComputedStyle(line, "::before")
-        return counter.content === "none" ? null : line.getBoundingClientRect().left - parseFloat(counter.left) > 0
-      })
+      (() => {
+        const code = document.querySelectorAll("details.comparison-piece")[1].querySelector("code")
+        const blockLeft = code.parentElement.getBoundingClientRect().left
+        const lines = [...code.querySelectorAll(".code-line")].map((line) => {
+          const number = getComputedStyle(line, "::before")
+          const numberLeft = line.getBoundingClientRect().left + parseFloat(number.left)
+          return {
+            counted: number.content.includes("counter(code-line)") && getComputedStyle(line).counterIncrement === "code-line 1",
+            left_of_code: parseFloat(number.left) < 0,
+            inside_block: numberLeft >= blockLeft
+          }
+        })
+        return { restarts: getComputedStyle(code).counterReset === "code-line 0", lines }
+      })()
     JS
   end
 
@@ -68,7 +78,8 @@ RSpec.describe "A multi-file code review on a phone", type: :system do
     travel_to(a_weekday) do
       open_dashboard(create_fake_provider_user)
 
-      expect(gutter_numbers).to eq([ true, true, true ])
+      numbered_line = { "counted" => true, "left_of_code" => true, "inside_block" => true }
+      expect(gutter_numbers).to eq("restarts" => true, "lines" => Array.new(3, numbered_line))
       expect(copied_text).to eq("def price\n  0\nend")
       expect(sideways_overflow).to eq(0)
     end
