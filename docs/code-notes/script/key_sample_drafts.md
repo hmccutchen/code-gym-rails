@@ -70,17 +70,31 @@ deleted after the read, like the key sheet.
 ## The spend cap
 
 `--max-cost DOLLARS` is required with `--run`, and builds a `SpendCap`
-(`docs/code-notes/script/spend_cap.md`) that `.service` hands to two
-overrides. Before every call, `call_and_log` checks the call's worst case,
-`.request_bound`: its input at three characters a token, fewer than the
-plan's four so the guard errs high, plus its full output cap, at its route's
-price. After every call, `log_usage` adds the reported usage's cost and
-prints the running total. When the next call could pass the cap,
-`SpendCap::Reached` ends the run before that call is sent: the sections
-already kept stay in the file, and the tally's `stopped` line, printed and
-written, says what the run stopped on. A retry the client makes on a 429 or
-5xx goes through no override, so it isn't checked again; a failed request
-is rarely billed.
+(`docs/code-notes/script/spend_cap.md`) that `.service` hands to its
+overrides. Every bound comes from one formula, `.bound`: the input at three
+characters a token, which errs high for code, plus the call's full output
+cap, at its route's price. The plan's total uses it too, so the plan and the
+cap can't disagree. A model with no price raises instead of counting as
+free.
+
+- **Before each section,** `draft_one` checks `#section_bound`: the draft,
+  the judge and, with `--triage`, the solve together. So a stop falls
+  between sections, and no paid draft is thrown away for want of its judge
+  or solve. That needs about $0.36 of headroom for a `code_review` section,
+  so a run can stop up to that much short of the cap.
+- **Before each call,** `call_and_log` checks that call's own
+  `.request_bound`, as a backstop for a prompt longer than the plan
+  measured.
+- **After each call,** `log_usage` adds the reported usage's cost and prints
+  the running total. A timed-out call reports no tokens though the provider
+  may have billed it, so it is counted at its bound and the line says so.
+
+When a check fails, `SpendCap::Reached` ends the run before anything is
+sent: the sections already kept stay in the file, and the tally's `stopped`
+line, printed and written, says what it stopped on. A retry the client makes
+on a 429, a 5xx or, for a call that isn't long-running, a timeout goes
+through no override, so it isn't checked again. A failed request is rarely
+billed.
 
 ## The plan
 
@@ -88,11 +102,12 @@ Without `--run` it prints the most calls it can make, before
 `ClaudeService`'s own retries on a connection error, 429 or 5xx, and a bound
 with every call at its output cap (`ClaudeService::MAX_TOKENS` for the retry,
 `CallProfiles::JUDGE_MAX_TOKENS` for the judge, the same `MAX_TOKENS` for
-a solve, which sets no cap of its own) and no caching. With `--triage` the
+a solve, which sets no cap of its own) and no caching, from `.bound`. With `--triage` the
 plan adds one solve per draft, since a failed solve discards its section
 and another draft follows. The retry's
 input is measured from the prompt a real retry sends, ladders included, by a
 service that stops at the provider call. The judge's input is measured over
-`FakeService`'s canned section, at four characters a token. Real drafts write
+`FakeService`'s canned section. Both are counted at three characters a
+token. Real drafts write
 far less than the cap, so the run's own cost line, from the reported usage,
 is the number to record.

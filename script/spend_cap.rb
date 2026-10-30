@@ -12,10 +12,10 @@ class SpendCap
     @spent = 0.0
   end
 
-  def check!(bound)
+  def check!(bound, what: "call")
     return if @spent + bound <= @limit
 
-    raise Reached, "the next call could cost up to #{dollars(bound)}, with #{dollars(@spent)} spent of the #{dollars(@limit)} cap"
+    raise Reached, "the next #{what} could cost up to #{dollars(bound)}, with #{dollars(@spent)} spent of the #{dollars(@limit)} cap"
   end
 
   def record(cost, purpose)

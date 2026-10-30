@@ -11,6 +11,7 @@ RSpec.describe KeySampleDrafts do
   let(:bodies)   { [] }
   let(:planted)  { nil }
   let(:tokens_out) { 30 }
+  let(:time_out)   { nil }
   let(:service)  { described_class.service("sk-ant-test", usage) }
   let(:dir)      { Dir.mktmpdir }
   let(:path)     { described_class.reserve_out_path!(File.join(dir, "keys.json")) }
@@ -27,7 +28,7 @@ RSpec.describe KeySampleDrafts do
 
   # A single-section retry carries the concept it was asked for, as a provider following the fixed-concept line would.
   before do
-    seen, queued, solved, sent, key, written_out = prompts, verdicts, solves, bodies, planted, tokens_out
+    seen, queued, solved, sent, key, written_out, timing_out = prompts, verdicts, solves, bodies, planted, tokens_out, time_out
     connection = Faraday.new do |f|
       f.adapter :test do |stub|
         stub.post(ClaudeService::API_URL) do |env|
@@ -38,6 +39,7 @@ RSpec.describe KeySampleDrafts do
           concept = prompt[/concept must be exactly `([^`]+)`/, 1]
           purpose = concept ? "retry_section" : (system == KeyTriage::SYSTEM ? KeyTriage::PURPOSE : purpose_for(system))
           seen << purpose
+          raise Faraday::TimeoutError, "read timeout" if purpose == timing_out
           if purpose == KeyTriage::PURPOSE
             text = (solved.shift || { "issue" => FakeService::EXERCISE_PROBLEM_SET.dig("code_review", "answer_key", "issue"), "fix" => "f" }).to_json
           else
@@ -163,10 +165,10 @@ RSpec.describe KeySampleDrafts do
       original.call(request)
     end
 
-    measured = drafts.send(:retry_input_tokens, KindDifficulty::LEVELS.first)
+    measured = drafts.send(:retry_input_chars, KindDifficulty::LEVELS.first)
     drafts(count: 1).call(path)
 
-    expect(measured).to eq(sent.first.size / described_class::APPROX_CHARS_PER_TOKEN)
+    expect(measured).to eq(sent.first.size)
   end
 
   it "drafts only the keyed kinds: the three read from drafts, and code_review" do
@@ -288,15 +290,41 @@ RSpec.describe KeySampleDrafts do
 
     def run(count) = described_class.new(kind: kind, language: "ruby_rails", count: count, service: capped, out: out).call(path)
 
-    context "when the first call alone could pass it" do
+    context "when the first section alone could pass it" do
       let(:limit) { 0.10 }
 
       it "makes no call, writes the empty file and says why it stopped" do
         result = run(1)
 
         expect(prompts).to be_empty
-        expect(result.stopped).to match(/could cost up to \$\d+\.\d\d.*\$0\.00 spent of the \$0\.10 cap/)
+        expect(result.stopped).to match(/next section could cost up to \$\d+\.\d\d.*\$0\.00 spent of the \$0\.10 cap/)
         expect(written).to include("sections" => [], "stopped" => result.stopped)
+      end
+    end
+
+    context "when the draft and judge fit but the solve wouldn't" do
+      let(:kind)  { ExerciseSection::CodeReview }
+      let(:limit) { described_class.new(kind: kind, language: "ruby_rails", count: 1, service: service, out: out, triage: true).send(:section_bound) - 0.001 }
+      let(:triage_run) { described_class.new(kind: kind, language: "ruby_rails", count: 1, service: capped, out: out, triage: true) }
+
+      it "stops before the section starts, so no paid draft is thrown away" do
+        result = triage_run.call(path)
+
+        expect(prompts).to be_empty
+        expect(result.stopped).to include("next section")
+      end
+    end
+
+    context "when a call times out" do
+      let(:limit)    { 5.0 }
+      let(:time_out) { "judge_section" }
+
+      it "counts the timed-out call at its worst case, since the provider may have billed it" do
+        run(1)
+
+        judged = usage.select { |call| call[:purpose] == "judge_section" }
+        expect(judged).to all(include(cost: be > 0))
+        expect(out.string).to include("(judge_section, timed out: counted at its worst case)")
       end
     end
 
@@ -313,6 +341,10 @@ RSpec.describe KeySampleDrafts do
         expect(out.string).to match(/\$0\.30 spent of \$0\.40 \(retry_section\)/)
       end
     end
+  end
+
+  it "refuses to bound a call on a model with no price, so the cap can't pass it as free" do
+    expect { described_class.bound("claude-unpriced", 300, 100) }.to raise_error(ArgumentError, /no price/)
   end
 
   it "refuses to run in production" do

@@ -13,8 +13,11 @@ USAGE = <<~TEXT.freeze
               it holds answer keys, so delete it after the read
   (no --run)  plan only: drafts, the most calls and a cost bound at the output cap, with no provider call
   --run       draft and judge on the production routes, billed to ANTHROPIC_API_KEY
-  --max-cost DOLLARS  required with --run: stop before any call whose worst case could take spending past this
-              amount, keep what was drafted, and print the running cost after each call
+  --max-cost DOLLARS  required with --run: before each section and each call, stop if its estimated worst case
+              (input at 3 characters a token, plus its full output cap) could take spending past this amount;
+              keep what was drafted and print the running cost after each call. A section needs about $0.36 of
+              headroom (#{KeyTriage::DEFAULT_SOLVER_MODEL} solve extra with --triage), so the run stops up to that
+              much short of the cap. The client's own retries after a 429, 5xx or timeout aren't checked again.
   --count N   sections to keep, 1 to #{KeySampleDrafts::COUNTS[:drafts][:most]} (default #{KeySampleDrafts::COUNTS[:drafts][:default]}: the read needs 5, plus one spare);
               with --triage 1 to #{KeySampleDrafts::COUNTS[:triage][:most]} (default #{KeySampleDrafts::COUNTS[:triage][:default]})
   --triage    code_review only: each kept section solved blind by a second call and compared with its key in Ruby;
@@ -69,5 +72,5 @@ if options[:run]
   puts "wrote #{path}"
 else
   drafts.plan
-  puts "with --max-cost $#{format('%.2f', options[:max_cost])}, the run stops before any call that could pass it" if options[:max_cost]
+  puts "with --max-cost $#{format('%.2f', options[:max_cost])}, the run stops before any section or call whose estimated worst case could pass it" if options[:max_cost]
 end
