@@ -14,6 +14,8 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   FILE_PARTS = %w[path code changed].freeze
 
+  FILE_FIELDS = (FILE_PARTS + %w[changed_lines]).freeze
+
   FILE_CODE_FIELDS = FILE_SLOTS.map { |number| "file_#{number}_code" }.freeze
 
   MULTI_FILE_RANGES = { "junior" => 1..1, "mid_level" => 2..2, "senior" => 2..3, "principal_engineer" => 2..3 }.freeze
@@ -53,10 +55,11 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.files(section)
     FILE_SLOTS.filter_map do |number|
-      path, code, changed = file_parts(section, number)
+      path, code, = file_parts(section, number)
       next unless usable_text?(path) && usable_text?(code)
 
-      File.new(path: path, code: code, changed: list_of?(changed, Integer) ? changed : [])
+      lines = section["file_#{number}_changed_lines"]
+      File.new(path: path, code: code, changed: list_of?(lines, Integer) ? lines : [])
     end
   end
 
@@ -130,18 +133,18 @@ class ExerciseSection::CodeReview < ExerciseSection
     end
     refuse!("changed_lines_unresolved", "No code review file has a changed line its quotes resolve to") if resolved.values.all?(&:empty?)
 
-    resolved.each { |number, lines| section["file_#{number}_changed"] = lines if usable_text?(section["file_#{number}_code"]) }
+    resolved.each { |number, lines| section["file_#{number}_changed_lines"] = lines if usable_text?(section["file_#{number}_code"]) }
   end
 
   def self.drop_absent_files!(section)
     FILE_SLOTS.each do |number|
       path, code, = file_parts(section, number)
-      FILE_PARTS.each { |part| section.delete("file_#{number}_#{part}") } if path.nil? && code.nil?
+      FILE_FIELDS.each { |part| section.delete("file_#{number}_#{part}") } if path.nil? && code.nil?
     end
   end
 
   def self.drop_file_fields!(section)
-    FILE_SLOTS.each { |number| FILE_PARTS.each { |part| section.delete("file_#{number}_#{part}") } }
+    FILE_SLOTS.each { |number| FILE_FIELDS.each { |part| section.delete("file_#{number}_#{part}") } }
   end
 
   def self.file_parts(section, number) = FILE_PARTS.map { |part| section["file_#{number}_#{part}"] }

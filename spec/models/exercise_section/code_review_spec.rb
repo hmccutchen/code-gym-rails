@@ -64,8 +64,8 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
   def code_for(section, **) = refusal_for(section, **)&.code
 
   describe ".files" do
-    it "returns each complete file in order, with its changed lines once they are line numbers" do
-      section = two_files.merge("file_1_changed" => [ 1, 3 ], "file_2_changed" => [ "item_1 = 1" ])
+    it "returns each complete file in order, with the changed line numbers the check stored" do
+      section = two_files.merge("file_1_changed_lines" => [ 1, 3 ], "file_2_changed_lines" => [ "item_1 = 1" ])
 
       expect(described_class.files(section)).to eq([
         described_class::File.new(path: "app/models/order.rb", code: numbered("order", 3), changed: [ 1, 3 ]),
@@ -168,7 +168,7 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
 
     def resolved(section, language: "ruby_rails", file_range: 2..2)
       described_class.reject_unusable!(section, language: language, file_range: file_range)
-      section.values_at("file_1_changed", "file_2_changed")
+      section.values_at("file_1_changed_lines", "file_2_changed_lines")
     end
 
     it "resolves a line quoted before formatting spaced it" do
@@ -201,6 +201,41 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
     end
   end
 
+  describe "running the check again on a section it passed" do
+    def checked(section)
+      described_class.reject_unusable!(section, language: "ruby_rails", file_range: 2..3)
+      section
+    end
+
+    it "passes it again and leaves it as the first run did" do
+      first = checked(two_files.merge(third_file))
+      again = checked(first.deep_dup)
+
+      expect(again).to eq(first)
+      expect(first.values_at("file_1_changed_lines", "file_2_changed_lines", "file_3_changed_lines")).to eq([ [ 1 ], [ 2 ], [ 1 ] ])
+    end
+
+    it "keeps the provider's quotes beside the line numbers they resolved to" do
+      section = checked(two_files)
+
+      expect(section.values_at("file_1_changed", "file_2_changed")).to eq([ [ "order_0 = 0" ], [ "item_1 = 1" ] ])
+    end
+
+    it "replaces line numbers a provider sent with the ones its quotes resolve to" do
+      section = checked(two_files.merge("file_1_changed_lines" => [ 3 ], "file_2_changed_lines" => [ 1, 2, 3 ]))
+
+      expect(section.values_at("file_1_changed_lines", "file_2_changed_lines")).to eq([ [ 1 ], [ 2 ] ])
+    end
+
+    it "drops line numbers a provider sent for an absent file or a single-file day" do
+      expect(checked(two_files.merge("file_3_changed_lines" => [ 1 ])).keys.grep(/\Afile_3_/)).to eq([])
+
+      single = { "snippet" => numbered("x", 5), "file_1_changed_lines" => [ 1 ] }
+      described_class.reject_unusable!(single)
+      expect(single.keys.grep(/\Afile_/)).to eq([])
+    end
+  end
+
   describe "what a passing section keeps" do
     it "leaves no field of an absent third file" do
       section = two_files.merge("file_3_changed" => [ "stray" ])
@@ -208,7 +243,7 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
       described_class.reject_unusable!(section, language: "ruby_rails", file_range: 2..3)
 
       expect(section.keys.grep(/\Afile_3_/)).to eq([])
-      expect(section.keys.grep(/\Afile_2_/)).to contain_exactly("file_2_path", "file_2_code", "file_2_changed")
+      expect(section.keys.grep(/\Afile_2_/)).to contain_exactly("file_2_path", "file_2_code", "file_2_changed", "file_2_changed_lines")
     end
 
     it "keeps a single-file section exactly as before on the default range" do
@@ -247,8 +282,8 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
   describe ".review_context" do
     it "lists each file under its path, with its changed lines and code, in place of the snippet" do
       section = { "question" => "What breaks?",
-                  "file_1_path" => "app/models/order.rb", "file_1_code" => "a = 1\nb = 2", "file_1_changed" => [ 2 ],
-                  "file_2_path" => "app/models/item.rb", "file_2_code" => "c = 3", "file_2_changed" => [],
+                  "file_1_path" => "app/models/order.rb", "file_1_code" => "a = 1\nb = 2", "file_1_changed_lines" => [ 2 ],
+                  "file_2_path" => "app/models/item.rb", "file_2_code" => "c = 3", "file_2_changed_lines" => [],
                   "answer_key" => { "issue" => "ANSWER-KEY-SENTINEL" } }
 
       expect(described_class.review_context(section: section, answer: "The total.", rating: "right_level")).to eq(<<~CONTEXT.chomp)
