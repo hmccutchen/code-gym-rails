@@ -28,8 +28,6 @@ Rails.application.configure do
   # Mailer views render outside the request cycle, where force_ssl has no effect, so https is set here.
   app_host = AppHost.resolve
   config.action_mailer.default_url_options = { host: app_host, protocol: "https" }
-  # Browser Origin headers include the scheme, so only the full https:// form matches.
-  config.action_cable.allowed_request_origins = [ "https://#{app_host}" ]
   config.action_mailer.delivery_method = :resend
 
   config.i18n.fallbacks = true

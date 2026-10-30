@@ -5,9 +5,7 @@ gem "propshaft"
 gem "pg", "~> 1.7"
 gem "puma", ">= 5.0"
 gem "importmap-rails"
-gem "turbo-rails"
 gem "stimulus-rails"
-gem "jbuilder"
 
 gem "bcrypt", "~> 3.1.7"
 gem "rotp", "~> 6.3"
@@ -31,12 +29,9 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 
 gem "solid_cache"
 gem "solid_queue"
-gem "solid_cable"
 
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
-
-gem "kamal", require: false
 
 gem "thruster", require: false
 

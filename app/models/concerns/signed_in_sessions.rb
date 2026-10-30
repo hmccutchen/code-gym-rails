@@ -5,7 +5,6 @@ module SignedInSessions
   RECENT_SIGN_IN = 15.minutes
 
   class_methods do
-    # Pages and the cable connection both resolve a session here, so the websocket can't outlive one the pages reject.
     def signed_in_through(user_id:, signed_in_at:)
       user = signed_in(user_id)
       user if user&.session_signed_in_valid?(signed_in_at)

@@ -8,8 +8,8 @@
 
 Login code emails (`UserMailer.login_code`) are sent via `deliver_later`, so
 delivery happens inside the **worker** service (Solid Queue), not `web`. `web`
-still reads `APP_HOST` at boot for `default_url_options` and the ActionCable
-origin check. Set all three vars on **both** services.
+still reads `APP_HOST` at boot for `default_url_options`. Set all three vars on **both**
+services.
 
 ## Vars to set
 

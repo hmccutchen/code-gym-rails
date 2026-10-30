@@ -11,8 +11,8 @@ database.
 
 ## production
 
-Railway provides one Postgres database through `DATABASE_URL`. Solid Queue,
-Solid Cache and Solid Cable all share it, and a regular migration creates
+Railway provides one Postgres database through `DATABASE_URL`. Solid Queue
+and Solid Cache share it, and a regular migration creates
 their tables. So this file must hold exactly one database config for
 production: `db:migrate` runs against every configured database, and any
 extra logical database would not receive `DATABASE_URL` and would fail to

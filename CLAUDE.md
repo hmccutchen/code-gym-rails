@@ -270,7 +270,7 @@ advisory signal; it is not evidence that anything was verified.
 
 - **Rails 8.1.4** + PostgreSQL
 - **Solid Queue** — background jobs + recurring hourly cron, gated per user to 8am weekdays for generation and to early afternoon for reminder nudges (no Redis needed)
-- **Solid Cable / ActionCable** — mounted but unused; the dashboard learns generation is done by polling `GET /dashboard/status`, since this app's layout never loads Turbo JS
+- **Polling, no websockets** — the dashboard learns generation is done by polling `GET /dashboard/status`; the app has no ActionCable and its layout never loads Turbo JS
 - **Stimulus and importmap** — every page script is a controller under `app/javascript/controllers`, bound with `data-action`; `app/assets/javascripts/code_gym_bootstrap.js` is the one blocking classic script, whose stubs answer for `window.CodeGymRequest` and `window.CodeGymSaveStatus`, record an edit typed before the modules load, and hold a pull-to-refresh reload's content down before the first frame
 - **Faraday** — provider API calls (not the official SDKs)
 - **Rouge** — server-side syntax highlighting for every code block (`CodeHighlight`)
