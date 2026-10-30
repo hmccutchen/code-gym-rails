@@ -82,11 +82,12 @@ RSpec.describe "Learn layout", type: :system do
 
   describe "on a phone" do
     [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
-      it "lays every box and group out as a 16px-inset card with 48px rows and 44px targets at #{width}px#{' with the largest text' if prefs.any?}" do
+      it "lays every box and group out as a full-width card with 48px rows and 44px targets at #{width}px#{' with the largest text' if prefs.any?}" do
         visit_learn(width: width, prefs: prefs)
 
-        edges(card_selector).each { |pair| expect(pair).to all(be_within(0.5).of(16)) }
-        expect(computed_style(".learn-group-block", "borderTopLeftRadius")).to eq("14px")
+        edges(card_selector).each { |pair| expect(pair).to all(be_within(0.5).of(0)) }
+        expect(computed_style(".learn-group-block", "borderTopLeftRadius")).to eq("0px")
+        expect(computed_style(".featured-concept", "paddingLeft")).to eq("16px")
         grouped_cards.each_cons(2) { |above, below| expect(below["top"] - above["bottom"]).to be_within(0.5).of(16) }
         expect(rect(".learn-filter")["top"] - rect(".featured-concept")["bottom"]).to be_within(0.5).of(16)
         expect_targets
@@ -147,6 +148,7 @@ RSpec.describe "Learn layout", type: :system do
         content = container_content
         expect(content["right"] - content["left"]).to be_within(0.5).of([ 1040, width - 48 ].min)
         expect(content["left"]).to be_within(1).of(client_width - content["right"])
+        expect(computed_style(".featured-concept", "paddingLeft")).to eq("16px")
       end
     end
 

@@ -3,7 +3,7 @@
 ## Layout
 
 The page is a `.card-page` (`phone_cards.css`): on a phone each entry is a
-card `max(16px, inset)` from the screen edge, from 600 to 899px the entries
+full-width card that runs to the safe area, from 600 to 899px the entries
 take the container's full width, and at 900px and wider the page's sheet,
 `pages/history.css`, puts the rail beside them
 (`docs/code-notes/app/assets/stylesheets/pages/history.md`).

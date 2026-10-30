@@ -73,14 +73,14 @@ RSpec.describe "Progress layout", type: :system do
 
   describe "on a phone" do
     [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
-      it "lays the legend and groups out as 16px-inset cards with 48px rows and 44px links at #{width}px#{' with the largest text' if prefs.any?}" do
+      it "lays the legend and groups out as full-width cards with 48px rows and 44px links at #{width}px#{' with the largest text' if prefs.any?}" do
         visit_progress(width: width, prefs: prefs)
 
         expect(page).to have_css(".progress-legend-card:not([open])")
         expect(page).to have_css(".progress-note", visible: :visible)
-        edges(card_selector).each { |pair| expect(pair).to all(be_within(0.5).of(16)) }
-        expect(computed_style("details.progress-group", "borderTopLeftRadius")).to eq("14px")
-        expect(computed_style(".progress-legend-card", "borderTopLeftRadius")).to eq("14px")
+        edges(card_selector).each { |pair| expect(pair).to all(be_within(0.5).of(0)) }
+        expect(computed_style("details.progress-group", "borderTopLeftRadius")).to eq("0px")
+        expect(computed_style(".progress-legend-card", "borderTopLeftRadius")).to eq("0px")
         grouped_cards.each_cons(2) { |above, below| expect(below["top"] - above["bottom"]).to be_within(0.5).of(16) }
         expect_targets
         expect(rects(".progress-legend dt").map { |r| r["left"] }.uniq.size).to eq(1)

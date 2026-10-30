@@ -10,6 +10,10 @@ Only the index's rules live here. The concept and lesson pages' rules, and
 example share, stay in the layout. `.learn-empty` left the layout's shared
 muted-colour rule for a rule of its own here.
 
+This week's concept pads its sides by 16px at every width, where the layout
+gives it `1.25rem`, so its text lines up with the other Learn cards and, on a
+phone, with the page heading.
+
 ## At 900px and wider
 
 - `.learn-top` is a two-column grid: this week's concept beside the filter.

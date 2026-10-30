@@ -1,6 +1,6 @@
 .learn-head h1 { font-size: 1.5rem; }
 .learn-top, .learn-buckets, .learn-groups { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.learn-page .featured-concept { margin-bottom: 0; }
+.learn-page .featured-concept { margin-bottom: 0; padding-inline: 16px; }
 .learn-page .featured-title a { display: inline-flex; align-items: center; min-height: 44px; }
 .learn-filter { display: flex; flex-direction: column; gap: 8px; }
 .learn-filter label { display: flex; align-items: center; gap: 12px; min-height: 48px; cursor: pointer; }
