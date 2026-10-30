@@ -4,7 +4,7 @@ The prompt for the judge that checks one generated section before an engineer se
 
 ## `.visible` and `.generate`
 
-`.visible` strips every answer-key field, every `ProblemSetIngest::SERVER_STAMPS` field and the kind's `.judge_hidden_fields`, so the judge sees one section as the engineer will, with no concept history. It is public because the blind-solve triage script (`script/key_triage.rb`) builds its solve prompt from the same step, so the rule for what a pre-submission AI call may see lives in one place. It returns the kind's verdict schema as `response_schema:`.
+`.visible` strips every answer-key field, every `ProblemSetIngest::SERVER_STAMPS` field and the kind's `.judge_hidden_fields`, so the judge sees one section as the engineer will, with no concept history. It is public because the blind-solve triage script (`script/key_triage.rb`) builds its solve prompt from the same step, so the rule for what a pre-submission AI call may see lives in one place. After the JSON, `.generate` prints the kind's `.judge_attachment`, when it has one: a multi-file code review's files, every line numbered (#630). It returns the kind's verdict schema as `response_schema:`.
 
 ## `PRINCIPLE_GUIDANCE`
 

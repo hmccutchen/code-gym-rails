@@ -35,8 +35,8 @@ RSpec.describe SectionJudgePrompt do
     request = described_class.generate(kind: ExerciseSection::CodeReview, section: section, rung: "senior", locked: false)
 
     expect_prompt_snapshot("judge__code_review_multi_file__prompt", request[:prompt])
-    expect(request[:prompt]).to include('"file_1_changed_lines"')
-    expect(request[:prompt]).not_to match(/"file_\d_#{quotes}":/)
+    expect(request[:prompt]).to include("Changed lines: 4\n1 | class Customer < ApplicationRecord", "4 |   def lifetime_total_cents")
+    expect(request[:prompt]).not_to match(/"file_\d_/)
     expect(request.values.to_json).not_to include("SENTINEL")
   end
 

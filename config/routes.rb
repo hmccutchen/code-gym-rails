@@ -8,7 +8,6 @@ Rails.application.routes.draw do
 
   get "service-worker.js" => "rails/pwa#service_worker", as: :pwa_service_worker, defaults: { format: :js }, format: false
 
-  mount ActionCable.server => "/cable"
 
   get    "login",        to: "sessions#new"
   post   "login",        to: "sessions#create"

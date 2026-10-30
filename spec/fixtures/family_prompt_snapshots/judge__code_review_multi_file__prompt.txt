@@ -12,13 +12,25 @@ The section as delivered:
   "question": "This change makes a customer's lifetime total a method instead of a stored column. What does it break, and how would you fix it?",
   "teaching_note": "Look at where the job calls the new method, and count the queries one run makes.",
   "concept": "n_plus_one",
-  "scenario": "a monthly loyalty report emailed to every customer",
-  "file_1_path": "app/models/customer.rb",
-  "file_1_code": "class Customer < ApplicationRecord\n  has_many :orders\n\n  def lifetime_total_cents\n    orders.sum(:total_cents)\n  end\nend",
-  "file_2_path": "app/jobs/loyalty_report_job.rb",
-  "file_2_code": "class LoyaltyReportJob < ApplicationJob\n  def perform\n    Customer.find_each do |customer|\n      LoyaltyMailer.with(customer: customer, total: customer.lifetime_total_cents).report.deliver_later\n    end\n  end\nend",
-  "file_1_changed_lines": [
-    4
-  ],
-  "file_2_changed_lines": []
+  "scenario": "a monthly loyalty report emailed to every customer"
 }
+
+The section's files, every line numbered, with "Changed lines" naming the lines the page marks as the change:
+File: app/models/customer.rb
+Changed lines: 4
+1 | class Customer < ApplicationRecord
+2 |   has_many :orders
+3 |
+4 |   def lifetime_total_cents
+5 |     orders.sum(:total_cents)
+6 |   end
+7 | end
+File: app/jobs/loyalty_report_job.rb
+Changed lines: none
+1 | class LoyaltyReportJob < ApplicationJob
+2 |   def perform
+3 |     Customer.find_each do |customer|
+4 |       LoyaltyMailer.with(customer: customer, total: customer.lifetime_total_cents).report.deliver_later
+5 |     end
+6 |   end
+7 | end

@@ -213,6 +213,8 @@ class ExerciseSection
 
     def judge_hidden_fields = []
 
+    def judge_attachment(section) = nil
+
     def rejudge_edits?
       false
     end

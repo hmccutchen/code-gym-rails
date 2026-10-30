@@ -58,7 +58,7 @@ class SectionJudgePrompt
       Every other field is the artifact and must not change.
       #{guidance_block(kind)}
       The section as delivered:
-      #{JSON.pretty_generate(shown)}
+      #{JSON.pretty_generate(shown)}#{attachment_block(kind, section)}
     PROMPT
   end
 
@@ -66,5 +66,10 @@ class SectionJudgePrompt
     kind.judge_guidance ? "\n#{kind.judge_guidance}\n" : ""
   end
 
-  private_class_method :guidance_block
+  def self.attachment_block(kind, section)
+    attachment = kind.judge_attachment(section)
+    attachment ? "\n\n#{attachment}" : ""
+  end
+
+  private_class_method :guidance_block, :attachment_block
 end

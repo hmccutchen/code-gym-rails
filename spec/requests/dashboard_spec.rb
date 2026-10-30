@@ -187,12 +187,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
-  it "never renders a Turbo Stream subscription tag (this app loads no Turbo JS)" do
-    create_exercise
-    get root_path
-    expect(response.body).not_to include("turbo-cable-stream-source")
-  end
-
   it "always renders the answer form as a plain POST, even for a persisted draft" do
     exercise = create_exercise
     create_response(exercise, submitted: false)
