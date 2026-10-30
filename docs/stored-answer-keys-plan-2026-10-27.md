@@ -308,13 +308,118 @@ in its own PR before the read.
   days. The first real section of each still logs its `[planted_key]` line,
   and those lines are checked when they appear.
 
+### Blind-solve triage for `code_review` drafts
+
+Added by the owner on 2026-10-30. A second model, which never sees the key,
+solves about 30 drafted `code_review` sections, and the script compares what
+it finds with each key. Disagreements tell the owner which keys to read
+first. **Agreement is screening only:** it never shows that a key is right,
+and the real-day read in step 3 stays PR 2's gate.
+
+- **Drafting.** `script/draft_key_samples.rb code_review OUT_PATH --triage`
+  drafts `code_review` sections through the same retry and judge path as the
+  drafted kinds, up to `--count 30`. `code_review` is accepted only with
+  `--triage`; the colleague's read of the three rarer kinds doesn't change.
+  The earlier review found two ways a drafted `code_review` wouldn't match
+  a real day, so the triage drafts fix both:
+  - **The concept follows the mode.** The drafts cycle through
+    `application_code`, `test_file` and `schema_review` in turn (10 of each
+    in 30). Each concept comes from
+    `ConceptVocabulary.selectable_for_section(..., mode:, rung:)`, so a
+    data-modeling concept never lands on an application-code draft.
+  - **Toy code only, single-file only.** The draft's plan has
+    `code_review_source: nil`, since a `RealSource` excerpt would need the
+    scenario restore that `JudgedGeneration` does on an edit, and
+    `code_review_files: :single`, since multi-file waits for launch B.
+- **The plan comes first.** Without `--run`, the script prints the drafts,
+  the judge calls and the solve calls, the most calls in total, and a cost
+  bound with every call at its output cap. **Every `--run` needs the
+  owner's approval of those numbers first.** Like the rest of the script, it
+  runs on the owner's machine against a local database, inside a read-only
+  transaction, and writes no day, history or `ApiUsage` row.
+- **The solve.** One extra call per kept section. The solver gets the section
+  as an engineer sees it before submitting, and is asked for the one planted
+  issue, quoting the code it points at in backticks, and a fix. Its reply
+  schema is `{ "issue", "fix" }`.
+- **The comparison is done in Ruby, never by a model.** Each backtick quote
+  in the solver's `issue` and in the key's `issue` is located in the
+  formatted snippet with `KeyQuote.find`. That is the whole-file search that
+  launch A removed until it had a caller; this step is that caller, so it
+  returns here. A section is:
+  - **agree** when any solver quote's line range overlaps any key quote's
+    line range
+  - **disagree** when the solver quotes lines that don't overlap
+  - **unlocated** when either side has no quote the code contains
+- **What it writes.**
+  - **Terminal:** agree, disagree and unlocated counts, overall and by mode,
+    with no section text.
+  - **The key sheet file outside the repository:** every disagreement and
+    unlocated section, plus 3 agreements (one per mode). Each entry holds the
+    section as shown, the key, and the solver's issue and fix. The file is
+    deleted after the read, like every key sheet.
+- **What the owner reads.** The disagreements first. Each gets one call:
+  - the key is wrong
+  - the solver is wrong
+  - both name a real flaw, and the key's is the planted one
+  - both name a real flaw, and the solver's is worse
+
+  The 3 agreements are read too, to check that agreement means what it
+  seems to. Only the counts go into PR 2's description.
+
+**Which model solves.** Any Claude model with a price in
+`ClaudeService::PRICE_PER_MILLION` can solve, on the owner's own Anthropic
+key, chosen with `--solver-model`. Today those are Opus 5.5, Sonnet 5.5 and
+Haiku 4.5. The default is Sonnet 5.5, so the solver isn't the generator's
+model: generation and retries run on Opus 5.5
+(`MODEL_FOR_PURPOSE["generate_exercise"]`). Sonnet 5.5 is also the judge's
+model, and the judge has already kept every section it sees, so the two
+checks aren't independent. Models from one family can share a blind spot,
+which is a second reason agreement only screens. Another provider (OpenAI,
+Gemini) can solve only with a key the owner holds for that provider, read
+from its own environment variable, as `regrade_review_baseline.rb --provider`
+does. The script never uses a house key or anyone else's.
+
+**Keeping the key out of the solve.** The solve is an AI call on a section
+nobody has answered yet, so CLAUDE.md's rule applies to it: answer-key
+fields never reach a pre-submission AI context. The build holds that like
+this:
+
+- **Input.** The solve prompt is built only from the section with
+  `ExerciseSection.all_answer_key_fields` and
+  `ProblemSetIngest::SERVER_STAMPS` removed, through the same helper the
+  judge's prompt uses (`SectionJudgePrompt`'s `visible` step, made public
+  and shared), so the rule lives in one place.
+- **Spec.** A sentinel is planted in every answer-key field. The spec stubs
+  the provider over Faraday and asserts that no request body contains the
+  sentinel, on the draft call, the judge call or the solve call.
+- **The key and the reply never meet in a prompt.** The comparison runs in
+  Ruby, so no call ever holds both.
+- **The reply is triage data only.** It is never written back to the
+  section, never stored (the run is read-only), never sent to another
+  prompt, and parsed with `log_raw: false`. It goes only to the key sheet
+  file.
+- **The solve prompt lives in the script.** Its text is in `script/`, not
+  `app/prompts`, so no path in the app can send it. Drafts are never shown
+  to an engineer, so no real day ever meets a solved section.
+
+**Specs.**
+- The three outcomes, on fixtures with known quotes.
+- Modes cycled across a 30-section run.
+- The `code_review` concept drawn from the mode's vocabulary.
+- `code_review` refused without `--triage`.
+- The plan printing the solve calls without making one.
+- The sentinel spec above.
+- The sheet holding every disagreement and exactly 3 agreements.
+- `KeyQuote.find` returning with its spec.
+
 1. **Wait.** Keys accumulate on real days. The quote threshold applies from
    the first keyed day: count only `attempt=draft` lines of the kinds that quote (`code_review`, `security_review`, `plan_review`) with `language=ruby_rails` (owner's decision, 2026-10-28). More than 2
    `quote_missing` in the first 10 stops the work, and the owner decides
    what's next. Report the `missing` count beside it.
 2. **Export the key sheet,** with the owner's approval for that export. Keep
    it outside the repository.
-3. **Read.** The owner reads the Ruby `code_review` sections from real days.
+3. **Read.** The owner reads the Ruby `code_review` sections from real days,
+   and, separately, the triage sheet's disagreements and 3 agreements.
    The colleague the owner chooses reads the drafted `security_review`,
    `plan_review` and `pseudocode_to_code` sections, since the owner can't
    judge those keys reliably. The spec's option B asks for about 5 per kind.

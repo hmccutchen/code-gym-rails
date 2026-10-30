@@ -125,6 +125,38 @@ keeps the four keys. It reads only submitted, reviewed days, it already holds
 the answers and the older keys, and the second PR's measuring regrades from
 it with and without the key (owner's decision, 2026-10-28).
 
+### A blind solve screens the `code_review` drafts
+
+The owner decided on 2026-10-30 to add a triage step for `code_review`.
+About 30 sections are drafted with the drafts script, toy and single-file,
+cycling through the three modes. Each one is solved by a separate call that
+never sees the key, and the script compares the solver's quoted lines with
+the key's in Ruby: agree, disagree or unlocated. The disagreements and three
+agreements go to the key sheet outside the repository for the owner to read.
+Every run waits for the owner's approval of its call count and cost.
+
+- **Agreement is screening only.** A solver that finds the same lines as the
+  key doesn't show the key is right. The generator and the solver can share
+  a mistake, the more so within one model family, and the judge (Sonnet 5.5,
+  the default solver too) has already kept each section. A disagreement
+  doesn't show the key is wrong either: the solver may have found a second
+  flaw, or misread the code. Triage only says which keys to read first. The
+  quote threshold and the owner's read of real-day keys stay the gate for the
+  second PR.
+- **The solver may run on a different model than the generator.** It can use
+  any priced Claude model on the owner's own key, Sonnet 5.5 by default
+  against the generator's Opus 5.5. It can use another provider only with a
+  key the owner holds for that provider.
+- **The key never reaches the solve.** The solve is a pre-submission AI
+  context, so its prompt is built from the section with every answer-key
+  field and server stamp removed, through the same step as the judge's
+  prompt. A sentinel spec checks every request body. The comparison never
+  puts the key and the reply in one prompt. The reply is never stored or
+  sent on, and the prompt lives in `script/`, out of the app's reach.
+- **This is not the judge's blind solve.** The judge solves only design
+  comparisons, live (`JudgeSolve`). This triage is an offline script, and
+  turns nothing on.
+
 ## Before the grader reads them
 
 The second PR changes grading, so these hold from now:

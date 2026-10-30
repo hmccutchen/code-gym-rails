@@ -446,3 +446,12 @@ data.*
   **I decided:** keep the two in separate fields rather than accept
   numbers as already resolved, so a provider can never skip the quote
   match by sending numbers
+
+## Fri Oct 30
+
+- a blind-solve triage for drafted code review keys added to the plan:
+  about 30 drafts solved without their keys, compared in Ruby `#611 open`
+  **why:** to find the keys worth reading first
+  **I decided:** agreement only screens, and the real-day read stays the
+  gate; I approve each run's call count and cost first; the disagreements
+  and three agreements go to a key sheet outside the repo
