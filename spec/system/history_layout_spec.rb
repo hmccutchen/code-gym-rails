@@ -95,13 +95,13 @@ RSpec.describe "History layout", type: :system do
 
   describe "on a phone" do
     [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
-      it "lays entries out as 16px-inset cards with 48px disclosures and 44px pager buttons at #{width}px#{' with the largest text' if prefs.any?}" do
+      it "lays entries out as full-width cards with 48px disclosures and 44px pager buttons at #{width}px#{' with the largest text' if prefs.any?}" do
         travel_to(a_weekday) do
           visit_history(width: width, prefs: prefs)
 
-          edges(".history-entry").each { |pair| expect(pair).to all(be_within(0.5).of(16)) }
+          edges(".history-entry").each { |pair| expect(pair).to all(be_within(0.5).of(0)) }
           expect(computed_style(".history-entry", "paddingLeft")).to eq("16px")
-          expect(computed_style(".history-entry", "borderTopLeftRadius")).to eq("14px")
+          expect(computed_style(".history-entry", "borderTopLeftRadius")).to eq("0px")
           entries = rects(".history-entry")
           entries.each_cons(2) { |above, below| expect(below["top"] - above["bottom"]).to be_within(0.5).of(16) }
           expect(rects("details.answers > summary, details.review > summary").map { |r| r["height"] }).to all(be >= 48)
@@ -118,8 +118,8 @@ RSpec.describe "History layout", type: :system do
 
         entry = rect(".history-entry")
         section = rect(".history-entry .section")
-        expect(section["left"] - entry["left"]).to be_within(0.5).of(17)
-        expect(entry["right"] - section["right"]).to be_within(0.5).of(17)
+        expect(section["left"] - entry["left"]).to be_within(0.5).of(16)
+        expect(entry["right"] - section["right"]).to be_within(0.5).of(16)
         expect(computed_style(".history-entry .section", "borderLeftWidth")).to eq("1px")
         expect(computed_style(".history-entry .section", "borderTopLeftRadius")).not_to eq("0px")
       end
@@ -134,13 +134,13 @@ RSpec.describe "History layout", type: :system do
       end
     end
 
-    it "puts entries at a 20px inset, not at 16px" do
+    it "stops entries at a 20px inset on that side only" do
       travel_to(a_weekday) do
         set_safe_area(left: 20)
         visit_history(width: 390)
         edges(".history-entry").each do |left, right|
           expect(left).to be_within(0.5).of(20)
-          expect(right).to be_within(0.5).of(16)
+          expect(right).to be_within(0.5).of(0)
         end
       end
     end

@@ -403,7 +403,7 @@ data.*
   same concept"; never the draft or the judge's words; a report of what
   each retry path records
 - the grader starts with code review, gated on its read and token cost;
-  drafted kinds join later `#611 open`
+  drafted kinds join later `#611`
 
 ## Thu Oct 29
 
@@ -418,8 +418,7 @@ data.*
 - a concept's Learn page shows its explanation, guide and pitfalls again
   when its stored lesson is the string "None" `#620`
   **why:** four production references stored "None", which counted as a
-  lesson, so their pages hid everything but the tagline, code and senior
-  lens, and offered no way to write a lesson
+  lesson and hid most of their pages
   **I decided:** after an explanation of each option with a real example,
   both a read-side guard, so a stored value with nothing to show counts as
   no lesson, and a one-time migration clearing every lesson that isn't an
@@ -438,25 +437,27 @@ data.*
   mid-level 2, senior and principal 2–3; half of non-RealSource days once on;
   after the reviews, the judge line waits for launch B, the key checks the
   files now, and KeyQuote's whole-file search waits for its caller
-- a multi-file code review's check made safe to run twice, keeping the
-  provider's quoted lines beside the line numbers they resolve to
-  `#624`
+- a multi-file code review's check made safe to run twice `#624`
   **why:** the check overwrote the quotes with line numbers, so a second
   run would refuse a good section
   **I decided:** keep the two in separate fields rather than accept
   numbers as already resolved, so a provider can never skip the quote
   match by sending numbers
+- cards on the phone run to the screen edge, so code wraps less `#631`
+  **why:** narrow cards hurt how code was laid out and read
+  **I decided:** after the reviews, tighten the code box too; notices stay
+  inset
 
 ## Fri Oct 30
 
-- a blind-solve triage for drafted code review keys added to the plan:
-  about 30 drafts solved without their keys, compared in Ruby `#611 open`
+- a blind-solve triage added to the plan: about 30 drafted code review
+  keys solved blind, compared in Ruby
   **why:** to find the keys worth reading first
   **I decided:** agreement only screens, and the real-day read stays the
   gate; I approve each run's call count and cost first; the disagreements
   and three agreements go to a key sheet outside the repo
 - the section judge shown a multi-file code review's marked line numbers,
-  not the provider's quotes `#629 merged`
+  not the provider's quotes `#629`
   **why:** a quote that matched no line marks nothing on the page, so the
   judge could read a change the engineer never sees, and nothing pinned
   what the judge sees for files
