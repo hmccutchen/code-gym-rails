@@ -65,6 +65,8 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.files_context(section) = files(section).map(&:prompt_text).join("\n").presence
 
+  def self.judge_hidden_fields = FILE_SLOTS.map { |number| "file_#{number}_changed" }
+
   def self.reject_unusable!(section, language: nil, file_range: 1..1, **)
     if file_range.max == 1
       reject_unusable_snippet!(section)

@@ -26,6 +26,19 @@ RSpec.describe SectionJudgePrompt do
     end
   end
 
+  it "shows a multi-file code review's files with the changed line numbers the page marks, and none of the provider's quotes" do
+    section = CodeReviewMultiFile::SECTION.deep_dup
+    section["file_1_changed"] = [ "def lifetime_total_cents", "SENTINEL-UNMARKED-QUOTE" ]
+    ExerciseSection::CodeReview.reject_unusable!(section, language: "ruby_rails", file_range: 2..2)
+
+    request = described_class.generate(kind: ExerciseSection::CodeReview, section: section, rung: "senior", locked: false)
+
+    expect_prompt_snapshot("judge__code_review_multi_file__prompt", request[:prompt])
+    expect(request[:prompt]).to include('"file_1_changed_lines"')
+    expect(request[:prompt]).not_to match(/"file_\d_changed":/)
+    expect(request.values.to_json).not_to include("SENTINEL")
+  end
+
   it "never shows the judge a planted key, for any kind that plants one" do
     ExerciseSection.all.select(&:planted_key?).each do |kind|
       section = FakeService::EXERCISE_PROBLEM_SET.fetch(kind.key).deep_dup
