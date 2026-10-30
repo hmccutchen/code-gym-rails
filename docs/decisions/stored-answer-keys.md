@@ -71,7 +71,7 @@ The owner decided on 2026-10-30, after the first triage run:
   a migration in full. 1,500 is about twice the solver's longest reply and
   about three times the longest uncut key field, so a few sentences with
   inline code fit, and a field past it is no longer a few sentences. Four
-  uncut fields is a small sample, so the fresh triage set drafted under the
+  uncut fields is a small sample, so the fresh set of 8 drafted under the
   new limit is also the check on it.
 - **The guidance asks for a few sentences a field,** in each keyed kind's
   schema line.

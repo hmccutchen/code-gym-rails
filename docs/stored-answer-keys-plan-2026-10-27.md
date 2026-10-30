@@ -494,9 +494,10 @@ Then:
 - Put the first triage run's counts there too (2026-10-30, stopped
   partway, under the old 500-character limit): 18 kept, 17 agree, 1
   disagree (the same flaw quoted on different lines), 0 unlocated, and 1
-  judge reply cut off at `JUDGE_MAX_TOKENS`. A fresh triage set, drafted
-  under the 1,500 limit, comes before the key read, and its counts go
-  beside these.
+  judge reply cut off at `JUDGE_MAX_TOKENS`. A fresh set of 8 drafted
+  `code_review` sections, under the 1,500 limit and with no solve, comes
+  before the key read (owner's decision, 2026-10-30, to spend less), and
+  its counts go beside these.
 
 ### Step 1. The review context line
 
@@ -506,8 +507,8 @@ Then:
   field of exactly 500 characters ending in `...`, on a day generated
   before the 1,500 limit deployed, was cut by the old `String#truncate`.
   PR 2 adds one check for it on `PlantedKey`, with a spec, and the section
-  is graded keyless. The PR description gives how many stored keys it
-  skips, from an owner-approved read-only count.
+  is graded keyless. PR 2 skips these keys whatever their number, so no
+  production count is taken (owner's decision, 2026-10-30).
 - **Snapshots:**
   - `review_prompt_spec` gains a keyed day.
   - Day A and day B stay byte-identical.
