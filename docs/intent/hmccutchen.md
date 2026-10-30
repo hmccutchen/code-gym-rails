@@ -476,4 +476,5 @@ data.*
   cut key can lose the part grading needs
   **I decided:** 1,500 from the run's lengths; a few sentences a field;
   PR 2 grades keys cut at the old limit as keyless; more than 2 too_long in
-  10 stops the work; a fresh triage set before my key read
+  10 stops the work; 8 fresh code review drafts, no solve, before my key
+  read, under a `--max-cost` cap the script enforces, to spend less
