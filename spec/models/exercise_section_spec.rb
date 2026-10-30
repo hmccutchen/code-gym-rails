@@ -694,6 +694,13 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".judge_hidden_fields" do
+    it "hides nothing for every kind but code_review, which hides its quoted changed lines" do
+      expect((described_class.all - [ ExerciseSection::CodeReview ]).map(&:judge_hidden_fields)).to all(eq([]))
+      expect(ExerciseSection::CodeReview.judge_hidden_fields).to eq(%w[file_1_changed file_2_changed file_3_changed])
+    end
+  end
+
   describe ".judge_guidance" do
     it "is absent for every kind but design_comparison" do
       expect((described_class.all - [ ExerciseSection::DesignComparison ]).map(&:judge_guidance)).to all(be_nil)

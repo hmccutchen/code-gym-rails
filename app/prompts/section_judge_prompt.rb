@@ -41,7 +41,7 @@ class SectionJudgePrompt
   PROMPT
 
   def self.generate(kind:, section:, rung:, locked:)
-    visible = section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS)
+    visible = section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS, *kind.judge_hidden_fields)
 
     { response_schema: JudgeVerdict.schema_for(kind), system: SYSTEM, prompt: <<~PROMPT }
       Section kind: #{kind.key}

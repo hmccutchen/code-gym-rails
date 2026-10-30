@@ -460,3 +460,13 @@ data.*
   **why:** narrow cards hurt how code was laid out and read
   **I decided:** after the reviews, tighten the code box too; notices stay
   inset
+
+## Fri Oct 30
+
+- the section judge shown a multi-file code review's marked line numbers,
+  not the provider's quotes `#629`
+  **why:** a quote that matched no line marks nothing on the page, so the
+  judge could read a change the engineer never sees, and nothing pinned
+  what the judge sees for files
+  **I decided:** numbers only, hidden through a per-kind hook rather than a
+  branch in the judge prompt
