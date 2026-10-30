@@ -24,15 +24,17 @@ The card, full-width button, switch, value row, segmented control and card headi
 
 ## Side margins and the safe area
 
-A card's outer edge sits `max(16px, inset)` from the screen edge on each side, where `inset` is that side's `env(safe-area-inset-*)`. `.container` pads each side by `--container-pad-left` and `--container-pad-right`, which are `max(1.5rem, inset)` under 1024px. Under 600px `.phone-page` and `.card-page` set each side's margin, in one rule, to the difference, reading those properties, so it never restates `.container`'s padding. `spec/views/container_gutter_spec.rb` fails if it does.
+The page's content edge sits `inset + 16px` from the screen edge on each side (`--page-gutter-left` and `--page-gutter-right`), where `inset` is that side's `env(safe-area-inset-*)`. `.container` pads each side by `--container-pad-left` and `--container-pad-right`, which are `max(1.5rem, inset)` under 1024px. Under 600px `.phone-page`, `.card-page` and `.today-page` set each side's margin, in one rule, to the difference, reading those properties, so it never restates `.container`'s padding. `spec/views/container_gutter_spec.rb` fails if it does.
 
-| Inset | `.container` pads | Margin | Card edge from screen |
-|---|---|---|---|
-| 0 | 24px | -8px | 16px |
-| 20px | 24px | -4px | 20px |
-| 44px | 44px | 0 | 44px |
+| Inset | `.container` pads | Margin | Content edge from screen | Card edge from screen |
+|---|---|---|---|---|
+| 0 | 24px | -8px | 16px | 0 |
+| 20px | 24px | 12px | 36px | 20px |
+| 44px | 44px | 16px | 60px | 44px |
 
-A single `calc(16px - 1.5rem)` would put the card 36px from the edge under a 44px inset, which is under the notch. If `.container`'s padding changes, this margin follows it through the properties.
+The gutter is the inset plus 16px, not the larger of the two, because a full-width card stops at the inset and pads its text 16px in from there. With `max(16px, inset)` a 20px inset put the heading and Submit at 20px and card text at 36px. A single `calc(16px - 1.5rem)` would put content 36px from the edge under a 44px inset, which is under the notch. If `.container`'s padding changes, this margin follows it through the properties.
+
+The page's text keeps that gutter, but its cards don't. Under 600px the outermost `.card`, `.section`, `.history-entry`, `.featured-concept` and `.progress-group` on a `.phone-page`, `.card-page` or `.today-page` run out to the safe area: a negative margin cancels the page gutter (`--page-gutter-left` and `--page-gutter-right`, which the page margin reads too), and the card drops its side borders and corner radius. The card's own 16px padding then lines its text up with the page heading. Code was the reason: in an outermost Today section at the default text size, with the card's border and gutter gone and the layout's 8px phone padding on `pre.snippet`, code text starts 25px from the screen edge where it used to start 50px, about six more characters per line before it wraps. A section nested in a History entry keeps its inset, so its code starts further in. A card nested inside another one, such as a section inside a History entry, keeps its border, radius and inset.
 
 At 600px and wider the page is `max-width: 480px`, centered, inside `.container`'s content box. That box is already padded by at least the inset, so no negative margin is needed.
 

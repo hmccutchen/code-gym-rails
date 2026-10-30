@@ -3,7 +3,7 @@
 ## Layout
 
 The page is a `.card-page` (`phone_cards.css`) and calls `wide_page`. On a
-phone every box and group is a card `max(16px, inset)` from the screen edge,
+phone every box and group is a full-width card that runs to the safe area,
 16px apart. From 600 to 899px they take the container's full width. At 900px
 and wider the page's own sheet puts this week's concept beside the filter
 and the groups three across. Every rule lives in `pages/learn.css`

@@ -29,7 +29,10 @@ RSpec.describe "container gutter" do
   it "offsets .phone-page by .container's gutter properties instead of a copy of their values" do
     margins = phone_cards.select { |rule| rule.selectors.include?(".phone-page") }.filter_map { |rule| rule.declaration("margin-left") }
 
-    expect(margins).to eq([ "calc(max(16px, env(safe-area-inset-left)) - var(--container-pad-left))" ])
+    expect(margins).to eq([ "calc(var(--page-gutter-left) - var(--container-pad-left))" ])
+    gutter = phone_cards.find { |rule| rule.declaration("--page-gutter-left") }
+    expect(gutter.declaration("--page-gutter-left")).to eq("calc(env(safe-area-inset-left) + 16px)")
+    expect(gutter.declaration("--page-gutter-right")).to eq("calc(env(safe-area-inset-right) + 16px)")
     expect(File.read(Rails.root.join("app/assets/stylesheets/phone_cards.css"))).not_to include("1.5rem")
   end
 
@@ -39,6 +42,24 @@ RSpec.describe "container gutter" do
     expect(margin_rules.size).to eq(1)
     expect(margin_rules.first.selectors).to contain_exactly(".phone-page", ".card-page", ".today-page")
     expect(margin_rules.first.media).to eq([ "@media (max-width: 599.98px)" ])
+  end
+
+  it "runs a phone page's outermost cards to the safe area by cancelling the page gutter" do
+    bleed = phone_cards.select { |rule| rule.declaration("margin-inline") && rule.media == [ "@media (max-width: 599.98px)" ] }
+
+    expect(bleed.size).to eq(1)
+    expect(bleed.first.declaration("margin-inline")).to eq(
+      "calc(env(safe-area-inset-left) - var(--page-gutter-left)) calc(env(safe-area-inset-right) - var(--page-gutter-right))"
+    )
+    expect(bleed.first.declaration("border-inline")).to eq("0")
+  end
+
+  it "bleeds and skips the same card classes, so a nested card keeps its inset" do
+    source = File.read(Rails.root.join("app/assets/stylesheets/phone_cards.css"))
+    matched, skipped = source.match(/:is\(([^)]*)\):not\(:is\(([^)]*)\) \*\)/).captures.map { |list| list.split(",").map(&:strip) }
+
+    expect(matched).to include(".card", ".section")
+    expect(skipped).to eq(matched)
   end
 
   it "widens a wide page and the nav to 1040px of content in one rule, built from the gutter properties" do
