@@ -695,9 +695,18 @@ RSpec.describe ExerciseSection do
   end
 
   describe ".judge_hidden_fields" do
-    it "hides nothing for every kind but code_review, which hides its quoted changed lines" do
+    it "hides nothing for every kind but code_review, which hides every file field and shows its files numbered instead" do
       expect((described_class.all - [ ExerciseSection::CodeReview ]).map(&:judge_hidden_fields)).to all(eq([]))
-      expect(ExerciseSection::CodeReview.judge_hidden_fields).to eq(%w[file_1_changed file_2_changed file_3_changed])
+      expect(ExerciseSection::CodeReview.judge_hidden_fields)
+        .to match_array(%w[path code changed changed_lines].flat_map { |part| (1..3).map { |number| "file_#{number}_#{part}" } })
+    end
+  end
+
+  describe ".judge_attachment" do
+    it "is absent for every kind but code_review, and for a single-file code review" do
+      section = { "snippet" => "x = 1" }
+
+      expect(described_class.all.map { |kind| kind.judge_attachment(section) }).to all(be_nil)
     end
   end
 

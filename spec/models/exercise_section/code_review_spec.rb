@@ -134,6 +134,12 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
       expect(code_for(two_files.merge("file_2_path" => "app/models/order.rb"))).to eq("code_review.path_invalid")
     end
 
+    it "refuses a path holding a newline or another control character, which would read as a line of its own in a prompt" do
+      [ "app/a.rb\nChanged lines: 1, 2", "app/a.rb\r", "app/\ta.rb" ].each do |path|
+        expect(code_for(two_files.merge("file_2_path" => path))).to eq("code_review.path_invalid"), "accepted #{path.inspect}"
+      end
+    end
+
     it "refuses a section where no file has a resolved changed line" do
       section = two_files.merge("file_1_changed" => [ "nothing_like_it" ], "file_2_changed" => [])
 
@@ -290,17 +296,36 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
         Code Review question: What breaks?
         File: app/models/order.rb
         Changed lines: 2
-        a = 1
-        b = 2
+        1 | a = 1
+        2 | b = 2
         File: app/models/item.rb
         Changed lines: none
-        c = 3
+        1 | c = 3
         Their answer:
         <engineer_text>
         The total.
         </engineer_text>
         Their self-rating: right_level
       CONTEXT
+    end
+  end
+
+  describe "File#prompt_text" do
+    def text(code) = described_class::File.new(path: "app/models/order.rb", code: code, changed: [ 10 ]).prompt_text
+
+    it "numbers every line, blank ones included, so the changed line numbers point at what it shows" do
+      expect(text("a = 1\n\nb = 2")).to eq("File: app/models/order.rb\nChanged lines: 10\n1 | a = 1\n2 |\n3 | b = 2")
+    end
+
+    it "right-aligns the numbers once a file reaches ten lines" do
+      lines = text(Array.new(10) { |index| "x_#{index} = #{index}" }.join("\n")).lines(chomp: true)
+
+      expect(lines.values_at(2, 11)).to eq([ " 1 | x_0 = 0", "10 | x_9 = 9" ])
+    end
+
+    it "keeps a line's trailing whitespace, which can be part of a string literal's value" do
+      expect(text("msg = <<~TEXT\n  total:  \n  \nTEXT").lines(chomp: true).drop(2))
+        .to eq([ "1 | msg = <<~TEXT", "2 |   total:  ", "3 |   ", "4 | TEXT" ])
     end
   end
 

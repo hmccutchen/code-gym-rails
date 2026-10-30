@@ -454,3 +454,9 @@ data.*
   what the judge sees for files
   **I decided:** numbers only, hidden through a per-kind hook rather than a
   branch in the judge prompt
+- every line of a multi-file code review's files numbered in its prompts,
+  and the judge shown the files that way `#633 open`
+  **why:** the judge got the code as one escaped string and the grader got
+  it unnumbered, so both had to count lines to find a changed line
+  **I decided:** number lines in every prompt, through the one file format
+  the grader already uses, rather than for the judge alone

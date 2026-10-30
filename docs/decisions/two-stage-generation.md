@@ -331,9 +331,10 @@ by assignment, not by subtraction.
 strips the answer key and every `ProblemSetIngest::SERVER_STAMPS` field, so
 it never learns the day eased this section, which real file grounded it, or
 that an earlier verdict rejected it. It also strips the kind's
-`.judge_hidden_fields`: a multi-file code review's quoted changed lines,
-since the page marks only the line numbers they resolved to
-(`docs/decisions/multi-file-code-review.md`, #625). `current_schema` is deliberately not
+`.judge_hidden_fields`: a multi-file code review's file fields, which it
+shows instead as numbered files after the JSON (`.judge_attachment`), so
+the judge reads the changed line numbers the page marks rather than the
+provider's quotes (`docs/decisions/multi-file-code-review.md`, #625, #630). `current_schema` is deliberately not
 stripped: it is on the engineer's screen, and answerability depends on it.
 The rung and lock state reach the judge as stated arguments instead, since
 a level is what it measures against. `SectionJudgePrompt::SYSTEM` enumerates the
