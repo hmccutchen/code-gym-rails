@@ -7,14 +7,17 @@ RSpec.describe KeySampleDrafts do
   let(:kind)     { ExerciseSection::SecurityReview }
   let(:prompts)  { [] }
   let(:verdicts) { [] }
+  let(:solves)   { [] }
+  let(:bodies)   { [] }
+  let(:planted)  { nil }
   let(:service)  { described_class.service("sk-ant-test", usage) }
   let(:dir)      { Dir.mktmpdir }
   let(:path)     { described_class.reserve_out_path!(File.join(dir, "keys.json")) }
 
   after { FileUtils.rm_rf(dir) }
 
-  def drafts(count: 2, language: "ruby_rails")
-    described_class.new(kind: kind, language: language, count: count, service: service, out: out)
+  def drafts(count: 2, language: "ruby_rails", triage: false)
+    described_class.new(kind: kind, language: language, count: count, service: service, out: out, triage: triage)
   end
 
   def reject = { "status" => "reject", "principle" => "underdetermined", "evidence" => "e", "reason" => "r" }
@@ -23,19 +26,26 @@ RSpec.describe KeySampleDrafts do
 
   # A single-section retry carries the concept it was asked for, as a provider following the fixed-concept line would.
   before do
-    seen, queued = prompts, verdicts
+    seen, queued, solved, sent, key = prompts, verdicts, solves, bodies, planted
     connection = Faraday.new do |f|
       f.adapter :test do |stub|
         stub.post(ClaudeService::API_URL) do |env|
+          sent << env.body
           body    = JSON.parse(env.body)
           system  = body["system"].is_a?(Array) ? body["system"].first["text"] : body["system"]
           prompt  = body["messages"].last["content"]
           concept = prompt[/concept must be exactly `([^`]+)`/, 1]
-          purpose = concept ? "retry_section" : purpose_for(system)
+          purpose = concept ? "retry_section" : (system == KeyTriage::SYSTEM ? KeyTriage::PURPOSE : purpose_for(system))
           seen << purpose
-          text = FakeService.new("unused").send(:call, AiService.request_for(purpose, system: system, prompt: prompt))[:text]
+          if purpose == KeyTriage::PURPOSE
+            text = (solved.shift || { "issue" => FakeService::EXERCISE_PROBLEM_SET.dig("code_review", "answer_key", "issue"), "fix" => "f" }).to_json
+          else
+            text = FakeService.new("unused").send(:call, AiService.request_for(purpose, system: system, prompt: prompt))[:text]
+          end
           if concept
-            text = { kind.key => JSON.parse(text).fetch(kind.key).merge("concept" => concept) }.to_json
+            drafted = JSON.parse(text).fetch(kind.key).merge("concept" => concept)
+            drafted["answer_key"] = key if key
+            text = { kind.key => drafted }.to_json
           elsif purpose == "judge_section" && queued.any?
             text = queued.shift.to_json
           end
@@ -163,6 +173,98 @@ RSpec.describe KeySampleDrafts do
     [ ExerciseSection::CodeReview, ExerciseSection::Pattern ].each do |other|
       expect { described_class.new(kind: other, language: "ruby_rails", count: 1, service: service, out: out) }
         .to raise_error(ArgumentError, /isn't drafted/)
+    end
+  end
+
+  context "with --triage" do
+    let(:kind) { ExerciseSection::CodeReview }
+    let(:key_issue) { FakeService::EXERCISE_PROBLEM_SET.dig("code_review", "answer_key", "issue") }
+
+    def triage(count: 3) = drafts(count: count, triage: true)
+
+    it "solves each kept section after its judge, and writes the outcome, mode and solver reply" do
+      result = triage(count: 1).call(path)
+
+      expect(prompts).to eq([ "retry_section", "judge_section", KeyTriage::PURPOSE ])
+      expect(result.entries.sole).to include("code_review_mode" => "application_code", "triage" => "agree", "key_lines" => { "snippet" => [ "2" ] },
+                                             "solver" => { "issue" => key_issue, "fix" => "f" })
+    end
+
+    it "cycles the modes across a 30-section run, each draft toy and single-file with a concept from its mode's vocabulary" do
+      plans = []
+      allow(ForcedConceptDrafts).to receive(:rung_draft).and_wrap_original do |original, *args, **options|
+        plans << options[:plan]
+        original.call(*args, **options)
+      end
+
+      entries = triage(count: 30).call(path).entries
+
+      expect(entries.map { |entry| entry["code_review_mode"] }).to eq(KeyTriage::MODES.map(&:to_s) * 10)
+      expect(plans.map(&:code_review_mode).tally.values).to all(be >= 10)
+      expect(plans.map { |plan| [ plan.code_review_source, plan.code_review_files ] }.uniq).to eq([ [ nil, :single ] ])
+      entries.each do |entry|
+        vocabulary = ConceptVocabulary.selectable_for_section("code_review", "ruby_rails", mode: entry["code_review_mode"].to_sym, rung: entry["rung"])
+        expect(vocabulary).to include(entry["concept"])
+      end
+    end
+
+    context "with a sentinel in every answer-key field" do
+      let(:planted) { %w[issue why_it_matters fix].index_with { |field| "SENTINEL-#{field} `customer.orders.sum(&:total_cents)`" } }
+
+      it "never sends a key to the draft, the judge or the solve" do
+        result = triage(count: 2).call(path)
+
+        expect(result.entries.size).to eq(2)
+        expect(result.entries.first["answer_key"].values.join).to include("SENTINEL")
+        expect(bodies.size).to eq(6)
+        expect(bodies).to all(satisfy { |body| !body.include?("SENTINEL") })
+      end
+    end
+
+    it "writes every disagreement and unlocated section and one agreement per mode, and names a mode with none" do
+      solves.push({ "issue" => key_issue, "fix" => "f" }, { "issue" => "`customers.each { |c| puts loyalty_tier(c) }`", "fix" => "f" },
+                  { "issue" => "nothing quoted", "fix" => "f" })
+
+      run    = triage(count: 3)
+      result = run.call(path)
+
+      expect(written["sections"].map { |entry| entry["triage"] }).to eq(%w[disagree unlocated agree])
+      expect(written["summary"].last).to eq("no agreement to read for: test_file, schema_review")
+      expect(run.summary(result).first).to eq("triage: agree 1 · disagree 1 · unlocated 1")
+      expect(prompts.count(KeyTriage::PURPOSE)).to eq(3)
+    end
+
+    it "counts a solve that fails, and leaves its section out" do
+      solves.push({ "issue" => "no fix" })
+
+      result = triage(count: 1).call(path)
+
+      expect(result.failed.sole).to start_with("ProviderError::InvalidResponseError")
+      expect(result.entries.size).to eq(1)
+    end
+
+    it "routes the solve to the solver model at its pinned effort, Sonnet 5.5 unless another solver model is named" do
+      triage(count: 1).call(path)
+      expect(JSON.parse(bodies.last)).to include("model" => "claude-sonnet-5-5", "output_config" => include("effort" => "high"))
+
+      bodies.clear
+      opus = described_class.service("sk-ant-test", usage, solver_model: "claude-opus-5-5")
+      described_class.new(kind: kind, language: "ruby_rails", count: 1, service: opus, out: out, triage: true).call(path)
+      expect(JSON.parse(bodies.last)).to include("model" => "claude-opus-5-5", "output_config" => include("effort" => "high"))
+      expect { described_class.service("sk-ant-test", usage, solver_model: "claude-haiku-4-5") }.to raise_error(ArgumentError, /solver model/)
+    end
+
+    it "prints a plan that counts the solve calls, and makes no call" do
+      triage(count: 3).plan
+
+      expect(prompts).to be_empty
+      expect(out.string).to include("each kept one solved", "at most 18 calls", "$")
+    end
+
+    it "is the only way code_review is drafted, and drafts nothing else" do
+      expect { drafts(count: 1) }.to raise_error(ArgumentError, /isn't drafted/)
+      expect { described_class.new(kind: ExerciseSection::SecurityReview, language: "ruby_rails", count: 1, service: service, out: out, triage: true) }
+        .to raise_error(ArgumentError, /code_review only/)
     end
   end
 

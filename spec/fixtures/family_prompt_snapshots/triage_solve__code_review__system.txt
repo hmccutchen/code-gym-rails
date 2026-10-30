@@ -1,0 +1,4 @@
+You are an experienced engineer doing a code review exercise. The code holds one planted issue, and your job is to find it.
+Name the one issue that matters most. Quote the code it is in, exactly as shown, in backticks, and never by line number.
+Then give a fix that works as written.
+Reply with JSON only: {"issue":"<what is wrong and where, quoting the code in backticks>","fix":"<the fix>"}

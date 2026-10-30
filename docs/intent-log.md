@@ -464,8 +464,15 @@ data.*
   **I decided:** numbers only, hidden through a per-kind hook rather than a
   branch in the judge prompt
 - every line of a multi-file code review's files numbered in its prompts,
-  and the judge shown the files that way `#633 open`
+  and the judge shown the files that way `#633`
   **why:** the judge got the code as one escaped string and the grader got
   it unnumbered, so both had to count lines to find a changed line
   **I decided:** number lines in every prompt, through the one file format
   the grader already uses, rather than for the judge alone
+- the blind-solve triage built as a `--triage` mode of the drafts script
+  `#635 open`
+  **why:** real code review keys arrive about one a weekday, and the triage
+  shows about 30 before the real-day read is done, without slowing PR 2
+  **I decided:** build it now rather than skip it, since it doesn't gate
+  PR 2; fix the plan's review finding on short agreement samples before
+  merging #611; no run until I approve its call count and cost

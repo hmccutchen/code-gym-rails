@@ -6,6 +6,17 @@ module KeyQuote
 
   def self.normalize(text, language:) = normalized_with_lines(text, language: language).first
 
+  def self.find(code, quote, language:)
+    wanted = normalize(quote, language: language)
+    return if wanted.empty?
+
+    shown, lines = normalized_with_lines(code, language: language)
+    start = shown.index(wanted)
+    return unless start && shown.index(wanted, start + 1).nil?
+
+    lines[start]..lines[start + wanted.length - 1]
+  end
+
   def self.line(code, quote, language:)
     wanted = normalize(quote, language: language)
     return if wanted.empty?

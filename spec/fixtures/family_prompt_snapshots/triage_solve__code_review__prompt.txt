@@ -1,0 +1,8 @@
+Section kind: code_review
+The section as the engineer sees it:
+{
+  "question": "This method recalculates a customer's loyalty tier every time it's called, even inside a loop over the whole customer list. What's the issue and how would you fix it?",
+  "snippet": "def loyalty_tier(customer)\n  total = customer.orders.sum(&:total_cents)\n  case total\n  when 0...10_000 then \"bronze\"\n  when 10_000...50_000 then \"silver\"\n  else \"gold\"\n  end\nend\n\ncustomers.each { |c| puts loyalty_tier(c) }",
+  "scenario": "a nightly loyalty-tier recalculation job",
+  "diagram": "flowchart TD\n  A[\"Nightly job\"] --> B[\"loyalty_tier\"]\n  B --> C[(\"orders\")]"
+}

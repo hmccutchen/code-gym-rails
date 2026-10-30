@@ -40,21 +40,25 @@ class SectionJudgePrompt
     {"status":"reject","principle":"...","evidence":"<quoted text>","reason":"<one or two sentences>"}
   PROMPT
 
+  def self.visible(kind, section)
+    section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS, *kind.judge_hidden_fields)
+  end
+
   def self.generate(kind:, section:, rung:, locked:)
-    visible = section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS, *kind.judge_hidden_fields)
+    shown = visible(kind, section)
 
     { response_schema: JudgeVerdict.schema_for(kind), system: SYSTEM, prompt: <<~PROMPT }
       Section kind: #{kind.key}
       The learner's task for this kind: #{kind.judge_task}
       #{kind.discovery? ? "This is a discovery task: wording that names where the issue is defeats it." : "Naming the concept is expected for this kind."}
-      Tagged concept: #{visible["concept"]}
+      Tagged concept: #{shown["concept"]}
       Pitched at: #{rung}#{locked ? " (locked: this level was asked for unconditionally)" : ""}
       Level meaning: #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}
       Prose fields you may rewrite: #{kind.prose_fields.join(', ')}
       Every other field is the artifact and must not change.
       #{guidance_block(kind)}
       The section as delivered:
-      #{JSON.pretty_generate(visible)}#{attachment_block(kind, section)}
+      #{JSON.pretty_generate(shown)}#{attachment_block(kind, section)}
     PROMPT
   end
 

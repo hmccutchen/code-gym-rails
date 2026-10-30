@@ -51,6 +51,14 @@ RSpec.describe SectionJudgePrompt do
     end
   end
 
+  it "shares its visible step, which drops answer keys, server stamps and the kind's hidden fields" do
+    kind = ExerciseSection::CodeReview
+    section = FakeService::EXERCISE_PROBLEM_SET.fetch(kind.key).merge("pitched_at" => "senior", "file_1_changed" => [ "x" ])
+
+    expect(described_class.visible(kind, section).keys)
+      .to match_array(section.keys - [ "answer_key", "pitched_at", "file_1_changed" ])
+  end
+
   it "sees one section and nothing about the day, the engineer or their history" do
     expect(described_class.method(:generate).parameters)
       .to eq([ [ :keyreq, :kind ], [ :keyreq, :section ], [ :keyreq, :rung ], [ :keyreq, :locked ] ])
