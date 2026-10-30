@@ -30,15 +30,6 @@ class DailyExercise < ApplicationRecord
     where(date: ...date).where("plan_notes ? 'size'").order(date: :desc).pick(Arel.sql("(plan_notes->>'size')::integer"))
   end
 
-  def code_review       = problem_set["code_review"]&.with_indifferent_access
-  def pattern            = problem_set["pattern"]&.with_indifferent_access
-  def challenge          = problem_set["challenge"]&.with_indifferent_access
-  def architecture       = problem_set["architecture"]&.with_indifferent_access
-  def security_review    = problem_set["security_review"]&.with_indifferent_access
-  def parsons_problem    = problem_set["parsons_problem"]&.with_indifferent_access
-  def plan_review        = problem_set["plan_review"]&.with_indifferent_access
-  def ambiguity_hunt     = problem_set["ambiguity_hunt"]&.with_indifferent_access
-
   def coverage_shown
     plan_notes["coverage_reason"] if active_section_keys.include?(plan_notes["coverage"])
   end

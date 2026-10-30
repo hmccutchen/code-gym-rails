@@ -168,8 +168,8 @@ RSpec.describe PreviewSeed do
       user = PreviewSeed.run!
       exercise = user.daily_exercises.find_by(date: Date.current)
 
-      expect(exercise.architecture).to be_present
-      expect(exercise.challenge).to be_nil
+      expect(exercise.problem_set["architecture"]).to be_present
+      expect(exercise.problem_set["challenge"]).to be_nil
     end
 
     it "seeds a reviewed day so the AI-review partial is reachable" do
@@ -179,7 +179,7 @@ RSpec.describe PreviewSeed do
       expect(response).to be_submitted
       expect(response).to be_reviewed
       expect(response.section_ratings).to eq("code_review" => "right_level", "pattern" => "right_level", "challenge" => "right_level")
-      expect(response.daily_exercise.challenge).to be_present
+      expect(response.daily_exercise.problem_set["challenge"]).to be_present
     end
 
     it "records which provider wrote the seeded review, as every real review does" do
