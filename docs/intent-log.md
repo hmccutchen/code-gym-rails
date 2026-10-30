@@ -404,3 +404,45 @@ data.*
   each retry path records
 - the grader starts with code review, gated on its read and token cost;
   drafted kinds join later `#611 open`
+
+## Thu Oct 29
+
+- a security_review snippet that is missing or past 40 lines refused at
+  ingest `#619`
+  **why:** its prompt asks for about 10 to 15 lines, but nothing checked the
+  reply, so a snippet of any length, or none, shipped
+  **I decided:** share code_review's 40-line cap rather than a tighter one
+  of its own, since nothing measures what providers return; after the
+  reviews, share only the usable-text test across the three kinds, each
+  kind keeping its own refusals
+- a concept's Learn page shows its explanation, guide and pitfalls again
+  when its stored lesson is the string "None" `#620`
+  **why:** four production references stored "None", which counted as a
+  lesson, so their pages hid everything but the tagline, code and senior
+  lens, and offered no way to write a lesson
+  **I decided:** after an explanation of each option with a real example,
+  both a read-side guard, so a stored value with nothing to show counts as
+  no lesson, and a one-time migration clearing every lesson that isn't an
+  object
+- the nav lined up with the page column from 800 to 899px `#621`
+  **why:** below 900px the nav ran full width while the page stopped at
+  800px, so the brand sat up to 50px left of the content
+  **I decided:** after a probe showed no link overflowing at any text size,
+  cap the nav at the page column less the side insets, so it lines up with
+  a landscape notch too
+- code review can show 2–3 files at higher rungs, built with its weight at 0
+  `#622`
+  **why:** a code review shouldn't need its own kind to show a change across
+  files
+  **I decided:** a shape of code review, not a new kind; junior 1 file,
+  mid-level 2, senior and principal 2–3; half of non-RealSource days once on;
+  after the reviews, the judge line waits for launch B, the key checks the
+  files now, and KeyQuote's whole-file search waits for its caller
+- a multi-file code review's check made safe to run twice, keeping the
+  provider's quoted lines beside the line numbers they resolve to
+  `#624`
+  **why:** the check overwrote the quotes with line numbers, so a second
+  run would refuse a good section
+  **I decided:** keep the two in separate fields rather than accept
+  numbers as already resolved, so a provider can never skip the quote
+  match by sending numbers

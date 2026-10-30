@@ -3,8 +3,10 @@ require "rails_helper"
 RSpec.describe ExerciseSection do
   it "names only code fields that appear in each kind's schema, since any other name would go unformatted silently" do
     described_class.all.each do |kind|
+      fragments = [ 1..1, 2..3 ].map { |file_range| kind.schema_fragment(label: "Ruby", file_range: file_range) }.join
+
       kind.code_fields.each do |field|
-        expect(kind.schema_fragment(label: "Ruby")).to include(%("#{field}")), "#{kind.key}: #{field}"
+        expect(fragments).to include(%("#{field}")), "#{kind.key}: #{field}"
       end
     end
   end
@@ -673,12 +675,20 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".usable_text?" do
+    it "accepts only a string with something besides whitespace, for the kinds' own boundary checks" do
+      expect(described_class.private_methods).to include(:usable_text?)
+      expect(ExerciseSection::CodeReview.respond_to?(:usable_text?)).to be(false)
+      expect([ "x", nil, "  \n ", 42 ].map { |value| described_class.send(:usable_text?, value) }).to eq([ true, false, false, false ])
+    end
+  end
+
   describe ".reject_unusable!" do
     it "leaves a section of a kind with nothing to refuse untouched" do
       section = { "question" => "" }
 
       (described_class.all - [ ExerciseSection::AmbiguityHunt, ExerciseSection::PseudocodeToCode, ExerciseSection::CodeReview,
-                               ExerciseSection::DesignComparison ]).each do |kind|
+                               ExerciseSection::SecurityReview, ExerciseSection::DesignComparison ]).each do |kind|
         expect { kind.reject_unusable!(section) }.not_to change { section }
       end
     end

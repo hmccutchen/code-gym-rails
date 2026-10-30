@@ -1,0 +1,1 @@
+- This section replaces one that was turned down. Its concept must be exactly `service_objects`, which the day's plan already placed here. It was turned down because it had the wrong number of files, or a single code snippet where files were asked for. Write a new section for the same concept.

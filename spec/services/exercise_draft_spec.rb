@@ -96,6 +96,36 @@ RSpec.describe ExerciseDraft do
     expect(lines.sole).to start_with("[planted_key] answer_key=ok kind=code_review language=ruby_rails attempt=retry code_review_mode=schema_review")
   end
 
+  describe "the planned code_review file range" do
+    let(:ranges) { [] }
+
+    before do
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).and_return(:multi)
+      allow(ProblemSetIngest).to receive(:call).and_wrap_original do |original, *args, **options|
+        ranges << options.fetch(:code_review_files)
+        original.call(*args, **options)
+      end
+      user.update!(skill_level: "mid_level")
+    end
+
+    it "holds the draft to the range its rung gives a multi-file day" do
+      described_class.call(user, language: "ruby_rails", provider: provider)
+
+      expect(ranges).to eq([ 2..2 ])
+    end
+
+    it "holds a retry to the same range as its draft" do
+      user.update!(section_kind_levels: { "code_review" => "senior" })
+      draft = described_class.call(user, language: "ruby_rails", provider: provider)
+      reply.replace("code_review" => CodeReviewMultiFile::SECTION.deep_dup)
+
+      section = described_class.retry_section(draft, ExerciseSection::CodeReview, "n_plus_one", provider: provider)
+
+      expect(ranges).to eq([ 2..3, 2..3 ])
+      expect(ExerciseSection::CodeReview.files(section).size).to eq(2)
+    end
+  end
+
   it "refuses an unsupported language before it plans or calls" do
     expect { described_class.call(user, language: "cobol", provider: provider) }.to raise_error(SetupError)
     expect(generated).to be_empty

@@ -112,7 +112,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
 
     def refusal_codes = %w[piece_missing piece_too_long answer_key_incomplete]
 
-    def reject_unusable!(section)
+    def reject_unusable!(section, **)
       CANONICAL_PIECES.each { |field| reject_unusable_piece!(field, section[field]) }
 
       key = section[ANSWER_KEY_FIELD]
@@ -187,7 +187,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
       GUIDANCE
     end
 
-    def schema_fragment(label:)
+    def schema_fragment(label:, **)
       <<~SCHEMA.chomp
         "design_comparison": {
             "title":    "string",
@@ -212,10 +212,6 @@ class ExerciseSection::DesignComparison < ExerciseSection
       return if shown_lines(piece) <= MAX_PIECE_LINES
 
       refuse!("piece_too_long", "Design comparison #{field} runs past #{MAX_PIECE_LINES} lines")
-    end
-
-    def usable_text?(value)
-      value.is_a?(String) && value.strip.present?
     end
 
     def code_review_overlap_line(alongside)

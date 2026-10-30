@@ -69,6 +69,24 @@ RSpec.describe FakeService do
     end
   end
 
+  describe "#generate_judged_exercise with a multi-file code review" do
+    before do
+      user.update!(skill_level: "mid_level")
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).and_return(:multi)
+      set = described_class::EXERCISE_PROBLEM_SET.merge("code_review" => CodeReviewMultiFile::SECTION)
+      stub_const("FakeService::REPLIES", described_class::REPLIES.merge("generate_exercise" => set.to_json))
+    end
+
+    it "delivers the files with their changed lines resolved to line numbers" do
+      judged = described_class.new(user.api_key).generate_judged_exercise(user, language: "ruby_rails")
+      section = judged.problem_set.fetch("code_review")
+
+      expect(judged.dropped_sections).to be_empty
+      expect(ExerciseSection::CodeReview.files(section).map(&:path)).to eq(%w[app/models/customer.rb app/jobs/loyalty_report_job.rb])
+      expect(section["file_1_changed_lines"]).to be_present.and(all(be_an(Integer)))
+    end
+  end
+
   describe "#review_sections" do
     it "returns ok: true for each requested section, independently gradable" do
       user_exercise = DailyExercise.create!(

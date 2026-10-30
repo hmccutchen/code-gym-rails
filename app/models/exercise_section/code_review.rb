@@ -6,22 +6,157 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   MAX_SNIPPET_LINES = RealSource::MAX_LINES
 
-  def self.key_context_fields = %w[snippet current_schema]
+  MAX_FILE_LINES = 15
+
+  MAX_PATH_LENGTH = 120
+
+  FILE_SLOTS = 1..3
+
+  FILE_PARTS = %w[path code changed].freeze
+
+  FILE_FIELDS = (FILE_PARTS + %w[changed_lines]).freeze
+
+  FILE_CODE_FIELDS = FILE_SLOTS.map { |number| "file_#{number}_code" }.freeze
+
+  MULTI_FILE_RANGES = { "junior" => 1..1, "mid_level" => 2..2, "senior" => 2..3, "principal_engineer" => 2..3 }.freeze
+
+  def self.hidden_key_line(fields:, shown:)
+    named = fields.map { |field| %("#{field}") }.to_sentence(words_connector: ", ", last_word_connector: " or ")
+    %(- "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside #{named} — ) +
+      "doing so would give away the answer before the engineer reads #{shown}. Quote the code it points at in backticks, never by line number."
+  end
+
+  HIDDEN_KEY_LINE = hidden_key_line(fields: %w[question scenario teaching_note diagram], shown: "the snippet").freeze
+
+  ANSWER_KEY_SCHEMA = <<~SCHEMA.chomp
+    "answer_key": {
+          "issue":          "string — what is wrong and where, quoting the code in backticks",
+          "why_it_matters": "string — what goes wrong because of it in this code",
+          "fix":            "string — a fix that works as written"
+        }
+  SCHEMA
+
+  def self.file_range(files:, rung:)
+    files == :multi ? MULTI_FILE_RANGES.fetch(rung, MULTI_FILE_RANGES.fetch("junior")) : 1..1
+  end
+
+  def self.day_file_range(plan:, difficulty:, skill_level:)
+    file_range(files: plan.code_review_files, rung: difficulty.rung_for(self, skill_level: skill_level))
+  end
+
+  def self.key_context_fields = [ "snippet", "current_schema", *FILE_CODE_FIELDS ]
 
   def self.quoted_key_texts(key) = [ key&.dig("issue") ]
 
   def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
 
-  def self.refusal_codes = %w[snippet_missing snippet_too_long]
+  def self.refusal_codes = %w[snippet_missing snippet_too_long file_count_wrong file_incomplete file_too_long path_invalid
+                              changed_lines_unresolved]
 
-  def self.reject_unusable!(section)
+  def self.files(section)
+    FILE_SLOTS.filter_map do |number|
+      path, code, = file_parts(section, number)
+      next unless usable_text?(path) && usable_text?(code)
+
+      lines = section["file_#{number}_changed_lines"]
+      File.new(path: path, code: code, changed: list_of?(lines, Integer) ? lines : [])
+    end
+  end
+
+  def self.files_context(section) = files(section).map(&:prompt_text).join("\n").presence
+
+  def self.reject_unusable!(section, language: nil, file_range: 1..1, **)
+    if file_range.max == 1
+      reject_unusable_snippet!(section)
+      return drop_file_fields!(section)
+    end
+
+    raise ArgumentError, "missing keyword: :language" if language.nil?
+
+    FILE_SLOTS.each { |number| reject_incomplete_file!(section, number) }
+    shown = files(section)
+    reject_wrong_file_count!(section, shown.size, file_range)
+    reject_long_files!(shown)
+    reject_invalid_paths!(shown)
+    resolve_changed_lines!(section, language)
+    drop_absent_files!(section)
+  end
+
+  def self.reject_unusable_snippet!(section)
     snippet = section["snippet"]
-    refuse!("snippet_missing", "Code review returned no usable snippet") unless snippet.is_a?(String) && snippet.strip.present?
+    refuse!("snippet_missing", "Code review returned no usable snippet") unless usable_text?(snippet)
 
     lines = shown_lines(snippet)
     return if lines <= MAX_SNIPPET_LINES
 
     refuse!("snippet_too_long", "Code review snippet runs #{lines} lines, past #{MAX_SNIPPET_LINES}")
+  end
+
+  def self.reject_incomplete_file!(section, number)
+    path, code, changed = file_parts(section, number)
+    given = [ path, code ].reject(&:nil?)
+    complete = given.empty? || (given.size == 2 && given.all? { |text| usable_text?(text) })
+    return if complete && (changed.nil? || list_of?(changed, String))
+
+    refuse!("file_incomplete", "Code review file #{number} is incomplete or has a field of the wrong type")
+  end
+
+  def self.reject_wrong_file_count!(section, count, file_range)
+    return if section["snippet"].nil? && file_range.cover?(count)
+
+    refuse!("file_count_wrong", "Code review has #{count} complete files and #{section["snippet"].nil? ? 'no' : 'a'} snippet, " \
+                                "where #{file_range.min} to #{file_range.max} files were asked for")
+  end
+
+  def self.reject_long_files!(shown)
+    counts = shown.map { |file| shown_lines(file.code) }
+    longest = counts.max.to_i
+    refuse!("file_too_long", "A code review file runs #{longest} lines, past #{MAX_FILE_LINES}") if longest > MAX_FILE_LINES
+    return if counts.sum <= MAX_SNIPPET_LINES
+
+    refuse!("file_too_long", "Code review files run #{counts.sum} lines together, past #{MAX_SNIPPET_LINES}")
+  end
+
+  def self.reject_invalid_paths!(shown)
+    longest = shown.map { |file| file.path.length }.max.to_i
+    refuse!("path_invalid", "A code review path runs #{longest} characters, past #{MAX_PATH_LENGTH}") if longest > MAX_PATH_LENGTH
+    return if shown.map(&:path).uniq.size == shown.size
+
+    refuse!("path_invalid", "Two code review files share a path")
+  end
+
+  def self.resolve_changed_lines!(section, language)
+    resolved = FILE_SLOTS.to_h do |number|
+      _, code, changed = file_parts(section, number)
+      lines = usable_text?(code) ? Array(changed).filter_map { |quote| KeyQuote.line(code, quote, language: language) } : []
+      [ number, lines.flat_map(&:to_a).uniq.sort ]
+    end
+    refuse!("changed_lines_unresolved", "No code review file has a changed line its quotes resolve to") if resolved.values.all?(&:empty?)
+
+    resolved.each { |number, lines| section["file_#{number}_changed_lines"] = lines if usable_text?(section["file_#{number}_code"]) }
+  end
+
+  def self.drop_absent_files!(section)
+    FILE_SLOTS.each do |number|
+      path, code, = file_parts(section, number)
+      FILE_FIELDS.each { |part| section.delete("file_#{number}_#{part}") } if path.nil? && code.nil?
+    end
+  end
+
+  def self.drop_file_fields!(section)
+    FILE_SLOTS.each { |number| FILE_FIELDS.each { |part| section.delete("file_#{number}_#{part}") } }
+  end
+
+  def self.file_parts(section, number) = FILE_PARTS.map { |part| section["file_#{number}_#{part}"] }
+
+  def self.list_of?(value, type) = value.is_a?(Array) && value.all?(type)
+
+  private_class_method :reject_unusable_snippet!, :reject_incomplete_file!, :reject_wrong_file_count!, :reject_long_files!,
+                       :reject_invalid_paths!, :resolve_changed_lines!, :drop_absent_files!, :drop_file_fields!, :file_parts,
+                       :list_of?
+
+  def self.arrange!(section)
+    section.delete("diagram") if files(section).any?
   end
 
   def self.diagrammable?
@@ -45,7 +180,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   end
 
   def self.code_fields
-    %w[snippet]
+    [ "snippet", *FILE_CODE_FIELDS ]
   end
 
   def self.prose_fields
@@ -53,12 +188,16 @@ class ExerciseSection::CodeReview < ExerciseSection
   end
 
   # A RealSource excerpt's own instruction replaces the mode's toy line.
-  def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, **)
-    <<~GUIDANCE.chomp
-      #{source ? source.instruction : content_instruction(label, mode, artifact, test_framework)}
-      - Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
-      - "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "question", "scenario", "teaching_note" or "diagram" — doing so would give away the answer before the engineer reads the snippet. Quote the code it points at in backticks, never by line number.
-    GUIDANCE
+  def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil,
+                               file_range: 1..1, code_style: nil, **)
+    vocabulary_line = "- Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}"
+    if file_range.max > 1
+      return MultiFile.guidance(file_range: file_range, label: label, mode: mode, artifact: artifact, test_framework: test_framework,
+                                rung: rung, code_style: code_style, vocabulary: vocabulary,
+                                shared_lines: [ vocabulary_line, MultiFile::HIDDEN_KEY_LINE ])
+    end
+
+    [ source ? source.instruction : content_instruction(label, mode, artifact, test_framework), vocabulary_line, HIDDEN_KEY_LINE ].join("\n")
   end
 
   def self.content_instruction(label, mode, artifact, test_framework)
@@ -74,7 +213,9 @@ class ExerciseSection::CodeReview < ExerciseSection
   private_class_method :content_instruction
 
   # Keep the snippet's language out of here: the instruction line above is its one authoritative statement.
-  def self.schema_fragment(label:)
+  def self.schema_fragment(label:, file_range: 1..1, **)
+    return MultiFile.schema_fragment(file_range: file_range, answer_key: ANSWER_KEY_SCHEMA) if file_range.max > 1
+
     <<~SCHEMA.chomp
       "code_review": {
           "question": "string — what to find/fix",
@@ -83,11 +224,7 @@ class ExerciseSection::CodeReview < ExerciseSection
           "concept": "string — exactly one concept from the provided vocabulary",
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help",
-          "answer_key": {
-            "issue":          "string — what is wrong and where, quoting the code in backticks",
-            "why_it_matters": "string — what goes wrong because of it in this code",
-            "fix":            "string — a fix that works as written"
-          }
+          #{ANSWER_KEY_SCHEMA}
         }
     SCHEMA
   end
@@ -100,7 +237,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.review_context(section:, answer:, rating:)
     [
       "Code Review question: #{section["question"]}",
-      "Code snippet: #{section["snippet"]}",
+      files_context(section) || "Code snippet: #{section["snippet"]}",
       current_schema_lines(section["current_schema"]),
       answer_lines(answer, rating)
     ].compact.join("\n")

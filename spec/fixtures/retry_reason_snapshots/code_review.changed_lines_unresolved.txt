@@ -1,0 +1,1 @@
+- This section replaces one that was turned down. Its concept must be exactly `service_objects`, which the day's plan already placed here. It was turned down because none of its quoted changed lines matched exactly one line of its file. Write a new section for the same concept.

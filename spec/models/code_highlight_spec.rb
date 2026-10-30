@@ -117,4 +117,44 @@ RSpec.describe CodeHighlight do
       expect(html("x = 2")).to include("2")
     end
   end
+
+  describe ".html with changed lines" do
+    let(:code) { "def total(items)\n  items.sum(&:price) # cents\n\nend" }
+
+    # Recorded before changed: existed, so a caller that passes none gets the same bytes.
+    let(:unchanged_html) do
+      %(<span class="code-line" style="--indent: 0"><span class="k">def</span> <span class="nf">total</span><span class="p">(</span><wbr><span class="n">items</span><span class="p">)</span></span>) +
+        %(<span class="code-line" style="--indent: 2">  <span class="n">items</span><span class="p">.</span><wbr><span class="nf">sum</span><span class="p">(</span><wbr><span class="o">&amp;</span><span class="ss">:price</span><span class="p">)</span> <span class="c1"># cents</span></span>) +
+        %(<span class="code-line" style="--indent: 0">\n</span><span class="code-line" style="--indent: 0"><span class="k">end</span></span>)
+    end
+
+    it "renders the same bytes as before when no line is changed" do
+      described_class::CACHE.clear
+
+      expect(described_class.html(code, lexer: "ruby")).to eq(unchanged_html)
+      expect(described_class.html(code, lexer: "ruby", changed: [])).to eq(unchanged_html)
+    end
+
+    it "marks each changed line by its 1-based number and changes nothing else" do
+      markup = described_class.html(code, lexer: "ruby", changed: [ 4, 2 ])
+
+      expect(lines(markup).map { |line| line["class"] }).to eq([ "code-line", "code-line code-line-changed", "code-line", "code-line code-line-changed" ])
+      expect(markup.gsub(" code-line-changed", "")).to eq(unchanged_html)
+    end
+
+    it "ignores a number past the last line" do
+      expect(lines(described_class.html(code, lexer: "ruby", changed: [ 9 ])).map { |line| line["class"] }.uniq).to eq([ "code-line" ])
+    end
+
+    it "keys the cache on the changed lines, in any order" do
+      described_class::CACHE.clear
+      plain = described_class.html(code, lexer: "ruby")
+      marked = described_class.html(code, lexer: "ruby", changed: [ 2, 1 ])
+
+      expect(marked).not_to eq(plain)
+      expect(Rouge::Lexers::Ruby).not_to receive(:new)
+      expect(described_class.html(code, lexer: "ruby", changed: [ 1, 2 ])).to eq(marked)
+      expect(described_class.html(code, lexer: "ruby")).to eq(plain)
+    end
+  end
 end

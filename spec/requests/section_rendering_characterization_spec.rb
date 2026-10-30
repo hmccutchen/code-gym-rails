@@ -212,6 +212,34 @@ RSpec.describe "section rendering", type: :request do
     end
   end
 
+  describe "a multi-file code review" do
+    let(:files) do
+      { "file_1_path" => "app/models/cr_order.rb", "file_1_code" => "cr_order_a = 1\ncr_order_b = 2\ncr_order_c = 3",
+        "file_1_changed_lines" => [ 2, 3 ],
+        "file_2_path" => "app/models/cr_item.rb", "file_2_code" => "cr_item_a = 1", "file_2_changed_lines" => [] }
+    end
+    let(:exercise) do
+      code_review = PAYLOADS.fetch("code_review").except("snippet").merge(files)
+      DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                            problem_set: { "code_review" => code_review, "pattern" => PAYLOADS.fetch("pattern") })
+    end
+
+    def file_pieces = Nokogiri::HTML(response.body).css("details.comparison-piece[open]")
+
+    it "shows each file open under its path, with its changed lines marked and named, in every render" do
+      [ -> { exercise and get root_path }, -> { submit!(exercise) and get root_path }, -> { get history_path } ].each do |render|
+        render.call
+
+        expect(file_pieces.map { |piece| piece.at_css("summary").text.strip })
+          .to eq([ "app/models/cr_order.rb — changed lines 2–3", "app/models/cr_item.rb" ])
+        expect(file_pieces.first.css(".code-line-changed").map(&:text)).to eq([ "cr_order_b = 2", "cr_order_c = 3" ])
+        expect(file_pieces.last.css(".code-line-changed")).to be_empty
+        expect(page_text).to include("cr_item_a = 1")
+        %w[CR-SECRET-ISSUE CR-SECRET-WHY CR-SECRET-FIX].each { |secret| expect(response.body).not_to include(secret) }
+      end
+    end
+  end
+
   describe "a reviewed, tagged day that offers the short version" do
     let(:exercise) { exercise_for(:challenge, :plan_review) }
 

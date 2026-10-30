@@ -33,7 +33,7 @@ class ExerciseSection::Architecture < ExerciseSection
     GUIDANCE
   end
 
-  def self.schema_fragment(label:)
+  def self.schema_fragment(label:, **)
     <<~SCHEMA.chomp
       "architecture": {
           "title":     "string — short name for the decision",

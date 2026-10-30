@@ -1,5 +1,10 @@
 # Spec: `change_review`, a review of a small change across 2–3 files (2026-10-27)
 
+**Superseded on 2026-10-29.** No `change_review` kind will be built. The
+multi-file review became a shape of `code_review` instead; see
+`docs/decisions/multi-file-code-review.md`. This file is kept as the record of
+the earlier proposal, and nothing below is current.
+
 Checked against origin/main at `056b9dc`. Not built yet. The build waits
 until the stored answer keys build (`docs/stored-answer-keys-spec-2026-10-27.md`)
 has merged, because this kind reuses its `answer_key` field and its quote

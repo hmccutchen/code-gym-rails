@@ -6,7 +6,7 @@ written. `ProblemSetIngest#format_code!` passes each kind's
 `.code_fields` (code review and security review snippets, challenge
 starter code, design comparison pieces) through `CodeFormat.all` in the
 day's language, before the boundary checks, so a bound such as
-`MAX_PIECE_LINES` or `CodeReview::MAX_SNIPPET_LINES` applies to the code as shown, and the page, grader,
+`MAX_PIECE_LINES` or the snippet cap `CodeReview::MAX_SNIPPET_LINES` (shared by `SecurityReview`) applies to the code as shown, and the page, grader,
 judge and duck all read the same layout. Ruby goes through RuboCop's
 `Layout` cops in process (`CodeFormat::Ruby`), which move whitespace and
 nothing else, so a planted defect survives token for token; a spec holds

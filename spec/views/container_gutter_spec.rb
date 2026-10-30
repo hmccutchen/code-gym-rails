@@ -17,6 +17,15 @@ RSpec.describe "container gutter" do
     expect(container_rules.first.declaration("padding")).to eq("0 var(--container-pad-right) 0 var(--container-pad-left)")
   end
 
+  it "caps the nav row at the plain column's cap less both side insets, and measures the collapse inside it" do
+    expect(container_rules.map { |rule| rule.declaration("--container-max") }).to eq(%w[800px 920px])
+    expect(container_rules.first.declaration("max-width")).to eq("var(--container-max)")
+
+    inner = layout.find { |rule| rule.selectors == [ "nav .inner" ] && rule.media.empty? }
+    expect(inner.declaration("max-width")).to eq("calc(var(--container-max) - env(safe-area-inset-left) - env(safe-area-inset-right))")
+    expect(inner.declaration("container-type")).to eq("inline-size")
+  end
+
   it "offsets .phone-page by .container's gutter properties instead of a copy of their values" do
     margins = phone_cards.select { |rule| rule.selectors.include?(".phone-page") }.filter_map { |rule| rule.declaration("margin-left") }
 

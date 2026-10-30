@@ -70,6 +70,9 @@ an unusable section (a habit without its catch included) rather than
 failing the call; the lesson sits outside the required fields like the
 guide and ladder. A tradeoff concept's habits are options, each with what
 it costs. `PLAIN_LANGUAGE_STANDARD` covers the lesson as well as the guide.
+A stored lesson counts only when `ConceptLesson.from_provider` still finds a
+part to show in it (`ConceptReference#usable_lesson`, #558), so a bad value in
+the column reads as no lesson rather than hiding the page's prose.
 A row with a lesson shows it in place of the explanation, the plain-language
 guide and the pitfalls, which it covers in less space; the tagline stays.
 The code example and worked example fold under "Code examples", and the

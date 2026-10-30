@@ -3,7 +3,7 @@ module GenerationPromptHelpers
     daily_kinds: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review },
     reinforcement: [], due_checks: [], established: [],
     fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
-    code_review_mode: :application_code, code_review_source: nil, scenario_flavor: :general,
+    code_review_mode: :application_code, code_review_source: nil, code_review_files: :single, scenario_flavor: :general,
     shared_concept: nil, coverage: nil, waiting_checks: nil, size: nil
   }.freeze
 

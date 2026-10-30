@@ -62,7 +62,7 @@ class ExerciseSection::PlanReview < ExerciseSection
     GUIDANCE
   end
 
-  def self.schema_fragment(label:)
+  def self.schema_fragment(label:, **)
     <<~SCHEMA.chomp
       "plan_review": {
           "title":    "string — short name for the plan/decision under review",

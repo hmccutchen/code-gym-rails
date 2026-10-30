@@ -68,7 +68,15 @@ read it before changing that area.
   Ruby `application_code` or `schema_review` day may be grounded in a
   `RealSource` excerpt; `test_file` has no pool. Ingest stamps the server's
   own `scenario` and `source`, plus `current_schema` for a migration excerpt,
-  and `RealSource` entries are appended, never inserted.
+  and `RealSource` entries are appended, never inserted. A multi-file day
+  (`docs/decisions/multi-file-code-review.md`)
+  shows 2 or 3 files (`file_N_path`, `file_N_code`, `file_N_changed` quotes,
+  resolved into the server's `file_N_changed_lines`) in
+  place of the snippet and diagram, in a range `CodeReview.file_range` sets
+  from `DailyPlan::Result#code_review_files` and the rung, and a range of one
+  keeps today's prompt byte for byte. `GenerationPrompt` passes the range to
+  every kind as `file_range:`, and `ExerciseDraft` hands the same range to
+  ingest, whose `.reject_unusable!` refuses a section outside it.
 - **Design comparison, the second fixed section**
   (`docs/decisions/design-comparison-the-second-fixed-section.md`): The second
   default daily kind (`ExerciseSection::DesignComparison`): two working pieces that
@@ -141,11 +149,11 @@ read it before changing that area.
   `ProblemSetIngest#format_code!` runs each kind's `.code_fields` through
   `CodeFormat.all` once, before the boundary checks, so bounds and every
   reader see the shown layout, such as the `code_review` snippet's cap
-  (`CodeReview::MAX_SNIPPET_LINES`, which is `RealSource::MAX_LINES`): a longer
-  snippet is refused, never cut, and design comparison's piece bound counts
-  lines the same way (`ExerciseSection.shown_lines`). Ruby uses
-  whitespace-only RuboCop `Layout` cops so a planted defect survives;
-  JavaScript uses Prettier. Unparseable code or a formatter that cannot run
+  (`CodeReview::MAX_SNIPPET_LINES`, which is `RealSource::MAX_LINES` and
+  which `SecurityReview` shares): a longer snippet is refused, never cut,
+  and design comparison's piece bound counts lines the same way
+  (`ExerciseSection.shown_lines`). Ruby uses whitespace-only RuboCop
+  `Layout` cops so a planted defect survives; JavaScript uses Prettier. Unparseable code or a formatter that cannot run
   comes back unchanged, and Parsons blocks are never formatted.
 - **Stored answer keys** (`docs/decisions/stored-answer-keys.md`):
   `code_review`, `security_review`, `plan_review` and `pseudocode_to_code`

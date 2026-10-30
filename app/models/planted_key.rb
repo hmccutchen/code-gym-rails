@@ -24,17 +24,18 @@ module PlantedKey
   end
 
   # A text with no quote at all counts as one miss: the key is asked to quote, so a paraphrase is a lead to read.
-  def self.unquoted_parts(texts, within:)
-    shown = unspaced(within.compact.join)
+  def self.unquoted_parts(texts, within:, language:)
+    shown = KeyQuote.normalize(within.compact.join, language: language)
     texts.compact.flat_map do |text|
       quotes = text.scan(QUOTE).flatten
       next [ text ] if quotes.empty?
 
-      quotes.select { |quote| unspaced(quote).length >= MIN_QUOTE_LENGTH && shown.exclude?(unspaced(quote)) }
+      quotes.select do |quote|
+        wanted = KeyQuote.normalize(quote, language: language)
+        wanted.length >= MIN_QUOTE_LENGTH && shown.exclude?(wanted)
+      end
     end
   end
-
-  def self.unspaced(text) = text.gsub(/\s+/, "")
 
   def self.store!(section, cleaned)
     cleaned ? section[FIELD] = cleaned : section.delete(FIELD)

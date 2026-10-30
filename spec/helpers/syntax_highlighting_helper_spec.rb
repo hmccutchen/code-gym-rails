@@ -10,6 +10,14 @@ RSpec.describe SyntaxHighlightingHelper, type: :helper do
       expect(code.css(".nb, .mi")).not_to be_empty
     end
 
+    it "passes changed lines through, and renders as before without them" do
+      marked = Nokogiri::HTML.fragment(helper.highlighted_code("a = 1\nb = 2", "ruby_rails", changed: [ 2 ]))
+
+      expect(marked.css(".code-line-changed").map(&:text)).to eq([ "b = 2" ])
+      expect(helper.highlighted_code("a = 1\nb = 2", "ruby_rails"))
+        .to eq(helper.content_tag(:code, CodeHighlight.html("a = 1\nb = 2", lexer: "ruby"), class: "highlight"))
+    end
+
     it "leaves no hook for a browser highlighter" do
       expect(helper.highlighted_code("puts 1", "ruby_rails")).not_to include("data-hljs")
     end

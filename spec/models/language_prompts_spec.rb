@@ -19,6 +19,16 @@ RSpec.describe LanguagePrompts do
     end
   end
 
+  describe "code_style" do
+    it "asks JavaScript for Prettier's style, since KeyQuote undoes only Prettier's rewrites" do
+      expect(described_class::ALL["javascript"][:code_style]).to include("Prettier's style", "semicolons", "double quotes")
+    end
+
+    it "is absent for Ruby, whose formatter only re-indents" do
+      expect(described_class::ALL["ruby_rails"][:code_style]).to be_nil
+    end
+  end
+
   it "raises a setup problem, not a provider failure, on an unsupported language" do
     expect { described_class.for("mixed") }.to raise_error(SetupError, /Unsupported generation language: "mixed"/)
   end

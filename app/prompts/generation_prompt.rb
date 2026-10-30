@@ -85,7 +85,7 @@ class GenerationPrompt
   def schema_for(kinds)
     label = config[:label]
 
-    sections = kinds.map { |kind| kind.schema_fragment(label: label) }
+    sections = kinds.map { |kind| kind.schema_fragment(label: label, file_range: code_review_file_range) }
                     .join(",\n  ")
 
     <<~SCHEMA
@@ -96,6 +96,10 @@ class GenerationPrompt
   end
 
   def config = LanguagePrompts.for(@language)
+
+  def code_review_file_range
+    ExerciseSection::CodeReview.day_file_range(plan: @plan, difficulty: @difficulty, skill_level: @user.skill_level)
+  end
 
   def kinds_for(only)
     only ? [ only ] : @plan.kinds
@@ -259,7 +263,9 @@ class GenerationPrompt
       test_framework: language_config[:test_framework],
       source:         source,
       rung:           rung,
-      alongside:      alongside
+      alongside:      alongside,
+      file_range:     code_review_file_range,
+      code_style:     language_config[:code_style]
     )
   end
 end
