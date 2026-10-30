@@ -317,6 +317,14 @@ wrapped continuation starts two columns past that indentation.
 then shows as one space while the rest stays in the text, so a copy keeps the
 original line.
 
+A multi-file code review's `pre.snippet.numbered` numbers each line in a gutter
+three columns wide: two digits and a space, which `MAX_FILE_LINES` stays within (`code_review_spec` holds it). The number is a CSS counter on
+`.code-line::before`, placed left of the line's box, so the hanging indent and
+the wrap padding never move it and a copy never includes it. The second
+`content` declaration hides the number from screen readers, and a browser that
+can't read it keeps the first. The numbers match the ones the prompts show,
+so a review that cites "line 4" points at a numbered line (#634).
+
 ## `.plan-excerpt`
 
 Plan-review excerpts are prose, so they get a left-border quote block instead

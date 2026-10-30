@@ -294,6 +294,7 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
 
       expect(described_class.review_context(section: section, answer: "The total.", rating: "right_level")).to eq(<<~CONTEXT.chomp)
         Code Review question: What breaks?
+        The page numbers each file's lines the way they are numbered here. The "N | " before each line is not part of the code, so never copy it into code you write.
         File: app/models/order.rb
         Changed lines: 2
         1 | a = 1
@@ -307,6 +308,22 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
         </engineer_text>
         Their self-rating: right_level
       CONTEXT
+    end
+  end
+
+  it "keeps a file short enough for the page's two-digit line-number gutter" do
+    expect(described_class::MAX_FILE_LINES.to_s.length).to be <= 2
+  end
+
+  describe ".judge_attachment" do
+    it "numbers the files without the note on copying code, since the judge writes none" do
+      section = { "file_1_path" => "app/models/order.rb", "file_1_code" => "a = 1", "file_1_changed_lines" => [ 1 ],
+                  "file_2_path" => "app/models/item.rb", "file_2_code" => "c = 3", "file_2_changed_lines" => [] }
+
+      attachment = described_class.judge_attachment(section)
+
+      expect(attachment).to include("1 | a = 1")
+      expect(attachment).not_to include("never copy")
     end
   end
 

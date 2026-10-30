@@ -13,7 +13,7 @@
   <% label = changed_lines_label(file.changed) %>
   <details class="comparison-piece" open>
     <summary><span class="file-summary"><%= file.path %><%= " — #{label}" if label.present? %></span></summary>
-    <pre class="snippet"><%= highlighted_code(file.code, exercise.language, changed: file.changed) %></pre>
+    <pre class="snippet numbered"><%= highlighted_code(file.code, exercise.language, changed: file.changed) %></pre>
   </details>
 <% end %>
 <% end %>

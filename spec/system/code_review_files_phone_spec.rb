@@ -43,6 +43,37 @@ RSpec.describe "A multi-file code review on a phone", type: :system do
     end
   end
 
+  def gutter_numbers
+    page.evaluate_script(<<~JS)
+      [...document.querySelectorAll("details.comparison-piece")[1].querySelectorAll(".code-line")].map((line) => {
+        const counter = getComputedStyle(line, "::before")
+        return counter.content === "none" ? null : line.getBoundingClientRect().left - parseFloat(counter.left) > 0
+      })
+    JS
+  end
+
+  def copied_text
+    page.evaluate_script(<<~JS)
+      (() => {
+        const range = document.createRange()
+        range.selectNodeContents(document.querySelectorAll("details.comparison-piece")[1].querySelector("code"))
+        getSelection().removeAllRanges()
+        getSelection().addRange(range)
+        return getSelection().toString()
+      })()
+    JS
+  end
+
+  it "numbers every line in a gutter left of the code, and copies the code without the numbers" do
+    travel_to(a_weekday) do
+      open_dashboard(create_fake_provider_user)
+
+      expect(gutter_numbers).to eq([ true, true, true ])
+      expect(copied_text).to eq("def price\n  0\nend")
+      expect(sideways_overflow).to eq(0)
+    end
+  end
+
   it "wraps a long path with no spaces instead of scrolling sideways" do
     long_path = "app/services/#{"subscription_renewal" * 5}.rb"
     files["file_2_path"] = long_path

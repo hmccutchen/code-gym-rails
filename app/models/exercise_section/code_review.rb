@@ -65,12 +65,18 @@ class ExerciseSection::CodeReview < ExerciseSection
     end
   end
 
-  def self.files_context(section) = files(section).map(&:prompt_text).join("\n").presence
+  NUMBERED_FILES_NOTE = "The page numbers each file's lines the way they are numbered here. " \
+                        "The \"N | \" before each line is not part of the code, so never copy it into code you write."
+
+  def self.files_context(section) = numbered_files(section)&.then { |files| "#{NUMBERED_FILES_NOTE}\n#{files}" }
+
+  def self.numbered_files(section) = files(section).map(&:prompt_text).join("\n").presence
+  private_class_method :numbered_files
 
   def self.judge_hidden_fields = FILE_SLOTS.flat_map { |number| FILE_FIELDS.map { |field| "file_#{number}_#{field}" } }
 
   def self.judge_attachment(section)
-    files = files_context(section)
+    files = numbered_files(section)
     "The section's files, every line numbered, with \"Changed lines\" naming the lines the page marks as the change:\n#{files}" if files
   end
 
