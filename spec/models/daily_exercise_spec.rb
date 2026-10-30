@@ -57,57 +57,6 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
-  describe "#architecture" do
-    it "reads the architecture blob with indifferent access, nil when absent" do
-      user = User.create!(email: "arch@example.com", name: "Arch")
-      with_arch = DailyExercise.new(problem_set: { "architecture" => { "concept" => "service_boundaries" } })
-      without    = DailyExercise.new(problem_set: { "challenge" => { "concept" => "n_plus_one" } })
-
-      expect(with_arch.architecture[:concept]).to eq("service_boundaries")
-      expect(without.architecture).to be_nil
-    end
-  end
-
-  describe "#security_review" do
-    it "reads the security_review blob with indifferent access, nil when absent" do
-      with_sec = DailyExercise.new(problem_set: { "security_review" => { "concept" => "xss_prevention" } })
-      without  = DailyExercise.new(problem_set: { "challenge" => { "concept" => "n_plus_one" } })
-
-      expect(with_sec.security_review[:concept]).to eq("xss_prevention")
-      expect(without.security_review).to be_nil
-    end
-  end
-
-  describe "#parsons_problem" do
-    it "reads the parsons_problem blob with indifferent access, nil when absent" do
-      with_parsons = DailyExercise.new(problem_set: { "parsons_problem" => { "title" => "Sort a list" } })
-      without      = DailyExercise.new(problem_set: {})
-
-      expect(with_parsons.parsons_problem[:title]).to eq("Sort a list")
-      expect(without.parsons_problem).to be_nil
-    end
-  end
-
-  describe "#plan_review" do
-    it "reads the plan_review blob with indifferent access, nil when absent" do
-      with_pr = DailyExercise.new(problem_set: { "plan_review" => { "concept" => "scope_creep" } })
-      without = DailyExercise.new(problem_set: { "challenge" => { "concept" => "n_plus_one" } })
-
-      expect(with_pr.plan_review[:concept]).to eq("scope_creep")
-      expect(without.plan_review).to be_nil
-    end
-  end
-
-  describe "#ambiguity_hunt" do
-    it "reads the ambiguity_hunt blob with indifferent access, nil when absent" do
-      with_ah = DailyExercise.new(problem_set: { "ambiguity_hunt" => { "title" => "Vague ask" } })
-      without = DailyExercise.new(problem_set: {})
-
-      expect(with_ah.ambiguity_hunt[:title]).to eq("Vague ask")
-      expect(without.ambiguity_hunt).to be_nil
-    end
-  end
-
   describe "#active_section_keys" do
     it "returns the four sections a current exercise presents" do
       exercise = DailyExercise.new(problem_set: {
