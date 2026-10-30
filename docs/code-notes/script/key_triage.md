@@ -15,15 +15,27 @@ the solve prompt, the comparison and the report.
 `.solve_prompt` renders the section through `SectionJudgePrompt.visible`, the
 judge's own strip of answer keys, server stamps and the kind's
 `.judge_hidden_fields`, so the rule for what a pre-submission call may see
-lives in one place. It also drops `concept`, which the judge sees but the
-page doesn't show on a `code_review` before review: a concept such as
-`n_plus_one` would point the solver at the flaw. The prompt text lives here
-in `script/`, so no path in the app can send it.
+lives in one place. `HIDDEN_FROM_SOLVER` drops two more fields:
 
-The solve is its own purpose, `triage_solve`. `KeySampleDrafts.service`
-routes it to the solver model, Sonnet 5.5 unless `--solver-model` names
-another model with a price in `ClaudeService::PRICE_PER_MILLION`, and keeps
-the effort of that model's existing route. The request sets no token cap,
+- `teaching_note`, which the page keeps locked until the section is
+  answered (`dashboard/_teaching_hint`) and which the generator writes as a
+  pointer to its key.
+- `concept`. The page does show it before answering, in the concept
+  reference's summary, but the generator chose that label to match its key,
+  so a solver given `n_plus_one` is steered toward the key's flaw. Hiding it
+  makes the solve stricter than the engineer's view, so agreement means more.
+
+The prompt text lives here in `script/`, so no path in the app can send it,
+and `spec/script/key_triage_spec.rb` pins it with prompt snapshots.
+
+The solve is its own purpose, `triage_solve`, kept out of
+`CallProfiles::BY_PURPOSE` because `ApiUsage::PURPOSES` must equal that
+table's keys and no usage row is ever written for it. `KeySampleDrafts.service`
+routes it to the solver model at `SOLVER_EFFORT`, `high`. The model is the
+judge's, Sonnet 5.5, unless `--solver-model` names another model on a
+`ClaudeService::MODEL_FOR_PURPOSE` route (`SOLVER_MODELS`): Haiku 4.5 is
+priced but on no route, so no effort setting has been used with it here.
+The request sets no token cap,
 since a capped call turns thinking off and Opus 5.5 has no off setting. The
 reply is parsed with `log_raw: false`, checked by `.reply` for a text
 `issue` and `fix`, and written only to the output file. The solve uses only
@@ -31,20 +43,24 @@ the owner's Anthropic key; another provider isn't built.
 
 ## The comparison
 
-`.outcome` finds each backtick quote, in the solver's `issue` and in the
+`.compare` finds each backtick quote, in the solver's `issue` and in the
 key's quoted texts (`.quoted_key_texts`), in each of the kind's
 `.key_context_fields` with `KeyQuote.find`. A quote shorter than
 `PlantedKey::MIN_QUOTE_LENGTH` once normalized is skipped, since it would
-match almost anywhere. Then:
+match almost anywhere, and `KeyQuote.find` places a quote only when the
+field holds it once. Then:
 
 - **agree:** a solver quote's line range overlaps a key quote's range in the
   same field
 - **disagree:** both sides have quotes the code holds, and none overlap
 - **unlocated:** either side has no quote the code holds
 
-`.find` returns a quote's first match, so a quote that appears twice is
-placed at its first appearance. Two quotes on the same line still overlap,
-so the cost is a rare false disagreement, which the owner reads anyway.
+A quote of three or more characters can still sit inside a longer name
+that the code holds once, and a wide quote agrees with anything inside it,
+so an agreement can be wrong. Each entry records `solver_lines` and
+`key_lines`, the lines each side's quotes landed on by field, so the owner
+sees how wide an agreeing match was and which side an unlocated section
+lacks.
 
 ## What it writes
 

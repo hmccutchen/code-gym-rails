@@ -151,8 +151,10 @@ Every run waits for the owner's approval of its call count and cost.
   context, so its prompt is built from the section with every answer-key
   field and server stamp removed, through the same step as the judge's
   prompt. A sentinel spec checks every request body. The comparison never
-  puts the key and the reply in one prompt. The reply is never stored or
-  sent on, and the prompt lives in `script/`, out of the app's reach.
+  puts the key and the reply in one prompt. The reply is never stored in
+  the database or sent to another prompt; it goes only to the key sheet
+  file outside the repository. The prompt lives in `script/`, out of the
+  app's reach.
 - **This is not the judge's blind solve.** The judge solves only design
   comparisons, live (`JudgeSolve`). This triage is an offline script, and
   turns nothing on.

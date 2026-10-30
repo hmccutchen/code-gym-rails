@@ -338,8 +338,10 @@ and the real-day read in step 3 stays PR 2's gate.
   owner's approval of those numbers first.** Like the rest of the script, it
   runs on the owner's machine against a local database, inside a read-only
   transaction, and writes no day, history or `ApiUsage` row.
-- **The solve.** One extra call per kept section. The solver gets the section
-  as an engineer sees it before submitting, and is asked for the one planted
+- **The solve.** One extra call per kept section, so at most one per draft
+  in the plan's bound, since a failed solve discards its section and
+  another draft follows. The solver gets the section as an engineer sees it
+  before answering, without the locked `teaching_note` hint, and is asked for the one planted
   issue, quoting the code it points at in backticks, and a fix. Its reply
   schema is `{ "issue", "fix" }`.
 - **The comparison is done in Ruby, never by a model.** Each backtick quote
@@ -351,7 +353,12 @@ and the real-day read in step 3 stays PR 2's gate.
     line range
   - **disagree** when the solver quotes lines that don't overlap
   - **unlocated** when either side has no quote the code contains
-- **What it writes.**
+
+  `KeyQuote.find` places a quote only when the code holds it once, so a
+  short quote such as `order` that appears several times is left
+  unplaced rather than guessed. Each entry records the lines each side's
+  quotes landed on, so the owner sees which side is unlocated and how wide
+  an agreeing match is.- **What it writes.**
   - **Terminal:** agree, disagree and unlocated counts, overall and by mode,
     with no section text.
   - **The key sheet file outside the repository:** every disagreement and
@@ -369,10 +376,11 @@ and the real-day read in step 3 stays PR 2's gate.
   The agreements are read too, to check that agreement means what it
   seems to. Only the counts go into PR 2's description.
 
-**Which model solves.** Any Claude model with a price in
-`ClaudeService::PRICE_PER_MILLION` can solve, on the owner's own Anthropic
-key, chosen with `--solver-model`. Today those are Opus 5.5, Sonnet 5.5 and
-Haiku 4.5. The default is Sonnet 5.5, so the solver isn't the generator's
+**Which model solves.** Any Claude model on a route in
+`ClaudeService::MODEL_FOR_PURPOSE` can solve, on the owner's own Anthropic
+key, chosen with `--solver-model`, at a pinned `high` effort. Today those
+are Opus 5.5 and Sonnet 5.5. Haiku 4.5 is priced but on no route, so it
+has no effort setting this app has used, and it isn't offered. The default is Sonnet 5.5, so the solver isn't the generator's
 model: generation and retries run on Opus 5.5
 (`MODEL_FOR_PURPOSE["generate_exercise"]`). Sonnet 5.5 is also the judge's
 model, and the judge has already kept every section it sees, so the two
@@ -395,8 +403,10 @@ this:
   and shared), so the rule lives in one place. Since #629 that step also
   drops the kind's `judge_hidden_fields`, so the solver sees the marked
   line numbers, not the provider's quotes, as the page does. The solve also
-  drops `concept`, which the page doesn't show before review and which
-  would point at the flaw.
+  drops `teaching_note`, which the page keeps locked until the section is
+  answered, and `concept`. The page does show the concept, in the concept
+  reference, but the generator chose that label to match its key, so
+  withholding it keeps agreement from being steered by it.
 - **Spec.** A sentinel is planted in every answer-key field. The spec stubs
   the provider over Faraday and asserts that no request body contains the
   sentinel, on the draft call, the judge call or the solve call.

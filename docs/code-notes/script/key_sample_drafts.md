@@ -71,7 +71,8 @@ Without `--run` it prints the most calls it can make, before
 with every call at its output cap (`ClaudeService::MAX_TOKENS` for the retry,
 `CallProfiles::JUDGE_MAX_TOKENS` for the judge, the same `MAX_TOKENS` for
 a solve, which sets no cap of its own) and no caching. With `--triage` the
-plan adds one solve per section asked for. The retry's
+plan adds one solve per draft, since a failed solve discards its section
+and another draft follows. The retry's
 input is measured from the prompt a real retry sends, ladders included, by a
 service that stops at the provider call. The judge's input is measured over
 `FakeService`'s canned section, at four characters a token. Real drafts write

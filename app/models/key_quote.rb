@@ -12,7 +12,9 @@ module KeyQuote
 
     shown, lines = normalized_with_lines(code, language: language)
     start = shown.index(wanted)
-    lines[start]..lines[start + wanted.length - 1] if start
+    return unless start && shown.index(wanted, start + 1).nil?
+
+    lines[start]..lines[start + wanted.length - 1]
   end
 
   def self.line(code, quote, language:)

@@ -186,7 +186,7 @@ RSpec.describe KeySampleDrafts do
       result = triage(count: 1).call(path)
 
       expect(prompts).to eq([ "retry_section", "judge_section", KeyTriage::PURPOSE ])
-      expect(result.entries.sole).to include("code_review_mode" => "application_code", "triage" => "agree",
+      expect(result.entries.sole).to include("code_review_mode" => "application_code", "triage" => "agree", "key_lines" => { "snippet" => [ "2" ] },
                                              "solver" => { "issue" => key_issue, "fix" => "f" })
     end
 
@@ -243,23 +243,22 @@ RSpec.describe KeySampleDrafts do
       expect(result.entries.size).to eq(1)
     end
 
-    it "routes the solve to the solver model, Sonnet 5.5 unless another priced model is named" do
+    it "routes the solve to the solver model at its pinned effort, Sonnet 5.5 unless another solver model is named" do
       triage(count: 1).call(path)
-      expect(JSON.parse(bodies.last)["model"]).to eq("claude-sonnet-5-5")
+      expect(JSON.parse(bodies.last)).to include("model" => "claude-sonnet-5-5", "output_config" => include("effort" => "high"))
 
       bodies.clear
-      haiku = described_class.service("sk-ant-test", usage, solver_model: "claude-haiku-4-5")
-      described_class.new(kind: kind, language: "ruby_rails", count: 1, service: haiku, out: out, triage: true).call(path)
-      expect(JSON.parse(bodies.last)).to include("model" => "claude-haiku-4-5")
-      expect(JSON.parse(bodies[0])["model"]).to eq("claude-opus-5-5")
-      expect { described_class.service("sk-ant-test", usage, solver_model: "claude-unpriced") }.to raise_error(ArgumentError, /no price/)
+      opus = described_class.service("sk-ant-test", usage, solver_model: "claude-opus-5-5")
+      described_class.new(kind: kind, language: "ruby_rails", count: 1, service: opus, out: out, triage: true).call(path)
+      expect(JSON.parse(bodies.last)).to include("model" => "claude-opus-5-5", "output_config" => include("effort" => "high"))
+      expect { described_class.service("sk-ant-test", usage, solver_model: "claude-haiku-4-5") }.to raise_error(ArgumentError, /solver model/)
     end
 
     it "prints a plan that counts the solve calls, and makes no call" do
       triage(count: 3).plan
 
       expect(prompts).to be_empty
-      expect(out.string).to include("each kept one solved", "at most 15 calls", "$")
+      expect(out.string).to include("each kept one solved", "at most 18 calls", "$")
     end
 
     it "is the only way code_review is drafted, and drafts nothing else" do

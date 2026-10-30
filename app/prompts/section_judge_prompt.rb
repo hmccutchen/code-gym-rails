@@ -45,20 +45,20 @@ class SectionJudgePrompt
   end
 
   def self.generate(kind:, section:, rung:, locked:)
-    visible = visible(kind, section)
+    shown = visible(kind, section)
 
     { response_schema: JudgeVerdict.schema_for(kind), system: SYSTEM, prompt: <<~PROMPT }
       Section kind: #{kind.key}
       The learner's task for this kind: #{kind.judge_task}
       #{kind.discovery? ? "This is a discovery task: wording that names where the issue is defeats it." : "Naming the concept is expected for this kind."}
-      Tagged concept: #{visible["concept"]}
+      Tagged concept: #{shown["concept"]}
       Pitched at: #{rung}#{locked ? " (locked: this level was asked for unconditionally)" : ""}
       Level meaning: #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}
       Prose fields you may rewrite: #{kind.prose_fields.join(', ')}
       Every other field is the artifact and must not change.
       #{guidance_block(kind)}
       The section as delivered:
-      #{JSON.pretty_generate(visible)}
+      #{JSON.pretty_generate(shown)}
     PROMPT
   end
 

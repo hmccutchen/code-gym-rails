@@ -6,6 +6,7 @@ require_relative "key_triage"
 class KeySampleDrafts
   KINDS = [ ExerciseSection::SecurityReview, ExerciseSection::PlanReview, ExerciseSection::PseudocodeToCode ].freeze
   TRIAGE_KIND = ExerciseSection::CodeReview
+  COUNTS = { drafts: { default: 6, most: 10 }, triage: { default: 30, most: 30 } }.freeze
   ATTEMPTS_PER_SECTION = 2
   APPROX_CHARS_PER_TOKEN = 4
   RESCUED = [ ProviderError, SetupError, JudgeVerdict::Invalid, *AiService::INFRASTRUCTURE_ERRORS ].freeze
@@ -13,9 +14,11 @@ class KeySampleDrafts
   Tally = Struct.new(:entries, :rejected, :keyless, :failed)
 
   def self.service(api_key, usage, solver_model: KeyTriage::DEFAULT_SOLVER_MODEL)
-    raise ArgumentError, "#{solver_model} has no price in ClaudeService" unless ClaudeService::PRICE_PER_MILLION.key?(solver_model)
+    unless KeyTriage::SOLVER_MODELS.include?(solver_model)
+      raise ArgumentError, "#{solver_model} isn't a solver model: #{KeyTriage::SOLVER_MODELS.join(', ')}"
+    end
 
-    solver_route = ClaudeService::MODEL_FOR_PURPOSE.values.find { |route| route[:model] == solver_model } || { model: solver_model }
+    solver_route = { model: solver_model, effort: KeyTriage::SOLVER_EFFORT }
     Class.new(ClaudeService) do
       define_method(:log_usage) do |_user, result, purpose:|
         usage << { purpose: purpose, tokens_in: result[:input_tokens].to_i, tokens_out: result[:output_tokens].to_i,
@@ -99,7 +102,7 @@ class KeySampleDrafts
 
   def attempts = @count * ATTEMPTS_PER_SECTION
 
-  def solves = @triage ? @count : 0
+  def solves = @triage ? attempts : 0
 
   def mode_for(kept) = (KeyTriage::MODES[kept % KeyTriage::MODES.size] if @triage)
 
@@ -136,8 +139,7 @@ class KeySampleDrafts
     return {} unless @triage
 
     solved = @service.solve_section(@user, @kind, section)
-    { "code_review_mode" => mode.to_s, "triage" => KeyTriage.outcome(@kind, section, solved["issue"], language: @language),
-      "solver" => solved }
+    { "code_review_mode" => mode.to_s, **KeyTriage.compare(@kind, section, solved["issue"], language: @language), "solver" => solved }
   end
 
   def write(tally, path)
@@ -150,7 +152,7 @@ class KeySampleDrafts
     ForcedConceptDrafts.rung_draft(@user, @language, rung, kind: @kind, plan: plan_for(mode))
   end
 
-  # Toy and single-file: a RealSource excerpt needs the scenario restore JudgedGeneration does, and multi-file waits for launch B.
+  # Toy and single-file: a RealSource excerpt needs the scenario restore JudgedGeneration does (key_sample_drafts.md).
   def plan_for(mode)
     plan = DailyPlan.for(@user, language: @language)
     mode ? plan.with(code_review_mode: mode, code_review_source: nil, code_review_files: :single) : plan
@@ -181,7 +183,7 @@ class KeySampleDrafts
   def tokens(*texts) = texts.sum(&:size) / APPROX_CHARS_PER_TOKEN
 
   def call_cost(purpose, input)
-    cap = CallProfiles::BY_PURPOSE.dig(purpose, :max_tokens) || ClaudeService::MAX_TOKENS
+    cap = (CallProfiles.fetch(purpose)[:max_tokens] unless purpose == KeyTriage::PURPOSE) || ClaudeService::MAX_TOKENS
     ClaudeService.cost_usd(model: @service.model_for(purpose), input_tokens: input, output_tokens: cap,
                            cache_read_tokens: 0, cache_write_tokens: 0).to_f
   end

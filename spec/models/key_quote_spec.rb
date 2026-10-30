@@ -52,6 +52,10 @@ RSpec.describe KeyQuote do
       expect(described_class.find(code, "do |item| item.price end", language: "ruby_rails")).to eq(2..4)
     end
 
+    it "finds nothing for a quote the code holds more than once, rather than guess which" do
+      expect(described_class.find("@orders = Order.all\norder = @orders.first", "order", language: "ruby_rails")).to be_nil
+    end
+
     it "finds nothing for a quote that normalizes to nothing" do
       expect(described_class.find("a,\nb", " , ", language: "ruby_rails")).to be_nil
     end

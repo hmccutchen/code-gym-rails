@@ -5,9 +5,11 @@ RSpec.describe KeyTriage do
   let(:kind)    { ExerciseSection::CodeReview }
   let(:section) { FakeService::EXERCISE_PROBLEM_SET.fetch("code_review").deep_dup }
 
-  def outcome(issue) = described_class.outcome(kind, section, issue, language: "ruby_rails")
+  def compared(issue) = described_class.compare(kind, section, issue, language: "ruby_rails")
 
-  describe ".outcome" do
+  def outcome(issue) = compared(issue)["triage"]
+
+  describe ".compare" do
     it "agrees when the solver quotes lines that overlap the key's" do
       expect(outcome("`total = customer.orders.sum(&:total_cents)` queries once per customer")).to eq("agree")
     end
@@ -20,6 +22,19 @@ RSpec.describe KeyTriage do
       expect(outcome("the loop is slow")).to eq("unlocated")
       expect(outcome("`Customer.find_each` is missing")).to eq("unlocated")
       expect(outcome("`c`")).to eq("unlocated")
+    end
+
+    it "is unlocated, not agreed, when a solver's short quote appears more than once in the code" do
+      section["snippet"] = "def index\n  @orders = Order.all.each { |o| o.user.name }\nend\n\ndef update\n  order.update(params[:order])\nend"
+      section["answer_key"]["issue"] = "`Order.all.each { |o| o.user.name }` loads each user"
+
+      expect(outcome("Unpermitted params passed straight to `update`, on the `order` record")).to eq("unlocated")
+    end
+
+    it "records the lines each side's quotes land on, so the sheet shows which side is unlocated and how wide a match is" do
+      expect(compared("`customers.each { |c| puts loyalty_tier(c) }` prints"))
+        .to include("solver_lines" => { "snippet" => [ "10" ] }, "key_lines" => { "snippet" => [ "2" ] })
+      expect(compared("the loop is slow")).to include("solver_lines" => {}, "key_lines" => { "snippet" => [ "2" ] })
     end
 
     it "is unlocated when the key has no quote the code holds" do
@@ -38,7 +53,14 @@ RSpec.describe KeyTriage do
   end
 
   describe ".solve_prompt" do
-    it "shows the section without its key, server stamps, hidden fields or concept" do
+    it "renders the solve request exactly as recorded" do
+      request = described_class.solve_prompt(kind, section)
+
+      expect_prompt_snapshot("triage_solve__code_review__system", request[:system])
+      expect_prompt_snapshot("triage_solve__code_review__prompt", request[:prompt])
+    end
+
+    it "shows the section without its key, server stamps, hidden fields, concept or locked hint" do
       section.merge!("answer_key" => section["answer_key"].transform_values { "SENTINEL-KEY" }, "pitched_at" => "SENTINEL-STAMP",
                      "file_1_changed" => [ "SENTINEL-QUOTE" ])
 
@@ -46,6 +68,7 @@ RSpec.describe KeyTriage do
 
       expect(request.values.to_json).not_to include("SENTINEL")
       expect(request[:prompt]).not_to include("n_plus_one")
+      expect(request[:prompt]).not_to include(section["teaching_note"])
       expect(request[:prompt]).to include(section["snippet"].lines.first.strip)
     end
   end

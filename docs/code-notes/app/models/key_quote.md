@@ -62,7 +62,10 @@ line inside it. It returns nil for a quote that normalizes to nothing.
 `.find(code, quote, language:)` is a substring search of the normalized
 quote in the normalized whole code. Each normalized character remembers the
 source line it came from, so the result is the 1-based range of lines the
-first match spans. It suits a quote that may be part of a line or several,
-and returns nil for a quote that normalizes to nothing. The triage script is
+match spans. It suits a quote that may be part of a line or several. It
+returns nil for a quote the code holds more than once, as `.line` does for
+two matches, since a short quote such as `order` would otherwise land on
+whichever appearance comes first, and for a quote that normalizes to
+nothing. The triage script is
 its first caller; launch B's evidence check
 (`docs/decisions/multi-file-code-review.md`) will be the second.
