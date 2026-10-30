@@ -20,8 +20,8 @@ RSpec.describe "The answer key each discovery kind plants" do
         expect(cleaned(kind, usable)[PlantedKey::FIELD]).to eq(fields.index_with { |field| "#{field} text" })
       end
 
-      it "bounds an over-long field" do
-        expect(cleaned(kind, usable.merge(fields.first => long))[PlantedKey::FIELD][fields.first].length).to eq(PlantedKey::MAX_LENGTH)
+      it "keeps an over-long field whole, for ingest to drop the key as too long rather than cut it" do
+        expect(kind.normalize_planted_key(PlantedKey::FIELD => usable.merge(fields.first => long))[fields.first]).to eq(long)
       end
 
       it "drops the key and keeps the section when a field is missing, blank or the wrong type" do

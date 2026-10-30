@@ -57,6 +57,34 @@ whose hooks raise until the kind answers them. The key only helps grading, and t
 behavior for a section without one, so dropping a section or spending a
 retry over a field the engineer never sees would cost more than it saves.
 
+### A key past the length limit is dropped, never cut
+
+The owner decided on 2026-10-30, after the first triage run:
+
+- **The limit is 1,500 characters a field** (`PlantedKey::MAX_LENGTH`, up
+  from 500). Under the old limit, ingest cut a long field to exactly 500
+  characters ending in `...`. In the four sections the run wrote out, 8 of
+  12 key fields were cut that way, so the largest stored field was 500, and
+  the stored keys can't show how long the provider wrote. The fields that
+  weren't cut ran 373 to 467 characters. The solver's replies on the same
+  sections were never cut, and ran 359 to 770, the longest a fix that wrote
+  a migration in full. 1,500 is about twice the longest uncut field seen, so
+  a few sentences with inline code fit, and a field past it is no longer a
+  few sentences.
+- **The guidance asks for a few sentences a field,** in each keyed kind's
+  schema line.
+- **A field past the limit drops the whole key.** A cut field can lose the
+  part grading needs, such as the second gap a key names. The section keeps
+  today's keyless grading, and its key note reads `too_long`, logged with no
+  key text. A list key (`plan_review`'s flaws, `pseudocode_to_code`'s
+  requirements) is dropped whole when one entry is too long. The multi-file
+  key's `evidence` entries, which arrive in launch B, follow the same rule.
+- **Keys stored at the old limit are recognisable.** `String#truncate(500)`
+  wrote a field of exactly 500 characters ending in `...`, and a field that
+  ended there by chance is close to impossible. A key with any such text
+  field, on a day generated before this change deployed, was cut. PR 2
+  grades a section with that key as keyless.
+
 ## Is the key right?
 
 Two checks, neither of which changes a key:
@@ -70,8 +98,8 @@ Two checks, neither of which changes a key:
   no quote at all counts as a miss (owner's decision, 2026-10-27). It
   catches a key that quotes code that isn't there, not one that quotes the
   right line and misreads it. Every keyed winning section logs one
-  `[planted_key]` line with its kind, language, outcome (`ok`, `missing` or
-  `quote_missing`), `attempt` (`draft` or `retry`) and the day's
+  `[planted_key]` line with its kind, language, outcome (`ok`, `missing`,
+  `too_long` or `quote_missing`), `attempt` (`draft` or `retry`) and the day's
   `code_review_mode`. The threshold is counted from those lines: more than 2
   `quote_missing` in the first 10 drafted Ruby sections of a kind that
   quotes (`code_review`, `security_review`, `plan_review`) stops the work,

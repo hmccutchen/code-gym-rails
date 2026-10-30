@@ -76,9 +76,9 @@ class ExerciseSection::SecurityReview < ExerciseSection
             "senior_lens":  "string — when to reach for it / tradeoffs"
           },
           "answer_key": {
-            "vulnerability": "string — what it is and where, quoting the code in backticks",
-            "exploit":       "string — how an attacker uses it here",
-            "mitigation":    "string — a change that closes it"
+            "vulnerability": "string — a few sentences: what it is and where, quoting the code in backticks",
+            "exploit":       "string — a few sentences: how an attacker uses it here",
+            "mitigation":    "string — a few sentences: a change that closes it"
           }
         }
     SCHEMA

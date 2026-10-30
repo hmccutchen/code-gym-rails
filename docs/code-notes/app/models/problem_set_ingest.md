@@ -46,3 +46,8 @@ winners only, but `JudgedGeneration` keeps every planned kind
 (`prune_to_expected_keys`), so a planned section an unplanned one beat still
 ships, and its key has to be clean too. Inside `.reject_unusable!` it would rely on every
 overriding kind calling `super`; here no kind can skip it.
+
+A cleaned key with any field past `PlantedKey::MAX_LENGTH` is deleted, and
+its section's key is remembered in `@too_long_keys`, so `#key_notes` can tell
+it apart from a key that was never sent: its outcome is `too_long`, not
+`missing`.

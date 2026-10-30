@@ -35,6 +35,7 @@ class ProblemSetIngest
     @fixed_concepts     = fixed_concepts
     @suggested_concepts = []
     @unusable_sections  = []
+    @too_long_keys      = Set.new
   end
 
   def call
@@ -64,7 +65,11 @@ class ProblemSetIngest
   def clean_planted_keys!
     @problem_set.each do |key, section|
       kind = ExerciseSection.find(key)
-      PlantedKey.store!(section, kind.normalize_planted_key(section)) if kind&.planted_key? && section.is_a?(Hash)
+      next unless kind&.planted_key? && section.is_a?(Hash)
+
+      cleaned = kind.normalize_planted_key(section)
+      @too_long_keys << key if PlantedKey.too_long?(cleaned)
+      PlantedKey.store!(section, (cleaned unless @too_long_keys.include?(key)))
     end
   end
 
@@ -72,11 +77,12 @@ class ProblemSetIngest
   def key_notes
     resolved_keys.filter_map do |key|
       kind = ExerciseSection.for(key)
-      KeyNote.new(key: key, language: @language, outcome: key_outcome(kind, @problem_set[key])) if kind.planted_key?
+      KeyNote.new(key: key, language: @language, outcome: key_outcome(key, kind, @problem_set[key])) if kind.planted_key?
     end
   end
 
-  def key_outcome(kind, section)
+  def key_outcome(key, kind, section)
+    return "too_long" if @too_long_keys.include?(key)
     return "missing" unless section.key?(PlantedKey::FIELD)
 
     kind.unquoted_key_parts(section, language: @language).empty? ? "ok" : "quote_missing"

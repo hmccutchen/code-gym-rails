@@ -56,6 +56,11 @@ keys:
 - **`PlantedKey::MAX_LENGTH = 500`**, the bound on one key field.
 - **`PlantedKey.text(value)`**: a stripped string, truncated to
   `MAX_LENGTH`, or nil when blank or not a string.
+
+  Superseded on 2026-10-30: the limit is 1,500, `.text` no longer cuts, and a
+  field past the limit drops the whole key with a `too_long` note
+  (`docs/decisions/stored-answer-keys.md`, "A key past the length limit is
+  dropped").
 - **`PlantedKey.list(value, max:, &entry)`**: maps each entry through the
   block, drops nils and keeps at most `max`.
 
@@ -477,11 +482,23 @@ Then:
 - Branch from `main`.
 - Put the `code_review` read's counts and the token-cost counts in the PR
   description draft now, so they can't be forgotten.
+- Put the first triage run's counts there too (2026-10-30, stopped
+  partway, under the old 500-character limit): 18 kept, 17 agree, 1
+  disagree (the same flaw quoted on different lines), 0 unlocated, and 1
+  judge reply cut off at `JUDGE_MAX_TOKENS`. A fresh triage set, drafted
+  under the 1,500 limit, comes before the key read, and its counts go
+  beside these.
 
 ### Step 1. The review context line
 
 - Each turned-on kind's `.review_context` adds "Answer key (hidden from
   the engineer, known here for grading): …" when the section has a key.
+- **A key cut at the old limit counts as no key.** A key with any text
+  field of exactly 500 characters ending in `...`, on a day generated
+  before the 1,500 limit deployed, was cut by the old `String#truncate`.
+  PR 2 adds one check for it on `PlantedKey`, with a spec, and the section
+  is graded keyless. The PR description gives how many stored keys it
+  skips, from an owner-approved read-only count.
 - **Snapshots:**
   - `review_prompt_spec` gains a keyed day.
   - Day A and day B stay byte-identical.

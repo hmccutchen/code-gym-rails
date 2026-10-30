@@ -166,7 +166,8 @@ read it before changing that area.
   too, since a judged day can ship it) or deletes an unusable one and keeps
   the section. Nothing reads it yet: not the grader, the page, the
   judge or any prompt, and specs pin each place. `ProblemSetIngest` notes
-  every keyed section that won its slot, last, as `ok`, `missing` or `quote_missing` (a quote
+  every keyed section that won its slot, last, as `ok`, `missing`, `too_long` (a field past
+  `PlantedKey::MAX_LENGTH`, which drops the whole key, never cuts it) or `quote_missing` (a quote
   the shown code or plan doesn't contain; the key stays), and
   `GenerationDiagnostics` logs one `[planted_key]` line per note, with its
   attempt and the day's `code_review_mode` and no key text. The quote match
