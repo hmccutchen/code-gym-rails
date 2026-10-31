@@ -38,9 +38,11 @@ priced but on no route, so no effort setting has been used with it here.
 The request sets no token cap,
 since a capped call turns thinking off and Opus 5.5 has no off setting. The
 reply is parsed with `log_raw: false`, checked by `.reply` for a text
-`issue` and `fix`, and written only to the output file. `.reply` keeps each
-field whole rather than reusing `PlantedKey.fields`, whose 500-character cap
-would drop a quote past it and cut the fix the owner reads. The solve uses only
+`issue` and `fix`, and written only to the output file. `.reply` checks only
+that each field is text, with no length limit: the stored-key limit
+(`PlantedKey::MAX_LENGTH`) drops a whole key, and a solver reply dropped for
+length would lose the quote the comparison needs and the fix the owner
+reads. The solve uses only
 the owner's Anthropic key; another provider isn't built.
 
 ## The comparison

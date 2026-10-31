@@ -2,14 +2,28 @@ require "rails_helper"
 
 RSpec.describe PlantedKey do
   describe ".text" do
-    it "strips a string and bounds it, and gives nil for a blank or a non-string" do
+    it "strips a string and keeps it whole, and gives nil for a blank or a non-string" do
       aggregate_failures do
         expect(described_class.text("  `find_each` loads in batches  ")).to eq("`find_each` loads in batches")
-        expect(described_class.text("x" * (described_class::MAX_LENGTH + 50)).length).to eq(described_class::MAX_LENGTH)
+        expect(described_class.text("x" * (described_class::MAX_LENGTH + 50)).length).to eq(described_class::MAX_LENGTH + 50)
         expect(described_class.text("   ")).to be_nil
         expect(described_class.text(nil)).to be_nil
         expect(described_class.text(42)).to be_nil
         expect(described_class.text([ "issue" ])).to be_nil
+      end
+    end
+  end
+
+  describe ".too_long?" do
+    it "is true when any text in a cleaned key, however nested, runs past the limit" do
+      long = "x" * (described_class::MAX_LENGTH + 1)
+
+      aggregate_failures do
+        expect(described_class.too_long?({ "issue" => "x" * described_class::MAX_LENGTH })).to be(false)
+        expect(described_class.too_long?({ "issue" => "a", "fix" => long })).to be(true)
+        expect(described_class.too_long?({ "flaws" => [ { "flaw" => "a", "pushback" => long } ] })).to be(true)
+        expect(described_class.too_long?({ "missable_requirements" => [ "a", long ] })).to be(true)
+        expect(described_class.too_long?(nil)).to be(false)
       end
     end
   end

@@ -5,15 +5,17 @@ as `script/draft_key_samples.rb KIND OUT_PATH`. The owner is the app's only
 user and their days rarely hold `security_review`, `plan_review` or
 `pseudocode_to_code`, so those three kinds are read from drafts
 (`docs/decisions/stored-answer-keys.md`, "The rarer kinds are read from
-drafts"). `KINDS` lists them. `code_review` is read from real days, and is
-drafted only with `--triage` (`docs/code-notes/script/key_triage.md`). A
-plain drafted `code_review` wouldn't match a real one: its fixed concept
-could contradict the plan's rolled content mode, and its judge edit would
-skip the scenario restore `JudgedGeneration` does for a `RealSource`
-section. The triage drafts fix both: each kept section takes the next mode
-in `KeyTriage::MODES`, its concept comes from that mode's vocabulary, and
-`.plan_for` gives the draft a plan with that mode, no `RealSource` and one
-file, since multi-file waits for launch B.
+drafts"). `KINDS` lists them. `code_review` (`TRIAGE_KIND`) is drafted too,
+with or without `--triage`, which adds only the blind solve
+(`docs/code-notes/script/key_triage.md`). A `code_review` drafted like the
+other kinds wouldn't match a real one: its fixed concept could contradict
+the plan's rolled content mode, and its judge edit would skip the scenario
+restore `JudgedGeneration` does for a `RealSource` section. So each kept
+`code_review` takes the next mode in `KeyTriage::MODES`, its concept comes
+from that mode's vocabulary, and `.plan_for` gives the draft a plan with
+that mode, no `RealSource` and one file, since multi-file waits for launch
+B. The owner asked on 2026-10-30 for a smaller `code_review` set without
+the solve, which is why drafting and solving are separate.
 
 ## The path
 
@@ -34,7 +36,8 @@ four kept sections cover every rung. Concepts cycle through the kind's
 selectable vocabulary, without `other`, shifted once per pass through the
 rungs so each concept meets each rung.
 
-A rejected draft, a draft whose key ingest dropped, and a provider, verdict
+A rejected draft, a draft whose key ingest dropped (never sent, unusable or
+too long; the `[planted_key] attempt=retry` log line says which), and a provider, verdict
 or connection failure are counted, not kept, and another draft is made, up to
 `ATTEMPTS_PER_SECTION` drafts for each section asked for. A section ingest
 refuses raises `ProviderError::InvalidResponseError` and counts as a failure.
@@ -64,17 +67,47 @@ each kept section and once more when the run ends, even on Ctrl-C, so an
 interrupted run keeps what it paid for. It holds answer keys, so it is
 deleted after the read, like the key sheet.
 
+## The spend cap
+
+`--max-cost DOLLARS` is required with `--run`, and builds a `SpendCap`
+(`docs/code-notes/script/spend_cap.md`) that `.service` hands to its
+overrides. Every bound comes from one formula, `.bound`: the input at three
+characters a token, which errs high for code, plus the call's full output
+cap, at its route's price. The plan's total uses it too, so the plan and the
+cap can't disagree. A model with no price raises instead of counting as
+free.
+
+- **Before each section,** `draft_one` checks `#section_bound`: the draft,
+  the judge and, with `--triage`, the solve together. So a stop falls
+  between sections, and no paid draft is thrown away for want of its judge
+  or solve. That needs about $0.36 of headroom for a `code_review` section,
+  so a run can stop up to that much short of the cap.
+- **Before each call,** `call_and_log` checks that call's own
+  `.request_bound`, as a backstop for a prompt longer than the plan
+  measured.
+- **After each call,** `log_usage` adds the reported usage's cost and prints
+  the running total. A timed-out call reports no tokens though the provider
+  may have billed it, so it is counted at its bound and the line says so.
+
+When a check fails, `SpendCap::Reached` ends the run before anything is
+sent: the sections already kept stay in the file, and the tally's `stopped`
+line, printed and written, says what it stopped on. A retry the client makes
+on a 429, a 5xx or, for a call that isn't long-running, a timeout goes
+through no override, so it isn't checked again. A failed request is rarely
+billed.
+
 ## The plan
 
 Without `--run` it prints the most calls it can make, before
 `ClaudeService`'s own retries on a connection error, 429 or 5xx, and a bound
 with every call at its output cap (`ClaudeService::MAX_TOKENS` for the retry,
 `CallProfiles::JUDGE_MAX_TOKENS` for the judge, the same `MAX_TOKENS` for
-a solve, which sets no cap of its own) and no caching. With `--triage` the
+a solve, which sets no cap of its own) and no caching, from `.bound`. With `--triage` the
 plan adds one solve per draft, since a failed solve discards its section
 and another draft follows. The retry's
 input is measured from the prompt a real retry sends, ladders included, by a
 service that stops at the provider call. The judge's input is measured over
-`FakeService`'s canned section, at four characters a token. Real drafts write
+`FakeService`'s canned section. Both are counted at three characters a
+token. Real drafts write
 far less than the cap, so the run's own cost line, from the reported usage,
 is the number to record.

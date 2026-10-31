@@ -32,9 +32,9 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   ANSWER_KEY_SCHEMA = <<~SCHEMA.chomp
     "answer_key": {
-          "issue":          "string — what is wrong and where, quoting the code in backticks",
-          "why_it_matters": "string — what goes wrong because of it in this code",
-          "fix":            "string — a fix that works as written"
+          "issue":          "string — a few sentences: what is wrong and where, quoting the code in backticks",
+          "why_it_matters": "string — a few sentences: what goes wrong because of it in this code",
+          "fix":            "string — a few sentences: a fix that works as written"
         }
   SCHEMA
 

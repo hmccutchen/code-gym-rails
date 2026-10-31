@@ -58,7 +58,9 @@ breaks in another. This replaces the separate `change_review` kind that
   for files.
 - **Launch B (waits for keyed grading of `code_review`, stored answer keys
   PR 2):**
-  - the key gains `files` and `evidence`, and a multi-file key that fails
+  - the key gains `files` and `evidence`, each `evidence` entry under
+    `PlantedKey::MAX_LENGTH` like any key field, so a too-long entry drops
+    the whole key with a `too_long` note, and a multi-file key that fails
     refuses its section
   - the grading note gets its multi-file branch for what to grade (its
     `improved_code` line is already built, #638)

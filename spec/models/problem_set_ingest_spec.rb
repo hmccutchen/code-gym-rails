@@ -42,6 +42,23 @@ RSpec.describe ProblemSetIngest do
       expect(result.problem_set["code_review"]).not_to have_key("answer_key")
     end
 
+    it "drops a whole key with a field past PlantedKey::MAX_LENGTH, keeps the section, and notes it as too_long" do
+      long = "`order.customer.name` #{'x' * PlantedKey::MAX_LENGTH}"
+      result = ingest({ "code_review" => code_review.merge("answer_key" => code_review["answer_key"].merge("fix" => long)) })
+
+      expect(result.key_notes.map(&:to_h)).to eq([ { key: "code_review", language: "ruby_rails", outcome: "too_long" } ])
+      expect(result.problem_set["code_review"]).not_to have_key("answer_key")
+      expect(result.problem_set["code_review"]["snippet"]).to eq(code_review["snippet"])
+    end
+
+    it "drops a list key whose one entry runs past the limit, rather than the entry alone" do
+      flaws = plan_review["answer_key"]["flaws"] + [ { "flaw" => "`exactly 300 seconds` #{'x' * PlantedKey::MAX_LENGTH}", "pushback" => "p" } ]
+      result = ingest({ "plan_review" => plan_review.merge("answer_key" => { "flaws" => flaws }) })
+
+      expect(result.key_notes.map(&:outcome)).to eq([ "too_long" ])
+      expect(result.problem_set["plan_review"]).not_to have_key("answer_key")
+    end
+
     it "notes a key quoting text the plan doesn't contain as quote_missing, and keeps the key" do
       result = ingest({ "plan_review" => plan_review })
 
@@ -62,6 +79,17 @@ RSpec.describe ProblemSetIngest do
                         "security_review" => security })
 
       expect(result.key_notes.map(&:key)).to eq([ "code_review" ])
+      expect(result.problem_set["security_review"]).not_to have_key("answer_key")
+    end
+
+    it "drops a losing alternative's too-long key as well, with no note, since only winners are noted" do
+      long_key = %w[vulnerability exploit mitigation].index_with { |field| "`User.find(id)` #{field}" }
+                                                       .merge("mitigation" => "x" * (PlantedKey::MAX_LENGTH + 1))
+      security = { "concept" => "sql_injection_prevention", "snippet" => "User.find(id)", "answer_key" => long_key }
+      result = ingest({ "code_review" => code_review, "architecture" => { "concept" => "service_boundaries", "question" => "q" },
+                        "security_review" => security })
+
+      expect(result.key_notes.map(&:to_h)).to eq([ { key: "code_review", language: "ruby_rails", outcome: "ok" } ])
       expect(result.problem_set["security_review"]).not_to have_key("answer_key")
     end
 

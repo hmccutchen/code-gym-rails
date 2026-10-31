@@ -13,8 +13,11 @@ stores the cleaned key, or deletes it, through `.store!`. An
 unusable key never drops the section: the key only helps grading, and the
 grader falls back to today's behavior for a section without one.
 
-`MAX_LENGTH` (500) bounds one field. A key is one or two sentences that
-quote a line of code or plan, so 500 characters only cuts a runaway reply.
+`MAX_LENGTH` (1,500) bounds one field, and `.too_long?` checks every text
+in a cleaned key against it, however nested. A field past it drops the whole
+key, never cuts it, since a cut field can lose the part grading needs
+(`docs/decisions/stored-answer-keys.md`, "A key past the length limit is
+dropped"). `.text` only strips, so the check sees the provider's full text.
 
 Three older helpers bound provider text the same way:
 `ExerciseSection::DesignComparison`'s `usable_text?`, `AmbiguityHunt`'s
