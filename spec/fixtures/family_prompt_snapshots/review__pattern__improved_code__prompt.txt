@@ -1,0 +1,19 @@
+Grade ONLY the "pattern" section from the day's context above.
+Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.
+
+Main point: the structure the problem calls for.
+Essential pieces: a structure and interface that would work for the stated problem. The answer scaffold names what to cover (Where this logic lives today; How you would call the service object; What you would test first), whether or not the answer kept the labels; a part it leaves out is an essential gap only when the design would not work without it.
+
+Return a single JSON object (NOT wrapped in a "pattern" key) with:
+- "rating": "beginner" | "developing" | "solid" | "strong"
+- "correct": array of strings — each entry one distinct thing they got right
+- "missed": array of strings — each entry one distinct thing they missed or got wrong
+- "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
+- "better_questions": array of strings — each entry one question they should have asked themselves
+- "next_step": string — one specific thing to study
+- "improved_code": string — the refactored structure that addresses what they missed — the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is structural; show enough of the shape to make the structure obvious.
+
+Each array entry must be ONE self-contained idea in one or two sentences. Never pack
+several points into one entry, and never number points inside an entry ("1) ... 2) ...")
+— separate ideas belong in separate entries. Use an empty array when there is nothing to
+say for that field.

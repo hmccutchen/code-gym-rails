@@ -93,6 +93,6 @@ class ExerciseSection::PlanReview < ExerciseSection
   end
 
   def self.improved_code_instruction(section:, answered:)
-    answered ? "a revised version of the plan that addresses what they missed" : "a revised version of the plan that fixes its planted flaws"
+    answered ? "a revised version of the plan that addresses what they missed" : "a revised version of the plan that fixes the flaws a reviewer should push back on"
   end
 end

@@ -168,6 +168,19 @@ RSpec.describe ReviewPrompt do
     end
   end
 
+  describe "the kinds whose improved_code wording depends on whether they answered" do
+    %w[pattern plan_review pseudocode_to_code].each do |key|
+      it "renders #{key}'s graded prompt and walkthrough exactly as recorded" do
+        section = FakeService::EXERCISE_PROBLEM_SET.fetch(key).deep_dup.merge("rounds" => {})
+
+        expect_prompt_snapshot("review__#{key}__improved_code__prompt",
+                               described_class.section_prompt(key: key, section: section, answer: long, rung: "mid_level"))
+        expect_prompt_snapshot("review__#{key}__improved_code__walkthrough",
+                               described_class.walkthrough_prompt(key: key, section: section, rung: "mid_level"))
+      end
+    end
+  end
+
   describe "a multi-file code review" do
     let(:files) do
       { "question" => "What breaks?",

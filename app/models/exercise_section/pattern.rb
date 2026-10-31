@@ -57,7 +57,7 @@ class ExerciseSection::Pattern < ExerciseSection
   end
 
   def self.improved_code_instruction(section:, answered:)
-    structure = answered ? "the refactored structure that addresses what they missed" : "the refactored structure the problem calls for"
+    structure = answered ? "the refactored structure that addresses what they missed" : "the refactored structure the problem needs"
     "#{structure} — the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is " \
       "structural; show enough of the shape to make the structure obvious."
   end

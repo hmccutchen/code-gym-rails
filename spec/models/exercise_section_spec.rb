@@ -146,8 +146,8 @@ RSpec.describe ExerciseSection do
   describe ".improved_code_instruction" do
     def instruction(key, answered:, section: {}) = described_class.find(key).improved_code_instruction(section: section, answered: answered)
 
-    it "asks every kind with no improved code for an empty string, answered or not" do
-      %w[architecture parsons_problem ambiguity_hunt design_comparison].each do |key|
+    it "asks every kind with no improved code for an empty string, answered or not, so a prompt never asks for code the page hides" do
+      described_class.all.reject(&:improved_code?).map(&:key).each do |key|
         [ true, false ].each { |answered| expect(instruction(key, answered: answered)).to eq("must be an empty string for this section"), key }
       end
     end
@@ -161,11 +161,12 @@ RSpec.describe ExerciseSection do
     it "asks pattern for the refactored structure, answered or not" do
       [ true, false ].each { |answered| expect(instruction("pattern", answered: answered)).to include("refactored structure") }
       expect(instruction("pattern", answered: false)).not_to include("what they missed")
+      expect(instruction("pattern", answered: false).scan("calls for").size).to eq(1)
     end
 
     it "asks plan_review for a revised plan, answered or not" do
       [ true, false ].each { |answered| expect(instruction("plan_review", answered: answered)).to include("revised version of the plan") }
-      expect(instruction("plan_review", answered: false)).not_to include("what they missed")
+      expect(instruction("plan_review", answered: false)).not_to match(/what they missed|planted/)
     end
 
     it "asks pseudocode_to_code for their corrected plan only when they wrote one" do
@@ -185,7 +186,8 @@ RSpec.describe ExerciseSection do
 
     it "is the one place a kind states its improved_code rule, so no grading note repeats one" do
       described_class.all.each do |kind|
-        expect(kind.grading_note(section: { "blocks" => %w[a b] }, answer: "order:0,1")).not_to include("improved_code"), kind.key
+        expect(kind.grading_note(section: { "blocks" => %w[a b] }, answer: "order:0,1"))
+          .not_to match(/improved[ _]code|revised (version of the )?plan|refactored structure|corrected plan/i), kind.key
       end
     end
   end

@@ -28,9 +28,10 @@ read it before changing that area.
   the grader. Per-kind grading notes name the main point and never restate the
   levels. What `improved_code` should hold is the kind's
   `.improved_code_instruction`, which both the graded prompt and the
-  walkthrough read, never a grading note (#642). Parsons' rating comes from its `fixed_rating` hook. `RubricCheck`
-  never rewrites a rating: it logs agreement, and its gap list also decides
-  whether the short version shows pitfalls. The competency gate and
+  walkthrough read, never a grading note (#642). Parsons' rating comes from
+  its `fixed_rating` hook. `RubricCheck` never rewrites a rating: it logs
+  agreement, and its gap list also decides whether the short version shows
+  pitfalls. The competency gate and
   `LevelSuggestion` read only `RUBRIC_VERSION`-stamped reviews;
   `ConceptMastery` and `RungLedger` read all history on purpose.
 - **Unanswered sections are reviewed, not graded** (`docs/decisions/grading-rubric.md`):
