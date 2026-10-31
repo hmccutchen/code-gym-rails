@@ -41,10 +41,12 @@ The mechanism, front to back:
   reads off `DailyResponse#answered?`. It says no answer was given, asks for a walkthrough
   of what a good answer covers, and never asks for "rating" or
   "essential_gaps". Each kind adds its own text through
-  `ExerciseSection.walkthrough_note(section:)`: empty for most kinds, and for
+  `ExerciseSection.walkthrough_note(section:)`: empty for most kinds; for
   Parsons the correct block order with a request to explain why each block
   belongs there (or a statement that the exercise data is unavailable when no
-  blocks are stored).
+  blocks are stored); and for a multi-file code review the line asking for a
+  `File: <path>` line above each changed file's part of `improved_code`
+  (#638).
 - `ReviewGrading#ungraded` removes "rating", "essential_gaps" and "rubric"
   from whatever the provider returned, before the prose judge runs. Parsons'
   `fixed_rating` and `RubricCheck` do not run for the section. The prose judge

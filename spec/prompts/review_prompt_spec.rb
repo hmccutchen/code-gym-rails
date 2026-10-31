@@ -156,4 +156,32 @@ RSpec.describe ReviewPrompt do
         .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :answer ], [ :keyreq, :answered ], [ :keyreq, :rung ] ])
     end
   end
+
+  describe "a multi-file code review" do
+    let(:files) do
+      { "question" => "What breaks?",
+        "file_1_path" => "app/models/order.rb", "file_1_code" => "def total\n  0\nend", "file_1_changed_lines" => [ 2 ],
+        "file_2_path" => "app/models/line_item.rb", "file_2_code" => "def price\n  0\nend", "file_2_changed_lines" => [] }
+    end
+    let(:graded) { described_class.section_prompt(key: "code_review", section: files, answer: long, rung: "senior") }
+    let(:walked) { described_class.walkthrough_prompt(key: "code_review", section: files, rung: "senior") }
+
+    it "asks for each changed file's improved code under a File: line, whether graded or walked through" do
+      [ graded, walked ].each do |prompt|
+        expect(prompt).to include(%(start each changed file's part of "improved_code" with a line "File: <path>"))
+      end
+    end
+
+    it "renders exactly as recorded" do
+      expect_prompt_snapshot("review__code_review_multi_file__prompt", graded)
+      expect_prompt_snapshot("review__code_review_multi_file__walkthrough", walked)
+    end
+
+    it "leaves a single-file section's prompts without the File: line" do
+      single = day_a.first[:section]
+
+      expect(described_class.section_prompt(key: "code_review", section: single, answer: long, rung: "senior")).not_to include("File: <path>")
+      expect(described_class.walkthrough_prompt(key: "code_review", section: single, rung: "senior")).not_to include("File: <path>")
+    end
+  end
 end
