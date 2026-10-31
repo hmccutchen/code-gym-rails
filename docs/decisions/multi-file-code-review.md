@@ -61,7 +61,8 @@ breaks in another. This replaces the separate `change_review` kind that
   - the key gains `files` and `evidence`, and a multi-file key that fails
     refuses its section
   - the grading note gets its multi-file branch for what to grade (its
-    `improved_code` line is already built, #638)
+    `improved_code` line is already built, in
+    `.improved_code_instruction`, #638 and #642)
   - the judge gets a paragraph for sections with files: solve the section
     first, reject it when one file alone shows the problem or it is an
     exploit, and never change a path, a file's code or the changed lines

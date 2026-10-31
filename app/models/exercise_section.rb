@@ -239,6 +239,10 @@ class ExerciseSection
       "Improved code"
     end
 
+    def improved_code_instruction(section:, answered:)
+      improved_code? ? "the #{improved_code_label.downcase} for this section" : "must be an empty string for this section"
+    end
+
     def improved_code_prose?
       false
     end

@@ -143,6 +143,53 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".improved_code_instruction" do
+    def instruction(key, answered:, section: {}) = described_class.find(key).improved_code_instruction(section: section, answered: answered)
+
+    it "asks every kind with no improved code for an empty string, answered or not" do
+      %w[architecture parsons_problem ambiguity_hunt design_comparison].each do |key|
+        [ true, false ].each { |answered| expect(instruction(key, answered: answered)).to eq("must be an empty string for this section"), key }
+      end
+    end
+
+    it "names the label for a kind with no instruction of its own" do
+      %w[challenge security_review].each do |key|
+        expect(instruction(key, answered: true)).to eq("the improved code for this section"), key
+      end
+    end
+
+    it "asks pattern for the refactored structure, answered or not" do
+      [ true, false ].each { |answered| expect(instruction("pattern", answered: answered)).to include("refactored structure") }
+      expect(instruction("pattern", answered: false)).not_to include("what they missed")
+    end
+
+    it "asks plan_review for a revised plan, answered or not" do
+      [ true, false ].each { |answered| expect(instruction("plan_review", answered: answered)).to include("revised version of the plan") }
+      expect(instruction("plan_review", answered: false)).not_to include("what they missed")
+    end
+
+    it "asks pseudocode_to_code for their corrected plan only when they wrote one" do
+      expect(instruction("pseudocode_to_code", answered: true)).to include("smallest change to their approach")
+      expect(instruction("pseudocode_to_code", answered: false)).not_to match(/their|they missed/)
+    end
+
+    it "asks a multi-file code review for a File: line above each changed file's part, answered or not" do
+      files = { "file_1_path" => "app/models/order.rb", "file_1_code" => "a = 1", "file_1_changed_lines" => [ 1 ],
+                "file_2_path" => "app/models/item.rb", "file_2_code" => "b = 2", "file_2_changed_lines" => [] }
+
+      [ true, false ].each do |answered|
+        expect(instruction("code_review", answered: answered, section: files)).to include(%("File: <path>"))
+      end
+      expect(instruction("code_review", answered: true, section: { "snippet" => "a = 1" })).to eq("the improved code for this section")
+    end
+
+    it "is the one place a kind states its improved_code rule, so no grading note repeats one" do
+      described_class.all.each do |kind|
+        expect(kind.grading_note(section: { "blocks" => %w[a b] }, answer: "order:0,1")).not_to include("improved_code"), kind.key
+      end
+    end
+  end
+
   describe ".improved_code_label / .improved_code_prose?" do
     it "describes plan_review's improvement as a revised plan rendered as prose" do
       kind = described_class.find("plan_review")
@@ -1104,15 +1151,10 @@ RSpec.describe ExerciseSection do
         "file_2_path" => "app/models/item.rb", "file_2_code" => "b = 2", "file_2_changed_lines" => [] }
     end
 
-    it "is empty for every kind but parsons and a multi-file code review, so shared code needs no branch" do
-      (ExerciseSection.all - [ ExerciseSection::ParsonsProblem, ExerciseSection::CodeReview ]).each do |kind|
+    it "is empty for every kind but parsons, so shared code needs no branch" do
+      (ExerciseSection.all - [ ExerciseSection::ParsonsProblem ]).each do |kind|
         expect(kind.walkthrough_note(section: two_files)).to eq(""), kind.key
       end
-    end
-
-    it "gives a multi-file code review the File: line for its improved code, and a single-file one nothing" do
-      expect(ExerciseSection::CodeReview.walkthrough_note(section: two_files)).to eq(ExerciseSection::CodeReview::IMPROVED_CODE_FILES_LINE)
-      expect(ExerciseSection::CodeReview.walkthrough_note(section: { "snippet" => "a = 1" })).to eq("")
     end
 
     it "gives parsons the correct order and nothing about a score" do

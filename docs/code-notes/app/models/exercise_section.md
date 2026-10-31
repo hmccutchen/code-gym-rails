@@ -74,6 +74,10 @@ The base class raises because a kind that returned nothing would produce a revie
 
 The defaults describe corrected source code. A kind whose improvement is prose overrides both.
 
+## `.improved_code_instruction`
+
+The review prompt's `improved_code` field line reads this, in the graded prompt (`answered: true`) and in an unanswered section's walkthrough (`answered: false`). The default names the label, or asks for an empty string when the kind has no improved code. Pattern, plan review, pseudocode to code and a multi-file code review override it, and a grading note never repeats it, since the walkthrough leaves grading notes out (#642). Pseudocode to code words its walkthrough without "their plan", since nobody wrote one.
+
 ## `.titled_label?`
 
 This is false for kinds whose `problem_set` entry carries no title of its own.

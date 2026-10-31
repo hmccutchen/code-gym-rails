@@ -157,6 +157,17 @@ RSpec.describe ReviewPrompt do
     end
   end
 
+  it "puts each kind's own improved_code instruction on the field line, whether graded or walked through" do
+    ExerciseSection.all.each do |kind|
+      section = { "blocks" => %w[a b] }
+      graded = described_class.section_prompt(key: kind.key, section: section, answer: "order:0,1", rung: "senior")
+      walked = described_class.walkthrough_prompt(key: kind.key, section: section, rung: "senior")
+
+      expect(graded).to include(%(- "improved_code": string — #{kind.improved_code_instruction(section: section, answered: true)}\n)), kind.key
+      expect(walked).to include(%(- "improved_code": string — #{kind.improved_code_instruction(section: section, answered: false)}\n)), kind.key
+    end
+  end
+
   describe "a multi-file code review" do
     let(:files) do
       { "question" => "What breaks?",
@@ -168,7 +179,7 @@ RSpec.describe ReviewPrompt do
 
     it "asks for each changed file's improved code under a File: line, whether graded or walked through" do
       [ graded, walked ].each do |prompt|
-        expect(prompt).to include(%(start each changed file's part of "improved_code" with a line "File: <path>"))
+        expect(prompt).to include(%(start each changed file's part with a line "File: <path>"))
       end
     end
 
