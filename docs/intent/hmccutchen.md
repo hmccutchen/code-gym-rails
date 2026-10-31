@@ -473,9 +473,21 @@ data.*
   **I decided:** a prompt rule, not a per-file shape, so the improved code
   stays one string
 - a stored key with a field past 1,500 characters dropped whole, not cut,
-  and noted `too_long` `#640 open`
+  and noted `too_long` `#640`
   **why:** the triage showed keys cut mid-sentence at 500 characters
   **I decided:** 1,500 from the run's lengths; a few sentences a field;
   PR 2 grades keys cut at the old limit as keyless; more than 2 too_long in
   10 stops the work; 8 fresh code review drafts, no solve, before my key
   read, under a `--max-cost` cap the script enforces, to spend less
+
+## Sat Oct 31
+
+- multi-file code review planned live before keyed grading, with guards,
+  and the token-cost query drafted, not run `#646 open`
+  **why:** to stop waiting on keyed grading for the multi-file mode
+  **I decided:** start at a quarter of eligible days; store the multi-file
+  key from the first day, unread until PR 2, keeping a section whose key
+  fails and counting the reasons; the refusal rule joins with PR 2; regrade
+  the early grades against their keys once PR 2 is on; keep the judge
+  paragraph, the keyless grading note, the split script and multi-file days
+  out of PR 2's samples; I approve the token query when the week is up

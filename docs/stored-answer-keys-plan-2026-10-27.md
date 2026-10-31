@@ -228,6 +228,60 @@ compares the output tokens on the owner's `generate_exercise` usage rows
 from the week before and the week after. The plan below is kept for the
 record.
 
+**The query, drafted 2026-10-31 and not run.** It waits for the owner's
+approval once the week after is over (from 4 November). PR 1 merged on
+28 October at 04:08 UTC, so the week before is 21 to 27 October and the
+week after 28 October to 3 November. It runs with the production database's
+connection, inside a read-only transaction, and prints counts only, so
+nothing is saved and there is nothing to delete.
+
+- **Two changes land inside the week after.** #640 added "a few sentences"
+  to the key guidance on 31 October, so the week after is also printed in
+  two parts, before and from that day. Multi-file days can start in that
+  week too, and they write more code, so any day whose `code_review` has
+  files is left out of every count.
+- **What it compares:** successful calls only (`failure` is null), for
+  `generate_exercise` and `retry_section` separately: the count, the mean
+  and median output tokens, the mean input tokens and the summed cost.
+- **The owner's user id** is 1, as the `[planted_key]` lines showed; confirm
+  it before the run.
+
+```ruby
+# bin/rails runner, against production, only with the owner's approval
+require Rails.root.join("script/review_baseline_export")
+
+owner   = 1
+windows = {
+  "before"            => Date.new(2026, 10, 21)..Date.new(2026, 10, 27),
+  "after"             => Date.new(2026, 10, 28)..Date.new(2026, 11, 3),
+  "after, to 30 Oct"  => Date.new(2026, 10, 28)..Date.new(2026, 10, 30),
+  "after, from 31 Oct" => Date.new(2026, 10, 31)..Date.new(2026, 11, 3)
+}
+
+ReviewBaselineExport.read_only do
+  multi_file_days = DailyExercise.where(user_id: owner, date: windows.values.map(&:begin).min..windows.values.map(&:end).max)
+                                 .select { |day| day.problem_set.dig("code_review", "file_1_path").present? }
+                                 .map(&:date)
+  puts "multi-file days left out: #{multi_file_days.size}"
+
+  windows.each do |label, range|
+    %w[generate_exercise retry_section].each do |purpose|
+      rows = ApiUsage.where(user_id: owner, purpose: purpose, date: range, failure: nil).where.not(date: multi_file_days)
+      outs = rows.pluck(:tokens_out).sort
+      median = outs.empty? ? 0 : outs[outs.size / 2]
+      puts format("%-20s %-17s calls %3d · out mean %6d median %6d · in mean %6d · $%.2f",
+                  label, purpose, outs.size, rows.average(:tokens_out).to_i, median,
+                  rows.average(:tokens_in).to_i, rows.sum(:cost_usd).to_f)
+    end
+  end
+end
+```
+
+The spec expected about 60 to 150 more output tokens per keyed section. A
+day plans 2 to 4 sections and `code_review` is always keyed, so the
+difference per `generate_exercise` call is read against how many keyed
+sections those days held.
+
 - One real generation per language on the owner's key, run with
   `script/compare_models.rb generate USER_ID`. It prints problem sets
   without keys and the token counts.
@@ -341,7 +395,8 @@ and the real-day read in step 3 stays PR 2's gate.
   - **Toy code only, single-file only.** The draft's plan has
     `code_review_source: nil`, since a `RealSource` excerpt would need the
     scenario restore that `JudgedGeneration` does on an edit, and
-    `code_review_files: :single`, since multi-file waits for launch B.
+    `code_review_files: :single`, since the triage compares single-file keys
+    only (`docs/decisions/multi-file-code-review.md`).
 - **The plan comes first.** Without `--run`, the script prints the drafts,
   the judge calls and the solve calls, the most calls in total, and a cost
   bound with every call at its output cap. **Every `--run` needs the
@@ -442,7 +497,7 @@ this:
 - `KeyQuote.find` returning with its spec.
 
 1. **Wait.** Keys accumulate on real days. The quote threshold applies from
-   the first keyed day: count only `attempt=draft` lines of the kinds that quote (`code_review`, `security_review`, `plan_review`) with `language=ruby_rails` (owner's decision, 2026-10-28). More than 2
+   the first keyed day: count only `attempt=draft` lines of the kinds that quote (`code_review`, `security_review`, `plan_review`) with `language=ruby_rails` (owner's decision, 2026-10-28), and for `code_review` only `code_review_files=single` lines (owner's decision, 2026-10-31). More than 2
    `quote_missing` in the first 10 stops the work, and the owner decides
    what's next. Report the `missing` count beside it. A `too_long` line
    doesn't count toward the 10, since its key never reached the quote
@@ -475,6 +530,20 @@ PR 2 turns on `code_review` only. `security_review`, `plan_review` and
 `pseudocode_to_code` stay off in it, whatever their drafts' state, and join
 in later PRs. Where a step below says "turned-on kinds", in PR 2 that is
 `code_review` alone.
+
+**Multi-file `code_review`** goes live before PR 2, with its key stored but
+unread (owner's decision, 2026-10-31; `docs/decisions/multi-file-code-review.md`,
+"Launch, revised"). So PR 2 also:
+- reads the multi-file key (`files` and `evidence`) through the same review
+  context line and the keyed branch of the multi-file grading note
+- adds the refusal rule: from PR 2 on, a multi-file section whose key fails
+  is refused (`answer_key_unusable`) instead of kept keyless
+- adds a multi-file calibration fixture beside the single-file one
+- runs the comparison of the early multi-file grades with keyed regrades,
+  as that doc's "Regrading the early multi-file grades" section describes
+- keeps multi-file days out of its single-file samples: the quote check
+  counts only `code_review_files=single` lines, and step 8's export takes
+  single-file sections only
 
 ### Step 0. Before writing code
 
@@ -606,8 +675,9 @@ reads a keyed grade under the unchanged `RUBRIC_VERSION` until the check
 has passed (owner's decision, after review).
 
 1. **Export** with `--keyed-only` (step 6), with the owner's approval:
-   keyed sections, up to 10 per kind, read-only, saved outside the
-   repository.
+   keyed single-file sections, up to 10 per kind, read-only, saved outside
+   the repository. Multi-file sections are left out here and compared on
+   their own.
 2. **Regrade on this branch,** on the owner's machine with the export copied
    down and the owner's key in the provider's environment variable: each
    section 5 times as stored and 5 times with `--without-keys`. Ask the
