@@ -73,7 +73,7 @@ class ExerciseSection::PlanReview < ExerciseSection
           "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary",
           "answer_key": {
-            "flaws": [{ "category": "string — #{FLAW_CATEGORIES.join(' | ')}", "flaw": "string — what is wrong, quoting the plan in backticks", "pushback": "string — what a reviewer should ask for" }, "... (one entry per planted flaw)"]
+            "flaws": [{ "category": "string — #{FLAW_CATEGORIES.join(' | ')}", "flaw": "string — a few sentences: what is wrong, quoting the plan in backticks", "pushback": "string — a few sentences: what a reviewer should ask for" }, "... (one entry per planted flaw)"]
           }
         }
     SCHEMA

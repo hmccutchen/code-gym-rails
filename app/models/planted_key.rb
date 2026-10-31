@@ -2,14 +2,24 @@
 module PlantedKey
   FIELD = "answer_key".freeze
 
-  MAX_LENGTH = 500
+  MAX_LENGTH = 1_500
 
   QUOTE = /`([^`]+)`/
 
   MIN_QUOTE_LENGTH = 3
 
   def self.text(value)
-    value.strip.truncate(MAX_LENGTH).presence if value.is_a?(String)
+    value.strip.presence if value.is_a?(String)
+  end
+
+  # A cut key could lose the part grading needs, so a field past the limit drops the whole key.
+  def self.too_long?(cleaned)
+    case cleaned
+    when String then cleaned.length > MAX_LENGTH
+    when Hash   then cleaned.values.any? { |value| too_long?(value) }
+    when Array  then cleaned.any? { |value| too_long?(value) }
+    else false
+    end
   end
 
   def self.list(value, max:, &entry)

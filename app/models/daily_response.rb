@@ -4,6 +4,8 @@ class DailyResponse < ApplicationRecord
   belongs_to :daily_exercise
   has_many :review_follow_ups, dependent: :destroy
 
+  self.ignored_columns += %w[legacy_rating]
+
   SELF_RATINGS = %w[too_easy right_level too_hard].freeze
   SELF_RATING_FAVORABLE = SELF_RATINGS[0, 2].freeze
   SELF_RATING_UNFAVORABLE = (SELF_RATINGS - SELF_RATING_FAVORABLE).freeze

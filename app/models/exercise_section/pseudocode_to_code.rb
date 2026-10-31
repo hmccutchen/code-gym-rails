@@ -97,7 +97,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
           "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary",
           "answer_key": {
-            "missable_requirements": ["string — a requirement \\"problem_statement\\" states that a plan could miss, and what a plan that misses it gets wrong", "... (1-3 total)"]
+            "missable_requirements": ["string — a few sentences: a requirement \\"problem_statement\\" states that a plan could miss, and what a plan that misses it gets wrong", "... (1-3 total)"]
           }
         }
     SCHEMA

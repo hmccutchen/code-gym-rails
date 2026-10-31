@@ -441,45 +441,44 @@ data.*
 
 ## Fri Oct 30
 
-- a blind-solve triage added to the plan: about 30 drafted code review
-  keys solved blind, compared in Ruby
+- a blind-solve triage added to the plan for drafted code review keys
   **why:** to find the keys worth reading first
-  **I decided:** agreement only screens, and the real-day read stays the
-  gate; I approve each run's call count and cost first; the disagreements
-  and three agreements go to a key sheet outside the repo
+  **I decided:** agreement only screens; the real-day read stays the gate;
+  I approve each run's cost; disagreements and three agreements go to a
+  key sheet outside the repo
 - the section judge shown a multi-file code review's marked line numbers,
   not the provider's quotes `#629`
-  **why:** a quote that matched no line marks nothing on the page, so the
-  judge could read a change the engineer never sees, and nothing pinned
-  what the judge sees for files
-  **I decided:** numbers only, hidden through a per-kind hook rather than a
-  branch in the judge prompt
+  **why:** a quote matching no line marks nothing the engineer sees
+  **I decided:** numbers only, through a per-kind hook, not a judge branch
 - every line of a multi-file code review's files numbered in its prompts,
   and the judge shown the files that way `#633`
-  **why:** the judge got the code as one escaped string and the grader got
-  it unnumbered, so both had to count lines to find a changed line
-  **I decided:** number lines in every prompt, through the one file format
-  the grader already uses, rather than for the judge alone
+  **why:** the judge and grader had to count lines to find a changed line
+  **I decided:** number lines in every prompt, through the grader's file
+  format, not for the judge alone
 - the blind-solve triage built as a `--triage` mode of the drafts script
-  `#635 open`
-  **why:** real code review keys arrive about one a weekday, and the triage
-  shows about 30 before the real-day read is done, without slowing PR 2
-  **I decided:** build it now rather than skip it, since it doesn't gate
-  PR 2; fix the plan's review finding on short agreement samples before
-  merging #611; no run until I approve its call count and cost
+  `#635`
+  **why:** real keys arrive about one a weekday; the triage shows about 30
+  sooner without slowing PR 2
+  **I decided:** build it now, since it doesn't gate PR 2; fix #611's
+  review finding before merging it; no run until I approve its cost
 - a multi-file code review's lines numbered on the page, and the grader and
-  duck told the `N | ` prefix is not code `#637 open`
-  **why:** since #633 the prompts number every line but the page showed
-  none, so a review citing line 4 pointed at nothing the engineer could see,
-  and the grader could copy the prefix into its improved code
+  duck told the `N | ` prefix is not code `#637`
+  **why:** a review citing line 4 pointed at nothing the page showed, and
+  the grader could copy the prefix into its code
   **I decided:** a gutter on the page plus one prompt rule, rather than the
   prompt rule alone, so a cited line number stays usable
 - a multi-file code review's improved code asked to name each file it
-  changes, under a `File: <path>` line `#641 open`
-  **why:** the review showed the improved code as one block with no path,
-  so the engineer had to guess which of the files each part replaced
-  **I decided:** a prompt rule rather than a per-file shape, so the improved
-  code stays one string and nothing that reads it changes
+  changes, under a `File: <path>` line `#641`
+  **why:** the engineer had to guess which file each part replaced
+  **I decided:** a prompt rule, not a per-file shape, so the improved code
+  stays one string
+- a stored key with a field past 1,500 characters dropped whole, not cut,
+  and noted `too_long` `#640 open`
+  **why:** the triage showed keys cut mid-sentence at 500 characters
+  **I decided:** 1,500 from the run's lengths; a few sentences a field;
+  PR 2 grades keys cut at the old limit as keyless; more than 2 too_long in
+  10 stops the work; 8 fresh code review drafts, no solve, before my key
+  read, under a `--max-cost` cap the script enforces, to spend less
 
 ## Sat Oct 31
 

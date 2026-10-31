@@ -138,3 +138,6 @@ compares it with the stored column across those shapes.
 
 It returns nil for an unanswered section whatever is stored, so reviews written before unanswered sections stopped being graded read the same as new ones, with no data migration. Readers of a grade go through it, or first restrict themselves to `answered_sections` as `ReviewedSectionResults.for` does.
 
+## `legacy_rating`
+
+`daily_responses.legacy_rating` kept the single rating a response carried before `section_ratings` existed. Nothing reads it, and no migration copied it into `section_ratings`. It is in `ignored_columns` for one release, so web and worker processes still running the old code never see it go, and the next release drops it. The drop discards the stored values for responses from before July 2026.
