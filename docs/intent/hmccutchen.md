@@ -479,3 +479,13 @@ data.*
   PR 2 grades keys cut at the old limit as keyless; more than 2 too_long in
   10 stops the work; 8 fresh code review drafts, no solve, before my key
   read, under a `--max-cost` cap the script enforces, to spend less
+
+## Sat Oct 31
+
+- each kind's rule for what its improved code holds stated once, on the
+  field line both the graded review and the walkthrough carry `#644 open`
+  **why:** pattern, plan review and pseudocode to code kept the rule in
+  their grading notes, which an unanswered section's walkthrough leaves out,
+  so its improved code came with no instruction
+  **I decided:** one improved code hook per kind rather than repeating the
+  rule in each walkthrough note, and the multi-file `File:` line moves there

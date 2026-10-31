@@ -3,7 +3,6 @@ Pitched at: junior — one clearly visible instance of the concept in a small sc
 
 Main point: the structure the problem calls for.
 Essential pieces: a structure and interface that would work for the stated problem. The answer scaffold names what to cover (Your approach; Interface — how would this be called; What would be easy to get wrong or worth testing), whether or not the answer kept the labels; a part it leaves out is an essential gap only when the design would not work without it.
-For "pattern", improved_code must show the refactored structure that addresses what they missed — the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is structural; show enough of the shape to make the structure obvious.
 
 Return a single JSON object (NOT wrapped in a "pattern" key) with:
 - "rating": "beginner" | "developing" | "solid" | "strong"
@@ -12,7 +11,7 @@ Return a single JSON object (NOT wrapped in a "pattern" key) with:
 - "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
 - "better_questions": array of strings — each entry one question they should have asked themselves
 - "next_step": string — one specific thing to study
-- "improved_code": string — the improved code for this section
+- "improved_code": string — the refactored structure that addresses what they missed — the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is structural; show enough of the shape to make the structure obvious.
 
 Each array entry must be ONE self-contained idea in one or two sentences. Never pack
 several points into one entry, and never number points inside an entry ("1) ... 2) ...")
