@@ -480,3 +480,13 @@ data.*
   so the engineer had to guess which of the files each part replaced
   **I decided:** a prompt rule rather than a per-file shape, so the improved
   code stays one string and nothing that reads it changes
+
+## Sat Oct 31
+
+- each kind's rule for what its improved code holds stated once, on the
+  field line both the graded review and the walkthrough carry `#644 open`
+  **why:** pattern, plan review and pseudocode to code kept the rule in
+  their grading notes, which an unanswered section's walkthrough leaves out,
+  so its improved code came with no instruction
+  **I decided:** one improved code hook per kind rather than repeating the
+  rule in each walkthrough note, and the multi-file `File:` line moves there
