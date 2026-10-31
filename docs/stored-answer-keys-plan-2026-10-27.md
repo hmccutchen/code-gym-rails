@@ -239,10 +239,15 @@ nothing is saved and there is nothing to delete.
   to the key guidance on 31 October, so the week after is also printed in
   two parts, before and from that day. Multi-file days can start in that
   week too, and they write more code, so any day whose `code_review` has
-  files is left out of every count.
+  files is left out of every count. A regenerated day is left out too:
+  regeneration overwrites `problem_set` but keeps every generation's usage
+  row, so a day regenerated from multi-file to single-file can't be told
+  apart from the stored set. That may leave out a few single-file days as
+  well, which only shrinks the sample.
 - **What it compares:** successful calls only (`failure` is null), for
   `generate_exercise` and `retry_section` separately: the count, the mean
-  and median output tokens, the mean input tokens and the summed cost.
+  and median output tokens (the mean of the middle two for an even count),
+  the mean input tokens and the summed cost.
 - **The owner's user id** is 1, as the `[planted_key]` lines showed; confirm
   it before the run.
 
@@ -259,16 +264,17 @@ windows = {
 }
 
 ReviewBaselineExport.read_only do
-  multi_file_days = DailyExercise.where(user_id: owner, date: windows.values.map(&:begin).min..windows.values.map(&:end).max)
-                                 .select { |day| day.problem_set.dig("code_review", "file_1_path").present? }
-                                 .map(&:date)
-  puts "multi-file days left out: #{multi_file_days.size}"
+  left_out = DailyExercise.where(user_id: owner, date: windows.values.map(&:begin).min..windows.values.map(&:end).max)
+                          .select { |day| day.regenerated_at.present? || day.problem_set.dig("code_review", "file_1_path").present? }
+                          .map(&:date)
+  puts "multi-file or regenerated days left out: #{left_out.size}"
 
   windows.each do |label, range|
     %w[generate_exercise retry_section].each do |purpose|
-      rows = ApiUsage.where(user_id: owner, purpose: purpose, date: range, failure: nil).where.not(date: multi_file_days)
+      rows = ApiUsage.where(user_id: owner, purpose: purpose, date: range, failure: nil).where.not(date: left_out)
       outs = rows.pluck(:tokens_out).sort
-      median = outs.empty? ? 0 : outs[outs.size / 2]
+      middle = outs.size / 2
+      median = if outs.empty? then 0 elsif outs.size.odd? then outs[middle] else (outs[middle - 1] + outs[middle]) / 2 end
       puts format("%-20s %-17s calls %3d · out mean %6d median %6d · in mean %6d · $%.2f",
                   label, purpose, outs.size, rows.average(:tokens_out).to_i, median,
                   rows.average(:tokens_in).to_i, rows.sum(:cost_usd).to_f)
@@ -497,7 +503,7 @@ this:
 - `KeyQuote.find` returning with its spec.
 
 1. **Wait.** Keys accumulate on real days. The quote threshold applies from
-   the first keyed day: count only `attempt=draft` lines of the kinds that quote (`code_review`, `security_review`, `plan_review`) with `language=ruby_rails` (owner's decision, 2026-10-28), and for `code_review` only `code_review_files=single` lines (owner's decision, 2026-10-31). More than 2
+   the first keyed day: count only `attempt=draft` lines of the kinds that quote (`code_review`, `security_review`, `plan_review`) with `language=ruby_rails` (owner's decision, 2026-10-28), and for `code_review` only single-file lines: `code_review_files=single`, or no `code_review_files` field at all, as on every line written before the multi-file launch (owner's decision, 2026-10-31). More than 2
    `quote_missing` in the first 10 stops the work, and the owner decides
    what's next. Report the `missing` count beside it. A `too_long` line
    doesn't count toward the 10, since its key never reached the quote
@@ -542,7 +548,8 @@ unread (owner's decision, 2026-10-31; `docs/decisions/multi-file-code-review.md`
 - runs the comparison of the early multi-file grades with keyed regrades,
   as that doc's "Regrading the early multi-file grades" section describes
 - keeps multi-file days out of its single-file samples: the quote check
-  counts only `code_review_files=single` lines, and step 8's export takes
+  counts only single-file lines (`code_review_files=single`, or lines from
+  before the launch, which carry no such field), and step 8's export takes
   single-file sections only
 
 ### Step 0. Before writing code

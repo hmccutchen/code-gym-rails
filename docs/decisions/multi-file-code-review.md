@@ -120,9 +120,11 @@ reason. Saved output stays outside the repository and is deleted after use.
 
 ### Kept out of PR 2's samples
 
-- **The quote check** counts only `code_review_files=single` lines, so a
-  multi-file key, which quotes whole files, doesn't change the single-file
-  threshold.
+- **The quote check** counts only single-file lines, so a multi-file key,
+  which quotes whole files, doesn't change the single-file threshold. A
+  single-file line is one with `code_review_files=single`, or one written
+  before the launch, which has no such field; the lines already counted
+  toward the first 10 stay counted.
 - **PR 2's measuring step** exports and regrades single-file sections only
   (`--keyed-only` gains a single-file filter). Multi-file sections get their
   own comparison, below.
