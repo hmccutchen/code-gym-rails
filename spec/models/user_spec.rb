@@ -488,7 +488,7 @@ RSpec.describe User, type: :model do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
       expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
@@ -498,7 +498,7 @@ RSpec.describe User, type: :model do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" }, legacy_rating: "right_level",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "developing" } })
 
@@ -509,7 +509,7 @@ RSpec.describe User, type: :model do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "retired_concept" })
 
       expect(user.concepts_needing_reinforcement).to eq([])
@@ -520,13 +520,13 @@ RSpec.describe User, type: :model do
       older = DailyExercise.create!(user: user, date: Date.current - 1, language: "ruby_rails",
                                     problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: older, date: Date.current - 1,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
       newer = DailyExercise.create!(user: user, date: Date.current, language: "javascript",
                                     problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: newer, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" }, legacy_rating: "too_easy",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
       expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
@@ -536,7 +536,7 @@ RSpec.describe User, type: :model do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "solid" } })
 
@@ -547,7 +547,7 @@ RSpec.describe User, type: :model do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" }, legacy_rating: "too_easy",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "strong" } })
 
@@ -558,7 +558,7 @@ RSpec.describe User, type: :model do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" }, legacy_rating: "right_level",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
       expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
@@ -579,14 +579,14 @@ RSpec.describe User, type: :model do
       older_exercise = DailyExercise.create!(user: user, date: Date.current - 1,
                                               problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: older_exercise, date: Date.current - 1,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "beginner" } })
 
       newer_exercise = DailyExercise.create!(user: user, date: Date.current,
                                               problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: newer_exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" }, legacy_rating: "too_easy",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "strong" } })
 
@@ -597,7 +597,7 @@ RSpec.describe User, type: :model do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "other" })
 
       expect(user.concepts_needing_reinforcement).to eq([])
@@ -1095,7 +1095,7 @@ RSpec.describe User, type: :model do
                                        answers: { "code_review" => "N+1 query in the loop" },
                                        concept_tags: { "code_review" => "n_plus_one" },
                                        ai_review: { "code_review" => { "rating" => "solid" } },
-                                       section_ratings: { "code_review" => "right_level" }, legacy_rating: "right_level",
+                                       section_ratings: { "code_review" => "right_level" },
                                        submitted_at: Time.current)
       usage = ApiUsage.create!(user: user, tokens_in: 100, tokens_out: 50,
                                purpose: "generate_exercise", date: Date.current)
