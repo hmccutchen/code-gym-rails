@@ -83,7 +83,8 @@ The owner decided on 2026-10-30, after the first triage run:
   too long. An entry cleaning already removes (a flaw with no pushback, an
   entry past the list's cap) is never measured, and the key keeps the
   rest. The multi-file
-  key's `evidence` entries, which arrive in launch B, follow the same rule.
+  key's `evidence` entries, stored from the multi-file launch on, follow
+  the same rule.
 - **Keys stored at the old limit are recognisable.** `String#truncate(500)`
   wrote a field of exactly 500 characters ending in `...`, and a field that
   ended there by chance is close to impossible. A key with any such text
