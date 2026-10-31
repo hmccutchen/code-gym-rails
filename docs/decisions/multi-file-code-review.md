@@ -36,6 +36,12 @@ breaks in another. This replaces the separate `change_review` kind that
   same way, so a review or the duck that cites a line number points at a
   line the engineer can see, and the grader and duck prompts say the
   `N | ` prefix is not code, so it never reaches `improved_code` (#634).
+  The improved code stays one string, and for a multi-file section the
+  grader starts each changed file's part with a `File: <path>` line, so the
+  engineer can tell which file each part replaces (#638). A per-file
+  `{ path, code }` shape was the alternative; it would need a new review
+  shape, its parsing and every reader of `improved_code` changed, for a
+  label the line already gives.
 - **One matcher.** `KeyQuote` holds the quote-matching rule for stored keys
   and changed lines alike. It keeps the stored keys rule (all whitespace
   ignored) and adds the comma and JavaScript rules that undo the formatters'
@@ -56,7 +62,8 @@ breaks in another. This replaces the separate `change_review` kind that
     `PlantedKey::MAX_LENGTH` like any key field, so a too-long entry drops
     the whole key with a `too_long` note, and a multi-file key that fails
     refuses its section
-  - the grading note gets its multi-file branch
+  - the grading note gets its multi-file branch for what to grade (its
+    `improved_code` line is already built, #638)
   - the judge gets a paragraph for sections with files: solve the section
     first, reject it when one file alone shows the problem or it is an
     exploit, and never change a path, a file's code or the changed lines

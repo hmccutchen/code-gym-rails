@@ -16,4 +16,4 @@ Stated once, in the day-level system prompt, so the section prompts never repeat
 
 ## `.walkthrough_prompt`
 
-It shares the entry rules and the JSON header with `.section_prompt` but leaves out the per-kind grading note on purpose: a grading note brings grading instructions into a prompt that must request no grade. In its place it reads the kind's `walkthrough_note`, empty except for Parsons, which supplies the correct block order. It never asks for "rating" or "essential_gaps".
+It shares the entry rules and the JSON header with `.section_prompt` but leaves out the per-kind grading note on purpose: a grading note brings grading instructions into a prompt that must request no grade. In its place it reads the kind's `walkthrough_note`. That is empty except for Parsons, which supplies the correct block order, and a multi-file code review, which asks for a `File: <path>` line above each changed file's part of `improved_code` (#638). The code review line is no grading instruction, so it belongs in both prompts. It never asks for "rating" or "essential_gaps".

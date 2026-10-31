@@ -1099,10 +1099,20 @@ RSpec.describe ExerciseSection do
   end
 
   describe "walkthrough note per kind" do
-    it "is empty for every kind but parsons, so shared code needs no branch" do
-      (ExerciseSection.all - [ ExerciseSection::ParsonsProblem ]).each do |kind|
-        expect(kind.walkthrough_note(section: { "blocks" => %w[a b] })).to eq(""), kind.key
+    let(:two_files) do
+      { "blocks" => %w[a b], "file_1_path" => "app/models/order.rb", "file_1_code" => "a = 1", "file_1_changed_lines" => [ 1 ],
+        "file_2_path" => "app/models/item.rb", "file_2_code" => "b = 2", "file_2_changed_lines" => [] }
+    end
+
+    it "is empty for every kind but parsons and a multi-file code review, so shared code needs no branch" do
+      (ExerciseSection.all - [ ExerciseSection::ParsonsProblem, ExerciseSection::CodeReview ]).each do |kind|
+        expect(kind.walkthrough_note(section: two_files)).to eq(""), kind.key
       end
+    end
+
+    it "gives a multi-file code review the File: line for its improved code, and a single-file one nothing" do
+      expect(ExerciseSection::CodeReview.walkthrough_note(section: two_files)).to eq(ExerciseSection::CodeReview::IMPROVED_CODE_FILES_LINE)
+      expect(ExerciseSection::CodeReview.walkthrough_note(section: { "snippet" => "a = 1" })).to eq("")
     end
 
     it "gives parsons the correct order and nothing about a score" do
