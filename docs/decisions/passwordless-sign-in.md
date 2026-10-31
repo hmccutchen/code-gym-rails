@@ -24,7 +24,7 @@ The extra factor worth having is possession of a phone. That came as an optional
   - It is redeemed under the user row lock, so it can be used only once.
   - It works only in the browser that asked for it, because `SessionsController#verify_code` reads the address from the session.
 - **Signing in.** A valid code, and the authenticator code when that is on, runs `reset_session` before `session[:user_id]` is set (`SignInCompletion#start_new_session_for`). That gives a new session id and a new CSRF token, and it discards everything written before sign-in. `return_to` and a pending trial are read first, so they survive. A second post of the same code from the same browser within 30 seconds, as a double tap sends, signs in too, rather than saying the spent code was wrong (`SignInCompletion#recent_sign_in`). The repeat keeps the first post's check time, so a session ended since then stays ended. `SignInCompletion#complete_sign_in` names the factor that passed and raises `WrongFactor` for the emailed code on an authenticator account, so no sign-in path can finish one on the inbox alone.
-- **The sign-in stamp.** Sign-in also writes `session[:signed_in_at]`. A session counts only while that stamp is at or after `users.sessions_valid_after` (`SignedInSessions`). Pages and the cable connection both check it through `User.signed_in_through`.
+- **The sign-in stamp.** Sign-in also writes `session[:signed_in_at]`. A session counts only while that stamp is at or after `users.sessions_valid_after` (`SignedInSessions`). Every page checks it through `User.signed_in_through`.
 - **Signed-out requests.** `require_login` redirects every signed-out request to `/login`. `request.js` reads that redirect as "signed out". The return address is saved only for a page navigation: a GET whose `Accept` names `text/html`. An expired dashboard poll therefore never becomes the page you land on after signing in. Reloading the page a rejected code renders, a `POST /login/code`, sends a `GET` there, which shows the code page again.
 - **Limits.** `docs/decisions/login-rate-limits.md` has them. Their windows are 15 minutes (`User::LOGIN_RATE_LIMIT_WINDOW`), longer than a code lives.
 
@@ -58,7 +58,7 @@ When the address belongs to an account with the authenticator on, `SessionsContr
 
 - The challenge lasts 5 minutes and ends after 5 wrong codes, counted on the row.
 - A right code, the daily cap, or expiry also ends it. Each sends the user back to `/login` to enter the address again, except a right code, which signs in.
-- The pending marker sets no `user_id`, so every page and the cable connection treat the browser as signed out until the second step passes.
+- The pending marker sets no `user_id`, so every page treats the browser as signed out until the second step passes.
 
 ## Stated plainly
 

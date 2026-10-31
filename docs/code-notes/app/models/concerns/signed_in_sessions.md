@@ -8,7 +8,7 @@ A session with no stamp, or one that doesn't parse, is rejected. That signs out 
 
 ## One lookup for pages
 
-`ApplicationController#current_user` calls `User.signed_in_through`. It finds the account through `User.signed_in`, which keeps the rule that only an active account resolves, and then checks the stamp. Any other reader of the session, such as a websocket connection, must call it too, or an ended session would keep working there after the pages had signed it out.
+`ApplicationController#current_user` calls `User.signed_in_through`. It finds the account through `User.signed_in`, which keeps the rule that only an active account resolves, and then checks the stamp. Any other reader of the session must call it too, or an ended session would keep working there after the pages had signed it out.
 
 ## Who writes the stamp
 
