@@ -127,15 +127,15 @@ or `ClaudeService::MAX_TOKENS` when the profile sets none. The printed line
 names each call's model, input estimate and cap.
 
 - **Judge call:** 3,500 input tokens (`JUDGE_INPUT_TOKENS`, the top of the
-  spec's 3,000–3,500 estimate) and `JUDGE_MAX_TOKENS` (1,200) out on
-  `claude-sonnet-5-5`: $0.019.
+  spec's 3,000–3,500 estimate) and `JUDGE_MAX_TOKENS` (2,000) out on
+  `claude-sonnet-5-5`: $0.027.
 - **Synthetic section:** one draft plus one judge call. `retry_section` has no
   token cap, so the draft is bounded by `ClaudeService::MAX_TOKENS` (16,000)
   out on `claude-opus-5-5`, plus 10,000 input tokens (`DRAFT_INPUT_TOKENS`).
   The rendered retry prompts in `spec/fixtures/prompt_snapshots/case__retry__*`
   are 18–20k characters, and the generation system prompt adds under 1k, which
   is about 6k tokens; 10,000 leaves room for a real engineer's history. That
-  gives $0.36 for the draft and $0.379 per section, against the spec's
+  gives $0.36 for the draft and $0.387 per section, against the spec's
   earlier $0.12, which left out the draft's full output cap.
 
 The script adds no token cap to the production profile; the bound is

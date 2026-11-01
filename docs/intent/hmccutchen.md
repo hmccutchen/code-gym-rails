@@ -512,3 +512,13 @@ data.*
   the code's own guard prevents, and phrase a hidden setting that is the
   flaw conditionally; the design spec stays untracked; I approve the
   production log read before the check is called fixed
+
+## Sun Nov 1
+
+- the section judge's token cap raised to 2,000, three times its largest
+  measured production reply `#649 open`
+  **why:** one judge reply in the code review triage run passed the 1,200
+  cap, and a cut-off judge ships its section unjudged
+  **I decided:** measure first with a read-only production query I ran;
+  2,000 rather than four times the measurement, so a full reply still fits
+  the read timeout and the regeneration deadline doesn't move

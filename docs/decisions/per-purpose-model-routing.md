@@ -22,7 +22,8 @@ Astra have no `none`, so a capped purpose can go to either only when its
 route carries a `reasoning_allowance`. That allowance keeps the route's
 effort and adds itself to the cap. The judge's is 25,000 tokens,
 OpenAI's suggested starting reserve for reasoning and output, so a judge
-call can cost up to 26,200 output tokens at Astra's $50 per million. The
+call can cost up to `JUDGE_MAX_TOKENS` plus 25,000 output tokens (27,000
+since #649) at Astra's $50 per million. The
 judge still runs on the 45-second `READ_TIMEOUT`, and one that runs out of
 time or budget falls back to the draft, like any other judge failure. A
 route with an allowance also makes its timeout final, as a long-running
