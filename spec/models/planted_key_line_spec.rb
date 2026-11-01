@@ -32,18 +32,18 @@ RSpec.describe PlantedKey, "shared hidden-key line" do
 
   describe ".hidden_key_line" do
     it "names the fields to keep the key out of, what is shown, the quote rule, and ends with the grounding rules" do
-      line = described_class.hidden_key_line(fields: %w[question scenario], shown: "the snippet", quoted: "the code")
+      line = described_class.hidden_key_line(fields: %w[question scenario teaching_note], before: "reads the snippet", quoted: "the code")
 
       aggregate_failures do
         expect(line).to start_with(%(- "answer_key" is HIDDEN test data))
-        expect(line).to include(%("question" or "scenario"), "before the engineer reads the snippet",
+        expect(line).to include(%("question", "scenario" or "teaching_note"), "before the engineer reads the snippet",
                                 "Quote the code it points at in backticks, never by line number.")
         expect(line).to end_with(described_class::GROUNDING)
       end
     end
 
     it "leaves the quote rule out for a kind whose key quotes nothing" do
-      line = described_class.hidden_key_line(fields: %w[question], shown: "plans", quoted: nil)
+      line = described_class.hidden_key_line(fields: %w[question], before: "plans", quoted: nil)
 
       expect(line).not_to include("in backticks, never by line number")
       expect(line).to end_with(described_class::GROUNDING)

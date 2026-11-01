@@ -21,7 +21,7 @@ class GenerationDiagnostics
   def key_notes(notes, attempt:, code_review_mode:)
     notes.each do |note|
       Rails.logger.info("[planted_key] answer_key=#{note.outcome} kind=#{note.key} language=#{note.language} " \
-                        "attempt=#{attempt} code_review_mode=#{code_review_mode} user=#{@user.id}")
+                        "attempt=#{attempt} code_review_mode=#{code_review_mode}#{quote_counts(note.quotes)} user=#{@user.id}")
     end
   end
 
@@ -42,6 +42,8 @@ class GenerationDiagnostics
   end
 
   private
+
+  def quote_counts(quotes) = quotes&.counts&.map { |name, count| " #{name}=#{count}" }&.join
 
   def retention(bucket, due_checks, problem_set, code_review_mode, dropped:)
     return if due_checks.empty?

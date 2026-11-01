@@ -13,7 +13,7 @@ RSpec.describe PlantedKey, ".quote_tally" do
 
   it "counts each backticked span under exactly one of verbatim, reference, scenario and unresolved" do
     result = tally([ "`expect(Adoption.count).to eq(0)` always holds, since `Adoption.create!` is stubbed; " \
-                     "`AdoptPet` uses Redis; `:null_store` hides it" ])
+                     "jobs use `Redis`; `:null_store` hides it" ])
 
     expect(result.counts).to eq(verbatim: 1, reference: 1, scenario: 1, unresolved: 1)
     expect(result.unresolved).to eq([ ":null_store" ])

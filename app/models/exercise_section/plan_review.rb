@@ -2,6 +2,8 @@
 class ExerciseSection::PlanReview < ExerciseSection
   extend PlantedKey::Kind
 
+  HIDDEN_KEY_LINE = PlantedKey.hidden_key_line(fields: %w[title question scenario answer_scaffold teaching_note], before: "reads the plan", quoted: "the plan text").freeze
+
   DEFAULT_SCAFFOLD = [
     "What's wrong:",
     "What you'd push back on before approving:"
@@ -58,7 +60,7 @@ class ExerciseSection::PlanReview < ExerciseSection
     <<~GUIDANCE.chomp
       - The "#{key}" section is a PLAN REVIEW: "plan_excerpt" is a short prose implementation plan, framed as if written by an AI assistant, short enough to review in one sitting (2-4 short paragraphs or a short numbered list, never a full design doc). It must contain 2-3 planted flaws that span levels — one real technical anti-pattern, one scope-creep item, one unflagged behavior change — never three of the same category.
       - Choose the plan_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
-      - "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "title", "question", "scenario", "answer_scaffold" or "teaching_note" — doing so would give away the answer before the engineer reads the plan. Quote the plan text it points at in backticks, never by line number.
+      #{HIDDEN_KEY_LINE}
     GUIDANCE
   end
 

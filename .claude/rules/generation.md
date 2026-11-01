@@ -170,6 +170,10 @@ read it before changing that area.
   `PlantedKey::MAX_LENGTH`, which drops the whole key, never cuts it) or `quote_missing` (a quote
   the shown code or plan doesn't contain; the key stays), and
   `GenerationDiagnostics` logs one `[planted_key]` line per note, with its
-  attempt and the day's `code_review_mode` and no key text. The quote match
-  ignores all whitespace. Strip sites read `ExerciseSection.all_answer_key_fields`, which
+  attempt, the day's `code_review_mode`, the quote tally's counts and no key
+  text. The quote match ignores all whitespace. Each backticked span is
+  `verbatim` in the code, a Ruby `reference` to it (`KeyReference`), a
+  `scenario` match, or `unresolved`, and only an unresolved span makes
+  `quote_missing`. Every keyed kind's hidden-key prompt line comes from
+  `PlantedKey.hidden_key_line`, ending in `PlantedKey::GROUNDING`. Strip sites read `ExerciseSection.all_answer_key_fields`, which
   stays at two entries.

@@ -1,5 +1,5 @@
 module ExerciseSection::CodeReview::MultiFile
-  HIDDEN_KEY_LINE = ExerciseSection::CodeReview.hidden_key_line(fields: %w[question scenario teaching_note], shown: "the files").freeze
+  HIDDEN_KEY_LINE = PlantedKey.hidden_key_line(fields: %w[question scenario teaching_note], before: "reads the files", quoted: "the code").freeze
 
   SUBTLETY = {
     "mid_level"          => "- Nothing in the question or the code points at the problem; reading the second file closely finds it.",

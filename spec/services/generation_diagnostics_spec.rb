@@ -37,7 +37,7 @@ RSpec.describe GenerationDiagnostics do
       diagnostics = described_class.new(user)
       diagnostics.set_size(size)
       diagnostics.unusable_sections([ Struct.new(:key, :reason).new("pattern", "too short") ])
-      diagnostics.key_notes([ ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "quote_missing") ],
+      diagnostics.key_notes([ ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "quote_missing", quotes: nil) ],
                             attempt: "draft", code_review_mode: :application_code)
       diagnostics.finished("ruby_rails", draft, problem_set, dropped_concepts: { "challenge" => "caching" })
     end
@@ -48,8 +48,8 @@ RSpec.describe GenerationDiagnostics do
   end
 
   it "logs one line per key note, with its kind, language and outcome" do
-    notes = [ ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "ok"),
-              ProblemSetIngest::KeyNote.new(key: "plan_review", language: "javascript", outcome: "missing") ]
+    notes = [ ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "ok", quotes: nil),
+              ProblemSetIngest::KeyNote.new(key: "plan_review", language: "javascript", outcome: "missing", quotes: nil) ]
 
     lines = logged_lines { described_class.new(user).key_notes(notes, attempt: "draft", code_review_mode: :test_file) }
 
