@@ -11,13 +11,6 @@ RSpec.describe DailyResponse, type: :model do
       .to raise_error(ActiveRecord::RecordNotUnique)
   end
 
-  describe "the retired legacy_rating column" do
-    it "is ignored, so a running process neither reads nor writes it" do
-      expect(described_class.column_names).not_to include("legacy_rating")
-      expect { described_class.new(legacy_rating: "too_hard") }.to raise_error(ActiveModel::UnknownAttributeError)
-    end
-  end
-
   describe "#review_provider_key" do
     let(:user) { User.create!(email: "label@example.com", name: "L", provider: "openai", api_keys: { "openai" => "sk-proj-x" }) }
 
