@@ -482,7 +482,7 @@ data.*
   **I decided:** a prompt rule, not a per-file shape, so the improved code
   stays one string
 - a stored key with a field past 1,500 characters dropped whole, not cut,
-  and noted `too_long` `#640 open`
+  and noted `too_long` `#640`
   **why:** the triage showed keys cut mid-sentence at 500 characters
   **I decided:** 1,500 from the run's lengths; a few sentences a field;
   PR 2 grades keys cut at the old limit as keyless; more than 2 too_long in
@@ -491,6 +491,22 @@ data.*
 
 ## Sat Oct 31
 
+- multi-file code review planned live before keyed grading, with guards,
+  and the token-cost query drafted, not run `#646 open`
+  **why:** to stop waiting on keyed grading for the multi-file mode
+  **I decided:** start at a quarter of eligible days; store the multi-file
+  key from the first day, unread until PR 2, keeping a section whose key
+  fails and counting the reasons; the refusal rule joins with PR 2; regrade
+  the early grades against their keys once PR 2 is on; keep the judge
+  paragraph, the keyless grading note, the split script and multi-file days
+  out of PR 2's samples; I approve the token query when the week is up
+- each kind's rule for what its improved code holds stated once, on the
+  field line both the graded review and the walkthrough carry `#644 open`
+  **why:** pattern, plan review and pseudocode to code kept the rule in
+  their grading notes, which an unanswered section's walkthrough leaves out,
+  so its improved code came with no instruction
+  **I decided:** one improved code hook per kind rather than repeating the
+  rule in each walkthrough note, and the multi-file `File:` line moves there
 - 8 fresh `code_review` drafts made under the $6 cap, for my key read
   **I decided:** all 8 keys right on the main flaw
 - a key's code references counted as resolved, not as missed quotes `#648`

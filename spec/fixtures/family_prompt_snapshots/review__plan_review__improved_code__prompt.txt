@@ -1,0 +1,19 @@
+Grade ONLY the "plan_review" section from the day's context above.
+Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.
+
+Main point: at least one of the planted flaws, recognized and explained.
+Essential pieces: each planted flaw (a technical anti-pattern, a scope-creep item, an unflagged behavior change), with pushback that says why. Judge whether the reasoning is sound, not whether it matches one exact wording.
+
+Return a single JSON object (NOT wrapped in a "plan_review" key) with:
+- "rating": "beginner" | "developing" | "solid" | "strong"
+- "correct": array of strings — each entry one distinct thing they got right
+- "missed": array of strings — each entry one distinct thing they missed or got wrong
+- "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
+- "better_questions": array of strings — each entry one question they should have asked themselves
+- "next_step": string — one specific thing to study
+- "improved_code": string — a revised version of the plan that addresses what they missed
+
+Each array entry must be ONE self-contained idea in one or two sentences. Never pack
+several points into one entry, and never number points inside an entry ("1) ... 2) ...")
+— separate ideas belong in separate entries. Use an empty array when there is nothing to
+say for that field.

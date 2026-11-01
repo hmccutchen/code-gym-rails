@@ -53,9 +53,12 @@ class ExerciseSection::Pattern < ExerciseSection
 
   def self.grading_note(section:, answer:)
     "Main point: the structure the problem calls for.\n" \
-    "Essential pieces: a structure and interface that would work for the stated problem. The answer scaffold names what to cover (#{scaffold_labels(section).map { |label| label.delete_suffix(':') }.join('; ')}), whether or not the answer kept the labels; a part it leaves out is an essential gap only when the design would not work without it.\n" \
-    "For \"pattern\", improved_code must show the refactored structure that addresses what they missed — " \
-    "the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is " \
-    "structural; show enough of the shape to make the structure obvious."
+    "Essential pieces: a structure and interface that would work for the stated problem. The answer scaffold names what to cover (#{scaffold_labels(section).map { |label| label.delete_suffix(':') }.join('; ')}), whether or not the answer kept the labels; a part it leaves out is an essential gap only when the design would not work without it."
+  end
+
+  def self.improved_code_instruction(section:, answered:)
+    structure = answered ? "the refactored structure that addresses what they missed" : "the refactored structure the problem needs"
+    "#{structure} — the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is " \
+      "structural; show enough of the shape to make the structure obvious."
   end
 end

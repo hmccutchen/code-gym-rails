@@ -1,0 +1,21 @@
+Grade ONLY the "pseudocode_to_code" section from the day's context above.
+Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.
+
+Grade the REASONING in their pseudocode, not the polish of the code it produced. The code was translated literally and faithfully from the pseudocode it was given — it was never corrected — so a flaw in it is a flaw in THAT version of the plan, and missing syntax or idiom in it is an artifact of translation and is never a fault. Attribute a flaw to their final answer only when the context above says the code was translated from that same text; if it says the plan was revised afterwards, check whether the final version still has the flaw before counting it.
+Main point: an approach that would solve the problem.
+Essential pieces: the gaps this standard counts. Only flag a gap if implementing the pseudocode literally as written would produce behavior that's actually wrong or that fails to handle something the problem statement requires. Do NOT flag: missing syntax or type detail, omitted mechanical/obvious steps (e.g. "return the result"), or any level of abstraction normal for pseudocode. Pseudocode is expected to be less granular than code — evaluate the REASONING, not the verbosity.
+If the context above shows a critique was requested, credit any revision that addressed a point it raised. NEVER treat an unaddressed critique point as a miss on its own: the critique is advisory, the engineer may have judged it wrong, and it is permitted to find nothing at all.
+
+Return a single JSON object (NOT wrapped in a "pseudocode_to_code" key) with:
+- "rating": "beginner" | "developing" | "solid" | "strong"
+- "correct": array of strings — each entry one distinct thing they got right
+- "missed": array of strings — each entry one distinct thing they missed or got wrong
+- "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
+- "better_questions": array of strings — each entry one question they should have asked themselves
+- "next_step": string — one specific thing to study
+- "improved_code": string — their corrected plan implemented — the smallest change to their approach that fixes what they missed, not a from-scratch ideal solution
+
+Each array entry must be ONE self-contained idea in one or two sentences. Never pack
+several points into one entry, and never number points inside an entry ("1) ... 2) ...")
+— separate ideas belong in separate entries. Use an empty array when there is nothing to
+say for that field.

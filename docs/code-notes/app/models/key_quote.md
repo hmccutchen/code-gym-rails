@@ -4,7 +4,7 @@ The one home for matching text a provider quoted against the code as the
 page shows it, after `CodeFormat` has reformatted it. The stored keys' quote
 check (`PlantedKey.quote_tally`, for its verbatim and scenario outcomes, and `KeyReference`, for a shortened call), the multi-file code review's
 changed-line resolver and the blind-solve triage script (`KeyTriage`) call
-it today, and launch B's evidence check will too. One matcher means one rule for what counts as "the same code", so two checks
+it today, and the multi-file key's evidence check will too. One matcher means one rule for what counts as "the same code", so two checks
 can't disagree about a quote (design spec section 4, 2026-10-29).
 
 ## The rules
@@ -67,5 +67,5 @@ returns nil for a quote the code holds more than once, as `.line` does for
 two matches, since a short quote such as `order` would otherwise land on
 whichever appearance comes first, and for a quote that normalizes to
 nothing. The triage script is
-its first caller; launch B's evidence check
+its first caller; the multi-file key's evidence check
 (`docs/decisions/multi-file-code-review.md`) will be the second.

@@ -61,7 +61,7 @@ class ReviewPrompt
       - "correct": array of strings — each entry one distinct thing they got right
       - "missed": array of strings — each entry one distinct thing they missed or got wrong
       - "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
-      #{shared_review_fields(kind)}
+      #{shared_review_fields(kind, section: section, answered: true)}
 
       #{ENTRY_RULES}
     PROMPT
@@ -77,7 +77,7 @@ class ReviewPrompt
       #{walkthrough_note_block(kind, section)}#{json_header(key)}
       - "correct": array of strings — always empty
       - "missed": array of strings — each entry one distinct thing a good answer would cover
-      #{shared_review_fields(kind)}
+      #{shared_review_fields(kind, section: section, answered: false)}
 
       #{ENTRY_RULES}
     PROMPT
@@ -92,19 +92,13 @@ class ReviewPrompt
     %(Return a single JSON object (NOT wrapped in a "#{key}" key) with:)
   end
 
-  def self.shared_review_fields(kind)
+  def self.shared_review_fields(kind, section:, answered:)
     <<~FIELDS.chomp
       - "better_questions": array of strings — each entry one question they should have asked themselves
       - "next_step": string — one specific thing to study
-      - "improved_code": string — #{improved_code_instruction(kind)}
+      - "improved_code": string — #{kind.improved_code_instruction(section: section, answered: answered)}
     FIELDS
   end
 
-  def self.improved_code_instruction(kind)
-    kind.improved_code? ?
-      "the #{kind.improved_code_label.downcase} for this section" :
-      "must be an empty string for this section"
-  end
-
-  private_class_method :walkthrough_note_block, :improved_code_instruction, :json_header, :shared_review_fields
+  private_class_method :walkthrough_note_block, :json_header, :shared_review_fields
 end
