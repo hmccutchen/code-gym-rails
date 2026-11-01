@@ -245,19 +245,17 @@ class ExerciseSection::CodeReview < ExerciseSection
     SCHEMA
   end
 
-  IMPROVED_CODE_FILES_LINE = "This section shows several files, so start each changed file's part of \"improved_code\" with a line " \
+  IMPROVED_CODE_FILES_LINE = "This section shows several files, so start each changed file's part with a line " \
                              "\"File: <path>\", the path exactly as shown above, and leave out a file the fix doesn't change."
 
   def self.grading_note(section:, answer:)
-    [ "Main point: the one planted issue — the defect in the snippet, the smell in the test file, or the flaw in the migration.\n" \
-      "Essential pieces: why it is a problem in this code, and a fix that would work as written.",
-      improved_code_files_line(section) ].compact.join("\n")
+    "Main point: the one planted issue — the defect in the snippet, the smell in the test file, or the flaw in the migration.\n" \
+    "Essential pieces: why it is a problem in this code, and a fix that would work as written."
   end
 
-  def self.walkthrough_note(section:) = improved_code_files_line(section).to_s
-
-  def self.improved_code_files_line(section) = (IMPROVED_CODE_FILES_LINE if files(section).any?)
-  private_class_method :improved_code_files_line
+  def self.improved_code_instruction(section:, answered:)
+    [ super, (IMPROVED_CODE_FILES_LINE if files(section).any?) ].compact.join(". ")
+  end
 
   def self.review_context(section:, answer:, rating:)
     [

@@ -500,3 +500,10 @@ data.*
   the early grades against their keys once PR 2 is on; keep the judge
   paragraph, the keyless grading note, the split script and multi-file days
   out of PR 2's samples; I approve the token query when the week is up
+- each kind's rule for what its improved code holds stated once, on the
+  field line both the graded review and the walkthrough carry `#644 open`
+  **why:** pattern, plan review and pseudocode to code kept the rule in
+  their grading notes, which an unanswered section's walkthrough leaves out,
+  so its improved code came with no instruction
+  **I decided:** one improved code hook per kind rather than repeating the
+  rule in each walkthrough note, and the multi-file `File:` line moves there

@@ -3,7 +3,6 @@ Pitched at: senior — the concept alongside a realistic constraint or a second 
 
 Main point: the one planted issue — the defect in the snippet, the smell in the test file, or the flaw in the migration.
 Essential pieces: why it is a problem in this code, and a fix that would work as written.
-This section shows several files, so start each changed file's part of "improved_code" with a line "File: <path>", the path exactly as shown above, and leave out a file the fix doesn't change.
 
 Return a single JSON object (NOT wrapped in a "code_review" key) with:
 - "rating": "beginner" | "developing" | "solid" | "strong"
@@ -12,7 +11,7 @@ Return a single JSON object (NOT wrapped in a "code_review" key) with:
 - "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
 - "better_questions": array of strings — each entry one question they should have asked themselves
 - "next_step": string — one specific thing to study
-- "improved_code": string — the improved code for this section
+- "improved_code": string — the improved code for this section. This section shows several files, so start each changed file's part with a line "File: <path>", the path exactly as shown above, and leave out a file the fix doesn't change.
 
 Each array entry must be ONE self-contained idea in one or two sentences. Never pack
 several points into one entry, and never number points inside an entry ("1) ... 2) ...")

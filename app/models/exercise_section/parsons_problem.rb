@@ -174,7 +174,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
         Verified result (already scored in Ruby — do not re-judge correctness or propose a different rating): #{grade(submitted, blocks.size)[:mismatches]} block(s) out of place.
 
         Explain WHY the misplaced blocks belong where they do — cite the actual dependency or logical reason (e.g. "this block uses a variable an earlier block declares, so it must come after it"), grounded strictly in the verified result above. Do not output a "rating" judgement of your own for this section; the rating is fixed by the verified result, not by you.
-        For this section "improved_code" must be an empty string.
       PARSONS
     end
 

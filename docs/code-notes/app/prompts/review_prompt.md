@@ -16,4 +16,6 @@ Stated once, in the day-level system prompt, so the section prompts never repeat
 
 ## `.walkthrough_prompt`
 
-It shares the entry rules and the JSON header with `.section_prompt` but leaves out the per-kind grading note on purpose: a grading note brings grading instructions into a prompt that must request no grade. In its place it reads the kind's `walkthrough_note`. That is empty except for Parsons, which supplies the correct block order, and a multi-file code review, which asks for a `File: <path>` line above each changed file's part of `improved_code` (#638). The code review line is no grading instruction, so it belongs in both prompts. It never asks for "rating" or "essential_gaps".
+It shares the entry rules and the JSON header with `.section_prompt` but leaves out the per-kind grading note on purpose: a grading note brings grading instructions into a prompt that must request no grade. In its place it reads the kind's `walkthrough_note`, empty except for Parsons, which supplies the correct block order. It never asks for "rating" or "essential_gaps".
+
+Both prompts end with the same fields, and the `improved_code` field line reads the kind's `.improved_code_instruction(section:, answered:)`. That hook is the one place a kind says what its improved code should hold, so the walkthrough gets it too. Before #642 pattern, plan review and pseudocode to code said it in their grading notes, which the walkthrough leaves out, so an unanswered section's improved code came with no instruction.

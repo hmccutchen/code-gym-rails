@@ -109,7 +109,8 @@ an answer that names the interaction across files that breaks, both sides of
 it, and a fix that touches the right file or files. A finding confined to one
 file earns credit only as far as it goes. The changed lines tell the grader
 where the change is, never where the flaw is. The `improved_code` line
-(#638) is unchanged. PR 2 adds the keyed wording beside it.
+(#638, in `.improved_code_instruction` since #642) is unchanged. PR 2 adds
+the keyed wording beside it.
 
 ### The split script
 

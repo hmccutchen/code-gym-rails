@@ -2564,14 +2564,13 @@ RSpec.describe AiService do
 
   describe "grading notes for the fourth-slot kinds" do
     it "instructs grading against the planted list for ambiguity_hunt" do
-      note = ExerciseSection::AmbiguityHunt.grading_note(section: {}, answer: nil)
-      expect(note).to match(/planted/i)
-      expect(note).to match(/empty string/i)
+      expect(ExerciseSection::AmbiguityHunt.grading_note(section: {}, answer: nil)).to match(/planted/i)
+      expect(ExerciseSection::AmbiguityHunt.improved_code_instruction(section: {}, answered: true)).to match(/empty string/i)
     end
 
     it "instructs evaluating pushback quality and a revised plan for plan_review" do
-      note = ExerciseSection::PlanReview.grading_note(section: {}, answer: nil)
-      expect(note).to match(/revised/i)
+      expect(ExerciseSection::PlanReview.grading_note(section: {}, answer: nil)).to match(/pushback/i)
+      expect(ExerciseSection::PlanReview.improved_code_instruction(section: {}, answered: true)).to match(/revised/i)
     end
 
     it "names challenge's main point in its own note" do
