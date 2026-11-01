@@ -68,10 +68,27 @@ truncated the longest valid replies mid-JSON.
 Both margins in the difficulty cap are chosen, not measured. A cap that is too
 tight loses the note silently.
 
+## `JUDGE_MEASURED_MAX_OUTPUT_TOKENS`
+
+The largest finished section-judge reply measured in production, in output
+tokens: 654, from `claude-sonnet-5-5`, over 47 `judge_section` usage rows from
+2026-10-05 to 2026-10-30 (39 Sonnet, 8 OpenAI, whose largest was 163), none of
+them truncated (#639). `ai_service_spec` asserts `JUDGE_MAX_TOKENS` holds three
+times it. A later measurement past a third of the cap needs a decision about
+the cap, not just a new number here.
+
 ## `JUDGE_MAX_TOKENS`
 
-Sized for five prose fields, Pattern's count. The headroom bounds a model that
-overruns, and passing the cap turns thinking off.
+Raised from 1,200 to 2,000 after one reply in the first `code_review` triage
+run (2026-10-30) passed 1,200 and fell back as `truncated`, so its section
+would have shipped unjudged (#639). An `edit` verdict writes back every prose
+field it rewrites, so the reply grows with the section's prose, not its rung,
+and one cap serves every rung. Three times the measured largest reply, rather
+than the review judge's four, keeps a full reply near 33 seconds at Sonnet's
+speed, inside `READ_TIMEOUT`, so the judge's worst-case call time and the
+regeneration deadline that reserves it stay as they were. The judge is billed
+only for the tokens it writes, so the room costs nothing until a reply uses
+it. Passing the cap turns thinking off.
 
 ## `REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS`
 
