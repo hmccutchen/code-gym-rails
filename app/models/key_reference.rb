@@ -10,15 +10,18 @@ module KeyReference
 
   ELISION = "...".freeze
 
+  ARGUMENTS_ELIDED = "(...)".freeze
+
   RUBY = "ruby_rails".freeze
 
   def self.resolves?(span, code:, language:)
     return false unless language == RUBY
 
     span = span.strip
-    if span.include?(ELISION) then elided?(span, code, language)
-    elsif (match = span.match(CALL)) then called?(match[1], match[2], code)
-    elsif (match = span.match(INSTANCE_METHOD)) then defined_in?(match[1], match[2], code)
+    named = span.delete_suffix(ARGUMENTS_ELIDED)
+    if (match = named.match(CALL)) then called?(match[1], match[2], code)
+    elsif (match = named.match(INSTANCE_METHOD)) then defined_in?(match[1], match[2], code)
+    elsif span.include?(ELISION) then elided?(span, code, language)
     else false
     end
   end
@@ -32,14 +35,21 @@ module KeyReference
   end
 
   def self.called?(receiver, name, code)
-    receiver_pattern = /(?<![\w:.])#{Regexp.escape(receiver)}(?![\w])/
-    name_pattern = /[.:]#{Regexp.escape(name)}(?![\w?!=])/
-    code.each_line.any? { |line| line.match?(receiver_pattern) && line.match?(name_pattern) }
+    receiver = Regexp.escape(receiver)
+    name = /#{Regexp.escape(name)}(?![\w?!=])/
+    call = /(?<![\w:.])#{receiver}\s*\.\s*#{name}/
+    stub = /\b(?:allow|expect)\(\s*#{receiver}\s*\)\s*\.\s*(?:to|not_to|to_not)\s+(?:receive|have_received)\(\s*:#{name}/
+    code.match?(call) || code.match?(stub)
   end
 
   def self.defined_in?(constant, name, code)
-    body = code[/^[ \t]*class #{Regexp.escape(constant)}\b.*?(?=^class\s|\z)/m]
-    body.present? && body.match?(/^[ \t]*def #{Regexp.escape(name)}(?![\w?!=])/)
+    lines = code.lines
+    start = lines.index { |line| line.match?(/^\s*class\s+#{Regexp.escape(constant)}(?=\s|<|;|$)/) }
+    return false unless start
+
+    indent = lines[start][/\A\s*/]
+    finish = (start + 1...lines.size).find { |index| lines[index].match?(/\A#{indent}end\b/) } || lines.size
+    lines[start + 1...finish].any? { |line| line.match?(/^\s*def\s+#{Regexp.escape(name)}(?![\w?!=])/) }
   end
 
   private_class_method :elided?, :called?, :defined_in?

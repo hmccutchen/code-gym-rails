@@ -54,10 +54,8 @@ module PlantedKey
       "doing so would give away the answer before the engineer #{before}.#{quote_rule} #{GROUNDING}"
   end
 
-  def self.unquoted_parts(texts, within:, language:) = quote_tally(texts, within: within, language: language).unresolved
-
   # A text with no quote at all counts as one miss: the key is asked to quote, so a paraphrase is a lead to read.
-  def self.quote_tally(texts, within:, language:, scenario: nil)
+  def self.quote_tally(texts, within:, scenario:, language:)
     code = within.compact.join("\n")
     outcomes = texts.compact.flat_map do |text|
       quotes = text.scan(QUOTE).flatten

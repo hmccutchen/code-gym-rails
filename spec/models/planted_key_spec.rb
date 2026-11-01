@@ -51,44 +51,46 @@ RSpec.describe PlantedKey do
     end
   end
 
-  describe ".unquoted_parts" do
+  describe ".quote_tally, the code-only part" do
+    def unquoted(texts, within:, language:) = described_class.quote_tally(texts, within: within, scenario: nil, language: language).unresolved
+
     let(:code) { "def update\n  current_user.update(params[:user])\nend" }
 
     it "returns each backticked quote not found in the text, with whitespace collapsed on both sides" do
       aggregate_failures do
-        expect(described_class.unquoted_parts([ "`current_user.update(params[:user])` assigns everything" ], within: [ code ], language: "ruby_rails")).to eq([])
-        expect(described_class.unquoted_parts([ "`current_user.update(   params[:user])`" ], within: [ "current_user.update(\n params[:user])" ], language: "ruby_rails")).to eq([])
-        expect(described_class.unquoted_parts([ "`update!(params)` and `current_user`" ], within: [ code ], language: "ruby_rails")).to eq([ "update!(params)" ])
+        expect(unquoted([ "`current_user.update(params[:user])` assigns everything" ], within: [ code ], language: "ruby_rails")).to eq([])
+        expect(unquoted([ "`current_user.update(   params[:user])`" ], within: [ "current_user.update(\n params[:user])" ], language: "ruby_rails")).to eq([])
+        expect(unquoted([ "`update!(params)` and `current_user`" ], within: [ code ], language: "ruby_rails")).to eq([ "update!(params)" ])
       end
     end
 
     it "ignores whitespace entirely, since formatting adds spaces the provider never wrote" do
-      expect(described_class.unquoted_parts([ "`{a: 1}` and `x+1`" ], within: [ "{ a: 1 }\ny = x + 1" ], language: "ruby_rails")).to eq([])
+      expect(unquoted([ "`{a: 1}` and `x+1`" ], within: [ "{ a: 1 }\ny = x + 1" ], language: "ruby_rails")).to eq([])
     end
 
     it "leaves a quote under three non-space characters unchecked, so a stray `.` neither passes nor fails" do
-      expect(described_class.unquoted_parts([ "`.` then `ab`" ], within: [ "nothing here" ], language: "ruby_rails")).to eq([])
-      expect(described_class.unquoted_parts([ "`.` then `abc`" ], within: [ "nothing here" ], language: "ruby_rails")).to eq([ "abc" ])
+      expect(unquoted([ "`.` then `ab`" ], within: [ "nothing here" ], language: "ruby_rails")).to eq([])
+      expect(unquoted([ "`.` then `abc`" ], within: [ "nothing here" ], language: "ruby_rails")).to eq([ "abc" ])
     end
 
     it "counts a text with no backticked quote as one unquoted part" do
-      expect(described_class.unquoted_parts([ "The update assigns everything.", "`current_user`" ], within: [ code ], language: "ruby_rails").size).to eq(1)
+      expect(unquoted([ "The update assigns everything.", "`current_user`" ], within: [ code ], language: "ruby_rails").size).to eq(1)
     end
 
     it "reads every text it is given, and ignores a missing one" do
-      expect(described_class.unquoted_parts([ "`nope`", nil ], within: [ code, nil ], language: "ruby_rails")).to eq([ "nope" ])
+      expect(unquoted([ "`nope`", nil ], within: [ code, nil ], language: "ruby_rails")).to eq([ "nope" ])
     end
 
     it "matches a quote that differs from the code only by a trailing comma" do
-      expect(described_class.unquoted_parts([ "`timeout: 5,`" ], within: [ "call(timeout: 5)" ], language: "ruby_rails")).to eq([])
+      expect(unquoted([ "`timeout: 5,`" ], within: [ "call(timeout: 5)" ], language: "ruby_rails")).to eq([])
     end
 
     it "applies the JavaScript rules when the language is JavaScript" do
       quote = [ "`return ids.map(id=>fetch(id))`" ]
       code = [ "return ids.map((id) => fetch(id));" ]
 
-      expect(described_class.unquoted_parts(quote, within: code, language: "javascript")).to eq([])
-      expect(described_class.unquoted_parts(quote, within: code, language: "ruby_rails")).to eq([ "return ids.map(id=>fetch(id))" ])
+      expect(unquoted(quote, within: code, language: "javascript")).to eq([])
+      expect(unquoted(quote, within: code, language: "ruby_rails")).to eq([ "return ids.map(id=>fetch(id))" ])
     end
   end
 

@@ -35,8 +35,7 @@ when `KeyReference.resolves?` finds the name it gives in the code
 (`docs/code-notes/app/models/key_reference.md`), `scenario` when it is in
 the scenario verbatim, and `unresolved` otherwise. The code comes first, so
 a span both hold counts as code. Only an unresolved span makes ingest's
-outcome `quote_missing`. `.unquoted_parts` is the tally's unresolved spans
-with no scenario. The Ruby formatter's Layout cops add spaces the provider
+outcome `quote_missing`. The Ruby formatter's Layout cops add spaces the provider
 never wrote (`{a: 1}` becomes `{ a: 1 }`, `x+1` becomes `x + 1`), and both
 formatters add a trailing comma to the last item of a wrapped list, so a
 quote of the provider's own snippet would otherwise miss against the code

@@ -38,6 +38,29 @@ RSpec.describe KeyReference do
     it "misses a method name that only appears as part of a longer name" do
       expect(resolves?("Adoption.create", "allow(Adoption).to receive(:create!)")).to be(false)
     end
+
+    it "resolves a reference written with (...) the way it resolves the bare name" do
+      aggregate_failures do
+        expect(resolves?("Rails.cache.fetch(...)", "expect(Rails.cache).to receive(:fetch)")).to be(true)
+        expect(resolves?("Adoption.create!(...)", "allow(Adoption).to receive(:create!)")).to be(true)
+        expect(resolves?("Adoption.create!(...)", "Adoption.create!(pet: pet)")).to be(true)
+      end
+    end
+
+    it "resolves a call the formatter split across lines, and a have_received stub" do
+      aggregate_failures do
+        expect(resolves?("Rails.cache.fetch", "Rails.cache\n  .fetch(\"summary\", expires_in: 1.hour)")).to be(true)
+        expect(resolves?("Rails.cache.fetch", "expect(Rails.cache).to have_received(:fetch)")).to be(true)
+      end
+    end
+
+    it "misses when the receiver and the method share a line but the method is called on something else" do
+      expect(resolves?("Adoption.create!", "Pet.create!(adoption: Adoption.new)")).to be(false)
+    end
+
+    it "misses when the receiver only appears as the namespace of a longer constant" do
+      expect(resolves?("Adoption.create!", "Adoption::Record.create!(x: 1)")).to be(false)
+    end
   end
 
   describe "a Const#method reference" do
@@ -56,6 +79,21 @@ RSpec.describe KeyReference do
 
     it "misses when no class of that name is shown" do
       expect(resolves?("AdoptPet#rollback", code)).to be(false)
+    end
+
+    it "misses a class that only shares the name's prefix as a namespace" do
+      expect(resolves?("Foo#perform", "class Foo::Bar\n  def perform\n  end\nend")).to be(false)
+    end
+
+    it "ends the class body at the class's own end, so a later method doesn't count" do
+      aggregate_failures do
+        expect(resolves?("Foo#perform", "class Foo\n  def call\n  end\nend\n\nRSpec.describe Foo do\n  def perform\n  end\nend")).to be(false)
+        expect(resolves?("Foo#perform", "class Foo\nend\n\ndef perform\nend")).to be(false)
+      end
+    end
+
+    it "resolves a method in a class nested inside a module" do
+      expect(resolves?("Foo#perform", "module Jobs\n  class Foo\n    def perform\n    end\n  end\nend")).to be(true)
     end
   end
 

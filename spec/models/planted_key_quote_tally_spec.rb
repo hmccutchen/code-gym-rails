@@ -53,10 +53,4 @@ RSpec.describe PlantedKey, ".quote_tally" do
       expect(tally([ "`Adoption.create!` and `:null_store`" ]).unresolved?).to be(true)
     end
   end
-
-  it "gives .unquoted_parts the same unresolved spans, so its callers are unchanged" do
-    texts = [ "`Adoption.create!` and `:null_store`" ]
-
-    expect(described_class.unquoted_parts(texts, within: [ code ], language: "ruby_rails")).to eq(tally(texts, scenario: nil).unresolved)
-  end
 end

@@ -167,13 +167,15 @@ read it before changing that area.
   the section. Nothing reads it yet: not the grader, the page, the
   judge or any prompt, and specs pin each place. `ProblemSetIngest` notes
   every keyed section that won its slot, last, as `ok`, `missing`, `too_long` (a field past
-  `PlantedKey::MAX_LENGTH`, which drops the whole key, never cuts it) or `quote_missing` (a quote
-  the shown code or plan doesn't contain; the key stays), and
+  `PlantedKey::MAX_LENGTH`, which drops the whole key, never cuts it) or `quote_missing` (a
+  backticked span that is neither in the shown code or plan, nor a Ruby
+  reference to it, nor in the scenario; the key stays), and
   `GenerationDiagnostics` logs one `[planted_key]` line per note, with its
   attempt, the day's `code_review_mode`, the quote tally's counts and no key
   text. The quote match ignores all whitespace. Each backticked span is
   `verbatim` in the code, a Ruby `reference` to it (`KeyReference`), a
   `scenario` match, or `unresolved`, and only an unresolved span makes
   `quote_missing`. Every keyed kind's hidden-key prompt line comes from
-  `PlantedKey.hidden_key_line`, ending in `PlantedKey::GROUNDING`. Strip sites read `ExerciseSection.all_answer_key_fields`, which
-  stays at two entries.
+  `PlantedKey.hidden_key_line`, ending in `PlantedKey::GROUNDING`.
+  Strip sites read `ExerciseSection.all_answer_key_fields`, which stays at
+  two entries.

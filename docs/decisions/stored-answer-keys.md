@@ -117,10 +117,11 @@ Two checks, neither of which changes a key:
 - **A code reference is not a misquote** (owner's decisions, 2026-11-01).
   A key names code in its prose as well as quoting it, so a backticked span
   that isn't verbatim in the code is tried as a Ruby reference before it
-  counts as missed: `Const.method` with both on one line, as a call or a
-  stub (`allow(Adoption).to receive(:create!)` holds `Adoption.create!`),
-  `Const#method` defined inside that class's body, or a call shortened with
-  `...` whose pieces appear in order (`KeyReference`). The scenario counts
+  counts as missed: `Const.method` called directly on that receiver or
+  stubbed on it (`allow(Adoption).to receive(:create!)` holds
+  `Adoption.create!`), with or without a trailing `(...)`, `Const#method`
+  defined inside that class's own body, or a call shortened with `...`
+  whose pieces appear in order (`KeyReference`). The scenario counts
   as shown, so a span neither verbatim nor a reference is then looked for in
   the scenario verbatim. Each span lands under one of `verbatim`,
   `reference`, `scenario` or `unresolved`, and the `[planted_key]` line logs

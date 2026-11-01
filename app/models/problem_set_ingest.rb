@@ -83,12 +83,11 @@ class ProblemSetIngest
   end
 
   def key_note(key, kind, section)
-    note = KeyNote.new(key: key, language: @language, outcome: "too_long", quotes: nil)
-    return note if @too_long_keys.include?(key)
-    return note.with(outcome: "missing") unless section.key?(PlantedKey::FIELD)
+    return KeyNote.new(key: key, language: @language, outcome: "too_long", quotes: nil) if @too_long_keys.include?(key)
+    return KeyNote.new(key: key, language: @language, outcome: "missing", quotes: nil) unless section.key?(PlantedKey::FIELD)
 
     quotes = kind.quote_tally(section, language: @language)
-    note.with(outcome: quotes.unresolved? ? "quote_missing" : "ok", quotes: quotes)
+    KeyNote.new(key: key, language: @language, outcome: quotes.unresolved? ? "quote_missing" : "ok", quotes: quotes)
   end
 
   def format_code!
