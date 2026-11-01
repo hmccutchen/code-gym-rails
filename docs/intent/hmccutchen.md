@@ -479,3 +479,20 @@ data.*
   PR 2 grades keys cut at the old limit as keyless; more than 2 too_long in
   10 stops the work; 8 fresh code review drafts, no solve, before my key
   read, under a `--max-cost` cap the script enforces, to spend less
+
+## Sat Oct 31
+
+- 8 fresh `code_review` drafts made under the $6 cap, for my key read
+  **I decided:** all 8 keys right on the main flaw
+- a key's code references counted as resolved, not as missed quotes `#648`
+  **why:** 4 of 8 drafts logged `quote_missing` for names like
+  `Adoption.create!` and `HoldPickupJob#perform`; only `:null_store` was a
+  real miss
+  **I decided:** scenario facts count as shown, searched after the code and
+  logged on their own; only unresolved spans count toward the stop
+  condition; no JavaScript shapes until a JavaScript run needs them; the 8
+  drafts are the design set and the next 10 real-day sections the test;
+  keys never lean on facts the snippet doesn't show, never claim an effect
+  the code's own guard prevents, and phrase a hidden setting that is the
+  flaw conditionally; the design spec stays untracked; I approve the
+  production log read before the check is called fixed
