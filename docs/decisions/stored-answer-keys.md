@@ -115,6 +115,30 @@ Two checks, neither of which changes a key:
   drafted Ruby sections of a keyed kind also stops the work, and the owner
   decides between raising the limit, tightening the guidance and accepting
   the rate (owner's decision, 2026-10-30).
+- **A code reference is not a misquote** (owner's decisions, 2026-11-01).
+  A key names code in its prose as well as quoting it, so a backticked span
+  that isn't verbatim in the code is tried as a Ruby reference before it
+  counts as missed: `Const.method` called directly on that receiver or
+  stubbed on it (`allow(Adoption).to receive(:create!)` holds
+  `Adoption.create!`), with or without a trailing `(...)`, `Const#method`
+  defined inside that class's own body, or a call shortened with `...`
+  whose pieces appear in order (`KeyReference`). The scenario counts
+  as shown, so a span neither verbatim nor a reference is then looked for in
+  the scenario verbatim. Each span lands under one of `verbatim`,
+  `reference`, `scenario` or `unresolved`, and the `[planted_key]` line logs
+  the four counts. Only an unresolved span makes `quote_missing`, and only
+  those count toward the threshold above. JavaScript gets no reference
+  shapes until a JavaScript run shows it needs them. The 8 Ruby
+  `code_review` drafts the owner read on 2026-11-01 shaped these rules (4
+  of 8 missed under the old check, 1 of 8 under these), so the test is the
+  next 10 Ruby keyed sections from real days. The generation prompt adds
+  three rules to every keyed kind's hidden-key line
+  (`PlantedKey::GROUNDING`): every claim follows from what is shown, the
+  scenario included, and the planted flaw is never stated in the scenario;
+  a consequence is traced through the code's guards, so a key never claims
+  an effect a guard prevents (one draft claimed a rollback sends an email
+  its job's status guard stops); and a hidden setting that is itself the
+  flaw is phrased conditionally, never asserted and never backticked.
 - **A sampled read.** The owner reads the Ruby `code_review` keys from real
   days, through the key sheet (`export_review_baseline.rb --key-sheet`),
   which carries the problem and its key and nothing about the owner's

@@ -2,7 +2,7 @@
 
 The one home for matching text a provider quoted against the code as the
 page shows it, after `CodeFormat` has reformatted it. The stored keys' quote
-check (`PlantedKey.unquoted_parts`), the multi-file code review's
+check (`PlantedKey.quote_tally`, for its verbatim and scenario outcomes, and `KeyReference`, for a shortened call), the multi-file code review's
 changed-line resolver and the blind-solve triage script (`KeyTriage`) call
 it today, and the multi-file key's evidence check will too. One matcher means one rule for what counts as "the same code", so two checks
 can't disagree about a quote (design spec section 4, 2026-10-29).

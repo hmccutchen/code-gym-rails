@@ -22,13 +22,8 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   MULTI_FILE_RANGES = { "junior" => 1..1, "mid_level" => 2..2, "senior" => 2..3, "principal_engineer" => 2..3 }.freeze
 
-  def self.hidden_key_line(fields:, shown:)
-    named = fields.map { |field| %("#{field}") }.to_sentence(words_connector: ", ", last_word_connector: " or ")
-    %(- "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside #{named} — ) +
-      "doing so would give away the answer before the engineer reads #{shown}. Quote the code it points at in backticks, never by line number."
-  end
-
-  HIDDEN_KEY_LINE = hidden_key_line(fields: %w[question scenario teaching_note diagram], shown: "the snippet").freeze
+  HIDDEN_KEY_LINE = PlantedKey.hidden_key_line(fields: %w[question scenario teaching_note diagram], before: "reads the snippet",
+                                                quoted: "the code").freeze
 
   ANSWER_KEY_SCHEMA = <<~SCHEMA.chomp
     "answer_key": {

@@ -2,6 +2,8 @@
 class ExerciseSection::PseudocodeToCode < ExerciseSection
   extend PlantedKey::Kind
 
+  HIDDEN_KEY_LINE = PlantedKey.hidden_key_line(fields: %w[title question scenario teaching_note], before: "plans", quoted: nil).freeze
+
   MAX_CRITIQUE_POINTS = 3
 
   MAX_CRITIQUE_POINT_LENGTH = 300
@@ -83,7 +85,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
       - State the problem in terms of behavior and inputs, never in terms of #{label} APIs: the engineer answers in pseudocode, and naming a framework method would hand them the decomposition.
       - Do NOT include starter code, a function signature, or a worked example. Choosing the decomposition is the whole exercise.
       - Choose the pseudocode_to_code concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
-      - "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "title", "question", "scenario" or "teaching_note" — doing so would give away the answer before the engineer plans.
+      #{HIDDEN_KEY_LINE}
     GUIDANCE
   end
 

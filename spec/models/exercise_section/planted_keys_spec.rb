@@ -86,8 +86,8 @@ RSpec.describe "The answer key each discovery kind plants" do
     end
   end
 
-  describe ".unquoted_key_parts" do
-    def unquoted(kind, section) = kind.unquoted_key_parts(section, language: "ruby_rails")
+  describe ".quote_tally" do
+    def unquoted(kind, section) = kind.quote_tally(section, language: "ruby_rails").unresolved
 
     it "checks a code review's issue against its snippet and any current schema" do
       kind = ExerciseSection::CodeReview
@@ -115,6 +115,14 @@ RSpec.describe "The answer key each discovery kind plants" do
       expect(unquoted(kind, section)).to eq([ "Scope grew.", "never written" ])
     end
 
+    it "reads the section's scenario after its code, for every keyed kind" do
+      kind = ExerciseSection::SecurityReview
+      section = { "snippet" => "User.find(id)", "scenario" => "Admins sign in through `SsoGateway`.",
+                  PlantedKey::FIELD => { "vulnerability" => "`User.find(id)` trusts `SsoGateway`" } }
+
+      expect(kind.quote_tally(section, language: "ruby_rails").counts).to eq(verbatim: 1, reference: 0, scenario: 1, unresolved: 0)
+    end
+
     it "quotes nothing for pseudocode to code, so nothing is unquoted" do
       expect(unquoted(ExerciseSection::PseudocodeToCode, PlantedKey::FIELD => { "missable_requirements" => [ "Empty input." ] })).to eq([])
     end
@@ -127,7 +135,7 @@ RSpec.describe "The answer key each discovery kind plants" do
       planted.each do |kind|
         section = FakeService::EXERCISE_PROBLEM_SET.fetch(kind.key).deep_dup
         expect(kind.normalize_planted_key(section)).to be_a(Hash), kind.key
-        expect(kind.unquoted_key_parts(section, language: "ruby_rails")).to eq([]), kind.key
+        expect(kind.quote_tally(section, language: "ruby_rails").unresolved).to eq([]), kind.key
         expect(kind.key_context_fields).to all(be_a(String)), kind.key
       end
     end

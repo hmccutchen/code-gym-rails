@@ -24,7 +24,7 @@ RSpec.describe ProblemSetIngest do
                                        { "flaw" => "`an admin endpoint` grew the scope", "pushback" => "Split it." } ] } }
     end
 
-    def notes(problem_set, language: "ruby_rails") = ingest(problem_set, language: language).key_notes.map(&:to_h)
+    def notes(problem_set, language: "ruby_rails") = ingest(problem_set, language: language).key_notes.map { |note| note.to_h.except(:quotes) }
 
     it "notes each keyed section once, with its language and outcome" do
       expect(notes({ "code_review" => code_review })).to eq([ { key: "code_review", language: "ruby_rails", outcome: "ok" } ])
@@ -34,7 +34,7 @@ RSpec.describe ProblemSetIngest do
       result = ingest({ "code_review" => code_review.merge("answer_key" => { "issue" => " " }),
                         "security_review" => { "concept" => "sql_injection_prevention", "snippet" => "User.find(id)" } })
 
-      expect(result.key_notes.map(&:to_h)).to contain_exactly(
+      expect(result.key_notes.map { |note| note.to_h.except(:quotes) }).to contain_exactly(
         { key: "code_review", language: "ruby_rails", outcome: "missing" },
         { key: "security_review", language: "ruby_rails", outcome: "missing" }
       )
@@ -46,7 +46,7 @@ RSpec.describe ProblemSetIngest do
       long = "`order.customer.name` #{'x' * PlantedKey::MAX_LENGTH}"
       result = ingest({ "code_review" => code_review.merge("answer_key" => code_review["answer_key"].merge("fix" => long)) })
 
-      expect(result.key_notes.map(&:to_h)).to eq([ { key: "code_review", language: "ruby_rails", outcome: "too_long" } ])
+      expect(result.key_notes.map { |note| note.to_h.except(:quotes) }).to eq([ { key: "code_review", language: "ruby_rails", outcome: "too_long" } ])
       expect(result.problem_set["code_review"]).not_to have_key("answer_key")
       expect(result.problem_set["code_review"]["snippet"]).to eq(code_review["snippet"])
     end
@@ -89,7 +89,7 @@ RSpec.describe ProblemSetIngest do
       result = ingest({ "code_review" => code_review, "architecture" => { "concept" => "service_boundaries", "question" => "q" },
                         "security_review" => security })
 
-      expect(result.key_notes.map(&:to_h)).to eq([ { key: "code_review", language: "ruby_rails", outcome: "ok" } ])
+      expect(result.key_notes.map { |note| note.to_h.except(:quotes) }).to eq([ { key: "code_review", language: "ruby_rails", outcome: "ok" } ])
       expect(result.problem_set["security_review"]).not_to have_key("answer_key")
     end
 

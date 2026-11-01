@@ -7,7 +7,7 @@ class ProblemSetIngest
     def initialize(key:, concept:, reason:, code: nil) = super
   end
 
-  KeyNote = Data.define(:key, :language, :outcome)
+  KeyNote = Data.define(:key, :language, :outcome, :quotes)
 
   Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections, :key_notes)
 
@@ -78,15 +78,16 @@ class ProblemSetIngest
   def key_notes
     resolved_keys.filter_map do |key|
       kind = ExerciseSection.for(key)
-      KeyNote.new(key: key, language: @language, outcome: key_outcome(key, kind, @problem_set[key])) if kind.planted_key?
+      key_note(key, kind, @problem_set[key]) if kind.planted_key?
     end
   end
 
-  def key_outcome(key, kind, section)
-    return "too_long" if @too_long_keys.include?(key)
-    return "missing" unless section.key?(PlantedKey::FIELD)
+  def key_note(key, kind, section)
+    return KeyNote.new(key: key, language: @language, outcome: "too_long", quotes: nil) if @too_long_keys.include?(key)
+    return KeyNote.new(key: key, language: @language, outcome: "missing", quotes: nil) unless section.key?(PlantedKey::FIELD)
 
-    kind.unquoted_key_parts(section, language: @language).empty? ? "ok" : "quote_missing"
+    quotes = kind.quote_tally(section, language: @language)
+    KeyNote.new(key: key, language: @language, outcome: quotes.unresolved? ? "quote_missing" : "ok", quotes: quotes)
   end
 
   def format_code!

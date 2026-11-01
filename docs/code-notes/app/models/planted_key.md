@@ -27,15 +27,29 @@ that added keys. hmccutchen/code-gym-rails#597 moves them here.
 
 ## The quote match
 
-`.unquoted_parts` compares the quote with the shown text through
-`KeyQuote.normalize`, given the set's language, and counts a quote missing
-when its normalized form isn't a substring of the normalized text
-(`docs/code-notes/app/models/key_quote.md`). The Ruby formatter's Layout
-cops add spaces the provider never wrote (`{a: 1}` becomes `{ a: 1 }`, `x+1`
-becomes `x + 1`), and both formatters add a trailing comma to the last item
-of a wrapped list, so a quote of the provider's own snippet would otherwise
-miss against the code as shown. A quote whose normalized form is under
-`MIN_QUOTE_LENGTH` characters is left out, since a lone `.` matches
-anything. A backtick inside a quote, such as a JavaScript template literal,
-splits it into fragments; the check is a diagnostic, so that limit is
-accepted.
+`.quote_tally` puts each backticked span of the key's quoting text under one
+outcome, tried in this order: `verbatim` when its normalized form is a
+substring of the normalized code (through `KeyQuote.normalize`, given the
+set's language; `docs/code-notes/app/models/key_quote.md`), `reference`
+when `KeyReference.resolves?` finds the name it gives in the code
+(`docs/code-notes/app/models/key_reference.md`), `scenario` when it is in
+the scenario verbatim, and `unresolved` otherwise. The code comes first, so
+a span both hold counts as code. Only an unresolved span makes ingest's
+outcome `quote_missing`. The Ruby formatter's Layout cops add spaces the provider
+never wrote (`{a: 1}` becomes `{ a: 1 }`, `x+1` becomes `x + 1`), and both
+formatters add a trailing comma to the last item of a wrapped list, so a
+quote of the provider's own snippet would otherwise miss against the code
+as shown. A quote whose normalized form is under `MIN_QUOTE_LENGTH`
+characters is left out, since a lone `.` matches anything. A backtick
+inside a quote, such as a JavaScript template literal, splits it into
+fragments; the check is a diagnostic, so that limit is accepted.
+
+## The hidden-key line
+
+`.hidden_key_line` builds the one prompt line every keyed kind gives the
+generator: which fields the key must stay out of, what the engineer reads
+first, the quote rule for a kind whose key quotes, then `GROUNDING`. The
+text before `GROUNDING` is each kind's line as it was before the line was
+shared, so the generation snapshots changed only by the appended rules.
+`GROUNDING`'s reasons are in `docs/decisions/stored-answer-keys.md`
+("A code reference is not a misquote").

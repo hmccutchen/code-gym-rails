@@ -498,3 +498,17 @@ data.*
   so its improved code came with no instruction
   **I decided:** one improved code hook per kind rather than repeating the
   rule in each walkthrough note, and the multi-file `File:` line moves there
+- 8 fresh `code_review` drafts made under the $6 cap, for my key read
+  **I decided:** all 8 keys right on the main flaw
+- a key's code references counted as resolved, not as missed quotes `#648`
+  **why:** 4 of 8 drafts logged `quote_missing` for names like
+  `Adoption.create!` and `HoldPickupJob#perform`; only `:null_store` was a
+  real miss
+  **I decided:** scenario facts count as shown, searched after the code and
+  logged on their own; only unresolved spans count toward the stop
+  condition; no JavaScript shapes until a JavaScript run needs them; the 8
+  drafts are the design set and the next 10 real-day sections the test;
+  keys never lean on facts the snippet doesn't show, never claim an effect
+  the code's own guard prevents, and phrase a hidden setting that is the
+  flaw conditionally; the design spec stays untracked; I approve the
+  production log read before the check is called fixed
