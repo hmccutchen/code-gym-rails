@@ -53,8 +53,12 @@ an error and equal to it: Ruby `==`, JavaScript `isDeepStrictEqual`.
 - **Output:** a runner prints exactly one result, as its last line
   starting with `BUGHUNT_RESULT `, then exits 0.
 - **Ruby** runs with `--disable-gems`, so no gem can load. It evaluates the
-  code and the call in one `eval` in `TOPLEVEL_BINDING`, so a syntax error
-  is caught and reported rather than killing the runner.
+  code and the call in one `eval`, so a syntax error is caught and reported
+  rather than killing the runner. The key and the subject each get a fresh
+  top-level scope (a lambda's binding made at the top level), and the
+  runner keeps its own state and helpers in `BugHuntRunner`. So a snippet's
+  top-level local named `wanted`, or its own `def finish`, can't change
+  the comparison.
 - **JavaScript** runs as an ES module (`.mjs`). The subject module exports
   the awaited result of the call. The runner then waits one
   `setImmediate` turn, so pending promise callbacks settle before the

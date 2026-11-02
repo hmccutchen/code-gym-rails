@@ -194,6 +194,20 @@ RSpec.describe "the bug_hunt harness runner", :runs_code do
     )
   end
 
+  it "keeps a snippet's top-level names out of the runner's own state" do
+    method = "def remove_evens(nums)\n  nums.each { |n| nums.delete(n) if n.even? }\n  nums\nend"
+    witness = { "call" => "remove_evens([1, 2, 4, 5])", "expected" => "[1, 5]", "returns" => "[1, 4, 5]" }
+    sections = [
+      BugHuntMeasureFixtures.section("rb_delete_while_each", "ruby_rails", "wanted = [1, 4, 5]\n#{method}", BugHuntMeasureFixtures.key(witness: witness)),
+      BugHuntMeasureFixtures.section("rb_shared_hash_default", "ruby_rails", "def finish(*) = nil\n#{method}", BugHuntMeasureFixtures.key(witness: witness))
+    ]
+
+    _run, by_harness = results(sections, "ruby")
+
+    expect(by_harness).to include("rb01-bug_real" => { "outcome" => "pass", "reason" => "mismatched" },
+                                  "rb02-bug_real" => { "outcome" => "pass", "reason" => "mismatched" })
+  end
+
   it "runs every JavaScript harness as an ES module, comparing a snapshot after pending promises settle" do
     _run, by_harness = results(BugHuntMeasureFixtures::JAVASCRIPT, "node")
 
