@@ -20,11 +20,10 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
 
   # Refuses an empty list, the only grading ground truth; a wrong count is fine and a long list is truncated.
   def self.reject_unusable!(section, **)
-    raw     = section[PLANTED_FIELD]
-    planted = raw.is_a?(Array) ? raw.grep(String).filter_map { |entry| entry.strip.presence } : []
+    planted = PlantedKey.list(section[PLANTED_FIELD], max: MAX_PLANTED) { |entry| PlantedKey.text(entry) }
     refuse!("planted_ambiguities_missing", "Ambiguity hunt returned no usable #{PLANTED_FIELD} to grade coverage against") if planted.empty?
 
-    section[PLANTED_FIELD] = planted.first(MAX_PLANTED)
+    section[PLANTED_FIELD] = planted
   end
 
   def self.improved_code?
