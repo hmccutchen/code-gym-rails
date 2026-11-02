@@ -36,10 +36,14 @@ RSpec.describe ConceptVocabulary do
   end
 
   describe "RAILS_CONCEPTS" do
-    it "is a frozen 44-entry vocabulary" do
-      expect(ConceptVocabulary::RAILS_CONCEPTS.size).to eq(44)
+    it "is a frozen 45-entry vocabulary" do
+      expect(ConceptVocabulary::RAILS_CONCEPTS.size).to eq(45)
       expect(ConceptVocabulary::RAILS_CONCEPTS).to be_frozen
       expect(ConceptVocabulary::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
+    end
+
+    it "includes array_mutation_pitfalls, which bug_hunt's Ruby mutation traps are tagged with" do
+      expect(ConceptVocabulary::RAILS_CONCEPTS).to include("array_mutation_pitfalls")
     end
 
     it "includes the two Rails security concepts chosen for real depth" do
