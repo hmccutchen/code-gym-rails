@@ -131,7 +131,12 @@ Two checks, neither of which changes a key:
   shapes until a JavaScript run shows it needs them. The 8 Ruby
   `code_review` drafts the owner read on 2026-11-01 shaped these rules (4
   of 8 missed under the old check, 1 of 8 under these), so the test is the
-  next 10 Ruby keyed sections from real days. The generation prompt adds
+  next 10 Ruby keyed sections from real days, leaving out `bug_hunt` lines
+  (`code_review_mode=bug_hunt`), whose one-line quotes in a 10-line snippet
+  say little about the check. PR 2's single-file samples, its
+  `--keyed-only` export and its calibration leave `bug_hunt` sections out the
+  same way (`CodeReview.bug_hunt?`), and its keyed `code_review` note gains a
+  fourth harm clause for them (`docs/decisions/bug-hunt.md`). The generation prompt adds
   three rules to every keyed kind's hidden-key line
   (`PlantedKey::GROUNDING`): every claim follows from what is shown, the
   scenario included, and the planted flaw is never stated in the scenario;

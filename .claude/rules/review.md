@@ -33,7 +33,12 @@ read it before changing that area.
   agreement, and its gap list also decides whether the short version shows
   pitfalls. The competency gate and
   `LevelSuggestion` read only `RUBRIC_VERSION`-stamped reviews;
-  `ConceptMastery` and `RungLedger` read all history on purpose.
+  `ConceptMastery` and `RungLedger` read all history on purpose, except
+  sections whose kind says they are not mastery evidence
+  (`DailyResponse#mastery_evidence?`: a `bug_hunt` section, which still
+  counts as an exposure and as kind-level evidence;
+  `docs/decisions/bug-hunt.md`). A `bug_hunt` section's grading note judges
+  against its goal line.
 - **Unanswered sections are reviewed, not graded** (`docs/decisions/grading-rubric.md`):
   `ReviewPrompt.for_section` gives an unanswered section the walkthrough
   prompt, choosing on `DailyResponse#answered?` as a value. It stores no

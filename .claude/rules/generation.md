@@ -7,13 +7,13 @@ paths:
   - "app/services/{judged_generation,exercise_draft}.rb"
   - "app/prompts/generation_prompt/**"
   - "app/services/judged_generation/**"
-  - "app/models/{exercise_section,concept_vocabulary,language_prompts,scenario_pools,concept_bucket,real_source,judge_verdict,verdict_schema,code_format,daily_exercise,suggested_concept,mermaid_source}.rb"
+  - "app/models/{exercise_section,concept_vocabulary,language_prompts,scenario_pools,concept_bucket,real_source,judge_verdict,verdict_schema,code_format,daily_exercise,suggested_concept,mermaid_source,bug_hunt_gotchas}.rb"
   - "app/models/exercise_section/**"
   - "app/models/code_format/**"
   - "app/clients/code_format/**"
   - "app/jobs/{generate_daily_exercises_job,regenerate_exercise_job}.rb"
   - "app/views/responses/bodies/**"
-  - "script/{compare_models,model_comparison,forced_concept_drafts,solve_agreement,report_answer_positions,answer_position_balance,key_sheet_export,key_sample_drafts,draft_key_samples}.rb"
+  - "script/{compare_models,model_comparison,forced_concept_drafts,solve_agreement,report_answer_positions,answer_position_balance,key_sheet_export,key_sample_drafts,draft_key_samples,bug_hunt_measure}.rb"
   - "spec/fixtures/judge/**"
   - "spec/**/*{ai_service,judged_generation,exercise_draft,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt,problem_set_ingest,exercise_section,real_source,judge_verdict,code_format,concept_vocabulary,generate_daily_exercises,regenerate_exercise}*"
   - "app/models/{daily_plan,section_rotation,section_count,day_hosts}.rb"
@@ -64,7 +64,7 @@ read it before changing that area.
 - **Closed concept vocabulary**: each section is tagged with one concept from a fixed per-language list (`ConceptVocabulary::RAILS_CONCEPTS` / `JS_CONCEPTS`), narrowed further at generation time for a schema-review `code_review` day (see below); anything a provider invents is normalized to `"other"` so concept history stays aggregatable.
 - **`code_review` content modes**
   (`docs/decisions/code-review-content-modes.md`): `code_review` rolls
-  `application_code`, `test_file` or `schema_review`
+  `application_code`, `test_file`, `schema_review` or `bug_hunt`
   (`DailyPlan::CODE_REVIEW_MODE_WEIGHTS`); only `schema_review` narrows to
   `DATA_MODELING_CONCEPTS` via `ConceptVocabulary.selectable_for_section`. A
   Ruby `application_code` or `schema_review` day may be grounded in a
@@ -79,6 +79,21 @@ read it before changing that area.
   keeps today's prompt byte for byte. `GenerationPrompt` passes the range to
   every kind as `file_range:`, and `ExerciseDraft` hands the same range to
   ingest, whose `.reject_unusable!` refuses a section outside it.
+- **`bug_hunt`, the fourth `code_review` mode**
+  (`docs/decisions/bug-hunt.md`): A goal line (`purpose`, at most
+  160 characters, deleted on every other mode, so it marks the section) and
+  at most `BugHunt::MAX_LINES` shown lines of core Ruby or ES-module
+  JavaScript with one trap from `BugHuntGotchas`, picked never-seen-first
+  into `plan_notes["bug_hunt"]`, never the section. Rolled on judged days
+  only (`DailyPlan.for(judged:)`), single-file, never `RealSource`; its
+  vocabulary is the picked entry's concept. No output: ingest refuses a
+  result comment. The key adds an optional code `witness`
+  (async witnesses return a snapshot), `looks_right_on` and
+  `fixed_snippet`; the quote check reads `issue` only. `purpose` is never a
+  prose field. Registry entries are appended, never inserted, and avoid
+  traps a formatter rewrites. Changing the `bug_hunt` prompt, an entry's
+  rule, its ingest checks or its judge text needs a re-measure
+  (`docs/code-notes/script/bug_hunt_measure.md`).
 - **Design comparison, the second fixed section**
   (`docs/decisions/design-comparison-the-second-fixed-section.md`): The second
   default daily kind (`ExerciseSection::DesignComparison`): two working pieces that
