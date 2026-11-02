@@ -1464,7 +1464,8 @@ RSpec.describe AiService do
                                ladder_senior: "a fresh senior rung", ladder_principal_engineer: "p")
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_junior: "j", ladder_senior: "s",
                                ladder_mid_level: "a mid-level pattern rung", ladder_principal_engineer: "p")
-      expect(GenerationLadders).to receive(:for).with({ ExerciseSection::Challenge => "senior" }, "ruby_rails", plan.code_review_mode)
+      expect(GenerationLadders).to receive(:for).with({ ExerciseSection::Challenge => "senior" }, "ruby_rails", plan.code_review_mode,
+                                                      gotcha: plan.code_review_gotcha)
                                                .and_call_original
 
       section = svc.send(:retry_section, draft, ExerciseSection::Challenge, "memoization")
@@ -1576,7 +1577,7 @@ RSpec.describe AiService do
 
       FakeService.new("fake-key").send(:draft_exercise, user, language: "javascript", blocking: false, judged: true)
 
-      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review)
+      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil)
     end
 
     describe "MAX_LADDER_GUIDANCE_CHARS" do
@@ -5051,8 +5052,8 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       now = [ start ]
       retry_and_judge = CallProfiles.worst_case_seconds_for("retry_section") + CallProfiles.worst_case_seconds_for("judge_section")
       deadline = GenerationDeadline.new(start + retry_and_judge, clock: -> { now.first })
-      allow(GenerationLadders).to receive(:for).and_wrap_original do |original, *args|
-        original.call(*args).tap { now[0] = start + 1 }
+      allow(GenerationLadders).to receive(:for).and_wrap_original do |original, *args, **options|
+        original.call(*args, **options).tap { now[0] = start + 1 }
       end
 
       expect { service.send(:retry_section, draft, ExerciseSection::Pattern, "service_objects", deadline: deadline) }

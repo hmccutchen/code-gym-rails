@@ -13,7 +13,8 @@ class ExerciseDraft
     history    = user.recent_performance
     difficulty = KindDifficulty.for(user)
     kinds      = plan.kinds
-    ladders    = GenerationLadders.for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode)
+    ladders    = GenerationLadders.for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode,
+                                       gotcha: plan.code_review_gotcha)
     prompt     = provider.prompt.call(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders)
 
     reply = provider.generate.call(user, "generate_exercise", language, prompt.render,
@@ -64,7 +65,7 @@ class ExerciseDraft
 
   def self.retry_ladders(draft, kind)
     GenerationLadders.for(draft.difficulty.rungs_for([ kind ], skill_level: draft.user.skill_level), draft.language,
-                          draft.plan.code_review_mode)
+                          draft.plan.code_review_mode, gotcha: draft.plan.code_review_gotcha)
   end
   private_class_method :retry_ladders
 

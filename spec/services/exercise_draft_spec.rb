@@ -26,7 +26,7 @@ RSpec.describe ExerciseDraft do
   end
 
   def draft_for(language: "ruby_rails", mode: :application_code)
-    described_class::Draft.new(user: user, language: language, problem_set: {}, plan: Struct.new(:code_review_mode).new(mode),
+    described_class::Draft.new(user: user, language: language, problem_set: {}, plan: Struct.new(:code_review_mode, :code_review_gotcha).new(mode, nil),
                                kinds: [], difficulty: KindDifficulty.none, ladders: {}, history: [],
                                suggested_concepts: [], unusable_sections: [])
   end
@@ -226,7 +226,7 @@ RSpec.describe ExerciseDraft do
 
       described_class.send(:retry_ladders, draft_for(language: "javascript", mode: :schema_review), ExerciseSection::CodeReview)
 
-      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review)
+      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil)
     end
   end
 end

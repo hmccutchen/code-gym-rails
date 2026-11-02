@@ -25,6 +25,7 @@ module GenerationPromptHelpers
 
   def render_generation_prompt(user, language = "ruby_rails", history: [], difficulty: KindDifficulty.none,
                         ladders: {}, only: nil, fixed_concept: nil, retry_cause: nil, **plan_overrides)
+    plan_overrides[:code_review_gotcha] ||= BugHuntGotchas.for_language(language).first if plan_overrides[:code_review_mode] == :bug_hunt
     GenerationPrompt.new(user, language, plan: plan_for(**plan_overrides), history: history,
                          difficulty: difficulty, ladders: ladders,
                          retention_annotation: generation_retention_annotation)

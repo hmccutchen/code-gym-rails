@@ -217,7 +217,9 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   # A RealSource excerpt's own instruction replaces the mode's toy line.
   def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil,
-                               file_range: 1..1, code_style: nil, **)
+                               file_range: 1..1, code_style: nil, gotcha: nil, **)
+    return BugHunt::Prompt.guidance(gotcha: gotcha, rung: rung, vocabulary: vocabulary) if BugHunt.mode?(mode)
+
     vocabulary_line = "- Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}"
     if file_range.max > 1
       return MultiFile.guidance(file_range: file_range, label: label, mode: mode, artifact: artifact, test_framework: test_framework,
@@ -241,7 +243,8 @@ class ExerciseSection::CodeReview < ExerciseSection
   private_class_method :content_instruction
 
   # Keep the snippet's language out of here: the instruction line above is its one authoritative statement.
-  def self.schema_fragment(label:, file_range: 1..1, **)
+  def self.schema_fragment(label:, file_range: 1..1, mode: nil, **)
+    return BugHunt::Prompt.schema_fragment if BugHunt.mode?(mode)
     return MultiFile.schema_fragment(file_range: file_range, answer_key: ANSWER_KEY_SCHEMA) if file_range.max > 1
 
     <<~SCHEMA.chomp
