@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Conventions held over app/ source" do
   THREAD_EXEMPT = {
     "app/clients/caller_zone_thread.rb" => { threads: 1, reason: "the one place a fan-out thread is started" },
-    "app/clients/code_format/javascript.rb" => { threads: 2, reason: "Prettier's stdout and stderr readers, which touch neither Time.zone nor the database" }
+    "app/clients/code_format/javascript.rb" => { threads: 1, reason: "one call starting Prettier's stdout and stderr readers, which touch neither Time.zone nor the database" }
   }.freeze
 
   def calls_in(path)

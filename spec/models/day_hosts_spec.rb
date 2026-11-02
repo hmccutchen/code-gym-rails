@@ -37,6 +37,18 @@ RSpec.describe DayHosts do
     expect(bug_hunt.can_tag?(ExerciseSection::Pattern, "service_objects", "ruby_rails")).to be(true)
   end
 
+  it "reads the strictest vocabulary, which every rung's vocabulary contains on every mode and trap" do
+    %w[ruby_rails javascript].each do |language|
+      days = DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys.map { |mode| [ mode, nil ] } +
+             BugHuntGotchas.for_language(language).map { |gotcha| [ :bug_hunt, gotcha ] }
+      ExerciseSection.all.product(KindDifficulty::LEVELS, days).each do |kind, rung, (mode, gotcha)|
+        plain = ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, gotcha: gotcha)
+        expect(plain - ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: rung, gotcha: gotcha))
+          .to be_empty, "#{kind.key} at #{rung} in #{language}, #{mode} #{gotcha&.id}"
+      end
+    end
+  end
+
   it "lists the kinds that can tag a concept, in the order given" do
     kinds = [ ExerciseSection::Architecture, ExerciseSection::Challenge, ExerciseSection::CodeReview ]
 

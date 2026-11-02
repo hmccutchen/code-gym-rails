@@ -49,8 +49,8 @@ button.
 **Drills are scoped to what today can tag, and stand a retention check
 down.** `DailyPlan` hands `concepts_needing_reinforcement` a `hostable:`
 test built from the day's non-fourth kinds and `code_review` mode through
-`DayHosts`, which reads `ConceptVocabulary.selectable_for_section`, the same authority
-`AiService#can_host?` reads for retention checks — so a drilled
+`DayHosts`, which reads `ConceptVocabulary.selectable_for_section` and which
+`AiService#annotate_retention_concept` also asks for retention checks — so a drilled
 architecture concept is offered only on an architecture day and a drilled
 data-modeling concept only when some section can tag it. A history entry
 ages out, but a drill persists until mastered and would otherwise claim a

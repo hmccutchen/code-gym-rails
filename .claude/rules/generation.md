@@ -125,8 +125,9 @@ read it before changing that area.
   language vocabularies, hosted only by `code_review` (non-schema modes),
   `pattern` and `challenge`; `parsons_problem` excludes them explicitly.
   `GenerationPrompt::ConceptGuidance#meta_skill_framing_guidance` requires
-  such a section to still hold one findable issue, and `AiService#can_host?`
-  derives hosting from `ConceptVocabulary.selectable_for_section`.
+  such a section to still hold one findable issue, and
+  `AiService#annotate_retention_concept` names hosts through `DayHosts`,
+  which reads `ConceptVocabulary.selectable_for_section`.
 - **The fourth slot** (`docs/decisions/the-fourth-slot.md`): An optional
   fourth key (`plan_review`, `ambiguity_hunt`, `pseudocode_to_code`) with its
   own language-independent vocabularies and buckets, planned on a separate

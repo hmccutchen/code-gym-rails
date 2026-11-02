@@ -196,15 +196,22 @@ give the user a raw 500.
 Names the sections that can host the concept today; otherwise the model
 guesses, and ingest records a false miss. It returns nil when no section today
 can host the concept, and `GenerationPrompt#retention_block` drops it from the
-prompt (`filter_map`). It stays here, with `#can_host?`, while the rest of the
-template lives in `GenerationPrompt`: `RealSource::APPLICATION_CODE` lists
-this method as a curated excerpt, so moving it would change exercise content
-and the source-history identity keyed on its path and name.
+prompt (`filter_map`). It stays here while the rest of the template lives in
+`GenerationPrompt`: `RealSource::APPLICATION_CODE` lists this method as a
+curated excerpt, so moving it would change exercise content and the
+source-history identity keyed on its path and name.
 
-## `#can_host?`
-
-Uses the day's language, not `cm.language`: `ConceptVocabulary::LANGUAGES`'
-"architecture" entry would report false hosts.
+It asks `DayHosts`, the planner's own rule, built with the day's
+`code_review` mode and trap and with each section's rung, so the hosting
+conditions live in one place: the planning-host hook, the bucket the check
+records under (`cm.language`) and the trap's withheld concept. It reads
+vocabularies in the day's language, not `cm.language`, since
+`ConceptVocabulary::LANGUAGES`' "architecture" entry would report false
+hosts. The planner passes no rungs and gets the strictest list, which every
+rung's vocabulary contains on every mode and trap (`day_hosts_spec`). So,
+given the same trap, the prompt may name one more host than the planner
+counted, never fewer: a tradeoff concept on a `principal_engineer`
+`design_comparison`.
 
 ## Review day context (`sections = keys.map`)
 

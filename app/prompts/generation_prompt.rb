@@ -157,7 +157,7 @@ class GenerationPrompt
 
   def retention_block(kinds, rungs)
     annotated_due_checks = @plan.due_checks.filter_map do |cm|
-      @retention_annotation.call(cm, kinds, @language, @plan.code_review_mode, rungs)
+      @retention_annotation.call(cm, kinds, @language, @plan.code_review_mode, rungs, gotcha: @plan.code_review_gotcha)
     end
     return "" if annotated_due_checks.none?
 

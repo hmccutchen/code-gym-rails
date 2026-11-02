@@ -28,14 +28,9 @@ Instructions:
 - The code_review snippet is a MODIFIED COPY of this real method from Code Gym's own source (`app/clients/ai_service.rb#annotate_retention_concept`). Reproduce its shape, names, and structure as the starting point, then introduce EXACTLY ONE flaw that expresses the chosen concept. Never return it unchanged — there would be nothing to find — and never introduce a second flaw, since grading assumes exactly one. Keep the real class, method, and variable names. The business-domain settings suggested for each section do not apply to this one: its setting is Code Gym itself, a learning app for engineers, so its comments, names, and any other prose describe Code Gym, never one of the suggested settings or another fictional domain. These source-specific instructions take precedence over the general variety, mastery-loop, and retention requests for new domains, names, or framing. Keep the required source names and setting even if this excerpt appears in prior framings. A retention check may use this excerpt: make the planted flaw a fresh application of the chosen concept, rather than relying on renamed identifiers or a new business story for novelty. This exception changes neither concept selection nor difficulty; all other sections still follow the general freshness rules. The scenario field must be exactly: "Code Gym's own source — `app/clients/ai_service.rb`, `#annotate_retention_concept` — altered for this exercise. The deployed method is fine; find what this copy gets wrong."
 
 ```ruby
-def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs)
-  hosts = kinds.filter_map do |kind|
-    mode = code_review_mode if kind == ExerciseSection::CodeReview
-    next unless kind.planning_host?(mode: code_review_mode)
-
-    kind.key if can_host?(cm, kind.key, language, mode: mode, rung: rungs[kind])
-  end
-
+def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs, gotcha: nil)
+  day_hosts = DayHosts.new(language, mode: code_review_mode, gotcha: gotcha, rungs: rungs)
+  hosts = day_hosts.hosts(kinds, cm.concept, cm.language).map(&:key)
   return nil if hosts.empty?
 
   "#{cm.concept} (#{hosts.to_sentence(two_words_connector: ' or ', last_word_connector: ', or ')})"
