@@ -556,3 +556,5 @@ data.*
   featured callout until submission; drop a puzzle the judge can't answer
   rather than ship it unchecked; accept the few minutes of a deploy when
   the old page could show the concept
+- no re-measure after the runner fix from the bot review
+  **I decided:** the measured drafts stand as they are

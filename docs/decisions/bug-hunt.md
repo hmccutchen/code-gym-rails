@@ -191,6 +191,11 @@ Before turning the mode on, the owner had drafts measured by running them
 - **Line width:** 7 JavaScript drafts had a line past 45 characters, 1 past
   60. That is guidance only.
 
+After the measurement, the Ruby runner changed so a snippet's top-level
+names can't reach its comparison. The owner decided that needs no
+re-measure (2026-11-02): only a snippet defining `wanted` or `finish` at the
+top level could have been affected, and all 23 drafts passed.
+
 A re-measure is needed when the `bug_hunt` prompt, an entry's rule, ingest's
 `bug_hunt` checks, the judge's `bug_hunt` text, the drafting or judging
 routes, `CodeFormat`, or the harness changes. `--entries` drafts only
