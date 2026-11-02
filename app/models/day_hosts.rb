@@ -7,7 +7,7 @@ class DayHosts
   end
 
   def can_tag?(kind, concept, bucket)
-    ConceptBucket.for(kind.key, @language) == bucket && vocabulary(kind).include?(concept)
+    kind.planning_host?(mode: @mode) && ConceptBucket.for(kind.key, @language) == bucket && vocabulary(kind).include?(concept)
   end
 
   def hosts(kinds, concept, bucket)

@@ -130,6 +130,10 @@ class ExerciseSection
       vocabulary
     end
 
+    def planning_host?(mode:) = true
+
+    def mastery_evidence?(_section) = true
+
     def planted_key? = false
 
     def answer_key_fields

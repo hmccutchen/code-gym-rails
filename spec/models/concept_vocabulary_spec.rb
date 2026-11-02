@@ -245,6 +245,31 @@ RSpec.describe ConceptVocabulary do
       end
     end
 
+    it "offers a bug_hunt code_review only the picked gotcha's concept" do
+      gotcha = BugHuntGotchas.find("rb_memo_falsy")
+
+      expect(described_class.selectable_for_section("code_review", "ruby_rails", mode: :bug_hunt, gotcha: gotcha))
+        .to eq(%w[memoization])
+    end
+
+    it "offers a bug_hunt code_review every registry concept when no gotcha is named" do
+      %w[ruby_rails javascript].each do |language|
+        vocabulary = described_class.selectable_for_section("code_review", language, mode: :bug_hunt)
+
+        expect(vocabulary).to match_array(BugHuntGotchas.concepts(language))
+        expect(vocabulary - described_class.selectable_for_section("code_review", language, mode: :application_code)).to be_empty
+      end
+    end
+
+    it "ignores a gotcha on every other mode and kind" do
+      gotcha = BugHuntGotchas.find("rb_memo_falsy")
+
+      expect(described_class.selectable_for_section("code_review", "ruby_rails", mode: :application_code, gotcha: gotcha))
+        .to eq(described_class.selectable_for_section("code_review", "ruby_rails", mode: :application_code))
+      expect(described_class.selectable_for_section("pattern", "ruby_rails", mode: :bug_hunt, gotcha: gotcha))
+        .to eq(ConceptVocabulary::RAILS_CONCEPTS)
+    end
+
     it "leaves pattern unnarrowed on every mode" do
       %i[application_code test_file schema_review].each do |mode|
         expect(described_class.selectable_for_section("pattern", "ruby_rails", mode: mode))

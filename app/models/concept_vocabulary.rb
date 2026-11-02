@@ -132,10 +132,10 @@ module ConceptVocabulary
     end
   end
 
-  def self.selectable_for_section(section_key, language, mode: nil, rung: nil)
+  def self.selectable_for_section(section_key, language, mode: nil, rung: nil, gotcha: nil)
     vocabulary =
       if mode && section_key == ExerciseSection::CodeReview.key
-        code_review_vocabulary(language, mode)
+        code_review_vocabulary(language, mode, gotcha)
       else
         for_section(section_key, language)
       end
@@ -145,9 +145,13 @@ module ConceptVocabulary
     ExerciseSection.for(section_key).narrow_vocabulary(remaining, rung: rung) & remaining
   end
 
-  def self.code_review_vocabulary(language, mode)
+  def self.code_review_vocabulary(language, mode, gotcha)
     full = for_language(language)
-    mode == :schema_review ? DATA_MODELING_CONCEPTS : full - DATA_MODELING_CONCEPTS
+    case mode
+    when :schema_review then DATA_MODELING_CONCEPTS
+    when :bug_hunt      then full & (gotcha ? [ gotcha.concept ] : BugHuntGotchas.concepts(language))
+    else                     full - DATA_MODELING_CONCEPTS
+    end
   end
   private_class_method :code_review_vocabulary
 

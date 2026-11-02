@@ -174,6 +174,14 @@ class ExerciseSection::CodeReview < ExerciseSection
     true
   end
 
+  def self.bug_hunt?(section) = BugHunt.section?(section)
+
+  def self.planning_host?(mode:) = mastery_evidence_mode?(mode)
+
+  def self.mastery_evidence?(section) = mastery_evidence_mode?(bug_hunt?(section) ? BugHunt::MODE : nil)
+
+  def self.mastery_evidence_mode?(mode) = !BugHunt.mode?(mode)
+
   def self.titled_label?
     false
   end

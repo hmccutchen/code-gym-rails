@@ -20,6 +20,15 @@ RSpec.describe DayHosts do
     expect(described_class.new("ruby_rails", mode: :schema_review).can_tag?(ExerciseSection::CodeReview, concept, "ruby_rails")).to be(true)
   end
 
+  it "lets code_review tag nothing on a bug_hunt day, since that section is not mastery evidence" do
+    bug_hunt = described_class.new("ruby_rails", mode: :bug_hunt)
+
+    BugHuntGotchas.concepts("ruby_rails").each do |concept|
+      expect(bug_hunt.can_tag?(ExerciseSection::CodeReview, concept, "ruby_rails")).to be(false)
+    end
+    expect(bug_hunt.can_tag?(ExerciseSection::Challenge, "memoization", "ruby_rails")).to be(true)
+  end
+
   it "lists the kinds that can tag a concept, in the order given" do
     kinds = [ ExerciseSection::Architecture, ExerciseSection::Challenge, ExerciseSection::CodeReview ]
 
