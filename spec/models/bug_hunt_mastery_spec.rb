@@ -37,6 +37,32 @@ RSpec.describe "A bug_hunt section and concept mastery" do
       expect(held.drilled_at).to be_present
     end
 
+    context "with a retention check due on the concept" do
+      let!(:due) do
+        user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard, streak: 1,
+                                       mastered_at: 1.month.ago, retention_interval_days: 7,
+                                       next_retention_check_on: Date.current - 1)
+      end
+
+      def skipped_day(sections, answered:)
+        reviewed_day(sections).tap { |response| response.update!(answers: response.answers.slice(*answered)) }
+      end
+
+      it "leaves the check due when the skipped section is a bug_hunt" do
+        record!(skipped_day({ "code_review" => hunt("memoization"), "design_comparison" => plain("caching") },
+                            answered: %w[design_comparison]))
+
+        expect(due.reload.next_retention_check_on).to eq(Date.current - 1)
+      end
+
+      it "defers the check for a skipped section when a bug_hunt is the only answered section carrying the concept" do
+        record!(skipped_day({ "code_review" => hunt("memoization"), "pattern" => plain("memoization") },
+                            answered: %w[code_review]))
+
+        expect(due.reload.next_retention_check_on).to eq(Date.current + 7)
+      end
+    end
+
     it "evaluates a concept the day carries elsewhere from that other section alone" do
       record!(reviewed_day({ "code_review" => hunt("memoization"), "pattern" => plain("memoization") }))
 
