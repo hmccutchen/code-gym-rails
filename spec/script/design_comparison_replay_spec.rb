@@ -59,7 +59,7 @@ RSpec.describe DesignComparisonReplay do
       expect(out.string).to include("design comparisons to judge: 3", "week of 2026-09-28: 2", "week of 2026-10-05: 1",
                                     "user #{user.id}: 2", "user #{other_user.id}: 1",
                                     "first date: 2026-10-01, last date: 2026-10-06",
-                                    "worst-case bound: $0.06 (3 × $0.019 per judge call; claude-sonnet-5-5 at list price " \
+                                    "worst-case bound: $0.08 (3 × $0.027 per judge call; claude-sonnet-5-5 at list price " \
                                     "with 3500 input tokens estimated and its full #{CallProfiles::JUDGE_MAX_TOKENS}-token output cap)")
       expect_no_section_text
     end

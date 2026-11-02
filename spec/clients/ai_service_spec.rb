@@ -4743,6 +4743,10 @@ RSpec.describe AiService, "#judge_section" do
   let(:user) { User.create!(email: "judge@example.com", name: "J", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
   let(:section) { { "question" => "What is wrong?", "snippet" => "code", "concept" => "n_plus_one", "teaching_note" => "hint", "pitched_at" => "senior" } }
 
+  it "keeps three times the largest measured judge reply under the judge's cap" do
+    expect(CallProfiles::JUDGE_MEASURED_MAX_OUTPUT_TOKENS * 3).to be <= CallProfiles::JUDGE_MAX_TOKENS
+  end
+
   it "sends the section, its concept, rung, lock state and the kind's task, and never another section or history" do
     svc = FakeService.new("fake-key")
     captured = nil

@@ -69,6 +69,11 @@ replaces the earlier "launch B waits for PR 2" order.
   - **a multi-file grading note that works without a key** (below)
   - **the read-only split script** (below)
   - **multi-file days kept out of PR 2's samples** (below)
+  - **the section judge's token cap re-measured** a few weeks after the mode
+    goes live: the owner re-runs the read-only `judge_section` usage query
+    from #639, since every reply behind `JUDGE_MEASURED_MAX_OUTPUT_TOKENS`
+    came from a single-file section, and a reply past a third of
+    `JUDGE_MAX_TOKENS` sends the cap back to the owner
 - **With PR 2:** the grader reads multi-file keys too, the refusal rule for a
   failed multi-file key joins, a multi-file calibration fixture is added, and
   the early grades are compared with keyed ones (below).
