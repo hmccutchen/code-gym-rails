@@ -132,6 +132,26 @@ RSpec.describe CodeFormat do
       lingering&.unlink
     end
 
+    it "hands the batch back unchanged when Node exits but a child process keeps its output open" do
+      lingering = Tempfile.new([ "lingering", ".mjs" ]).tap do |file|
+        file.write(<<~JS) && file.close
+          import { spawn } from "node:child_process";
+          spawn(process.execPath, ["-e", "setTimeout(() => {}, 8000)"], { stdio: ["ignore", "inherit", "inherit"], detached: true }).unref();
+          process.stdout.write(JSON.stringify(["let a = 1;"]));
+        JS
+      end
+      stub_const("CodeFormat::Javascript::SCRIPT", lingering.path)
+      allow(Rails.logger).to receive(:warn)
+
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      expect(described_class.all([ "let a=1" ], language: "javascript")).to eq([ "let a=1" ])
+
+      expect(Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).to be < 5
+      expect(Rails.logger).to have_received(:warn).with("[code_format] language=javascript fallback=Timeout::Error")
+    ensure
+      lingering&.unlink
+    end
+
     it "hands back every snippet unchanged when Node cannot run" do
       allow(Open3).to receive(:popen3).and_raise(Errno::ENOENT)
       allow(Rails.logger).to receive(:warn)

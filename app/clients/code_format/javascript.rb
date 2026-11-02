@@ -18,23 +18,25 @@ module CodeFormat
 
     def self.run(input)
       Open3.popen3("node", SCRIPT) do |stdin, stdout, stderr, wait|
-        output, errors = [ stdout, stderr ].map { |io| Thread.new { io.read } }
+        readers = [ stdout, stderr ].map { |io| Thread.new { io.read } }
         stdin.write(input)
         stdin.close
         finish(wait)
-        output.value
+        raise Timeout::Error, "Prettier's output stayed open after it exited" unless settle(readers)
+
+        readers.first.value
       ensure
-        settle([ output, errors ].compact)
+        settle(readers) if readers
       end
     end
     private_class_method :run
 
     def self.settle(readers)
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + READER_GRACE_SECONDS
-      readers.each do |reader|
-        left = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
-        reader.join([ left, 0 ].max) || reader.kill.join
+      finished = readers.map do |reader|
+        reader.join([ deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0 ].max).tap { |done| reader.kill.join unless done }
       end
+      finished.all?
     end
     private_class_method :settle
 
