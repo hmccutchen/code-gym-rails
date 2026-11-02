@@ -12,6 +12,7 @@ RSpec.describe KeySampleDrafts do
   let(:planted)  { nil }
   let(:tokens_out) { 30 }
   let(:time_out)   { nil }
+  let(:extra_fields) { {} }
   let(:service)  { described_class.service("sk-ant-test", usage) }
   let(:dir)      { Dir.mktmpdir }
   let(:path)     { described_class.reserve_out_path!(File.join(dir, "keys.json")) }
@@ -29,6 +30,7 @@ RSpec.describe KeySampleDrafts do
   # A single-section retry carries the concept it was asked for, as a provider following the fixed-concept line would.
   before do
     seen, queued, solved, sent, key, written_out, timing_out = prompts, verdicts, solves, bodies, planted, tokens_out, time_out
+    extra = extra_fields
     connection = Faraday.new do |f|
       f.adapter :test do |stub|
         stub.post(ClaudeService::API_URL) do |env|
@@ -46,7 +48,7 @@ RSpec.describe KeySampleDrafts do
             text = FakeService.new("unused").send(:call, AiService.request_for(purpose, system: system, prompt: prompt))[:text]
           end
           if concept
-            drafted = JSON.parse(text).fetch(kind.key).merge("concept" => concept)
+            drafted = JSON.parse(text).fetch(kind.key).merge("concept" => concept).merge(extra)
             drafted["answer_key"] = key if key
             text = { kind.key => drafted }.to_json
           elsif purpose == "judge_section" && queued.any?
@@ -175,6 +177,79 @@ RSpec.describe KeySampleDrafts do
     expect([ *described_class::KINDS, described_class::TRIAGE_KIND ]).to all(satisfy(&:planted_key?))
     expect { described_class.new(kind: ExerciseSection::Pattern, language: "ruby_rails", count: 1, service: service, out: out) }
       .to raise_error(ArgumentError, /isn't drafted/)
+  end
+
+  context "with --mode bug_hunt" do
+    let(:kind) { ExerciseSection::CodeReview }
+    let(:extra_fields) do
+      { "purpose" => "Remove every even number from nums.", "snippet" => "def remove_evens(nums)\n  nums.reject(&:even?)\nend",
+        "diagram" => "" }
+    end
+    let(:planted) do
+      { "issue" => "`def remove_evens(nums)` keeps the wrong items.", "why_it_matters" => "w", "fix" => "f",
+        "witness" => { "call" => "remove_evens([1, 2])", "expected" => "[1]", "returns" => "[2]" },
+        "fixed_snippet" => "def remove_evens(nums) = nums.reject(&:even?)" }
+    end
+    let(:ruby_entries) { BugHuntGotchas.for_language("ruby_rails") }
+
+    def hunt(count: 2, entries: nil, language: "ruby_rails")
+      described_class.new(kind: kind, language: language, count: count, service: service, out: out, bug_hunt: true, entries: entries)
+    end
+
+    it "prints a plan naming the mode, the entries and a bound, and makes no call" do
+      hunt(count: 11).plan
+
+      expect(prompts).to be_empty
+      expect(out.string).to include("code_review (bug_hunt)", "11 sections", "entries: #{ruby_entries.map(&:id).join(', ')}", "$")
+    end
+
+    it "drafts one kept section per registry entry, in list order, each on a bug_hunt plan with the entry's trap and concept" do
+      plans = []
+      allow(ForcedConceptDrafts).to receive(:rung_draft).and_wrap_original do |original, *args, **options|
+        plans << options[:plan]
+        original.call(*args, **options)
+      end
+
+      result = hunt(count: 3).call(path)
+
+      expect(result.entries.map { |entry| entry["registry_id"] }).to eq(ruby_entries.first(3).map(&:id))
+      expect(result.entries.map { |entry| entry["concept"] }).to eq(ruby_entries.first(3).map(&:concept))
+      expect(result.entries.first).to include("purpose" => "Remove every even number from nums.")
+      expect(result.entries.first.dig("answer_key", "witness", "returns")).to eq("[2]")
+      expect(plans.map(&:code_review_mode).uniq).to eq([ :bug_hunt ])
+      expect(plans.map(&:code_review_gotcha)).to eq(ruby_entries.first(3))
+      expect(plans.map(&:code_review_files).uniq).to eq([ :single ])
+      expect(plans.map(&:code_review_source).uniq).to eq([ nil ])
+    end
+
+    it "drafts the same entry again after a rejection" do
+      verdicts << reject
+
+      result = hunt(count: 2).call(path)
+
+      expect(result.rejected).to eq(1)
+      expect(result.entries.map { |entry| entry["registry_id"] }).to eq(ruby_entries.first(2).map(&:id))
+    end
+
+    it "drafts only the named entries, in the order given, for a partial re-measure" do
+      result = hunt(count: 2, entries: %w[rb_to_i_silent rb_memo_falsy]).call(path)
+
+      expect(result.entries.map { |entry| entry["registry_id"] }).to eq(%w[rb_to_i_silent rb_memo_falsy])
+    end
+
+    it "refuses an entry the language's registry doesn't hold, and a count past the entries" do
+      expect { hunt(entries: %w[js_var_in_loop]) }.to raise_error(ArgumentError, /isn't a ruby_rails bug_hunt entry/)
+      expect { hunt(count: 12) }.to raise_error(ArgumentError, /1 to 11/)
+    end
+
+    it "refuses the mode with --triage, on another kind, and --entries without the mode" do
+      expect { described_class.new(kind: kind, language: "ruby_rails", count: 1, service: service, out: out, triage: true, bug_hunt: true) }
+        .to raise_error(ArgumentError, /bug_hunt/)
+      expect { described_class.new(kind: ExerciseSection::SecurityReview, language: "ruby_rails", count: 1, service: service, out: out,
+                                   bug_hunt: true) }.to raise_error(ArgumentError, /bug_hunt/)
+      expect { described_class.new(kind: kind, language: "ruby_rails", count: 1, service: service, out: out, entries: %w[rb_memo_falsy]) }
+        .to raise_error(ArgumentError, /--entries needs/)
+    end
   end
 
   context "with --triage" do

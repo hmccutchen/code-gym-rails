@@ -78,10 +78,22 @@ class KeySampleDrafts
     raise ArgumentError, "#{full} already exists"
   end
 
-  def initialize(kind:, language:, count:, service:, out:, triage: false)
+  def self.gotchas_for(language, ids)
+    registry = BugHuntGotchas.for_language(language)
+    return registry if ids.nil?
+
+    ids.map { |id| registry.find { |gotcha| gotcha.id == id } or raise ArgumentError, "#{id} isn't a #{language} bug_hunt entry" }
+  end
+
+  def initialize(kind:, language:, count:, service:, out:, triage: false, bug_hunt: false, entries: nil)
     drafted = [ *KINDS, TRIAGE_KIND ]
     raise ArgumentError, "#{kind.key} isn't drafted for the key read: #{drafted.map(&:key).join(', ')}" unless drafted.include?(kind)
     raise ArgumentError, "--triage drafts #{TRIAGE_KIND.key} only" if triage && kind != TRIAGE_KIND
+    raise ArgumentError, "--mode bug_hunt drafts #{TRIAGE_KIND.key} only, without --triage" if bug_hunt && (triage || kind != TRIAGE_KIND)
+    raise ArgumentError, "--entries needs --mode bug_hunt" if entries && !bug_hunt
+
+    @gotchas = (self.class.gotchas_for(language, entries) if bug_hunt)
+    raise ArgumentError, "--count must be 1 to #{@gotchas.size} with --mode bug_hunt" if @gotchas && !count.between?(1, @gotchas.size)
 
     @triage   = triage
     @kind     = kind
@@ -93,7 +105,9 @@ class KeySampleDrafts
   end
 
   def plan
-    @out.puts "=== draft_key_samples plan: #{@kind.key}, #{@language} · #{@count} sections · no provider call made ==="
+    @out.puts "=== draft_key_samples plan: #{@kind.key}#{' (bug_hunt)' if @gotchas}, #{@language} · #{@count} sections · " \
+              "no provider call made ==="
+    @out.puts "entries: #{@gotchas.first(@count).map(&:id).join(', ')}" if @gotchas
     @out.puts "at most #{attempts} drafts, each judged#{', and each kept one solved' if @triage}: " \
               "at most #{(attempts * 2) + solves} calls, before the client's own retries"
     @out.puts "bound, with every call at its output cap and no caching: $#{format('%.2f', output_cap_cost)}"
@@ -132,28 +146,37 @@ class KeySampleDrafts
 
   def solves = @triage ? attempts : 0
 
-  def mode_for(kept) = (KeyTriage::MODES[kept % KeyTriage::MODES.size] if @kind == TRIAGE_KIND)
+  def mode_for(kept)
+    return ExerciseSection::CodeReview::BugHunt::MODE if @gotchas
+
+    KeyTriage::MODES[kept % KeyTriage::MODES.size] if @kind == TRIAGE_KIND
+  end
+
+  def gotcha_for(kept) = @gotchas&.fetch(kept)
 
   def rung_for(kept) = KindDifficulty::LEVELS[kept % KindDifficulty::LEVELS.size]
 
   # Offset once per pass through the rungs, so every concept meets every rung.
-  def concept_for(attempt, rung, mode)
+  def concept_for(attempt, rung, mode, kept: 0)
+    return gotcha_for(kept).concept if @gotchas
+
     concepts = ConceptVocabulary.selectable_for_section(@kind.key, @language, mode: mode, rung: rung) - [ "other" ]
     concepts[(attempt + (attempt / KindDifficulty::LEVELS.size)) % concepts.size]
   end
 
   def draft_one(attempt, tally, path)
     @service.check_section!(section_bound) if @service.capped?
-    rung    = rung_for(tally.entries.size)
-    mode    = mode_for(tally.entries.size)
-    section = @service.send(:retry_section, draft_for(rung, mode), @kind, concept_for(attempt, rung, mode))
+    kept    = tally.entries.size
+    rung    = rung_for(kept)
+    mode    = mode_for(kept)
+    section = @service.send(:retry_section, draft_for(rung, mode, gotcha_for(kept)), @kind, concept_for(attempt, rung, mode, kept: kept))
     return tally.keyless += 1 unless section.key?(PlantedKey::FIELD)
 
     verdict = @service.judge_section(@user, @kind, section, rung: rung, locked: true)
     return tally.rejected += 1 if verdict.reject?
 
-    kept = verdict.apply(section)
-    tally.entries << entry(kept, rung, verdict).merge(triage_fields(kept, mode))
+    judged = verdict.apply(section)
+    tally.entries << entry(judged, rung, verdict).merge(triage_fields(judged, mode), bug_hunt_fields(judged, kept))
     write(tally, path)
   rescue *RESCUED => e
     tally.failed << "#{e.class}: #{e.message}"
@@ -162,6 +185,12 @@ class KeySampleDrafts
   def entry(section, rung, verdict)
     KeySheetExport.entry(@kind.key, @language, section).merge("concept" => section["concept"], "rung" => rung,
                                                                "judge" => verdict.status.to_s)
+  end
+
+  def bug_hunt_fields(section, kept)
+    return {} unless @gotchas
+
+    { "registry_id" => gotcha_for(kept).id, "purpose" => section[ExerciseSection::CodeReview::BugHunt::PURPOSE_FIELD] }
   end
 
   def triage_fields(section, mode)
@@ -177,14 +206,14 @@ class KeySampleDrafts
                                           "keyless" => tally.keyless, "failed" => tally.failed, "stopped" => tally.stopped))
   end
 
-  def draft_for(rung, mode)
-    ForcedConceptDrafts.rung_draft(@user, @language, rung, kind: @kind, plan: plan_for(mode))
+  def draft_for(rung, mode, gotcha = nil)
+    ForcedConceptDrafts.rung_draft(@user, @language, rung, kind: @kind, plan: plan_for(mode, gotcha))
   end
 
   # Toy and single-file: a RealSource excerpt needs the scenario restore JudgedGeneration does (key_sample_drafts.md).
-  def plan_for(mode)
+  def plan_for(mode, gotcha)
     plan = DailyPlan.for(@user, language: @language, judged: true)
-    mode ? plan.with(code_review_mode: mode, code_review_source: nil, code_review_files: :single) : plan
+    mode ? plan.with(code_review_mode: mode, code_review_source: nil, code_review_files: :single, code_review_gotcha: gotcha) : plan
   end
 
   def output_cap_cost = attempts * section_bound
@@ -210,7 +239,9 @@ class KeySampleDrafts
         throw :retry_prompt, build_system_prompt(language) + prompt
       end
     end.new("plan-only")
-    chars(catch(:retry_prompt) { measuring.send(:retry_section, draft_for(rung, mode_for(0)), @kind, concept_for(0, rung, mode_for(0))) })
+    chars(catch(:retry_prompt) do
+      measuring.send(:retry_section, draft_for(rung, mode_for(0), gotcha_for(0)), @kind, concept_for(0, rung, mode_for(0)))
+    end)
   end
 
   def chars(*texts) = texts.sum(&:size)
