@@ -575,3 +575,8 @@ data.*
   traps and the re-measure triggers stated twice `#658`
   **I decided:** a change that leaves the drafts, their formatted code and
   every check's verdict on them unchanged needs no re-measure
+- phone cards' safe-area margins kept on the right side under a
+  right-to-left language `#659`
+  **I decided:** fix it now, and run the 8-section judge check from the
+  stored-answer-keys plan with a $3 cap, which closed the judge token
+  issue
