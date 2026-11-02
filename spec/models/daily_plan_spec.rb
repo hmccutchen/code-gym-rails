@@ -786,6 +786,15 @@ RSpec.describe DailyPlan do
       expect(result.notes).not_to have_key("bug_hunt")
     end
 
+    it "withholds no concept from the other sections on a day without a code_review section" do
+      user.update!(daily_section_count: 1, daily_section_kinds: %w[design_comparison code_review])
+      allow(DayHosts).to receive(:new).and_call_original
+
+      plan
+
+      expect(DayHosts).to have_received(:new).with("ruby_rails", mode: :bug_hunt, gotcha: nil)
+    end
+
     it "picks no gotcha on any other mode" do
       pin_code_review_mode(:application_code)
 
