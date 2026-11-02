@@ -31,6 +31,8 @@ class ConceptMastery < ApplicationRecord
     sections_by_concept = Hash.new { |h, k| h[k] = [] }
     response.answered_concept_tags.slice(*sections).each do |section, concept|
       next if concept.blank? || concept == "other"
+      next unless response.mastery_evidence?(section)
+
       sections_by_concept[concept] << section
     end
 

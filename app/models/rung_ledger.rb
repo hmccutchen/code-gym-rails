@@ -43,6 +43,7 @@ class RungLedger
 
       data = exercise.problem_set[section]
       next unless data.is_a?(Hash) && data["pitched_at"].present? && !data["eased"]
+      next unless ExerciseSection.for(section).mastery_evidence?(data)
 
       grouped[[ concept, ConceptBucket.for(section, exercise.language), data["pitched_at"] ]] << section
     end

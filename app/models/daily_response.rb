@@ -279,6 +279,8 @@ class DailyResponse < ApplicationRecord
     concept_tags.slice(*answered_sections)
   end
 
+  def mastery_evidence?(section) = ExerciseSection.for(section).mastery_evidence?(daily_exercise&.problem_set&.dig(section.to_s))
+
   def submit_blocker
     answered = answered_sections
     if answered.empty?
