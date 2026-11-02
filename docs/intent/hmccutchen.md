@@ -562,3 +562,7 @@ data.*
   reader threads and one hosting rule for retention checks `#655`
   **I decided:** start on both issues right after the `bug_hunt` PR merged,
   in one PR
+- the next two follow-up issues, the planner and prompt seeing different
+  traps and the re-measure triggers stated twice `#658`
+  **I decided:** a change that leaves the drafts and their formatted code
+  unchanged needs no re-measure
