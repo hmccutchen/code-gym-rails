@@ -317,6 +317,7 @@ class User < ApplicationRecord
     recent_daily_responses(limit).each do |r|
       r.answered_concept_tags.each do |section, concept|
         next if concept.blank? || concept == "other"
+        next unless r.mastery_evidence?(section)
 
         tag_bucket = ConceptBucket.for(section, r.daily_exercise&.language)
         next unless still_in_vocabulary?(concept, tag_bucket)

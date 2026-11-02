@@ -57,6 +57,23 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
+  describe "#concepts_withheld_before_submission" do
+    def exercise_with(code_review)
+      DailyExercise.new(user: user, date: Date.current, problem_set: {
+                          "code_review" => code_review, "design_comparison" => { "concept" => "god_object" } })
+    end
+
+    it "lists the concept of a section whose kind hides it until submission" do
+      expect(exercise_with({ "concept" => "memoization", "purpose" => "Sum the prices." }).concepts_withheld_before_submission)
+        .to eq(%w[memoization])
+    end
+
+    it "lists nothing on a day whose sections all show their concept, or for an untagged section" do
+      expect(exercise_with({ "concept" => "memoization" }).concepts_withheld_before_submission).to eq([])
+      expect(exercise_with({ "concept" => "other", "purpose" => "Sum the prices." }).concepts_withheld_before_submission).to eq([])
+    end
+  end
+
   describe "#active_section_keys" do
     it "returns the four sections a current exercise presents" do
       exercise = DailyExercise.new(problem_set: {
@@ -120,7 +137,7 @@ RSpec.describe DailyExercise, type: :model do
 
     it "keeps the planned pair and its rotated third, in order, after a reload and after the user's pair changes" do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil, design_comparison: nil)
-      plan = DailyPlan.for(pair_user, language: "ruby_rails")
+      plan = DailyPlan.for(pair_user, language: "ruby_rails", judged: true)
       set  = plan.kinds.to_h { |kind| [ kind.key, { "question" => "?" } ] }
       exercise = DailyExercise.create!(user: pair_user, date: Date.current, generated_at: Time.current,
                                        problem_set: set, plan_notes: plan.notes)

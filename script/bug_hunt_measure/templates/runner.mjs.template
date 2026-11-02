@@ -1,0 +1,51 @@
+import { isDeepStrictEqual } from "node:util";
+
+const HARNESS = "%HARNESS%";
+const CHECK = "%CHECK%";
+const SPEC = %SPEC%;
+const NOT_CORE = ["ReferenceError"];
+const MISSING_MODULE = ["ERR_MODULE_NOT_FOUND", "ERR_UNSUPPORTED_DIR_IMPORT", "ERR_UNKNOWN_BUILTIN_MODULE"];
+
+const errorName = (error) => error?.constructor?.name ?? typeof error;
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+process.on("unhandledRejection", () => {});
+
+const finish = (outcome, reason, error) => {
+  const line = { harness: HARNESS, outcome, reason, ...(error ? { error } : {}) };
+  process.stdout.write(`BUGHUNT_RESULT ${JSON.stringify(line)}\n`, () => process.exit(0));
+  return new Promise(() => {});
+};
+
+if (SPEC === null) await finish("not_runnable", "key_unparsable");
+
+let wanted;
+if (SPEC.raises === null) {
+  try {
+    wanted = (await import(`./${HARNESS}.expected.mjs`)).default;
+  } catch {
+    await finish("not_runnable", "key_unparsable");
+  }
+}
+
+let actual;
+let raised = null;
+try {
+  actual = (await import(`./${HARNESS}.subject.mjs`)).__bughuntResult;
+} catch (error) {
+  if (error instanceof SyntaxError) await finish("not_runnable", "syntax");
+  if (NOT_CORE.includes(errorName(error)) || MISSING_MODULE.includes(error?.code)) {
+    await finish("not_runnable", "not_core", error?.code ?? errorName(error));
+  }
+  raised = error;
+}
+await settle();
+
+let matched;
+try {
+  matched = SPEC.raises !== null ? raised !== null && errorName(raised) === SPEC.raises : raised === null && isDeepStrictEqual(actual, wanted);
+} catch {
+  matched = false;
+}
+const pass = CHECK === "bug_real" ? !matched : matched;
+await finish(pass ? "pass" : "fail", matched ? "matched" : "mismatched", raised === null ? undefined : errorName(raised));

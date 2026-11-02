@@ -33,7 +33,7 @@
   </div>
 
   <%# Outside #dashboard-content, which the generating poller replaces. Placement: docs/code-notes/app/views/dashboard/show.html.md %>
-  <% if featured_concept %>
+  <% if featured_callout_shown?(@exercise, @response) %>
     <div class="featured-compact">
       <%= render "shared/featured_concept", featured: featured_concept, day_response: @response %>
     </div>

@@ -52,6 +52,17 @@ read it before changing that area.
   through the shared `ConceptReference`, and is never offered to a trial
   account (`User#prepares_ladders?`). `AiService::MAX_LADDER_GUIDANCE_CHARS`
   bounds the ladder block.
+- **`bug_hunt` days** (`docs/decisions/bug-hunt.md`): `DailyPlan.for` takes
+  `judged:` from the generation path and rolls
+  `UNJUDGED_CODE_REVIEW_MODE_WEIGHTS` (no `bug_hunt`) when it is false. A
+  `bug_hunt` day is single-file without rolling. `code_review` is not a
+  planning host on it (`ExerciseSection.planning_host?`, read through
+  `DayHosts`; main-track capacity counts planning hosts only), so no
+  reinforcement entry, retention check, coverage check or shared concept
+  is planned onto a section that moves no mastery. The picked trap's
+  concept is left out of every other kind's vocabulary, which `DayHosts`
+  reads, so nothing on that concept is planned onto another section either.
+  `DailyPlan` still reads no `KindDifficulty`.
 - **Drills** (`docs/decisions/drills.md`): A drill (`ConceptDrills`) only
   moves a concept to the front of `User#concepts_needing_reinforcement`; it
   never touches rotation, weights or `KindDifficulty`. It clears on the same

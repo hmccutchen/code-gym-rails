@@ -107,16 +107,22 @@ CLI (cached on `spec/playwright/package-lock.json`), while the `test` job runs
 everything else via `--exclude-pattern "system/**/*_spec.rb"` — the two halves
 run in parallel so unit/request feedback isn't gated behind browser setup.
 
-`spec/support/real_source_default.rb` pins `DailyPlan`'s real-source sub-roll
-to `:toy` for every example; a spec that exercises the grounded `code_review`
-path opts out with its own `:real` stub. The mode roll is deliberately *not*
-pinned this way — it only changes the prompt, so a canned response comes back
-through ingest identical either way — but the real-source roll changes what
-ingest stamps onto the set, and without the default every example asserting
-on a delivered set is nondeterministic at the roll's weight. A spec that needs
-a particular mode calls `pin_code_review_mode` (`spec/support/code_review_mode_helpers.rb`),
-which stubs only the mode's weights. A `WeightedRoll.pick` stub without
-`with(...)` matches every roll, so it replaces the `:toy` pin without failing.
+`spec/support/roll_defaults.rb` pins two of `DailyPlan`'s rolls for every
+example, since each changes what the plan or ingest produce:
+
+- **The real-source sub-roll** lands `:toy`. Without it, every example
+  asserting on a delivered set is nondeterministic at the roll's weight. A
+  spec that exercises the grounded `code_review` path opts out with its own
+  `:real` stub.
+- **The mode roll never lands `bug_hunt`.** It rolls the other three modes as
+  before. A `bug_hunt` day changes main-track capacity, and ingest refuses the
+  canned `code_review` section, which has no `purpose`. A spec that needs
+  `bug_hunt`, or any other particular mode, calls `pin_code_review_mode`
+  (`spec/support/code_review_mode_helpers.rb`), which stubs both the judged
+  and unjudged mode weights.
+
+A `WeightedRoll.pick` stub without `with(...)` matches every roll, so it
+replaces both pins without failing.
 
 CI runs the suite against Postgres 18, the major version production runs, on every PR (see `.github/workflows/ci.yml`).
 

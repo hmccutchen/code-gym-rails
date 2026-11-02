@@ -35,7 +35,7 @@ always swap. `.reject_unusable!` refuses a missing, blank or non-string
 piece, a piece past `MAX_PIECE_LINES` (24 non-blank lines), and an answer key missing any
 of `deciding_fact`, `principle`, `why_other_fails`. Specs pin the roll to
 B (`spec/support/weighted_roll_position_default.rb`), which sorts after
-`real_source_default.rb` on purpose. `script/report_answer_positions.rb`
+`roll_defaults.rb` on purpose. `script/report_answer_positions.rb`
 is the read-only check on A/B balance; no log line records a position.
 
 **The answer key never leaves the server before review.** `answer_key` is

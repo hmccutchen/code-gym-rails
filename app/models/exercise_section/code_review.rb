@@ -1,6 +1,8 @@
 # Design notes: docs/code-notes/app/models/exercise_section/code_review.md
 class ExerciseSection::CodeReview < ExerciseSection
   extend PlantedKey::Kind
+  extend BugHunt::Checks
+  extend BugHunt::KindHooks
 
   KEY_FIELDS = %w[issue why_it_matters fix].freeze
 
@@ -45,10 +47,13 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.quoted_key_texts(key) = [ key&.dig("issue") ]
 
-  def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
+  def self.normalize_planted_key(section)
+    key = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
+    key && bug_hunt?(section) ? key.merge(BugHunt.optional_key_fields(section[PlantedKey::FIELD])) : key
+  end
 
   def self.refusal_codes = %w[snippet_missing snippet_too_long file_count_wrong file_incomplete file_too_long path_invalid
-                              changed_lines_unresolved]
+                              changed_lines_unresolved] + BugHunt::REFUSAL_CODES
 
   def self.files(section)
     FILE_SLOTS.filter_map do |number|
@@ -75,7 +80,10 @@ class ExerciseSection::CodeReview < ExerciseSection
     "The section's files, every line numbered, with \"Changed lines\" naming the lines the page marks as the change:\n#{files}" if files
   end
 
-  def self.reject_unusable!(section, language: nil, file_range: 1..1, **)
+  def self.reject_unusable!(section, language: nil, file_range: 1..1, mode: nil, **)
+    return reject_bug_hunt!(section) if BugHunt.mode?(mode)
+
+    section.delete(BugHunt::PURPOSE_FIELD)
     if file_range.max == 1
       reject_unusable_snippet!(section)
       return drop_file_fields!(section)
@@ -167,7 +175,7 @@ class ExerciseSection::CodeReview < ExerciseSection
                        :list_of?
 
   def self.arrange!(section)
-    section.delete("diagram") if files(section).any?
+    section.delete("diagram") if files(section).any? || bug_hunt?(section)
   end
 
   def self.diagrammable?
@@ -200,7 +208,9 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   # A RealSource excerpt's own instruction replaces the mode's toy line.
   def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil,
-                               file_range: 1..1, code_style: nil, **)
+                               file_range: 1..1, code_style: nil, gotcha: nil, **)
+    return BugHunt::Prompt.guidance(gotcha: gotcha, rung: rung, vocabulary: vocabulary) if BugHunt.mode?(mode)
+
     vocabulary_line = "- Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}"
     if file_range.max > 1
       return MultiFile.guidance(file_range: file_range, label: label, mode: mode, artifact: artifact, test_framework: test_framework,
@@ -224,7 +234,8 @@ class ExerciseSection::CodeReview < ExerciseSection
   private_class_method :content_instruction
 
   # Keep the snippet's language out of here: the instruction line above is its one authoritative statement.
-  def self.schema_fragment(label:, file_range: 1..1, **)
+  def self.schema_fragment(label:, file_range: 1..1, mode: nil, **)
+    return BugHunt::Prompt.schema_fragment if BugHunt.mode?(mode)
     return MultiFile.schema_fragment(file_range: file_range, answer_key: ANSWER_KEY_SCHEMA) if file_range.max > 1
 
     <<~SCHEMA.chomp
@@ -244,6 +255,8 @@ class ExerciseSection::CodeReview < ExerciseSection
                              "\"File: <path>\", the path exactly as shown above, and leave out a file the fix doesn't change."
 
   def self.grading_note(section:, answer:)
+    return BugHunt::Prompt::GRADING_NOTE if bug_hunt?(section)
+
     "Main point: the one planted issue — the defect in the snippet, the smell in the test file, or the flaw in the migration.\n" \
     "Essential pieces: why it is a problem in this code, and a fix that would work as written."
   end
@@ -255,7 +268,8 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.review_context(section:, answer:, rating:)
     [
       "Code Review question: #{section["question"]}",
-      files_context(section) || "Code snippet: #{section["snippet"]}",
+      snippet_context(section) || files_context(section) || "Code snippet: #{section["snippet"]}",
+      ("No program output was shown to the engineer." if bug_hunt?(section)),
       current_schema_lines(section["current_schema"]),
       answer_lines(answer, rating)
     ].compact.join("\n")

@@ -111,3 +111,22 @@ service that stops at the provider call. The judge's input is measured over
 token. Real drafts write
 far less than the cap, so the run's own cost line, from the reported usage,
 is the number to record.
+
+## `--mode bug_hunt`
+
+`--mode bug_hunt` drafts `code_review` on the `bug_hunt` mode for the
+measurement in `docs/code-notes/script/bug_hunt_measure.md`. Each draft's
+plan is the day's plan with the mode, the entry's `code_review_gotcha`, no
+`RealSource` excerpt and a single file, and `DailyPlan.for` is called with
+`judged: true`, since every draft is judged. The script walks the
+language's `BugHuntGotchas` registry in list order, one kept section per
+entry, with the entry's concept fixed. A rejected or failed draft tries
+the same entry again, within the usual two attempts a section, so the
+kept sections line up with the entries. `--count` defaults to the number
+of entries and can't exceed it. `--entries ID,ID` drafts only the named
+entries, in the order given, for a partial re-measure. Each kept entry
+adds `registry_id` and `purpose` beside the key-sheet fields, which
+`bug_hunt_measure.rb build` reads. `--mode` refuses `--triage` and any kind
+but `code_review`, and everything else about the run (the read-only
+transaction, the output path outside the repository, `--max-cost` and the
+plan-only mode) is unchanged.

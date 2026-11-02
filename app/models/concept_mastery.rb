@@ -31,6 +31,8 @@ class ConceptMastery < ApplicationRecord
     sections_by_concept = Hash.new { |h, k| h[k] = [] }
     response.answered_concept_tags.slice(*sections).each do |section, concept|
       next if concept.blank? || concept == "other"
+      next unless response.mastery_evidence?(section)
+
       sections_by_concept[concept] << section
     end
 
@@ -71,9 +73,9 @@ class ConceptMastery < ApplicationRecord
   private_class_method :defer_skipped_checks!
 
   def self.skipped_check_scopes(response, sections)
-    answered = response.answered_concept_tags.values
+    answered = response.answered_concept_tags.select { |section, _| response.mastery_evidence?(section) }.values
     tags = response.concept_tags.slice(*(sections & response.section_keys))
-      .reject { |section, concept| answered.include?(concept) || !response.section_reviewed?(section) }
+      .select { |section, concept| response.mastery_evidence?(section) && response.section_reviewed?(section) && !answered.include?(concept) }
     tags.group_by { |section, _| ConceptBucket.for(section, response.daily_exercise.language) }
       .map do |bucket, pairs|
         response.user.concept_masteries.in_bucket(bucket).where(concept: pairs.map(&:last))

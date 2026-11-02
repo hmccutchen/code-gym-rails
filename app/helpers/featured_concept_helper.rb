@@ -10,6 +10,11 @@ module FeaturedConceptHelper
     featured_concept.present? && featured_concept.marks?(concept: concept, bucket: bucket)
   end
 
+  def featured_callout_shown?(exercise, day_response)
+    featured_concept.present? &&
+      (exercise.nil? || day_response&.submitted? || exercise.concepts_withheld_before_submission.exclude?(featured_concept.concept))
+  end
+
   # The tagline can describe what a section asks the engineer to find, so it waits until the day is submitted.
   def featured_tagline_shown?(day_response)
     day_response.nil? || day_response.submitted?

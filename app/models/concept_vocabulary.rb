@@ -43,7 +43,7 @@ module ConceptVocabulary
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
-    over_mocking testing_implementation_not_behavior
+    over_mocking testing_implementation_not_behavior array_mutation_pitfalls
   ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS +
     MODULE_DESIGN_CONCEPTS + SILENT_CORRECTNESS_CONCEPTS + DOMAIN_MODELING_CONCEPTS).freeze
 
@@ -132,12 +132,12 @@ module ConceptVocabulary
     end
   end
 
-  def self.selectable_for_section(section_key, language, mode: nil, rung: nil)
+  def self.selectable_for_section(section_key, language, mode: nil, rung: nil, gotcha: nil)
     vocabulary =
       if mode && section_key == ExerciseSection::CodeReview.key
-        code_review_vocabulary(language, mode)
+        code_review_vocabulary(language, mode, gotcha)
       else
-        for_section(section_key, language)
+        for_section(section_key, language) - [ gotcha&.concept ]
       end
 
     excluded = excluded_concepts_for(section_key)
@@ -145,9 +145,13 @@ module ConceptVocabulary
     ExerciseSection.for(section_key).narrow_vocabulary(remaining, rung: rung) & remaining
   end
 
-  def self.code_review_vocabulary(language, mode)
+  def self.code_review_vocabulary(language, mode, gotcha)
     full = for_language(language)
-    mode == :schema_review ? DATA_MODELING_CONCEPTS : full - DATA_MODELING_CONCEPTS
+    case mode
+    when :schema_review then DATA_MODELING_CONCEPTS
+    when :bug_hunt      then full & (gotcha ? [ gotcha.concept ] : BugHuntGotchas.concepts(language))
+    else                     full - DATA_MODELING_CONCEPTS
+    end
   end
   private_class_method :code_review_vocabulary
 

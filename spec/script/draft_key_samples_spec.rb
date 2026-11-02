@@ -16,4 +16,20 @@ RSpec.describe "script/draft_key_samples.rb" do
   ensure
     FileUtils.rm_rf(dir)
   end
+
+  it "refuses an unknown bug_hunt entry before reserving the file or making a call" do
+    dir = Dir.mktmpdir
+    path = File.join(dir, "keys.json")
+    env = { "ANTHROPIC_API_KEY" => "sk-ant-test", "RAILS_ENV" => "test" }
+
+    output, status = Open3.capture2e(env, "bin/rails", "runner", "script/draft_key_samples.rb", "code_review", path,
+                                     "--mode", "bug_hunt", "--entries", "rb_not_in_the_registry", "--run", "--max-cost", "1",
+                                     chdir: Rails.root.to_s)
+
+    expect(status).not_to be_success
+    expect(output).to include("rb_not_in_the_registry isn't a ruby_rails bug_hunt entry")
+    expect(File).not_to exist(path)
+  ensure
+    FileUtils.rm_rf(dir)
+  end
 end

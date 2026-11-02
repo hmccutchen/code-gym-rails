@@ -130,6 +130,14 @@ class ExerciseSection
       vocabulary
     end
 
+    def planning_host?(mode:) = true
+
+    def concept_shown_before_submission?(_section) = true
+
+    def mastery_evidence?(_section) = true
+
+    def ships_unjudged?(_section) = true
+
     def planted_key? = false
 
     def answer_key_fields
@@ -210,6 +218,10 @@ class ExerciseSection
     def judge_guidance
       nil
     end
+
+    def judge_task_for(_section) = judge_task
+
+    def judge_guidance_for(_section) = judge_guidance
 
     def judge_hidden_fields = []
 

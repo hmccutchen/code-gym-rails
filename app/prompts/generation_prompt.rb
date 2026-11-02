@@ -85,7 +85,7 @@ class GenerationPrompt
   def schema_for(kinds)
     label = config[:label]
 
-    sections = kinds.map { |kind| kind.schema_fragment(label: label, file_range: code_review_file_range) }
+    sections = kinds.map { |kind| kind.schema_fragment(label: label, file_range: code_review_file_range, mode: @plan.code_review_mode) }
                     .join(",\n  ")
 
     <<~SCHEMA
@@ -256,7 +256,7 @@ class GenerationPrompt
     language_config = config
 
     kind.generation_guidance(
-      vocabulary:     ConceptVocabulary.selectable_for_section(kind.key, @language, mode: mode, rung: rung),
+      vocabulary:     ConceptVocabulary.selectable_for_section(kind.key, @language, mode: mode, rung: rung, gotcha: @plan.code_review_gotcha),
       label:          language_config[:label],
       mode:           mode,
       artifact:       language_config[:schema_artifact],
@@ -265,7 +265,8 @@ class GenerationPrompt
       rung:           rung,
       alongside:      alongside,
       file_range:     code_review_file_range,
-      code_style:     language_config[:code_style]
+      code_style:     language_config[:code_style],
+      gotcha:         @plan.code_review_gotcha
     )
   end
 end

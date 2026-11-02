@@ -8,7 +8,7 @@ class SectionContext
       ("Why it exists: #{data["why"]}" if data["why"].present?),
       ("Question: #{data["question"]}" if data["question"].present?),
       ("Options: #{Array(data["options"]).join(" / ")}" if data["options"].present?),
-      ("Code snippet:\n#{data["snippet"]}" if data["snippet"].present?),
+      ExerciseSection::CodeReview.snippet_context(data) || ("Code snippet:\n#{data["snippet"]}" if data["snippet"].present?),
       ExerciseSection::CodeReview.files_context(data),
       ("Current schema, as the table stands today:\n#{data["current_schema"]}" if data["current_schema"].present?),
       ("Starter code:\n#{data["starter_code"]}" if data["starter_code"].present?),

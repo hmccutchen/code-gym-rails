@@ -6,21 +6,22 @@ class ExerciseDraft
   Draft = Data.define(:user, :language, :problem_set, :plan, :kinds, :difficulty, :ladders, :history,
                       :suggested_concepts, :unusable_sections)
 
-  def self.call(user, language:, provider:, blocking: false, deadline: GenerationDeadline::NONE)
+  def self.call(user, language:, provider:, judged:, blocking: false, deadline: GenerationDeadline::NONE)
     LanguagePrompts.for(language)
-    plan       = DailyPlan.for(user, language: language)
+    plan       = DailyPlan.for(user, language: language, judged: judged)
     GenerationDiagnostics.new(user).set_size(plan.size)
     history    = user.recent_performance
     difficulty = KindDifficulty.for(user)
     kinds      = plan.kinds
-    ladders    = GenerationLadders.for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode)
+    ladders    = GenerationLadders.for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode,
+                                       gotcha: plan.code_review_gotcha)
     prompt     = provider.prompt.call(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders)
 
     reply = provider.generate.call(user, "generate_exercise", language, prompt.render,
                                    subject: "problem set", blocking: blocking, deadline: deadline)
     ingested = ProblemSetIngest.call(
       reply, language: language, expected_keys: kinds.map(&:key), daily: plan.daily_kinds, code_review_source: plan.code_review_source,
-      code_review_files: code_review_files(plan, difficulty, user), pitched_at: difficulty.rungs(skill_level: user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
+      code_review_files: code_review_files(plan, difficulty, user), code_review_mode: plan.code_review_mode, pitched_at: difficulty.rungs(skill_level: user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
     )
 
     diagnostics = GenerationDiagnostics.new(user)
@@ -43,6 +44,7 @@ class ExerciseDraft
       reply, language: language,
       expected_keys: [ kind.key ], daily: draft.plan.daily_kinds, fixed_concepts: { kind.key => concept },
       code_review_source: draft.plan.code_review_source, code_review_files: code_review_files(draft.plan, draft.difficulty, user),
+      code_review_mode: draft.plan.code_review_mode,
       pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
       eased_for: eased_concepts_for(draft.plan, draft.difficulty).slice(kind.key)
     )
@@ -63,7 +65,7 @@ class ExerciseDraft
 
   def self.retry_ladders(draft, kind)
     GenerationLadders.for(draft.difficulty.rungs_for([ kind ], skill_level: draft.user.skill_level), draft.language,
-                          draft.plan.code_review_mode)
+                          draft.plan.code_review_mode, gotcha: draft.plan.code_review_gotcha)
   end
   private_class_method :retry_ladders
 

@@ -221,7 +221,7 @@ RSpec.describe AiService do
 
       spy_class.new(canned_text: full_problem_set.to_json).generate_exercise(user)
       retry_draft = spy_class.new(canned_text: full_problem_set.to_json)
-                            .send(:draft_exercise, user, language: "ruby_rails", blocking: false)
+                            .send(:draft_exercise, user, language: "ruby_rails", blocking: false, judged: true)
       spy_class.new(canned_text: { "pattern" => FakeService::EXERCISE_PROBLEM_SET["pattern"].deep_dup }.to_json)
                .send(:retry_section, retry_draft, ExerciseSection::Pattern, "service_objects")
       spy_class.new(canned_text: review_json).review_sections(user, exercise, response, sections: %w[code_review])
@@ -1464,7 +1464,8 @@ RSpec.describe AiService do
                                ladder_senior: "a fresh senior rung", ladder_principal_engineer: "p")
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_junior: "j", ladder_senior: "s",
                                ladder_mid_level: "a mid-level pattern rung", ladder_principal_engineer: "p")
-      expect(GenerationLadders).to receive(:for).with({ ExerciseSection::Challenge => "senior" }, "ruby_rails", plan.code_review_mode)
+      expect(GenerationLadders).to receive(:for).with({ ExerciseSection::Challenge => "senior" }, "ruby_rails", plan.code_review_mode,
+                                                      gotcha: plan.code_review_gotcha)
                                                .and_call_original
 
       section = svc.send(:retry_section, draft, ExerciseSection::Challenge, "memoization")
@@ -1574,9 +1575,9 @@ RSpec.describe AiService do
       pin_code_review_mode(:schema_review)
       allow(GenerationLadders).to receive(:for).and_call_original
 
-      FakeService.new("fake-key").send(:draft_exercise, user, language: "javascript", blocking: false)
+      FakeService.new("fake-key").send(:draft_exercise, user, language: "javascript", blocking: false, judged: true)
 
-      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review)
+      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil)
     end
 
     describe "MAX_LADDER_GUIDANCE_CHARS" do
@@ -2270,7 +2271,7 @@ RSpec.describe AiService do
 
     it "threads the rolled mode into both the prompt and the diagnostics payload" do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:schema_review)
+      pin_code_review_mode(:schema_review)
 
       set = full_problem_set("code_review" => { "concept" => "missing_index" })
       svc = double_class.new(canned_text: set.to_json)
@@ -2291,7 +2292,7 @@ RSpec.describe AiService do
 
     it "threads a grounded code_review into the prompt, the stamped set, and the diagnostics payload" do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+      pin_code_review_mode(:application_code)
       allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:real)
       excerpt = RealSource::APPLICATION_CODE.first
 
@@ -4959,6 +4960,16 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(single.dropped_sections).to eq([])
   end
 
+  it "tells the plan which path it is on, so bug_hunt is rolled on the judged path only" do
+    allow(DailyPlan).to receive(:for).and_call_original
+
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", judged: true)
+
+    FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
+    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", judged: false)
+  end
+
   { "b" => true, "a" => false }.each do |better, matched|
     it "hands back the judge's solves, naming the provider and the model it routed the judge to (key #{better})" do
       allow(WeightedRoll).to receive(:pick).with(ExerciseSection::DesignComparison::POSITION_WEIGHTS).and_return(better)
@@ -5037,12 +5048,12 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     it "checks a retry against the time left after its ladders load, so no retry request starts" do
       service = FakeService.new("fake-key")
-      draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false)
+      draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false, judged: true)
       now = [ start ]
       retry_and_judge = CallProfiles.worst_case_seconds_for("retry_section") + CallProfiles.worst_case_seconds_for("judge_section")
       deadline = GenerationDeadline.new(start + retry_and_judge, clock: -> { now.first })
-      allow(GenerationLadders).to receive(:for).and_wrap_original do |original, *args|
-        original.call(*args).tap { now[0] = start + 1 }
+      allow(GenerationLadders).to receive(:for).and_wrap_original do |original, *args, **options|
+        original.call(*args, **options).tap { now[0] = start + 1 }
       end
 
       expect { service.send(:retry_section, draft, ExerciseSection::Pattern, "service_objects", deadline: deadline) }
@@ -5053,7 +5064,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     it "starts a retry only when its re-judge fits after it, so a retried section is never shipped unjudged" do
       service = FakeService.new("fake-key")
-      draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false)
+      draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false, judged: true)
       retry_alone = GenerationDeadline.new(Time.current + CallProfiles.worst_case_seconds_for("retry_section"))
 
       expect { service.send(:retry_section, draft, ExerciseSection::Pattern, "service_objects", deadline: retry_alone) }

@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -u
+cd "$(dirname "$0")"
+
+only=${1:-all}
+out=${2:-results.jsonl}
+case "$only" in all|ruby|node) ;; *) echo "usage: run.sh [all|ruby|node] [OUTPUT]" >&2; exit 2 ;; esac
+
+limit=$(command -v timeout || command -v gtimeout) || { echo "GNU timeout is required (on macOS: brew install coreutils)" >&2; exit 2; }
+
+network_mode=${BUGHUNT_NETWORK_OFF:-auto}
+offline=()
+case "$network_mode" in
+  auto|require)
+    if unshare -rn true 2> /dev/null; then offline=(unshare -rn)
+    elif unshare -n true 2> /dev/null; then offline=(unshare -n)
+    elif [ "$network_mode" = require ]; then echo "BUGHUNT_NETWORK_OFF=require, but unshare can't turn the network off here" >&2; exit 2
+    fi ;;
+  never|external) ;;
+  *) echo "BUGHUNT_NETWORK_OFF must be auto, require, never or external" >&2; exit 2 ;;
+esac
+if [ "$network_mode" = external ]; then network=external
+elif [ ${#offline[@]} -gt 0 ]; then network=off
+else network=on
+fi
+
+build_id=$(cat build_id) || exit 2
+runtimes=()
+if [ "$only" != node ]; then runtimes+=("\"ruby\":\"$(ruby -e 'print RUBY_VERSION')\""); fi
+if [ "$only" != ruby ]; then runtimes+=("\"node\":\"$(node -p 'process.versions.node')\""); fi
+scratch=$(mktemp) || exit 2
+
+(IFS=,; printf '{"build":"%s","network":"%s","runtime":{%s}}\n' "$build_id" "$network" "${runtimes[*]}") > "$out"
+
+while read -r harness runtime file; do
+  [ "$only" = all ] || [ "$only" = "$runtime" ] || continue
+  case "$runtime" in
+    ruby) command=(ruby --disable-gems "$file") ;;
+    node) command=(node "$file") ;;
+    *) echo "unknown runtime $runtime for $harness" >&2; exit 2 ;;
+  esac
+  "$limit" -k 1 5 ${offline[@]+"${offline[@]}"} "${command[@]}" < /dev/null > "$scratch" 2> /dev/null
+  status=$?
+  line=$(grep '^BUGHUNT_RESULT ' "$scratch" | tail -n 1)
+  if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+    printf '{"harness":"%s","outcome":"not_runnable","reason":"timeout"}\n' "$harness" >> "$out"
+  elif [ -z "$line" ]; then
+    printf '{"harness":"%s","outcome":"not_runnable","reason":"no_result"}\n' "$harness" >> "$out"
+  else
+    printf '%s\n' "${line#BUGHUNT_RESULT }" >> "$out"
+  fi
+done < harnesses.txt
+rm -f "$scratch"
+echo "wrote $out (network $network)"

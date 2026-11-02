@@ -1,0 +1,52 @@
+require "json"
+
+module BugHuntRunner
+  HARNESS  = "%HARNESS%"
+  CHECK    = "%CHECK%"
+  SPEC     = %SPEC%
+  NOT_CORE = [ NameError, LoadError ].freeze
+
+  def self.finish(outcome, reason, error = nil)
+    line = { "harness" => HARNESS, "outcome" => outcome, "reason" => reason }
+    line["error"] = error if error
+    $stdout.puts("BUGHUNT_RESULT #{JSON.generate(line)}")
+    $stdout.flush
+    exit!(0)
+  end
+
+  def self.fresh_scope = TOPLEVEL_BINDING.eval("lambda { binding }").call
+
+  def self.evaluate(part) = fresh_scope.eval(File.read("#{HARNESS}.#{part}.rb"), "#{part}.rb")
+
+  def self.expected
+    evaluate("expected")
+  rescue SyntaxError, StandardError
+    finish("not_runnable", "key_unparsable")
+  end
+
+  def self.run
+    finish("not_runnable", "key_unparsable") if SPEC.nil?
+    wanted = expected if SPEC["raises"].nil?
+    actual, raised = subject_result
+    matched = matched?(actual, raised, wanted)
+    pass = CHECK == "bug_real" ? !matched : matched
+    finish(pass ? "pass" : "fail", matched ? "matched" : "mismatched", raised&.class&.name)
+  end
+
+  def self.subject_result
+    [ evaluate("subject"), nil ]
+  rescue SyntaxError
+    finish("not_runnable", "syntax")
+  rescue LoadError, StandardError, SystemStackError => e
+    finish("not_runnable", "not_core", e.class.name) if NOT_CORE.include?(e.class)
+    [ nil, e ]
+  end
+
+  def self.matched?(actual, raised, wanted)
+    SPEC["raises"] ? raised&.class&.name == SPEC["raises"] : raised.nil? && actual == wanted
+  rescue StandardError
+    false
+  end
+end
+
+BugHuntRunner.run

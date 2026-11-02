@@ -53,7 +53,7 @@ class ModelComparison
   def generate(user_id)
     user     = User.find(user_id)
     language = user.language_for_today
-    plan     = DailyPlan.for(user, language: language)
+    plan     = DailyPlan.for(user, language: language, judged: false)
 
     compare("generate", heading: "user #{user.id}, #{language}") do |service|
       problem_set = with_fixed_plan(plan) { service.generate_exercise(user, language: language) }
@@ -93,11 +93,11 @@ class ModelComparison
   def judge(user_id)
     user       = User.find(user_id)
     language   = user.language_for_today
-    plan       = DailyPlan.for(user, language: language)
+    plan       = DailyPlan.for(user, language: language, judged: true)
     difficulty = KindDifficulty.for(user)
 
     draft = with_fixed_plan(plan) do
-      pinned_service(CANDIDATES.fetch("generate").first, []).send(:draft_exercise, user, language: language, blocking: true)
+      pinned_service(CANDIDATES.fetch("generate").first, []).send(:draft_exercise, user, language: language, blocking: true, judged: true)
     end
 
     runs = compare("judge", heading: "user #{user.id}, #{language}") do |service|

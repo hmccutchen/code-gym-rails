@@ -12,11 +12,11 @@ class ForcedConceptDrafts
   end
 
   # Today's plan for this user, with the one kind targeted and locked so the prompt pitches it exactly at the rung asked for.
-  def self.rung_draft(user, language, rung, kind: KIND, plan: DailyPlan.for(user, language: language))
+  def self.rung_draft(user, language, rung, kind: KIND, plan: DailyPlan.for(user, language: language, judged: true))
     difficulty = KindDifficulty.new(levels: { kind.key => rung }, locked: [ kind.key ])
     kinds      = plan.kinds
     ladders    = GenerationLadders.for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language,
-                                       plan.code_review_mode)
+                                       plan.code_review_mode, gotcha: plan.code_review_gotcha)
     history    = user.recent_performance
 
     ExerciseDraft::Draft.new(user: user, language: language, problem_set: {}, plan: plan, kinds: kinds,

@@ -116,7 +116,35 @@ RSpec.describe "generation prompt characterization" do
 
   MULTI_FILE_RUNGS = { "mid_level" => [ "2 files", '"file_3_path"' ], "senior" => [ "2 or 3 files", "the structure this snippet describes" ] }.freeze
 
-  MULTI_FILE_FIXTURES = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys, MULTI_FILE_RUNGS.keys)
+  BUG_HUNT_RUNGS = {
+    "junior"    => [ "already gives a visibly wrong result", "looks_right_on\" is a call" ],
+    "mid_level" => [ "gives the right result by accident", "already gives a visibly wrong result" ],
+    "senior"    => [ "shows only on an edge the purpose covers", "the purpose suggests first gives the right result" ]
+  }.freeze
+
+  BUG_HUNT_ENTRIES = { "ruby_rails" => "rb_delete_while_each", "javascript" => "js_foreach_async" }.freeze
+
+  BUG_HUNT_FIXTURES = DailyExercise::LANGUAGES.product(BUG_HUNT_RUNGS.keys).to_h { |language, rung|
+    gotcha = BugHuntGotchas.find(BUG_HUNT_ENTRIES.fetch(language))
+    [ "case__#{language}__bug_hunt_#{rung}",
+      { render:   -> { render_case(language, pattern: :pattern, code_review_mode: :bug_hunt, code_review_gotcha: gotcha,
+                                   difficulty: KindDifficulty.new(levels: { "code_review" => rung }, locked: [])) },
+        includes: [ BUG_HUNT_RUNGS.fetch(rung).first, gotcha.rule, "exactly one: #{gotcha.concept}\n", '"purpose":',
+                    '"fixed_snippet":', "never a live reference" ],
+        excludes: [ BUG_HUNT_RUNGS.fetch(rung).last, "The code_review snippet must be", '"diagram":  "string — Mermaid source showing the structure this snippet' ] } ]
+  }.merge(
+    "case__retry__ruby_rails__code_review_bug_hunt" => {
+      render:   -> { render_case("ruby_rails", code_review_mode: :bug_hunt, code_review_gotcha: BugHuntGotchas.find("rb_ensure_return"),
+                                 only: ExerciseSection::CodeReview, fixed_concept: "error_handling", retry_cause: "code_review.output_shown") },
+      includes: [ "Its concept must be exactly `error_handling`", "a bug hunt never shows output", "Write core Ruby only" ],
+      excludes: [ '"design_comparison": {', "The code_review snippet must be" ],
+      schema:   %w[code_review]
+    }
+  ).freeze
+
+  MULTI_FILE_MODES = DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys.select { |mode| ExerciseSection::CodeReview.multi_file_mode?(mode) }.freeze
+
+  MULTI_FILE_FIXTURES = DailyExercise::LANGUAGES.product(MULTI_FILE_MODES, MULTI_FILE_RUNGS.keys)
     .to_h { |language, mode, rung|
       authorization = ConceptVocabulary.selectable_for_section("code_review", language, mode: mode, rung: rung).include?("authorization")
       contract_line = "a broken contract between files"
@@ -309,7 +337,7 @@ RSpec.describe "generation prompt characterization" do
       excludes: [ "as their concept today", "Retention checks due today", '"challenge": {' ],
       schema:   %w[pseudocode_to_code]
     }
-  }.merge(MULTI_FILE_FIXTURES).freeze
+  }.merge(MULTI_FILE_FIXTURES).merge(BUG_HUNT_FIXTURES).freeze
 
   def render_case(language, as: user, **plan)
     render_generation_prompt(as, language, **BARE_PLAN.merge(plan))
@@ -385,7 +413,7 @@ RSpec.describe "generation prompt characterization" do
     it "pins every retry case to a one-section schema" do
       retries = CASE_FIXTURES.select { |name, _| name.start_with?("case__retry__") }
 
-      expect(retries.size).to eq(4)
+      expect(retries.size).to eq(5)
       expect(retries.values.map { |fixture| fixture.fetch(:schema).size }).to all(eq(1))
     end
   end

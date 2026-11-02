@@ -18,11 +18,11 @@ Reinforcement is truncated to today's hosts because the prompt demands every con
 
 Every reinforcement entry, drilled or from recent history, must pass the same `.host_test`: some non-fourth kind planned today can tag it through `DayHosts`. `User#concepts_needing_reinforcement` applies it to both through its `hostable:` argument. A bucket check alone let through a concept no section could tag, such as a meta-skill concept on a two-section `schema_review` day, where code review takes only data-modeling concepts and design comparison never takes meta-skill ones. A history entry left out is offered again on a later day that can host it, while it is still in recent history.
 
-The capacity count (every non-fourth kind) is deliberately approximate: on some days the daily kinds host fewer concepts than that, and placement is advisory anyway.
+The capacity count (every non-fourth kind that `DayHosts#planning_host?` accepts, so a `bug_hunt` day's `code_review` doesn't count) is deliberately approximate: on some days the daily kinds host fewer concepts than that, and placement is advisory anyway.
 
 ## `.code_review_source_for`
 
-The real-source choice is a second roll inside the mode, so `CODE_REVIEW_MODE_WEIGHTS`' three-way split stays exact.
+The real-source choice is a second roll inside the mode, so `CODE_REVIEW_MODE_WEIGHTS`' split stays exact. `RealSource.pool(:bug_hunt)` is empty, so a `bug_hunt` day is never grounded.
 
 ## `CODE_REVIEW_FILE_WEIGHTS`
 
@@ -43,3 +43,11 @@ Reinforcement and due checks carry stronger prompt annotations, so any concept t
 ## `.established_in_buckets`
 
 The query builds one condition per bucket and ORs them, so a language concept cannot qualify by matching the architecture list.
+
+## `CODE_REVIEW_MODE_WEIGHTS` and `UNJUDGED_CODE_REVIEW_MODE_WEIGHTS`
+
+`bug_hunt` is rolled only on a judged day. `.for` takes `judged:` from the path that called it (`AiService#generate_judged_exercise` passes true, `#generate_unjudged_exercise` false), because a model may not name `AiService` to ask `.judged_on?` itself. An unjudged day rolls `UNJUDGED_CODE_REVIEW_MODE_WEIGHTS`, the same weights without `bug_hunt`: a weekend `bug_hunt` would ship with no judge to reject a snippet that is correct as written, holds a second trap, or uses code outside the core language. `WeightedRoll` divides by the remaining total. It is its own constant so a spec can pin the roll on either path (`pin_code_review_mode` stubs both).
+
+## `.code_review_gotcha_for`
+
+A `bug_hunt` day picks its trap from `BugHuntGotchas` here, never-seen-first from `plan_notes["bug_hunt"]`, and `Result#notes` writes the id back there. A day without a `code_review` section picks none. The trap is picked before `DayHosts` is built, from the day's kinds before coverage, so the hosts can leave its concept out of the other sections. When coverage then adds `code_review`, `.gotcha_delivered` picks the trap late; the other sections' vocabularies didn't leave its concept out, and the page's withheld-concept check is what hides it. `BugHuntGotchas.last_seen_for` counts a day only when its stored `code_review` section has a `purpose`, so a section the judge or ingest dropped never counts as seen. It doesn't depend on the concept tracks, since a `bug_hunt` section serves no reinforcement entry or retention check. A `bug_hunt` day is also single-file without rolling: `ExerciseSection::CodeReview.multi_file_mode?` says so.

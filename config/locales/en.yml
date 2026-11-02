@@ -632,6 +632,7 @@ en:
     code_review:
       name: "Code Review"
       placeholder: "What's the issue and how would you fix it?"
+      goal: "Goal:"
       current_schema: "Current schema (db/schema.rb)"
       changed_lines:
         one: "changed line %{lines}"

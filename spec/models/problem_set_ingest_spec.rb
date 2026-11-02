@@ -453,8 +453,10 @@ RSpec.describe ProblemSetIngest do
 
         step(set)
 
-        expect(ExerciseSection::Architecture).to have_received(:reject_unusable!).with(set["architecture"], language: "ruby_rails", file_range: 1..1)
-        expect(ExerciseSection::PlanReview).to have_received(:reject_unusable!).with(set["plan_review"], language: "ruby_rails", file_range: 1..1)
+        expect(ExerciseSection::Architecture).to have_received(:reject_unusable!)
+          .with(set["architecture"], language: "ruby_rails", file_range: 1..1, mode: nil)
+        expect(ExerciseSection::PlanReview).to have_received(:reject_unusable!)
+          .with(set["plan_review"], language: "ruby_rails", file_range: 1..1, mode: nil)
         expect(ExerciseSection::Challenge).not_to have_received(:reject_unusable!)
         expect(ExerciseSection::AmbiguityHunt).not_to have_received(:reject_unusable!)
       end
@@ -1016,8 +1018,10 @@ RSpec.describe ProblemSetIngest, "multi-file code reviews" do
 
     ingest(set, code_review_files: 2..3)
 
-    expect(ExerciseSection::CodeReview).to have_received(:reject_unusable!).with(set["code_review"], language: "ruby_rails", file_range: 2..3)
-    expect(ExerciseSection::Pattern).to have_received(:reject_unusable!).with(set["pattern"], language: "ruby_rails", file_range: 2..3)
+    expect(ExerciseSection::CodeReview).to have_received(:reject_unusable!)
+      .with(set["code_review"], language: "ruby_rails", file_range: 2..3, mode: nil)
+    expect(ExerciseSection::Pattern).to have_received(:reject_unusable!)
+      .with(set["pattern"], language: "ruby_rails", file_range: 2..3, mode: nil)
   end
 
   it "keeps a multi-file section with its changed lines resolved against the formatted code" do
@@ -1054,5 +1058,64 @@ RSpec.describe ProblemSetIngest, "the canned multi-file code review" do
                                   daily: DailyKinds::DEFAULT, expected_keys: %w[code_review], code_review_files: 2..2)
 
     expect(result.key_notes.map(&:outcome)).to eq([ "ok" ])
+  end
+end
+
+RSpec.describe ProblemSetIngest, "bug_hunt code reviews" do
+  let(:section) do
+    { "concept" => "array_mutation_pitfalls", "question" => "What's wrong?", "purpose" => "Remove every even number from nums.",
+      "snippet" => "def remove_evens(nums)\n  nums.each { |n| nums.delete(n) if n.even? }\n  nums\nend",
+      "diagram" => "graph TD; A-->B",
+      "answer_key" => { "issue" => "`nums.delete(n)` skips the next element.", "why_it_matters" => "w", "fix" => "f",
+                        "witness" => { "call" => "remove_evens([1, 2, 4, 5])", "expected" => "[1, 5]", "returns" => "[1, 4, 5]" },
+                        "fixed_snippet" => "def remove_evens(nums) = nums.reject(&:even?)" } }
+  end
+
+  def ingest(set, mode:)
+    described_class.call(set, language: "ruby_rails", daily: DailyKinds::DEFAULT, expected_keys: set.keys, code_review_mode: mode)
+  end
+
+  it "hands the day's mode to every kind's boundary check" do
+    allow(ExerciseSection::CodeReview).to receive(:reject_unusable!)
+    set = { "code_review" => section }
+
+    ingest(set, mode: :bug_hunt)
+
+    expect(ExerciseSection::CodeReview).to have_received(:reject_unusable!)
+      .with(set["code_review"], language: "ruby_rails", file_range: 1..1, mode: :bug_hunt)
+  end
+
+  it "keeps a bug_hunt section with its purpose, its witness and no diagram" do
+    result = ingest({ "code_review" => section }, mode: :bug_hunt)
+    kept = result.problem_set.fetch("code_review")
+
+    expect(result.unusable_sections).to be_empty
+    expect(kept["purpose"]).to eq("Remove every even number from nums.")
+    expect(kept).not_to have_key("diagram")
+    expect(kept.dig("answer_key", "witness", "returns")).to eq("[1, 4, 5]")
+    expect(kept.dig("answer_key", "fixed_snippet")).to be_present
+  end
+
+  it "refuses a bug_hunt section past the 10-line cap after formatting" do
+    long = section.merge("snippet" => Array.new(11) { |index| "x#{index} = #{index}" }.join("\n"))
+
+    result = ingest({ "code_review" => long, "pattern" => { "concept" => "memoization", "question" => "q" } }, mode: :bug_hunt)
+
+    expect(result.unusable_sections.map(&:code)).to eq([ "code_review.bug_hunt_too_long" ])
+  end
+
+  it "notes the key as ok when its issue quotes the code" do
+    result = ingest({ "code_review" => section }, mode: :bug_hunt)
+
+    expect(result.key_notes.map(&:outcome)).to eq([ "ok" ])
+  end
+
+  it "drops a purpose sent on another mode, keeping the section a plain code review" do
+    plain = section.except("diagram").merge("snippet" => "x = 1")
+
+    kept = ingest({ "code_review" => plain }, mode: :application_code).problem_set.fetch("code_review")
+
+    expect(kept).not_to have_key("purpose")
+    expect(kept["answer_key"].keys).to eq(ExerciseSection::CodeReview::KEY_FIELDS)
   end
 end

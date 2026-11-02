@@ -4,7 +4,7 @@ module KeyTriage
   DEFAULT_SOLVER_MODEL = ClaudeService::MODEL_FOR_PURPOSE.fetch("judge_section")[:model]
   SOLVER_MODELS = ClaudeService::MODEL_FOR_PURPOSE.values.map { |route| route[:model] }.uniq.freeze
   SOLVER_EFFORT = "high".freeze
-  MODES = DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys.freeze
+  MODES = (DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys - [ ExerciseSection::CodeReview::BugHunt::MODE ]).freeze
   OUTCOMES = %w[agree disagree unlocated].freeze
   REPLY_FIELDS = %w[issue fix].freeze
   HIDDEN_FROM_SOLVER = %w[concept teaching_note].freeze

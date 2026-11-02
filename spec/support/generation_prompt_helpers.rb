@@ -3,7 +3,8 @@ module GenerationPromptHelpers
     daily_kinds: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review },
     reinforcement: [], due_checks: [], established: [],
     fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
-    code_review_mode: :application_code, code_review_source: nil, code_review_files: :single, scenario_flavor: :general,
+    code_review_mode: :application_code, code_review_source: nil, code_review_files: :single, code_review_gotcha: nil,
+    scenario_flavor: :general,
     shared_concept: nil, coverage: nil, waiting_checks: nil, size: nil
   }.freeze
 
@@ -24,6 +25,7 @@ module GenerationPromptHelpers
 
   def render_generation_prompt(user, language = "ruby_rails", history: [], difficulty: KindDifficulty.none,
                         ladders: {}, only: nil, fixed_concept: nil, retry_cause: nil, **plan_overrides)
+    plan_overrides[:code_review_gotcha] ||= BugHuntGotchas.for_language(language).first if plan_overrides[:code_review_mode] == :bug_hunt
     GenerationPrompt.new(user, language, plan: plan_for(**plan_overrides), history: history,
                          difficulty: difficulty, ladders: ladders,
                          retention_annotation: generation_retention_annotation)

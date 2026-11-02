@@ -36,10 +36,14 @@ RSpec.describe ConceptVocabulary do
   end
 
   describe "RAILS_CONCEPTS" do
-    it "is a frozen 44-entry vocabulary" do
-      expect(ConceptVocabulary::RAILS_CONCEPTS.size).to eq(44)
+    it "is a frozen 45-entry vocabulary" do
+      expect(ConceptVocabulary::RAILS_CONCEPTS.size).to eq(45)
       expect(ConceptVocabulary::RAILS_CONCEPTS).to be_frozen
       expect(ConceptVocabulary::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
+    end
+
+    it "includes array_mutation_pitfalls, which bug_hunt's Ruby mutation traps are tagged with" do
+      expect(ConceptVocabulary::RAILS_CONCEPTS).to include("array_mutation_pitfalls")
     end
 
     it "includes the two Rails security concepts chosen for real depth" do
@@ -238,6 +242,39 @@ RSpec.describe ConceptVocabulary do
         vocabulary = described_class.selectable_for_section("code_review", "ruby_rails", mode: mode)
         expect(vocabulary).not_to include(*ConceptVocabulary::DATA_MODELING_CONCEPTS)
         expect(vocabulary).to include("n_plus_one")
+      end
+    end
+
+    it "offers a bug_hunt code_review only the picked gotcha's concept" do
+      gotcha = BugHuntGotchas.find("rb_memo_falsy")
+
+      expect(described_class.selectable_for_section("code_review", "ruby_rails", mode: :bug_hunt, gotcha: gotcha))
+        .to eq(%w[memoization])
+    end
+
+    it "offers a bug_hunt code_review every registry concept when no gotcha is named" do
+      %w[ruby_rails javascript].each do |language|
+        vocabulary = described_class.selectable_for_section("code_review", language, mode: :bug_hunt)
+
+        expect(vocabulary).to match_array(BugHuntGotchas.concepts(language))
+        expect(vocabulary - described_class.selectable_for_section("code_review", language, mode: :application_code)).to be_empty
+      end
+    end
+
+    it "ignores a gotcha on code_review's other modes" do
+      gotcha = BugHuntGotchas.find("rb_memo_falsy")
+
+      expect(described_class.selectable_for_section("code_review", "ruby_rails", mode: :application_code, gotcha: gotcha))
+        .to eq(described_class.selectable_for_section("code_review", "ruby_rails", mode: :application_code))
+    end
+
+    it "withholds the gotcha's concept from every other kind, so no other section names the trap before submission" do
+      gotcha = BugHuntGotchas.find("rb_memo_falsy")
+
+      expect(described_class.selectable_for_section("pattern", "ruby_rails", mode: :bug_hunt, gotcha: gotcha))
+        .to eq(ConceptVocabulary::RAILS_CONCEPTS - [ "memoization" ])
+      (ExerciseSection.all - [ ExerciseSection::CodeReview ]).each do |kind|
+        expect(described_class.selectable_for_section(kind.key, "ruby_rails", mode: :bug_hunt, gotcha: gotcha)).not_to include("memoization")
       end
     end
 

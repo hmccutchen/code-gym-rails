@@ -75,7 +75,7 @@ class JudgedGeneration
     end
 
     threads.map(&:value).each_with_object({}) do |(key, outcome, section), outcomes|
-      set[key]      = section
+      section ? set[key] = section : set.delete(key)
       outcomes[key] = outcome
     end
   end
@@ -101,6 +101,8 @@ class JudgedGeneration
   end
 
   def unjudged_draft(kind, section, outcome)
+    return [ kind.key, outcome.merge(dropped: true), nil ] unless kind.ships_unjudged?(section)
+
     chain(kind).settle(0)
     [ kind.key, outcome, section ]
   end
@@ -193,10 +195,14 @@ class JudgedGeneration
   end
 
   def unjudged_retry(kind, retried, outcome)
-    return [ *drop(outcome), true ] if outcome[:fallback] == ProviderError::DeadlineError.judge_fallback_reason
+    return [ *drop(outcome), true ] unless ships_retry_unjudged?(kind, retried, outcome)
 
     chain(kind).settle(outcome[:retries])
     [ retried, outcome.merge(status: :keep), true ]
+  end
+
+  def ships_retry_unjudged?(kind, retried, outcome)
+    outcome[:fallback] != ProviderError::DeadlineError.judge_fallback_reason && kind.ships_unjudged?(retried)
   end
 
   def record_attempt(outcome, verdict = nil)

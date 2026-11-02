@@ -14,6 +14,10 @@ module GenerationPrompt::RetryReasons
     "code_review.path_invalid" => "one of its file paths ran past #{ExerciseSection::CodeReview::MAX_PATH_LENGTH} characters or " \
                                   "held a line break or another control character, or two of its files had the same path.",
     "code_review.changed_lines_unresolved" => "none of its quoted changed lines matched exactly one line of its file.",
+    "code_review.purpose_missing" => "it had no purpose line, or its purpose ran over more than one line.",
+    "code_review.purpose_too_long" => "its purpose line ran past #{ExerciseSection::CodeReview::BugHunt::MAX_PURPOSE_LENGTH} characters.",
+    "code_review.bug_hunt_too_long" => "its code snippet ran past #{ExerciseSection::CodeReview::BugHunt::MAX_LINES} lines.",
+    "code_review.output_shown" => "its code showed a result in a comment, and a bug hunt never shows output.",
     "security_review.snippet_missing" => "it had no code snippet.",
     "security_review.snippet_too_long" => "its code snippet ran past #{ExerciseSection::SecurityReview::MAX_SNIPPET_LINES} lines.",
     "design_comparison.piece_missing" => "one of its two pieces of code was missing.",
