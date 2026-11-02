@@ -90,10 +90,10 @@ RSpec.describe BugHuntGotchas do
   describe ".last_seen_for" do
     let(:user) { User.create!(email: "hunt@example.com", name: "Hunt") }
 
-    def exercise_on(date, gotcha:)
+    def exercise_on(date, gotcha:, code_review: { "concept" => "memoization", "purpose" => "Return the cached total." })
       user.daily_exercises.create!(
         date: date, generated_at: Time.current, language: "ruby_rails",
-        problem_set: { "code_review" => { "concept" => "memoization" } },
+        problem_set: { "code_review" => code_review, "design_comparison" => { "concept" => "caching" } }.compact,
         plan_notes: { "daily_kinds" => [ "code_review" ], "bug_hunt" => gotcha }.compact
       )
     end
@@ -108,6 +108,18 @@ RSpec.describe BugHuntGotchas do
 
     it "ignores days that picked no gotcha" do
       exercise_on(Date.current - 1, gotcha: nil)
+
+      expect(described_class.last_seen_for(user)).to eq({})
+    end
+
+    it "ignores a day whose bug_hunt section was dropped" do
+      exercise_on(Date.current - 1, gotcha: "rb_memo_falsy", code_review: nil)
+
+      expect(described_class.last_seen_for(user)).to eq({})
+    end
+
+    it "ignores a day whose code_review section is another mode" do
+      exercise_on(Date.current - 1, gotcha: "rb_memo_falsy", code_review: { "concept" => "memoization" })
 
       expect(described_class.last_seen_for(user)).to eq({})
     end

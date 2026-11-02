@@ -60,7 +60,7 @@ class DailyPlan
     Result.new(daily_kinds: daily, rotation: rotation, **tracks, coverage: coverage, size: size,
                code_review_mode: code_review_mode, code_review_source: source,
                code_review_files: single ? :single : WeightedRoll.pick(CODE_REVIEW_FILE_WEIGHTS),
-               code_review_gotcha: code_review_gotcha_for(user, language, code_review_mode),
+               code_review_gotcha: code_review_gotcha_for(user, language, code_review_mode, daily, rotation),
                scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS))
   end
 
@@ -69,8 +69,9 @@ class DailyPlan
   end
   private_class_method :code_review_mode_weights
 
-  def self.code_review_gotcha_for(user, language, mode)
+  def self.code_review_gotcha_for(user, language, mode, daily, rotation)
     return nil unless ExerciseSection::CodeReview::BugHunt.mode?(mode)
+    return nil unless ExerciseSection.for_plan(daily: daily, rotation: rotation).include?(ExerciseSection::CodeReview)
 
     BugHuntGotchas.pick(language, last_seen: BugHuntGotchas.last_seen_for(user))
   end

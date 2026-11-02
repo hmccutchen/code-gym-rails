@@ -767,12 +767,23 @@ RSpec.describe DailyPlan do
     it "picks the language's first gotcha never seen, and records its id in the notes" do
       seen = BugHuntGotchas.for_language("javascript").first
       user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "javascript",
-                                   problem_set: { "code_review" => {} }, plan_notes: { "bug_hunt" => seen.id })
+                                   problem_set: { "code_review" => { "purpose" => "Sum the totals." } },
+                                   plan_notes: { "bug_hunt" => seen.id })
 
       result = plan(language: "javascript")
 
       expect(result.code_review_gotcha).to eq(BugHuntGotchas.for_language("javascript").second)
       expect(result.notes["bug_hunt"]).to eq(result.code_review_gotcha.id)
+    end
+
+    it "picks no gotcha on a day without a code_review section" do
+      user.update!(daily_section_count: 1, daily_section_kinds: %w[design_comparison code_review])
+
+      result = plan
+
+      expect(result.kinds).not_to include(ExerciseSection::CodeReview)
+      expect(result.code_review_gotcha).to be_nil
+      expect(result.notes).not_to have_key("bug_hunt")
     end
 
     it "picks no gotcha on any other mode" do

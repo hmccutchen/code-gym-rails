@@ -82,6 +82,7 @@ module BugHuntGotchas
   def self.last_seen_for(user)
     user.daily_exercises
         .where("plan_notes ->> 'bug_hunt' IS NOT NULL")
+        .where("problem_set -> 'code_review' ->> ? IS NOT NULL", ExerciseSection::CodeReview::BugHunt::PURPOSE_FIELD)
         .group("plan_notes ->> 'bug_hunt'")
         .maximum(:date)
   end
