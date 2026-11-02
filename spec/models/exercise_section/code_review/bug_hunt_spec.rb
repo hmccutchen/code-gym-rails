@@ -53,6 +53,16 @@ RSpec.describe ExerciseSection::CodeReview do
     end
   end
 
+  describe ".ships_unjudged?" do
+    it "refuses to ship a bug_hunt section without a verdict, and lets every other section ship" do
+      expect(described_class.ships_unjudged?({ "purpose" => "Sum the prices." })).to be(false)
+      expect(described_class.ships_unjudged?({ "snippet" => "x" })).to be(true)
+      (ExerciseSection.all - [ described_class ]).each do |kind|
+        expect(kind.ships_unjudged?({ "purpose" => "Sum the prices." })).to be(true)
+      end
+    end
+  end
+
   describe ".bug_hunt?" do
     it "reads the purpose field" do
       expect(described_class.bug_hunt?({ "purpose" => "Sum the prices." })).to be(true)

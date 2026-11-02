@@ -149,6 +149,13 @@ schedule.
   - as `unstated_prerequisite`: non-core code
   - as `underdetermined`: an undefined call
 - **What it may not touch:** `purpose` is not in `.prose_fields`.
+- **When it can't answer:** a `bug_hunt` section is dropped, never shipped
+  unjudged (`ships_unjudged?`, read by `JudgedGeneration` on the first pass
+  and on a retry's re-judge). Every other kind keeps its draft. The judge is
+  the only check that the code is wrong as written, which is why weekends
+  don't roll the mode. The cost: on a judge outage the day loses its
+  `code_review` section, and nothing replaces it (owner's decision,
+  2026-11-02).
 
 ## The measurement (2026-11-02)
 

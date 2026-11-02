@@ -19,4 +19,6 @@ module ExerciseSection::CodeReview::BugHunt::KindHooks
   def snippet_context(section) = BugHunt.snippet_context(section)
 
   def concept_shown_before_submission?(section) = !bug_hunt?(section)
+
+  def ships_unjudged?(section) = !bug_hunt?(section)
 end

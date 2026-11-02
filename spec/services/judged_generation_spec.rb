@@ -304,6 +304,32 @@ RSpec.describe JudgedGeneration do
     expect(Rails.logger).to have_received(:warn).with(/\[judge_fallback\]/).exactly(3).times
   end
 
+  describe "a bug_hunt section the judge cannot answer" do
+    before do
+      drafted["code_review"] = drafted["code_review"].merge("purpose" => "Return the cached total.")
+      allow(Rails.logger).to receive(:warn)
+    end
+
+    it "drops the section rather than ship it unjudged" do
+      verdicts["code_review"] = [ ProviderError::TimeoutError.new("slow") ]
+
+      judged = run
+
+      expect(judged.problem_set).not_to have_key("code_review")
+      expect(judged.dropped_sections).to eq(%w[code_review])
+      expect(judged.outcomes["code_review"]).to include(dropped: true, fallback: "timeout")
+    end
+
+    it "drops a retry whose re-judge fails" do
+      verdicts["code_review"] = [ reject, JudgeVerdict::Invalid.new("bad") ]
+
+      judged = run
+
+      expect(judged.problem_set).not_to have_key("code_review")
+      expect(judged.outcomes["code_review"]).to include(dropped: true, fallback: "invalid_output", retries: 1)
+    end
+  end
+
   it "records a truncated judge reply under the reason the review judge uses" do
     verdicts["code_review"] = [ ProviderError::TruncatedResponseError.new("cut off") ]
     allow(Rails.logger).to receive(:warn)

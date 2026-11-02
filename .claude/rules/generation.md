@@ -52,7 +52,9 @@ read it before changing that area.
   at once; a retry's prompt names the recorded cause (the judge's principle
   or the refusal code) through one fixed line in
   `GenerationPrompt::RetryReasons`, or no reason when none is recorded, and
-  never the draft or the judge's own words; a judge failure keeps the draft;
+  never the draft or the judge's own words; a judge failure keeps the draft,
+  except where the kind's `.ships_unjudged?` says no (a `bug_hunt` section
+  is dropped);
   a day with every section dropped raises `AllSectionsRejectedError` and
   writes no row. A dropped kind still counts as
   scheduled, and nothing in the rotation compensates, on purpose; a day's
