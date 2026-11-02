@@ -208,9 +208,10 @@ records under (`cm.language`) and the trap's withheld concept. It reads
 vocabularies in the day's language, not `cm.language`, since
 `ConceptVocabulary::LANGUAGES`' "architecture" entry would report false
 hosts. The planner passes no rungs and gets the strictest list, which every
-rung's vocabulary contains (`day_hosts_spec`). So the prompt may name one
-more host than the planner counted, never fewer: a tradeoff concept on a
-`principal_engineer` `design_comparison`.
+rung's vocabulary contains on every mode and trap (`day_hosts_spec`). So,
+given the same trap, the prompt may name one more host than the planner
+counted, never fewer: a tradeoff concept on a `principal_engineer`
+`design_comparison`.
 
 ## Review day context (`sections = keys.map`)
 

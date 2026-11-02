@@ -5,6 +5,7 @@ module CodeFormat
   module Javascript
     SCRIPT = Rails.root.join("vendor/prettier/format.mjs").to_s
     TIMEOUT_SECONDS = 20
+    READER_GRACE_SECONDS = 2
 
     # nil where Prettier could not parse a snippet; raises when Node or the package is missing.
     def self.all(snippets)
@@ -23,10 +24,19 @@ module CodeFormat
         finish(wait)
         output.value
       ensure
-        [ output, errors ].compact.each(&:join)
+        settle([ output, errors ].compact)
       end
     end
     private_class_method :run
+
+    def self.settle(readers)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + READER_GRACE_SECONDS
+      readers.each do |reader|
+        left = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        reader.join([ left, 0 ].max) || reader.kill.join
+      end
+    end
+    private_class_method :settle
 
     def self.finish(wait)
       unless wait.join(TIMEOUT_SECONDS)
