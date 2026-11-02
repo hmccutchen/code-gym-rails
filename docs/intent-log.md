@@ -567,3 +567,7 @@ data.*
   the old page could show the concept
 - no re-measure after the runner fix from the bot review
   **I decided:** the measured drafts stand as they are
+- the two follow-up issues from the `bug_hunt` reviews, the formatter's
+  reader threads and one hosting rule for retention checks `#655`
+  **I decided:** start on both issues right after the `bug_hunt` PR merged,
+  in one PR
