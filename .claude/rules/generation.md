@@ -88,7 +88,8 @@ read it before changing that area.
   JavaScript with one trap from `BugHuntGotchas`, picked never-seen-first
   into `plan_notes["bug_hunt"]`, never the section. Rolled on judged days
   only (`DailyPlan.for(judged:)`), single-file, never `RealSource`; its
-  vocabulary is the picked entry's concept. No output: ingest refuses a
+  vocabulary is the picked entry's concept, and every other kind's
+  vocabulary that day leaves that concept out. No output: ingest refuses a
   result comment. The key adds an optional code `witness`
   (async witnesses return a snapshot), `looks_right_on` and
   `fixed_snippet`; the quote check reads `issue` only. `purpose` is never a

@@ -822,6 +822,20 @@ RSpec.describe DailyPlan do
       expect(plan.reinforcement).to eq([])
     end
 
+    it "plans no retention check on the picked trap's concept onto another section" do
+      concept = BugHuntGotchas.for_language("ruby_rails").first.concept
+      user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :standard,
+                                     mastered_at: 1.month.ago, retention_interval_days: 7,
+                                     next_retention_check_on: Date.current - 1)
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: nil, fourth: nil)
+
+      hunt = plan
+
+      expect(hunt.code_review_gotcha.concept).to eq(concept)
+      expect(hunt.due_checks).to eq([])
+      expect(hunt.waiting_checks).to include(a_hash_including(concept: concept, reason: :no_host))
+    end
+
     it "picks no shared concept, which design_comparison's reference would name before submission" do
       allow(SharedConcept).to receive(:pick).and_call_original
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)

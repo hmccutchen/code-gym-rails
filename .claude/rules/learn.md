@@ -97,10 +97,13 @@ read it before changing that area.
   until it has copy.
 - **A `bug_hunt` section hides its concept until the day is submitted**
   (`docs/decisions/bug-hunt.md`): `ExerciseSection.concept_shown_before_submission?`
-  is false for one, so the section partial renders no concept reference and
-  no featured marker before submission; its goal line is plain text, never
-  glossary-wrapped. A request spec fails if the concept's name appears on
-  the unsubmitted dashboard.
+  is false for one, and `DailyExercise#concepts_withheld_before_submission`
+  is the one list the page reads: no section whose concept is on it renders
+  a concept reference or featured marker before submission, and the
+  dashboard's featured callout is left off when it features one
+  (`featured_callout_shown?`). The goal line is plain text, never
+  glossary-wrapped. A request spec fails if the concept's name appears
+  anywhere on the unsubmitted dashboard.
 - **The weekly featured concept**
   (`docs/decisions/the-weekly-featured-concept.md`):
   `FeaturedConcept.for(user)` stores one met concept per user per week

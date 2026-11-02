@@ -261,13 +261,21 @@ RSpec.describe ConceptVocabulary do
       end
     end
 
-    it "ignores a gotcha on every other mode and kind" do
+    it "ignores a gotcha on code_review's other modes" do
       gotcha = BugHuntGotchas.find("rb_memo_falsy")
 
       expect(described_class.selectable_for_section("code_review", "ruby_rails", mode: :application_code, gotcha: gotcha))
         .to eq(described_class.selectable_for_section("code_review", "ruby_rails", mode: :application_code))
+    end
+
+    it "withholds the gotcha's concept from every other kind, so no other section names the trap before submission" do
+      gotcha = BugHuntGotchas.find("rb_memo_falsy")
+
       expect(described_class.selectable_for_section("pattern", "ruby_rails", mode: :bug_hunt, gotcha: gotcha))
-        .to eq(ConceptVocabulary::RAILS_CONCEPTS)
+        .to eq(ConceptVocabulary::RAILS_CONCEPTS - [ "memoization" ])
+      (ExerciseSection.all - [ ExerciseSection::CodeReview ]).each do |kind|
+        expect(described_class.selectable_for_section(kind.key, "ruby_rails", mode: :bug_hunt, gotcha: gotcha)).not_to include("memoization")
+      end
     end
 
     it "leaves pattern unnarrowed on every mode" do

@@ -137,7 +137,7 @@ module ConceptVocabulary
       if mode && section_key == ExerciseSection::CodeReview.key
         code_review_vocabulary(language, mode, gotcha)
       else
-        for_section(section_key, language)
+        for_section(section_key, language) - [ gotcha&.concept ]
       end
 
     excluded = excluded_concepts_for(section_key)

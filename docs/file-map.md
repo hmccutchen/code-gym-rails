@@ -239,8 +239,9 @@ What each listed file does.
   rule choosing among met concepts, from the ledger and the user's past picks
 - `app/helpers/featured_concept_helper.rb` — `#featured_concept`, the pick
   read once per request; `#featured_section?`, which the section wrapper asks;
-  and `#featured_tagline_shown?`, the one rule for when the callout shows the
-  reference's tagline
+  `#featured_callout_shown?`, which leaves the dashboard callout off while
+  it would name a withheld `bug_hunt` concept; and `#featured_tagline_shown?`,
+  the one rule for when the callout shows the reference's tagline
 - `app/views/responses/_featured_marker.html.erb` — the marker beside a
   section's label when it carries this week's concept
 - `app/models/concept_book_sources.rb` — `ConceptBookSources`: the hand-curated

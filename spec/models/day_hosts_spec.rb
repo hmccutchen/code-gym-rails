@@ -29,6 +29,14 @@ RSpec.describe DayHosts do
     expect(bug_hunt.can_tag?(ExerciseSection::Challenge, "memoization", "ruby_rails")).to be(true)
   end
 
+  it "lets no kind tag the picked gotcha's concept on a bug_hunt day" do
+    gotcha   = BugHuntGotchas.find("rb_memo_falsy")
+    bug_hunt = described_class.new("ruby_rails", mode: :bug_hunt, gotcha: gotcha)
+
+    expect(bug_hunt.can_tag?(ExerciseSection::Pattern, "memoization", "ruby_rails")).to be(false)
+    expect(bug_hunt.can_tag?(ExerciseSection::Pattern, "service_objects", "ruby_rails")).to be(true)
+  end
+
   it "lists the kinds that can tag a concept, in the order given" do
     kinds = [ ExerciseSection::Architecture, ExerciseSection::Challenge, ExerciseSection::CodeReview ]
 

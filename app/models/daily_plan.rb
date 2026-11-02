@@ -48,7 +48,8 @@ class DailyPlan
     daily            = DailyKinds.for(user)
     rotation         = SectionRotation.for(history, count: size.count, preferences: preferences, daily: daily)
     code_review_mode = WeightedRoll.pick(code_review_mode_weights(judged))
-    hosts            = DayHosts.new(language, mode: code_review_mode)
+    gotcha           = code_review_gotcha_for(user, language, code_review_mode)
+    hosts            = DayHosts.new(language, mode: code_review_mode, gotcha: gotcha)
     due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
     tracks           = concept_tracks(user, language, daily, rotation, due: due, hosts: hosts)
     coverage, rotation, tracks = with_coverage(coverage_for(user, size, preferences, daily, tracks.fetch(:waiting_checks), hosts),
@@ -60,7 +61,7 @@ class DailyPlan
     Result.new(daily_kinds: daily, rotation: rotation, **tracks, coverage: coverage, size: size,
                code_review_mode: code_review_mode, code_review_source: source,
                code_review_files: single ? :single : WeightedRoll.pick(CODE_REVIEW_FILE_WEIGHTS),
-               code_review_gotcha: code_review_gotcha_for(user, language, code_review_mode, daily, rotation),
+               code_review_gotcha: (gotcha if code_review_day?(daily, rotation)),
                scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS))
   end
 
@@ -69,13 +70,17 @@ class DailyPlan
   end
   private_class_method :code_review_mode_weights
 
-  def self.code_review_gotcha_for(user, language, mode, daily, rotation)
+  def self.code_review_gotcha_for(user, language, mode)
     return nil unless ExerciseSection::CodeReview::BugHunt.mode?(mode)
-    return nil unless ExerciseSection.for_plan(daily: daily, rotation: rotation).include?(ExerciseSection::CodeReview)
 
     BugHuntGotchas.pick(language, last_seen: BugHuntGotchas.last_seen_for(user))
   end
   private_class_method :code_review_gotcha_for
+
+  def self.code_review_day?(daily, rotation)
+    ExerciseSection.for_plan(daily: daily, rotation: rotation).include?(ExerciseSection::CodeReview)
+  end
+  private_class_method :code_review_day?
 
   def self.size_for(user, history)
     DaySize.for(setting: user.daily_section_count, completion: SectionCount.for(history), gate: CompetencyGate.for(user))

@@ -1,8 +1,9 @@
 # Reads vocabularies with no rung, the strictest list, because the plan never reads difficulty targets.
 class DayHosts
-  def initialize(language, mode:)
+  def initialize(language, mode:, gotcha: nil)
     @language     = language
     @mode         = mode
+    @gotcha       = gotcha
     @vocabularies = {}
   end
 
@@ -19,6 +20,6 @@ class DayHosts
   private
 
   def vocabulary(kind)
-    @vocabularies[kind] ||= ConceptVocabulary.selectable_for_section(kind.key, @language, mode: @mode).to_set
+    @vocabularies[kind] ||= ConceptVocabulary.selectable_for_section(kind.key, @language, mode: @mode, gotcha: @gotcha).to_set
   end
 end

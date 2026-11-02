@@ -15,9 +15,9 @@ RSpec.describe "A bug_hunt section on the dashboard", type: :request do
       "answer_key" => { "issue" => "SENTINEL-KEY", "why_it_matters" => "w", "fix" => "f" } }
   end
 
-  def todays_set(submitted: false)
+  def todays_set(submitted: false, comparison_concept: "god_object")
     problem_set = { "code_review" => hunt,
-                    "design_comparison" => { "question" => "Pick one", "piece_a" => "a", "piece_b" => "b", "concept" => "god_object" } }
+                    "design_comparison" => { "question" => "Pick one", "piece_a" => "a", "piece_b" => "b", "concept" => comparison_concept } }
     exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, problem_set: problem_set,
                                      plan_notes: { "daily_kinds" => %w[code_review design_comparison] })
     return unless submitted
@@ -48,7 +48,24 @@ RSpec.describe "A bug_hunt section on the dashboard", type: :request do
     get root_path
 
     expect(code_review_section).not_to include(%(<span class="featured-marker">))
-    expect(code_review_section).not_to include("Memoization")
+    expect(response.body).not_to include("Memoization")
+  end
+
+  it "shows the featured callout again once the day is submitted" do
+    submit_set_showing(user, "memoization", date: Date.current - 10)
+    todays_set(submitted: true)
+
+    get root_path
+
+    expect(response.body).to include("featured-concept", "Memoization")
+  end
+
+  it "hides the concept on another section that carries the same one" do
+    todays_set(comparison_concept: "memoization")
+
+    get root_path
+
+    expect(response.body).not_to include("memoization", "Memoization")
   end
 
   it "shows the concept reference once the day is submitted" do

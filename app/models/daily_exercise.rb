@@ -59,6 +59,14 @@ class DailyExercise < ApplicationRecord
     ExerciseSection.resolved_keys(problem_set, daily: daily_kinds)
   end
 
+  def concepts_withheld_before_submission
+    active_section_keys.filter_map do |key|
+      section = problem_set[key]
+      concept = section&.dig("concept")
+      concept if concept.present? && concept != "other" && !ExerciseSection.for(key).concept_shown_before_submission?(section)
+    end
+  end
+
   def regeneration_offered?(response)
     !(response&.persisted? && response.reviewed?) && regenerated_at.nil? && !user.trial_ended?
   end

@@ -1,6 +1,6 @@
 <%# Locals: kind, key, data, slot, exercise, response, submitted, picker (nil on a card with no swap control). %>
 <% bucket = ConceptBucket.for(key, exercise.language) %>
-<% concept_shown = submitted || kind.concept_shown_before_submission?(data) %>
+<% concept_shown = submitted || exercise.concepts_withheld_before_submission.exclude?(data["concept"]) %>
 <% label = capture do %>
   <% if kind.titled_label? %><%= t("responses.section.titled_label", slot: slot, name: t("sections.#{key}.name"), title: data["title"]) %><% else %><%= t("responses.section.label", slot: slot, name: t("sections.#{key}.name")) %><% end %>
 <% end %>
