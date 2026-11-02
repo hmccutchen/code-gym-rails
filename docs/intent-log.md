@@ -531,3 +531,32 @@ data.*
   **I decided:** measure first with a read-only production query I ran;
   2,000 rather than four times the measurement, so a full reply still fits
   the read timeout and the regeneration deadline doesn't move
+- a "find the bug" puzzle for Ruby and JavaScript, as a fourth `code_review`
+  mode, `bug_hunt` `#652`
+  **why:** I wanted a quick social-media style puzzle: 5 to 10 lines, one
+  planted language gotcha, a one-line goal, and a short answer
+  **I decided:** a mode of `code_review` rather than a new kind, so two kinds
+  don't look alike; weights 0.24, 0.23, 0.33 and 0.20; core Ruby and core
+  JavaScript only, no Rails or TypeScript; no program output on the page;
+  the concept hidden until the day is submitted; no per-user setting; a
+  closed registry per language, picked never-seen-first; existing concepts
+  first, plus Ruby `array_mutation_pitfalls`; principal pitched as senior;
+  rolled on judged days only; a puzzle counts as an exposure, not mastery
+  evidence; the key carries a runnable witness, a snapshot for async traps,
+  and the fixed snippet; specs stay untracked
+- drafts measured by running them before building the page
+  **I decided:** about 23 drafts, one per registry entry, run with no
+  network and no secrets, failures read and a small sample; a $4 cap and my
+  approval before anything billed
+
+## Mon Nov 2
+
+- the measurement moved ahead of the page, mastery and docs work
+  **I decided:** a key just for the run, deleted afterwards, never my main
+  key; in the end my own key, rotated after the run; all 12 JavaScript
+  entries kept as written, the measurement cuts failing ones
+- the `bug_hunt` purpose's 160-character limit stated in the prompt
+  **why:** 16 of 22 Ruby drafts were refused for a purpose past 160
+  characters the prompt never mentioned
+  **I decided:** state the limit rather than raise it, and redraft only the
+  missing entries
