@@ -17,19 +17,24 @@ module CodeFormat
 
     def self.run(input)
       Open3.popen3("node", SCRIPT) do |stdin, stdout, stderr, wait|
+        output, errors = [ stdout, stderr ].map { |io| Thread.new { io.read } }
         stdin.write(input)
         stdin.close
-        reader = Thread.new { stdout.read }
-        Thread.new { stderr.read }
-        unless wait.join(TIMEOUT_SECONDS)
-          Process.kill("KILL", wait.pid)
-          raise Timeout::Error, "Prettier took longer than #{TIMEOUT_SECONDS} seconds"
-        end
-        raise IOError, "Prettier exited with #{wait.value.exitstatus}" unless wait.value.success?
-
-        reader.value
+        finish(wait)
+        output.value
+      ensure
+        [ output, errors ].compact.each(&:join)
       end
     end
     private_class_method :run
+
+    def self.finish(wait)
+      unless wait.join(TIMEOUT_SECONDS)
+        Process.kill("KILL", wait.pid)
+        raise Timeout::Error, "Prettier took longer than #{TIMEOUT_SECONDS} seconds"
+      end
+      raise IOError, "Prettier exited with #{wait.value.exitstatus}" unless wait.value.success?
+    end
+    private_class_method :finish
   end
 end

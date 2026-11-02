@@ -93,6 +93,24 @@ RSpec.describe CodeFormat do
       stalled&.unlink
     end
 
+    it "finishes reading stderr before the pipes close, so no reader thread dies with IOError" do
+      lingering = Tempfile.new([ "lingering", ".mjs" ]).tap do |file|
+        file.write(<<~JS) && file.close
+          import { spawn } from "node:child_process";
+          spawn(process.execPath, ["-e", "setTimeout(() => {}, 500)"], { stdio: ["ignore", "ignore", "inherit"], detached: true }).unref();
+          process.stdout.write(JSON.stringify(["let a = 1;"]));
+        JS
+      end
+      stub_const("CodeFormat::Javascript::SCRIPT", lingering.path)
+      readers = []
+      allow(Thread).to receive(:new).and_wrap_original { |original, *args, &block| original.call(*args, &block).tap { |thread| readers << thread } }
+
+      expect(described_class.all([ "let a=1" ], language: "javascript")).to eq([ "let a = 1;" ])
+      expect { readers.each(&:join) }.not_to raise_error
+    ensure
+      lingering&.unlink
+    end
+
     it "hands back every snippet unchanged when Node cannot run" do
       allow(Open3).to receive(:popen3).and_raise(Errno::ENOENT)
       allow(Rails.logger).to receive(:warn)
