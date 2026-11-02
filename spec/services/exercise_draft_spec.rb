@@ -96,6 +96,20 @@ RSpec.describe ExerciseDraft do
     expect(lines.sole).to start_with("[planted_key] answer_key=ok kind=code_review language=ruby_rails attempt=retry code_review_mode=schema_review")
   end
 
+  it "hands ingest the day's code_review mode, on the draft and on a retry" do
+    modes = []
+    allow(ProblemSetIngest).to receive(:call).and_wrap_original do |original, *args, **options|
+      modes << options.fetch(:code_review_mode)
+      original.call(*args, **options)
+    end
+    pin_code_review_mode(:test_file)
+
+    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+    described_class.retry_section(draft, ExerciseSection::CodeReview, draft.problem_set.dig("code_review", "concept"), provider: provider)
+
+    expect(modes).to eq(%i[test_file test_file])
+  end
+
   describe "the planned code_review file range" do
     let(:ranges) { [] }
 

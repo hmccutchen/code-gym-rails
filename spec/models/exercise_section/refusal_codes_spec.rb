@@ -39,7 +39,8 @@ RSpec.describe "Section kind refusal codes" do
 
   it "refuses only through refuse!, each kind using exactly the codes it lists, so every refusal reaches a retry with its code" do
     ExerciseSection.all.each do |kind|
-      source = Rails.root.join("app/models/exercise_section/#{kind.key}.rb").read
+      folder = Rails.root.join("app/models/exercise_section")
+      source = [ folder.join("#{kind.key}.rb"), *folder.glob("#{kind.key}/**/*.rb") ].map(&:read).join("\n")
 
       expect(source).not_to include("ProviderError::InvalidResponseError"), "#{kind.key} raises a refusal with no code"
       expect(source.scan(/refuse!\("(\w+)"/).flatten.uniq).to match_array(kind.refusal_codes)

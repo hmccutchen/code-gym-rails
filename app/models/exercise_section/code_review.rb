@@ -1,6 +1,7 @@
 # Design notes: docs/code-notes/app/models/exercise_section/code_review.md
 class ExerciseSection::CodeReview < ExerciseSection
   extend PlantedKey::Kind
+  extend BugHunt::Checks
 
   KEY_FIELDS = %w[issue why_it_matters fix].freeze
 
@@ -45,10 +46,13 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.quoted_key_texts(key) = [ key&.dig("issue") ]
 
-  def self.normalize_planted_key(section) = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
+  def self.normalize_planted_key(section)
+    key = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
+    key && bug_hunt?(section) ? key.merge(BugHunt.optional_key_fields(section[PlantedKey::FIELD])) : key
+  end
 
   def self.refusal_codes = %w[snippet_missing snippet_too_long file_count_wrong file_incomplete file_too_long path_invalid
-                              changed_lines_unresolved]
+                              changed_lines_unresolved] + BugHunt::REFUSAL_CODES
 
   def self.files(section)
     FILE_SLOTS.filter_map do |number|
@@ -75,7 +79,10 @@ class ExerciseSection::CodeReview < ExerciseSection
     "The section's files, every line numbered, with \"Changed lines\" naming the lines the page marks as the change:\n#{files}" if files
   end
 
-  def self.reject_unusable!(section, language: nil, file_range: 1..1, **)
+  def self.reject_unusable!(section, language: nil, file_range: 1..1, mode: nil, **)
+    return reject_bug_hunt!(section) if BugHunt.mode?(mode)
+
+    section.delete(BugHunt::PURPOSE_FIELD)
     if file_range.max == 1
       reject_unusable_snippet!(section)
       return drop_file_fields!(section)
@@ -167,7 +174,7 @@ class ExerciseSection::CodeReview < ExerciseSection
                        :list_of?
 
   def self.arrange!(section)
-    section.delete("diagram") if files(section).any?
+    section.delete("diagram") if files(section).any? || bug_hunt?(section)
   end
 
   def self.diagrammable?
