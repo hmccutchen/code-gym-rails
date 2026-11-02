@@ -3,6 +3,7 @@ require_relative "key_sheet_export"
 require_relative "forced_concept_drafts"
 require_relative "key_triage"
 require_relative "spend_cap"
+require_relative "in_memory_usage"
 
 class KeySampleDrafts
   KINDS = [ ExerciseSection::SecurityReview, ExerciseSection::PlanReview, ExerciseSection::PseudocodeToCode ].freeze
@@ -20,13 +21,14 @@ class KeySampleDrafts
     end
 
     solver_route = { model: solver_model, effort: KeyTriage::SOLVER_EFFORT }
-    Class.new(ClaudeService) do
-      define_method(:log_usage) do |_user, result, purpose:|
-        call = { purpose: purpose, tokens_in: result[:input_tokens].to_i, tokens_out: result[:output_tokens].to_i,
-                 cache_read: result[:cache_read_tokens].to_i, cache_write: result[:cache_write_tokens].to_i }
-        usage << call.merge(cost: result[:tokens_unknown] ? @call_bound : KeySampleDrafts.call_cost(call, routed_model(purpose)))
-        cap&.record(usage.last[:cost].to_f, result[:tokens_unknown] ? "#{purpose}, timed out: counted at its worst case" : purpose)
+    logged = InMemoryUsage.provider(ClaudeService, usage) do |result, purpose|
+      call = { purpose: purpose, tokens_in: result[:input_tokens].to_i, tokens_out: result[:output_tokens].to_i,
+               cache_read: result[:cache_read_tokens].to_i, cache_write: result[:cache_write_tokens].to_i }
+      call.merge(cost: result[:tokens_unknown] ? @call_bound : KeySampleDrafts.call_cost(call, routed_model(purpose))).tap do |entry|
+        cap&.record(entry[:cost].to_f, result[:tokens_unknown] ? "#{purpose}, timed out: counted at its worst case" : purpose)
       end
+    end
+    Class.new(logged) do
       define_method(:call_and_log) do |user, request, **options|
         @call_bound = KeySampleDrafts.request_bound(request, routed_model(request.purpose))
         cap&.check!(@call_bound)
@@ -39,7 +41,7 @@ class KeySampleDrafts
         result = call_and_log(user, AiService::Request.build(purpose: KeyTriage::PURPOSE, **KeyTriage.solve_prompt(kind, section)))
         KeyTriage.reply(parse_json_object(result[:text], subject: "#{kind.key} solve", log_raw: false))
       end
-      private :log_usage, :route_for, :call_and_log
+      private :route_for, :call_and_log
     end.new(api_key)
   end
 
