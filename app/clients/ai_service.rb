@@ -360,21 +360,12 @@ class AiService
     text
   end
 
-  def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs)
-    hosts = kinds.filter_map do |kind|
-      mode = code_review_mode if kind == ExerciseSection::CodeReview
-      next unless kind.planning_host?(mode: code_review_mode)
-
-      kind.key if can_host?(cm, kind.key, language, mode: mode, rung: rungs[kind])
-    end
-
+  def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs, gotcha: nil)
+    day_hosts = DayHosts.new(language, mode: code_review_mode, gotcha: gotcha, rungs: rungs)
+    hosts = day_hosts.hosts(kinds, cm.concept, cm.language).map(&:key)
     return nil if hosts.empty?
 
     "#{cm.concept} (#{hosts.to_sentence(two_words_connector: ' or ', last_word_connector: ', or ')})"
-  end
-
-  def can_host?(cm, section_key, language, mode: nil, rung: nil)
-    ConceptVocabulary.selectable_for_section(section_key, language, mode: mode, rung: rung).include?(cm.concept)
   end
 
   def call(request)

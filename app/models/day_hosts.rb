@@ -1,9 +1,10 @@
-# Reads vocabularies with no rung, the strictest list, because the plan never reads difficulty targets.
+# The plan passes no rungs, so each kind reads the strictest list: the plan never reads difficulty targets.
 class DayHosts
-  def initialize(language, mode:, gotcha: nil)
+  def initialize(language, mode:, gotcha: nil, rungs: {})
     @language     = language
     @mode         = mode
     @gotcha       = gotcha
+    @rungs        = rungs
     @vocabularies = {}
   end
 
@@ -20,6 +21,6 @@ class DayHosts
   private
 
   def vocabulary(kind)
-    @vocabularies[kind] ||= ConceptVocabulary.selectable_for_section(kind.key, @language, mode: @mode, gotcha: @gotcha).to_set
+    @vocabularies[kind] ||= ConceptVocabulary.selectable_for_section(kind.key, @language, mode: @mode, rung: @rungs[kind], gotcha: @gotcha).to_set
   end
 end

@@ -264,7 +264,7 @@ RSpec.describe "generation prompt characterization" do
     "case__ruby_rails__source_annotate_retention_concept" => {
       render:   -> { render_case("ruby_rails", pattern: :pattern, third: :challenge, code_review_source: CURATED_METHOD) },
       includes: [ "MODIFIED COPY of this real method from Code Gym's own source (`app/clients/ai_service.rb#annotate_retention_concept`)",
-                  "def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs)" ],
+                  "def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs, gotcha: nil)" ],
       excludes: [ "must be realistic Ruby/Rails code" ]
     },
     "case__ruby_rails__source_migration" => {
