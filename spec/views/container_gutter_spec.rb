@@ -37,7 +37,7 @@ RSpec.describe "container gutter" do
   end
 
   it "insets a full-width card page and Today by the same one formula as .phone-page" do
-    margin_rules = phone_cards.select { |rule| rule.declaration("margin-left") }
+    margin_rules = phone_cards.select { |rule| rule.declaration("margin-left")&.include?("--container-pad-left") }
 
     expect(margin_rules.size).to eq(1)
     expect(margin_rules.first.selectors).to contain_exactly(".phone-page", ".card-page", ".today-page")
@@ -45,12 +45,12 @@ RSpec.describe "container gutter" do
   end
 
   it "runs a phone page's outermost cards to the safe area by cancelling the page gutter" do
-    bleed = phone_cards.select { |rule| rule.declaration("margin-inline") && rule.media == [ "@media (max-width: 599.98px)" ] }
+    bleed = phone_cards.select { |rule| rule.declaration("border-inline") && rule.media == [ "@media (max-width: 599.98px)" ] }
 
     expect(bleed.size).to eq(1)
-    expect(bleed.first.declaration("margin-inline")).to eq(
-      "calc(env(safe-area-inset-left) - var(--page-gutter-left)) calc(env(safe-area-inset-right) - var(--page-gutter-right))"
-    )
+    expect(bleed.first.declaration("margin-left")).to eq("calc(env(safe-area-inset-left) - var(--page-gutter-left))")
+    expect(bleed.first.declaration("margin-right")).to eq("calc(env(safe-area-inset-right) - var(--page-gutter-right))")
+    expect(bleed.first.declaration("margin-inline")).to be_nil
     expect(bleed.first.declaration("border-inline")).to eq("0")
   end
 
