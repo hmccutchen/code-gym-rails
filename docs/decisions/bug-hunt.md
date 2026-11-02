@@ -199,6 +199,8 @@ top level could have been affected, and all 23 drafts passed.
 A re-measure is needed when the `bug_hunt` prompt, an entry's rule, ingest's
 `bug_hunt` checks, the judge's `bug_hunt` text, the drafting or judging
 routes, `CodeFormat`, or the harness changes. `--entries` drafts only
-changed entries. A change to one of these that leaves the drafts and their
-formatted code unchanged, such as how a thread is joined, needs no
-re-measure, and its PR says why (owner's decision, 2026-11-02).
+changed entries. A change to one of these that leaves the drafts, their
+formatted code and every check's verdict on them unchanged needs no
+re-measure, and its PR shows why: for example, how `CodeFormat` joins its
+reader threads (#655). A harness, ingest or judge change that could flip a
+pass or a fail still needs one (owner's decision, 2026-11-02).

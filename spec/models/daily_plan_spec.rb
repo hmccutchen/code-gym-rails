@@ -1358,6 +1358,20 @@ RSpec.describe DailyPlan, "the coverage exception" do
     expect(plan.waiting_checks).to include(a_hash_including(concept: trap.concept, reason: :no_host))
   end
 
+  it "records no trap when coverage is given up on a bug_hunt day without a code_review section" do
+    pin_code_review_mode(:bug_hunt)
+    user.update!(daily_section_kinds: %w[pattern design_comparison])
+    addition = CoverageException::Addition.new(kind: ExerciseSection::Architecture, reason: :due_check,
+                                               check: { concept: "service_boundaries", bucket: "architecture" })
+    allow(CoverageException).to receive(:for).and_return(addition)
+
+    plan = described_class.for(user, language: "ruby_rails", judged: true)
+
+    expect(plan.coverage).to be_nil
+    expect(plan.code_review_gotcha).to be_nil
+    expect(plan.notes).not_to have_key("bug_hunt")
+  end
+
   it "adds the longest-unseen kind once the gap has run past four weeks" do
     two_section_day(Date.current - 60)
 

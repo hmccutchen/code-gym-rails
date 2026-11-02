@@ -564,5 +564,5 @@ data.*
   in one PR
 - the next two follow-up issues, the planner and prompt seeing different
   traps and the re-measure triggers stated twice `#658`
-  **I decided:** a change that leaves the drafts and their formatted code
-  unchanged needs no re-measure
+  **I decided:** a change that leaves the drafts, their formatted code and
+  every check's verdict on them unchanged needs no re-measure
