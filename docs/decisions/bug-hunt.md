@@ -77,9 +77,11 @@ setting turns it off or weights it (owner's decision).
 entries, each tagged with a concept from its language's vocabulary.
 - **The pick:** `DailyPlan` picks one never-seen-first, then the one seen
   longest ago, the same shape as `RealSource.pick`. The picked id is
-  recorded in `plan_notes["bug_hunt"]`, outside the section. A day without
-  a `code_review` section picks none, and an entry counts as seen only on a
-  day that delivered its section, so a dropped section doesn't use it up.
+  recorded in `plan_notes["bug_hunt"]`, outside the section. The trap is
+  picked on every `bug_hunt` roll, so the planner and the prompt always see
+  the same one, but it's recorded only on a day that holds a `code_review`
+  section. An entry counts as seen only on a day that delivered its
+  section, so a dropped section doesn't use it up.
 - **Order:** entries are appended, never inserted, since list order is the
   drain order.
 - **Formatting:** every entry avoids traps a formatter rewrites, such as
