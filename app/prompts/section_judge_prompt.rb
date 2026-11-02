@@ -49,21 +49,22 @@ class SectionJudgePrompt
 
     { response_schema: JudgeVerdict.schema_for(kind), system: SYSTEM, prompt: <<~PROMPT }
       Section kind: #{kind.key}
-      The learner's task for this kind: #{kind.judge_task}
+      The learner's task for this kind: #{kind.judge_task_for(section)}
       #{kind.discovery? ? "This is a discovery task: wording that names where the issue is defeats it." : "Naming the concept is expected for this kind."}
       Tagged concept: #{shown["concept"]}
       Pitched at: #{rung}#{locked ? " (locked: this level was asked for unconditionally)" : ""}
       Level meaning: #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}
       Prose fields you may rewrite: #{kind.prose_fields.join(', ')}
       Every other field is the artifact and must not change.
-      #{guidance_block(kind)}
+      #{guidance_block(kind, section)}
       The section as delivered:
       #{JSON.pretty_generate(shown)}#{attachment_block(kind, section)}
     PROMPT
   end
 
-  def self.guidance_block(kind)
-    kind.judge_guidance ? "\n#{kind.judge_guidance}\n" : ""
+  def self.guidance_block(kind, section)
+    guidance = kind.judge_guidance_for(section)
+    guidance ? "\n#{guidance}\n" : ""
   end
 
   def self.attachment_block(kind, section)

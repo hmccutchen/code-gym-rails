@@ -8,6 +8,11 @@ RSpec.describe SectionJudgePrompt do
     "design_comparison" => [ ExerciseSection::DesignComparison,
       { "title" => "Rates", "scenario" => "A rates file.", "question" => "Which would you ship?", "piece_a" => "a", "piece_b" => "b",
         "concept" => "information_hiding", "answer_key" => "SENTINEL-KEY", "pitched_at" => "junior" }, "junior", false ],
+    "code_review_bug_hunt" => [ ExerciseSection::CodeReview,
+      { "question" => "What's wrong, why, and how would you fix it?", "purpose" => "Remove every even number from nums.",
+        "snippet" => "def remove_evens(nums)\n  nums.each { |n| nums.delete(n) if n.even? }\n  nums\nend",
+        "concept" => "array_mutation_pitfalls", "teaching_note" => "hint", "answer_key" => "SENTINEL-KEY",
+        "pitched_at" => "principal_engineer" }, "principal_engineer", false ],
     "pattern" => [ ExerciseSection::Pattern,
       { "title" => "Memoize", "why" => "Repeat work", "scenario" => "s", "question" => "When would you cache this?",
         "concept" => "memoization", "teaching_note" => "hint" }, "mid_level", false ]

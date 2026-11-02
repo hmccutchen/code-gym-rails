@@ -215,6 +215,10 @@ class ExerciseSection
       nil
     end
 
+    def judge_task_for(_section) = judge_task
+
+    def judge_guidance_for(_section) = judge_guidance
+
     def judge_hidden_fields = []
 
     def judge_attachment(section) = nil

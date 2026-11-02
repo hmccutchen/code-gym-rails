@@ -52,3 +52,26 @@ RSpec.describe ExerciseSection::CodeReview::BugHunt::Prompt do
     expect(lines.last).to eq("  }")
   end
 end
+
+RSpec.describe ExerciseSection::CodeReview, "judging a bug_hunt section" do
+  let(:hunt) { { "purpose" => "Remove every even number.", "snippet" => "x" } }
+  let(:plain) { { "snippet" => "x" } }
+
+  it "states the bug hunt task and guidance for a bug_hunt section only" do
+    expect(described_class.judge_task_for(hunt)).to eq(described_class::BugHunt::Prompt::JUDGE_TASK)
+    expect(described_class.judge_guidance_for(hunt)).to include("correct as written", "principal_engineer exactly as senior")
+    expect(described_class.judge_task_for(plain)).to eq(described_class.judge_task)
+    expect(described_class.judge_guidance_for(plain)).to be_nil
+  end
+
+  it "never lets the judge rewrite the purpose" do
+    expect(described_class.prose_fields).not_to include("purpose")
+  end
+
+  it "leaves every other kind's judge task and guidance as they were" do
+    (ExerciseSection.all - [ described_class ]).each do |kind|
+      expect(kind.judge_task_for(hunt)).to eq(kind.judge_task)
+      expect(kind.judge_guidance_for(hunt)).to eq(kind.judge_guidance)
+    end
+  end
+end

@@ -207,6 +207,10 @@ class ExerciseSection::CodeReview < ExerciseSection
     true
   end
 
+  def self.judge_task_for(section) = bug_hunt?(section) ? BugHunt::Prompt::JUDGE_TASK : judge_task
+
+  def self.judge_guidance_for(section) = bug_hunt?(section) ? BugHunt::Prompt::JUDGE_GUIDANCE : judge_guidance
+
   def self.code_fields
     [ "snippet", *FILE_CODE_FIELDS ]
   end

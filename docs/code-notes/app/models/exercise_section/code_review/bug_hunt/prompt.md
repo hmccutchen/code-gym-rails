@@ -33,3 +33,17 @@ It drops `scenario` and `diagram` and adds `purpose` and the key's
 optional fields. `looks_right_on` is in the schema at every rung, since the
 fragment has no rung; ingest keeps it when it is complete and drops it
 when not.
+
+## The judge (`JUDGE_TASK`, `JUDGE_GUIDANCE`)
+
+`CodeReview.judge_task_for` and `.judge_guidance_for` return these for a
+`bug_hunt` section; every other kind's section-aware hooks fall back to
+its class-level task and guidance unchanged. The guidance asks the judge to
+solve the puzzle first, then names which rejection principle each failure
+falls under: correct as written, a second trap, shown output or a purpose
+that gives the trap away are `reasoning_failure`; code outside the core
+language is `unstated_prerequisite`; calling something undefined is
+`underdetermined`. The judge prompt still prints the generic level meaning
+for the pitched rung, so the guidance says `principal_engineer` is pitched
+as `senior` here. `purpose` is not in `.prose_fields`, so the judge can
+never rewrite what defines a correct answer.

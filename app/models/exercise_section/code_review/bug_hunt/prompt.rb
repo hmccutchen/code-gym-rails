@@ -33,6 +33,20 @@ module ExerciseSection::CodeReview::BugHunt::Prompt
   LOOKS_RIGHT_LINE = "- \"looks_right_on\" is a call on another input the purpose covers where the snippet gives the right result " \
                      "by accident, with the \"expected\" literal it gives."
 
+  JUDGE_TASK = "Find the one planted language trap: an input the purpose covers that the code gets wrong, and the fix."
+
+  JUDGE_GUIDANCE = <<~GUIDANCE.squish
+    This section is a bug hunt: a short puzzle with one trap planted in the core language, a one-line "purpose" saying what
+    the code is meant to do, and no program output. Solve it before judging: find an input the purpose covers that the code
+    gets wrong. Reject it as reasoning_failure when the code is correct as written for every input the purpose covers, when it
+    holds a second planted trap, when the snippet, purpose, question or teaching_note shows program output, or when the purpose
+    names or hints at the trap. Reject it as unstated_prerequisite when it uses Rails, TypeScript, a framework or anything else
+    outside the core language, and as underdetermined when the code calls something it doesn't define apart from the
+    language's built-ins. A bug hunt pitches principal_engineer exactly as senior, one trap that shows only on an edge the
+    purpose covers, so judge it against that and never against a decision at system scale. The purpose and the snippet are
+    the artifact: never change them.
+  GUIDANCE
+
   def self.rung_line(rung) = RUNG_LINES.fetch(RUNG_FOR.fetch(rung, rung), RUNG_LINES.fetch("junior"))
 
   def self.guidance(gotcha:, rung:, vocabulary:)
