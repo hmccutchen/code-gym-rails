@@ -116,7 +116,9 @@ RSpec.describe "generation prompt characterization" do
 
   MULTI_FILE_RUNGS = { "mid_level" => [ "2 files", '"file_3_path"' ], "senior" => [ "2 or 3 files", "the structure this snippet describes" ] }.freeze
 
-  MULTI_FILE_FIXTURES = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys, MULTI_FILE_RUNGS.keys)
+  MULTI_FILE_MODES = DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys.select { |mode| ExerciseSection::CodeReview.multi_file_mode?(mode) }.freeze
+
+  MULTI_FILE_FIXTURES = DailyExercise::LANGUAGES.product(MULTI_FILE_MODES, MULTI_FILE_RUNGS.keys)
     .to_h { |language, mode, rung|
       authorization = ConceptVocabulary.selectable_for_section("code_review", language, mode: mode, rung: rung).include?("authorization")
       contract_line = "a broken contract between files"

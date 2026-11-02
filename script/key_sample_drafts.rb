@@ -183,7 +183,7 @@ class KeySampleDrafts
 
   # Toy and single-file: a RealSource excerpt needs the scenario restore JudgedGeneration does (key_sample_drafts.md).
   def plan_for(mode)
-    plan = DailyPlan.for(@user, language: @language)
+    plan = DailyPlan.for(@user, language: @language, judged: true)
     mode ? plan.with(code_review_mode: mode, code_review_source: nil, code_review_files: :single) : plan
   end
 

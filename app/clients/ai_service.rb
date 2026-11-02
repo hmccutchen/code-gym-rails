@@ -114,7 +114,7 @@ class AiService
   end
 
   def generate_unjudged_exercise(user, language: user.language_for_today, blocking: false, deadline: GenerationDeadline::NONE)
-    draft   = draft_exercise(user, language: language, blocking: blocking, deadline: deadline)
+    draft   = draft_exercise(user, language: language, blocking: blocking, deadline: deadline, judged: false)
     planned = draft.kinds.map(&:key)
     dropped = draft.unusable_sections.select { |section| planned.include?(section.key) }
     ExerciseDraft.finish(draft, draft.problem_set, provider: exercise_draft_provider,
@@ -124,7 +124,7 @@ class AiService
   end
 
   def generate_judged_exercise(user, language: user.language_for_today, deadline: GenerationDeadline::NONE)
-    draft = draft_exercise(user, language: language, blocking: false, deadline: deadline)
+    draft = draft_exercise(user, language: language, blocking: false, deadline: deadline, judged: true)
     JudgedGeneration.call(
       user: user, draft: draft,
       providers: -> { fresh_service.judged_generation_provider(deadline) },
@@ -295,8 +295,8 @@ class AiService
 
   private
 
-  def draft_exercise(user, language:, blocking:, deadline: GenerationDeadline::NONE)
-    ExerciseDraft.call(user, language: language, blocking: blocking, deadline: deadline, provider: exercise_draft_provider)
+  def draft_exercise(user, language:, blocking:, judged:, deadline: GenerationDeadline::NONE)
+    ExerciseDraft.call(user, language: language, blocking: blocking, deadline: deadline, judged: judged, provider: exercise_draft_provider)
   end
 
   def retry_section(draft, kind, concept, cause = nil, deadline: GenerationDeadline::NONE)

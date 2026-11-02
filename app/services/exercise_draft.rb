@@ -6,9 +6,9 @@ class ExerciseDraft
   Draft = Data.define(:user, :language, :problem_set, :plan, :kinds, :difficulty, :ladders, :history,
                       :suggested_concepts, :unusable_sections)
 
-  def self.call(user, language:, provider:, blocking: false, deadline: GenerationDeadline::NONE)
+  def self.call(user, language:, provider:, judged:, blocking: false, deadline: GenerationDeadline::NONE)
     LanguagePrompts.for(language)
-    plan       = DailyPlan.for(user, language: language)
+    plan       = DailyPlan.for(user, language: language, judged: judged)
     GenerationDiagnostics.new(user).set_size(plan.size)
     history    = user.recent_performance
     difficulty = KindDifficulty.for(user)

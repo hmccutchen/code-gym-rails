@@ -27,6 +27,16 @@ RSpec.describe DailyKindSwap::Consequences do
       expect(consequences("plan_review", place: 1, pair: unshared).sentences).not_to include(t(:shared_concept))
     end
 
+    it "answers the same with bug_hunt among the modes as without it, since code_review tags nothing on a bug_hunt day" do
+      without_bug_hunt = DailyPlan::CODE_REVIEW_MODE_WEIGHTS.except(:bug_hunt)
+      pairs = ExerciseSection.all.permutation(2).map(&:to_a)
+      answers = pairs.map { |pair| described_class.shares_a_concept?(pair, %w[ruby_rails javascript]) }
+
+      stub_const("DailyPlan::CODE_REVIEW_MODE_WEIGHTS", without_bug_hunt)
+
+      expect(pairs.map { |pair| described_class.shares_a_concept?(pair, %w[ruby_rails javascript]) }).to eq(answers)
+    end
+
     it "reads sharing from the kinds' own hostable concepts, not from fourth membership" do
       expect(consequences("pattern").sentences).not_to include(t(:shared_concept))
     end

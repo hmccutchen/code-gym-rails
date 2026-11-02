@@ -176,6 +176,8 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.bug_hunt?(section) = BugHunt.section?(section)
 
+  def self.multi_file_mode?(mode) = !BugHunt.mode?(mode)
+
   def self.planning_host?(mode:) = mastery_evidence_mode?(mode)
 
   def self.mastery_evidence?(section) = mastery_evidence_mode?(bug_hunt?(section) ? BugHunt::MODE : nil)

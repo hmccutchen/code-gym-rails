@@ -2,12 +2,12 @@
 class DailyPlan
   Result = Data.define(:daily_kinds, :rotation, :reinforcement, :due_checks, :established,
                         :fourth_reinforcement, :fourth_due_checks, :fourth_established,
-                        :code_review_mode, :code_review_source, :code_review_files, :scenario_flavor,
+                        :code_review_mode, :code_review_source, :code_review_files, :code_review_gotcha, :scenario_flavor,
                         :shared_concept, :coverage, :waiting_checks, :size) do
     def notes
       { "daily_kinds" => daily_kinds.map(&:key), "size" => size&.count, "size_reason" => size&.reason&.to_s,
         "brake" => (true if size&.brake?), "coverage" => coverage&.kind&.key, "coverage_reason" => coverage&.reason&.to_s,
-        "shared_concept" => shared_concept }.compact
+        "shared_concept" => shared_concept, "bug_hunt" => code_review_gotcha&.id }.compact
     end
 
     def kinds = ExerciseSection.for_plan(daily: daily_kinds, rotation: rotation)
@@ -21,8 +21,10 @@ class DailyPlan
   ROTATED_JUDGE_RETRIES = 1
 
   CODE_REVIEW_MODE_WEIGHTS = {
-    application_code: 0.34, test_file: 0.33, schema_review: 0.33
+    application_code: 0.34, test_file: 0.33, schema_review: 0.33, bug_hunt: 0.0
   }.freeze
+
+  UNJUDGED_CODE_REVIEW_MODE_WEIGHTS = CODE_REVIEW_MODE_WEIGHTS.except(ExerciseSection::CodeReview::BugHunt::MODE).freeze
 
   CODE_REVIEW_FILE_WEIGHTS = { single: 1.0, multi: 0.0 }.freeze
 
@@ -39,13 +41,13 @@ class DailyPlan
 
   NO_FOURTH_TRACK = { fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
 
-  def self.for(user, language:)
+  def self.for(user, language:, judged:)
     history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
     size             = size_for(user, history)
     preferences      = KindPreferences.for(user)
     daily            = DailyKinds.for(user)
     rotation         = SectionRotation.for(history, count: size.count, preferences: preferences, daily: daily)
-    code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
+    code_review_mode = WeightedRoll.pick(code_review_mode_weights(judged))
     hosts            = DayHosts.new(language, mode: code_review_mode)
     due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
     tracks           = concept_tracks(user, language, daily, rotation, due: due, hosts: hosts)
@@ -53,12 +55,26 @@ class DailyPlan
                                                daily, rotation, tracks, user, language, due: due, hosts: hosts)
 
     source = code_review_source_for(user, language, code_review_mode)
+    single = source || !ExerciseSection::CodeReview.multi_file_mode?(code_review_mode)
 
     Result.new(daily_kinds: daily, rotation: rotation, **tracks, coverage: coverage, size: size,
                code_review_mode: code_review_mode, code_review_source: source,
-               code_review_files: source ? :single : WeightedRoll.pick(CODE_REVIEW_FILE_WEIGHTS),
+               code_review_files: single ? :single : WeightedRoll.pick(CODE_REVIEW_FILE_WEIGHTS),
+               code_review_gotcha: code_review_gotcha_for(user, language, code_review_mode),
                scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS))
   end
+
+  def self.code_review_mode_weights(judged)
+    judged ? CODE_REVIEW_MODE_WEIGHTS : UNJUDGED_CODE_REVIEW_MODE_WEIGHTS
+  end
+  private_class_method :code_review_mode_weights
+
+  def self.code_review_gotcha_for(user, language, mode)
+    return nil unless ExerciseSection::CodeReview::BugHunt.mode?(mode)
+
+    BugHuntGotchas.pick(language, last_seen: BugHuntGotchas.last_seen_for(user))
+  end
+  private_class_method :code_review_gotcha_for
 
   def self.size_for(user, history)
     DaySize.for(setting: user.daily_section_count, completion: SectionCount.for(history), gate: CompetencyGate.for(user))
@@ -125,7 +141,7 @@ class DailyPlan
   def self.main_track(user, language, kinds:, daily:, hosts:, due:)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
                                                         hostable: host_test(kinds: kinds, hosts: hosts))
-    capacity      = kinds.count { |kind| !kind.fourth? }
+    capacity      = kinds.count { |kind| !kind.fourth? && hosts.planning_host?(kind) }
     reinforcement = share_hosts(reinforcement, capacity)
     slots         = capacity - reinforcement.size
     slots         = 1 if slots.zero? && overdue_retention_check_pending?(due, kinds: kinds, hosts: hosts, reinforcement: reinforcement)
