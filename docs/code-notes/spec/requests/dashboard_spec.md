@@ -10,7 +10,7 @@ A glossary term inside a section's summary would nest an interactive control ins
 
 ## "mobile section gutter"
 
-The regex is tied to the `.section` selector inside the 600px media query, so deleting the break-out `margin-inline` declaration fails the example rather than leaving it green.
+The example parses the layout's `.section` rules and fails if one of them sets its own `margin-inline`, so the layout can't give sections a second break-out beside the shared one. The shared break-out lives in `phone_cards.css`, and `spec/views/container_gutter_spec.rb` pins its declarations.
 
 ## Structure diagrams: `data-owns-details`
 
