@@ -551,3 +551,8 @@ data.*
   characters the prompt never mentioned
   **I decided:** state the limit rather than raise it, and redraft only the
   missing entries
+- the review findings on `bug_hunt` that needed my call
+  **I decided:** keep the trap's concept off every other section and the
+  featured callout until submission; drop a puzzle the judge can't answer
+  rather than ship it unchecked; accept the few minutes of a deploy when
+  the old page could show the concept
