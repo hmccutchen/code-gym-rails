@@ -1342,6 +1342,22 @@ RSpec.describe DailyPlan, "the coverage exception" do
     expect(plan.notes).not_to have_key("coverage")
   end
 
+  it "withholds the trap's concept from the other sections when coverage adds a bug_hunt code_review" do
+    pin_code_review_mode(:bug_hunt)
+    user.update!(daily_section_kinds: %w[pattern design_comparison])
+    allow(CoverageException).to receive(:for).and_return(CoverageException::Addition.new(kind: ExerciseSection::CodeReview, reason: :gap))
+    trap = BugHuntGotchas.for_language("ruby_rails").first
+    user.concept_masteries.create!(concept: trap.concept, language: "ruby_rails", tier: :standard, mastered_at: 6.months.ago,
+                                   retention_interval_days: 7, next_retention_check_on: Date.current - 1)
+
+    plan = described_class.for(user, language: "ruby_rails", judged: true)
+
+    expect(plan.coverage.kind).to eq(ExerciseSection::CodeReview)
+    expect(plan.code_review_gotcha).to eq(trap)
+    expect(plan.due_checks.map(&:concept)).not_to include(trap.concept)
+    expect(plan.waiting_checks).to include(a_hash_including(concept: trap.concept, reason: :no_host))
+  end
+
   it "adds the longest-unseen kind once the gap has run past four weeks" do
     two_section_day(Date.current - 60)
 

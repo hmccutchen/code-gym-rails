@@ -48,12 +48,13 @@ class DailyPlan
     daily            = DailyKinds.for(user)
     rotation         = SectionRotation.for(history, count: size.count, preferences: preferences, daily: daily)
     code_review_mode = WeightedRoll.pick(code_review_mode_weights(judged))
-    gotcha           = (code_review_gotcha_for(user, language, code_review_mode) if code_review_day?(daily, rotation))
-    hosts            = DayHosts.new(language, mode: code_review_mode, gotcha: gotcha)
+    trap             = code_review_gotcha_for(user, language, code_review_mode)
+    hosts_for        = ->(day_rotation) { DayHosts.new(language, mode: code_review_mode, gotcha: day_gotcha(trap, daily, day_rotation)) }
+    hosts            = hosts_for.call(rotation)
     due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
     tracks           = concept_tracks(user, language, daily, rotation, due: due, hosts: hosts)
     coverage, rotation, tracks = with_coverage(coverage_for(user, size, preferences, daily, tracks.fetch(:waiting_checks), hosts),
-                                               daily, rotation, tracks, user, language, due: due, hosts: hosts)
+                                               daily, rotation, tracks, user, language, due: due, hosts_for: hosts_for)
 
     source = code_review_source_for(user, language, code_review_mode)
     single = source || !ExerciseSection::CodeReview.multi_file_mode?(code_review_mode)
@@ -61,7 +62,7 @@ class DailyPlan
     Result.new(daily_kinds: daily, rotation: rotation, **tracks, coverage: coverage, size: size,
                code_review_mode: code_review_mode, code_review_source: source,
                code_review_files: single ? :single : WeightedRoll.pick(CODE_REVIEW_FILE_WEIGHTS),
-               code_review_gotcha: gotcha_delivered(gotcha, user, language, code_review_mode, daily, rotation),
+               code_review_gotcha: day_gotcha(trap, daily, rotation),
                scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS))
   end
 
@@ -77,12 +78,10 @@ class DailyPlan
   end
   private_class_method :code_review_gotcha_for
 
-  def self.gotcha_delivered(gotcha, user, language, mode, daily, rotation)
-    return nil unless code_review_day?(daily, rotation)
-
-    gotcha || code_review_gotcha_for(user, language, mode)
+  def self.day_gotcha(trap, daily, rotation)
+    trap if code_review_day?(daily, rotation)
   end
-  private_class_method :gotcha_delivered
+  private_class_method :day_gotcha
 
   def self.code_review_day?(daily, rotation)
     ExerciseSection.for_plan(daily: daily, rotation: rotation).include?(ExerciseSection::CodeReview)
@@ -107,11 +106,11 @@ class DailyPlan
   end
   private_class_method :concept_tracks
 
-  def self.with_coverage(coverage, daily, rotation, tracks, user, language, due:, hosts:)
+  def self.with_coverage(coverage, daily, rotation, tracks, user, language, due:, hosts_for:)
     return [ nil, rotation, tracks ] unless coverage
 
     added_rotation = rotation.merge(ExerciseSection.slot_for(coverage.kind, daily: daily) => coverage.kind.key.to_sym)
-    added_tracks   = concept_tracks(user, language, daily, added_rotation, due: due, hosts: hosts)
+    added_tracks   = concept_tracks(user, language, daily, added_rotation, due: due, hosts: hosts_for.call(added_rotation))
     return [ nil, rotation, tracks ] unless check_landed?(coverage, added_tracks)
 
     [ coverage, added_rotation, added_tracks ]

@@ -94,9 +94,9 @@ read it before changing that area.
   (async witnesses return a snapshot), `looks_right_on` and
   `fixed_snippet`; the quote check reads `issue` only. `purpose` is never a
   prose field. Registry entries are appended, never inserted, and avoid
-  traps a formatter rewrites. Changing the `bug_hunt` prompt, an entry's
-  rule, its ingest checks or its judge text needs a re-measure
-  (`docs/code-notes/script/bug_hunt_measure.md`).
+  traps a formatter rewrites. What needs a re-measure is listed once, at
+  the end of the decision doc's measurement section; the run steps are in
+  `docs/code-notes/script/bug_hunt_measure.md`.
 - **Design comparison, the second fixed section**
   (`docs/decisions/design-comparison-the-second-fixed-section.md`): The second
   default daily kind (`ExerciseSection::DesignComparison`): two working pieces that
