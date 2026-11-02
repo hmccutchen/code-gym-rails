@@ -79,9 +79,10 @@ entries, each tagged with a concept from its language's vocabulary.
   longest ago, the same shape as `RealSource.pick`. The picked id is
   recorded in `plan_notes["bug_hunt"]`, outside the section. The trap is
   picked on every `bug_hunt` roll, so the planner and the prompt always see
-  the same one, but it's recorded only on a day that holds a `code_review`
-  section. An entry counts as seen only on a day that delivered its
-  section, so a dropped section doesn't use it up.
+  the same one, but it's recorded only when the day's plan includes a
+  `code_review` section, even if the judge or ingest later drops it. An
+  entry counts as seen only on a day that delivered its section
+  (`BugHuntGotchas.last_seen_for`), so a dropped section doesn't use it up.
 - **Order:** entries are appended, never inserted, since list order is the
   drain order.
 - **Formatting:** every entry avoids traps a formatter rewrites, such as
