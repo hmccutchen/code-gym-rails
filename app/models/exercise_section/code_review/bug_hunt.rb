@@ -16,7 +16,17 @@ module ExerciseSection::CodeReview::BugHunt
 
   FIXED_SNIPPET_FIELD = "fixed_snippet".freeze
 
+  NUMBERED_SNIPPET_NOTE = "The page numbers the snippet's lines the way they are numbered here. " \
+                          "The \"N | \" before each line is not part of the code, so never copy it into code you write."
+
   def self.mode?(mode) = mode == MODE
+
+  def self.snippet_context(section)
+    return unless section?(section)
+
+    numbered = ExerciseSection::CodeReview::File.new(path: nil, code: section["snippet"].to_s, changed: []).numbered_code
+    "Goal: #{section[PURPOSE_FIELD]}\nCode snippet, lines numbered:\n#{NUMBERED_SNIPPET_NOTE}\n#{numbered}"
+  end
 
   def self.section?(section) = section.is_a?(Hash) && section.key?(PURPOSE_FIELD)
 

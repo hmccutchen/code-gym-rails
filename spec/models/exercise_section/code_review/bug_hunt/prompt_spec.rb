@@ -82,3 +82,39 @@ RSpec.describe ExerciseSection::CodeReview, "judging a bug_hunt section" do
     end
   end
 end
+
+RSpec.describe ExerciseSection::CodeReview, "reviewing a bug_hunt section" do
+  let(:hunt) do
+    { "question" => "What's wrong, why, and how would you fix it?", "purpose" => "Remove every even number from nums.",
+      "snippet" => "def remove_evens(nums)\n  nums.each { |n| nums.delete(n) if n.even? }\n  nums\nend",
+      "concept" => "array_mutation_pitfalls", "answer_key" => { "issue" => "SENTINEL-KEY", "witness" => { "call" => "SENTINEL-CALL" } } }
+  end
+  let(:plain) { { "question" => "What is wrong?", "snippet" => "Order.all.each { |o| o.user.name }" } }
+
+  it "grades a bug_hunt section against its goal, and leaves every other section's note as it was" do
+    note = described_class.grading_note(section: hunt, answer: "a")
+
+    expect(note).to include("judged against the goal line", "has missed the main point", "doesn't meet it")
+    expect(described_class.grading_note(section: plain, answer: "a")).to start_with("Main point: the one planted issue")
+  end
+
+  it "gives the grader the goal and the snippet with its lines numbered as the page numbers them, and no key" do
+    context = described_class.review_context(section: hunt, answer: "my answer", rating: "right_level")
+
+    expect(context).to include("Goal: Remove every even number from nums.", "1 | def remove_evens(nums)",
+                               "4 | end", "is not part of the code", "No program output was shown")
+    expect(context).not_to include("SENTINEL")
+  end
+
+  it "shows the duck the goal and the numbered snippet, never the concept or the key" do
+    context = SectionContext.render(hunt)
+
+    expect(context).to include("Goal: Remove every even number from nums.", "2 |   nums.each")
+    expect(context).not_to include("SENTINEL", "array_mutation_pitfalls")
+  end
+
+  it "leaves every other section's context as it was" do
+    expect(SectionContext.render(plain)).to include("Code snippet:\nOrder.all.each { |o| o.user.name }")
+    expect(SectionContext.render(plain)).not_to include("Goal:")
+  end
+end

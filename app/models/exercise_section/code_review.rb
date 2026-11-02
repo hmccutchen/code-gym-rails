@@ -2,6 +2,7 @@
 class ExerciseSection::CodeReview < ExerciseSection
   extend PlantedKey::Kind
   extend BugHunt::Checks
+  extend BugHunt::KindHooks
 
   KEY_FIELDS = %w[issue why_it_matters fix].freeze
 
@@ -181,15 +182,6 @@ class ExerciseSection::CodeReview < ExerciseSection
     true
   end
 
-  def self.bug_hunt?(section) = BugHunt.section?(section)
-
-  def self.multi_file_mode?(mode) = !BugHunt.mode?(mode)
-
-  def self.planning_host?(mode:) = mastery_evidence_mode?(mode)
-
-  def self.mastery_evidence?(section) = mastery_evidence_mode?(bug_hunt?(section) ? BugHunt::MODE : nil)
-
-  def self.mastery_evidence_mode?(mode) = !BugHunt.mode?(mode)
 
   def self.titled_label?
     false
@@ -207,9 +199,6 @@ class ExerciseSection::CodeReview < ExerciseSection
     true
   end
 
-  def self.judge_task_for(section) = bug_hunt?(section) ? BugHunt::Prompt::JUDGE_TASK : judge_task
-
-  def self.judge_guidance_for(section) = bug_hunt?(section) ? BugHunt::Prompt::JUDGE_GUIDANCE : judge_guidance
 
   def self.code_fields
     [ "snippet", *FILE_CODE_FIELDS ]
@@ -268,6 +257,8 @@ class ExerciseSection::CodeReview < ExerciseSection
                              "\"File: <path>\", the path exactly as shown above, and leave out a file the fix doesn't change."
 
   def self.grading_note(section:, answer:)
+    return BugHunt::Prompt::GRADING_NOTE if bug_hunt?(section)
+
     "Main point: the one planted issue — the defect in the snippet, the smell in the test file, or the flaw in the migration.\n" \
     "Essential pieces: why it is a problem in this code, and a fix that would work as written."
   end
@@ -279,7 +270,8 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.review_context(section:, answer:, rating:)
     [
       "Code Review question: #{section["question"]}",
-      files_context(section) || "Code snippet: #{section["snippet"]}",
+      snippet_context(section) || files_context(section) || "Code snippet: #{section["snippet"]}",
+      ("No program output was shown to the engineer." if bug_hunt?(section)),
       current_schema_lines(section["current_schema"]),
       answer_lines(answer, rating)
     ].compact.join("\n")

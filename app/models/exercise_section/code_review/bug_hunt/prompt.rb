@@ -47,6 +47,14 @@ module ExerciseSection::CodeReview::BugHunt::Prompt
     the artifact: never change them.
   GUIDANCE
 
+  GRADING_NOTE = "Main point: the planted language trap, judged against the goal line: an input the goal covers that this " \
+                 "code gets wrong, and why the language does that.\n" \
+                 "Essential pieces: why the trap happens, and a fix that gives the right result for every input the goal covers.\n" \
+                 "An answer that says the code works, or traces only an input that happens to give the right result, has missed " \
+                 "the main point. An answer that names the trap but explains it wrongly earns credit only for what it got right. " \
+                 "A different trap that also gives a wrong result for an input the goal covers meets the main point. A style " \
+                 "point, a faster way, or input the goal doesn't cover is credited in \"correct\" and doesn't meet it."
+
   def self.rung_line(rung) = RUNG_LINES.fetch(RUNG_FOR.fetch(rung, rung), RUNG_LINES.fetch("junior"))
 
   def self.guidance(gotcha:, rung:, vocabulary:)

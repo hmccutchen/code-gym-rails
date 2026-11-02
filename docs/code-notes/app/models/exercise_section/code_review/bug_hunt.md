@@ -46,3 +46,22 @@ dropped alone and the rest of the key is kept. Every text inside them is
 measured against `PlantedKey::MAX_LENGTH` like the rest of the key. The
 quote check still reads only `issue`, since a witness holds inputs that
 aren't in the code.
+
+## `KindHooks`
+
+The hooks `CodeReview` answers differently for `bug_hunt`: `bug_hunt?`,
+`multi_file_mode?`, `planning_host?`, `mastery_evidence?` and the rule both
+read (`mastery_evidence_mode?`), `judge_task_for`, `judge_guidance_for` and
+`snippet_context`. `CodeReview` extends the module, so each one answers as
+the kind's own class method and overrides `ExerciseSection`'s default. They
+live here rather than in `code_review.rb` to keep that file under 300 lines.
+
+## `.snippet_context`
+
+The goal line and the snippet with every line numbered (`1 | def …`), the
+way the page numbers them, under a note that the `N | ` prefix is not code.
+`CodeReview.review_context` and `SectionContext` (the duck and the
+difficulty assessment) both read it, so the grader and the duck can cite
+"line 4" and the engineer sees line 4. It never includes the concept or the
+key. A section that isn't a `bug_hunt` gets nil, and its context renders as
+before.
