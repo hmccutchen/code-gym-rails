@@ -28,7 +28,7 @@ Instructions:
 - The code_review section is a bug hunt today: a short puzzle with one planted language trap, not realistic application code.
 - Plant exactly this trap: Delete from an array inside its own `each` loop, so the element after each removal is skipped.
 - Write core Ruby only: no Rails, no gems, no `require`, and nothing that reads files, the network, the clock, the time zone or random numbers.
-- "purpose" is one sentence saying what the code is meant to do, precise enough to decide which inputs it covers. It never names or hints at the trap.
+- "purpose" is one sentence of at most 160 characters saying what the code is meant to do, precise enough to decide which inputs it covers. It never names or hints at the trap.
 - "snippet" is 5 to 10 lines that define everything they call apart from the language's built-ins. Keep each line under 45 characters where you can and never past 60, since it is read on a phone.
 - Show no program output anywhere: no result comments such as `# => 3`, no `puts` or `console.log` of a result, and no output in the question, the purpose or the teaching_note.
 - Pitch it so the input the purpose suggests first already gives a visibly wrong result.
@@ -83,7 +83,7 @@ Return JSON matching this schema exactly:
 {
   "code_review": {
     "question": "string — ask what is wrong, why, and how to fix it",
-    "purpose":  "string — one sentence: what the code is meant to do",
+    "purpose":  "string — one sentence of at most 160 characters: what the code is meant to do",
     "snippet":  "string — 5-10 lines, matching the bug hunt instruction above",
     "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer, naming no input or output",
     "concept": "string — exactly one concept from the provided vocabulary",

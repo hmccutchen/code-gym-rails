@@ -56,7 +56,8 @@ module ExerciseSection::CodeReview::BugHunt::Prompt
       "- The code_review section is a bug hunt today: a short puzzle with one planted language trap, not realistic application code.",
       "- Plant exactly this trap: #{gotcha.rule}",
       CORE_LANGUAGE.fetch(gotcha.language),
-      "- \"purpose\" is one sentence saying what the code is meant to do, precise enough to decide which inputs it covers. " \
+      "- \"purpose\" is one sentence of at most #{ExerciseSection::CodeReview::BugHunt::MAX_PURPOSE_LENGTH} characters saying " \
+        "what the code is meant to do, precise enough to decide which inputs it covers. " \
         "It never names or hints at the trap.",
       "- \"snippet\" is 5 to #{ExerciseSection::CodeReview::BugHunt::MAX_LINES} lines that define everything they call apart " \
         "from the language's built-ins. Keep each line under 45 characters where you can and never past 60, since it is read on a phone.",
@@ -76,7 +77,7 @@ module ExerciseSection::CodeReview::BugHunt::Prompt
     <<~SCHEMA.chomp
       "code_review": {
           "question": "string — ask what is wrong, why, and how to fix it",
-          "purpose":  "string — one sentence: what the code is meant to do",
+          "purpose":  "string — one sentence of at most #{ExerciseSection::CodeReview::BugHunt::MAX_PURPOSE_LENGTH} characters: what the code is meant to do",
           "snippet":  "string — 5-#{ExerciseSection::CodeReview::BugHunt::MAX_LINES} lines, matching the bug hunt instruction above",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer, naming no input or output",
           "concept": "string — exactly one concept from the provided vocabulary",

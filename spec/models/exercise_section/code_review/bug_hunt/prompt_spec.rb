@@ -18,6 +18,13 @@ RSpec.describe ExerciseSection::CodeReview::BugHunt::Prompt do
     expect(guidance(javascript, "junior")).to include("Write core JavaScript as an ES module", "never timers")
   end
 
+  it "states the purpose's length limit, the one ingest enforces, in the guidance and the schema" do
+    limit = ExerciseSection::CodeReview::BugHunt::MAX_PURPOSE_LENGTH
+
+    expect(guidance(ruby, "junior")).to include("one sentence of at most #{limit} characters")
+    expect(described_class.schema_fragment).to include("one sentence of at most #{limit} characters")
+  end
+
   it "pitches principal_engineer exactly as senior" do
     expect(guidance(ruby, "principal_engineer")).to eq(guidance(ruby, "senior"))
   end

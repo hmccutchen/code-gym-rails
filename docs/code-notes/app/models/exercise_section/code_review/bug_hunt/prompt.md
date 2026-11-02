@@ -26,6 +26,10 @@ on any other mode renders exactly as before.
   and a live reference would show its settled state.
 - **`looks_right_on`** is asked for from `mid_level` up, where the input the
   purpose suggests first is meant to look right.
+- **The purpose's length** is stated in the guidance and the schema from
+  `BugHunt::MAX_PURPOSE_LENGTH`, the limit ingest enforces. The first Ruby
+  measurement run asked only for "one sentence", and 16 of its 22 drafts
+  were refused at 161 to 213 characters.
 
 ## `.schema_fragment`
 
