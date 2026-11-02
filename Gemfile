@@ -8,7 +8,7 @@ gem "importmap-rails"
 gem "stimulus-rails"
 
 gem "bcrypt", "~> 3.1.7"
-gem "rotp", "~> 6.3"
+gem "rotp", "~> 6.4"
 gem "rqrcode", "~> 3.2"
 
 gem "resend"
