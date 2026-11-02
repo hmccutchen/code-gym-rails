@@ -43,6 +43,16 @@ RSpec.describe ExerciseSection::CodeReview do
     end
   end
 
+  describe ".concept_shown_before_submission?" do
+    it "hides the concept of a bug_hunt section only" do
+      expect(described_class.concept_shown_before_submission?({ "purpose" => "Sum the prices." })).to be(false)
+      expect(described_class.concept_shown_before_submission?({ "snippet" => "x" })).to be(true)
+      (ExerciseSection.all - [ described_class ]).each do |kind|
+        expect(kind.concept_shown_before_submission?({ "purpose" => "Sum the prices." })).to be(true)
+      end
+    end
+  end
+
   describe ".bug_hunt?" do
     it "reads the purpose field" do
       expect(described_class.bug_hunt?({ "purpose" => "Sum the prices." })).to be(true)

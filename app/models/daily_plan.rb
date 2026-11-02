@@ -21,7 +21,7 @@ class DailyPlan
   ROTATED_JUDGE_RETRIES = 1
 
   CODE_REVIEW_MODE_WEIGHTS = {
-    application_code: 0.34, test_file: 0.33, schema_review: 0.33, bug_hunt: 0.0
+    application_code: 0.24, test_file: 0.23, schema_review: 0.33, bug_hunt: 0.20
   }.freeze
 
   UNJUDGED_CODE_REVIEW_MODE_WEIGHTS = CODE_REVIEW_MODE_WEIGHTS.except(ExerciseSection::CodeReview::BugHunt::MODE).freeze

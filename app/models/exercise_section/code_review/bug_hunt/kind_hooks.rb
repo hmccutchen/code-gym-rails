@@ -17,4 +17,6 @@ module ExerciseSection::CodeReview::BugHunt::KindHooks
   def judge_guidance_for(section) = bug_hunt?(section) ? BugHunt::Prompt::JUDGE_GUIDANCE : judge_guidance
 
   def snippet_context(section) = BugHunt.snippet_context(section)
+
+  def concept_shown_before_submission?(section) = !bug_hunt?(section)
 end

@@ -1,11 +1,12 @@
 <%# Locals: kind, key, data, slot, exercise, response, submitted, picker (nil on a card with no swap control). %>
 <% bucket = ConceptBucket.for(key, exercise.language) %>
+<% concept_shown = submitted || kind.concept_shown_before_submission?(data) %>
 <% label = capture do %>
   <% if kind.titled_label? %><%= t("responses.section.titled_label", slot: slot, name: t("sections.#{key}.name"), title: data["title"]) %><% else %><%= t("responses.section.label", slot: slot, name: t("sections.#{key}.name")) %><% end %>
 <% end %>
 <details class="section" open data-slot="<%= slot %>" data-section-fold="<%= key %>">
   <%# No glossary terms in the summary (a control nested in a control), and never role="button": it erases the <h2>. %>
-  <summary class="section-label"><h2 class="section-title"><%= label %></h2><%= render "responses/featured_marker" if featured_section?(data["concept"], bucket) %>
+  <summary class="section-label"><h2 class="section-title"><%= label %></h2><%= render "responses/featured_marker" if concept_shown && featured_section?(data["concept"], bucket) %>
   <% unless submitted %>
     <span class="section-status" data-status-for="<%= key %>"><%= section_status(response, key) %></span>
   <% end %>
@@ -22,7 +23,7 @@
   <%= render kind.body_partial, data: data, exercise: exercise, response: response, submitted: submitted %>
   <%= render "shared/mermaid_diagram", source: data["diagram"] %>
 
-  <% if (ref = concept_reference_for(data["concept"], bucket)) %>
+  <% if concept_shown && (ref = concept_reference_for(data["concept"], bucket)) %>
     <%= render "shared/concept_reference", reference: ref,
           open: !submitted && kind.reference_opens_before_answer? && first_exposure?(data["concept"], bucket, exercise.date) %>
   <% end %>

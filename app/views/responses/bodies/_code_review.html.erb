@@ -1,6 +1,10 @@
 <%# Locals: data, exercise, response, submitted. %>
 <% files = ExerciseSection::CodeReview.files(data) %>
-<% if files.empty? %>
+<% if ExerciseSection::CodeReview.bug_hunt?(data) %>
+<div class="section-scenario bug-hunt-goal"><strong><%= t("sections.code_review.goal") %></strong> <%= data["purpose"] %></div>
+<% snippet = ExerciseSection::CodeReview::File.new(path: nil, code: data["snippet"].to_s, changed: []) %>
+<pre class="snippet"><%= highlighted_code(snippet.code, exercise.language, number_width: snippet.number_width) %></pre>
+<% elsif files.empty? %>
 <pre class="snippet"><%= highlighted_code(data["snippet"], exercise.language) %></pre>
 <% if data["current_schema"].present? %>
   <details class="ref">

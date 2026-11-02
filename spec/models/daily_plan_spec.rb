@@ -379,15 +379,15 @@ RSpec.describe DailyPlan do
   end
 
   describe "CODE_REVIEW_MODE_WEIGHTS" do
-    it "splits three ways, summing to 1.0, with bug_hunt off until its page and mastery handling land" do
-      expect(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys)
-        .to eq(%i[application_code test_file schema_review bug_hunt])
-      expect(DailyPlan::CODE_REVIEW_MODE_WEIGHTS[:bug_hunt]).to eq(0.0)
+    it "splits four ways as decided, summing to 1.0" do
+      expect(DailyPlan::CODE_REVIEW_MODE_WEIGHTS)
+        .to eq(application_code: 0.24, test_file: 0.23, schema_review: 0.33, bug_hunt: 0.20)
       expect(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.values.sum).to be_within(0.001).of(1.0)
     end
 
     it "reaches every mode" do
-      { 0.0 => :application_code, 0.34 => :test_file, 0.67 => :schema_review }.each do |value, expected|
+      allow(WeightedRoll).to receive(:pick).and_call_original
+      { 0.0 => :application_code, 0.24 => :test_file, 0.47 => :schema_review, 0.80 => :bug_hunt }.each do |value, expected|
         allow(WeightedRoll).to receive(:rand).and_return(value)
         expect(WeightedRoll.pick(DailyPlan::CODE_REVIEW_MODE_WEIGHTS)).to eq(expected)
       end

@@ -132,6 +132,8 @@ class ExerciseSection
 
     def planning_host?(mode:) = true
 
+    def concept_shown_before_submission?(_section) = true
+
     def mastery_evidence?(_section) = true
 
     def planted_key? = false
