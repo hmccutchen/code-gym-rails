@@ -182,7 +182,6 @@ class ExerciseSection::CodeReview < ExerciseSection
     true
   end
 
-
   def self.titled_label?
     false
   end
@@ -198,7 +197,6 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.discovery?
     true
   end
-
 
   def self.code_fields
     [ "snippet", *FILE_CODE_FIELDS ]

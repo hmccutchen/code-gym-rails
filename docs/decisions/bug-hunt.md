@@ -60,7 +60,9 @@ setting turns it off or weights it (owner's decision).
 entries, each tagged with a concept from its language's vocabulary.
 - **The pick:** `DailyPlan` picks one never-seen-first, then the one seen
   longest ago, the same shape as `RealSource.pick`. The picked id is
-  recorded in `plan_notes["bug_hunt"]`, outside the section.
+  recorded in `plan_notes["bug_hunt"]`, outside the section. A day without
+  a `code_review` section picks none, and an entry counts as seen only on a
+  day that delivered its section, so a dropped section doesn't use it up.
 - **Order:** entries are appended, never inserted, since list order is the
   drain order.
 - **Formatting:** every entry avoids traps a formatter rewrites, such as
@@ -104,7 +106,10 @@ schedule.
 
 - **What skips it:** `ConceptMastery.record_review!`,
   `User#concepts_needing_reinforcement` and `RungLedger` skip a section
-  whose kind answers `mastery_evidence?` false.
+  whose kind answers `mastery_evidence?` false. That includes deferring a
+  skipped retention check: skipping a puzzle never defers one, and an
+  answered puzzle doesn't stop a skipped section elsewhere from deferring
+  its check.
 - **Planning:** `code_review` is not a planning host on a `bug_hunt` day
   (`planning_host?`, read by `DayHosts`, with main-track capacity counting
   planning hosts only). So no reinforcement entry, retention check,
