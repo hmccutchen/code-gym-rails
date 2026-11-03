@@ -593,3 +593,6 @@ data.*
   and stopping once every kind is full `#666`
   **I decided:** batch the read and keep the per-kind sample, rather than
   close the issue or bring back an overall cap
+- shared component sheets, starting with the authenticator pages, and the
+  admin tables scrolling in their own box on a phone `#668`
+  **I decided:** start on both issues in one PR
