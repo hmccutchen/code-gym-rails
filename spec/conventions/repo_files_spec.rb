@@ -15,9 +15,7 @@ RSpec.describe "Conventions held over the repository's own files" do
     roots = REFERENCE_ROOTS.map { |root| Regexp.escape(root) }.join("|")
     pattern = Regexp.new("`((?:#{roots})/[^`\\s<*{]+)`")
     File.readlines(path).each_with_index.flat_map do |line, index|
-      next [] if line.include?("~~")
-
-      line.scan(pattern).flatten.map { |reference| [ reference.sub(/[:#]\d+.*\z/, "").sub(/[.,;:]\z/, ""), index + 1 ] }
+      line.gsub(/~~.*?~~/, "").scan(pattern).flatten.map { |reference| [ reference.sub(/[:#]\d+.*\z/, "").sub(/[.,;:]\z/, ""), index + 1 ] }
     end
   end
 
@@ -33,12 +31,12 @@ RSpec.describe "Conventions held over the repository's own files" do
     expect(missing).to be_empty, "paths named in instructions that do not exist:\n#{missing.join("\n")}"
   end
 
-  it "ignores a struck-through reference, which records a file that was deleted" do
+  it "ignores a struck-through reference, which records a file that was deleted, and keeps the rest of the line" do
     doc = Tempfile.new([ "doc", ".md" ])
     doc.write("~~delete `spec/gone_spec.rb`~~ and read `spec/rails_helper.rb`\n")
     doc.close
 
-    expect(referenced_paths(doc.path)).to be_empty
+    expect(referenced_paths(doc.path).map(&:first)).to eq([ "spec/rails_helper.rb" ])
   end
 
   it "pins every CI job to ubuntu-24.04 rather than a moving label" do
@@ -48,10 +46,10 @@ RSpec.describe "Conventions held over the repository's own files" do
   end
 
   it "lists every table in the models rule's table, so a new model is documented where its rule loads" do
-    rule = File.read(Rails.root.join(".claude/rules/models.md"))
+    rows = File.readlines(Rails.root.join(".claude/rules/models.md")).select { |line| line.start_with?("| `") }
     tables = ActiveRecord::Base.connection.tables - %w[schema_migrations ar_internal_metadata]
     undocumented = tables.reject do |table|
-      rule.match?(/`#{table.classify}`/) || rule.include?("`#{table}`") || table.start_with?("solid_")
+      table.start_with?("solid_") || rows.any? { |row| row.start_with?("| `#{table.classify}`") || row.include?("table `#{table}`") }
     end
 
     expect(undocumented).to be_empty, "tables with no row in .claude/rules/models.md: #{undocumented.join(', ')}"
