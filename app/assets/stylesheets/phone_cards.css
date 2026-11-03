@@ -68,7 +68,8 @@
   .segment:has(:checked) { outline: 2px solid Highlight; }
 }
 
-details.card > summary { min-height: 48px; display: list-item; padding-block: .75rem; cursor: pointer; font-weight: 600; }
+details.card > summary { min-height: 48px; display: flex; align-items: center; list-style: none; padding-block: .75rem; cursor: pointer; font-weight: 600; }
+details.card > summary::-webkit-details-marker { display: none; }
 
 /* Any author display beats the browser's [hidden] rule, so this restores it for every element on the page. */
 :is(.phone-page, .card-page) [hidden] { display: none; }
