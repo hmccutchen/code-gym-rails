@@ -2,6 +2,7 @@
 class ReviewBaselineExport
   FORMAT = 1
   PER_KIND = 10
+  BATCH_SIZE = 50
 
   Entry = Data.define(:date, :section, :rung, :stored_rating, :review_provider, :exercise, :response)
 
@@ -39,9 +40,10 @@ class ReviewBaselineExport
       "day's last recorded provider: #{providers.join(', ')}"
   end
 
-  def initialize(user_id:, per_kind: PER_KIND)
-    @user_id  = user_id
-    @per_kind = per_kind
+  def initialize(user_id:, per_kind: PER_KIND, batch_size: BATCH_SIZE)
+    @user_id    = user_id
+    @per_kind   = per_kind
+    @batch_size = batch_size
   end
 
   def call
@@ -55,12 +57,26 @@ class ReviewBaselineExport
 
   def days
     taken = Hash.new(0)
-    responses.each_with_object([]) do |response, days|
-      sections = gradable_sections(response).select { |section| taken[section] < @per_kind }
-      next if sections.empty?
+    each_response_newest_first(until_full: -> { kinds_to_fill.all? { |kind| taken[kind] >= @per_kind } })
+      .each_with_object([]) do |response, days|
+        sections = gradable_sections(response).select { |section| taken[section] < @per_kind }
+        next if sections.empty?
 
-      sections.each { |section| taken[section] += 1 }
-      days << day(response, sections)
+        sections.each { |section| taken[section] += 1 }
+        days << day(response, sections)
+      end
+  end
+
+  def each_response_newest_first(until_full:)
+    Enumerator.new do |yielder|
+      before = nil
+      loop do
+        batch = responses.then { |scope| before ? scope.where(date: ...before) : scope }.limit(@batch_size).to_a
+        batch.each { |response| yielder << response }
+        break if batch.size < @batch_size || until_full.call
+
+        before = batch.last.date
+      end
     end
   end
 
@@ -68,6 +84,8 @@ class ReviewBaselineExport
     DailyResponse.where(user_id: @user_id).where.not(submitted_at: nil).where.not(ai_review: nil)
                  .includes(:daily_exercise).order(date: :desc)
   end
+
+  def kinds_to_fill = ExerciseSection.keys.reject { |kind| ExerciseSection.for(kind).rating_fixed? }
 
   # The evidence rule's own filter, minus any kind whose rating Ruby fixes rather than the grader.
   def gradable_sections(response)

@@ -27,6 +27,10 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       grade(submitted_order(answer, blocks.size), blocks.size)[:rating]
     end
 
+    def rating_fixed?
+      true
+    end
+
     def block_token(block_id, exercise:, key:, section_data:)
       OpenSSL::HMAC.hexdigest(
         "SHA256", Rails.application.secret_key_base,

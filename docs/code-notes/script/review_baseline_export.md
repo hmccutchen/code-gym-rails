@@ -22,6 +22,17 @@ is left out, because regrading it would measure nothing. A kind that has
 reached its limit can leave part of a day behind: the day is still exported whole, since grading reads every section of
 the day as context, but only the sections taken are listed under `sections`.
 
+## How it reads
+
+It reads days newest first in batches of 50 (`BATCH_SIZE`), paging on the
+date, which is unique per account, so it never holds every reviewed day at
+once (#594). It stops after a batch once every kind the grader rates has its
+10: every registered kind except one whose rating Ruby fixes
+(`ExerciseSection.rating_fixed?`, today only Parsons, which could never fill).
+A kind short of its 10, such as one that rarely rotates in, keeps it reading
+to the oldest day, since the per-kind sample needs those sections; the
+export is the same either way, only the reading stops sooner.
+
 ## What it writes
 
 Per day: the date, language, `review_provider` (the provider of the day's

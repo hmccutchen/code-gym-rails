@@ -1,6 +1,15 @@
 require "rails_helper"
 
 RSpec.describe ExerciseSection do
+  it "says a kind fixes its rating exactly when its fixed_rating hook returns one" do
+    parsons = ExerciseSection::ParsonsProblem
+    section = { "blocks" => %w[a b], "pitched_at" => "junior" }
+
+    expect(described_class.all.select(&:rating_fixed?)).to eq([ parsons ])
+    expect(parsons.fixed_rating(section: section, answer: "order:1,0")).to be_present
+    expect((described_class.all - [ parsons ]).map { |kind| kind.fixed_rating(section: {}, answer: "a") }).to all(be_nil)
+  end
+
   it "names only code fields that appear in each kind's schema, since any other name would go unformatted silently" do
     described_class.all.each do |kind|
       fragments = [ 1..1, 2..3 ].map { |file_range| kind.schema_fragment(label: "Ruby", file_range: file_range) }.join

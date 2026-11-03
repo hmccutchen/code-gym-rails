@@ -73,6 +73,44 @@ RSpec.describe ReviewBaselineExport do
     expect(described_class::PER_KIND).to eq(10)
   end
 
+  describe "reading days in batches" do
+    def daily_response_selects(&block)
+      queries = []
+      counter = ->(*, payload) { queries << payload[:sql] if payload[:sql].match?(/SELECT .*FROM "daily_responses"/) }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
+      queries
+    end
+
+    it "exports the same days whatever the batch size" do
+      (14..20).each { |day| reviewed_day(Date.new(2026, 10, day), %w[code_review challenge].first(day.even? ? 2 : 1).index_with({})) }
+
+      expect(described_class.new(user_id: user.id, per_kind: 2, batch_size: 2).call["days"])
+        .to eq(described_class.new(user_id: user.id, per_kind: 2).call["days"])
+    end
+
+    it "stops reading once every kind the grader rates has its limit" do
+      (10..20).each { |day| reviewed_day(Date.new(2026, 10, day), { "code_review" => {}, "challenge" => {} }) }
+      export = described_class.new(user_id: user.id, per_kind: 2, batch_size: 2)
+      allow(export).to receive(:kinds_to_fill).and_return(%w[code_review challenge])
+
+      selects = daily_response_selects { expect(export.call["days"].map { |day| day["date"] }).to eq(%w[2026-10-20 2026-10-19]) }
+
+      expect(selects.size).to eq(1)
+    end
+
+    it "reads every day while a kind the grader rates is short of its limit" do
+      (17..20).each { |day| reviewed_day(Date.new(2026, 10, day), { "code_review" => {} }) }
+      export = described_class.new(user_id: user.id, per_kind: 1, batch_size: 2)
+      allow(export).to receive(:kinds_to_fill).and_return(%w[code_review challenge])
+
+      expect(daily_response_selects { export.call }.size).to eq(3)
+    end
+
+    it "fills every registered kind except one whose rating Ruby fixes" do
+      expect(described_class.new(user_id: user.id).send(:kinds_to_fill)).to eq(ExerciseSection.keys - [ "parsons_problem" ])
+    end
+  end
+
   it "exports the gap positions the grader wrote when the prose judge reworded the review, and none of its text" do
     reviewed_day(Date.new(2026, 10, 20), { "code_review" => { review: {
       "rating" => "developing", "missed" => [ "reworded" ], "rubric" => stamp,
