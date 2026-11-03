@@ -294,7 +294,10 @@ module Glossary
     "backfill" => %w[backfills],
     "compensating action" => [ "compensating actions" ],
     "form object" => [ "form objects" ],
-    "value object" => [ "value objects" ]
+    "value object" => [ "value objects" ],
+    "rollback" => [ "rollbacks", "roll back", "rolls back", "rolled back", "rolling back" ],
+    "transaction" => %w[transactions],
+    "promise" => %w[promises]
   }.freeze
 
   # Longest first, so the alternation prefers the longer of two overlapping words at the same position.
