@@ -138,7 +138,7 @@ says what a deviation from one requires.
 - **One way to send a request** — a page script sends through
   `CodeGymRequest.send`, and a save that must not overlap another goes
   through `CodeGymSaveStatus.queue`, never a hand-built `fetch` or its own
-  promise chain. The server answers every error with `render_json_error`, so
+  promise chain (`app_source_spec` fails on a `fetch` outside `request.js`). The server answers every error with `render_json_error`, so
   the browser has one rule for what a failure may show. A queue retries only
   when its caller passes `offline:` and only a save that got no reply; the
   dashboard's answers are the one caller, since its endpoint accepts a repeat.

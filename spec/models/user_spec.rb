@@ -447,7 +447,7 @@ RSpec.describe User, type: :model do
     let(:user) { User.create!(email: "history@example.com", name: "History") }
 
     def exercise_on(date, keys, answers: nil)
-      problem_set = keys.index_with { |key| { "question" => "q" } }
+      problem_set = keys.index_with { { "question" => "q" } }
       exercise = DailyExercise.create!(user: user, date: date, language: "ruby_rails",
                                        generated_at: Time.current, problem_set: problem_set)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: date, answers: answers) if answers

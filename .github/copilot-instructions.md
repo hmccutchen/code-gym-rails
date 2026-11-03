@@ -114,16 +114,13 @@ the largest difficulty block any day can produce. A diff that raises the
 constant to make it pass must say in the PR description what that costs per
 generation.
 
-**Does any new class or method exceed the size threshold?** A method over **25
-lines** (excluding heredoc bodies) or a new file in `app/` over **300 lines**
-must be justified in the PR description or split. These numbers are drawn from
-this repo: across 282 methods in `app/`, the 95th percentile is 31 lines and 20
-methods exceed 25.
+**Does any new class or method exceed the size threshold?** RuboCop
+(`Metrics/MethodLength`, `ClassLength`, `ModuleLength`) holds the limits set
+in `.rubocop.yml` for `app/`. An exemption, whether a `rubocop:disable` or a
+`.rubocop_todo.yml` entry, needs the reason in the PR description.
 
-Two honest caveats. First, this is **not machine-enforced** —
-`rubocop-rails-omakase` disables the entire `Metrics` department, so no CI job
-measures it and the reviewer is the only enforcement. Second, several existing
-files exceed these numbers, most visibly `app/clients/ai_service.rb`, which
+One caveat: several existing files exceed these limits and sit in
+`.rubocop_todo.yml`, most visibly `app/clients/ai_service.rb`, which
 was 1303 lines with a 156-line `build_exercise_prompt` when these figures were
 taken; that template is now `GenerationPrompt#render`, still mostly heredocs of
 prompt text rather than logic, which is why the threshold excludes heredoc
@@ -221,7 +218,8 @@ are the standing exceptions).
 **Does AI-calling code bypass `AiService.for`?** BLOCKING. Shared logic lives
 in `ai_service.rb`, the prompt classes it calls (`app/prompts/*_prompt.rb`)
 and `ProviderError`; subclasses own only provider-specific HTTP and auth. A controller building its own Faraday
-request is a violation.
+request is a violation, and `spec/conventions/app_source_spec.rb` fails on
+Faraday anywhere in `app/` outside `app/clients`.
 
 **Can a concept tag bypass normalization against the closed vocabulary?**
 BLOCKING. `RAILS_CONCEPTS`, `JS_CONCEPTS`, and the rest are deliberately closed

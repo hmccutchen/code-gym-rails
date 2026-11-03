@@ -194,4 +194,19 @@ RSpec.describe "Conventions held over app/ source" do
     expect(level_writes("user.assign_attributes('section_kind_levels' => {})").size).to eq(1)
     expect(level_writes("rungs(skill_level: user.skill_level); User.new(skill_level: 'junior')").size).to eq(0)
   end
+
+  it "names Faraday only inside app/clients, where the provider requests are built" do
+    offenders = app_files.reject { |path| relative(path).start_with?("app/clients/") }.select { |path| File.read(path).match?(/\bFaraday\b/) }
+
+    expect(offenders.map { |path| relative(path) }).to be_empty, "Faraday outside app/clients: #{offenders.map { |path| relative(path) }.join(', ')}"
+  end
+
+  it "sends every page request through CodeGymRequest, the one place that calls fetch" do
+    scripts = Dir[Rails.root.join("app/{javascript,assets/javascripts}/**/*.js")].sort
+    offenders = scripts.reject { |path| relative(path) == "app/javascript/code_gym/request.js" }.select do |path|
+      File.read(path).match?(/(?<![\w.])fetch\s*\(|\bwindow\.fetch\b|XMLHttpRequest/)
+    end
+
+    expect(offenders.map { |path| relative(path) }).to be_empty, "fetch outside request.js: #{offenders.map { |path| relative(path) }.join(', ')}"
+  end
 end

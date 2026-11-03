@@ -18,7 +18,7 @@ RSpec.describe AddMidLevelRung do
   it "maps every legacy value and preserves every current level" do
     mappings = { "beginner" => "junior", "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer" }
     expected = mappings.merge(KindDifficulty::LEVELS.index_with(&:itself))
-    users = expected.keys.map.with_index do |level, index|
+    users = expected.keys.map.with_index do |_level, index|
       User.create!(email: "level#{index}@example.com", name: "Level", skill_level: "junior")
     end
 
