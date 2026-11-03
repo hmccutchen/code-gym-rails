@@ -46,6 +46,15 @@ RSpec.describe GeminiStructuredOutputCheck do
     expect { described_class.new(api_key: "AIzaCheck", out: out).run }.not_to change(ApiUsage, :count)
   end
 
+  it "builds its service on InMemoryUsage and still reports each fixture's output tokens" do
+    allow(InMemoryUsage).to receive(:provider).and_call_original
+
+    rows = described_class.new(api_key: "AIzaCheck", out: out).run
+
+    expect(InMemoryUsage).to have_received(:provider).with(GeminiService, anything).twice
+    expect(rows.map(&:tokens_out)).to eq([ 7, 0 ])
+  end
+
   it "sends each fixture once, even when the reply would be retried" do
     sent = 0
     retrying = Faraday::Connection.new do |f|

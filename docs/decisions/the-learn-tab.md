@@ -142,6 +142,10 @@ were widened to the second sense the text used: `transaction` for a payment,
 `promise` as a guarantee, `rollback` for a transaction or a side effect,
 `invariant` for a value a loop can compute once before it starts, and `ref`
 for a Rails column holding another record's id. A spec pins each sense.
+A second listing over the same export (#664) checked new forms for three of
+them: `rollbacks`, `roll back`, `rolls back`, `rolled back` and `rolling back`
+for `rollback`, `transactions` and `promises`. It found three matches, each
+in a sense the widened definition covers, so the forms were added.
 
 The architecture section's inline reference
 (`responses/bodies/_architecture.html.erb`, built from the exercise JSON) stays

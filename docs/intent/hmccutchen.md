@@ -586,3 +586,6 @@ data.*
   used them in `#663`
   **I decided:** run the export myself and hand over the file, rather than
   open the production database to this session
+- glossary word forms for rollback, transaction and promise, and the two
+  Gemini scripts on the shared usage helper `#665`
+  **I decided:** start on both follow-up issues in one PR

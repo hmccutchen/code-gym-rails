@@ -71,6 +71,12 @@ RSpec.describe Glossary do
       expect(Glossary::TERMS.keys & [ "background jobs", "closures", "policy objects", "query objects", "service objects" ]).to be_empty
       expect(Glossary.key_for("closures")).to eq("closure")
     end
+
+    it "resolves the plural and verb forms the production sense listing checked (#664)" do
+      expect([ "rollbacks", "roll back", "rolls back", "Rolled back", "rolling back" ].map { |word| Glossary.key_for(word) }).to all(eq("rollback"))
+      expect(Glossary.key_for("transactions")).to eq("transaction")
+      expect(Glossary.key_for("promises")).to eq("promise")
+    end
   end
 
   describe "LOOKUP" do
