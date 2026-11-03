@@ -36,6 +36,30 @@ RSpec.describe "Admin tables on a phone", type: :system do
     expect(scroll_boxes).to eq([ [ 0, "region", I18n.t("admin.suggested_concepts.index.heading") ] ])
   end
 
+  OVERFLOWING_BOXES = "[...document.querySelectorAll('.table-scroll')].filter(box => box.scrollWidth > box.clientWidth)".freeze
+
+  # A wheel turn moves only a box the user can scroll, where setting scrollLeft from a script moves an overflow: hidden one too.
+  def scroll_by_wheel(index)
+    box = "#{OVERFLOWING_BOXES}[#{index}]"
+    x, y = page.evaluate_script("(box => { box.scrollIntoView({ block: 'center' }); const r = box.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })(#{box})")
+    page.driver.with_playwright_page do |pw|
+      pw.mouse.move(x, y)
+      pw.mouse.wheel(200, 0)
+    end
+    wait_for { page.evaluate_script("#{box}.scrollLeft") > 0 }
+  end
+
+  [ [ :admin_judge_solves_path, "judge solves" ], [ :admin_suggested_concepts_path, "suggested concepts" ] ].each do |path, name|
+    it "lets a user scroll each overflowing #{name} table sideways at 320px" do
+      resize(320)
+      visit public_send(path)
+
+      count = page.evaluate_script("#{OVERFLOWING_BOXES}.length")
+      expect(count).to be_positive
+      count.times { |index| scroll_by_wheel(index) }
+    end
+  end
+
   [ 320, 390 ].each do |width|
     it "keeps the judge solves page within a #{width}px screen, scrolling each table in its own box" do
       resize(width)
