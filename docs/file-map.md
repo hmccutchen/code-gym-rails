@@ -1,6 +1,6 @@
 # File Map
 
-What each listed file does.
+What each listed file does. Specs, migrations and the skills under `.claude/` are not listed.
 
 - `app/models/track_change.rb` — `TrackChange`: which per-kind targets a track change clears, the one statement of the rule; pure.
 - `app/forms/profile_update.rb` — `ProfileUpdate`: `PATCH /profile`'s form. Checks the posted shape, runs the stale-page and track-choice checks under the user-row lock, saves through `LevelChange` in one transaction, and returns an `Outcome` the controller maps to JSON; which values a field allows stays with `User`'s validators.
@@ -285,7 +285,7 @@ What each listed file does.
 - `spec/system/settings_partial_styles_spec.rb` — measures the computed styles the Settings partials' rules give the difficulty controls, the Display groups and the key guide, at phone and desktop widths
 - `spec/system/answer_form_reconnect_spec.rb` — forces the answer form's Stimulus controller to disconnect and reconnect, which no page does today, and pins that `DraftCopy#reconnect` keeps the pre-#510 behavior: a save sent before the reconnect still clears its matching copy or keeps the offline wording, and the token, scope, proofs and restore record reset
 - `spec/conventions/app_source_spec.rb` — parses `app/` with Prism and fails on `Thread.new` outside `CallerZoneThread` (or a named exemption with its reason and exact thread count) and on `send(:...)`, and fails a model that reads the controller session or takes it as an argument, Faraday in `app/` outside `app/clients`, and a `fetch` in a page script outside `request.js`
-- `spec/conventions/repo_files_spec.rb` — fails on a repository path or bare filename an instruction doc names that does not exist (a struck-through span is exempt), on a CI job not on `ubuntu-24.04`, on a database table with no row in `.claude/rules/models.md`, and on a Ruby, JavaScript or Python file outside the views, or a `bin` script, with no entry in this file
+- `spec/conventions/repo_files_spec.rb` — fails on a repository path or bare filename an instruction doc names that does not exist (a struck-through span is exempt), on a CI job not on `ubuntu-24.04`, on a database table with no row in `.claude/rules/models.md`, and on a Ruby, JavaScript or Python file under `app/` (outside the views), `lib/`, `script/` or `config/`, or any file under `bin/`, with no entry in this file; specs, migrations and the skills under `.claude/` are not listed
 - `.rubocop_todo.yml` — the `app/` classes and modules that already exceed the `Metrics` length limits in `.rubocop.yml`; a fixed one leaves it. A long method carries its own `rubocop:disable` instead
 - `spec/support/layout_helpers.rb` — `LayoutHelpers` for system specs: `resize`, `page_width`, `sideways_overflow`, `set_safe_area`, `set_default_font_size`, `expect_nav_on_the_column`, `apply_text_spacing`, `open_every_disclosure`, `rect` and `rects`, with `LARGEST_TEXT` and `LAYOUT_WIDTHS`
 - `spec/views/desktop_stylesheet_spec.rb` — fails on a rule in `desktop.css` outside its 900px block, on a selector not scoped to a page, the wide container or the nav, and on the stylesheet loading before `phone_cards.css` or the layout's `<style>`
@@ -443,3 +443,12 @@ What each listed file does.
 - `bin/setup` — installs gems if `bundle check` fails, installs Prettier for `CodeFormat`, installs the git hooks in `lefthook.yml` and runs `bin/rails db:prepare`.
 - `config/initializers/preview_mail.rb` — calls `PreviewMail.apply!` after the app boots, because `ActionMailer::MailDeliveryJob` is not loaded when initializers first run.
 - `script/bug_hunt_measure/report.rb` — `BugHuntMeasure::Report`: reads a built harness folder's manifest and the result files from running it, refuses results that fail its checks, and writes `failures.md` and `counts.txt` into a new folder outside the repository.
+- `config/application.rb` — `CodeGymRails::Application`: requires the Rails frameworks one by one, loads `lib/boot/database_pool`, sets the Rails 8.0 defaults and autoloads `lib` except its boot, task, asset, RuboCop and comment-check folders.
+- `config/boot.rb` — points Bundler at the `Gemfile` and loads `bundler/setup` and `bootsnap/setup`.
+- `config/environment.rb` — loads `config/application.rb` and initializes the app.
+- `config/environments/development.rb` — development settings: code reloading on, eager loading off, full error pages, a memory cache store, and page caching switched on by `tmp/caching-dev.txt`.
+- `config/environments/production.rb` — production settings: eager loading, forced SSL, logs to standard output, Solid Cache and Solid Queue, Resend mail delivery, and the mail host from `AppHost.resolve`.
+- `config/environments/test.rb` — test settings: eager loading only when `CI` is set, a null cache store, the test mail and job adapters, and forgery protection off.
+- `config/importmap.rb` — pins `application`, Stimulus, and every file under `app/javascript/controllers` and `app/javascript/code_gym`.
+- `config/puma.rb` — the web server: thread count from `RAILS_MAX_THREADS`, port from `PORT`, and the Solid Queue plugin when `SOLID_QUEUE_IN_PUMA` is set.
+- `config/routes.rb` — every route in the app and the controller action that serves it, including the health check, the PWA manifest and service worker, and login.

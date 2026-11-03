@@ -85,11 +85,11 @@ RSpec.describe "Conventions held over the repository's own files" do
   def mapped?(path) = file_map_tokens.any? { |token| path == token || path.end_with?("/#{token}") }
 
   def mappable_files
-    tracked = `git -C #{Rails.root} ls-files app lib bin script config/initializers`.split("\n")
-    tracked.reject { |path| path.start_with?("app/views/") }.select { |path| path.match?(/\.(rb|js|py)\z/) || path.match?(%r{\Abin/[^.]+\z}) }
+    tracked = `git -C #{Rails.root} ls-files app lib bin script config`.split("\n")
+    tracked.reject { |path| path.start_with?("app/views/") }.select { |path| path.start_with?("bin/") || path.match?(/\.(rb|js|py)\z/) }
   end
 
-  it "lists every Ruby, JavaScript and Python file outside the views, and every bin script, in docs/file-map.md" do
+  it "lists every Ruby, JavaScript and Python file under app (outside the views), lib, script and config, and every bin file, in docs/file-map.md" do
     unlisted = mappable_files.reject { |path| mapped?(path) }
 
     expect(unlisted).to be_empty, "files with no entry in docs/file-map.md:\n#{unlisted.join("\n")}"
