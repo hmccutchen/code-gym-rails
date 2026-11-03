@@ -1,3 +1,5 @@
+require_relative "in_memory_usage"
+
 # Billed to the key it is given; writes no ApiUsage rows.
 class GeminiStructuredOutputCheck
   FIXTURE_DIR = Rails.root.join("spec/fixtures/judge")
@@ -45,10 +47,9 @@ class GeminiStructuredOutputCheck
 
   # One attempt per fixture: a retry would spend the free tier's daily budget on the same fixture.
   def service(usage)
-    Class.new(GeminiService) do
+    Class.new(InMemoryUsage.provider(GeminiService, usage) { |result, _purpose| result[:output_tokens].to_i }) do
       define_method(:call) { |request| super(request.with(single_attempt: true)) }
-      define_method(:log_usage) { |_user, result, purpose:| usage << result[:output_tokens].to_i }
-      private :call, :log_usage
+      private :call
     end.new(@api_key)
   end
 end

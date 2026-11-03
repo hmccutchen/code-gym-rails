@@ -6,8 +6,8 @@ instead of writing an `ApiUsage` row, and whose `record_suggested_concept`
 does nothing. A billed script builds its own subclass on top of it for its
 other overrides (a pinned route, a read timeout, the prose judge turned off).
 
-- **Why one place:** four scripts used to each define their own `log_usage`
-  (#608). If `AiService#log_usage` changed its signature, every copy needed
+- **Why one place:** four Claude scripts used to each define their own
+  `log_usage` (#608), and two Gemini scripts did the same until #661. If `AiService#log_usage` changed its signature, every copy needed
   the same edit, and a missed one raised `ArgumentError` partway through a
   billed run. `spec/script/in_memory_usage_spec.rb` now fails if the
   parameters stop matching `AiService#log_usage`.
@@ -25,9 +25,11 @@ other overrides (a pinned route, a read timeout, the prose judge turned off).
   judging runs a thread per section.
 - **Suggested concepts:** every script records none, since a run is a
   measurement. Today only a full draft (`ExerciseDraft.finish`) records one.
-  `KeySampleDrafts` drafts through `retry_section`, and the calibration only
-  calls `generate_concept_reference`; neither records one, so the stub
-  changes nothing for them yet.
+  `GeminiCapacityProbe` drafts a full exercise each tester-day, so before
+  #661 a probe run could add its drafts' suggestions to the team's
+  `SuggestedConcept` list; the stub is what stops that now. `KeySampleDrafts`
+  drafts through `retry_section`, and the calibration only calls
+  `generate_concept_reference`; neither records one.
 - **The guard's shape:** it compares parameter kinds plus keyword names, so a
   renamed `purpose:` fails it. Positional names aren't compared, since the
   override marks the unused user `_user`.
