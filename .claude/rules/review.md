@@ -29,7 +29,8 @@ read it before changing that area.
   levels. What `improved_code` should hold is the kind's
   `.improved_code_instruction`, which both the graded prompt and the
   walkthrough read, never a grading note (#642). Parsons' rating comes from
-  its `fixed_rating` hook. `RubricCheck` never rewrites a rating: it logs
+  its `fixed_rating` hook, and `.rating_fixed?` says which kinds override
+  it (a spec checks each kind's answer against the override). `RubricCheck` never rewrites a rating: it logs
   agreement, and its gap list also decides whether the short version shows
   pitfalls. The competency gate and
   `LevelSuggestion` read only `RUBRIC_VERSION`-stamped reviews;

@@ -2,6 +2,7 @@
 class ReviewBaselineExport
   FORMAT = 1
   PER_KIND = 10
+  BATCH_SIZE = 50
 
   Entry = Data.define(:date, :section, :rung, :stored_rating, :review_provider, :exercise, :response)
 
@@ -39,9 +40,10 @@ class ReviewBaselineExport
       "day's last recorded provider: #{providers.join(', ')}"
   end
 
-  def initialize(user_id:, per_kind: PER_KIND)
-    @user_id  = user_id
-    @per_kind = per_kind
+  def initialize(user_id:, per_kind: PER_KIND, batch_size: BATCH_SIZE)
+    @user_id    = user_id
+    @per_kind   = per_kind
+    @batch_size = batch_size
   end
 
   def call
@@ -55,25 +57,35 @@ class ReviewBaselineExport
 
   def days
     taken = Hash.new(0)
-    responses.each_with_object([]) do |response, days|
-      sections = gradable_sections(response).select { |section| taken[section] < @per_kind }
-      next if sections.empty?
+    days  = []
+    batch = responses_before(nil)
+    loop do
+      batch.each do |response|
+        sections = gradable_sections(response).select { |section| taken[section] < @per_kind }
+        next if sections.empty?
 
-      sections.each { |section| taken[section] += 1 }
-      days << day(response, sections)
+        sections.each { |section| taken[section] += 1 }
+        days << day(response, sections)
+      end
+      break if batch.size < @batch_size || kinds_to_fill.all? { |kind| taken[kind] >= @per_kind }
+
+      batch = responses_before(batch.last.date)
     end
+    days
   end
 
-  def responses
-    DailyResponse.where(user_id: @user_id).where.not(submitted_at: nil).where.not(ai_review: nil)
-                 .includes(:daily_exercise).order(date: :desc)
+  def responses_before(date)
+    scope = DailyResponse.where(user_id: @user_id).where.not(submitted_at: nil).where.not(ai_review: nil)
+    scope = scope.where(date: ...date) if date
+    scope.includes(:daily_exercise).order(date: :desc).limit(@batch_size).to_a
   end
+
+  def kinds_to_fill = ExerciseSection.keys.reject { |kind| ExerciseSection.for(kind).rating_fixed? }
 
   # The evidence rule's own filter, minus any kind whose rating Ruby fixes rather than the grader.
   def gradable_sections(response)
-    ReviewedSectionResults.for(response, require_rubric: true, include_eased: true).map(&:kind).reject do |section|
-      ExerciseSection.for(section).fixed_rating(section: response.daily_exercise.problem_set[section], answer: response.answer_for(section))
-    end
+    ReviewedSectionResults.for(response, require_rubric: true, include_eased: true).map(&:kind)
+                          .reject { |section| ExerciseSection.for(section).rating_fixed? }
   end
 
   def day(response, sections)

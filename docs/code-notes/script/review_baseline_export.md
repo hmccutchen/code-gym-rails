@@ -17,10 +17,23 @@ A section is taken when `ReviewedSectionResults.for(response, require_rubric:
 true, include_eased: true)` returns it, which means it was answered, has a
 `pitched_at` rung, a known rating and the current `RUBRIC_VERSION` stamp.
 Eased sections stay in, since the grader never sees `eased`. A section whose
-rating Ruby fixes (`.fixed_rating` returns one, which today is only Parsons)
-is left out, because regrading it would measure nothing. A kind that has
+rating Ruby fixes (`.rating_fixed?`, which today is only Parsons) is left
+out, because regrading it would measure nothing. A kind that has
 reached its limit can leave part of a day behind: the day is still exported whole, since grading reads every section of
 the day as context, but only the sections taken are listed under `sections`.
+
+## How it reads
+
+It reads days newest first in batches of 50 (`BATCH_SIZE`), paging on the
+date, which is unique per account, so it holds one batch at a time rather
+than every reviewed day (#594). That bound on memory is the main gain.
+
+It also stops after a batch once every kind the grader rates has its 10:
+every registered kind except one whose rating Ruby fixes, which could never
+fill. That stop rarely fires. The rotating kinds share one or two slots a
+day, and an account that excludes a kind or keeps a Daily sections setting
+of 1 or 2 never gets some kinds at all, so most exports still read to the
+oldest day. The export is the same either way.
 
 ## What it writes
 

@@ -598,3 +598,7 @@ data.*
 - glossary word forms for rollback, transaction and promise, and the two
   Gemini scripts on the shared usage helper `#665`
   **I decided:** start on both follow-up issues in one PR
+- the review baseline export reading its days in batches, newest first,
+  and stopping once every kind is full `#666`
+  **I decided:** batch the read and keep the per-kind sample, rather than
+  close the issue or bring back an overall cap

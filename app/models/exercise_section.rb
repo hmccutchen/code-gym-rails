@@ -203,6 +203,10 @@ class ExerciseSection
       nil
     end
 
+    def rating_fixed?
+      false
+    end
+
     def judge_task
       raise NotImplementedError, "#{name} must state its task"
     end
