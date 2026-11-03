@@ -79,4 +79,24 @@ RSpec.describe "Conventions held over the repository's own files" do
 
     expect(undocumented).to be_empty, "tables with no row in .claude/rules/models.md: #{undocumented.join(', ')}"
   end
+
+  def file_map_tokens = @file_map_tokens ||= File.read(Rails.root.join("docs/file-map.md")).scan(/`([^`\s]+)`/).flatten.to_set
+
+  def mapped?(path) = file_map_tokens.any? { |token| path == token || path.end_with?("/#{token}") }
+
+  def mappable_files
+    tracked = `git -C #{Rails.root} ls-files app lib bin script config/initializers`.split("\n")
+    tracked.reject { |path| path.start_with?("app/views/") }.select { |path| path.match?(/\.(rb|js|py)\z/) || path.match?(%r{\Abin/[^.]+\z}) }
+  end
+
+  it "lists every Ruby, JavaScript and Python file outside the views, and every bin script, in docs/file-map.md" do
+    unlisted = mappable_files.reject { |path| mapped?(path) }
+
+    expect(unlisted).to be_empty, "files with no entry in docs/file-map.md:\n#{unlisted.join("\n")}"
+  end
+
+  it "reads a file as listed by its full path or by its path below a shared folder, and an unknown file as unlisted" do
+    expect(mapped?("app/models/coverage_exception/history.rb")).to be(true)
+    expect(mapped?("app/models/definitely_not_a_file_xyz.rb")).to be(false)
+  end
 end

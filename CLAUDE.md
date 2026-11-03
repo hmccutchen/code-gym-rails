@@ -265,7 +265,7 @@ rather than only catching it afterward:
 RuboCop, `bin/comment-check`, `archspec check`, Brakeman, and `importmap audit`. The convention specs in
 `spec/conventions/` also fail on a path an instruction doc names that no longer
 exists, a table missing from `.claude/rules/models.md`, a CI job off
-`ubuntu-24.04`, Faraday elsewhere in `app/` than `app/clients`, and a `fetch` outside
+`ubuntu-24.04`, a file with no entry in `docs/file-map.md`, Faraday elsewhere in `app/` than `app/clients`, and a `fetch` outside
 `request.js`. It does *not* run a Ruby dependency
 CVE audit (`bundle-audit` is not installed) or any complexity check beyond
 length, and this
@@ -377,4 +377,6 @@ Setup, parallel runs, system specs and the spec support defaults are in
 
 ## File Map
 
-`docs/file-map.md` lists what each file does.
+`docs/file-map.md` lists what each file does. A convention spec fails on a
+Ruby, JavaScript or Python file outside the views, or a `bin` script, with no
+entry there, so a new file brings its entry in the same change.
