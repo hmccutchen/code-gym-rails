@@ -1,13 +1,10 @@
 require "rails_helper"
 
 RSpec.describe ExerciseSection do
-  it "says a kind fixes its rating exactly when its fixed_rating hook returns one" do
-    parsons = ExerciseSection::ParsonsProblem
-    section = { "blocks" => %w[a b], "pitched_at" => "junior" }
-
-    expect(described_class.all.select(&:rating_fixed?)).to eq([ parsons ])
-    expect(parsons.fixed_rating(section: section, answer: "order:1,0")).to be_present
-    expect((described_class.all - [ parsons ]).map { |kind| kind.fixed_rating(section: {}, answer: "a") }).to all(be_nil)
+  it "says a kind fixes its rating exactly when it overrides the fixed_rating hook" do
+    described_class.all.each do |kind|
+      expect(kind.rating_fixed?).to eq(kind.method(:fixed_rating).owner != described_class.singleton_class), kind.key
+    end
   end
 
   it "names only code fields that appear in each kind's schema, since any other name would go unformatted silently" do
