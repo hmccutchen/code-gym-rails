@@ -116,8 +116,9 @@ generation.
 
 **Does any new class or method exceed the size threshold?** RuboCop
 (`Metrics/MethodLength`, `ClassLength`, `ModuleLength`) holds the limits set
-in `.rubocop.yml` for `app/`. An exemption, whether a `rubocop:disable` or a
-`.rubocop_todo.yml` entry, needs the reason in the PR description.
+in `.rubocop.yml` for `app/`. A long method carries a `rubocop:disable
+Metrics/MethodLength` on its `def` line, a long class or module sits in
+`.rubocop_todo.yml`, and either needs the reason in the PR description.
 
 One caveat: several existing files exceed these limits and sit in
 `.rubocop_todo.yml`, most visibly `app/clients/ai_service.rb`, which

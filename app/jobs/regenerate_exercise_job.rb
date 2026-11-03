@@ -13,7 +13,7 @@ class RegenerateExerciseJob < ApplicationJob
 
   private
 
-  def regenerate(user)
+  def regenerate(user) # rubocop:disable Metrics/MethodLength
     exercise = user.daily_exercises.for_date.first
     return unless exercise&.regenerating_since
 

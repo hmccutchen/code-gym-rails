@@ -2,7 +2,7 @@ class DashboardController < ApplicationController
   # no-store, or Back after submit → review replays the cached empty form with a Submit button that re-posts it.
   before_action :no_store, only: :show
 
-  def show
+  def show # rubocop:disable Metrics/MethodLength
     return redirect_to(welcome_path) if current_user.first_run?
 
     # Re-read after the move: a second first-load of the day can lose the race and move nothing.

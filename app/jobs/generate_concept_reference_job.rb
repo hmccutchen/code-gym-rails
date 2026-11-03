@@ -6,7 +6,7 @@ class GenerateConceptReferenceJob < ApplicationJob
                      duration: CallProfiles.call_budget_seconds(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT).seconds
 
   # refresh rewrites the whole row so its parts come from one response; only a deliberate Learn click passes it.
-  def perform(concept:, language:, user_id:, refresh: false)
+  def perform(concept:, language:, user_id:, refresh: false) # rubocop:disable Metrics/MethodLength
     return if concept == "other"
 
     # Another job may have generated it in the enqueue/run gap.

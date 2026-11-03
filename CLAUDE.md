@@ -254,9 +254,12 @@ rather than only catching it afterward:
     ("Domain data stays off provider classes") says which one may
     (`app_source_spec`).
 - Method, class and module length in `app/` is held by RuboCop's `Metrics`
-  cops, with the limits set in `.rubocop.yml`. The files that already exceed
-  them are listed in `.rubocop_todo.yml`; a new exemption needs the PR to say
-  why, and a fixed one leaves the list.
+  cops, with the limits set in `.rubocop.yml`. A method that exceeds its limit
+  carries a trailing `# rubocop:disable Metrics/MethodLength` on its `def`
+  line, and `Lint/RedundantCopDisableDirective` fails the build once the method
+  is short enough, so the directive must go. The classes and modules that
+  exceed theirs are listed in `.rubocop_todo.yml`. A new exemption of either
+  kind needs the PR to say why.
 
 **What CI does and doesn't tell you.** The workflow runs RSpec, system specs,
 RuboCop, `bin/comment-check`, `archspec check`, Brakeman, and `importmap audit`. The convention specs in
