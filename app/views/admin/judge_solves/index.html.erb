@@ -24,8 +24,8 @@
   <p class="withheld-count"><strong><%= t("admin.judge_solves.index.withheld", count: @counts.withheld) %></strong>
     <span class="withheld-note"><%= t("admin.judge_solves.index.withheld_explained") %></span></p>
 
-  <h2><%= t("admin.judge_solves.index.outcomes_heading") %></h2>
-  <div class="table-scroll">
+  <h2 id="outcome-counts-heading"><%= t("admin.judge_solves.index.outcomes_heading") %></h2>
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="outcome-counts-heading">
     <table class="solve-counts outcome-counts">
       <thead>
         <tr>
@@ -44,8 +44,8 @@
     </table>
   </div>
 
-  <h2><%= t("admin.judge_solves.index.reverts_heading") %></h2>
-  <div class="table-scroll">
+  <h2 id="revert-counts-heading"><%= t("admin.judge_solves.index.reverts_heading") %></h2>
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="revert-counts-heading">
     <table class="solve-counts revert-counts">
       <thead>
         <tr>

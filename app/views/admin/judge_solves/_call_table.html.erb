@@ -1,6 +1,6 @@
 <%# Locals: heading, table_class, calls (the rows, uncalled first), count (callable taking source and call). %>
-<h2><%= heading %></h2>
-<div class="table-scroll">
+<h2 id="<%= table_class %>-heading"><%= heading %></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-labelledby="<%= table_class %>-heading">
   <table class="solve-counts <%= table_class %>">
     <thead>
       <tr>

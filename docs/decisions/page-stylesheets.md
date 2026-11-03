@@ -42,7 +42,9 @@ their shared `authenticators/_styles` partial became
 `components/authenticator.css`. The admin judge solves and suggested
 concepts pages link `components/table_scroll.css`, whose `.table-scroll` box
 lets each table scroll sideways on a phone rather than widen the page
-(#574). It is a component sheet rather than a layout rule because only those
+(#574). Each box is a focusable region named by its table's heading, since
+the judge solves tables hold nothing else a keyboard could reach their
+hidden columns through. It is a component sheet rather than a layout rule because only those
 two pages use it, so the pages everyone else loads don't carry it.
 `spec/views/page_stylesheets_spec.rb` holds `components/` to exactly the
 names views pass to `component_stylesheet`.
