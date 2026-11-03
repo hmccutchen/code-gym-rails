@@ -667,7 +667,7 @@ class ModelComparison
     line   = "estimate, at about #{APPROX_CHARS_PER_TOKEN} characters a token and #{ReviewStability::MEAN_OUTPUT_TOKENS} output tokens a call, " \
              "with each day's context cached after its first call: #{tokens[:input]} in / #{tokens[:cache_write]} cache write / " \
              "#{tokens[:cache_read]} cache read / #{calls * ReviewStability::MEAN_OUTPUT_TOKENS} out"
-    return "#{line} · unpriced (#{service.class.superclass.name} has no price list)" unless service.class.prices_usage?
+    return "#{line} · unpriced (#{service.class.ancestors.find(&:name)} has no price list)" unless service.class.prices_usage?
 
     cap   = CallProfiles.fetch("review_response")[:max_tokens] || service.class::MAX_TOKENS
     worst = estimated_cost(route, input: tokens[:input] + tokens[:cache_write] + tokens[:cache_read], output: calls * cap)

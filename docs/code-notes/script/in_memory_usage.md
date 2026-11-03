@@ -17,6 +17,10 @@ other overrides (a pinned route, a read timeout, the prose judge turned off).
   each call's cost and its spend cap.
 - **Threads:** appends go through a lock, since `ModelComparison` grades on
   several threads.
-- **Suggested concepts:** every script records none. A run is a measurement,
-  and `KeySampleDrafts` runs inside a read-only transaction where a write
-  would fail.
+- **Suggested concepts:** every script records none, since a run is a
+  measurement. Today only a full draft (`ExerciseDraft.finish`) records one;
+  `KeySampleDrafts` and the calibration draft through `retry_section`, which
+  doesn't, so the stub changes nothing for them yet.
+- **The guard's shape:** it compares parameter kinds plus keyword names, so a
+  renamed `purpose:` fails it. Positional names aren't compared, since the
+  override marks the unused user `_user`.

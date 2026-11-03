@@ -1,4 +1,4 @@
-# Reasoning: docs/code-notes/script/in_memory_usage.md
+# Design notes: docs/code-notes/script/in_memory_usage.md
 module InMemoryUsage
   def self.provider(base, usage, &row)
     lock = Mutex.new

@@ -38,9 +38,9 @@ RSpec.describe InMemoryUsage do
   end
 
   it "takes the same parameters as AiService#log_usage, so a signature change fails here rather than in a billed run" do
-    provider = described_class.provider(ClaudeService, usage)
+    shape = ->(method) { method.parameters.map { |kind, name| kind.to_s.start_with?("key") ? [ kind, name ] : kind } }
 
-    expect(provider.instance_method(:log_usage).parameters.map(&:first))
-      .to eq(AiService.instance_method(:log_usage).parameters.map(&:first))
+    expect(shape.call(described_class.provider(ClaudeService, usage).instance_method(:log_usage)))
+      .to eq(shape.call(AiService.instance_method(:log_usage)))
   end
 end

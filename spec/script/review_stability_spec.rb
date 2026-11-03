@@ -52,6 +52,14 @@ RSpec.describe ReviewStability do
     expect(out.string).to match(/cache read .* · \$\d+\.\d{2}\nworst case, .* \$\d+\.\d{2}/)
   end
 
+  it "names the provider whose model has no price list when it plans an unpriced run" do
+    export_days({ Date.new(2026, 10, 20) => %w[code_review] })
+
+    comparison.review_stability(export_path, runs: 2, provider: "gemini")
+
+    expect(out.string).to include("unpriced (GeminiService has no price list)")
+  end
+
   it "grades every section the asked number of times on the production review route and reports how the ratings moved" do
     export_days({ Date.new(2026, 10, 20) => %w[code_review challenge] })
     replies.concat(%w[solid developing solid] + %w[strong strong beginner])

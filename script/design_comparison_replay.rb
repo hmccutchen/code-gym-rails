@@ -1,3 +1,4 @@
+require_relative "in_memory_usage"
 require_relative "model_comparison"
 
 # Prints counts and ids only, never a solve, a key or section text, so its output can be pasted anywhere.
