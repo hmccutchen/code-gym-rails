@@ -39,15 +39,19 @@ of the page's own sheet, so the page's rules win their ties with a shared
 component's. `ApplicationHelper#linked_stylesheets` gives that list. The
 authenticator setup, sign-in-again and recovery codes pages were the first:
 their shared `authenticators/_styles` partial became
-`components/authenticator.css`.
+`components/authenticator.css`. The admin judge solves and suggested
+concepts pages link `components/table_scroll.css`, whose `.table-scroll` box
+lets each table scroll sideways on a phone rather than widen the page
+(#574). It is a component sheet rather than a layout rule because only those
+two pages use it, so the pages everyone else loads don't carry it.
+`spec/views/page_stylesheets_spec.rb` holds `components/` to exactly the
+names views pass to `component_stylesheet`.
 
 ## What stays shared
 
 A rule stays in the layout, or in `phone_cards.css`, when more than one page
 uses its class: the featured card (Today and Learn), `.history-pill` (History
-and Today's submitted day), `.learn-intro` (Progress and Learn),
-`.table-scroll` (the admin judge solves and suggested concepts pages, whose
-tables scroll sideways in it on a phone rather than widening the page, #574), the
+and Today's submitted day), `.learn-intro` (Progress and Learn), the
 disclosure chevron rule, and the Learn concept and lesson pages' rules, which
 aren't part of the page layout work. A partial's styles go in the sheet of
 the page it renders on, or, when it renders on several pages, in a small

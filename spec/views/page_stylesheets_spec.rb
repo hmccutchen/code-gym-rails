@@ -35,6 +35,14 @@ RSpec.describe "page stylesheets" do
     selector.split(/\s*[ >+~]\s*/).last.match?(/\.learn-(bucket|group-block|entry)\b/)
   end
 
+  it "has a component sheet for each name a view passes to component_stylesheet, and no other" do
+    named = Rails.root.glob("app/views/**/*.erb").flat_map { |path| path.read.scan(/component_stylesheet[ (]+["'](\w+)["']/).flatten }.uniq
+    sheets = Rails.root.glob("app/assets/stylesheets/components/*.css").map { |path| path.basename(".css").to_s }
+
+    expect(sheets).to match_array(named)
+    expect(named).to include("authenticator", "table_scroll")
+  end
+
   it "has a sheet for each page, and no other" do
     sheets = Rails.root.glob("app/assets/stylesheets/pages/*.css").map { |path| path.basename(".css").to_s }
 
