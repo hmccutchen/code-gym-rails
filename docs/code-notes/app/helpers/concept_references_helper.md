@@ -2,6 +2,10 @@
 
 ## `#concept_reference_for`
 
+Its second argument is a bucket from `ConceptBucket.for`, which is what a
+`ConceptReference` row's `language` column holds, so `architecture` and the
+other non-language buckets look up the same way as a language (#593).
+
 The memo is a plain hash on the view instance, so it lives exactly as long as
 one render and cannot carry a row between requests or between users. The only
 writer of a `ConceptReference` is `GenerateConceptReferenceJob`, which every
