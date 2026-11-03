@@ -15,12 +15,14 @@ other overrides (a pinned route, a read timeout, the prose judge turned off).
   (`InMemoryUsage.tokens`). A block builds a script's own row and runs on the
   service, so it can read the service's state, as `KeySampleDrafts` does for
   each call's cost and its spend cap.
-- **Threads:** appends go through a lock, since `ModelComparison` grades on
-  several threads.
+- **Threads:** appends go through a lock, since
+  `ConceptReferenceCalibration`'s concurrent mode calls the provider from
+  several threads at once. The other three scripts call it from one thread.
 - **Suggested concepts:** every script records none, since a run is a
-  measurement. Today only a full draft (`ExerciseDraft.finish`) records one;
-  `KeySampleDrafts` and the calibration draft through `retry_section`, which
-  doesn't, so the stub changes nothing for them yet.
+  measurement. Today only a full draft (`ExerciseDraft.finish`) records one.
+  `KeySampleDrafts` drafts through `retry_section`, and the calibration only
+  calls `generate_concept_reference`; neither records one, so the stub
+  changes nothing for them yet.
 - **The guard's shape:** it compares parameter kinds plus keyword names, so a
   renamed `purpose:` fails it. Positional names aren't compared, since the
   override marks the unused user `_user`.
