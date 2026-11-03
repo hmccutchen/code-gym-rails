@@ -15,9 +15,13 @@ other overrides (a pinned route, a read timeout, the prose judge turned off).
   (`InMemoryUsage.tokens`). A block builds a script's own row and runs on the
   service, so it can read the service's state, as `KeySampleDrafts` does for
   each call's cost and its spend cap.
-- **Threads:** appends go through a lock, since
-  `ConceptReferenceCalibration`'s concurrent mode calls the provider from
-  several threads at once. The other three scripts call it from one thread.
+- **Threads:** one generated subclass shares one `usage` array across all
+  its instances, so appends go through a lock. The app can call those
+  instances from several threads at once: a judged draft, such as
+  `ModelComparison`'s generate comparison, judges each section on its own
+  thread (`JudgedGeneration`), each with a fresh provider instance. Scripts
+  that run their own threads, like `ConceptReferenceCalibration`, build a
+  subclass and array per thread, so they don't share one.
 - **Suggested concepts:** every script records none, since a run is a
   measurement. Today only a full draft (`ExerciseDraft.finish`) records one.
   `KeySampleDrafts` drafts through `retry_section`, and the calibration only
