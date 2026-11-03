@@ -189,6 +189,9 @@ What each listed file does.
 - `app/assets/stylesheets/desktop.css` — the shared layout at 900px and wider: the wide container and the nav's cap. Every rule sits inside one `@media (min-width: 900px)` block (`docs/decisions/desktop-layout.md`)
 - `app/assets/stylesheets/pages/history.css`, `progress.css`, `learn.css`, `account.css`, `settings.css`, `today.css` — each page's own styles, phone rules first and any 900px rules last, linked only on that page by `page_stylesheet` (`docs/decisions/page-stylesheets.md`)
 - `app/assets/stylesheets/components/authenticator.css` — the authenticator setup, sign-in-again and recovery codes pages' shared styles, linked by `component_stylesheet "authenticator"` on each
+- `app/assets/stylesheets/components/form_field.css` — the field, label and text-input rules every page with a `.form-field` shares, apart from Settings; linked before the page group's own component sheet
+- `app/assets/stylesheets/components/login.css` — the sign-in, enter-code and second-factor pages' shared styles
+- `app/assets/stylesheets/components/trial.css` — the trial start and trial pages' shared styles
 - `app/assets/stylesheets/components/table_scroll.css` — `.table-scroll`, the box each admin table scrolls sideways in on a phone, linked by `component_stylesheet "table_scroll"` on the judge solves and suggested concepts pages
 - `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility

@@ -1,0 +1,6 @@
+.login-wrap { max-width: 400px; margin: 6rem auto; text-align: center; }
+.login-wrap h1 { font-size: 1.8rem; margin-bottom: .5rem; }
+.login-wrap p  { color: var(--muted); margin-bottom: 2rem; }
+.form-field { text-align: left; }
+.form-field input:not([type="checkbox"], [type="radio"], [type="range"]):focus { border-color: var(--accent); }
+.pending-divider { border-top: 1px solid var(--border); padding-top: 1.25rem; font-size: .85rem; }
