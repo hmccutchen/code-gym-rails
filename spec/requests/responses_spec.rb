@@ -1425,7 +1425,7 @@ RSpec.describe "Responses", type: :request do
     end
 
     it "accepts a submitted answer, rating, and completes review through history" do
-      exercise = create_security_review_exercise
+      create_security_review_exercise
 
       post responses_path,
         params: { response: {

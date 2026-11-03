@@ -13,6 +13,10 @@ paths:
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at, dropped_sections (jsonb), plan_notes (jsonb, default {}: what the plan did — `daily_kinds`, `size`, `coverage`, `shared_concept`) |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), review_provider (which provider wrote the review), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
+| `ConceptMastery` | user_id, concept, language, tier (standard/reduced/paused), streak, last_rating, mastered_at, retention_interval_days, next_retention_check_on, drilled_at, drill_group, cooldown_remaining — one user's standing on one concept; moved only by `ConceptMastery.record_review!` |
+| `ReviewFollowUp` | daily_response_id, section, role (user/assistant), content — one message of a follow-up conversation under a review; kept through `User#anonymize!` |
+| `RecognitionGuide` | group_key (unique per concept group), questions, contrast, misfires — a shared guide that teaches a way of looking, written once for every teammate |
+| `SuggestedConcept` | language, normalized_name, display_name, occurrences, first_seen_at, last_seen_at, status (pending/promoted/dismissed), reviewed_by_id, reviewed_at — a concept tag the provider invented, held for an admin and never added to a vocabulary on its own |
 | `InviteCode`    | code_digest (SHA-256 of the raw code, unique), label, seats, redeemed_count, expires_at, trial_days, daily_request_cap |
 | `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
 | `FeaturedConcept` | user_id, week_of (the Monday, in the user's zone), bucket, concept — unique on user_id and week_of; one row per week a user had a concept to feature |

@@ -188,12 +188,11 @@ interpretation.
 and adds three house cops in `lib/rubocop/cop/code_gym/`, the comment rules
 above (`SingleLineComment`, `AttachedComment`, `CommentLimit`). Where omakase
 has an opinion, that opinion wins — don't argue formatting in review.
-Two things it deliberately does *not* cover, so neither is machine-checkable
-here: `Metrics` and `Naming` are disabled outright
-(no method-length, class-length, ABC, or complexity cop runs, and no naming cop
-at all), and `Lint` is off except for three re-enabled cops.
-`Lint/UselessAssignment` is not among them, so dead locals left behind by an
-extraction are a known blind spot — grep for them yourself.
+Omakase leaves `Naming` and most of `Lint` and `Metrics` off, so `.rubocop.yml`
+turns on the ones this project's rules need: `Lint/UselessAssignment` and
+`Lint/UnusedBlockArgument` (dead locals left by an extraction), and
+`Metrics/MethodLength`, `ClassLength` and `ModuleLength` for `app/`. No naming
+or complexity cop runs.
 
 **Rails-native concerns follow Rails Guides conventions.** Validations,
 callbacks, migrations, strong params, routing, and Active Record query
@@ -254,13 +253,19 @@ rather than only catching it afterward:
   - No model names `AiService` or a provider class; `.claude/rules/patterns.md`
     ("Domain data stays off provider classes") says which one may
     (`app_source_spec`).
-- New methods stay under 25 lines (excluding heredoc bodies), new `app/` files
-  under 300 — or the PR says why not. Nothing enforces this mechanically;
-  `Metrics` is disabled.
+- Methods stay under 25 lines and classes and modules under 300, with a
+  heredoc counting as one line. RuboCop enforces it in `app/`. The files that
+  already exceed it are listed in `.rubocop_todo.yml`; a new one needs a
+  `rubocop:disable` with the PR saying why, and a fixed one leaves the list.
 
 **What CI does and doesn't tell you.** The workflow runs RSpec, system specs,
-RuboCop, `bin/comment-check`, `archspec check`, Brakeman, and `importmap audit`. It does *not* run a Ruby dependency
-CVE audit (`bundle-audit` is not installed) or any complexity check, and this
+RuboCop, `bin/comment-check`, `archspec check`, Brakeman, and `importmap audit`. The convention specs in
+`spec/conventions/` also fail on a path an instruction doc names that no longer
+exists, a table missing from `.claude/rules/models.md`, a CI job off
+`ubuntu-24.04`, Faraday outside `app/clients`, and a `fetch` outside
+`request.js`. It does *not* run a Ruby dependency
+CVE audit (`bundle-audit` is not installed) or any complexity check beyond
+length, and this
 repository has no branch protection — so no check gates a merge. The local
 hooks (`lefthook.yml`) run the same checks, except the system specs, before a
 push, but anyone can skip them. CI is

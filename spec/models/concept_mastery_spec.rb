@@ -126,7 +126,7 @@ RSpec.describe ConceptMastery, type: :model do
     end
 
     it "doubles the interval when the scheduled check was due" do
-      cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
+      user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
         retention_interval_days: 7, next_retention_check_on: Date.current - 1)
       cm = review!(concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong")
       expect(cm.retention_interval_days).to eq(14)
@@ -134,7 +134,7 @@ RSpec.describe ConceptMastery, type: :model do
     end
 
     it "re-anchors the date without growing the interval when the check was not due" do
-      cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
+      user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
         retention_interval_days: 7, next_retention_check_on: Date.current + 5)
       cm = review!(concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong")
       expect(cm.retention_interval_days).to eq(7)
@@ -142,7 +142,7 @@ RSpec.describe ConceptMastery, type: :model do
     end
 
     it "caps the interval at 60 days" do
-      cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
+      user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
         retention_interval_days: 56, next_retention_check_on: Date.current - 1)
       cm = review!(concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong")
       expect(cm.retention_interval_days).to eq(60)
@@ -150,7 +150,7 @@ RSpec.describe ConceptMastery, type: :model do
 
     it "clears the schedule on a non-mastered evaluation and leaves mastered_at intact" do
       mastered_time = 1.day.ago
-      cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
+      user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
         mastered_at: mastered_time, retention_interval_days: 7, next_retention_check_on: Date.current + 7)
       cm = review!(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing")
       expect(cm.next_retention_check_on).to be_nil

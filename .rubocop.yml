@@ -1,6 +1,8 @@
 # Omakase Ruby styling for Rails
 inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 
+inherit_from: .rubocop_todo.yml
+
 inherit_mode:
   merge:
     - Exclude
@@ -23,3 +25,30 @@ CodeGym/AttachedComment:
 CodeGym/CommentLimit:
   Enabled: true
   Max: 5
+
+Lint/UselessAssignment:
+  Enabled: true
+
+Lint/UnusedBlockArgument:
+  Enabled: true
+
+Metrics/MethodLength:
+  Enabled: true
+  Max: 25
+  CountAsOne: [ heredoc ]
+  Include:
+    - "app/**/*.rb"
+
+Metrics/ClassLength:
+  Enabled: true
+  Max: 300
+  CountAsOne: [ heredoc ]
+  Include:
+    - "app/**/*.rb"
+
+Metrics/ModuleLength:
+  Enabled: true
+  Max: 300
+  CountAsOne: [ heredoc ]
+  Include:
+    - "app/**/*.rb"
