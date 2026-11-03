@@ -1,12 +1,12 @@
 module ConceptReferencesHelper
   # Nil when no reference exists yet, which renders no dropdown; generation stays in GenerateConceptReferenceJob.
-  def concept_reference_for(concept, language)
+  def concept_reference_for(concept, bucket)
     return nil if concept.blank?
 
     # Memoized per request: one page repeats a concept across its sections and days.
     @concept_references ||= {}
-    @concept_references.fetch([ concept, language ]) do |key|
-      @concept_references[key] = ConceptReference.find_by(concept: concept, language: language)
+    @concept_references.fetch([ concept, bucket ]) do |key|
+      @concept_references[key] = ConceptReference.find_by(concept: concept, language: bucket)
     end
   end
 
