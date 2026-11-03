@@ -29,9 +29,25 @@ as a view's `<style>` did. Before `display` and `display_light`, because those
 are the user's display preferences and load last on purpose. Their overrides
 of page rules (the light palette's field border and rung colours) already
 outweigh them, so the order is a margin, not what makes them win. One sheet
-per page: a second call replaces the first, so a component sheet shared by
-several pages needs the helper to take more than one name when the first
-such partial moves.
+per page: a second call replaces the first.
+
+A component that several pages render keeps its styles in
+`components/<name>.css`, and each of those pages calls
+`component_stylesheet "<name>"` (#569). The layout links every component
+sheet named once, in the order first named, right after `desktop` and ahead
+of the page's own sheet, so the page's rules win their ties with a shared
+component's. `ApplicationHelper#linked_stylesheets` gives that list. The
+authenticator setup, sign-in-again and recovery codes pages were the first:
+their shared `authenticators/_styles` partial became
+`components/authenticator.css`. The admin judge solves and suggested
+concepts pages link `components/table_scroll.css`, whose `.table-scroll` box
+lets each table scroll sideways on a phone rather than widen the page
+(#574). Each box is a focusable region named by its table's heading, since
+the judge solves tables hold nothing else a keyboard could reach their
+hidden columns through. It is a component sheet rather than a layout rule because only those
+two pages use it, so the pages everyone else loads don't carry it.
+`spec/views/page_stylesheets_spec.rb` holds `components/` to exactly the
+names views pass to `component_stylesheet`.
 
 ## What stays shared
 
@@ -60,5 +76,9 @@ and without push reminders) and Settings (with a key and without, both
 disclosures open) were checked the same way: 10,236 records, no difference.
 Today was checked with a fresh set, a partly answered set, a submitted and
 reviewed day, the weekend, paused and failed states: 16,660 records, no
-difference. On the generating state only the spinner's rotation differed,
+difference. The authenticator sheet moved a `<style>` from the body, after
+the display sheets, to a link before them, which could have changed a tie
+with the light palette. The setup, recovery codes and sign-in-again pages
+were checked at 390 and 1280px in the dark and light themes: 904 records, no
+difference once the test server's port and the random QR code were set aside. On the generating state only the spinner's rotation differed,
 since it was caught at another point in its animation.

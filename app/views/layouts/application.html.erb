@@ -439,7 +439,7 @@
   </style>
   <%= stylesheet_link_tag "phone_cards" %>
   <%= stylesheet_link_tag "desktop" %>
-  <%= stylesheet_link_tag "pages/#{content_for(:page_stylesheet)}" if content_for?(:page_stylesheet) %>
+  <%= safe_join(linked_stylesheets.map { |sheet| stylesheet_link_tag(sheet) }, "\n  ") %>
   <% if display_stylesheets? %>
     <%= stylesheet_link_tag "display" %>
     <%= stylesheet_link_tag "display_light", media: display_preferences.light_palette_media, data: { light_palette_media: true } %>

@@ -166,8 +166,11 @@ plain class too, and `desktop.css` gives `nav .inner` the same 1040px cap at
 
 A view that calls `page_stylesheet` gets one more `<link>`, to
 `pages/<name>.css`, after `desktop` and before the display sheets
-(`docs/decisions/page-stylesheets.md`). On a page that calls nothing, the
-line renders empty.
+(`docs/decisions/page-stylesheets.md`). A view that calls
+`component_stylesheet` gets a `<link>` to `components/<name>.css` in the
+same place, once however many times it is named, and ahead of the page's
+own sheet, so the page's rules win their ties. `linked_stylesheets` gives
+the order. On a page that calls neither, nothing renders there.
 
 ## `nav .inner`
 

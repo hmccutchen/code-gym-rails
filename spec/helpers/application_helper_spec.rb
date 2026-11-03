@@ -21,4 +21,17 @@ RSpec.describe ApplicationHelper, type: :helper do
     helper.page_stylesheet "learn"
     expect(helper.content_for(:page_stylesheet)).to eq("learn")
   end
+
+  it "links no sheet of its own on a page that names none" do
+    expect(helper.linked_stylesheets).to eq([])
+  end
+
+  it "links each component sheet once, in the order first named, ahead of the page's own sheet" do
+    helper.page_stylesheet "account"
+    helper.component_stylesheet "authenticator"
+    helper.component_stylesheet "copy_row"
+    helper.component_stylesheet "authenticator"
+
+    expect(helper.linked_stylesheets).to eq(%w[components/authenticator components/copy_row pages/account])
+  end
 end
