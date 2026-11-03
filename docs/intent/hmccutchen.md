@@ -586,3 +586,7 @@ data.*
   used them in `#663`
   **I decided:** run the export myself and hand over the file, rather than
   open the production database to this session
+- the review baseline export reading its days in batches, newest first,
+  and stopping once every kind is full `#666`
+  **I decided:** batch the read and keep the per-kind sample, rather than
+  close the issue or bring back an overall cap
