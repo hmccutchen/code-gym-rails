@@ -25,11 +25,12 @@ other overrides (a pinned route, a read timeout, the prose judge turned off).
   judging runs a thread per section.
 - **Suggested concepts:** every script records none, since a run is a
   measurement. Today only a full draft (`ExerciseDraft.finish`) records one.
-  `GeminiCapacityProbe` drafts a full exercise each tester-day, so before
-  #661 a probe run could add its drafts' suggestions to the team's
-  `SuggestedConcept` list; the stub is what stops that now. `KeySampleDrafts`
+  `GeminiCapacityProbe` drafts through `AiService#draft_exercise`, which
+  returns from `ExerciseDraft.call` before `finish`, `KeySampleDrafts`
   drafts through `retry_section`, and the calibration only calls
-  `generate_concept_reference`; neither records one.
+  `generate_concept_reference`. None of them records one, so the stub
+  changes nothing for them yet; it covers a script that later finishes a
+  draft.
 - **The guard's shape:** it compares parameter kinds plus keyword names, so a
   renamed `purpose:` fails it. Positional names aren't compared, since the
   override marks the unused user `_user`.
