@@ -211,4 +211,26 @@ RSpec.describe Glossary do
       expect(Glossary::TERMS["throttling"]).to match(/interval/).and match(/CPU|processor/)
     end
   end
+
+  describe "entries widened by the sense listing over production text (#578)" do
+    it "defines transaction for a database and for a payment" do
+      expect(Glossary::TERMS["transaction"]).to match(/roll back/).and match(/payment/)
+    end
+
+    it "defines promise for JavaScript and as a guarantee" do
+      expect(Glossary::TERMS["promise"]).to match(/JavaScript/).and match(/guarantee/)
+    end
+
+    it "defines rollback for a migration, a transaction and a side effect" do
+      expect(Glossary::TERMS["rollback"]).to match(/migration/).and match(/transaction/).and match(/side effect/)
+    end
+
+    it "defines invariant as a condition and as a value a loop can compute once before it starts" do
+      expect(Glossary::TERMS["invariant"]).to match(/condition/).and match(/once, before the loop/)
+    end
+
+    it "defines ref for React and as a Rails column holding another record's id" do
+      expect(Glossary::TERMS["ref"]).to match(/useRef/).and match(/record's id/)
+    end
+  end
 end
