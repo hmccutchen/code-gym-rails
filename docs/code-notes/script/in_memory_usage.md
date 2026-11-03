@@ -16,12 +16,13 @@ other overrides (a pinned route, a read timeout, the prose judge turned off).
   service, so it can read the service's state, as `KeySampleDrafts` does for
   each call's cost and its spend cap.
 - **Threads:** one generated subclass shares one `usage` array across all
-  its instances, so appends go through a lock. The app can call those
-  instances from several threads at once: a judged draft, such as
-  `ModelComparison`'s generate comparison, judges each section on its own
-  thread (`JudgedGeneration`), each with a fresh provider instance. Scripts
-  that run their own threads, like `ConceptReferenceCalibration`, build a
-  subclass and array per thread, so they don't share one.
+  its instances, so appends go through a lock. No current script calls a
+  subclass's instances from more than one thread:
+  `ConceptReferenceCalibration` builds a subclass and array per thread, and
+  the others call the provider from one thread. The lock is a safeguard
+  carried over from `ModelComparison`'s own copy, for a caller that would,
+  such as one going through `AiService#generate_judged_exercise`, whose
+  judging runs a thread per section.
 - **Suggested concepts:** every script records none, since a run is a
   measurement. Today only a full draft (`ExerciseDraft.finish`) records one.
   `KeySampleDrafts` drafts through `retry_section`, and the calibration only
