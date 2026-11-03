@@ -45,12 +45,22 @@ RSpec.describe "Conventions held over the repository's own files" do
     expect(runners.reject { |_job, runner| runner == "ubuntu-24.04" }).to be_empty
   end
 
+  def table_documented?(rows, table)
+    rows.any? { |row| row.start_with?("| `#{table.classify}`") || row.match?(/\A\| `\w+` \| table `#{table}`:/) }
+  end
+
+  it "counts a table as documented by its model's row or a table alias in that row's own position, not a passing mention" do
+    rows = [ "| `DailyKindSwapEvent` | table `daily_kind_swaps`: user_id |", "| `User` | see also table `invite_codes` for the other side |" ]
+
+    expect(table_documented?(rows, "daily_kind_swaps")).to be(true)
+    expect(table_documented?(rows, "users")).to be(true)
+    expect(table_documented?(rows, "invite_codes")).to be(false)
+  end
+
   it "lists every table in the models rule's table, so a new model is documented where its rule loads" do
     rows = File.readlines(Rails.root.join(".claude/rules/models.md")).select { |line| line.start_with?("| `") }
     tables = ActiveRecord::Base.connection.tables - %w[schema_migrations ar_internal_metadata]
-    undocumented = tables.reject do |table|
-      table.start_with?("solid_") || rows.any? { |row| row.start_with?("| `#{table.classify}`") || row.include?("table `#{table}`") }
-    end
+    undocumented = tables.reject { |table| table.start_with?("solid_") || table_documented?(rows, table) }
 
     expect(undocumented).to be_empty, "tables with no row in .claude/rules/models.md: #{undocumented.join(', ')}"
   end

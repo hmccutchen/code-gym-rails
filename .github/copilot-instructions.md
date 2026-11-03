@@ -115,14 +115,11 @@ constant to make it pass must say in the PR description what that costs per
 generation.
 
 **Does any new class or method exceed the size threshold?** RuboCop
-(`Metrics/MethodLength`, `ClassLength`, `ModuleLength`, heredocs counted as
-one line) fails a method over **25 lines** or a class or module over **300**
-in `app/`. A `rubocop:disable` or a new `.rubocop_todo.yml` entry needs the
-reason in the PR description. These numbers are drawn from
-this repo: across 282 methods in `app/`, the 95th percentile is 31 lines and 20
-methods exceed 25.
+(`Metrics/MethodLength`, `ClassLength`, `ModuleLength`) holds the limits set
+in `.rubocop.yml` for `app/`. An exemption, whether a `rubocop:disable` or a
+`.rubocop_todo.yml` entry, needs the reason in the PR description.
 
-One caveat: several existing files exceed these numbers and sit in
+One caveat: several existing files exceed these limits and sit in
 `.rubocop_todo.yml`, most visibly `app/clients/ai_service.rb`, which
 was 1303 lines with a 156-line `build_exercise_prompt` when these figures were
 taken; that template is now `GenerationPrompt#render`, still mostly heredocs of
@@ -222,7 +219,7 @@ are the standing exceptions).
 in `ai_service.rb`, the prompt classes it calls (`app/prompts/*_prompt.rb`)
 and `ProviderError`; subclasses own only provider-specific HTTP and auth. A controller building its own Faraday
 request is a violation, and `spec/conventions/app_source_spec.rb` fails on
-Faraday anywhere outside `app/clients`.
+Faraday anywhere in `app/` outside `app/clients`.
 
 **Can a concept tag bypass normalization against the closed vocabulary?**
 BLOCKING. `RAILS_CONCEPTS`, `JS_CONCEPTS`, and the rest are deliberately closed

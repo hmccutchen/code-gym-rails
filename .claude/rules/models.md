@@ -13,7 +13,7 @@ paths:
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at, dropped_sections (jsonb), plan_notes (jsonb, default {}: what the plan did — `daily_kinds`, `size`, `coverage`, `shared_concept`) |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), review_provider (which provider wrote the review), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
-| `ConceptMastery` | user_id, concept, language, tier (standard/reduced/paused), streak, last_rating, mastered_at, retention_interval_days, next_retention_check_on, drilled_at, drill_group, cooldown_remaining — one user's standing on one concept; moved only by `ConceptMastery.record_review!` |
+| `ConceptMastery` | user_id, concept, language, tier (standard/reduced/paused), streak, last_rating, mastered_at, retention_interval_days, next_retention_check_on, drilled_at, drill_group, cooldown_remaining — one user's standing on one concept; tier, streak and mastery move through `ConceptMastery.record_review!`; `ConceptDrills` also sets the drill fields and ends a pause |
 | `ReviewFollowUp` | daily_response_id, section, role (user/assistant), content — one message of a follow-up conversation under a review; kept through `User#anonymize!` |
 | `RecognitionGuide` | group_key (unique per concept group), questions, contrast, misfires — a shared guide that teaches a way of looking, written once for every teammate |
 | `SuggestedConcept` | language, normalized_name, display_name, occurrences, first_seen_at, last_seen_at, status (pending/promoted/dismissed), reviewed_by_id, reviewed_at — a concept tag the provider invented, held for an admin and never added to a vocabulary on its own |
@@ -26,8 +26,8 @@ paths:
 | `ConceptReference` | concept, language (unique together), tagline, explanation, code_example, senior_lens, guide_plain_language, guide_worked_example, guide_pitfalls, ladder_junior, ladder_mid_level, ladder_senior, ladder_principal_engineer, lesson, generation_version — one shared reference per concept for every teammate, with no user_id; `.claude/rules/learn.md` owns its rules |
 | `JudgeSolve` | one row per blind judge pass on a design comparison: user_id, daily_exercise_id, set_generated_at (all null only for synthetic), source (live/replay/synthetic), section, attempt, edit_check, shipped, never_shown_reason (replaced_by_retry/section_dropped, live unshipped rows only), edit_reverted, revert_reason, rung, locked, concept, judge_status, judge_pick, key_better, matched (null = unsolved), unsolved_reason, unsolved_detail, judged_section (jsonb, with its answer_key), section_digest, judge_provider, judge_model, draft_model, app_revision, human_call (checked against matched), human_note, human_called_at. Every page reads content through `JudgeSolve.readable` (hidden unless proven: synthetic, a never_shown_reason, or that row's own section reviewed on the set it belongs to); `docs/decisions/design-comparison-the-second-fixed-section.md` |
 
-`ConceptReference` (not listed above — it has no `user_id`; see
-`.claude/rules/learn.md`) now also carries `guide_plain_language`, `guide_worked_example`,
+`ConceptReference` (it has no `user_id`; see
+`.claude/rules/learn.md`) also carries `guide_plain_language`, `guide_worked_example`,
 `guide_pitfalls` (all nullable text). `ConceptReference#guide?` — all three
 guide fields present — is the single authority for "does this row carry a
 guide". It also
