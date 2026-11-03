@@ -43,6 +43,13 @@ RSpec.describe "page stylesheets" do
     expect(named).to include("authenticator", "table_scroll")
   end
 
+  it "leaves the same input types out of the field rule as the light palette's field border, and the login focus rule" do
+    excluded = ->(path) { File.read(Rails.root.join("app/assets/stylesheets", path))[/\.form-field input(:not\([^)]*\))/, 1] }
+
+    expect(excluded.call("components/form_field.css")).to eq(excluded.call("display_light.css"))
+    expect(excluded.call("components/login.css")).to eq(excluded.call("display_light.css"))
+  end
+
   it "has a sheet for each page, and no other" do
     sheets = Rails.root.glob("app/assets/stylesheets/pages/*.css").map { |path| path.basename(".css").to_s }
 

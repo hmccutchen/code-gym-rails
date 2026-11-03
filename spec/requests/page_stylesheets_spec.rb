@@ -44,14 +44,14 @@ RSpec.describe "Page stylesheets", type: :request do
       expect_component_sheets("form_field", "authenticator")
     end
 
-    it "links them on the sign-in-again page" do
+    it "links its own sheet alone on the sign-in-again page, which has no field" do
       allow(User).to receive(:signed_in_recently?).and_return(false)
       get account_authenticator_path
       expect(response.body).to include(I18n.t("authenticators.sign_in_again.heading"))
       expect_authenticator_sheet_alone
     end
 
-    it "links them on the new recovery codes page" do
+    it "links its own sheet alone on the new recovery codes page, which has no field" do
       secret, = enroll_second_factor(user)
       post login_path, params: { email: user.email }
       post verify_login_code_path, params: { code: user.generate_login_code! }

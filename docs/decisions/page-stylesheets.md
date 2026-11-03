@@ -44,12 +44,16 @@ pages followed with `components/login.css`, and the two trial pages with
 `components/trial.css` (#669). Those three groups and the authenticator setup
 page had each copied the same field, label and text-input rules, so those
 live once in `components/form_field.css`, named first on each page that
-holds a `.form-field`. Its input rule leaves out checkboxes, radios and
-ranges, as the light palette's field-border rule does, because the trial
-form's provider radios sit inside a `.form-field` fieldset. Settings keeps
-its own field rules in `pages/settings.css`: they also style
-`.settings-fields`, set a monospace font and size checkboxes, so they are a
-different rule rather than a copy. The admin judge solves and suggested
+holds a `.form-field`, and `app_views_spec` fails on a page that shows one
+without linking it, a partial's callers included. Its input rule leaves out
+checkboxes, radios and ranges, because the trial form's provider radios sit
+inside a `.form-field` fieldset. The light palette's field-border rule and
+the login sheet's focus rule leave out the same three, and
+`spec/views/page_stylesheets_spec.rb` holds the three lists equal. Settings
+keeps its own field rules in `pages/settings.css` and links no field sheet:
+its label and input rules also style `.settings-fields`, set a monospace
+font and size checkboxes. Only its one-line `.form-field` spacing rule
+matches the shared sheet's word for word. The admin judge solves and suggested
 concepts pages link `components/table_scroll.css`, whose `.table-scroll` box
 lets each table scroll sideways on a phone rather than widen the page
 (#574). Each box is a focusable region named by its table's heading, since

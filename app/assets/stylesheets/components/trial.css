@@ -1,7 +1,6 @@
 .trial-wrap { max-width: 520px; margin: 3rem auto; }
 .trial-wrap h1 { font-size: 1.6rem; margin-bottom: .75rem; }
 .trial-wrap p { color: var(--muted); margin-bottom: 1rem; }
-.form-field legend { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
 .trial-providers { border: 0; padding: 0; }
 .trial-provider { display: flex; gap: .5rem; align-items: center; color: var(--text); }
 .data-notice { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem; }
