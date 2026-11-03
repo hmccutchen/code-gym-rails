@@ -80,9 +80,13 @@ RSpec.describe "Conventions held over the repository's own files" do
     expect(undocumented).to be_empty, "tables with no row in .claude/rules/models.md: #{undocumented.join(', ')}"
   end
 
-  def file_map_tokens = @file_map_tokens ||= File.read(Rails.root.join("docs/file-map.md")).scan(/`([^`\s]+)`/).flatten.to_set
+  def entry_tokens(text)
+    text.lines.select { |line| line.start_with?("- `") }.flat_map { |line| line.split(" — ", 2).first.scan(/`([^`\s]+)`/).flatten }.to_set
+  end
 
-  def mapped?(path) = file_map_tokens.any? { |token| path == token || path.end_with?("/#{token}") }
+  def file_map_tokens = @file_map_tokens ||= entry_tokens(File.read(Rails.root.join("docs/file-map.md")))
+
+  def mapped?(path, tokens = file_map_tokens) = tokens.any? { |token| path == token || path.end_with?("/#{token}") }
 
   def mappable_files
     tracked = `git -C #{Rails.root} ls-files app lib bin script config`.split("\n")
@@ -93,6 +97,14 @@ RSpec.describe "Conventions held over the repository's own files" do
     unlisted = mappable_files.reject { |path| mapped?(path) }
 
     expect(unlisted).to be_empty, "files with no entry in docs/file-map.md:\n#{unlisted.join("\n")}"
+  end
+
+  it "takes a file's tokens from the file list that opens an entry, not from a name its description mentions" do
+    map = "- `app/javascript/controllers/application.js` — starts Stimulus; `index.js` loads the rest.\n- `a.rb` (+ `b/c.rb`) — grouped.\n"
+    tokens = entry_tokens(map)
+
+    expect(mapped?("app/javascript/controllers/index.js", tokens)).to be(false)
+    expect(mapped?("app/x/b/c.rb", tokens)).to be(true)
   end
 
   it "reads a file as listed by its full path or by its path below a shared folder, and an unknown file as unlisted" do
