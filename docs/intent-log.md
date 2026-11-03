@@ -584,3 +584,7 @@ data.*
 - two refactors from earlier reviews, one usage-logging class for the billed
   scripts and one rule for bounding provider text `#660`
   **I decided:** start on both issues now, in one PR
+- the `concept_reference_for` parameter renamed to `bucket`, and an export
+  of review and exercise text for the glossary sense check `#662`
+  **I decided:** ship the export now and run it on production after it
+  deploys, rather than open a public endpoint on the production database
