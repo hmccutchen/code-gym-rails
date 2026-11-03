@@ -1,4 +1,5 @@
 require "optparse"
+require_relative "in_memory_usage"
 
 # Design notes: docs/code-notes/script/gemini_capacity_probe.md
 class GeminiCapacityProbe
@@ -318,8 +319,7 @@ class GeminiCapacityProbe
   def service
     log     = @attempts
     adapter = @adapter
-    @service ||= Class.new(GeminiService) do
-      define_method(:log_usage) { |_user, _result, purpose:| }
+    @service ||= Class.new(InMemoryUsage.provider(GeminiService, [])) do
       define_method(:build_connection) do
         Faraday.new do |f|
           f.options.open_timeout      = CallProfiles::OPEN_TIMEOUT
@@ -330,7 +330,7 @@ class GeminiCapacityProbe
           f.adapter(*adapter)
         end
       end
-      private :log_usage, :build_connection
+      private :build_connection
     end.new(@api_key)
   end
 end

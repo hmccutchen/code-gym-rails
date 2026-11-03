@@ -225,6 +225,14 @@ RSpec.describe GeminiCapacityProbe, type: :model do
     expect([ ApiUsage.count, DailyExercise.count, DailyResponse.count, ConceptReference.count ]).to eq([ 0, 0, 0, 0 ])
   end
 
+  it "builds its service on InMemoryUsage, so its log_usage is held to AiService's signature and it records no suggested concept" do
+    allow(InMemoryUsage).to receive(:provider).and_call_original
+    service = probe.send(:service)
+
+    expect(InMemoryUsage).to have_received(:provider).with(GeminiService, anything)
+    expect { service.send(:record_suggested_concept, Struct.new(:bucket, :name).new("ruby_rails", "probe_concept")) }.not_to change(SuggestedConcept, :count)
+  end
+
   it "records a reply the app could not use and goes on" do
     fake = FakeService.new("fake")
     broken = Faraday::Adapter::Test::Stubs.new do |stub|
