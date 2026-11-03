@@ -29,15 +29,25 @@ as a view's `<style>` did. Before `display` and `display_light`, because those
 are the user's display preferences and load last on purpose. Their overrides
 of page rules (the light palette's field border and rung colours) already
 outweigh them, so the order is a margin, not what makes them win. One sheet
-per page: a second call replaces the first, so a component sheet shared by
-several pages needs the helper to take more than one name when the first
-such partial moves.
+per page: a second call replaces the first.
+
+A component that several pages render keeps its styles in
+`components/<name>.css`, and each of those pages calls
+`component_stylesheet "<name>"` (#569). The layout links every component
+sheet named once, in the order first named, right after `desktop` and ahead
+of the page's own sheet, so the page's rules win their ties with a shared
+component's. `ApplicationHelper#linked_stylesheets` gives that list. The
+authenticator setup, sign-in-again and recovery codes pages were the first:
+their shared `authenticators/_styles` partial became
+`components/authenticator.css`.
 
 ## What stays shared
 
 A rule stays in the layout, or in `phone_cards.css`, when more than one page
 uses its class: the featured card (Today and Learn), `.history-pill` (History
-and Today's submitted day), `.learn-intro` (Progress and Learn), the
+and Today's submitted day), `.learn-intro` (Progress and Learn),
+`.table-scroll` (the admin judge solves and suggested concepts pages, whose
+tables scroll sideways in it on a phone rather than widening the page, #574), the
 disclosure chevron rule, and the Learn concept and lesson pages' rules, which
 aren't part of the page layout work. A partial's styles go in the sheet of
 the page it renders on, or, when it renders on several pages, in a small
@@ -60,5 +70,9 @@ and without push reminders) and Settings (with a key and without, both
 disclosures open) were checked the same way: 10,236 records, no difference.
 Today was checked with a fresh set, a partly answered set, a submitted and
 reviewed day, the weekend, paused and failed states: 16,660 records, no
-difference. On the generating state only the spinner's rotation differed,
+difference. The authenticator sheet moved a `<style>` from the body, after
+the display sheets, to a link before them, which could have changed a tie
+with the light palette. The setup, recovery codes and sign-in-again pages
+were checked at 390 and 1280px in the dark and light themes: 904 records, no
+difference once the test server's port and the random QR code were set aside. On the generating state only the spinner's rotation differed,
 since it was caught at another point in its animation.
