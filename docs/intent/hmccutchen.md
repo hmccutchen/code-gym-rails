@@ -572,3 +572,6 @@ data.*
 - the 8-section judge check from the stored-answer-keys plan, which closed
   the judge token issue
   **I decided:** run it now, with a $3 cap
+- two refactors from earlier reviews, one usage-logging class for the billed
+  scripts and one rule for bounding provider text `#660`
+  **I decided:** start on both issues now, in one PR

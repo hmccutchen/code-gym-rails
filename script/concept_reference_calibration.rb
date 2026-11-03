@@ -1,3 +1,5 @@
+require_relative "in_memory_usage"
+
 # Design notes: docs/code-notes/script/concept_reference_calibration.md
 class ConceptReferenceCalibration
   PROVIDERS = {
@@ -136,17 +138,13 @@ class ConceptReferenceCalibration
   def pinned_service(probe, usage)
     timeout = @timeout
 
-    Class.new(@provider_class) do
+    Class.new(InMemoryUsage.provider(@provider_class, usage)) do
       define_method(:call) do |request|
         request = request.with(read_timeout: timeout) if request.purpose == PURPOSE
         super(request)
       end
       define_method(:build_connection) { super().tap { |conn| conn.builder.use(AttemptCounter, probe) } }
-      define_method(:log_usage) do |_user, result, purpose:|
-        usage << { tokens_in: result[:input_tokens].to_i, tokens_out: result[:output_tokens].to_i }
-      end
-      define_method(:record_suggested_concept) { |_suggestion| }
-      private :call, :build_connection, :log_usage, :record_suggested_concept
+      private :call, :build_connection
     end.new(@api_key)
   end
 

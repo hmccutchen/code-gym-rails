@@ -1,3 +1,4 @@
+require_relative "in_memory_usage"
 require_relative "model_comparison"
 
 # Prints counts and ids only, never a solve, a key or section text, so its output can be pasted anywhere.
@@ -211,14 +212,8 @@ class DesignComparisonReplay
     raise MissingKey, "ANTHROPIC_API_KEY is not set. Calls are billed to it, never to a user's stored key." unless @api_key
 
     usage = @usage
-    Class.new(ClaudeService) do
+    Class.new(InMemoryUsage.provider(ClaudeService, usage)) do
       def self.judges_review_prose? = false
-
-      define_method(:log_usage) do |_user, result, purpose:|
-        usage << { tokens_in: result[:input_tokens].to_i, tokens_out: result[:output_tokens].to_i }
-      end
-      define_method(:record_suggested_concept) { |_suggestion| }
-      private :log_usage, :record_suggested_concept
     end.new(@api_key)
   end
 end

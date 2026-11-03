@@ -19,11 +19,12 @@ key, never cuts it, since a cut field can lose the part grading needs
 (`docs/decisions/stored-answer-keys.md`, "A key past the length limit is
 dropped"). `.text` only strips, so the check sees the provider's full text.
 
-Three older helpers bound provider text the same way:
-`ExerciseSection::DesignComparison`'s `usable_text?`, `AmbiguityHunt`'s
-inline strip and `ExerciseSection.normalize_scaffold`. They stay where they
-are for now, since moving them would change two working kinds inside the PR
-that added keys. hmccutchen/code-gym-rails#597 moves them here.
+`.text` and `.list` are the one rule for trimming and capping provider
+text. Besides the keys, `ExerciseSection.usable_text?` (design comparison's
+pieces and key), `AmbiguityHunt.reject_unusable!`'s planted list and
+`ExerciseSection.normalize_scaffold` call them (#597), each keeping its own
+cap; a scaffold label is still cut at `MAX_SCAFFOLD_LABEL_LENGTH`, unlike a
+key field.
 
 ## The quote match
 

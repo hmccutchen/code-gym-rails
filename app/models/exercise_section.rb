@@ -159,7 +159,7 @@ class ExerciseSection
 
     def shown_lines(code) = code.lines.count { |line| line.strip.present? }
 
-    def usable_text?(value) = value.is_a?(String) && value.strip.present?
+    def usable_text?(value) = !PlantedKey.text(value).nil?
 
     def refuse!(code, message)
       raise ArgumentError, "#{code} is not one of #{name}'s refusal codes" unless refusal_codes.include?(code)
@@ -299,11 +299,7 @@ class ExerciseSection
     end
 
     def normalize_scaffold(raw)
-      return [] unless raw.is_a?(Array)
-
-      raw.grep(String)
-         .filter_map { |label| label.strip.presence&.truncate(MAX_SCAFFOLD_LABEL_LENGTH) }
-         .first(MAX_SCAFFOLD_LABELS)
+      PlantedKey.list(raw, max: MAX_SCAFFOLD_LABELS) { |label| PlantedKey.text(label)&.truncate(MAX_SCAFFOLD_LABEL_LENGTH) }
     end
 
     def scaffold_template(section_data = nil)

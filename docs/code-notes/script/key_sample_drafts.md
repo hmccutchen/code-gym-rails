@@ -54,9 +54,10 @@ section and one agreement per mode, plus the summary.
 ## What it writes
 
 The draft user is an unsaved `User`, so `DailyPlan` and `recent_performance`
-read no history and the draft lands in no day. `.service` subclasses
-`ClaudeService` to keep usage in memory for the cost line instead of writing
-`ApiUsage` rows. The run is wrapped in `ReviewBaselineExport.read_only`, so a
+read no history and the draft lands in no day. `.service` builds on
+`InMemoryUsage.provider` (`script/in_memory_usage.rb`) to keep usage in
+memory for the cost line instead of writing `ApiUsage` rows, and records no
+suggested concept. The run is wrapped in `ReviewBaselineExport.read_only`, so a
 write the override misses fails loudly instead of landing, and
 `.refuse_production!` stops the runner in production.
 

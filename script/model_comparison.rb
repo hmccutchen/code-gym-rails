@@ -1,3 +1,4 @@
+require_relative "in_memory_usage"
 require_relative "solve_agreement"
 require_relative "forced_concept_drafts"
 require_relative "review_baseline_export"
@@ -451,20 +452,15 @@ class ModelComparison
 
   # A subclass per route: it turns the prose judge off through the class method review_grading_provider reads.
   def pinned_service(route, usage, provider: ClaudeService)
-    lock = Mutex.new
+    logged = InMemoryUsage.provider(provider, usage) do |result, _purpose|
+      InMemoryUsage.tokens(result).merge(cache_read: result[:cache_read_tokens].to_i, cache_write: result[:cache_write_tokens].to_i)
+    end
 
-    Class.new(provider) do
+    Class.new(logged) do
       def self.judges_review_prose? = false
 
       define_method(:route_for) { |_purpose| route }
-      define_method(:log_usage) do |_user, result, purpose:|
-        lock.synchronize do
-          usage << { tokens_in: result[:input_tokens].to_i, tokens_out: result[:output_tokens].to_i,
-                     cache_read: result[:cache_read_tokens].to_i, cache_write: result[:cache_write_tokens].to_i }
-        end
-      end
-      define_method(:record_suggested_concept) { |_suggestion| }
-      private :route_for, :log_usage, :record_suggested_concept
+      private :route_for
     end.new(@api_key)
   end
 
@@ -671,7 +667,7 @@ class ModelComparison
     line   = "estimate, at about #{APPROX_CHARS_PER_TOKEN} characters a token and #{ReviewStability::MEAN_OUTPUT_TOKENS} output tokens a call, " \
              "with each day's context cached after its first call: #{tokens[:input]} in / #{tokens[:cache_write]} cache write / " \
              "#{tokens[:cache_read]} cache read / #{calls * ReviewStability::MEAN_OUTPUT_TOKENS} out"
-    return "#{line} · unpriced (#{service.class.superclass.name} has no price list)" unless service.class.prices_usage?
+    return "#{line} · unpriced (#{service.class.ancestors.find(&:name)} has no price list)" unless service.class.prices_usage?
 
     cap   = CallProfiles.fetch("review_response")[:max_tokens] || service.class::MAX_TOKENS
     worst = estimated_cost(route, input: tokens[:input] + tokens[:cache_write] + tokens[:cache_read], output: calls * cap)

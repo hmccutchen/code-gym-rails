@@ -113,9 +113,9 @@ either. It keeps the production routes, so every replay record comes from the
 production judge. The billing spec drives `--run` through the real
 connection with only the adapter swapped, and checks the `x-api-key` header.
 
-Its subclass repeats a few lines of `ModelComparison#pinned_service`. A
-shared class is a follow-up once the sibling change to `#pinned_service`
-lands, since extracting it now would conflict with that change.
+Both subclasses build on `InMemoryUsage.provider`
+(`script/in_memory_usage.rb`), which holds the usage-logging override all
+four billed scripts share.
 
 ## Cost bounds
 
