@@ -579,3 +579,10 @@ data.*
   of review and exercise text for the glossary sense check `#662`
   **I decided:** ship the export now and run it on production after it
   deploys, rather than open a public endpoint on the production database
+
+## Tue Nov 3
+
+- five glossary definitions widened to the second sense production text
+  used them in `#663`
+  **I decided:** run the export myself and hand over the file, rather than
+  open the production database to this session

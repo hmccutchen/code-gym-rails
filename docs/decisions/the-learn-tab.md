@@ -133,7 +133,15 @@ submission, so a definition there can't hint at an answer. Unlike the
 reference prose above, review text was wrapped without a wrong-sense listing
 first. The two misfires found in review were reworded: `callback` now covers a
 Rails model hook as well as a function passed in, and `ref` no longer reads as
-React-only. Issue #578 tracks a full listing over stored review text.
+React-only.
+
+The full listing over stored review and exercise text came later (#578), run
+with `script/glossary_sense_listing.rb` on an export of production text from
+`script/export_glossary_text.rb`. It matched 41 keys, and five definitions
+were widened to the second sense the text used: `transaction` for a payment,
+`promise` as a guarantee, `rollback` for a transaction or a side effect,
+`invariant` for a value a loop can compute once before it starts, and `ref`
+for a Rails column holding another record's id. A spec pins each sense.
 
 The architecture section's inline reference
 (`responses/bodies/_architecture.html.erb`, built from the exercise JSON) stays
