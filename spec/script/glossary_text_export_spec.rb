@@ -9,7 +9,11 @@ RSpec.describe GlossaryTextExport do
     { "code_review" => { "scenario" => "A webhook retries.", "question" => "What's wrong?" },
       "architecture" => { "question" => "Which design?", "options" => [ "A queue", "A cron job" ] },
       "ambiguity_hunt" => { "question" => "What's unclear?", "request" => "Add a callback after save." },
-      "pseudocode_to_code" => { "question" => "Write it.", "problem_statement" => "Sum the totals." } }
+      "pseudocode_to_code" => { "question" => "Write it.", "problem_statement" => "Sum the totals." },
+      "pattern" => { "question" => "Which pattern?", "why" => "A service object keeps the controller thin." },
+      "plan_review" => { "question" => "What's missing?", "plan_excerpt" => "Step 1: add a callback.",
+                         "answer_key" => { "issue" => "KEY-SENTINEL" } },
+      "security_review" => { "question" => "What's exposed?", "planted_ambiguities" => [ "AMBIGUITY-SENTINEL" ] } }
   end
 
   def reviewed_day
@@ -47,16 +51,21 @@ RSpec.describe GlossaryTextExport do
       { "source" => "exercise", "id" => "#{exercise_id}:ambiguity_hunt", "field" => "question", "text" => "What's unclear?" },
       { "source" => "exercise", "id" => "#{exercise_id}:ambiguity_hunt", "field" => "request", "text" => "Add a callback after save." },
       { "source" => "exercise", "id" => "#{exercise_id}:pseudocode_to_code", "field" => "question", "text" => "Write it." },
-      { "source" => "exercise", "id" => "#{exercise_id}:pseudocode_to_code", "field" => "problem_statement", "text" => "Sum the totals." }
+      { "source" => "exercise", "id" => "#{exercise_id}:pseudocode_to_code", "field" => "problem_statement", "text" => "Sum the totals." },
+      { "source" => "exercise", "id" => "#{exercise_id}:pattern", "field" => "question", "text" => "Which pattern?" },
+      { "source" => "exercise", "id" => "#{exercise_id}:pattern", "field" => "why", "text" => "A service object keeps the controller thin." },
+      { "source" => "exercise", "id" => "#{exercise_id}:plan_review", "field" => "question", "text" => "What's missing?" },
+      { "source" => "exercise", "id" => "#{exercise_id}:plan_review", "field" => "plan_excerpt", "text" => "Step 1: add a callback." },
+      { "source" => "exercise", "id" => "#{exercise_id}:security_review", "field" => "question", "text" => "What's exposed?" }
     )
   end
 
-  it "leaves out answers, ratings, answer keys and any user detail" do
+  it "leaves out the answer, rating, answer key and user columns" do
     reviewed_day
 
     described_class.new(out: out).call
 
-    expect(out.string).not_to include("an answer", "solid", "right_level", "glossary-export@example.com", "Export")
+    expect(out.string).not_to include("an answer", "solid", "right_level", "glossary-export@example.com", "KEY-SENTINEL", "AMBIGUITY-SENTINEL")
   end
 
   it "reads inside a read-only transaction" do

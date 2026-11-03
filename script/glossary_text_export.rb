@@ -2,8 +2,8 @@
 require_relative "review_baseline_export"
 
 class GlossaryTextExport
-  EXERCISE_FIELDS = { "scenario" => "scenario", "question" => "question", "options" => "option",
-                      "request" => "request", "problem_statement" => "problem_statement" }.freeze
+  EXERCISE_FIELDS = { "scenario" => "scenario", "question" => "question", "options" => "option", "request" => "request",
+                      "problem_statement" => "problem_statement", "why" => "why", "plan_excerpt" => "plan_excerpt" }.freeze
 
   def initialize(out:)
     @out = out
@@ -11,8 +11,8 @@ class GlossaryTextExport
 
   def call
     ReviewBaselineExport.read_only do
-      DailyResponse.reviewed.find_each { |response| review_rows(response).each { |row| write(row) } }
-      DailyExercise.find_each { |exercise| exercise_rows(exercise).each { |row| write(row) } }
+      DailyResponse.reviewed.select(:id, :ai_review, :review_alternates).find_each { |response| review_rows(response).each { |row| write(row) } }
+      DailyExercise.select(:id, :problem_set).find_each { |exercise| exercise_rows(exercise).each { |row| write(row) } }
     end
   end
 
