@@ -4,6 +4,7 @@ RSpec.describe "Conventions held over the repository's own files" do
   REFERENCE_DOCS = %w[CLAUDE.md .github/copilot-instructions.md].freeze
   REFERENCE_ROOTS = %w[app lib spec config docs bin db script .claude .github].freeze
   GITIGNORED_REFERENCES = %w[spec/examples.txt].freeze
+  BARE_EXTENSIONS = %w[rb yml yaml toml md json js].freeze
 
   def relative(path) = Pathname(path).relative_path_from(Rails.root).to_s
 
@@ -13,22 +14,36 @@ RSpec.describe "Conventions held over the repository's own files" do
 
   def referenced_paths(path)
     roots = REFERENCE_ROOTS.map { |root| Regexp.escape(root) }.join("|")
-    pattern = Regexp.new("`((?:#{roots})/[^`\\s<*{]+)`")
+    pattern = Regexp.new("`((?:#{roots})/[^`\\s<*{]+|\\.?[\\w-]+(?:\\.[\\w-]+)*\\.(?:#{BARE_EXTENSIONS.join('|')}))`")
     File.readlines(path).each_with_index.flat_map do |line, index|
       line.gsub(/~~.*?~~/, "").scan(pattern).flatten.map { |reference| [ reference.sub(/[:#]\d+.*\z/, "").sub(/[.,;:]\z/, ""), index + 1 ] }
     end
   end
 
-  it "names only files that exist whenever an instruction doc gives a repository path" do
-    missing = instruction_docs.flat_map do |doc|
-      referenced_paths(doc).filter_map do |reference, line|
-        next if GITIGNORED_REFERENCES.include?(reference) || Rails.root.join(reference).exist?
+  def tracked_basenames = @tracked_basenames ||= `git -C #{Rails.root} ls-files`.split("\n").map { |file| File.basename(file) }.to_set
 
-        "#{relative(doc)}:#{line}: #{reference}"
-      end
-    end
+  def reference_exists?(reference)
+    return true if GITIGNORED_REFERENCES.include?(reference) || Rails.root.join(reference).exist?
+
+    !reference.include?("/") && tracked_basenames.include?(reference)
+  end
+
+  def missing_references(doc)
+    referenced_paths(doc).reject { |reference, _line| reference_exists?(reference) }
+  end
+
+  it "names only files that exist whenever an instruction doc gives a repository path" do
+    missing = instruction_docs.flat_map { |doc| missing_references(doc).map { |reference, line| "#{relative(doc)}:#{line}: #{reference}" } }
 
     expect(missing).to be_empty, "paths named in instructions that do not exist:\n#{missing.join("\n")}"
+  end
+
+  it "checks a bare filename too, finding it at the root or under any folder, and flags one that exists nowhere" do
+    doc = Tempfile.new([ "doc", ".md" ])
+    doc.write("read `.rubocop_todo.yml` and `compose.rb` but not `.rubocop_todo_deleted.yml`\n")
+    doc.close
+
+    expect(missing_references(doc.path).map(&:first)).to eq([ ".rubocop_todo_deleted.yml" ])
   end
 
   it "ignores a struck-through reference, which records a file that was deleted, and keeps the rest of the line" do
