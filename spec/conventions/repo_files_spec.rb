@@ -40,7 +40,7 @@ RSpec.describe "Conventions held over the repository's own files" do
 
   it "checks a bare filename too, finding it at the root or under any folder, and flags one that exists nowhere" do
     doc = Tempfile.new([ "doc", ".md" ])
-    doc.write("read `.rubocop_todo.yml` and `compose.rb` but not `.rubocop_todo_deleted.yml`\n")
+    doc.write("read `.rubocop_todo.yml` and `ai_service.rb` but not `.rubocop_todo_deleted.yml`\n")
     doc.close
 
     expect(missing_references(doc.path).map(&:first)).to eq([ ".rubocop_todo_deleted.yml" ])
