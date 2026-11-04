@@ -8,7 +8,7 @@ class FeaturedConcept < ApplicationRecord
 
   def self.for(user, today: Date.current)
     week   = week_of(today)
-    stored = user.featured_concepts.find_by(week_of: week)
+    stored = this_weeks(user, today)
     return stored if stored&.still_met_by?(user, today)
 
     pair = pick_for(user, week, today)
@@ -20,6 +20,8 @@ class FeaturedConcept < ApplicationRecord
 
     claim(user, week, pair)
   end
+
+  def self.this_weeks(user, today = Date.current) = user.featured_concepts.find_by(week_of: week_of(today))
 
   # Savepoint so the unique index's RecordNotUnique rolls back only this insert and the re-read can see the winner.
   def self.claim(user, week, (concept, bucket))

@@ -6,17 +6,26 @@ class ForcedConceptDrafts
   # The draft guidance line sits between the draft-guidance markers in each note.
   NOTES = { "proportionality" => Rails.root.join("docs/proportionality-concept-2026-10-07.md") }.freeze
 
+  def self.todays_plan(user, language)
+    DailyPlan.for(user, language: language, judged: true, featured_concept: stored_featured_concept(user))
+  end
+
+  def self.stored_featured_concept(user)
+    row = FeaturedConcept.this_weeks(user)
+    row.concept if row&.still_met_by?(user, Date.current)
+  end
+
   def self.guidance_for(concept)
     path = NOTES.fetch(concept) { raise ArgumentError, "No design note for #{concept}; known: #{NOTES.keys.join(', ')}" }
     path.read[GUIDANCE_PATTERN, 1] or raise ArgumentError, "#{path} has no draft-guidance block"
   end
 
   # Today's plan for this user, with the one kind targeted and locked so the prompt pitches it exactly at the rung asked for.
-  def self.rung_draft(user, language, rung, kind: KIND, plan: DailyPlan.for(user, language: language, judged: true))
+  def self.rung_draft(user, language, rung, kind: KIND, plan: todays_plan(user, language))
     difficulty = KindDifficulty.new(levels: { kind.key => rung }, locked: [ kind.key ])
     kinds      = plan.kinds
     ladders    = GenerationLadders.for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language,
-                                       plan.code_review_mode, gotcha: plan.code_review_gotcha)
+                                       plan.code_review_mode, gotcha: plan.code_review_gotcha, featured_concept: plan.featured_concept)
     history    = user.recent_performance
 
     ExerciseDraft::Draft.new(user: user, language: language, problem_set: {}, plan: plan, kinds: kinds,

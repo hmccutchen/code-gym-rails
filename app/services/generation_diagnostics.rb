@@ -36,7 +36,7 @@ class GenerationDiagnostics
       retention(DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks,
                 problem_set, plan.code_review_mode, dropped: fourth_dropped)
     end
-    waiting_retention(plan.waiting_checks)
+    waiting_retention(plan.waiting_checks, featured_concept: plan.featured_concept)
     shared_concept(plan, problem_set)
     coverage(plan.coverage)
     difficulty(language, draft, problem_set, judge: judge, unhosted: unhosted)
@@ -79,11 +79,12 @@ class GenerationDiagnostics
     )
   end
 
-  def waiting_retention(waiting)
+  def waiting_retention(waiting, featured_concept:)
     return if waiting.empty?
 
-    entries = waiting.map { |check| "#{check[:bucket]}:#{check[:concept]}(#{check[:reason]})" }
-    Rails.logger.info("[retention] user=#{@user.id} date=#{Date.current} waiting=#{entries.join(',')}")
+    entries  = waiting.map { |check| "#{check[:bucket]}:#{check[:concept]}(#{check[:reason]})" }
+    held     = waiting.any? { |check| check[:held_by_featured] }
+    Rails.logger.info("[retention] user=#{@user.id} date=#{Date.current} waiting=#{entries.join(',')}#{" featured=#{featured_concept}" if held}")
   end
 
   def difficulty(language, draft, problem_set, judge:, unhosted:)

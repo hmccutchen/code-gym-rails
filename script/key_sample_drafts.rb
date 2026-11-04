@@ -214,7 +214,7 @@ class KeySampleDrafts
 
   # Toy and single-file: a RealSource excerpt needs the scenario restore JudgedGeneration does (key_sample_drafts.md).
   def plan_for(mode, gotcha)
-    plan = DailyPlan.for(@user, language: @language, judged: true)
+    plan = ForcedConceptDrafts.todays_plan(@user, @language)
     mode ? plan.with(code_review_mode: mode, code_review_source: nil, code_review_files: :single, code_review_gotcha: gotcha) : plan
   end
 

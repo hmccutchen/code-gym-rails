@@ -54,7 +54,7 @@ section and one agreement per mode, plus the summary.
 ## What it writes
 
 The draft user is an unsaved `User`, so `DailyPlan` and `recent_performance`
-read no history and the draft lands in no day. `.service` builds on
+read no history, it has no featured concept, and the draft lands in no day. `.service` builds on
 `InMemoryUsage.provider` (`script/in_memory_usage.rb`) to keep usage in
 memory for the cost line instead of writing `ApiUsage` rows, and records no
 suggested concept. The run is wrapped in `ReviewBaselineExport.read_only`, so a
@@ -118,8 +118,8 @@ is the number to record.
 `--mode bug_hunt` drafts `code_review` on the `bug_hunt` mode for the
 measurement in `docs/code-notes/script/bug_hunt_measure.md`. Each draft's
 plan is the day's plan with the mode, the entry's `code_review_gotcha`, no
-`RealSource` excerpt and a single file, and `DailyPlan.for` is called with
-`judged: true`, since every draft is judged. The script walks the
+`RealSource` excerpt and a single file, and `ForcedConceptDrafts.todays_plan`
+builds it with `judged: true`, since every draft is judged. The script walks the
 language's `BugHuntGotchas` registry in list order, one kept section per
 entry, with the entry's concept fixed. A rejected or failed draft tries
 the same entry again, within the usual two attempts a section, so the

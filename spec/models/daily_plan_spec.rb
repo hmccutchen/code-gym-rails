@@ -1282,6 +1282,28 @@ RSpec.describe DailyPlan, "retention checks left waiting" do
       .to eq([ { bucket: "plan_review", concept: "scope_creep", reason: :no_host } ])
   end
 
+  it "marks a check the featured concept held back, and only that one" do
+    user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+    due("scope_creep", "plan_review")
+    due("service_boundaries", "architecture")
+
+    held_back = described_class.for(user, language: "ruby_rails", judged: true, featured_concept: "scope_creep")
+
+    expect(held_back.waiting_checks.to_h { |w| [ w[:concept], w[:held_by_featured] ] })
+      .to eq("scope_creep" => true, "service_boundaries" => nil)
+  end
+
+  it "does not mark a featured concept's check that would have had no host anyway" do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    due("scope_creep", "plan_review")
+
+    plan = described_class.for(user, language: "ruby_rails", judged: true, featured_concept: "scope_creep")
+
+    expect(plan.waiting_checks).to contain_exactly(a_hash_including(concept: "scope_creep", reason: :no_host))
+    expect(plan.waiting_checks.first).not_to have_key(:held_by_featured)
+  end
+
   it "says no_slot when a section could tag the check but reinforcement took every host" do
     allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
       %w[n_plus_one service_objects query_objects policy_objects].map { |c| { concept: c, bucket: "ruby_rails", tier: "standard" } }
