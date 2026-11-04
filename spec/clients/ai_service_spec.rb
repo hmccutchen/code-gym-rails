@@ -6263,4 +6263,27 @@ RSpec.describe AiService, "review prompt call sites" do
       expect_prompt_snapshot("review__day_a__#{key}__prompt", service.send(:build_review_section_prompt, exercise, response, key))
     end
   end
+
+  describe "the REVIEW_APPROACH_PARAGRAPH switch" do
+    around do |example|
+      original = ENV["REVIEW_APPROACH_PARAGRAPH"]
+      example.run
+    ensure
+      ENV["REVIEW_APPROACH_PARAGRAPH"] = original
+    end
+
+    it "builds today's section prompt when REVIEW_APPROACH_PARAGRAPH is unset" do
+      ENV.delete("REVIEW_APPROACH_PARAGRAPH")
+      today = File.read(PromptSnapshotHelpers::PROMPT_SNAPSHOT_DIR.join("review__day_a__code_review__prompt.txt"))
+
+      expect(service.send(:build_review_section_prompt, exercise, response, "code_review")).to eq(today)
+    end
+
+    it "asks for the approach paragraph when REVIEW_APPROACH_PARAGRAPH is 1" do
+      ENV["REVIEW_APPROACH_PARAGRAPH"] = "1"
+
+      expect(service.send(:build_review_section_prompt, exercise, response, "code_review"))
+        .to include("how an experienced engineer would start on this kind of problem")
+    end
+  end
 end

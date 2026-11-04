@@ -79,7 +79,7 @@ RSpec.describe ReviewHelper, type: :helper do
     end
 
     it "leaves a field with no walkthrough heading unchanged on an unanswered section" do
-      expect(helper.review_field_label(response, "pattern", "next_step")).to eq("Next step")
+      expect(helper.review_field_label(response, "pattern", "next_step")).to eq("Approach and next step")
     end
   end
 end

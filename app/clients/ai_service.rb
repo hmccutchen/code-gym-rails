@@ -421,7 +421,8 @@ class AiService
 
   def build_review_section_prompt(exercise, daily_response, section)
     ReviewPrompt.for_section(key: section, section: exercise.problem_set[section] || {}, answer: daily_response.answer_for(section),
-                             answered: daily_response.answered?(section), rung: review_rung(exercise, daily_response, section))
+                             answered: daily_response.answered?(section), rung: review_rung(exercise, daily_response, section),
+                             approach: ReviewApproachParagraph.enabled?)
   end
 
   def review_rung(exercise, daily_response, section)

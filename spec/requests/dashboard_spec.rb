@@ -210,6 +210,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).not_to include('data-rating-for="code_review"')
   end
 
+  it "shows next_step under Approach and next step on a submitted review" do
+    create_response(create_exercise, ai_review: sample_review)
+
+    get root_path
+
+    expect(response.body).to include("<strong>Approach and next step:</strong> Read about advisory locks")
+  end
+
   it "renders the review with the keys review_response actually returns" do
     create_response(create_exercise, ai_review: sample_review)
     get root_path
