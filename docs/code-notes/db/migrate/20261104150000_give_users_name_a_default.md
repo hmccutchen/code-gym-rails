@@ -15,8 +15,8 @@ sign-in code would never be sent. A nonblank default passes it.
 The release still serving also writes a real name on sign-up and account
 deletion, which a default accepts. Names already stored are not touched.
 
-A later release drops the column (#686), once web and worker both run code that
-ignores it.
+`DropUsersName` drops the column (#686), now that web and worker both run code
+that ignores it.
 
 Earlier versions of this change touched the column on a pull-request app or a
 development database: one dropped it, and one made it nullable. So `up` does

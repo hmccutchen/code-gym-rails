@@ -13,10 +13,7 @@ class User < ApplicationRecord
   has_many :daily_kind_swap_events, dependent: :destroy
   belongs_to :invite_code, optional: true
 
-  self.ignored_columns += %w[learning_track name]
-
-  LEGACY_NAME_ON_DELETION = "Deleted user".freeze
-  private_constant :LEGACY_NAME_ON_DELETION
+  self.ignored_columns += %w[learning_track]
 
   serialize :api_keys, coder: JSON
   encrypts :api_keys
@@ -212,7 +209,6 @@ class User < ApplicationRecord
         reminder_level:                   :none,
         anonymized_at:                    Time.current
       )
-      scrub_legacy_name
     end
     true
   end
@@ -429,12 +425,6 @@ class User < ApplicationRecord
   end
 
   private
-
-  def scrub_legacy_name
-    return unless self.class.connection.column_exists?(:users, :name)
-
-    self.class.where(id: id).update_all([ "name = ?", LEGACY_NAME_ON_DELETION ])
-  end
 
   def write_generation_status!(columns)
     update_columns(columns.merge(updated_at: Time.current))
