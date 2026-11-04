@@ -1124,6 +1124,35 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#todays_or_held_exercise" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    let(:user) { User.create!(email: "viewer@example.com", name: "Viewer", time_zone: "UTC") }
+
+    def exercise_on(date) = user.daily_exercises.create!(date: date, generated_at: Time.current, problem_set: { "code_review" => { "question" => "q" } })
+
+    it "reads today's set first" do
+      travel_to(Time.utc(2026, 7, 22, 12)) do
+        today = exercise_on(Date.current)
+        expect(user.todays_or_held_exercise).to eq(today)
+      end
+    end
+
+    it "reads a paused user's held set when there is none today, without moving it" do
+      travel_to(Time.utc(2026, 7, 22, 12)) do
+        held = exercise_on(Date.current - 1)
+        user.update!(paused_generation_at: 2.days.ago)
+
+        expect(user.todays_or_held_exercise).to eq(held)
+        expect(held.reload.date).to eq(Date.current - 1)
+      end
+    end
+
+    it "is nil with no set today and nothing held" do
+      expect(user.todays_or_held_exercise).to be_nil
+    end
+  end
+
   describe "#resume_generation!" do
     include ActiveSupport::Testing::TimeHelpers
 

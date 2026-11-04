@@ -17,7 +17,9 @@ module FeaturedConceptHelper
 
   # Learn reads today's set, or a paused user's held one, without carrying it forward as the dashboard does.
   def featured_shown_beside_todays_set?
-    exercise = current_user.daily_exercises.for_date.first || current_user.held_exercise
+    return false if featured_concept.blank?
+
+    exercise = current_user.todays_or_held_exercise
     featured_callout_shown?(exercise, exercise&.daily_response)
   end
 

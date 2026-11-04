@@ -88,7 +88,7 @@ class DailyKindSwap
   end
 
   # A held set moves to today only on a dashboard load, so a page left open past midnight can swap before it has.
-  def swapped_on = @swapped_on ||= exercise || @user.held_exercise
+  def swapped_on = @swapped_on ||= @user.todays_or_held_exercise
 
   def exercise = @exercise ||= @user.daily_exercises.for_date.first
 
