@@ -93,7 +93,7 @@ RSpec.describe "Conventions held over the repository's own files" do
     tracked.reject { |path| path.start_with?("app/views/") }.select { |path| path.start_with?("bin/") || path.match?(/\.(rb|js|py)\z/) }
   end
 
-  it "lists every Ruby, JavaScript and Python file under app (outside the views), lib, script and config, and every bin file, in docs/file-map.md" do
+  it "lists every .rb, .js and .py file under app (outside the views), lib, script and config, and every bin file, in docs/file-map.md" do
     unlisted = mappable_files.reject { |path| mapped?(path) }
 
     expect(unlisted).to be_empty, "files with no entry in docs/file-map.md:\n#{unlisted.join("\n")}"

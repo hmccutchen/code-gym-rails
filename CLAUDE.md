@@ -190,7 +190,8 @@ above (`SingleLineComment`, `AttachedComment`, `CommentLimit`). Where omakase
 has an opinion, that opinion wins — don't argue formatting in review.
 Omakase leaves `Naming` and most of `Lint` and `Metrics` off, so `.rubocop.yml`
 turns on the ones this project's rules need: `Lint/UselessAssignment` and
-`Lint/UnusedBlockArgument` (dead code left by an extraction), and
+`Lint/UnusedBlockArgument` (dead code left by an extraction),
+`Lint/RedundantCopDisableDirective` (a `rubocop:disable` that no longer disables anything), and
 `Metrics/MethodLength`, `ClassLength` and `ModuleLength` for `app/`. No naming
 or complexity cop runs.
 
@@ -257,7 +258,8 @@ rather than only catching it afterward:
   cops, with the limits set in `.rubocop.yml`. A method that exceeds its limit
   carries a trailing `# rubocop:disable Metrics/MethodLength` on its `def`
   line, and `Lint/RedundantCopDisableDirective` fails the build once the method
-  is short enough, so the directive must go. The classes and modules that
+  is short enough, so the directive must go. The same cop reports a
+  `Metrics` directive outside `app/`, where those cops do not run. The classes and modules that
   exceed theirs are listed in `.rubocop_todo.yml`. A new exemption of either
   kind needs the PR to say why.
 
@@ -378,7 +380,7 @@ Setup, parallel runs, system specs and the spec support defaults are in
 ## File Map
 
 `docs/file-map.md` lists what each file does. A convention spec fails on a
-Ruby, JavaScript or Python file under `app/` (outside the views), `lib/`,
+`.rb`, `.js` or `.py` file under `app/` (outside the views), `lib/`,
 `script/` or `config/`, or any file under `bin/`, with no entry there, so a new
 file brings its entry in the same change. Specs, migrations and the
 skills under `.claude/` are not listed: a spec is named for its subject and a
