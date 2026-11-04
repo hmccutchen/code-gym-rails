@@ -20,6 +20,10 @@ class ExerciseSection::PlanReview < ExerciseSection
 
   def self.key_context_fields = %w[plan_excerpt]
 
+  def self.glossary_shown_before_submission? = false
+
+  def self.concept_shown_before_submission?(_section) = false
+
   def self.quoted_key_texts(key) = Array(key&.dig("flaws")).map { |flaw| flaw["flaw"] }
 
   def self.normalize_planted_key(section)

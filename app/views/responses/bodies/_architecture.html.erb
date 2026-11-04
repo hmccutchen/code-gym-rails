@@ -1,7 +1,7 @@
-<%# Locals: data, exercise, response, submitted. %>
+<%# Locals: kind, data, exercise, response, submitted. %>
 <% if data["options"].present? %>
   <ul class="arch-options">
-    <% data["options"].each do |opt| %><li><%= glossary_wrap(opt) %></li><% end %>
+    <% data["options"].each do |opt| %><li><%= section_glossary_wrap(opt, kind: kind, submitted: submitted) %></li><% end %>
   </ul>
 <% end %>
 <% if data["reference"].present? %>

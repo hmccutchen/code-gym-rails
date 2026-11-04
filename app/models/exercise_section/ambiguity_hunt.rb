@@ -18,6 +18,10 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
 
   def self.refusal_codes = %w[planted_ambiguities_missing]
 
+  def self.glossary_shown_before_submission? = false
+
+  def self.concept_shown_before_submission?(_section) = false
+
   # Refuses an empty list, the only grading ground truth; a wrong count is fine and a long list is truncated.
   def self.reject_unusable!(section, **)
     planted = PlantedKey.list(section[PLANTED_FIELD], max: MAX_PLANTED) { |entry| PlantedKey.text(entry) }

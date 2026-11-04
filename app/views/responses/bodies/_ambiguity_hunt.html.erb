@@ -1,2 +1,2 @@
-<%# Locals: data, exercise, response, submitted. Never render data["planted_ambiguities"]: it is the hidden answer key. %>
-<div class="plan-excerpt"><%= glossary_wrap(data["request"]) %></div>
+<%# Locals: kind, data, exercise, response, submitted. Never render data["planted_ambiguities"]: it is the hidden answer key. %>
+<div class="plan-excerpt"><%= section_glossary_wrap(data["request"], kind: kind, submitted: submitted) %></div>

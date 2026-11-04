@@ -1,2 +1,2 @@
-<%# Locals: data, exercise, response, submitted. %>
-<div class="why-box"><strong><%= t("sections.pattern.why_label") %></strong> <%= glossary_wrap(data["why"]) %></div>
+<%# Locals: kind, data, exercise, response, submitted. %>
+<div class="why-box"><strong><%= t("sections.pattern.why_label") %></strong> <%= section_glossary_wrap(data["why"], kind: kind, submitted: submitted) %></div>
