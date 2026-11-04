@@ -31,8 +31,11 @@ desktop-width touch device, and a pointer query can't be trusted to tell it
 apart from a laptop with a touch screen. The top nav's links follow it too:
 above the width where the nav collapses they are 44px tall
 (`nav_link_targets_spec`), where they were 34px before #550. The name field
-beside them is the one exception left: it is about 27px tall, and #555 gives
-it a 44px target.
+beside them is at least 44px tall too, in the row and in the open menu, at
+every text size (`nav_name_field_target_spec`, #555); it was about 27px. Its
+width still shrinks just above the collapse point, to 12px at 730px at 100%
+text: the nav collapses at one em width, and a minimum field width needs a
+different one at each text size, so #681 holds that.
 
 A link inside a sentence is exempt, as WCAG 2.5.8 allows and
 `docs/accessibility-audit-2026-09-30.md` records: Progress' "Change the mix"
