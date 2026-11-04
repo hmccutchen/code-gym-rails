@@ -4,7 +4,7 @@ require "rails_helper"
 RSpec.describe "Login code verification under concurrency", type: :model do
   self.use_transactional_tests = false
 
-  let!(:user) { User.create!(email: "race@example.com", name: "Race") }
+  let!(:user) { User.create!(email: "race@example.com") }
 
   after { User.where(email: "race@example.com").delete_all }
 

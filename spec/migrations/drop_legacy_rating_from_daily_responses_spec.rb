@@ -5,7 +5,7 @@ require migration_path.to_s
 
 RSpec.describe DropLegacyRatingFromDailyResponses do
   let(:connection) { ActiveRecord::Base.connection }
-  let(:user) { User.create!(email: "kept@example.com", name: "Kept") }
+  let(:user) { User.create!(email: "kept@example.com") }
   let(:exercise) { DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current) }
   let!(:response) do
     DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {}, section_ratings: { "code_review" => "too_hard" })

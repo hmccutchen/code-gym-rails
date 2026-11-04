@@ -15,7 +15,7 @@ RSpec.describe RemoveTrackLeftoversFromUsers do
   end
 
   it "rolls back by restoring the columns with their defaults" do
-    user = User.create!(email: "kept@example.com", name: "Kept")
+    user = User.create!(email: "kept@example.com")
 
     migrate(:down)
 

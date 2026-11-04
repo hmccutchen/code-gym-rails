@@ -3,7 +3,7 @@ require "rails_helper"
 # Rebaseline only for intended page changes: UPDATE_PAGE_SNAPSHOTS=1 bundle exec rspec spec/requests/existing_account_pages_spec.rb
 RSpec.describe "Pages for an account that predates the learning track", type: :request do
   let(:user) do
-    User.create!(id: 900_001, email: "existing@example.com", name: "Existing",
+    User.create!(id: 900_001, email: "existing@example.com",
                  time_zone: "UTC", created_at: Time.utc(2026, 1, 5, 12),
                  track_chosen_at: Time.current).tap do |user|
       user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test-key" })

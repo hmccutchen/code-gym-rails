@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe GenerateConceptReferenceJob do
-  let(:user) { User.create!(email: "job@example.com", name: "Job", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }) }
+  let(:user) { User.create!(email: "job@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }) }
 
   let(:reference_hash) do
     {

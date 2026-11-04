@@ -108,5 +108,5 @@ read it before changing that area.
   Account is enough to say whose account it is. The nav's name field is
   gone, `PATCH /profile` ignores a posted `name`, the emails and the
   welcome-back notice greet no one by name, and the generation prompt
-  leaves it out. `users.name` is still written at sign-up until the column
-  is dropped (#686).
+  leaves it out. The `users.name` column is gone (#686): sign-up creates the
+  account from the email alone, and account deletion has no name to overwrite.

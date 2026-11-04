@@ -24,8 +24,8 @@ RSpec.describe AddLevelSuggestionAnswersToUsers do
   end
 
   it "copies each account's answer count from the old column" do
-    answered = User.create!(email: "answered@example.com", name: "Answered")
-    untouched = User.create!(email: "untouched@example.com", name: "Untouched")
+    answered = User.create!(email: "answered@example.com")
+    untouched = User.create!(email: "untouched@example.com")
     migrate(:down)
     connection.exec_update("UPDATE users SET track_proposals_answered = 4 WHERE id = #{answered.id}")
 
@@ -36,7 +36,7 @@ RSpec.describe AddLevelSuggestionAnswersToUsers do
   end
 
   it "rolls back by removing the new column and leaving the old count as it was" do
-    user = User.create!(email: "kept@example.com", name: "Kept")
+    user = User.create!(email: "kept@example.com")
     connection.exec_update("UPDATE users SET track_proposals_answered = 2 WHERE id = #{user.id}")
 
     migrate(:down)

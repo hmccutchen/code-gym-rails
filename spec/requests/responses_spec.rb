@@ -685,7 +685,7 @@ RSpec.describe "Responses", type: :request do
     end
 
     it "404s for another user's response" do
-      other = create_user_with_key(email: "other@example.com", name: "Other")
+      other = create_user_with_key(email: "other@example.com")
       daily_response = create_reviewed_response(other)
 
       post email_review_response_path(daily_response)
@@ -1223,7 +1223,7 @@ RSpec.describe "Responses", type: :request do
     end
 
     it "404s for another user's response" do
-      other = create_user_with_key(email: "other@example.com", name: "Other")
+      other = create_user_with_key(email: "other@example.com")
       r = reviewed_response_for(other)
       login_as(user)
 
@@ -1373,7 +1373,7 @@ RSpec.describe "Responses", type: :request do
     end
 
     it "404s for another user's response" do
-      other = create_user_with_key(email: "other@example.com", name: "Other")
+      other = create_user_with_key(email: "other@example.com")
       r = reviewed_response_for(other)
       login_as(user)
 
@@ -1483,7 +1483,7 @@ RSpec.describe "Responses", type: :request do
     end
 
     it "404s for another user's response" do
-      other = create_user_with_key(email: "other@example.com", name: "Other")
+      other = create_user_with_key(email: "other@example.com")
       daily_response = create_response_for(other)
 
       delete start_over_response_path(daily_response)

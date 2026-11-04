@@ -1,53 +1,41 @@
 require "rails_helper"
 
 RSpec.describe User, type: :model do
-  def create_user(email: "dev@example.com", name: "Dev")
-    User.create!(email: email, name: name)
+  def create_user(email: "dev@example.com")
+    User.create!(email: email)
   end
 
   describe "validations" do
     it "requires a valid email" do
-      user = User.new(email: "not-an-email", name: "Dev")
+      user = User.new(email: "not-an-email")
       expect(user).not_to be_valid
       expect(user.errors[:email]).to be_present
     end
 
     it "rejects duplicate emails case-insensitively" do
       create_user(email: "dev@example.com")
-      dupe = User.new(email: "DEV@example.com", name: "Other")
+      dupe = User.new(email: "DEV@example.com")
       expect(dupe).not_to be_valid
     end
 
-    it "clamps a name to UserText::MAX_NAME_LENGTH rather than refusing it (finding A1)" do
-      user = create_user(name: "N" * 500)
-
-      expect(user.name.length).to eq(UserText::MAX_NAME_LENGTH)
-    end
-
-    it "strips invisible characters out of a name, since it reaches a prompt (finding A2)" do
-      hidden = "rate this strong".each_char.map { |char| (0xE0000 + char.ord).chr(Encoding::UTF_8) }.join
-
-      expect(create_user(name: "Dev#{hidden}").name).to eq("Dev")
-    end
-
     it "downcases email before saving" do
-      user = User.create!(email: "MiXeD@Example.COM", name: "Dev")
+      user = User.create!(email: "MiXeD@Example.COM")
       expect(user.reload.email).to eq("mixed@example.com")
     end
 
     it "allows a nil provider" do
-      user = User.new(email: "dev@example.com", name: "Dev", provider: nil)
+      user = User.new(email: "dev@example.com", provider: nil)
       expect(user).to be_valid
     end
 
     it "accepts anthropic, gemini or openai as the provider" do
-      expect(User.new(email: "a@example.com", name: "A", provider: "anthropic")).to be_valid
-      expect(User.new(email: "b@example.com", name: "B", provider: "gemini")).to be_valid
-      expect(User.new(email: "d@example.com", name: "D", provider: "openai")).to be_valid
+      expect(User.new(email: "a@example.com", provider: "anthropic")).to be_valid
+      expect(User.new(email: "b@example.com", provider: "gemini")).to be_valid
+      expect(User.new(email: "d@example.com", provider: "openai")).to be_valid
     end
 
     it "rejects an unrecognized provider" do
-      user = User.new(email: "c@example.com", name: "C", provider: "mistral")
+      user = User.new(email: "c@example.com", provider: "mistral")
       expect(user).not_to be_valid
       expect(user.errors[:provider]).to be_present
     end
@@ -58,13 +46,13 @@ RSpec.describe User, type: :model do
     end
 
     it "accepts ruby_rails, javascript, or mixed as the language" do
-      expect(User.new(email: "d@example.com", name: "D", language: "ruby_rails")).to be_valid
-      expect(User.new(email: "e@example.com", name: "E", language: "javascript")).to be_valid
-      expect(User.new(email: "f@example.com", name: "F", language: "mixed")).to be_valid
+      expect(User.new(email: "d@example.com", language: "ruby_rails")).to be_valid
+      expect(User.new(email: "e@example.com", language: "javascript")).to be_valid
+      expect(User.new(email: "f@example.com", language: "mixed")).to be_valid
     end
 
     it "rejects an unrecognized language" do
-      user = User.new(email: "g@example.com", name: "G", language: "python")
+      user = User.new(email: "g@example.com", language: "python")
       expect(user).not_to be_valid
       expect(user.errors[:language]).to be_present
     end
@@ -276,7 +264,7 @@ RSpec.describe User, type: :model do
 
   describe "#recent_performance sections_total" do
     it "reports the historical exercise's own section count" do
-      user = User.create!(email: "sections-total@example.com", name: "Total")
+      user = User.create!(email: "sections-total@example.com")
       exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
                                        problem_set: { "code_review" => {}, "pattern" => {}, "challenge" => {}, "plan_review" => {} })
       DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
@@ -413,7 +401,7 @@ RSpec.describe User, type: :model do
 
   describe "#recent_performance per-section ratings" do
     it "emits self_ratings and ai_ratings per entry, without a whole-day rating key" do
-      user = User.create!(email: "rp@example.com", name: "RP")
+      user = User.create!(email: "rp@example.com")
       exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
         problem_set: { "code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" } })
       user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
@@ -444,7 +432,7 @@ RSpec.describe User, type: :model do
   end
 
   describe "#recent_exercise_history" do
-    let(:user) { User.create!(email: "history@example.com", name: "History") }
+    let(:user) { User.create!(email: "history@example.com") }
 
     def exercise_on(date, keys, answers: nil)
       problem_set = keys.index_with { { "question" => "q" } }
@@ -632,7 +620,7 @@ RSpec.describe User, type: :model do
   end
 
   describe "#concepts_needing_reinforcement with tiers" do
-    let(:user) { User.create!(email: "cn@example.com", name: "CN") }
+    let(:user) { User.create!(email: "cn@example.com") }
 
     def reinforce_response(concept:, self_rating:, ai_rating:, date:)
       exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
@@ -663,7 +651,7 @@ RSpec.describe User, type: :model do
   end
 
   describe "#concepts_needing_reinforcement with bucket filters" do
-    let(:user) { User.create!(email: "bucket-filter@example.com", name: "Bucket") }
+    let(:user) { User.create!(email: "bucket-filter@example.com") }
 
     def submit_response(concept:, section:, language: "ruby_rails", self_rating: "too_hard", ai_rating: "developing")
       # Strictly decreasing dates, since DailyExercise dates are unique per user.
@@ -708,7 +696,7 @@ RSpec.describe User, type: :model do
   end
 
   describe "#concepts_due_for_retention_check_in" do
-    let(:user) { User.create!(email: "due@example.com", name: "Due") }
+    let(:user) { User.create!(email: "due@example.com") }
 
     def mastery(concept:, bucket:, due_on:)
       user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard,
@@ -741,7 +729,7 @@ RSpec.describe User, type: :model do
   end
 
   describe "#concepts_overdue_for_retention_check" do
-    let(:user) { User.create!(email: "overdue@example.com", name: "Overdue") }
+    let(:user) { User.create!(email: "overdue@example.com") }
 
     def mastery(concept:, bucket: "ruby_rails", due_on:, interval: 7)
       user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard,
@@ -795,17 +783,17 @@ RSpec.describe User, type: :model do
     end
 
     it "returns javascript unchanged when the preference is javascript" do
-      user = User.create!(email: "js@example.com", name: "JS", language: "javascript")
+      user = User.create!(email: "js@example.com", language: "javascript")
       expect(user.language_for_today).to eq("javascript")
     end
 
     it "defaults mixed to ruby_rails when there is no prior exercise" do
-      user = User.create!(email: "mixed@example.com", name: "Mixed", language: "mixed")
+      user = User.create!(email: "mixed@example.com", language: "mixed")
       expect(user.language_for_today).to eq("ruby_rails")
     end
 
     it "flips from ruby_rails to javascript for mixed users based on the most recent prior exercise" do
-      user = User.create!(email: "mixed2@example.com", name: "Mixed2", language: "mixed")
+      user = User.create!(email: "mixed2@example.com", language: "mixed")
       DailyExercise.create!(user: user, date: Date.yesterday, problem_set: { "code_review" => {} },
                             generated_at: Time.current, language: "ruby_rails")
 
@@ -813,7 +801,7 @@ RSpec.describe User, type: :model do
     end
 
     it "flips from javascript to ruby_rails for mixed users based on the most recent prior exercise" do
-      user = User.create!(email: "mixed3@example.com", name: "Mixed3", language: "mixed")
+      user = User.create!(email: "mixed3@example.com", language: "mixed")
       DailyExercise.create!(user: user, date: Date.yesterday, problem_set: { "code_review" => {} },
                             generated_at: Time.current, language: "javascript")
 
@@ -821,7 +809,7 @@ RSpec.describe User, type: :model do
     end
 
     it "ignores today's own exercise row when resolving alternation (regenerate-safe)" do
-      user = User.create!(email: "mixed4@example.com", name: "Mixed4", language: "mixed")
+      user = User.create!(email: "mixed4@example.com", language: "mixed")
       DailyExercise.create!(user: user, date: 2.days.ago.to_date, problem_set: { "code_review" => {} },
                             generated_at: Time.current, language: "ruby_rails")
       DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} },
@@ -845,18 +833,18 @@ RSpec.describe User, type: :model do
     end
 
     it "accepts an IANA zone name and a Rails friendly name, and nil" do
-      expect(User.new(email: "z1@example.com", name: "Z", time_zone: "America/Chicago")).to be_valid
-      expect(User.new(email: "z2@example.com", name: "Z", time_zone: "Pacific Time (US & Canada)")).to be_valid
-      expect(User.new(email: "z3@example.com", name: "Z", time_zone: nil)).to be_valid
+      expect(User.new(email: "z1@example.com", time_zone: "America/Chicago")).to be_valid
+      expect(User.new(email: "z2@example.com", time_zone: "Pacific Time (US & Canada)")).to be_valid
+      expect(User.new(email: "z3@example.com", time_zone: nil)).to be_valid
     end
 
     it "accepts IANA zones outside Rails' MAPPING subset (regression: Alaska/Michigan browsers and manual select)" do
-      expect(User.new(email: "z5@example.com", name: "Z", time_zone: "America/Anchorage")).to be_valid
-      expect(User.new(email: "z6@example.com", name: "Z", time_zone: "America/Detroit")).to be_valid
+      expect(User.new(email: "z5@example.com", time_zone: "America/Anchorage")).to be_valid
+      expect(User.new(email: "z6@example.com", time_zone: "America/Detroit")).to be_valid
     end
 
     it "rejects a garbage zone" do
-      user = User.new(email: "z4@example.com", name: "Z", time_zone: "Mars/Phobos")
+      user = User.new(email: "z4@example.com", time_zone: "Mars/Phobos")
       expect(user).not_to be_valid
       expect(user.errors[:time_zone]).to be_present
     end
@@ -955,6 +943,10 @@ RSpec.describe User, type: :model do
   end
 
   describe "columns" do
+    it "has no name column, since nothing reads or writes one" do
+      expect(User.column_names).not_to include("name")
+    end
+
     it "has none of the Devise columns, and has the authenticator, challenge and session columns" do
       expect(User.column_names & %w[encrypted_password reset_password_token reset_password_sent_at
                                     confirmation_token confirmed_at confirmation_sent_at otp_required_for_login]).to be_empty
@@ -1015,7 +1007,7 @@ RSpec.describe User, type: :model do
 
   describe "#anonymize!" do
     it "replaces or clears every identifying field" do
-      user = create_user(email: "real@example.com", name: "Real Person")
+      user = create_user(email: "real@example.com")
       user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-secret" })
       user.generate_login_code!
 
@@ -1023,7 +1015,6 @@ RSpec.describe User, type: :model do
 
       user.reload
       expect(user.email).to eq("deleted-user-#{user.id}@anonymized.local")
-      expect(user.name).to eq("Deleted user")
       expect(user.api_key).to be_nil
       expect(user.login_code_digest).to be_nil
       expect(user.login_code_sent_at).to be_nil
@@ -1127,7 +1118,7 @@ RSpec.describe User, type: :model do
   describe "#todays_or_held_exercise" do
     include ActiveSupport::Testing::TimeHelpers
 
-    let(:user) { User.create!(email: "viewer@example.com", name: "Viewer", time_zone: "UTC") }
+    let(:user) { User.create!(email: "viewer@example.com", time_zone: "UTC") }
 
     def exercise_on(date) = user.daily_exercises.create!(date: date, generated_at: Time.current, problem_set: { "code_review" => { "question" => "q" } })
 
@@ -1158,7 +1149,7 @@ RSpec.describe User, type: :model do
 
     let(:wednesday) { Time.utc(2026, 7, 22, 12) }
 
-    let(:user) { User.create!(email: "resumer@example.com", name: "Resumer", time_zone: "UTC") }
+    let(:user) { User.create!(email: "resumer@example.com", time_zone: "UTC") }
 
     def pause_on(date)
       user.update!(paused_generation_at: date.in_time_zone(user.effective_time_zone) + 9.hours)
@@ -1315,7 +1306,7 @@ RSpec.describe User, type: :model do
     end
 
     it "resolves both today and the pause day in the user's zone, not the caller's" do
-      tokyoite = User.create!(email: "tokyo@example.com", name: "Tokyo", time_zone: "Asia/Tokyo")
+      tokyoite = User.create!(email: "tokyo@example.com", time_zone: "Asia/Tokyo")
       tokyoite.update!(paused_generation_at: Time.utc(2026, 7, 21, 23)) # 08:00 on the 22nd in Tokyo
       held = tokyoite.daily_exercises.create!(date: Date.new(2026, 7, 22), generated_at: Time.current,
                                              problem_set: { "code_review" => { "question" => "q" } })
@@ -1326,7 +1317,7 @@ RSpec.describe User, type: :model do
     end
 
     it "reads the pause day in the user's own zone, not the server's" do
-      new_yorker = User.create!(email: "ny@example.com", name: "NY", time_zone: "America/New_York")
+      new_yorker = User.create!(email: "ny@example.com", time_zone: "America/New_York")
       # 22:00 on the 21st in New York, which is already the 22nd in UTC.
       new_yorker.update!(paused_generation_at: Time.utc(2026, 7, 22, 2))
       held = new_yorker.daily_exercises.create!(date: Date.new(2026, 7, 21), generated_at: Time.current,
@@ -1415,7 +1406,7 @@ RSpec.describe User, type: :model do
     end
 
     it "renders improved_code visibility for many responses with a single index query shared through inverse_of" do
-      user = User.create!(email: "budget@example.com", name: "B")
+      user = User.create!(email: "budget@example.com")
       3.times do |i|
         ex = user.daily_exercises.create!(date: Date.current - i, generated_at: Time.current, language: "ruby_rails",
           problem_set: { "code_review" => { "concept" => "n_plus_one" } })
@@ -1517,7 +1508,7 @@ RSpec.describe User, type: :model do
   end
 
   describe "#daily_section_count" do
-    let(:user) { User.create!(email: "sections@example.com", name: "Sections") }
+    let(:user) { User.create!(email: "sections@example.com") }
 
     it "defaults to Automatic" do
       expect(user.daily_section_count).to be_nil
@@ -1553,7 +1544,7 @@ RSpec.describe User, type: :model do
     it "does not block an unrelated save when a stored count falls outside today's range" do
       user.update_column(:daily_section_count, ExerciseSection::MAX_SECTIONS + 1)
 
-      expect(user.reload.update(name: "Renamed")).to be(true)
+      expect(user.reload.update(time_zone: "Asia/Tokyo")).to be(true)
     end
 
     it "never offers fewer sections than the daily kinds every day holds" do
@@ -1567,7 +1558,7 @@ RSpec.describe User, type: :model do
 
   describe "reminder level" do
     let(:user) do
-      User.create!(email: "level@example.com", name: "Level", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" })
+      User.create!(email: "level@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" })
     end
 
     it "defaults to none, so a new account is not enrolled" do
@@ -1744,7 +1735,7 @@ RSpec.describe User, type: :model do
         user.update!(section_kind_levels: { "pattern" => "junior" })
 
         expect { user.generate_login_code! }.not_to(change { user.reload.section_kind_preferences_version })
-        expect { user.update!(name: "Renamed") }.not_to(change { user.reload.section_kind_preferences_version })
+        expect { user.update!(time_zone: "Asia/Tokyo") }.not_to(change { user.reload.section_kind_preferences_version })
         expect { user.update!(section_kind_levels: { "pattern" => "junior" }, excluded_section_kinds: []) }
           .not_to(change { user.reload.section_kind_preferences_version })
       end
@@ -1760,7 +1751,7 @@ RSpec.describe User, type: :model do
 end
 
 RSpec.describe User, "#concepts_needing_reinforcement with drills", type: :model do
-  let(:user) { User.create!(email: "drill-reinf@example.com", name: "Drill") }
+  let(:user) { User.create!(email: "drill-reinf@example.com") }
 
   def submit_response(concept:, section: "code_review", self_rating: "too_hard", ai_rating: "developing", date:)
     exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
@@ -1841,7 +1832,7 @@ RSpec.describe User, "#concepts_needing_reinforcement with drills", type: :model
 end
 
 RSpec.describe User, "#concepts_needing_reinforcement across language buckets", type: :model do
-  let(:user) { User.create!(email: "mixed-reinf@example.com", name: "Mixed", language: "mixed") }
+  let(:user) { User.create!(email: "mixed-reinf@example.com", language: "mixed") }
 
   def submit_response(concept:, language:, date:, self_rating: "too_hard", ai_rating: "developing")
     exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: language,
@@ -1872,7 +1863,7 @@ end
 
 RSpec.describe User, "#recent_performance without feedback", type: :model do
   it "carries no feedback key, so nothing free-form reaches the generation prompt" do
-    user = User.create!(email: "no-feedback@example.com", name: "NF")
+    user = User.create!(email: "no-feedback@example.com")
     exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, language: "ruby_rails",
                                             problem_set: { "code_review" => { "concept" => "n_plus_one" } })
     user.daily_responses.create!(daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
@@ -1887,7 +1878,7 @@ RSpec.describe User, "#carry_held_set_forward!", type: :model do
   include ActiveSupport::Testing::TimeHelpers
 
   let(:wednesday) { Time.utc(2026, 7, 22, 12) }
-  let(:user) { User.create!(email: "holder@example.com", name: "Holder", time_zone: "UTC") }
+  let(:user) { User.create!(email: "holder@example.com", time_zone: "UTC") }
 
   def pause_on(date)
     user.update!(paused_generation_at: date.in_time_zone(user.effective_time_zone) + 9.hours)
@@ -2004,7 +1995,7 @@ end
 
 RSpec.describe User, "#recent_exercise_history with dropped sections", type: :model do
   it "counts a dropped section as scheduled for rotation and carries its count" do
-    user = User.create!(email: "drops@example.com", name: "D")
+    user = User.create!(email: "drops@example.com")
     user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
       problem_set: { "code_review" => { "question" => "q" }, "pattern" => { "question" => "q" } },
       dropped_sections: [ "challenge" ])
@@ -2019,7 +2010,7 @@ end
 
 RSpec.describe User, "trials", type: :model do
   it "is ready with its own key or an active trial, and nothing else" do
-    bare = User.create!(email: "bare@example.com", name: "Bare")
+    bare = User.create!(email: "bare@example.com")
     expect(bare).not_to be_provider_ready
     expect(create_user_with_key).to be_provider_ready
 
@@ -2061,7 +2052,7 @@ RSpec.describe User, "trials", type: :model do
   it "ends the trial at the end of its last day in the user's zone, on the chosen provider" do
     invite, = mint_trial_code(days: 3)
     stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
-    user = User.create!(email: "z@example.com", name: "Z", time_zone: "Asia/Tokyo")
+    user = User.create!(email: "z@example.com", time_zone: "Asia/Tokyo")
 
     expect(user.start_trial!(invite: invite, provider: "fake", consented_at: Time.utc(2026, 10, 6, 14),
                              now: Time.utc(2026, 10, 6, 14))).to be(true)
@@ -2074,7 +2065,7 @@ RSpec.describe User, "trials", type: :model do
   it "counts the trial from when the seat is taken after Tokyo midnight, keeping consent before it as its own time" do
     invite, = mint_trial_code(days: 3)
     stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
-    user = User.create!(email: "z@example.com", name: "Z", time_zone: "Asia/Tokyo")
+    user = User.create!(email: "z@example.com", time_zone: "Asia/Tokyo")
     consented = Time.utc(2026, 10, 6, 14, 55)
     redeemed  = Time.utc(2026, 10, 6, 15, 5)
 
@@ -2086,7 +2077,7 @@ RSpec.describe User, "trials", type: :model do
 
   it "refuses a trial on a provider with no house key, a missing code, or a second trial, taking no seat" do
     invite, = mint_trial_code(seats: 3)
-    user = User.create!(email: "z@example.com", name: "Z")
+    user = User.create!(email: "z@example.com")
 
     expect(user.start_trial!(invite: invite, provider: "openai", consented_at: Time.current)).to be(false)
     expect(user.start_trial!(invite: nil, provider: "fake", consented_at: Time.current)).to be(false)
@@ -2106,7 +2097,7 @@ RSpec.describe User, "trials", type: :model do
 end
 
 RSpec.describe User, "generation status", type: :model do
-  let(:user) { User.create!(email: "status@example.com", name: "Status") }
+  let(:user) { User.create!(email: "status@example.com") }
 
   it "records a failure, then a message, then clears them, even when the stored provider and language are invalid" do
     user.update_columns(provider: "nonsense", language: "cobol")

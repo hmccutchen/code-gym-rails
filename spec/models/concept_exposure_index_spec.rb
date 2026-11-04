@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe ConceptExposureIndex do
-  let(:user) { User.create!(email: "ex@example.com", name: "Ex") }
+  let(:user) { User.create!(email: "ex@example.com") }
 
   def submit(concept:, date:, language: "ruby_rails", section: "code_review", submitted_at: Time.current)
     exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: language,

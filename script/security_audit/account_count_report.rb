@@ -1,4 +1,4 @@
-# Prints numbers only, never an email or name, inside a read-only transaction that is rolled back.
+# Prints numbers only, never an email, inside a read-only transaction that is rolled back.
 class AccountCountReport
   def initialize(out: $stdout)
     @out = out

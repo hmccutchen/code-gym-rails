@@ -4,9 +4,9 @@ require Rails.root.join("db/migrate/20261021090000_clear_provider_keys_and_push_
 RSpec.describe ClearProviderKeysAndPushSubscriptions do
   def migrate_up = ActiveRecord::Migration.suppress_messages { described_class.new.migrate(:up) }
 
-  let(:own_key) { User.create!(email: "own@example.com", name: "Own", provider: "gemini", api_keys: { "gemini" => "AIza-own" }) }
+  let(:own_key) { User.create!(email: "own@example.com", provider: "gemini", api_keys: { "gemini" => "AIza-own" }) }
   let(:trial) do
-    User.create!(email: "trial@example.com", name: "Trial", provider: "gemini", api_keys: { "gemini" => "AIza-trial" },
+    User.create!(email: "trial@example.com", provider: "gemini", api_keys: { "gemini" => "AIza-trial" },
                  trial_started_at: 1.day.ago, trial_ends_at: 6.days.from_now, trial_consented_at: 1.day.ago)
   end
 

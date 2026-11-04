@@ -30,8 +30,8 @@ RSpec.describe AddLevelSuggestionColumnsToUsers do
   end
 
   it "copies each account's switch and cutoffs from the track columns" do
-    off = User.create!(email: "off@example.com", name: "Off")
-    on = User.create!(email: "on@example.com", name: "On")
+    off = User.create!(email: "off@example.com")
+    on = User.create!(email: "on@example.com")
     cutoffs = { "code_review" => { "level" => "junior", "through" => "2026-10-10" } }
     migrate(:down)
     write_track_columns(off, suggestions: false, cutoffs: cutoffs)
@@ -43,13 +43,13 @@ RSpec.describe AddLevelSuggestionColumnsToUsers do
   end
 
   it "gives an account created afterwards the defaults" do
-    user = User.create!(email: "new@example.com", name: "New")
+    user = User.create!(email: "new@example.com")
 
     expect(user.reload).to have_attributes(level_suggestions: true, level_suggestion_cutoffs: {})
   end
 
   it "rolls back by removing the new columns and leaving the track columns as they were" do
-    user = User.create!(email: "kept@example.com", name: "Kept")
+    user = User.create!(email: "kept@example.com")
     write_track_columns(user, suggestions: false, cutoffs: { "pattern" => { "level" => "senior" } })
 
     migrate(:down)

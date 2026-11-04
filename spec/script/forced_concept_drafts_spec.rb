@@ -2,7 +2,7 @@ require "rails_helper"
 require Rails.root.join("script/model_comparison")
 
 RSpec.describe ForcedConceptDrafts do
-  let(:user)     { User.create!(email: "forced@example.com", name: "Forced", language: "ruby_rails") }
+  let(:user)     { User.create!(email: "forced@example.com", language: "ruby_rails") }
   let(:out)      { StringIO.new }
   let(:prompts)  { [] }
   let(:concept)  { "proportionality" }

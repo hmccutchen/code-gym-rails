@@ -6,7 +6,7 @@ RSpec.describe AccountCountReport do
   let(:report) { described_class.new(out: out) }
 
   def account(email, key: false, created_at: 1.year.ago)
-    attributes = { email: email, name: "Name", created_at: created_at }
+    attributes = { email: email, created_at: created_at }
     attributes[:api_keys] = { "anthropic" => "sk-ant-test-key" } if key
     User.create!(attributes)
   end
@@ -43,16 +43,16 @@ RSpec.describe AccountCountReport do
     )
   end
 
-  it "prints numbers only, never an email or a name" do
+  it "prints numbers only, never an email" do
     report.report
 
     expect(out.string).to include("active, never added a key                2")
-    expect(out.string).not_to include("@example.com", "Name")
+    expect(out.string).not_to include("@example.com")
   end
 
   it "runs its queries in a transaction that refuses writes" do
     expect {
-      report.read_only { User.create!(email: "written@example.com", name: "Written") }
+      report.read_only { User.create!(email: "written@example.com") }
     }.to raise_error(ActiveRecord::StatementInvalid, /read-only transaction/)
     expect(User.exists?(email: "written@example.com")).to be(false)
   end

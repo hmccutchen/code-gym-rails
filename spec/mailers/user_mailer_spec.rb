@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe UserMailer, type: :mailer do
   describe "#login_code" do
-    let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
+    let(:user) { User.create!(email: "dev@example.com") }
     let(:mail) { UserMailer.login_code(user) }
     let(:raw_code) { mail.body.encoded[/is:\s*(\d{6})/m, 1] }
 
@@ -40,7 +40,7 @@ RSpec.describe UserMailer, type: :mailer do
   end
 
   describe "#second_factor_changed" do
-    let(:user) { User.create!(email: "dev@example.com", name: "Dev", time_zone: "America/New_York") }
+    let(:user) { User.create!(email: "dev@example.com", time_zone: "America/New_York") }
     let(:changed_at) { Time.utc(2026, 10, 23, 14, 5) }
 
     it "says what changed and when, in the user's zone" do

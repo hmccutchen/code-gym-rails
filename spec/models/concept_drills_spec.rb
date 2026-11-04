@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe ConceptDrills do
-  let(:user) { User.create!(email: "drills@example.com", name: "Drills") }
+  let(:user) { User.create!(email: "drills@example.com") }
 
   def row(concept, bucket = "ruby_rails")
     user.concept_masteries.find_by(concept: concept, language: bucket)

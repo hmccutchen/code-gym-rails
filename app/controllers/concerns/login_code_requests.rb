@@ -30,7 +30,7 @@ module LoginCodeRequests
 
   # `active` only: an anonymized row's email was rewritten, so this creates a fresh account instead.
   def mail_login_code(email, user = User.active.find_by(email: email))
-    user ||= User.create!(email: email, name: email.split("@").first)
+    user ||= User.create!(email: email)
     UserMailer.login_code(user).deliver_later
 
     remember_pending_login(email)

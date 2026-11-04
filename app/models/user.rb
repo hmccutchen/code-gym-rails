@@ -31,8 +31,6 @@ class User < ApplicationRecord
 
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
-  validates :name,  presence: true
-  before_validation :clean_name, if: :name_changed?
   validates :skill_level, inclusion: { in: SKILL_LEVELS, message: SKILL_LEVEL_RULE }
   validates :provider, inclusion: { in: ->(_) { AiProvider.keys } }, allow_nil: true
   validate :api_keys_name_providers, if: :api_keys_changed?
@@ -202,7 +200,6 @@ class User < ApplicationRecord
 
       update!(
         email:                            "deleted-user-#{id}@anonymized.local",
-        name:                             "Deleted user",
         api_keys:                         nil,
         login_code_sent_at:               nil,
         login_code_digest:                nil,
@@ -431,10 +428,6 @@ class User < ApplicationRecord
 
   def write_generation_status!(columns)
     update_columns(columns.merge(updated_at: Time.current))
-  end
-
-  def clean_name
-    self.name = UserText.clean(name, limit: UserText::MAX_NAME_LENGTH).strip
   end
 
   def carry_forward(held)

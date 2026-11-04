@@ -5,7 +5,7 @@ RSpec.describe "Accounts", type: :request do
 
   describe "GET /account" do
     it "shows the identity summary, log out control and settings link" do
-      user = create_user_with_key(email: "dev@example.com", name: "Dev")
+      user = create_user_with_key(email: "dev@example.com")
       login_as(user)
 
       get account_path
@@ -16,7 +16,7 @@ RSpec.describe "Accounts", type: :request do
     end
 
     it "links the shared phone stylesheet" do
-      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+      login_as(create_user_with_key(email: "dev@example.com"))
 
       get account_path
 
@@ -25,7 +25,7 @@ RSpec.describe "Accounts", type: :request do
     end
 
     it "reaches Settings from the nav, not from the Account page itself" do
-      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+      login_as(create_user_with_key(email: "dev@example.com"))
 
       get account_path
 
@@ -36,7 +36,7 @@ RSpec.describe "Accounts", type: :request do
 
     # Without that skip a keyless user is bounced to /setup and cannot log out.
     it "renders for a user who has not added an API key yet" do
-      user = User.create!(email: "keyless@example.com", name: "Keyless")
+      user = User.create!(email: "keyless@example.com")
       login_as(user)
 
       get account_path
@@ -65,7 +65,7 @@ RSpec.describe "Accounts", type: :request do
 
   describe "DELETE /account" do
     it "anonymizes the user, clears the session and redirects to login" do
-      user = create_user_with_key(email: "leaving@example.com", name: "Leaving")
+      user = create_user_with_key(email: "leaving@example.com")
       login_as(user)
 
       delete account_path
@@ -226,7 +226,7 @@ RSpec.describe "Accounts", type: :request do
 
   describe "card order" do
     it "marks the page and its identity card for the desktop grid" do
-      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+      login_as(create_user_with_key(email: "dev@example.com"))
 
       get account_path
 
@@ -241,7 +241,7 @@ RSpec.describe "Accounts", type: :request do
 
     it "orders the cards identity, practice, reminders, security, usage, session, danger" do
       with_push_credentials do
-        login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+        login_as(create_user_with_key(email: "dev@example.com"))
 
         get account_path
 
@@ -251,7 +251,7 @@ RSpec.describe "Accounts", type: :request do
 
     it "leaves the Reminders card out when push isn't configured" do
       without_push_credentials do
-        login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+        login_as(create_user_with_key(email: "dev@example.com"))
 
         get account_path
 
@@ -261,7 +261,7 @@ RSpec.describe "Accounts", type: :request do
 
     it "styles the reminders offer's status line as a card note" do
       with_push_credentials do
-        login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+        login_as(create_user_with_key(email: "dev@example.com"))
 
         get account_path
 
@@ -286,7 +286,7 @@ RSpec.describe "Accounts", type: :request do
     end
 
     it "puts Log out in the Session card as a full-width button" do
-      login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
+      login_as(create_user_with_key(email: "dev@example.com"))
 
       get account_path
 
@@ -318,7 +318,7 @@ RSpec.describe "Accounts", type: :request do
     end
 
     it "shows the paused state and a resume button when paused" do
-      user = create_user_with_key(email: "paused@example.com", name: "Paused")
+      user = create_user_with_key(email: "paused@example.com")
       user.update!(paused_generation_at: Time.utc(2026, 7, 29, 12, 0))
       login_as(user)
 
@@ -331,7 +331,7 @@ RSpec.describe "Accounts", type: :request do
 
   describe "PATCH /account/toggle_generation" do
     it "pauses automatic generation for an active user" do
-      user = create_user_with_key(email: "pauser@example.com", name: "Pauser")
+      user = create_user_with_key(email: "pauser@example.com")
       login_as(user)
 
       patch toggle_generation_account_path
@@ -343,7 +343,7 @@ RSpec.describe "Accounts", type: :request do
     end
 
     it "resumes automatic generation for a paused user" do
-      user = create_user_with_key(email: "resumer@example.com", name: "Resumer")
+      user = create_user_with_key(email: "resumer@example.com")
       user.update!(paused_generation_at: Time.current)
       login_as(user)
 
@@ -357,7 +357,7 @@ RSpec.describe "Accounts", type: :request do
 
     it "brings the held set forward to today and says so" do
       travel_to(Time.utc(2026, 7, 22, 12)) do
-        user = create_user_with_key(email: "held@example.com", name: "Held")
+        user = create_user_with_key(email: "held@example.com")
         held = user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current,
                                             problem_set: { "code_review" => { "question" => "q" } })
         user.update!(paused_generation_at: (Date.current - 1).in_time_zone(user.effective_time_zone) + 9.hours)
@@ -373,7 +373,7 @@ RSpec.describe "Accounts", type: :request do
 
     # Read as a flip, a double-tapped Resume would pause generation again.
     it "stays resumed when Resume is double-tapped" do
-      user = create_user_with_key(email: "doubletap@example.com", name: "Double")
+      user = create_user_with_key(email: "doubletap@example.com")
       user.update!(paused_generation_at: Time.current)
       login_as(user)
 
@@ -384,7 +384,7 @@ RSpec.describe "Accounts", type: :request do
 
     # The pause timestamp is #held_exercise's floor, so re-stamping it would strand the held set.
     it "stays paused when Pause is double-tapped, without restamping the pause" do
-      user = create_user_with_key(email: "doubletap2@example.com", name: "Double Two")
+      user = create_user_with_key(email: "doubletap2@example.com")
       paused_at = 2.days.ago.change(usec: 0)
       user.update!(paused_generation_at: paused_at)
       login_as(user)
@@ -396,7 +396,7 @@ RSpec.describe "Accounts", type: :request do
 
     it "still recovers the held set after a repeated Pause from a stale tab" do
       travel_to(Time.utc(2026, 7, 22, 12)) do
-        user = create_user_with_key(email: "stale-tab@example.com", name: "Stale")
+        user = create_user_with_key(email: "stale-tab@example.com")
         held = user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current,
                                             problem_set: { "code_review" => { "question" => "q" } })
         user.update!(paused_generation_at: (Date.current - 1).in_time_zone(user.effective_time_zone) + 9.hours)

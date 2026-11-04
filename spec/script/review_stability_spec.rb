@@ -2,7 +2,7 @@ require "rails_helper"
 require Rails.root.join("script/model_comparison")
 
 RSpec.describe ReviewStability do
-  let(:user) { User.create!(email: "stability@example.com", name: "Stability") }
+  let(:user) { User.create!(email: "stability@example.com") }
   let(:out) { StringIO.new }
   let(:posted) { [] }
   # Ratings for successive grades; :bad_key answers 401 and any grade past the queue is "solid".

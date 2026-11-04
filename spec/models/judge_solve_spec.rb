@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe JudgeSolve, type: :model do
-  let(:user) { User.create!(email: "judge-solves@example.com", name: "J") }
+  let(:user) { User.create!(email: "judge-solves@example.com") }
   let(:exercise) { exercise_on(Date.current) }
 
   let(:section) do

@@ -687,7 +687,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   describe "review button label" do
     it "names the user's provider on the get-review button" do
-      user = create_user_with_key(email: "gem@example.com", name: "Gem")
+      user = create_user_with_key(email: "gem@example.com")
       user.store_api_key("AIzaGem", provider: "gemini")
       user.save!
       login_as(user)
@@ -712,7 +712,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   describe "the nav" do
     it "shows no name field and no name" do
-      user = create_user_with_key(email: "edit@example.com", name: "Editable")
+      user = create_user_with_key(email: "edit@example.com")
       login_as(user)
 
       get root_path
@@ -724,7 +724,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   describe "brand title link" do
     it "links the brand title back to the dashboard when logged in" do
-      login_as(create_user_with_key(email: "brand@example.com", name: "Brand"))
+      login_as(create_user_with_key(email: "brand@example.com"))
 
       get root_path
 

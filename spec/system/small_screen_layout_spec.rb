@@ -644,7 +644,7 @@ RSpec.describe "Small screen layout", type: :system do
         end
 
         {
-          "a user with no key and no exercises" => -> { User.create!(email: "no-key@example.com", name: "No key", time_zone: "UTC", track_chosen_at: Time.current) },
+          "a user with no key and no exercises" => -> { User.create!(email: "no-key@example.com", time_zone: "UTC", track_chosen_at: Time.current) },
           "an active trial user" => -> { create_trial_user }
         }.each do |who, build|
           it "keeps Connection's text spaced and inside the card for #{who}" do

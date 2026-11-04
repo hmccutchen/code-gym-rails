@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe ReviewGrading do
-  let(:user) { User.create!(email: "grading@example.com", name: "Grading") }
+  let(:user) { User.create!(email: "grading@example.com") }
 
   def exercise_and_response
     exercise = DailyExercise.create!(
@@ -393,7 +393,7 @@ RSpec.describe ReviewGrading do
   end
 
   describe "judging graded reviews" do
-    let(:user) { User.create!(email: "graded@example.com", name: "G", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
+    let(:user) { User.create!(email: "graded@example.com", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
     let(:exercise) do
       DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
                             problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys)
@@ -592,7 +592,7 @@ RSpec.describe ReviewGrading do
   end
 
   describe "the essential-gap check on each graded section" do
-    let(:user) { User.create!(email: "rubric@example.com", name: "R", provider: "fake", api_keys: { "fake" => "fake-test-key" }, skill_level: "senior") }
+    let(:user) { User.create!(email: "rubric@example.com", provider: "fake", api_keys: { "fake" => "fake-test-key" }, skill_level: "senior") }
     let(:service) { FakeService.new("key") }
     let(:logged) { StringIO.new }
     let(:saved_exercise) do

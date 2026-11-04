@@ -43,7 +43,7 @@ RSpec.describe "Provider failures as users see them", type: :request do
   end
 
   let(:user) do
-    User.create!(email: "gemini@example.com", name: "Gem", time_zone: "America/New_York",
+    User.create!(email: "gemini@example.com", time_zone: "America/New_York",
                  track_chosen_at: Time.current).tap do |u|
       u.update!(provider: "gemini", api_keys: { "gemini" => "AIzaTestKey" })
     end

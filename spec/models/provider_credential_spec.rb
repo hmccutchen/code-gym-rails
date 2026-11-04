@@ -12,7 +12,7 @@ RSpec.describe ProviderCredential, type: :model do
   end
 
   it "hands an account with neither key nor trial nothing, as before trials existed" do
-    user = User.create!(email: "bare@example.com", name: "Bare")
+    user = User.create!(email: "bare@example.com")
 
     expect(described_class.for(user)).to eq(described_class::Credential.new(key: nil, house: false))
   end
