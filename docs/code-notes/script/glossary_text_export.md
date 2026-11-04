@@ -12,9 +12,9 @@ runs it and sends the lines to stdout.
     `DailyResponse::AI_REVIEW_FIELDS` point, the difficulty reason and every
     saved alternate explanation.
   - **Exercises** (`source: "exercise"`, `id` `<exercise>:<section>`): the
-    scenario, question, architecture options, the architecture inline
-    reference's tagline, explanation, tradeoffs and senior lens (`reference_*`
-    fields), ambiguity hunt request,
+    scenario, question, architecture options, each section's stored
+    `reference` tagline, explanation, tradeoffs and senior lens (`reference_*`
+    fields; only the architecture partial shows them), ambiguity hunt request,
     pseudocode problem statement, pattern `why` and plan review
     `plan_excerpt`. A spec fixture holds every one, so a field the export
     drops fails it. It reads every `problem_set` key, alternates the page

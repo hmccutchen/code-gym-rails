@@ -148,9 +148,15 @@ for `rollback`, `transactions` and `promises`. It found three matches, each
 in a sense the widened definition covers, so the forms were added.
 
 The architecture section's inline reference
-(`responses/bodies/_architecture.html.erb`, built from the exercise JSON) stays
-plain too, because the production audit never covered that text. Issue #561
-covers auditing and wrapping it.
+(`responses/bodies/_architecture.html.erb`, built from the exercise JSON) was
+left plain at first, because the production audit never covered that text.
+On 2026-11-04 (#561) a read-only export of the stored `reference` blocks gave
+28 rows from architecture sections, and the sense listing, run with an empty
+base-words file, found 13 matches across 8 keys there (`transaction`,
+`idempotent`, `connection pool`, `eventual consistency`, `pessimistic
+locking`, `background job`, `concurrency`, `contention`), each in a sense its
+definition covers. The tagline, explanation, tradeoffs and senior lens now go
+through `section_glossary_wrap`; the summary and the diagram stay plain.
 
 **Glossary backfill, batch one (2026-10-26).** The production audit of the
 existing references found 770 term rows in fields a reader sees, and 625 of
