@@ -10,9 +10,11 @@ When a concept appears in more than one section, the least favorable section's A
 
 A paused concept returns early. Paused concepts only count down their cooldown, which `.count_down_paused_concepts!` does as the first step of `.record_review!`.
 
-The final `else` branch is the stagnant case: the rating is the same as or worse than the last one.
+## `.record_unmastered`
 
-When the review does not master the concept, the retention schedule is cleared, so a failed retention check sends the concept back into normal reinforcement. `mastered_at` is left alone, because it records the first mastery.
+The streak resets when the rating improved or there was no earlier rating. Otherwise it is the stagnant case: the rating is the same as or worse than the last one, so the streak grows and can step the tier down.
+
+The retention schedule is cleared, so a failed retention check sends the concept back into normal reinforcement. `mastered_at` is left alone, because it records the first mastery.
 
 ## `.retention_schedule_for`
 
