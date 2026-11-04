@@ -41,6 +41,8 @@ class ExerciseSection::CodeReview < ExerciseSection
     files == :multi ? MULTI_FILE_RANGES.fetch(rung, MULTI_FILE_RANGES.fetch("junior")) : 1..1
   end
 
+  def self.multi_file_range?(file_range) = file_range.max > 1
+
   def self.day_file_range(plan:, difficulty:, skill_level:)
     file_range(files: plan.code_review_files, rung: difficulty.rung_for(self, skill_level: skill_level))
   end
@@ -94,7 +96,7 @@ class ExerciseSection::CodeReview < ExerciseSection
     return reject_bug_hunt!(section) if BugHunt.mode?(mode)
 
     section.delete(BugHunt::PURPOSE_FIELD)
-    if file_range.max == 1
+    unless multi_file_range?(file_range)
       reject_unusable_snippet!(section)
       return drop_file_fields!(section)
     end
@@ -208,6 +210,8 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.judge_guidance_for(section) = files(section).any? ? MultiFile::JUDGE_GUIDANCE : super
 
+  def self.ships_unjudged?(section) = files(section).none? && super
+
   def self.discovery?
     true
   end
@@ -226,7 +230,7 @@ class ExerciseSection::CodeReview < ExerciseSection
     return BugHunt::Prompt.guidance(gotcha: gotcha, rung: rung, vocabulary: vocabulary) if BugHunt.mode?(mode)
 
     vocabulary_line = "- Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}"
-    if file_range.max > 1
+    if multi_file_range?(file_range)
       return MultiFile.guidance(file_range: file_range, label: label, mode: mode, artifact: artifact, test_framework: test_framework,
                                 rung: rung, code_style: code_style, vocabulary: vocabulary,
                                 shared_lines: [ vocabulary_line, MultiFile::HIDDEN_KEY_LINE ])
@@ -250,7 +254,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   # Keep the snippet's language out of here: the instruction line above is its one authoritative statement.
   def self.schema_fragment(label:, file_range: 1..1, mode: nil, **)
     return BugHunt::Prompt.schema_fragment if BugHunt.mode?(mode)
-    return MultiFile.schema_fragment(file_range: file_range, answer_key: MultiFile::ANSWER_KEY_SCHEMA) if file_range.max > 1
+    return MultiFile.schema_fragment(file_range: file_range, answer_key: MultiFile::ANSWER_KEY_SCHEMA) if multi_file_range?(file_range)
 
     <<~SCHEMA.chomp
       "code_review": {

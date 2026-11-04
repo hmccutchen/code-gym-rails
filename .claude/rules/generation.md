@@ -53,8 +53,8 @@ read it before changing that area.
   or the refusal code) through one fixed line in
   `GenerationPrompt::RetryReasons`, or no reason when none is recorded, and
   never the draft or the judge's own words; a judge failure keeps the draft,
-  except where the kind's `.ships_unjudged?` says no (a `bug_hunt` section
-  is dropped);
+  except where the kind's `.ships_unjudged?` says no (a `bug_hunt` section,
+  or a `code_review` with files, is dropped);
   a day with every section dropped raises `AllSectionsRejectedError` and
   writes no row. A dropped kind still counts as
   scheduled, and nothing in the rotation compensates, on purpose; a day's
@@ -84,7 +84,9 @@ read it before changing that area.
   `multi: 0.25` with guards: the key adds `files` and `evidence`, and one
   that fails (`files_unmatched`, `evidence_unlocated`) is dropped with the
   section kept until keyed grading; the judge gets `MultiFile::JUDGE_GUIDANCE`
-  and the grader `MultiFile::GRADING_NOTE`, which reads no key.
+  and the grader `MultiFile::GRADING_NOTE`, which reads no key. Files roll
+  only on judged days, and a section with files is dropped when its judge
+  fails (`.ships_unjudged?`), as a bug hunt is.
 - **`bug_hunt`, the fourth `code_review` mode**
   (`docs/decisions/bug-hunt.md`): A goal line (`purpose`, at most
   160 characters, deleted on every other mode, so it marks the section) and

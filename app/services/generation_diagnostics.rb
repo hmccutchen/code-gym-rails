@@ -19,7 +19,7 @@ class GenerationDiagnostics
   end
 
   def key_notes(notes, attempt:, code_review_mode:, code_review_files:)
-    files = code_review_files.max > 1 ? "multi" : "single"
+    files = ExerciseSection::CodeReview.multi_file_range?(code_review_files) ? "multi" : "single"
     notes.each do |note|
       Rails.logger.info("[planted_key] answer_key=#{note.outcome} kind=#{note.key} language=#{note.language} attempt=#{attempt} " \
                         "code_review_mode=#{code_review_mode} code_review_files=#{files}#{quote_counts(note.quotes)} user=#{@user.id}")

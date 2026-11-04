@@ -59,8 +59,27 @@ RSpec.describe CodeReviewSplit do
 
     described_class.new(out: out, log_lines: log).report
 
-    expect(out.string).to include("multi-file code_review key notes: 4 (ok 1, missing 0, too_long 0, files_unmatched 1, " \
-                                  "evidence_unlocated 2, quote_missing 0)")
+    expect(out.string).to include("multi-file code_review key notes: 4 (evidence_unlocated 2, files_unmatched 1, ok 1)")
+  end
+
+  it "names every outcome the log holds, so the counts always add up to the total" do
+    log = [ "[planted_key] answer_key=a_new_reason kind=code_review language=ruby_rails attempt=draft code_review_mode=test_file " \
+            "code_review_files=multi user=1" ]
+
+    described_class.new(out: out, log_lines: log).report
+
+    expect(out.string).to include("multi-file code_review key notes: 1 (a_new_reason 1)")
+  end
+
+  it "reads the lines GenerationDiagnostics writes" do
+    lines = []
+    allow(Rails.logger).to receive(:info) { |message| lines << message.to_s }
+    note = ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "evidence_unlocated", quotes: nil)
+    GenerationDiagnostics.new(user).key_notes([ note ], attempt: "draft", code_review_mode: :test_file, code_review_files: 2..3)
+
+    described_class.new(out: out, log_lines: lines).report
+
+    expect(out.string).to include("multi-file code_review key notes: 1 (evidence_unlocated 1)")
   end
 
   it "says when it was given no log" do

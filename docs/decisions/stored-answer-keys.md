@@ -108,10 +108,10 @@ Two checks, neither of which changes a key:
   `too_long` or `quote_missing`, and for a multi-file key `files_unmatched`
   or `evidence_unlocated`), `attempt` (`draft` or `retry`) and the day's
   `code_review_mode`, and since the multi-file launch its
-  `code_review_files` (`single` or `multi`). The threshold is counted from
-  single-file lines only: a line with `code_review_files=single`, or one
-  written before the field existed. A multi-file key quotes whole files, so
-  its lines are counted apart, by `script/split_code_review_results.rb`
+  `code_review_files` (`single` or `multi`). The field describes the day's
+  `code_review`, so every keyed kind's line carries it, and only a
+  `kind=code_review` line marked `multi` leaves the threshold count: a
+  multi-file key quotes whole files, so those lines are counted apart, by `script/split_code_review_results.rb`
   (`docs/decisions/multi-file-code-review.md`), and the lines already counted
   toward the first 10 stay counted. More than 2
   `quote_missing` in the first 10 drafted Ruby sections of a kind that

@@ -74,6 +74,12 @@ replaces the earlier "launch B waits for PR 2" order.
     from #639, since every reply behind `JUDGE_MEASURED_MAX_OUTPUT_TOKENS`
     came from a single-file section, and a reply past a third of
     `JUDGE_MAX_TOKENS` sends the cap back to the owner
+  The judge is one of the guards, so a section with files never ships
+  without it (owner's decision, 2026-11-04, as for `bug_hunt`): `DailyPlan`
+  rolls files only on a judged day, so a weekend day is single-file, and a
+  section with files whose judge call fails is dropped
+  (`CodeReview.ships_unjudged?`), which costs that day its `code_review`.
+  The shares below are of judged days.
   The split script also gives `bug_hunt` sections a row of their own, since
   they are not mastery evidence and would blur the single-file figures the
   multi-file ones are compared with. `FakeService` answers a prompt that asks
@@ -83,7 +89,7 @@ replaces the earlier "launch B waits for PR 2" order.
   failed multi-file key joins, a multi-file calibration fixture is added, and
   the early grades are compared with keyed ones (below).
 
-At `mid_level` and above, 0.25 makes about 15% of Ruby `code_review` days
+At `mid_level` and above, 0.25 makes about 15% of judged Ruby `code_review` days
 multi-file and about 20% of JavaScript days. A `bug_hunt` day (20% of days)
 is always single-file, and `RealSource` keeps about 20% of Ruby days single,
 so a quarter of the remaining 60% of Ruby days and 80% of JavaScript days

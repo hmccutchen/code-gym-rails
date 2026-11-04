@@ -406,6 +406,12 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
                                                                     "Never change a path, a file's code or its changed lines")
     end
 
+    it "is dropped rather than shipped when the judge can't check it" do
+      expect(described_class.ships_unjudged?(two_files)).to be(false)
+      expect(described_class.ships_unjudged?(single)).to be(true)
+      expect(described_class.ships_unjudged?(bug_hunt)).to be(false)
+    end
+
     it "leaves the single-file and bug hunt sections as they were" do
       expect(described_class.judge_task_for(single)).to eq(described_class.judge_task)
       expect(described_class.judge_guidance_for(single)).to be_nil
@@ -478,6 +484,12 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file generation" do
     it "has a range for every level, none wider than the file slots" do
       expect(described_class::MULTI_FILE_RANGES.keys).to eq(KindDifficulty::LEVELS)
       expect(described_class::MULTI_FILE_RANGES.values.map(&:max).max).to eq(described_class::FILE_SLOTS.max)
+    end
+  end
+
+  describe ".multi_file_range?" do
+    it "is true only for a range that can hold more than one file" do
+      expect([ 1..1, 2..2, 2..3 ].map { |range| described_class.multi_file_range?(range) }).to eq([ false, true, true ])
     end
   end
 

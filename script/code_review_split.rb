@@ -6,7 +6,6 @@ class CodeReviewSplit
   SHAPES = %w[single multi bug_hunt].freeze
   RATINGS = ConceptMastery::AI_RATING_RANK.keys.freeze
   UNRATED = "unrated".freeze
-  KEY_OUTCOMES = %w[ok missing too_long files_unmatched evidence_unlocated quote_missing].freeze
   MULTI_KEY_LINE = /\A\[planted_key\] answer_key=(\w+) kind=code_review .*\bcode_review_files=multi\b/
 
   def initialize(out: $stdout, log_lines: nil)
@@ -50,7 +49,7 @@ class CodeReviewSplit
   def key_note_line
     return "no log given" if @log_lines.nil?
 
-    outcomes = @log_lines.filter_map { |line| line[MULTI_KEY_LINE, 1] }.tally
-    "#{outcomes.values.sum} (#{KEY_OUTCOMES.map { |outcome| "#{outcome} #{outcomes.fetch(outcome, 0)}" }.join(', ')})"
+    outcomes = @log_lines.filter_map { |line| line[MULTI_KEY_LINE, 1] }.tally.sort_by { |outcome, count| [ -count, outcome ] }
+    "#{outcomes.sum(&:last)} (#{outcomes.map { |outcome, count| "#{outcome} #{count}" }.join(', ')})"
   end
 end
