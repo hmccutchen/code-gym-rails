@@ -31,8 +31,8 @@ page, so featuring a developing concept says nothing that page does not.
 **Stored, so it holds for the week.** `featured_concepts` keeps one row per
 user and `week_of`, the Monday of the week in the user's own zone, which
 `ApplicationController#use_time_zone` sets around every action. The first
-page load of a week computes and stores the pick, and every load after reads
-it, so new work during the week cannot move it. A pick computed on every
+call of a week, a page load or the morning's generation, computes and stores
+the pick, and every call after reads it, so new work during the week cannot move it. A pick computed on every
 load was rejected: it would build `RungLedger`, which reads every submitted
 response and its exercise, twice on each dashboard and Learn load, and could
 avoid only last week's concept rather than rotate. The stored rows are also
@@ -148,15 +148,19 @@ its hidden concepts.
 
 **The guards stay.** `featured_callout_shown?` and Learn's
 `featured_shown_beside_todays_set?` still leave the callout and the block off
-for the cases above, for a first week on which no concept had been met yet when
-the set was generated (the pick comes later, from exposures that include the
-set), and for a provider that tags the concept anyway, as the bug-hunt page
-check does.
+for the cases generation does not cover: the held set and the midnight window
+above, a provider that tags the concept anyway (as the bug-hunt page check
+does), and a mid-week re-pick. The last happens when the stored pick stops
+being met (the user changes language, or Start over removes its only
+exposure): `FeaturedConcept.for` then replaces or removes the row, and a set
+already generated that week was planned against the old pick. A first week with
+nothing met yet is not one of them: exposures count only submitted responses,
+so a pick made later cannot match a set that is still unsubmitted.
 
 **Why generation may read it.** `FeaturedConcept.for` reads exposures and the
 `RungLedger`, which come from reviewed answers. It reads no track, suggestion
 or trial state and never `ConceptMastery`, so `level_suggestion_isolation_spec`
 and `trial_isolation_spec` do not cover it. It writes the row the dashboard
-would have written on the first visit of the week, and an existing row is read
-unchanged. The prompt never names the concept: the pick only shortens the closed
+would have written on the first visit of the week, and it replaces or removes a
+stale row exactly as the dashboard does. The prompt never names the concept: the pick only shortens the closed
 list a hiding kind may choose from.

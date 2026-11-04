@@ -98,7 +98,7 @@ User browses /learn (independent of the daily flow above):
 
 Every dashboard, /learn and /history load, any day of the week:
   └→ FeaturedConcept.for(user)        → this user's concept for the week, from
-       concepts they have met, picked on their first visit of the week and read
-       by every visit after — rendered at the top of /learn and as a small
+       concepts they have met, picked on the first call of the week, a visit or
+       the morning's generation, and read by every call after — rendered at the top of /learn and as a small
        callout on the dashboard, and marked on every section that carries it
 ```

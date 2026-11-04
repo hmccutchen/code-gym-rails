@@ -12,6 +12,8 @@ The plan chooses the day's concepts so the caller can compare what was offered w
 
 The fourth track takes the day's fourth kind from the planned kinds, so a daily fourth and a rotated fourth are planned the same way. Under the pair's layout a day never holds two. `Result#fourth` is derived from `#kinds` the same way rather than stored beside the rotation, so a hand-built plan cannot name one fourth kind in its rotation and another in its prompt lines.
 
+The fourth track also asks `DayHosts` which concepts that kind can tag, through `fourth_track(..., hosts:)`, for its reinforcement, its overdue check, its due checks and its established concepts. It used to take every concept in the bucket, because the fourth kind alone tags that bucket. It matters when the week's featured concept (`Result#featured`) is one the fourth kind hides from itself: that concept is no longer planned onto the section, and a due check on it lands in `waiting_checks` as `no_host` until the week turns over (`docs/decisions/the-weekly-featured-concept.md`). For any other day the answer is the kind's whole vocabulary, so nothing changes.
+
 ## `.main_track`
 
 Reinforcement is truncated to today's hosts because the prompt demands every concept it lists.

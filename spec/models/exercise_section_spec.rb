@@ -150,13 +150,13 @@ RSpec.describe ExerciseSection do
       end
     end
 
-    it "agrees with what the page withholds: a kind hides its concept in the plan when it hides it from a section" do
-      hidden_sections = { ExerciseSection::CodeReview => { "purpose" => "Sum the prices." } }
-      ExerciseSection.all.each do |kind|
-        section = hidden_sections.fetch(kind, {})
-        mode    = kind == ExerciseSection::CodeReview ? :bug_hunt : nil
+    it "agrees with what the page withholds, for every kind on every day mode: a kind hides its concept in the plan when it hides it from a section" do
+      DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key do |mode|
+        section = mode == ExerciseSection::CodeReview::BugHunt::MODE ? { "purpose" => "Sum the prices." } : {}
 
-        expect(kind.concept_hidden_in_plan?(mode: mode)).to eq(!kind.concept_shown_before_submission?(section)), kind.name
+        ExerciseSection.all.each do |kind|
+          expect(kind.concept_hidden_in_plan?(mode: mode)).to eq(!kind.concept_shown_before_submission?(section)), "#{kind.name} on #{mode}"
+        end
       end
     end
   end

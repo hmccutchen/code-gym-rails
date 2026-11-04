@@ -1,4 +1,4 @@
-# One concept per user per week, picked on the first visit and read by every visit after it.
+# One concept per user per week, picked on the first call of the week (a visit or a generation) and read by every call after it.
 class FeaturedConcept < ApplicationRecord
   belongs_to :user
 

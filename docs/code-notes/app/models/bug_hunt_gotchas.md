@@ -25,7 +25,10 @@ bug would look fixed by the time a witness compared it.
 Never-seen entries first, in list order, then the one seen longest ago,
 with ties in list order: the same shape as `RealSource.pick`. That bounds
 the longest wait before an entry comes round again by the size of the
-list, which is why entries are appended, never inserted.
+list, which is why entries are appended, never inserted. The week's featured
+concept is skipped by name (#687), so the bound holds over the entries that
+remain. A spec holds that every language's list teaches at least two concepts,
+so the skip never leaves nothing to pick.
 
 ## `.last_seen_for`
 

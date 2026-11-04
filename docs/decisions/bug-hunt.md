@@ -59,7 +59,10 @@ setting turns it off or weights it (owner's decision).
     says yet which concept a section will hide. That window is accepted:
     the set is generated at 8am or on the first dashboard visit, so it is
     short, and a featured concept seen then says nothing about a set that
-    doesn't exist yet.
+    doesn't exist yet. Generation also keeps the week's featured concept
+    out of the trap pick and out of the other hiding kinds (#687,
+    `docs/decisions/the-weekly-featured-concept.md`), so these guards now
+    cover only the rarer cases listed there.
   - Every other kind's vocabulary leaves out the picked trap's concept
     (`ConceptVocabulary.selectable_for_section(..., gotcha:)`), so the
     prompt never offers it to another section. `DayHosts` reads the same

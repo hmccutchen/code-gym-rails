@@ -34,6 +34,14 @@ RSpec.describe DayHosts do
       .can_tag?(ExerciseSection::Challenge, "memoization", "ruby_rails")).to be(true)
   end
 
+  it "never hides the concept of a kind that hosts a main-track bucket, which is why the retention annotation needs no featured concept" do
+    DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key do |mode|
+      ExerciseSection.all.select { |kind| kind.concept_hidden_in_plan?(mode: mode) }.each do |kind|
+        expect(kind.fourth? || !kind.planning_host?(mode: mode)).to be(true), "#{kind.name} on #{mode} hides its concept and hosts a main-track bucket"
+      end
+    end
+  end
+
   it "lets code_review tag nothing on a bug_hunt day, since that section is not mastery evidence" do
     bug_hunt = described_class.new("ruby_rails", mode: :bug_hunt)
 
