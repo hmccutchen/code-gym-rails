@@ -599,3 +599,9 @@ data.*
 - login and trial styles as component sheets with one field rule, and the
   layout's chevron on collapsible cards `#671`
   **I decided:** start on both issues in one PR
+
+## Wed Nov 4
+
+- the deferred-module system spec waiting for the dashboard to finish
+  parsing, after it failed once under load `#676`
+  **I decided:** file an issue for the race, then fix it
