@@ -605,3 +605,6 @@ data.*
 - shared component sheets for the authenticator pages, and admin tables
   that scroll in their own box on a phone `#668`
   **I decided:** start on both issues in one PR
+- login and trial styles as component sheets with one field rule, and the
+  layout's chevron on collapsible cards `#671`
+  **I decided:** start on both issues in one PR

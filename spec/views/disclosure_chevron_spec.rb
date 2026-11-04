@@ -10,6 +10,17 @@ RSpec.describe "disclosure chevrons" do
 
     chevron = ViewStyles.rules(layout).find { |rule| rule.selectors.include?("details.section > summary::before") }
     expect(chevron.selectors).to include("details.review summary::before", "details.answers summary::before",
-                                         "details.progress-group summary::before", ".learn-recognition summary::before")
+                                         "details.progress-group summary::before", ".learn-recognition summary::before",
+                                         "details.card > summary::before")
+  end
+
+  it "draws a collapsible card's chevron in place of the browser's marker, turning it when the card opens" do
+    closed = ViewStyles.rules(layout).find { |rule| rule.selectors.include?("details.section:not([open]) > summary::before") }
+    card = ViewStyles.stylesheet_rules(Rails.root.join("app/assets/stylesheets/phone_cards.css"))
+                     .find { |rule| rule.selectors == [ "details.card > summary" ] }
+
+    expect(closed.selectors).to include("details.card:not([open]) > summary::before")
+    expect(card.declaration("display")).to eq("flex")
+    expect(card.declaration("list-style")).to eq("none")
   end
 end

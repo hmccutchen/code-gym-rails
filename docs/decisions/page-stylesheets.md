@@ -39,7 +39,21 @@ of the page's own sheet, so the page's rules win their ties with a shared
 component's. `ApplicationHelper#linked_stylesheets` gives that list. The
 authenticator setup, sign-in-again and recovery codes pages were the first:
 their shared `authenticators/_styles` partial became
-`components/authenticator.css`. The admin judge solves and suggested
+`components/authenticator.css`. The sign-in, enter-code and second-factor
+pages followed with `components/login.css`, and the two trial pages with
+`components/trial.css` (#669). Those three groups and the authenticator setup
+page had each copied the same field, label and text-input rules, so those
+live once in `components/form_field.css`, named first on each page that
+holds a `.form-field`, and `app_views_spec` fails on a page that shows one
+without linking it, a partial's callers included. Its input rule leaves out
+checkboxes, radios and ranges, because the trial form's provider radios sit
+inside a `.form-field` fieldset. The light palette's field-border rule and
+the login sheet's focus rule leave out the same three, and
+`spec/views/page_stylesheets_spec.rb` holds the three lists equal. Settings
+keeps its own field rules in `pages/settings.css` and links no field sheet:
+its label and input rules also style `.settings-fields`, set a monospace
+font and size checkboxes. Only its one-line `.form-field` spacing rule
+matches the shared sheet's word for word. The admin judge solves and suggested
 concepts pages link `components/table_scroll.css`, whose `.table-scroll` box
 lets each table scroll sideways on a phone rather than widen the page
 (#574). Each box is a focusable region named by its table's heading, since
@@ -76,9 +90,14 @@ and without push reminders) and Settings (with a key and without, both
 disclosures open) were checked the same way: 10,236 records, no difference.
 Today was checked with a fresh set, a partly answered set, a submitted and
 reviewed day, the weekend, paused and failed states: 16,660 records, no
-difference. The authenticator sheet moved a `<style>` from the body, after
-the display sheets, to a link before them, which could have changed a tie
-with the light palette. The setup, recovery codes and sign-in-again pages
-were checked at 390 and 1280px in the dark and light themes: 904 records, no
-difference once the test server's port and the random QR code were set aside. On the generating state only the spinner's rotation differed,
+difference. On the generating state only the spinner's rotation differed,
 since it was caught at another point in its animation.
+
+The authenticator sheet moved a `<style>` from the body, after the display
+sheets, to a link before them, which could have changed a tie with the
+light palette. The setup, recovery codes and sign-in-again pages were
+checked at 390 and 1280px in the dark and light themes: 904 records, no
+difference once the test server's port and the random QR code were set
+aside. The login and trial sheets and the shared field sheet (#669) were
+checked the same way on the sign-in, enter-code, second-factor, trial start,
+trial and authenticator setup pages: 876 records, no difference.

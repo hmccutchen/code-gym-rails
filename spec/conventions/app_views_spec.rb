@@ -72,7 +72,7 @@ RSpec.describe "Conventions held over app/views" do
   end
 
   it "keeps a page's styles in its own stylesheet, never a <style> block in its views" do
-    paged = Dir[Rails.root.join("app/views/{history,progress,accounts,api_keys,dashboard,authenticators,recovery_codes}/*.erb")] +
+    paged = Dir[Rails.root.join("app/views/{history,progress,accounts,api_keys,dashboard,authenticators,recovery_codes,sessions,second_factor_challenges,trials}/*.erb")] +
             %w[index.html.erb _recognition_guide.html.erb].map { |name| Rails.root.join("app/views/learn", name).to_s }
     offenders = paged.select { |path| File.read(path).match?(/<style\b/) }.map { |path| relative(path) }
 
@@ -95,6 +95,21 @@ RSpec.describe "Conventions held over app/views" do
   def rendered_partials(source) = source.scan(/\brender[ (]+(?:partial:\s*)?["']([\w\/]+)["']/).flatten
 
   def page_for(partial) = PAGE_SHEET_PARTIALS.find { |pattern, _| partial.match?(pattern) }&.last
+
+  it "links the form field sheet on every page that shows a .form-field, Settings apart" do
+    views = Dir[Rails.root.join("app/views/**/*.erb")].to_h { |path| [ relative(path), File.read(path) ] }
+    holders = views.select { |path, source| source.include?("form-field") && path != "app/views/api_keys/edit.html.erb" }.keys
+    pages = holders.flat_map do |holder|
+      next [ holder ] unless File.basename(holder).start_with?("_")
+
+      partial = holder.delete_prefix("app/views/").sub(%r{/_([^/]+?)\.html\.erb\z}, '/\\1')
+      views.select { |_, source| rendered_partials(source).include?(partial) }.keys
+    end
+
+    expect(pages).not_to be_empty
+    unlinked = pages.uniq.reject { |page| views.fetch(page).include?(%(component_stylesheet "form_field")) }
+    expect(unlinked).to be_empty, "#{unlinked.join(', ')} show a .form-field without linking components/form_field.css"
+  end
 
   it "renders a partial styled by a page sheet only on the page that links that sheet" do
     offenders = Dir[Rails.root.join("app/{views,controllers,helpers}/**/*.{erb,rb}")].flat_map do |path|
