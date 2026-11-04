@@ -82,7 +82,7 @@ class GenerationDiagnostics
     return if waiting.empty?
 
     entries  = waiting.map { |check| "#{check[:bucket]}:#{check[:concept]}(#{check[:reason]})" }
-    held     = waiting.any? { |check| check[:concept] == featured_concept && check[:reason].to_s == "no_host" }
+    held     = waiting.any? { |check| check[:held_by_featured] }
     Rails.logger.info("[retention] user=#{@user.id} date=#{Date.current} waiting=#{entries.join(',')}#{" featured=#{featured_concept}" if held}")
   end
 

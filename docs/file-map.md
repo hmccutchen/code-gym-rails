@@ -243,7 +243,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
   the layout for that reason, like `responses/_answered_sections`
 - `app/models/featured_concept.rb` — `FeaturedConcept.for(user)`: this week's
   stored pick for one user, computed on the first visit, re-picked in place
-  when it leaves the user's slice
+  when it leaves the user's slice; `.this_weeks` reads this week's row and writes nothing
 - `app/models/featured_concept_pick.rb` — `FeaturedConceptPick`: the pure
   rule choosing among met concepts, from the ledger and the user's past picks
 - `app/helpers/featured_concept_helper.rb` — `#featured_concept`, the pick
@@ -457,5 +457,5 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `config/puma.rb` — the web server: thread count from `RAILS_MAX_THREADS`, port from `PORT`, and the Solid Queue plugin when `SOLID_QUEUE_IN_PUMA` is set.
 - `config/routes.rb` — every route in the app and the controller action that serves it, including the health check, the PWA manifest and service worker, and login.
 - `app/javascript/code_gym/push.js` — the `code_gym/push` module: `supported` tests for `Notification`, service workers and `PushManager`, and `subscribeAndRegister` registers `/service-worker.js`, subscribes with the VAPID key (replacing a subscription made with another key) and posts the endpoint and keys to the register path unless the endpoint is already known. A rejected or signed-out reply throws an error with readable text.
-- `script/forced_concept_drafts.rb` — `ForcedConceptDrafts`: drafts a design comparison section for a concept the vocabulary does not hold yet. `with_concept` adds the concept to that kind's vocabulary only for the block and puts it back, the design note's draft-guidance line goes into the prompt of one service instance, and `rung_draft` targets and locks the kind at a chosen rung. `todays_plan` plans with this week's stored featured concept, read without `FeaturedConcept.for`, so a run writes no featured row.
+- `script/forced_concept_drafts.rb` — `ForcedConceptDrafts`: drafts a design comparison section for a concept the vocabulary does not hold yet. `with_concept` adds the concept to that kind's vocabulary only for the block and puts it back, the design note's draft-guidance line goes into the prompt of one service instance, and `rung_draft` targets and locks the kind at a chosen rung. `todays_plan` plans with this week's stored featured concept (`FeaturedConcept.this_weeks`, used only while the user still meets it), read without `FeaturedConcept.for`, so a run writes no featured row.
 - `script/key_sheet_export.rb` — `KeySheetExport`: read-only export of one account's reviewed sections whose kind carries a planted answer key, newest day first, up to a set number per kind and language; each entry has the question, what the engineer was shown and the key. `script/export_review_baseline.rb` runs it.

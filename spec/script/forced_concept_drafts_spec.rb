@@ -39,6 +39,7 @@ RSpec.describe ForcedConceptDrafts do
     include MetConceptHelpers
 
     it "plans and builds ladders with this week's stored featured concept, as production does" do
+      submit_set_showing(user, "n_plus_one", date: Date.current - 3)
       user.featured_concepts.create!(week_of: FeaturedConcept.week_of(Date.current), concept: "n_plus_one", bucket: "ruby_rails")
       allow(GenerationLadders).to receive(:for).and_call_original
 
@@ -46,6 +47,16 @@ RSpec.describe ForcedConceptDrafts do
 
       expect(draft.plan.featured_concept).to eq("n_plus_one")
       expect(GenerationLadders).to have_received(:for).with(anything, "ruby_rails", anything, hash_including(featured_concept: "n_plus_one"))
+    end
+
+    it "plans without a stored row the user no longer meets, which production would replace" do
+      row = user.featured_concepts.create!(week_of: FeaturedConcept.week_of(Date.current), concept: "n_plus_one", bucket: "ruby_rails")
+
+      draft = described_class.rung_draft(user, "ruby_rails", "senior")
+
+      expect(row.still_met_by?(user, Date.current)).to be(false)
+      expect(draft.plan.featured_concept).to be_nil
+      expect(user.featured_concepts.count).to eq(1)
     end
 
     it "writes no featured concept row for a user with a concept to feature but no row this week" do

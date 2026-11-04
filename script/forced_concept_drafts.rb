@@ -11,7 +11,8 @@ class ForcedConceptDrafts
   end
 
   def self.stored_featured_concept(user)
-    user.featured_concepts.find_by(week_of: FeaturedConcept.week_of(Date.current))&.concept
+    row = FeaturedConcept.this_weeks(user)
+    row.concept if row&.still_met_by?(user, Date.current)
   end
 
   def self.guidance_for(concept)

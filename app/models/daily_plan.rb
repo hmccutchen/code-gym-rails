@@ -49,12 +49,16 @@ class DailyPlan
     rotation         = SectionRotation.for(history, count: size.count, preferences: preferences, daily: daily)
     code_review_mode = WeightedRoll.pick(code_review_mode_weights(judged))
     trap             = code_review_gotcha_for(user, language, code_review_mode, featured_concept)
-    hosts_for        = ->(day_rotation) { DayHosts.new(language, mode: code_review_mode, gotcha: day_gotcha(trap, daily, day_rotation), featured_concept: featured_concept) }
+    hosts_for        = lambda do |day_rotation, featured = featured_concept|
+      DayHosts.new(language, mode: code_review_mode, gotcha: day_gotcha(trap, daily, day_rotation), featured_concept: featured)
+    end
+    unfeatured_for   = ->(day_rotation) { hosts_for.call(day_rotation, nil) if featured_concept }
     hosts            = hosts_for.call(rotation)
     due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
-    tracks           = concept_tracks(user, language, daily, rotation, due: due, hosts: hosts)
+    tracks           = concept_tracks(user, language, daily, rotation, due: due, hosts: hosts, unfeatured: unfeatured_for.call(rotation))
     coverage, rotation, tracks = with_coverage(coverage_for(user, size, preferences, daily, tracks.fetch(:waiting_checks), hosts),
-                                               daily, rotation, tracks, user, language, due: due, hosts_for: hosts_for)
+                                               daily, rotation, tracks, user, language, due: due, hosts_for: hosts_for,
+                                               unfeatured_for: unfeatured_for)
 
     source = code_review_source_for(user, language, code_review_mode)
     single = source || !ExerciseSection::CodeReview.multi_file_mode?(code_review_mode)
@@ -97,20 +101,21 @@ class DailyPlan
   end
   private_class_method :due_buckets
 
-  def self.concept_tracks(user, language, daily, rotation, due:, hosts:)
+  def self.concept_tracks(user, language, daily, rotation, due:, hosts:, unfeatured:)
     kinds  = ExerciseSection.for_plan(daily: daily, rotation: rotation)
     tracks = main_track(user, language, kinds: kinds, daily: daily, hosts: hosts, due: due)
              .merge(fourth_track(user, kinds.find(&:fourth?), due: due, hosts: hosts))
 
-    tracks.merge(waiting_checks: waiting_checks(tracks, due, kinds: kinds, hosts: hosts))
+    tracks.merge(waiting_checks: waiting_checks(tracks, due, kinds: kinds, hosts: hosts, unfeatured: unfeatured))
   end
   private_class_method :concept_tracks
 
-  def self.with_coverage(coverage, daily, rotation, tracks, user, language, due:, hosts_for:)
+  def self.with_coverage(coverage, daily, rotation, tracks, user, language, due:, hosts_for:, unfeatured_for:)
     return [ nil, rotation, tracks ] unless coverage
 
     added_rotation = rotation.merge(ExerciseSection.slot_for(coverage.kind, daily: daily) => coverage.kind.key.to_sym)
-    added_tracks   = concept_tracks(user, language, daily, added_rotation, due: due, hosts: hosts_for.call(added_rotation))
+    added_tracks   = concept_tracks(user, language, daily, added_rotation, due: due, hosts: hosts_for.call(added_rotation),
+                                    unfeatured: unfeatured_for.call(added_rotation))
     return [ nil, rotation, tracks ] unless check_landed?(coverage, added_tracks)
 
     [ coverage, added_rotation, added_tracks ]
@@ -137,7 +142,7 @@ class DailyPlan
   end
   private_class_method :coverage_for
 
-  def self.waiting_checks(tracks, due, kinds:, hosts:)
+  def self.waiting_checks(tracks, due, kinds:, hosts:, unfeatured:)
     taken = claimed_concepts(tracks[:reinforcement] + tracks[:fourth_reinforcement],
                              tracks[:due_checks] + tracks[:fourth_due_checks])
 
@@ -145,7 +150,8 @@ class DailyPlan
        .sort_by { |cm| -overdue_ratio(cm) }
        .map do |cm|
          reason = hosts.hosts(kinds, cm.concept, cm.language).any? ? :no_slot : :no_host
-         { bucket: cm.language, concept: cm.concept, overdue_ratio: overdue_ratio(cm), reason: reason }
+         held   = reason == :no_host && unfeatured&.hosts(kinds, cm.concept, cm.language)&.any?
+         { bucket: cm.language, concept: cm.concept, overdue_ratio: overdue_ratio(cm), reason: reason, held_by_featured: (true if held) }.compact
        end
   end
   private_class_method :waiting_checks
