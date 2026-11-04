@@ -2,9 +2,11 @@
 
 ## What it owns
 
-The name field in the global navigation bar, on every signed-in page: the
+The name field in the global navigation bar, on every signed-in page, and in
+the Account page's Name card, both rendered from `shared/_name_editor`: the
 save on blur, the confirmation or error line, and reverting the field when a
-save is refused.
+save is refused. The two fields are separate controllers, so a name saved in
+one shows in the other on the next page load.
 
 ## It saves through the queue, not a bare request
 

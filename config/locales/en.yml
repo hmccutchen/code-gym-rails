@@ -874,6 +874,7 @@ en:
       active: "Automatic generation is active."
       pause: "Pause automatic generation"
       danger_heading: "Danger zone"
+      name_heading: "Name"
       practice_heading: "Daily practice"
       reminders_heading: "Reminders"
       session_heading: "Session"

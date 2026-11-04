@@ -5,7 +5,10 @@ Account's styles: its phone rules, then its desktop rules in one
 with the page's phone rules. The layout links it on Account only, through
 `page_stylesheet` (`docs/decisions/page-stylesheets.md`).
 
-The page's own rules come first, then those of the partials in the order they
+The page's own rules come first, the Name card's among them: it holds the
+shared `shared/_name_editor` partial the nav also renders, widened to the card
+and given a visible border, since the nav hides its own field where the row
+is too tight (#681). Then come the rules of the partials in the order they
 render: `accounts/_push_reminders`, `accounts/_authenticator` and
 `accounts/_api_usage`. Each partial renders on Account only.
 

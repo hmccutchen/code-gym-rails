@@ -12,6 +12,11 @@
     </p>
   </section>
 
+  <section class="card account-name">
+    <h2><label for="account-name-input"><%= t("accounts.show.name_heading") %></label></h2>
+    <%= render "shared/name_editor", input_id: "account-name-input", status_id: "account-name-status", aria_label: nil %>
+  </section>
+
   <section class="card">
     <h2><%= t("accounts.show.practice_heading") %></h2>
     <% if current_user.paused_generation_at? %>

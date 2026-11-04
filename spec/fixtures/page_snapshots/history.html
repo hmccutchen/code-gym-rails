@@ -184,7 +184,8 @@
     nav .nav-links { display: flex; gap: .25rem; font-size: .9rem; color: var(--muted); align-items: center; min-width: 0; }
     nav .nav-links a { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 500; padding: .35rem .7rem; border-radius: 999px; transition: background-color .15s, color .15s; }
     nav .nav-links a:hover, nav .nav-links a[aria-current="page"] { color: var(--text); background: var(--surface-raised); text-decoration: none; }
-    nav .name-editor { display: flex; align-items: center; min-width: 0; }
+    nav .name-editor { display: flex; align-items: center; min-width: 0; flex: 0 1 calc(9rem + .4rem); container: nav-name / inline-size; contain-intrinsic-inline-size: calc(9rem + .4rem); }
+    nav .name-editor-input { flex: 1 1 auto; width: 0; }
     nav .nav-toggle { display: none; }
 
     @container (max-width: 42em) {
@@ -207,6 +208,7 @@
         box-shadow: var(--shadow);
       }
       nav .nav-links[data-open] a { padding: .75rem; border-radius: var(--radius-sm); }
+      nav .nav-links[data-open] .name-editor { flex: none; }
       nav .nav-links[data-open] .name-editor-input { width: 100%; }
     }
 
@@ -476,6 +478,9 @@
       border-color: var(--border);
     }
     .name-editor-status { font-size: .75rem; color: var(--muted); margin-left: .4rem; }
+    @container nav-name (max-width: calc(5rem + .4rem)) {
+      .name-editor-input, .name-editor-status { display: none; }
+    }
 
     .learn-back { display: inline-block; padding-block: 4px; }
     .learn-intro, .learn-bucket-label, .learn-no-guide { color: var(--muted); }
@@ -542,20 +547,21 @@
       </button>
       <div class="nav-links" id="nav-links" data-nav-menu-target="links">
         <span class="name-editor"
-              data-controller="name-editor"
-              data-name-editor-url-value="/profile"
-              data-name-editor-saved-text-value="Saved ✓"
-              data-name-editor-error-text-value="Couldn&#39;t save">
-          <input type="text"
-                 id="nav-name-input"
-                 class="name-editor-input"
-                 value="Existing"
-                 aria-label="Your display name"
-                 data-name-editor-target="input"
-                 data-action="blur->name-editor#save">
-          <span id="nav-name-status" class="name-editor-status" aria-live="polite"
-                data-name-editor-target="status"></span>
-        </span>
+      data-controller="name-editor"
+      data-name-editor-url-value="/profile"
+      data-name-editor-saved-text-value="Saved ✓"
+      data-name-editor-error-text-value="Couldn&#39;t save">
+  <input type="text"
+         id="nav-name-input"
+         class="name-editor-input"
+         value="Existing"
+         aria-label="Your display name"
+         data-name-editor-target="input"
+         data-action="blur->name-editor#save">
+  <span id="nav-name-status" class="name-editor-status" aria-live="polite"
+        data-name-editor-target="status"></span>
+</span>
+
           <a href="/">Today</a>
           <a href="/learn">Learn</a>
           <a href="/progress">Progress</a>

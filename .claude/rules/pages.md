@@ -97,8 +97,8 @@ read it before changing that area.
   A page's targets stay 44px at every width, apart from a link inside a
   sentence, with no `(pointer: fine)`
   relaxation (`nav_link_targets_spec` holds the top nav's links to it, and
-  `nav_name_field_target_spec` its name field); the name field's width still
-  shrinks just above the collapse point until #681.
+  `nav_name_field_target_spec` its name field, which hides from the row
+  rather than shrink under 5rem; the Account page's Name card edits it then).
 - **Push reminders** (`docs/decisions/push-reminders.md`): Optional weekday
   ready and afternoon nudge notifications. Intent (`User#reminder_level`) and
   transport (`PushSubscription`) are separate: an endpoint can die without
