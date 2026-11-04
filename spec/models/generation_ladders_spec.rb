@@ -22,10 +22,10 @@ RSpec.describe GenerationLadders do
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
     end
     rungs = { ExerciseSection::PlanReview => "senior", ExerciseSection::Challenge => "senior" }
-    featured = FeaturedConcept.new(concept: hidden, bucket: "plan_review")
+    featured = hidden
 
     plain = described_class.for(rungs, "ruby_rails", :application_code)
-    withheld = described_class.for(rungs, "ruby_rails", :application_code, featured: featured)
+    withheld = described_class.for(rungs, "ruby_rails", :application_code, featured_concept: featured)
 
     expect(plain["senior"]).to include(hidden => "s", shown => "s", "n_plus_one" => "s")
     expect(withheld["senior"]).to include(shown => "s", "n_plus_one" => "s")

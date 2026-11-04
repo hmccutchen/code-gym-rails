@@ -97,15 +97,16 @@ cause, so the callout never has to disappear: generation does not give the
 week's concept to a section that hides its concept.
 
 **How.** `ExerciseDraft.call` asks `FeaturedConcept.for(user)` before it plans
-and passes the row to `DailyPlan.for(featured:)`, which carries it on
-`DailyPlan::Result#featured` to every place that already carries the bug-hunt
+and passes its concept name (a string, so the pure plan holds no record) to
+`DailyPlan.for(featured_concept:)`, which carries it on
+`DailyPlan::Result#featured_concept` to every place that already carries the bug-hunt
 trap: the prompt's vocabulary line, the difficulty ladders, `DayHosts` and the
 diagnostics. Three rules use it:
 
 - `BugHuntGotchas.pick` skips every entry whose concept is the featured one.
   A spec holds that each language's list teaches at least two concepts, so a
   skip can never leave nothing to pick.
-- `ConceptVocabulary.selectable_for_section(..., featured:)` leaves it out of a
+- `ConceptVocabulary.selectable_for_section(..., featured_concept:)` leaves it out of a
   kind whose `.concept_hidden_in_plan?(mode:)` is true. A kind answers for itself
   (`plan_review` and `ambiguity_hunt` always, `code_review` on a bug-hunt day),
   so no shared code branches on kind. A spec holds that every hiding kind still
@@ -121,6 +122,18 @@ Only the Ruby and JavaScript bug-hunt lists share names (three of them);
 `plan_review` and `ambiguity_hunt` names appear in no other list, so the rule
 costs nothing there. `FeaturedConcept#marks?` still compares the bucket, since
 it marks sections and not hides them.
+
+**Decisions on the review of this change.**
+
+- The mode roll, the trap and the featured exclusion are not bundled into one
+  planning method now. Tracked in #692 with the other generation scripts.
+- A database error (`ActiveRecord::ActiveRecordError`) in the featured lookup
+  is logged with the user id and the day plans with no featured concept. Other
+  errors still raise.
+- A set generated across the Sunday-to-Monday turn can look up the old week's
+  concept. The callout guards already compare names and cover that window, so
+  nothing extra is done for it.
+- The hosting cost below is accepted.
 
 **What it costs.** `DayHosts` reads those vocabularies, so a featured
 `plan_review` or `ambiguity_hunt` concept has no host that week. These kinds

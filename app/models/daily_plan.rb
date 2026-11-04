@@ -2,7 +2,7 @@
 class DailyPlan
   Result = Data.define(:daily_kinds, :rotation, :reinforcement, :due_checks, :established,
                         :fourth_reinforcement, :fourth_due_checks, :fourth_established,
-                        :code_review_mode, :code_review_source, :code_review_files, :code_review_gotcha, :featured, :scenario_flavor,
+                        :code_review_mode, :code_review_source, :code_review_files, :code_review_gotcha, :featured_concept, :scenario_flavor,
                         :shared_concept, :coverage, :waiting_checks, :size) do
     def notes
       { "daily_kinds" => daily_kinds.map(&:key), "size" => size&.count, "size_reason" => size&.reason&.to_s,
@@ -41,15 +41,15 @@ class DailyPlan
 
   NO_FOURTH_TRACK = { fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
 
-  def self.for(user, language:, judged:, featured: nil)
+  def self.for(user, language:, judged:, featured_concept: nil)
     history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
     size             = size_for(user, history)
     preferences      = KindPreferences.for(user)
     daily            = DailyKinds.for(user)
     rotation         = SectionRotation.for(history, count: size.count, preferences: preferences, daily: daily)
     code_review_mode = WeightedRoll.pick(code_review_mode_weights(judged))
-    trap             = code_review_gotcha_for(user, language, code_review_mode, featured)
-    hosts_for        = ->(day_rotation) { DayHosts.new(language, mode: code_review_mode, gotcha: day_gotcha(trap, daily, day_rotation), featured: featured) }
+    trap             = code_review_gotcha_for(user, language, code_review_mode, featured_concept)
+    hosts_for        = ->(day_rotation) { DayHosts.new(language, mode: code_review_mode, gotcha: day_gotcha(trap, daily, day_rotation), featured_concept: featured_concept) }
     hosts            = hosts_for.call(rotation)
     due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
     tracks           = concept_tracks(user, language, daily, rotation, due: due, hosts: hosts)
@@ -62,7 +62,7 @@ class DailyPlan
     Result.new(daily_kinds: daily, rotation: rotation, **tracks, coverage: coverage, size: size,
                code_review_mode: code_review_mode, code_review_source: source,
                code_review_files: single ? :single : WeightedRoll.pick(CODE_REVIEW_FILE_WEIGHTS),
-               code_review_gotcha: day_gotcha(trap, daily, rotation), featured: featured,
+               code_review_gotcha: day_gotcha(trap, daily, rotation), featured_concept: featured_concept,
                scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS))
   end
 
@@ -71,10 +71,10 @@ class DailyPlan
   end
   private_class_method :code_review_mode_weights
 
-  def self.code_review_gotcha_for(user, language, mode, featured)
+  def self.code_review_gotcha_for(user, language, mode, featured_concept)
     return nil unless ExerciseSection::CodeReview::BugHunt.mode?(mode)
 
-    BugHuntGotchas.pick(language, last_seen: BugHuntGotchas.last_seen_for(user), featured: featured)
+    BugHuntGotchas.pick(language, last_seen: BugHuntGotchas.last_seen_for(user), featured_concept: featured_concept)
   end
   private_class_method :code_review_gotcha_for
 

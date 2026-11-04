@@ -87,12 +87,10 @@ RSpec.describe BugHuntGotchas do
     end
 
     context "when a concept is the week's featured one" do
-      def featured(concept, bucket: "ruby_rails") = FeaturedConcept.new(concept: concept, bucket: bucket)
-
       it "skips every entry for that concept, even the first never-seen one" do
         first = entries.first
 
-        picked = described_class.pick("ruby_rails", last_seen: {}, featured: featured(first.concept))
+        picked = described_class.pick("ruby_rails", last_seen: {}, featured_concept: first.concept)
 
         expect(picked.concept).not_to eq(first.concept)
         expect(picked).to eq(entries.find { |entry| entry.concept != first.concept })
@@ -103,16 +101,16 @@ RSpec.describe BugHuntGotchas do
         rest    = entries.reject { |entry| entry.concept == skipped }
         seen    = rest.each_with_index.to_h { |entry, index| [ entry.id, Date.current - index ] }
 
-        picked = described_class.pick("ruby_rails", last_seen: seen, featured: featured(skipped))
+        picked = described_class.pick("ruby_rails", last_seen: seen, featured_concept: skipped)
 
         expect(picked).to eq(rest.last)
       end
 
-      it "skips the concept by name whichever bucket the week features it under, as the callout guard compares names" do
+      it "skips a concept both languages teach in either, as the callout guard compares names" do
         shared = (described_class.concepts("ruby_rails") & described_class.concepts("javascript")).first
         javascript = described_class.for_language("javascript")
 
-        picked = described_class.pick("javascript", last_seen: {}, featured: featured(shared, bucket: "ruby_rails"))
+        picked = described_class.pick("javascript", last_seen: {}, featured_concept: shared)
 
         expect(javascript.first.concept).to eq(shared)
         expect(picked.concept).not_to eq(shared)
@@ -120,14 +118,14 @@ RSpec.describe BugHuntGotchas do
       end
 
       it "ignores a featured concept no entry teaches" do
-        expect(described_class.pick("ruby_rails", last_seen: {}, featured: featured("service_boundaries", bucket: "architecture")))
+        expect(described_class.pick("ruby_rails", last_seen: {}, featured_concept: "service_boundaries"))
           .to eq(entries.first)
       end
 
       it "leaves another concept to pick from, whichever one is featured, in every language's registry" do
         described_class::BY_LANGUAGE.each do |language, registry|
           registry.map(&:concept).uniq.each do |concept|
-            expect(described_class.pick(language, last_seen: {}, featured: featured(concept, bucket: language))).to be_present
+            expect(described_class.pick(language, last_seen: {}, featured_concept: concept)).to be_present
           end
         end
       end

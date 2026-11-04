@@ -48,12 +48,11 @@ RSpec.describe GenerationPrompt do
 
   it "leaves the week's featured concept out of a section that hides its concept, and names it in no other line" do
     featured_concept = ConceptVocabulary::PLAN_REVIEW_CONCEPTS.first
-    featured = FeaturedConcept.new(concept: featured_concept, bucket: "plan_review")
     quiet_plan = plan.with(fourth_reinforcement: [], fourth_established: [])
 
     plain = GenerationPrompt.new(user, "ruby_rails", plan: quiet_plan, history: history, difficulty: difficulty, ladders: ladders,
                                  retention_annotation: generation_retention_annotation).render
-    withheld = GenerationPrompt.new(user, "ruby_rails", plan: quiet_plan.with(featured: featured), history: history, difficulty: difficulty,
+    withheld = GenerationPrompt.new(user, "ruby_rails", plan: quiet_plan.with(featured_concept: featured_concept), history: history, difficulty: difficulty,
                                     ladders: ladders, retention_annotation: generation_retention_annotation).render
 
     expect(plain).to include(featured_concept)

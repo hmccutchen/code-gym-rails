@@ -72,8 +72,8 @@ module BugHuntGotchas
 
   def self.find(id) = all.find { |entry| entry.id == id }
 
-  def self.pick(language, last_seen:, featured: nil)
-    entries     = for_language(language).reject { |entry| entry.concept == featured&.concept }
+  def self.pick(language, last_seen:, featured_concept: nil)
+    entries     = for_language(language).reject { |entry| entry.concept == featured_concept }
     never, seen = entries.partition { |entry| !last_seen.key?(entry.id) }
 
     never.first || seen.min_by { |entry| [ last_seen.fetch(entry.id), entries.index(entry) ] }

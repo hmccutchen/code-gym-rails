@@ -252,7 +252,7 @@ class GenerationPrompt
 
     kind.generation_guidance(
       vocabulary:     ConceptVocabulary.selectable_for_section(kind.key, @language, mode: mode, rung: rung,
-                                                               gotcha: @plan.code_review_gotcha, featured: @plan.featured),
+                                                               gotcha: @plan.code_review_gotcha, featured_concept: @plan.featured_concept),
       label:          language_config[:label],
       mode:           mode,
       artifact:       language_config[:schema_artifact],

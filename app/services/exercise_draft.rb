@@ -8,13 +8,13 @@ class ExerciseDraft
 
   def self.call(user, language:, provider:, judged:, blocking: false, deadline: GenerationDeadline::NONE)
     LanguagePrompts.for(language)
-    plan       = DailyPlan.for(user, language: language, judged: judged, featured: FeaturedConcept.for(user))
+    plan       = DailyPlan.for(user, language: language, judged: judged, featured_concept: featured_concept_name(user))
     GenerationDiagnostics.new(user).set_size(plan.size)
     history    = user.recent_performance
     difficulty = KindDifficulty.for(user)
     kinds      = plan.kinds
     ladders    = GenerationLadders.for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode,
-                                       gotcha: plan.code_review_gotcha, featured: plan.featured)
+                                       gotcha: plan.code_review_gotcha, featured_concept: plan.featured_concept)
     prompt     = provider.prompt.call(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders)
 
     reply = provider.generate.call(user, "generate_exercise", language, prompt.render,
@@ -58,6 +58,14 @@ class ExerciseDraft
                                                    dropped_concepts: dropped_concepts, judge: judge, unhosted: unhosted)
   end
 
+  def self.featured_concept_name(user)
+    FeaturedConcept.for(user)&.concept
+  rescue ActiveRecord::ActiveRecordError => error
+    Rails.logger.warn("Featured concept lookup failed for user #{user.id}, planning without it: #{error.class}")
+    nil
+  end
+  private_class_method :featured_concept_name
+
   def self.code_review_files(plan, difficulty, user)
     ExerciseSection::CodeReview.day_file_range(plan: plan, difficulty: difficulty, skill_level: user.skill_level)
   end
@@ -65,7 +73,7 @@ class ExerciseDraft
 
   def self.retry_ladders(draft, kind)
     GenerationLadders.for(draft.difficulty.rungs_for([ kind ], skill_level: draft.user.skill_level), draft.language,
-                          draft.plan.code_review_mode, gotcha: draft.plan.code_review_gotcha, featured: draft.plan.featured)
+                          draft.plan.code_review_mode, gotcha: draft.plan.code_review_gotcha, featured_concept: draft.plan.featured_concept)
   end
   private_class_method :retry_ladders
 

@@ -63,7 +63,7 @@ read it before changing that area.
   concept is left out of every other kind's vocabulary, which `DayHosts`
   reads, so nothing on that concept is planned onto another section either.
   The week's featured concept is left out of the kinds that hide their concept
-  in the same way (`featured:`), and the fourth track asks `DayHosts` too, so a
+  in the same way (`featured_concept:`), and the fourth track asks `DayHosts` too, so a
   featured `plan_review` or `ambiguity_hunt` concept waits until the week turns
   over (`docs/decisions/the-weekly-featured-concept.md`).
   `DailyPlan` still reads no `KindDifficulty`.

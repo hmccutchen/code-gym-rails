@@ -738,10 +738,10 @@ RSpec.describe DailyPlan do
   describe "a bug_hunt day" do
     let(:user) { User.create!(email: "hunt-plan@example.com", name: "Hunt") }
 
-    def plan(judged: true, language: "ruby_rails", featured: nil)
+    def plan(judged: true, language: "ruby_rails", featured_concept: nil)
       allow(WeightedRoll).to receive(:pick).and_call_original
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:bug_hunt)
-      DailyPlan.for(user, language: language, judged: judged, featured: featured)
+      DailyPlan.for(user, language: language, judged: judged, featured_concept: featured_concept)
     end
 
     it "rolls bug_hunt only on a judged day" do
@@ -778,28 +778,25 @@ RSpec.describe DailyPlan do
 
     it "skips the week's featured concept when it picks the gotcha, and carries the featured concept on the plan" do
       first = BugHuntGotchas.for_language("ruby_rails").first
-      featured = FeaturedConcept.new(concept: first.concept, bucket: "ruby_rails")
-
-      result = plan(featured: featured)
+      result = plan(featured_concept: first.concept)
 
       expect(result.code_review_gotcha.concept).not_to eq(first.concept)
       expect(result.code_review_gotcha).to eq(BugHuntGotchas.for_language("ruby_rails").find { |entry| entry.concept != first.concept })
-      expect(result.featured).to eq(featured)
+      expect(result.featured_concept).to eq(first.concept)
     end
 
-    it "skips the concept by name for a mixed-language user whose week features it under the other language" do
+    it "skips the concept by name for a mixed-language user whose Ruby week features a concept JavaScript teaches too" do
       shared = (BugHuntGotchas.concepts("ruby_rails") & BugHuntGotchas.concepts("javascript")).first
-      featured = FeaturedConcept.new(concept: shared, bucket: "ruby_rails")
       user.update!(language: "mixed")
 
-      result = plan(language: "javascript", featured: featured)
+      result = plan(language: "javascript", featured_concept: shared)
 
       expect(BugHuntGotchas.for_language("javascript").first.concept).to eq(shared)
       expect(result.code_review_gotcha.concept).not_to eq(shared)
     end
 
     it "carries no featured concept unless one is passed" do
-      expect(plan.featured).to be_nil
+      expect(plan.featured_concept).to be_nil
     end
 
     it "picks no gotcha on a day without a code_review section" do
@@ -818,7 +815,7 @@ RSpec.describe DailyPlan do
 
       plan
 
-      expect(DayHosts).to have_received(:new).with("ruby_rails", mode: :bug_hunt, gotcha: nil, featured: nil)
+      expect(DayHosts).to have_received(:new).with("ruby_rails", mode: :bug_hunt, gotcha: nil, featured_concept: nil)
     end
 
     it "picks no gotcha on any other mode" do
@@ -1268,10 +1265,10 @@ RSpec.describe DailyPlan, "retention checks left waiting" do
     user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
     allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
     due("scope_creep", "plan_review")
-    featured = FeaturedConcept.new(concept: "scope_creep", bucket: "plan_review")
+    featured = "scope_creep"
 
     unfeatured = described_class.for(user, language: "ruby_rails", judged: true)
-    held_back  = described_class.for(user, language: "ruby_rails", judged: true, featured: featured)
+    held_back  = described_class.for(user, language: "ruby_rails", judged: true, featured_concept: featured)
 
     expect(unfeatured.fourth_due_checks.map(&:concept)).to eq(%w[scope_creep])
     expect(held_back.fourth_due_checks).to eq([])
