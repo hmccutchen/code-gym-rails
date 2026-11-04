@@ -71,6 +71,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/models/trial_allowance.rb` — `TrialAllowance.check!`: the per-account cap and the house-key guard, run ahead of every house-key call
 - `app/models/house_keys.rb` / `trial_mode.rb` — the house keys and guards from ENV, and the kill switch
 - `app/controllers/trials_controller.rb` — `/trial/start` for someone signed out and `/trial` for a keyless account: the code, the provider, the data notice and consent, and a trial's standing once it has begun
+- `app/models/missing_set_state.rb` — `MissingSetState.for`: what a day with no set shows (trial ended, waiting for a provider, generating, failed today, weekend, paused, or start generating), from plain values
 - `app/models/trial_status.rb` — `TrialStatus`: a trial's standing for its pages: days left, today's calls against the cap, the day it ended
 - `script/mint_invite_code.rb` — mints one invite code and prints it once
 - `script/record_competency_gate_fixture.rb` — rebuilds `spec/fixtures/competency_gate/default_pair_histories.json` from the gate as it stands; run only for a deliberate gate change
@@ -354,7 +355,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/controllers/concerns/.keep` — empty placeholder that keeps the otherwise empty `app/controllers/concerns` folder in git.
 - `app/controllers/concerns/exercise_mix_ladders.rb` — `ExerciseMixLadders`: gives a controller and its views the ladder coverage labels and the ladder preparation summary (gap count, button label), computed from `LadderCoverage`.
 - `app/controllers/concerns/provider_call_limits.rb` — `ProviderCallLimits`: `limit_provider_calls` sets the hourly and daily rate limits on endpoints that spend the app's provider key, one shared count per user, skipped for users with their own key.
-- `app/controllers/dashboard_controller.rb` — `DashboardController`: `#show` loads today's set and response and decides which dashboard state to render (generating, failed, trial ended, weekend, submitted). It sends the page no-store so Back after submit cannot replay a stale form.
+- `app/controllers/dashboard_controller.rb` — `DashboardController`: `#show` loads today's set and response and renders the state `MissingSetState` names for a day with no set, enqueuing generation itself when the state is `:start_generation`. It sends the page no-store so Back after submit cannot replay a stale form.
 - `app/controllers/learn_lessons_controller.rb` — `LearnLessonsController`: `GET /learn/lessons/:lesson`, a read-only page for one `LearnLessons` entry that returns not found for an unknown key.
 - `app/controllers/profile_controller.rb` — `ProfileController`: `PATCH /profile`. It saves through `ProfileUpdate` and maps the outcome to a JSON reply: the saved settings, a 409 with the current preference state when the page is stale, or an error.
 - `app/helpers/application_helper.rb` — `ApplicationHelper`: page title, wide-page and container class helpers, and the stylesheet list a page links (shared components first, then the page's own sheet).

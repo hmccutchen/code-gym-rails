@@ -10,13 +10,10 @@ class DashboardController < ApplicationController
     @trial_status = TrialStatus.for(current_user) if current_user.on_trial?
     @daily_kind_pickers = DailyKindSwap::Picker.for_day(current_user, exercise: @exercise, response: @response)
 
-    if @exercise&.regenerating?
-      @generating = true
-      return
-    end
+    return @missing_set_state = :generating if @exercise&.regenerating?
 
     @regeneration_failed = @exercise.present? && current_user.last_generation_error_date == Date.current
-    settle_missing_set if @exercise.nil?
+    @missing_set_state = settle_missing_set if @exercise.nil?
   end
 
   # GET /dashboard/status — polled by dashboard/_generating.
@@ -55,25 +52,14 @@ class DashboardController < ApplicationController
   end
 
   def settle_missing_set
-    if current_user.trial_ended?
-      @trial_ended = true
-      return
-    end
-    return unless current_user.provider_ready?
+    state = MissingSetState.for(
+      trial_ended: current_user.trial_ended?, provider_ready: current_user.provider_ready?,
+      manual_trigger: flash[:generating].present?, failed_today: current_user.last_generation_error_date == Date.current,
+      weekend: Date.current.on_weekend?, paused: current_user.paused_generation_at?
+    )
+    return state unless state == :start_generation
 
-    if flash[:generating]
-      # A fresh manual trigger outranks a failure recorded earlier today.
-      @generating = true
-    elsif current_user.last_generation_error_date == Date.current
-      @generation_failed = true
-    elsif Date.current.on_weekend?
-      # Ahead of the pause check: a weekend is empty either way, so naming the pause would mislead.
-      @weekend_no_exercise = true
-    elsif current_user.paused_generation_at?
-      @generation_paused = true
-    else
-      GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
-      @generating = true
-    end
+    GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
+    :generating
   end
 end
