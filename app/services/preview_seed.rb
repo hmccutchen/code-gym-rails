@@ -121,7 +121,7 @@ class PreviewSeed
     }
   end
 
-  def architecture_set
+  def architecture_set # rubocop:disable Metrics/MethodLength
     {
       "code_review" => {
         "scenario"      => "Order history page for a storefront",
@@ -160,7 +160,7 @@ class PreviewSeed
     }
   end
 
-  def challenge_set
+  def challenge_set # rubocop:disable Metrics/MethodLength
     {
       "code_review" => {
         "scenario"      => "Nightly invoice roll-up",
@@ -193,7 +193,7 @@ class PreviewSeed
     }
   end
 
-  def sample_review
+  def sample_review # rubocop:disable Metrics/MethodLength
     {
       # Difficulty levels disagree with the grades on purpose, so a reviewer sees the pairings the note explains.
       "code_review" => {

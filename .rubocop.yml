@@ -32,6 +32,9 @@ Lint/UselessAssignment:
 Lint/UnusedBlockArgument:
   Enabled: true
 
+Lint/RedundantCopDisableDirective:
+  Enabled: true
+
 Metrics/MethodLength:
   Enabled: true
   Max: 25

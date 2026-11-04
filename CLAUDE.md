@@ -190,7 +190,8 @@ above (`SingleLineComment`, `AttachedComment`, `CommentLimit`). Where omakase
 has an opinion, that opinion wins — don't argue formatting in review.
 Omakase leaves `Naming` and most of `Lint` and `Metrics` off, so `.rubocop.yml`
 turns on the ones this project's rules need: `Lint/UselessAssignment` and
-`Lint/UnusedBlockArgument` (dead code left by an extraction), and
+`Lint/UnusedBlockArgument` (dead code left by an extraction),
+`Lint/RedundantCopDisableDirective` (a `rubocop:disable` that no longer disables anything), and
 `Metrics/MethodLength`, `ClassLength` and `ModuleLength` for `app/`. No naming
 or complexity cop runs.
 
@@ -254,15 +255,19 @@ rather than only catching it afterward:
     ("Domain data stays off provider classes") says which one may
     (`app_source_spec`).
 - Method, class and module length in `app/` is held by RuboCop's `Metrics`
-  cops, with the limits set in `.rubocop.yml`. The files that already exceed
-  them are listed in `.rubocop_todo.yml`; a new exemption needs the PR to say
-  why, and a fixed one leaves the list.
+  cops, with the limits set in `.rubocop.yml`. A method that exceeds its limit
+  carries a trailing `# rubocop:disable Metrics/MethodLength` on its `def`
+  line, and `Lint/RedundantCopDisableDirective` fails the build once the method
+  is short enough, so the directive must go. The same cop reports a
+  `Metrics` directive outside `app/`, where those cops do not run. The classes and modules that
+  exceed theirs are listed in `.rubocop_todo.yml`. A new exemption of either
+  kind needs the PR to say why.
 
 **What CI does and doesn't tell you.** The workflow runs RSpec, system specs,
 RuboCop, `bin/comment-check`, `archspec check`, Brakeman, and `importmap audit`. The convention specs in
 `spec/conventions/` also fail on a path an instruction doc names that no longer
 exists, a table missing from `.claude/rules/models.md`, a CI job off
-`ubuntu-24.04`, Faraday elsewhere in `app/` than `app/clients`, and a `fetch` outside
+`ubuntu-24.04`, a file under `app/`, `lib/`, `script/`, `config/` or `bin/` with no entry in `docs/file-map.md`, Faraday elsewhere in `app/` than `app/clients`, and a `fetch` outside
 `request.js`. It does *not* run a Ruby dependency
 CVE audit (`bundle-audit` is not installed) or any complexity check beyond
 length, and this
@@ -374,4 +379,9 @@ Setup, parallel runs, system specs and the spec support defaults are in
 
 ## File Map
 
-`docs/file-map.md` lists what each file does.
+`docs/file-map.md` lists what each file does. A convention spec fails on a
+`.rb`, `.js` or `.py` file under `app/` (outside the views), `lib/`,
+`script/` or `config/`, or any file under `bin/`, with no entry there, so a new
+file brings its entry in the same change. Specs, migrations and the
+skills under `.claude/` are not listed: a spec is named for its subject and a
+migration for its change.

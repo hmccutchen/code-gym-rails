@@ -83,7 +83,7 @@ class ConceptMastery < ApplicationRecord
   end
   private_class_method :skipped_check_scopes
 
-  def self.evaluate_concept!(user, concept, bucket, response, sections)
+  def self.evaluate_concept!(user, concept, bucket, response, sections) # rubocop:disable Metrics/MethodLength
     ai_ratings = sections.map { |s| response.ai_rating_for(s) }
     return if ai_ratings.any?(&:nil?)
 

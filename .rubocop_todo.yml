@@ -1,11 +1,3 @@
-Metrics/MethodLength:
-  Exclude:
-    - "app/controllers/dashboard_controller.rb"
-    - "app/jobs/generate_concept_reference_job.rb"
-    - "app/jobs/regenerate_exercise_job.rb"
-    - "app/models/concept_mastery.rb"
-    - "app/services/preview_seed.rb"
-
 Metrics/ClassLength:
   Exclude:
     - "app/clients/ai_service.rb"
