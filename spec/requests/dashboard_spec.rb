@@ -679,6 +679,19 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(ref.css("a .gloss-term, button .gloss-term, summary .gloss-term, label .gloss-term, :not(body)[data-action*=click] .gloss-term")).to be_empty
     end
 
+    it "still renders a stored reference whose prose fields are not strings" do
+      exercise = DailyExercise.last
+      exercise.problem_set["architecture"]["reference"].merge!(
+        "explanation" => [ "A queue absorbs bursts." ], "senior_lens" => 42, "tradeoffs" => [ "A closure helps.", { "odd" => 1 } ]
+      )
+      exercise.save!
+
+      get root_path
+
+      expect(response).to have_http_status(:ok)
+      expect(Nokogiri::HTML5(response.body).text).to include("A queue absorbs bursts.", "A closure helps.")
+    end
+
     it "escapes markup in a wrapped reference field" do
       exercise = DailyExercise.last
       exercise.problem_set["architecture"]["reference"]["explanation"] = "Use <b>raw</b> closure"

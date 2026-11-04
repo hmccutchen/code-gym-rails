@@ -34,7 +34,10 @@ non-blank result is safe HTML, whatever it matched. A view would escape a
 plain string anyway, but a caller that sends the result to a page script for
 `innerHTML` would not; returning one kind of value means no caller has to know
 which case it got. Text that is `blank?` comes back unchanged: `nil`, an empty
-string, and a string of only whitespace, which has nothing to escape.
+string, and a string of only whitespace, which has nothing to escape. So does a
+value that isn't a string, such as an array or a number in a stored exercise
+row from before ingest checked it, and the view prints it escaped as it would
+without the helper. Without that, `to_str` raises and the whole page fails.
 
 ## `#glossary_wrap_prose`
 
