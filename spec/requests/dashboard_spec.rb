@@ -522,6 +522,43 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       end
     end
 
+    describe "the concept on a kind whose concept is the category of its hidden gap" do
+      let(:sections) do
+        {
+          "plan_review" => { "title" => "Plan", "question" => "What's wrong?", "plan_excerpt" => "Do it." },
+          "ambiguity_hunt" => { "title" => "Ask", "question" => "What's unclear?", "request" => "Add a leaderboard.",
+                                "planted_ambiguities" => [ "Tie-breaking is unstated" ] }
+        }
+      end
+
+      { "plan_review" => "scope_creep", "ambiguity_hunt" => "unspecified_edge_cases" }.each do |kind, concept|
+        context "on #{kind}" do
+          let(:day) { base_problem_set.merge(kind => sections.fetch(kind).merge("concept" => concept)) }
+
+          before do
+            ConceptReference.create!(concept: concept, language: kind, tagline: "GAP-TAGLINE",
+                                     explanation: "GAP-EXPLANATION", code_example: "c", senior_lens: "l")
+          end
+
+          it "names the concept nowhere before submission" do
+            create_exercise(problem_set: day)
+
+            get root_path
+
+            expect(response.body).not_to include("GAP-TAGLINE", "GAP-EXPLANATION", concept.humanize)
+          end
+
+          it "shows the concept reference once the day is submitted" do
+            create_response(create_exercise(problem_set: day))
+
+            get root_path
+
+            expect(response.body).to include("GAP-TAGLINE", concept.humanize)
+          end
+        end
+      end
+    end
+
     it "renders an old exercise with a populated but now-unused glossary field without error" do
       ps = base_problem_set
       ps["code_review"]["glossary"] = [ { "term" => "closure", "definition" => "stale AI-generated definition" } ]
@@ -1090,8 +1127,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include('data-rating-for="plan_review"')
     end
 
-    it "renders the plan_review concept-reference dropdown from the plan_review bucket, not the exercise's language" do
-      create_exercise(problem_set: base_problem_set.merge(
+    it "renders the plan_review concept-reference dropdown from the plan_review bucket, not the exercise's language, once submitted" do
+      exercise = create_exercise(problem_set: base_problem_set.merge(
         "plan_review" => {
           "title" => "Cache plan", "question" => "What's wrong?",
           "plan_excerpt" => "Cache for 300 seconds. Also add an admin cache-clear endpoint.",
@@ -1100,6 +1137,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       ))
       ConceptReference.create!(concept: "cache_invalidation", language: "plan_review",
                                tagline: "Watch for stale reads", explanation: "e", code_example: "c", senior_lens: "l")
+      create_response(exercise)
 
       get root_path
 

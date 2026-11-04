@@ -134,7 +134,7 @@ class ExerciseSection
 
     def concept_shown_before_submission?(_section) = true
 
-    def glossary_before_submission? = true
+    def glossary_shown_before_submission? = true
 
     def mastery_evidence?(_section) = true
 

@@ -49,8 +49,12 @@ read it before changing that area.
   is one sentence of at most 180 characters.
   An answer-form section's prose goes through `section_glossary_wrap`, which
   leaves it plain before submission when the kind's
-  `.glossary_before_submission?` is false: plan review and ambiguity hunt,
+  `.glossary_shown_before_submission?` is false: plan review and ambiguity hunt,
   whose hidden answers are the kind of gap a definition names (#564).
+  Every kind with an answer key has a recorded value, and a spec fails on a
+  new keyed kind until it has one. `pseudocode_to_code` keeps its tooltips:
+  its missable requirements are stated in the problem statement, so a
+  definition can't reveal one.
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
   `ConceptGroup` or language-independent bucket gets one shared
   `RecognitionGuide` on how to look for that kind of problem. It teaches a
@@ -101,7 +105,9 @@ read it before changing that area.
   until it has copy.
 - **A `bug_hunt` section hides its concept until the day is submitted**
   (`docs/decisions/bug-hunt.md`): `ExerciseSection.concept_shown_before_submission?`
-  is false for one, and `DailyExercise#concepts_withheld_before_submission`
+  is false for one, and for every plan review and ambiguity hunt, whose
+  concept is the category of the hidden gap (#564).
+  `DailyExercise#concepts_withheld_before_submission`
   is the one list the page reads: no section whose concept is on it renders
   a concept reference or featured marker before submission, and the
   dashboard's featured callout is left off when it features one

@@ -31,7 +31,7 @@ module GlossaryHelper
   end
 
   def section_glossary_wrap(text, kind:, submitted:)
-    submitted || kind.glossary_before_submission? ? glossary_wrap(text) : text
+    submitted || kind.glossary_shown_before_submission? ? glossary_wrap(text) : text
   end
 
   def glossary_wrap_prose(text, seen: Set.new)

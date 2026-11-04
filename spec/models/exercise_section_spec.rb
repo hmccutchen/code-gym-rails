@@ -99,16 +99,34 @@ RSpec.describe ExerciseSection do
     end
   end
 
-  describe ".glossary_before_submission?" do
+  describe ".glossary_shown_before_submission?" do
     it "is false for plan_review and ambiguity_hunt, whose hidden answers are the kind of gap a definition names" do
-      expect(ExerciseSection::PlanReview.glossary_before_submission?).to be(false)
-      expect(ExerciseSection::AmbiguityHunt.glossary_before_submission?).to be(false)
+      expect(ExerciseSection::PlanReview.glossary_shown_before_submission?).to be(false)
+      expect(ExerciseSection::AmbiguityHunt.glossary_shown_before_submission?).to be(false)
     end
 
     it "is true for every other kind" do
       (ExerciseSection.all - [ ExerciseSection::PlanReview, ExerciseSection::AmbiguityHunt ]).each do |kind|
-        expect(kind.glossary_before_submission?).to be(true), "#{kind} withheld its glossary unexpectedly"
+        expect(kind.glossary_shown_before_submission?).to be(true), "#{kind} withheld its glossary unexpectedly"
       end
+    end
+
+    it "is a recorded decision for every kind with a hidden answer key, so a new keyed kind cannot show tooltips by default" do
+      decided = {
+        ExerciseSection::PlanReview => false, ExerciseSection::AmbiguityHunt => false,
+        ExerciseSection::PseudocodeToCode => true, ExerciseSection::CodeReview => true,
+        ExerciseSection::SecurityReview => true, ExerciseSection::DesignComparison => true
+      }
+
+      expect(ExerciseSection.all.select { |kind| kind.answer_key_fields.any? }).to match_array(decided.keys)
+      decided.each { |kind, shown| expect(kind.glossary_shown_before_submission?).to be(shown), kind.name }
+    end
+  end
+
+  describe ".concept_shown_before_submission?" do
+    it "is false for plan_review and ambiguity_hunt, whose concept is the category of the hidden gap" do
+      expect(ExerciseSection::PlanReview.concept_shown_before_submission?({})).to be(false)
+      expect(ExerciseSection::AmbiguityHunt.concept_shown_before_submission?({})).to be(false)
     end
   end
 
