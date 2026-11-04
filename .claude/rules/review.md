@@ -1,7 +1,7 @@
 ---
 paths:
   - "app/services/{response_review,review_grading}.rb"
-  - "app/clients/{review_prose_judge,ai_service}.rb"
+  - "app/clients/{review_prose_judge,review_approach_paragraph,ai_service}.rb"
   - "app/prompts/{review_prose_judge_prompt,review_prompt,difficulty_prompt,prompt_standards}.rb"
   - "app/models/{review_prose_verdict,rubric_check,daily_response,review_follow_up,review_short_version}.rb"
   - "app/controllers/responses_controller.rb"
@@ -83,3 +83,11 @@ read it before changing that area.
   fields, only when the concept has a reference row; the review email
   leaves it out. Every reader of `graded_prose`
   goes through `ReviewProseVerdict.as_graded`.
+- **The approach paragraph** (`docs/decisions/the-approach-paragraph.md`):
+  only when `ReviewApproachParagraph.enabled?` (`REVIEW_APPROACH_PARAGRAPH`
+  exactly `"1"`), `next_step` asks for how an experienced engineer would start
+  and where the answer followed that start, then one thing to study. It adds
+  no review field and no key. With the switch off, the review prompt is byte
+  for byte today's, and a spec compares it with the recorded snapshots.
+  `ReviewPrompt` takes the switch as `approach:` and never reads the
+  environment, and the grader never draws on `SectionKindGuide`.

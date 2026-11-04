@@ -16,6 +16,14 @@ class ReviewPrompt
     say for that field.
   RULES
 
+  NEXT_STEP = "one specific thing to study".freeze
+
+  APPROACH_NEXT_STEP = "a short paragraph of three or four sentences: how an experienced engineer would start on this kind of problem, " \
+                       "where this answer followed that start and where it did not, then one specific thing to study".freeze
+
+  APPROACH_NEXT_STEP_WALKTHROUGH = "a short paragraph of two or three sentences: how an experienced engineer would start on this kind of problem, " \
+                                   "then one specific thing to study".freeze
+
   def self.day_system(coach:, sections:)
     others = sections.size - 1
     others_clause =
@@ -41,13 +49,13 @@ class ReviewPrompt
     CONTEXT
   end
 
-  def self.for_section(key:, section:, answer:, answered:, rung:)
-    return walkthrough_prompt(key: key, section: section, rung: rung) unless answered
+  def self.for_section(key:, section:, answer:, answered:, rung:, approach: false)
+    return walkthrough_prompt(key: key, section: section, rung: rung, approach: approach) unless answered
 
-    section_prompt(key: key, section: section, answer: answer, rung: rung)
+    section_prompt(key: key, section: section, answer: answer, rung: rung, approach: approach)
   end
 
-  def self.section_prompt(key:, section:, answer:, rung:)
+  def self.section_prompt(key:, section:, answer:, rung:, approach: false)
     kind = ExerciseSection.for(key)
 
     <<~PROMPT
@@ -61,13 +69,13 @@ class ReviewPrompt
       - "correct": array of strings — each entry one distinct thing they got right
       - "missed": array of strings — each entry one distinct thing they missed or got wrong
       - "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
-      #{shared_review_fields(kind, section: section, answered: true)}
+      #{shared_review_fields(kind, section: section, answered: true, approach: approach)}
 
       #{ENTRY_RULES}
     PROMPT
   end
 
-  def self.walkthrough_prompt(key:, section:, rung:)
+  def self.walkthrough_prompt(key:, section:, rung:, approach: false)
     kind = ExerciseSection.for(key)
 
     <<~PROMPT
@@ -77,7 +85,7 @@ class ReviewPrompt
       #{walkthrough_note_block(kind, section)}#{json_header(key)}
       - "correct": array of strings — always empty
       - "missed": array of strings — each entry one distinct thing a good answer would cover
-      #{shared_review_fields(kind, section: section, answered: false)}
+      #{shared_review_fields(kind, section: section, answered: false, approach: approach)}
 
       #{ENTRY_RULES}
     PROMPT
@@ -92,13 +100,19 @@ class ReviewPrompt
     %(Return a single JSON object (NOT wrapped in a "#{key}" key) with:)
   end
 
-  def self.shared_review_fields(kind, section:, answered:)
+  def self.shared_review_fields(kind, section:, answered:, approach:)
     <<~FIELDS.chomp
       - "better_questions": array of strings — each entry one question they should have asked themselves
-      - "next_step": string — one specific thing to study
+      - "next_step": string — #{next_step_instruction(answered: answered, approach: approach)}
       - "improved_code": string — #{kind.improved_code_instruction(section: section, answered: answered)}
     FIELDS
   end
 
-  private_class_method :walkthrough_note_block, :json_header, :shared_review_fields
+  def self.next_step_instruction(answered:, approach:)
+    return NEXT_STEP unless approach
+
+    answered ? APPROACH_NEXT_STEP : APPROACH_NEXT_STEP_WALKTHROUGH
+  end
+
+  private_class_method :walkthrough_note_block, :json_header, :shared_review_fields, :next_step_instruction
 end
