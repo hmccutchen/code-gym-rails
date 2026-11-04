@@ -6,12 +6,15 @@ class ConceptReferencePrompt
 
   WORKED_EXAMPLE_BOUND = "At most the two fragments plus four sentences of prose.".freeze
 
+  DATA_MODELING_NOTE = "It is a database schema concept: tables, columns, keys, indexes, constraints and the " \
+                       "migrations that change them, whatever language the application is written in.".freeze
+
   def self.generate(concept:, language:, coach:, label:)
     medium = ConceptVocabulary.language_agnostic?(language) ? nil : label
 
     { system: "You are a senior #{coach} engineer writing a concise, durable reference for one concept. Return ONLY valid JSON.",
       prompt: <<~PROMPT }
-        Write a durable reference for the #{coach} concept: "#{concept}".
+        Write a durable reference for the #{coach} concept: "#{concept}".#{data_modeling_note(concept)}
         #{SCOPE} Be precise and senior-level.
 
         Then write a longer, plainer-language guide for someone meeting this
@@ -51,7 +54,7 @@ class ConceptReferencePrompt
   def self.reframe(concept:, coach:, already_read:, prior_alternates:)
     { system: "You are a senior #{coach} engineer re-teaching one concept to an engineer for whom the standard reference did not land. Return plain prose — no JSON, no markdown fences.\n\n#{UserText::PROMPT_RULE}",
       prompt: <<~PROMPT }
-        The concept: "#{concept}"
+        The concept: "#{concept}"#{data_modeling_note(concept)}
 
         The reference they have already read:
         #{already_read.map { |field, text| "#{field}: #{text}" }.join("\n")}
@@ -64,6 +67,10 @@ class ConceptReferencePrompt
 
         #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
       PROMPT
+  end
+
+  def self.data_modeling_note(concept)
+    ConceptVocabulary::DATA_MODELING_CONCEPTS.include?(concept) ? " #{DATA_MODELING_NOTE}" : ""
   end
 
   def self.senior_lens_description(concept)

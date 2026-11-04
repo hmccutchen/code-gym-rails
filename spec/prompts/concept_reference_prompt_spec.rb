@@ -49,6 +49,25 @@ RSpec.describe ConceptReferencePrompt do
     end
   end
 
+  describe "the data-modeling concepts" do
+    let(:schema_note) { ConceptReferencePrompt::DATA_MODELING_NOTE }
+
+    def reframe(concept) = described_class.reframe(concept: concept, coach: LanguagePrompts.for("javascript")[:coach],
+                                                   already_read: already_read, prior_alternates: [])[:prompt]
+
+    it "tells the model each one is about a database schema, in every language, so a JavaScript reference can't read unsafe_migration as React's UNSAFE_ methods" do
+      ConceptVocabulary::DATA_MODELING_CONCEPTS.product(%w[ruby_rails javascript]).each do |concept, language|
+        expect(reference_prompt(concept, language)).to include(schema_note), "#{concept} in #{language}"
+        expect(reframe(concept)).to include(schema_note), "#{concept} reframe"
+      end
+    end
+
+    it "leaves every other concept's prompt without the note" do
+      expect(reference_prompt("state_lifting", "javascript")).not_to include(schema_note)
+      expect(reframe("n_plus_one")).not_to include(schema_note)
+    end
+  end
+
   describe ".generate's code example, lesson and senior lens" do
     it "frames code_example as language-agnostic pseudocode for the architecture config" do
       language = "architecture"
