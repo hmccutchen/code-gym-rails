@@ -25,7 +25,7 @@ label when no zone is saved. On connect the controller writes the same text
 again, which changes nothing; after that, only a `change` moves it.
 
 With scripts off, a changed but unsaved Exercise language still shows the
-saved value until Save key posts the form. Keeping the native select visible
+saved value until Save posts the form. Keeping the native select visible
 until the script runs would cover that case, but it changes the overlay
 design, and the user chose to keep the overlay (PR #512 review).
 
