@@ -5,6 +5,14 @@
 The keys for every provider are encrypted together as one value. Decrypting
 them needs `RAILS_MASTER_KEY` or the credentials file.
 
+## `#anonymize!` and the ignored `name` column
+
+`User` ignores `users.name`, so `update!` can no longer overwrite it. A name
+stored before the change would survive account deletion, while the deletion
+page promises to remove it. `scrub_legacy_name` writes "Deleted user" with a
+plain `update_all` inside the same lock, as the previous release did. It goes
+with the column when a later release drops it (#686).
+
 ## `before_save :bump_section_kind_preferences_version` and `#section_kind_settings`
 
 `#section_kind_settings` builds `SectionKindSettings` from the user's columns

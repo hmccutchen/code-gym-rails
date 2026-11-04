@@ -949,12 +949,13 @@ RSpec.describe User, type: :model do
       expect(create_user).not_to respond_to(:name)
     end
 
-    it "leaves the name column nullable, so a release that no longer sends a name can still insert a user" do
+    it "gives the name column a nonblank default, so an insert that sends no name passes the validation the previous release still runs" do
       name = User.connection.columns(:users).find { |column| column.name == "name" }
+      User.connection.execute("INSERT INTO users (email, created_at, updated_at) VALUES ('raw@example.com', now(), now())")
 
-      expect(name.null).to be(true)
-      expect { User.connection.execute("INSERT INTO users (email, created_at, updated_at) VALUES ('raw@example.com', now(), now())") }
-        .not_to raise_error
+      expect(name.null).to be(false)
+      expect(name.default).to be_present
+      expect(User.connection.select_value("SELECT name FROM users WHERE email = 'raw@example.com'")).to eq(name.default)
     end
 
     it "has none of the Devise columns, and has the authenticator, challenge and session columns" do
@@ -1030,6 +1031,15 @@ RSpec.describe User, type: :model do
       expect(user.login_code_sent_at).to be_nil
       expect(user.anonymized_at).to be_present
       expect(user).to be_anonymized
+    end
+
+    it "overwrites a name stored before the column was ignored, since the deletion page promises to remove it" do
+      user = create_user(email: "named@example.com")
+      User.connection.execute("UPDATE users SET name = 'Real Person' WHERE id = #{user.id}")
+
+      user.anonymize!
+
+      expect(User.connection.select_value("SELECT name FROM users WHERE id = #{user.id}")).to eq("Deleted user")
     end
 
     it "clears an authenticator left from the Devise sign-in" do

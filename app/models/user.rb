@@ -15,6 +15,8 @@ class User < ApplicationRecord
 
   self.ignored_columns += %w[learning_track name]
 
+  LEGACY_NAME_ON_DELETION = "Deleted user".freeze
+
   serialize :api_keys, coder: JSON
   encrypts :api_keys
   encrypts :otp_secret
@@ -209,6 +211,7 @@ class User < ApplicationRecord
         reminder_level:                   :none,
         anonymized_at:                    Time.current
       )
+      scrub_legacy_name
     end
     true
   end
@@ -425,6 +428,10 @@ class User < ApplicationRecord
   end
 
   private
+
+  def scrub_legacy_name
+    self.class.where(id: id).update_all([ "name = ?", LEGACY_NAME_ON_DELETION ])
+  end
 
   def write_generation_status!(columns)
     update_columns(columns.merge(updated_at: Time.current))
