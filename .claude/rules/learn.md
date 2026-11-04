@@ -117,7 +117,10 @@ read it before changing that area.
   (`featured_shown_beside_todays_set?`, today's set or a held one). A
   `bug_hunt` goal line is plain text, never
   glossary-wrapped. A request spec fails if the concept's name appears
-  anywhere on the unsubmitted dashboard.
+  anywhere on the unsubmitted dashboard. Generation also leaves the week's
+  featured concept out of those sections (#687,
+  `docs/decisions/the-weekly-featured-concept.md`), so the callout is left off
+  only as a guard.
 - **The weekly featured concept**
   (`docs/decisions/the-weekly-featured-concept.md`):
   `FeaturedConcept.for(user)` stores one met concept per user per week

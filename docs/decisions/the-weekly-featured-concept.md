@@ -58,8 +58,9 @@ recovery read raises `PG::InFailedSqlTransaction`. Transactional specs
 cannot surface this, since Rails opens its test wrapper non-joinable, so the
 spec that pins it opens an ordinary caller transaction explicitly.
 
-**Selects and displays only — it never generates.** No provider call and no
-`ApiUsage` row (a spec pins that). Shared `ConceptReference` rows are read,
+**Selects and displays — it never calls a provider.** No provider call and no
+`ApiUsage` row (a spec pins that). Generation reads the pick for one reason,
+which the section below explains. Shared `ConceptReference` rows are read,
 never written. A featured concept whose guide was never written, or with no
 reference row at all, still links to the ordinary `LearnController#show`
 page, which offers the on-demand "Write this up" control.
@@ -84,3 +85,65 @@ marking less once a concept is held at the user's rung, would go. Marking
 a section before it is answered was a deliberate choice: a met concept's
 reference already names it in its closed disclosure's title, and the
 engineer still has to find and explain it.
+
+## Generation leaves it out of sections that hide their concept (#687)
+
+Three kinds hide their concept until the day is submitted: `code_review` on a
+bug-hunt day, `plan_review` and `ambiguity_hunt`. If the week's concept was
+also one of theirs, the dashboard left the callout off that day, and the
+callout was back on the next day, so a user could guess what the hidden section
+held. The first fix hid the callout on the colliding day. This one removes the
+cause, so the callout never has to disappear: generation does not give the
+week's concept to a section that hides its concept.
+
+**How.** `ExerciseDraft.call` asks `FeaturedConcept.for(user)` before it plans
+and passes the row to `DailyPlan.for(featured:)`, which carries it on
+`DailyPlan::Result#featured` to every place that already carries the bug-hunt
+trap: the prompt's vocabulary line, the difficulty ladders, `DayHosts` and the
+diagnostics. Three rules use it:
+
+- `BugHuntGotchas.pick` skips every entry whose concept is the featured one.
+  A spec holds that each language's list teaches at least two concepts, so a
+  skip can never leave nothing to pick.
+- `ConceptVocabulary.selectable_for_section(..., featured:)` leaves it out of a
+  kind whose `.concept_hidden_in_plan?(mode:)` is true, and only when the
+  featured row's bucket is the kind's own bucket. A kind answers for itself
+  (`plan_review` and `ambiguity_hunt` always, `code_review` on a bug-hunt day),
+  so no shared code branches on kind. A spec holds that every hiding kind still
+  has a concept to offer whichever one is featured, at every rung.
+- A kind that shows its concept keeps it, so the week's concept can still be
+  practiced where it is allowed.
+
+**What it costs.** `DayHosts` reads those vocabularies, so a featured
+`plan_review` or `ambiguity_hunt` concept has no host that week. These kinds
+are the only ones that tag their buckets, so reinforcement, a drill and a
+retention check on that concept are not planned onto the fourth section, and a
+due check lands in `waiting_checks` as `no_host` until the week turns over.
+The fourth track used to pick its concepts without asking `DayHosts`; it asks
+now, and a spec pins the effect. The main track is unaffected, because no
+hiding kind hosts a main-track bucket, so `annotate_retention_concept` needs no
+change either. A day with no featured concept plans and renders exactly as
+before: every prompt snapshot is unchanged.
+
+**Which week.** The pick is for the week of `Date.current` in the user's zone,
+which the jobs set with `Time.use_zone(user.effective_time_zone)`, the same day
+the set is dated and the same week the dashboard asks about. A set generated
+on a Monday uses Monday's week. A paused user's held set that
+`User#carry_held_set_forward!` moves into a new week was generated under the
+old week's pick and is not regenerated, so the new week's concept can be one of
+its hidden concepts.
+
+**The guards stay.** `featured_callout_shown?` and Learn's
+`featured_shown_beside_todays_set?` still leave the callout and the block off
+for the cases above, for a first week on which no concept had been met yet when
+the set was generated (the pick comes later, from exposures that include the
+set), and for a provider that tags the concept anyway, as the bug-hunt page
+check does.
+
+**Why generation may read it.** `FeaturedConcept.for` reads exposures and the
+`RungLedger`, which come from reviewed answers. It reads no track, suggestion
+or trial state and never `ConceptMastery`, so `level_suggestion_isolation_spec`
+and `trial_isolation_spec` do not cover it. It writes the row the dashboard
+would have written on the first visit of the week, and an existing row is read
+unchanged. The prompt never names the concept: the pick only shortens the closed
+list a hiding kind may choose from.

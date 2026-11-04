@@ -72,8 +72,9 @@ module BugHuntGotchas
 
   def self.find(id) = all.find { |entry| entry.id == id }
 
-  def self.pick(language, last_seen:)
-    entries     = for_language(language)
+  def self.pick(language, last_seen:, featured: nil)
+    bucket      = ConceptBucket.for(ExerciseSection::CodeReview.key, language)
+    entries     = for_language(language).reject { |entry| featured&.marks?(concept: entry.concept, bucket: bucket) }
     never, seen = entries.partition { |entry| !last_seen.key?(entry.id) }
 
     never.first || seen.min_by { |entry| [ last_seen.fetch(entry.id), entries.index(entry) ] }

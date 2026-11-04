@@ -53,6 +53,15 @@ RSpec.describe ExerciseSection::CodeReview do
     end
   end
 
+  describe ".concept_hidden_in_plan?" do
+    it "is true on a bug_hunt day only, so the other modes keep the concept in the vocabulary" do
+      expect(described_class.concept_hidden_in_plan?(mode: :bug_hunt)).to be(true)
+      %i[application_code test_file schema_review].each do |mode|
+        expect(described_class.concept_hidden_in_plan?(mode: mode)).to be(false), mode.to_s
+      end
+    end
+  end
+
   describe ".ships_unjudged?" do
     it "refuses to ship a bug_hunt section without a verdict, and lets every other section ship" do
       expect(described_class.ships_unjudged?({ "purpose" => "Sum the prices." })).to be(false)

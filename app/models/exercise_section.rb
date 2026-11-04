@@ -134,6 +134,8 @@ class ExerciseSection
 
     def concept_shown_before_submission?(_section) = true
 
+    def concept_hidden_in_plan?(mode:) = !concept_shown_before_submission?(nil)
+
     def glossary_shown_before_submission? = true
 
     def mastery_evidence?(_section) = true

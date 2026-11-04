@@ -251,7 +251,8 @@ class GenerationPrompt
     language_config = config
 
     kind.generation_guidance(
-      vocabulary:     ConceptVocabulary.selectable_for_section(kind.key, @language, mode: mode, rung: rung, gotcha: @plan.code_review_gotcha),
+      vocabulary:     ConceptVocabulary.selectable_for_section(kind.key, @language, mode: mode, rung: rung,
+                                                               gotcha: @plan.code_review_gotcha, featured: @plan.featured),
       label:          language_config[:label],
       mode:           mode,
       artifact:       language_config[:schema_artifact],

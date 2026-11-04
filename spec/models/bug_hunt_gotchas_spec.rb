@@ -85,6 +85,47 @@ RSpec.describe BugHuntGotchas do
     it "ignores a seen id the registry no longer holds" do
       expect(described_class.pick("ruby_rails", last_seen: { "rb_cut_long_ago" => Date.current - 100 })).to eq(entries.first)
     end
+
+    context "when a concept is the week's featured one" do
+      def featured(concept, bucket: "ruby_rails") = FeaturedConcept.new(concept: concept, bucket: bucket)
+
+      it "skips every entry for that concept, even the first never-seen one" do
+        first = entries.first
+
+        picked = described_class.pick("ruby_rails", last_seen: {}, featured: featured(first.concept))
+
+        expect(picked.concept).not_to eq(first.concept)
+        expect(picked).to eq(entries.find { |entry| entry.concept != first.concept })
+      end
+
+      it "still prefers a never-seen entry, then the one seen longest ago, among the rest" do
+        skipped = entries.first.concept
+        rest    = entries.reject { |entry| entry.concept == skipped }
+        seen    = rest.each_with_index.to_h { |entry, index| [ entry.id, Date.current - index ] }
+
+        picked = described_class.pick("ruby_rails", last_seen: seen, featured: featured(skipped))
+
+        expect(picked).to eq(rest.last)
+      end
+
+      it "ignores a featured concept recorded under another bucket" do
+        expect(described_class.pick("ruby_rails", last_seen: {}, featured: featured(entries.first.concept, bucket: "javascript")))
+          .to eq(entries.first)
+      end
+
+      it "ignores a featured concept no entry teaches" do
+        expect(described_class.pick("ruby_rails", last_seen: {}, featured: featured("service_boundaries", bucket: "architecture")))
+          .to eq(entries.first)
+      end
+
+      it "leaves another concept to pick from, whichever one is featured, in every language's registry" do
+        described_class::BY_LANGUAGE.each do |language, registry|
+          registry.map(&:concept).uniq.each do |concept|
+            expect(described_class.pick(language, last_seen: {}, featured: featured(concept, bucket: language))).to be_present
+          end
+        end
+      end
+    end
   end
 
   describe ".last_seen_for" do

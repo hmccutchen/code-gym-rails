@@ -20,5 +20,7 @@ module ExerciseSection::CodeReview::BugHunt::KindHooks
 
   def concept_shown_before_submission?(section) = !bug_hunt?(section)
 
+  def concept_hidden_in_plan?(mode:) = BugHunt.mode?(mode)
+
   def ships_unjudged?(section) = !bug_hunt?(section)
 end

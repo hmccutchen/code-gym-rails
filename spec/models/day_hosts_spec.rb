@@ -20,6 +20,20 @@ RSpec.describe DayHosts do
     expect(described_class.new("ruby_rails", mode: :schema_review).can_tag?(ExerciseSection::CodeReview, concept, "ruby_rails")).to be(true)
   end
 
+  it "refuses the week's featured concept to a kind that hides its concept, and leaves it to a kind that shows it" do
+    plan_review = ConceptVocabulary::PLAN_REVIEW_CONCEPTS.first
+    featured = FeaturedConcept.new(concept: plan_review, bucket: "plan_review")
+    featuring = described_class.new("ruby_rails", mode: :application_code, featured: featured)
+
+    expect(hosts.can_tag?(ExerciseSection::PlanReview, plan_review, "plan_review")).to be(true)
+    expect(featuring.can_tag?(ExerciseSection::PlanReview, plan_review, "plan_review")).to be(false)
+    expect(featuring.can_tag?(ExerciseSection::PlanReview, ConceptVocabulary::PLAN_REVIEW_CONCEPTS.second, "plan_review")).to be(true)
+
+    memoization = FeaturedConcept.new(concept: "memoization", bucket: "ruby_rails")
+    expect(described_class.new("ruby_rails", mode: :application_code, featured: memoization)
+      .can_tag?(ExerciseSection::Challenge, "memoization", "ruby_rails")).to be(true)
+  end
+
   it "lets code_review tag nothing on a bug_hunt day, since that section is not mastery evidence" do
     bug_hunt = described_class.new("ruby_rails", mode: :bug_hunt)
 

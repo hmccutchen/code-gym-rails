@@ -2,7 +2,7 @@
 class DailyPlan
   Result = Data.define(:daily_kinds, :rotation, :reinforcement, :due_checks, :established,
                         :fourth_reinforcement, :fourth_due_checks, :fourth_established,
-                        :code_review_mode, :code_review_source, :code_review_files, :code_review_gotcha, :scenario_flavor,
+                        :code_review_mode, :code_review_source, :code_review_files, :code_review_gotcha, :featured, :scenario_flavor,
                         :shared_concept, :coverage, :waiting_checks, :size) do
     def notes
       { "daily_kinds" => daily_kinds.map(&:key), "size" => size&.count, "size_reason" => size&.reason&.to_s,
@@ -41,15 +41,15 @@ class DailyPlan
 
   NO_FOURTH_TRACK = { fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
 
-  def self.for(user, language:, judged:)
+  def self.for(user, language:, judged:, featured: nil)
     history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
     size             = size_for(user, history)
     preferences      = KindPreferences.for(user)
     daily            = DailyKinds.for(user)
     rotation         = SectionRotation.for(history, count: size.count, preferences: preferences, daily: daily)
     code_review_mode = WeightedRoll.pick(code_review_mode_weights(judged))
-    trap             = code_review_gotcha_for(user, language, code_review_mode)
-    hosts_for        = ->(day_rotation) { DayHosts.new(language, mode: code_review_mode, gotcha: day_gotcha(trap, daily, day_rotation)) }
+    trap             = code_review_gotcha_for(user, language, code_review_mode, featured)
+    hosts_for        = ->(day_rotation) { DayHosts.new(language, mode: code_review_mode, gotcha: day_gotcha(trap, daily, day_rotation), featured: featured) }
     hosts            = hosts_for.call(rotation)
     due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
     tracks           = concept_tracks(user, language, daily, rotation, due: due, hosts: hosts)
@@ -62,7 +62,7 @@ class DailyPlan
     Result.new(daily_kinds: daily, rotation: rotation, **tracks, coverage: coverage, size: size,
                code_review_mode: code_review_mode, code_review_source: source,
                code_review_files: single ? :single : WeightedRoll.pick(CODE_REVIEW_FILE_WEIGHTS),
-               code_review_gotcha: day_gotcha(trap, daily, rotation),
+               code_review_gotcha: day_gotcha(trap, daily, rotation), featured: featured,
                scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS))
   end
 
@@ -71,10 +71,10 @@ class DailyPlan
   end
   private_class_method :code_review_mode_weights
 
-  def self.code_review_gotcha_for(user, language, mode)
+  def self.code_review_gotcha_for(user, language, mode, featured)
     return nil unless ExerciseSection::CodeReview::BugHunt.mode?(mode)
 
-    BugHuntGotchas.pick(language, last_seen: BugHuntGotchas.last_seen_for(user))
+    BugHuntGotchas.pick(language, last_seen: BugHuntGotchas.last_seen_for(user), featured: featured)
   end
   private_class_method :code_review_gotcha_for
 
@@ -99,8 +99,8 @@ class DailyPlan
 
   def self.concept_tracks(user, language, daily, rotation, due:, hosts:)
     kinds  = ExerciseSection.for_plan(daily: daily, rotation: rotation)
-    fourth = kinds.find(&:fourth?)&.key&.to_sym
-    tracks = main_track(user, language, kinds: kinds, daily: daily, hosts: hosts, due: due).merge(fourth_track(user, fourth, due: due))
+    tracks = main_track(user, language, kinds: kinds, daily: daily, hosts: hosts, due: due)
+             .merge(fourth_track(user, kinds.find(&:fourth?), due: due, hosts: hosts))
 
     tracks.merge(waiting_checks: waiting_checks(tracks, due, kinds: kinds, hosts: hosts))
   end
@@ -190,18 +190,19 @@ class DailyPlan
   end
   private_class_method :host_test
 
-  def self.fourth_track(user, fourth, due:)
-    return NO_FOURTH_TRACK if fourth.nil?
+  def self.fourth_track(user, kind, due:, hosts:)
+    return NO_FOURTH_TRACK if kind.nil?
 
-    bucket = FOURTH_BUCKET_FOR.fetch(fourth)
-    reinforcement = user.concepts_needing_reinforcement(bucket: bucket).first(FOURTH_SLOT_CAPACITY)
-    reinforcement = [] if reinforcement.any? && overdue_retention_check_pending_for_bucket?(user, bucket, reinforcement: reinforcement)
-    due_checks    = retention_checks_for_bucket(due, bucket, slots: FOURTH_SLOT_CAPACITY - reinforcement.size,
-                                                reinforcement: reinforcement)
+    bucket        = FOURTH_BUCKET_FOR.fetch(kind.key.to_sym)
+    hostable      = ->(concept, concept_bucket) { hosts.can_tag?(kind, concept, concept_bucket) }
+    reinforcement = user.concepts_needing_reinforcement(bucket: bucket, hostable: hostable).first(FOURTH_SLOT_CAPACITY)
+    reinforcement = [] if reinforcement.any? && overdue_retention_check_pending_for_bucket?(user, bucket, reinforcement: reinforcement, hostable: hostable)
+    due_checks    = retention_checks_for_bucket(due.select { |cm| hostable.call(cm.concept, cm.language) }, bucket,
+                                                slots: FOURTH_SLOT_CAPACITY - reinforcement.size, reinforcement: reinforcement)
+    established   = established_concepts_for_bucket(user, bucket, reinforcement: reinforcement, due_checks: due_checks)
 
     { fourth_reinforcement: reinforcement, fourth_due_checks: due_checks,
-      fourth_established: established_concepts_for_bucket(user, bucket, reinforcement: reinforcement,
-                                                          due_checks: due_checks) }
+      fourth_established: established.select { |cm| hostable.call(cm.concept, cm.language) } }
   end
   private_class_method :fourth_track
 
@@ -222,10 +223,10 @@ class DailyPlan
   private_class_method :established_concepts_for_bucket
 
   # Required: a small fourth vocabulary nearly always has reinforcement, which would otherwise starve retention.
-  def self.overdue_retention_check_pending_for_bucket?(user, bucket, reinforcement: [])
+  def self.overdue_retention_check_pending_for_bucket?(user, bucket, hostable:, reinforcement: [])
     claimed_here = claimed_concepts(reinforcement).filter_map { |concept, claimed_bucket| concept if claimed_bucket == bucket }
 
-    user.concepts_overdue_for_retention_check(bucket: bucket).where.not(concept: claimed_here).exists?
+    user.concepts_overdue_for_retention_check(bucket: bucket).where.not(concept: claimed_here).any? { |cm| hostable.call(cm.concept, bucket) }
   end
   private_class_method :overdue_retention_check_pending_for_bucket?
 

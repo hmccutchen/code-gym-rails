@@ -278,6 +278,61 @@ RSpec.describe ConceptVocabulary do
       end
     end
 
+    context "when a concept is the week's featured one" do
+      def featured(concept, bucket) = FeaturedConcept.new(concept: concept, bucket: bucket)
+
+      it "leaves it out of plan_review and ambiguity_hunt, whose concept names the hidden gap" do
+        { "plan_review" => ConceptVocabulary::PLAN_REVIEW_CONCEPTS, "ambiguity_hunt" => ConceptVocabulary::AMBIGUITY_HUNT_CONCEPTS }.each do |key, concepts|
+          concept = concepts.first
+
+          vocabulary = described_class.selectable_for_section(key, "ruby_rails", featured: featured(concept, key))
+
+          expect(vocabulary).to eq(concepts - [ concept ]), key
+        end
+      end
+
+      it "keeps it in every kind that shows its concept, so the week's concept stays practicable there" do
+        shown = ExerciseSection.all.reject { |kind| kind.concept_hidden_in_plan?(mode: nil) }
+        concept = "n_plus_one"
+
+        shown.each do |kind|
+          bucket = ConceptBucket.for(kind.key, "ruby_rails")
+          expect(described_class.selectable_for_section(kind.key, "ruby_rails", featured: featured(concept, bucket)))
+            .to eq(described_class.selectable_for_section(kind.key, "ruby_rails")), kind.name
+        end
+      end
+
+      it "ignores a featured concept recorded under another bucket" do
+        expect(described_class.selectable_for_section("plan_review", "ruby_rails", featured: featured(ConceptVocabulary::PLAN_REVIEW_CONCEPTS.first, "ruby_rails")))
+          .to eq(ConceptVocabulary::PLAN_REVIEW_CONCEPTS)
+      end
+
+      it "leaves it out of a bug_hunt code_review that was named no gotcha, and out of no other mode" do
+        concept = BugHuntGotchas.concepts("ruby_rails").first
+
+        expect(described_class.selectable_for_section("code_review", "ruby_rails", mode: :bug_hunt, featured: featured(concept, "ruby_rails")))
+          .to match_array(BugHuntGotchas.concepts("ruby_rails") - [ concept ])
+        expect(described_class.selectable_for_section("code_review", "ruby_rails", mode: :application_code, featured: featured(concept, "ruby_rails")))
+          .to eq(described_class.selectable_for_section("code_review", "ruby_rails", mode: :application_code))
+      end
+
+      it "leaves every hiding kind another concept to offer, whichever one is featured, at every rung" do
+        hiding = ExerciseSection.all.select { |kind| kind.concept_hidden_in_plan?(mode: nil) }
+
+        hiding.each do |kind|
+          bucket = ConceptBucket.for(kind.key, "ruby_rails")
+          described_class.selectable_for_section(kind.key, "ruby_rails").each do |concept|
+            [ nil, *KindDifficulty::LEVELS ].each do |rung|
+              offered = described_class.selectable_for_section(kind.key, "ruby_rails", rung: rung, featured: featured(concept, bucket))
+
+              expect(offered).to be_present, "#{kind.name} offers nothing with #{concept} featured at #{rung.inspect}"
+              expect(offered).not_to include(concept)
+            end
+          end
+        end
+      end
+    end
+
     it "leaves pattern unnarrowed on every mode" do
       %i[application_code test_file schema_review].each do |mode|
         expect(described_class.selectable_for_section("pattern", "ruby_rails", mode: mode))

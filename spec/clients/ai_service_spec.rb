@@ -1465,7 +1465,7 @@ RSpec.describe AiService do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_junior: "j", ladder_senior: "s",
                                ladder_mid_level: "a mid-level pattern rung", ladder_principal_engineer: "p")
       expect(GenerationLadders).to receive(:for).with({ ExerciseSection::Challenge => "senior" }, "ruby_rails", plan.code_review_mode,
-                                                      gotcha: plan.code_review_gotcha)
+                                                      gotcha: plan.code_review_gotcha, featured: plan.featured)
                                                .and_call_original
 
       section = svc.send(:retry_section, draft, ExerciseSection::Challenge, "memoization")
@@ -1577,7 +1577,7 @@ RSpec.describe AiService do
 
       FakeService.new("fake-key").send(:draft_exercise, user, language: "javascript", blocking: false, judged: true)
 
-      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil)
+      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil, featured: nil)
     end
 
     describe "MAX_LADDER_GUIDANCE_CHARS" do
@@ -4964,10 +4964,10 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     allow(DailyPlan).to receive(:for).and_call_original
 
     FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
-    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", judged: true)
+    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", judged: true, featured: nil)
 
     FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
-    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", judged: false)
+    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", judged: false, featured: nil)
   end
 
   { "b" => true, "a" => false }.each do |better, matched|
