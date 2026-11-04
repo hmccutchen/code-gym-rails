@@ -5,7 +5,7 @@ require migration_path.to_s
 
 RSpec.describe MakeDailyResponseExerciseUnique do
   let(:connection) { ActiveRecord::Base.connection }
-  let(:user) { User.create!(email: "dup-#{SecureRandom.hex(3)}@example.com", name: "Dup") }
+  let(:user) { User.create!(email: "dup-#{SecureRandom.hex(3)}@example.com") }
   let(:exercise) do
     DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
                           problem_set: { "code_review" => { "question" => "q" } })

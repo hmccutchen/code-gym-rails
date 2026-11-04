@@ -13,7 +13,10 @@ class User < ApplicationRecord
   has_many :daily_kind_swap_events, dependent: :destroy
   belongs_to :invite_code, optional: true
 
-  self.ignored_columns += %w[learning_track]
+  self.ignored_columns += %w[learning_track name]
+
+  LEGACY_NAME_ON_DELETION = "Deleted user".freeze
+  private_constant :LEGACY_NAME_ON_DELETION
 
   serialize :api_keys, coder: JSON
   encrypts :api_keys
@@ -31,8 +34,6 @@ class User < ApplicationRecord
 
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
-  validates :name,  presence: true
-  before_validation :clean_name, if: :name_changed?
   validates :skill_level, inclusion: { in: SKILL_LEVELS, message: SKILL_LEVEL_RULE }
   validates :provider, inclusion: { in: ->(_) { AiProvider.keys } }, allow_nil: true
   validate :api_keys_name_providers, if: :api_keys_changed?
@@ -202,7 +203,6 @@ class User < ApplicationRecord
 
       update!(
         email:                            "deleted-user-#{id}@anonymized.local",
-        name:                             "Deleted user",
         api_keys:                         nil,
         login_code_sent_at:               nil,
         login_code_digest:                nil,
@@ -212,6 +212,7 @@ class User < ApplicationRecord
         reminder_level:                   :none,
         anonymized_at:                    Time.current
       )
+      scrub_legacy_name
     end
     true
   end
@@ -429,12 +430,14 @@ class User < ApplicationRecord
 
   private
 
-  def write_generation_status!(columns)
-    update_columns(columns.merge(updated_at: Time.current))
+  def scrub_legacy_name
+    return unless self.class.connection.column_exists?(:users, :name)
+
+    self.class.where(id: id).update_all([ "name = ?", LEGACY_NAME_ON_DELETION ])
   end
 
-  def clean_name
-    self.name = UserText.clean(name, limit: UserText::MAX_NAME_LENGTH).strip
+  def write_generation_status!(columns)
+    update_columns(columns.merge(updated_at: Time.current))
   end
 
   def carry_forward(held)

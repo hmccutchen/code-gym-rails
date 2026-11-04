@@ -3,7 +3,7 @@ require Rails.root.join("script/glossary_text_export")
 require Rails.root.join("script/glossary_sense_listing_report")
 
 RSpec.describe GlossaryTextExport do
-  let(:user) { User.create!(email: "glossary-export@example.com", name: "Export") }
+  let(:user) { User.create!(email: "glossary-export@example.com") }
   let(:out) { StringIO.new }
   let(:sections) do
     { "code_review" => { "scenario" => "A webhook retries.", "question" => "What's wrong?" },

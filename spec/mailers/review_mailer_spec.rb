@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe ReviewMailer, type: :mailer do
   describe "#send_review" do
-    let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
+    let(:user) { User.create!(email: "dev@example.com") }
 
     let(:exercise) do
       user.daily_exercises.create!(

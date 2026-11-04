@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Preview auto-login", type: :request do
   # Only a row PreviewSeed.seeded? recognizes gets signed in, so sign-in examples need a seeded row.
   def seeded_user(email = PreviewSeed::DEFAULT_EMAIL)
-    User.create!(email: email, name: "Preview Reviewer",
+    User.create!(email: email,
                  provider: "anthropic", api_keys: { "anthropic" => PreviewSeed::DUMMY_API_KEY })
   end
 
@@ -104,7 +104,7 @@ RSpec.describe "Preview auto-login", type: :request do
     end
 
     it "declines for a real account that happens to sit at the configured address" do
-      User.create!(email: PreviewSeed::DEFAULT_EMAIL, name: "Real Person",
+      User.create!(email: PreviewSeed::DEFAULT_EMAIL,
                    provider: "anthropic", api_keys: { "anthropic" => "sk-ant-a-real-key" })
 
       controller.send(:preview_auto_login)
@@ -113,7 +113,7 @@ RSpec.describe "Preview auto-login", type: :request do
     end
 
     it "declines for an account carrying no API key at all" do
-      User.create!(email: PreviewSeed::DEFAULT_EMAIL, name: "Signed Up, No Key")
+      User.create!(email: PreviewSeed::DEFAULT_EMAIL)
 
       controller.send(:preview_auto_login)
 
@@ -148,7 +148,7 @@ RSpec.describe "Preview auto-login", type: :request do
 
     it "already logged in is left alone" do
       seeded_user
-      real_user = User.create!(email: "already-logged-in@example.com", name: "Real")
+      real_user = User.create!(email: "already-logged-in@example.com")
       session[:user_id] = real_user.id
       session[:signed_in_at] = User.session_stamp
 

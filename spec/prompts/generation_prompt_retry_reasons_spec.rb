@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe GenerationPrompt::RetryReasons do
   let(:snapshot_dir) { Rails.root.join("spec/fixtures/retry_reason_snapshots") }
-  let(:user) { User.new(email: "retry@example.com", name: "Retry", skill_level: "senior") }
+  let(:user) { User.new(email: "retry@example.com", skill_level: "senior") }
 
   def retry_line(cause)
     prompt = render_generation_prompt(user, "ruby_rails", only: ExerciseSection::Pattern, fixed_concept: "service_objects",

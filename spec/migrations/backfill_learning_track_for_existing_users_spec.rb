@@ -5,7 +5,7 @@ require migration_path.to_s
 
 RSpec.describe BackfillLearningTrackForExistingUsers do
   def account(email, learning_track)
-    User.create!(email: email, name: "Account").tap { |user| write_learning_track(user, learning_track) }
+    User.create!(email: email).tap { |user| write_learning_track(user, learning_track) }
   end
 
   it "marks every undecided account none and leaves decided accounts alone" do

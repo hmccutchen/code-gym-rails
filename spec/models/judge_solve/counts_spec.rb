@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe JudgeSolve::Counts, type: :model do
-  let(:user) { User.create!(email: "counts@example.com", name: "C") }
+  let(:user) { User.create!(email: "counts@example.com") }
   let(:exercise) { exercise_on(Date.current) }
   let(:counts) { described_class.new }
 

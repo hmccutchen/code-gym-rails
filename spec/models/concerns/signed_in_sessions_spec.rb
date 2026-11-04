@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe SignedInSessions do
-  let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
+  let(:user) { User.create!(email: "dev@example.com") }
 
   describe "#session_signed_in_valid?" do
     it "accepts any stamped session while sessions_valid_after is unset" do

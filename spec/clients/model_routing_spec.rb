@@ -92,7 +92,7 @@ RSpec.describe "per-purpose model routing" do
 
   # The examples above call #call directly and would miss call_and_log dropping the purpose.
   it "routes the generation call made through call_and_log, not only a direct #call" do
-    user     = User.create!(email: "routing@example.com", name: "Routing")
+    user     = User.create!(email: "routing@example.com")
     bodies   = []
     service  = ClaudeService.new("sk-ant-test")
     connection = Faraday.new do |f|

@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe LadderCoverage do
-  let(:user) { User.create!(email: "coverage@example.com", name: "Coverage", language: "ruby_rails") }
+  let(:user) { User.create!(email: "coverage@example.com", language: "ruby_rails") }
 
   def laddered(concept, bucket)
     ConceptReference.create!(concept: concept, language: bucket,

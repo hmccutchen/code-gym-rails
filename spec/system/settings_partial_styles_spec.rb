@@ -52,7 +52,7 @@ RSpec.describe "Settings partials' styles", type: :system do
       end
 
       it "spaces the key guide's blocks and indents its lists" do
-        visit_as(User.create!(email: "keyless-#{SecureRandom.hex(3)}@example.com", name: "Keyless", **chosen_track(true)))
+        visit_as(User.create!(email: "keyless-#{SecureRandom.hex(3)}@example.com", **chosen_track(true)))
         visit setup_path
 
         expect(styles(".key-guide > .hint + .hint", "marginTop")).to eq([ rem(0.5) ])

@@ -5,11 +5,18 @@
 The keys for every provider are encrypted together as one value. Decrypting
 them needs `RAILS_MASTER_KEY` or the credentials file.
 
-## `before_validation :clean_name`
+## `#anonymize!` and the ignored `name` column
 
-A name that breaks the rules is cleaned and clamped rather than refused.
-Sign-up names the row after the email's local part, which can be long or
-oddly shaped, so refusing it would fail the login.
+`User` ignores `users.name`, so `update!` can no longer overwrite it. A name
+stored before the change would survive account deletion, while the deletion
+page promises to remove it. `scrub_legacy_name` writes "Deleted user" with a
+plain `update_all` inside the same lock, as the previous release did. It first
+asks the database whether the column exists. The next release's migration drops
+the column before that release takes traffic, so for a few minutes processes on
+this release still serve deletions against a table with no `name`, and an
+unconditional update would fail the whole deletion. The check reads the table,
+not Active Record's cached columns, which this process loaded before the drop.
+The method goes with the column when that release lands (#686).
 
 ## `before_save :bump_section_kind_preferences_version` and `#section_kind_settings`
 

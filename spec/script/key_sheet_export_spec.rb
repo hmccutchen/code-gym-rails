@@ -2,7 +2,7 @@ require "rails_helper"
 require Rails.root.join("script/key_sheet_export")
 
 RSpec.describe KeySheetExport do
-  let(:user) { User.create!(email: "sheet@example.com", name: "Sheet") }
+  let(:user) { User.create!(email: "sheet@example.com") }
   let(:key) { { "issue" => "`order.customer` per row", "why_it_matters" => "w", "fix" => "f" } }
   let(:code_review) do
     { "question" => "What is wrong?", "scenario" => "orders page", "snippet" => "orders.each { |order| order.customer }",

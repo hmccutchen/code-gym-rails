@@ -2,7 +2,7 @@ require "rails_helper"
 require Rails.root.join("script/answer_position_balance")
 
 RSpec.describe AnswerPositionBalance do
-  let(:user) { User.create!(email: "balance@example.com", name: "Balance") }
+  let(:user) { User.create!(email: "balance@example.com") }
   let(:out) { StringIO.new }
 
   def exercise_on(date, better)

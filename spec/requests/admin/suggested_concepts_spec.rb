@@ -1,8 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "Admin::SuggestedConcepts", type: :request do
-  let(:admin) { create_user_with_key(email: "admin@example.com", name: "Admin") }
-  let(:member) { create_user_with_key(email: "member@example.com", name: "Member") }
+  let(:admin) { create_user_with_key(email: "admin@example.com") }
+  let(:member) { create_user_with_key(email: "member@example.com") }
 
   before { ENV["ADMIN_EMAILS"] = "admin@example.com" }
   after  { ENV.delete("ADMIN_EMAILS") }

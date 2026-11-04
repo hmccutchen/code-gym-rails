@@ -2,8 +2,8 @@ require "rails_helper"
 
 # `owner` holds the data and `intruder` tries to reach it; see docs/security-audit-2026-10-05.md.
 RSpec.describe "Cross-user access", type: :request do
-  let(:owner)    { create_user_with_key(email: "owner@example.com", name: "Owner") }
-  let(:intruder) { create_user_with_key(email: "intruder@example.com", name: "Intruder") }
+  let(:owner)    { create_user_with_key(email: "owner@example.com") }
+  let(:intruder) { create_user_with_key(email: "intruder@example.com") }
 
   let!(:owner_exercise) do
     DailyExercise.create!(
@@ -131,7 +131,6 @@ RSpec.describe "Cross-user access", type: :request do
     it "ignores columns outside the profile allowlist" do
       patch profile_path, params: {
         user: {
-          name: "Renamed",
           email: "owner@example.com",
           provider: "openai",
           api_keys: { "anthropic" => "sk-ant-planted" },
@@ -146,7 +145,6 @@ RSpec.describe "Cross-user access", type: :request do
 
       expect(response).to have_http_status(:ok)
       intruder.reload
-      expect(intruder.name).not_to eq("Renamed")
       expect(intruder.email).to eq("intruder@example.com")
       expect(intruder.provider).to eq("anthropic")
       expect(intruder.api_keys).to eq("anthropic" => "sk-ant-test-key")
@@ -154,7 +152,6 @@ RSpec.describe "Cross-user access", type: :request do
       expect(intruder.paused_generation_at).to be_nil
       expect(intruder.reminder_level).to eq("none")
       expect(intruder.level_suggestion_cutoffs).to eq({})
-      expect(owner.reload.name).to eq("Owner")
     end
   end
 end

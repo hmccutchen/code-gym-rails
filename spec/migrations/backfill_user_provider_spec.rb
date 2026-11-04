@@ -18,7 +18,7 @@ RSpec.describe BackfillUserProvider do
   end
 
   it "backfills provider from an Anthropic-shaped key" do
-    user = User.create!(email: "legacy@example.com", name: "Legacy")
+    user = User.create!(email: "legacy@example.com")
     legacy_key(user, "sk-ant-legacy-key")
 
     described_class.new.up
@@ -27,7 +27,7 @@ RSpec.describe BackfillUserProvider do
   end
 
   it "backfills provider from a Gemini-shaped key" do
-    user = User.create!(email: "legacy-gemini@example.com", name: "Legacy Gemini")
+    user = User.create!(email: "legacy-gemini@example.com")
     legacy_key(user, "AIzaSyLegacyKey123")
 
     described_class.new.up
@@ -36,7 +36,7 @@ RSpec.describe BackfillUserProvider do
   end
 
   it "leaves provider nil and logs a warning for an unrecognized key" do
-    user = User.create!(email: "legacy-unknown@example.com", name: "Legacy Unknown")
+    user = User.create!(email: "legacy-unknown@example.com")
     legacy_key(user, "totally-unknown-format")
 
     expect(Rails.logger).to receive(:warn).with(/unrecognized key format/)
@@ -46,14 +46,14 @@ RSpec.describe BackfillUserProvider do
   end
 
   it "skips users with no api_key set" do
-    user = User.create!(email: "no-key@example.com", name: "No Key")
+    user = User.create!(email: "no-key@example.com")
 
     expect { described_class.new.up }.not_to raise_error
     expect(user.reload.provider).to be_nil
   end
 
   it "is idempotent and does not re-update users with provider already set" do
-    user = User.create!(email: "already-set@example.com", name: "Already Set")
+    user = User.create!(email: "already-set@example.com")
     legacy_key(user, "sk-ant-some-key", provider: "anthropic")
 
     # Should not raise or re-decrypt

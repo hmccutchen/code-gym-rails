@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe ReviewFollowUp do
-  let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
+  let(:user) { User.create!(email: "dev@example.com") }
   let(:exercise) do
     user.daily_exercises.create!(date: Date.current, generated_at: Time.current, language: "ruby_rails",
       problem_set: { "code_review" => { "question" => "q" } })

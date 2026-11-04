@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe User, "daily section kinds" do
-  let(:user) { User.create!(email: "daily-kinds@example.com", name: "Daily") }
+  let(:user) { User.create!(email: "daily-kinds@example.com") }
 
   it "saves a full pair and the empty default" do
     expect(user.update(daily_section_kinds: %w[architecture code_review])).to be(true)

@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe DailyResponse, ".with_ai_ratings_only" do
-  let(:user) { User.create!(email: "ratings-only@example.com", name: "Ratings", language: "ruby_rails") }
+  let(:user) { User.create!(email: "ratings-only@example.com", language: "ruby_rails") }
   let(:prose) { "The fix still loads every line item before filtering by status. " * 40 }
   let(:full_review) do
     { "rating" => "solid", "correct" => [ prose ], "missed" => [ prose ], "next_step" => prose, "improved_code" => prose,
@@ -98,7 +98,7 @@ RSpec.describe DailyResponse, ".with_ai_ratings_only" do
   end
 
   it "keeps the scope it is chained onto" do
-    other = User.create!(email: "ratings-other@example.com", name: "Other", language: "ruby_rails")
+    other = User.create!(email: "ratings-other@example.com", language: "ruby_rails")
     mine = respond(2, { "code_review" => full_review })
     other_exercise = DailyExercise.create!(user: other, date: mine.date, problem_set: { "code_review" => { "question" => "Q" } }, generated_at: Time.current)
     other.daily_responses.create!(daily_exercise: other_exercise, date: mine.date, submitted_at: Time.current, ai_review: {})

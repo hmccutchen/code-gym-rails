@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Welcome", type: :request do
   def new_account(**attrs)
-    User.create!(email: "new@example.com", name: "New", **attrs)
+    User.create!(email: "new@example.com", **attrs)
   end
 
   it "requires login" do

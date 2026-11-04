@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe DailyResponse, type: :model do
   it "refuses a second response for the same exercise, whatever its date" do
-    user = User.create!(email: "one-response@example.com", name: "O")
+    user = User.create!(email: "one-response@example.com")
     exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
                                      problem_set: { "code_review" => { "question" => "q" } })
     DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
@@ -12,7 +12,7 @@ RSpec.describe DailyResponse, type: :model do
   end
 
   describe "#review_provider_key" do
-    let(:user) { User.create!(email: "label@example.com", name: "L", provider: "openai", api_keys: { "openai" => "sk-proj-x" }) }
+    let(:user) { User.create!(email: "label@example.com", provider: "openai", api_keys: { "openai" => "sk-proj-x" }) }
 
     it "is the provider that wrote the review" do
       expect(DailyResponse.new(user: user, review_provider: "anthropic").review_provider_key).to eq("anthropic")
@@ -24,7 +24,7 @@ RSpec.describe DailyResponse, type: :model do
   end
 
   describe ".answered_kinds_for" do
-    let(:user) { User.create!(email: "kinds@example.com", name: "K") }
+    let(:user) { User.create!(email: "kinds@example.com") }
 
     def response_on(date, ratings, submitted: true)
       exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
@@ -47,7 +47,7 @@ RSpec.describe DailyResponse, type: :model do
     end
 
     it "ignores another user's answers" do
-      other = User.create!(email: "kinds-other@example.com", name: "O")
+      other = User.create!(email: "kinds-other@example.com")
       exercise = DailyExercise.create!(user: other, date: Date.current, generated_at: Time.current, language: "ruby_rails",
                                        problem_set: { "code_review" => { "question" => "q" } })
       DailyResponse.create!(user: other, daily_exercise: exercise, date: Date.current,
@@ -65,7 +65,7 @@ RSpec.describe DailyResponse, type: :model do
 
   describe "pseudocode rounds" do
     def response_for(rounds)
-      user     = User.create!(email: "pseudo-#{SecureRandom.hex(4)}@example.com", name: "P")
+      user     = User.create!(email: "pseudo-#{SecureRandom.hex(4)}@example.com")
       exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
                                        language: "ruby_rails",
                                        problem_set: { "pseudocode_to_code" => { "question" => "Plan it" } })
@@ -199,7 +199,7 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
-  let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
+  let(:user) { User.create!(email: "dev@example.com") }
 
   let(:exercise) do
     user.daily_exercises.create!(
@@ -274,7 +274,7 @@ RSpec.describe DailyResponse, type: :model do
     end
 
     it "computes completeness against the exercise's own section count, not a hardcoded 3" do
-      exercise = DailyExercise.create!(user: User.create!(email: "four-section@example.com", name: "Four"),
+      exercise = DailyExercise.create!(user: User.create!(email: "four-section@example.com"),
                                        date: Date.current, generated_at: Time.current,
                                        problem_set: {
                                          "code_review" => {}, "pattern" => {}, "challenge" => {}, "plan_review" => {}
@@ -285,7 +285,7 @@ RSpec.describe DailyResponse, type: :model do
     end
 
     it "computes completeness against the sections presented, not every payload key" do
-      exercise = DailyExercise.create!(user: User.create!(email: "eight-key@example.com", name: "Eight"),
+      exercise = DailyExercise.create!(user: User.create!(email: "eight-key@example.com"),
                                        date: Date.current, generated_at: Time.current,
                                        problem_set: ExerciseSection.keys.index_with { {} })
       answer = ->(key) { key == "design_comparison" ? ExerciseSection::DesignComparison.encode_answer("a", "a" * 40) : "a" * 20 }
@@ -814,7 +814,7 @@ RSpec.describe DailyResponse, type: :model do
 
   describe "#fully_reviewed?" do
     def exercise_with_three_sections
-      user = User.create!(email: "fr_test@example.com", name: "FR")
+      user = User.create!(email: "fr_test@example.com")
       DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current,
         language: "ruby_rails",
@@ -857,7 +857,7 @@ RSpec.describe DailyResponse, type: :model do
 
   describe "#reviewing?" do
     def response_claimed_at(reviewing_since)
-      user = User.create!(email: "reviewing-#{SecureRandom.hex(3)}@example.com", name: "R")
+      user = User.create!(email: "reviewing-#{SecureRandom.hex(3)}@example.com")
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
         problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
@@ -881,7 +881,7 @@ RSpec.describe DailyResponse, type: :model do
 
   describe "#replace_blocker" do
     def response_with(**attributes)
-      user = User.create!(email: "blocker-#{SecureRandom.hex(3)}@example.com", name: "B")
+      user = User.create!(email: "blocker-#{SecureRandom.hex(3)}@example.com")
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
         problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
@@ -912,7 +912,7 @@ RSpec.describe DailyResponse, type: :model do
 
   describe "#section_reviewed?" do
     it "is true only for a section with a Hash entry in ai_review" do
-      user = User.create!(email: "sr_test@example.com", name: "SR")
+      user = User.create!(email: "sr_test@example.com")
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
         problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
@@ -927,7 +927,7 @@ RSpec.describe DailyResponse, type: :model do
   end
 
   describe "capped appends" do
-    let(:user) { User.create!(email: "caps@example.com", name: "C") }
+    let(:user) { User.create!(email: "caps@example.com") }
     let(:response) do
       exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
                                        problem_set: { "code_review" => { "question" => "q" } })
