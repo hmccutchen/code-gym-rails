@@ -59,9 +59,57 @@ RSpec.describe ReviewPrompt do
                            described_class.section_prompt(key: "code_review", section: section, answer: nil, rung: "mid_level"))
   end
 
+  describe "the approach paragraph" do
+    let(:start_line) { "how an experienced engineer would start on this kind of problem" }
+    let(:walkthrough_section) { day_a.first[:section] }
+
+    def recorded(name) = File.read(PromptSnapshotHelpers::PROMPT_SNAPSHOT_DIR.join("#{name}.txt"))
+
+    it "renders today's prompts byte for byte when approach is off, compared with the files recorded before the switch existed" do
+      day_a.each do |entry|
+        args = { key: entry[:key], section: entry[:section], answer: entry[:answer], rung: entry[:rung] }
+        today = recorded("review__day_a__#{entry[:key]}__prompt")
+
+        expect(described_class.section_prompt(**args, approach: false)).to eq(today), entry[:key]
+        expect(described_class.section_prompt(**args)).to eq(today), entry[:key]
+      end
+      expect(described_class.walkthrough_prompt(key: "code_review", section: walkthrough_section, rung: "senior", approach: false))
+        .to eq(recorded("review__day_a__code_review__walkthrough_nothing_written"))
+    end
+
+    it "asks for the approach paragraph on a graded section when approach is on" do
+      entry = day_a.first
+      prompt = described_class.section_prompt(key: entry[:key], section: entry[:section], answer: entry[:answer], rung: entry[:rung], approach: true)
+
+      expect(prompt).to include(start_line, "where this answer followed that start and where it did not")
+      expect(prompt).not_to include(%("next_step": string — one specific thing to study))
+      expect_prompt_snapshot("review__day_a__code_review__approach__prompt", prompt)
+    end
+
+    it "asks a walkthrough for the approach without mentioning an answer" do
+      prompt = described_class.walkthrough_prompt(key: "code_review", section: walkthrough_section, rung: "senior", approach: true)
+
+      expect(prompt).to include(start_line)
+      expect(prompt).not_to include("this answer")
+      expect_prompt_snapshot("review__day_a__code_review__approach__walkthrough", prompt)
+    end
+
+    it "passes approach through for_section to both shapes" do
+      entry = day_a.first
+      graded = described_class.for_section(key: entry[:key], section: entry[:section], answer: entry[:answer], answered: true, rung: "senior", approach: true)
+      walked = described_class.for_section(key: entry[:key], section: entry[:section], answer: nil, answered: false, rung: "senior", approach: true)
+
+      expect([ graded, walked ]).to all(include(start_line))
+    end
+
+    it "never reads the environment, so the switch is a value it is handed" do
+      expect(File.read(Rails.root.join("app/prompts/review_prompt.rb"))).not_to include("ENV")
+    end
+  end
+
   it "takes the rung as a value, so it never reads a user's difficulty settings" do
     expect(described_class.method(:section_prompt).parameters)
-      .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :answer ], [ :keyreq, :rung ] ])
+      .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :answer ], [ :keyreq, :rung ], [ :key, :approach ] ])
   end
 
   describe ".walkthrough_prompt" do
@@ -70,7 +118,7 @@ RSpec.describe ReviewPrompt do
 
     it "takes the rung as a value and no answer text, since a section with any written answer is graded instead" do
       expect(described_class.method(:walkthrough_prompt).parameters)
-        .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :rung ] ])
+        .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :rung ], [ :key, :approach ] ])
     end
 
     it "says no answer was given and asks for no rating" do
@@ -153,7 +201,7 @@ RSpec.describe ReviewPrompt do
 
     it "takes the answer state as a value, so it never reads a response" do
       expect(described_class.method(:for_section).parameters)
-        .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :answer ], [ :keyreq, :answered ], [ :keyreq, :rung ] ])
+        .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :answer ], [ :keyreq, :answered ], [ :keyreq, :rung ], [ :key, :approach ] ])
     end
   end
 

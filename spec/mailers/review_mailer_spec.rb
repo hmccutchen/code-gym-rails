@@ -62,7 +62,7 @@ RSpec.describe ReviewMailer, type: :mailer do
       expect(body).to include("What you got right:\n- You spotted the N+1 query")
       expect(body).to include("What you missed:\n- The missing index on user_id")
       expect(body).to include("Questions to ask yourself:\n- What happens under concurrent writes?")
-      expect(body).to include("Next step: Read about partial indexes")
+      expect(body).to include("Approach and next step: Read about partial indexes")
       expect(body).to include("Improved code:")
       expect(body).to include("User.includes(:posts)")
     end
