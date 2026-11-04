@@ -15,6 +15,9 @@ RSpec.describe DropUsersName do
   end
 
   it "drops the name column, and does nothing when it is already gone" do
+    migrate(:down)
+    expect(connection.column_exists?(:users, :name)).to be(true)
+
     migrate(:up)
     expect(connection.column_exists?(:users, :name)).to be(false)
 
