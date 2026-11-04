@@ -21,6 +21,16 @@ mix shares one version.
 `Duration#inspect` returns the humanized form ("15 minutes"), which is what
 the mailer wants; it is not a debug dump.
 
+## `#generation_failed_today?`
+
+The one test for "generation failed today", read by the dashboard's three
+actions and by `#clear_stale_generation_error!` (#691). "Today" is
+`Date.current`, so it is the day in whatever zone the caller runs in: a
+request runs in the user's zone (`ApplicationController#use_time_zone`), and
+so do the generation jobs. The jobs' own `last_generation_error_date.present?`
+checks ask a different question, whether any failure is recorded, so they
+clear yesterday's too and don't go through this.
+
 ## `#clear_stale_generation_error!`
 
 Only an error from today is cleared. An error from an earlier day is history,
