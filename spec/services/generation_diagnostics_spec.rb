@@ -80,4 +80,23 @@ RSpec.describe GenerationDiagnostics do
     expect(retention.find { |line| line.include?("bucket=#{DailyPlan::FOURTH_BUCKET_FOR.fetch(:plan_review)}") })
       .to include("dropped=plan_review:rollout_plan")
   end
+
+  describe "a retention check held back by the featured concept" do
+    def waiting_line(featured_concept:, reason: "no_host")
+      waiting = [ { bucket: "plan_review", concept: "scope_creep", reason: reason } ]
+      held    = draft.with(plan: plan.with(featured_concept: featured_concept, waiting_checks: waiting))
+      lines   = logged_lines { described_class.new(user).finished("ruby_rails", held, problem_set) }
+      lines.grep(/\A\[retention\].*waiting=/).sole
+    end
+
+    it "names the featured concept when it is a check left with no host" do
+      expect(waiting_line(featured_concept: "scope_creep"))
+        .to eq("[retention] user=#{user.id} date=#{Date.current} waiting=plan_review:scope_creep(no_host) featured=scope_creep")
+    end
+
+    it "names no featured concept when the waiting check is another concept or waits for another reason" do
+      expect(waiting_line(featured_concept: "caching")).not_to include("featured=")
+      expect(waiting_line(featured_concept: "scope_creep", reason: "rested")).not_to include("featured=")
+    end
+  end
 end

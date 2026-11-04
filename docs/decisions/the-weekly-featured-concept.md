@@ -140,6 +140,8 @@ it marks sections and not hides them.
 are the only ones that tag their buckets, so reinforcement, a drill and a
 retention check on that concept are not planned onto the fourth section, and a
 due check lands in `waiting_checks` as `no_host` until the week turns over.
+The `[retention] waiting=` line then ends `featured=<concept>`, so the log says
+why the check waited (#693).
 The fourth track used to pick its concepts without asking `DayHosts`; it asks
 now, and a spec pins the effect. The main track is unaffected, because no
 hiding kind hosts a main-track bucket, so `annotate_retention_concept` needs no

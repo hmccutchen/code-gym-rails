@@ -20,3 +20,5 @@ check the plan did not offer and reinforcement does not carry lands on
 could tag it but the hosts went elsewhere, `no_host` when none could.
 Generation logs them on one line beside the other two:
 `[retention] user=… date=… waiting=bucket:concept(no_slot|no_host),…`.
+When one of the `no_host` checks is the week's featured concept, the line ends
+`featured=<concept>` (#693).
