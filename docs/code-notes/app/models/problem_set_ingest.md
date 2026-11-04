@@ -31,7 +31,7 @@ A diagram is rendered into an HTML data attribute, so it is held to `MermaidSour
 ## `#normalize_reference_prose!`
 
 A section's `reference` block reaches the page through `glossary_wrap`, which
-needs strings. Its tagline, explanation and senior lens are deleted when they
+needs strings. A `reference` that isn't a hash is deleted. Its tagline, explanation and senior lens are deleted when they
 aren't strings, and its tradeoffs keep only nonblank strings, or are deleted
 when none is left. It reads every section's `reference`, so a kind that adds
 one needs no change here.

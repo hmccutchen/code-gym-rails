@@ -639,6 +639,13 @@ RSpec.describe ProblemSetIngest do
         expect(step(set)["architecture"]["reference"]).to eq("tagline" => "t", "tradeoffs" => [ "a" ])
       end
 
+      it "drops a reference that is not a hash" do
+        [ "a stray string", [ "t" ], 42 ].each do |bad|
+          set = { "architecture" => { "question" => "q", "reference" => bad } }
+          expect(step(set)["architecture"]).not_to have_key("reference")
+        end
+      end
+
       it "drops a reference's tradeoffs when none is a usable string" do
         set = { "architecture" => { "reference" => { "tagline" => "t", "tradeoffs" => "one string" } } }
 

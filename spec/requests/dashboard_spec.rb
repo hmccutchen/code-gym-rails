@@ -692,6 +692,28 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(Nokogiri::HTML5(response.body).text).to include("A queue absorbs bursts.", "A closure helps.")
     end
 
+    it "still renders a stored reference whose tradeoffs is one string" do
+      exercise = DailyExercise.last
+      exercise.problem_set["architecture"]["reference"]["tradeoffs"] = "Queues add a hop."
+      exercise.save!
+
+      get root_path
+
+      expect(response).to have_http_status(:ok)
+      expect(Nokogiri::HTML5(response.body).text).to include("Queues add a hop.")
+    end
+
+    it "renders the architecture section without its reference when the stored reference is not a hash" do
+      exercise = DailyExercise.last
+      exercise.problem_set["architecture"]["reference"] = "a stray string"
+      exercise.save!
+
+      get root_path
+
+      expect(response).to have_http_status(:ok)
+      expect(reference_body).to be_nil
+    end
+
     it "escapes markup in a wrapped reference field" do
       exercise = DailyExercise.last
       exercise.problem_set["architecture"]["reference"]["explanation"] = "Use <b>raw</b> closure"

@@ -233,9 +233,10 @@ class ProblemSetIngest
 
   def normalize_reference_prose!
     @problem_set.each_value do |section_data|
-      reference = section_data["reference"] if section_data.is_a?(Hash)
-      next unless reference.is_a?(Hash)
+      next unless section_data.is_a?(Hash) && section_data.key?("reference")
+      next section_data.delete("reference") unless section_data["reference"].is_a?(Hash)
 
+      reference = section_data["reference"]
       REFERENCE_PROSE_FIELDS.each { |field| reference.delete(field) if reference.key?(field) && !reference[field].is_a?(String) }
       keep_string_tradeoffs(reference) if reference.key?("tradeoffs")
     end
