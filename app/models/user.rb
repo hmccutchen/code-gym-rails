@@ -133,8 +133,10 @@ class User < ApplicationRecord
     anonymized_at.present?
   end
 
+  def generation_failed_today? = last_generation_error_date == Date.current
+
   def clear_stale_generation_error!
-    return unless last_generation_error_date == Date.current
+    return unless generation_failed_today?
 
     clear_generation_failure!
   end
