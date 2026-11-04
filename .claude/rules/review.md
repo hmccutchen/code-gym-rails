@@ -88,6 +88,7 @@ read it before changing that area.
   exactly `"1"`), `next_step` asks for how an experienced engineer would start
   and where the answer followed that start, then one thing to study. It adds
   no review field and no key. With the switch off, the review prompt is byte
-  for byte today's, and a spec compares it with the recorded snapshots.
+  for byte today's: a spec compares it with the recorded snapshots, and after
+  a recording run `git diff` must show no existing `review__*` file changed.
   `ReviewPrompt` takes the switch as `approach:` and never reads the
   environment, and the grader never draws on `SectionKindGuide`.

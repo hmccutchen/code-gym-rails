@@ -18,11 +18,12 @@ class ReviewPrompt
 
   NEXT_STEP = "one specific thing to study".freeze
 
-  APPROACH_NEXT_STEP = "a short paragraph of three or four sentences: how an experienced engineer would start on this kind of problem, " \
-                       "where this answer followed that start and where it did not, then one specific thing to study".freeze
+  APPROACH_START = "how an experienced engineer would start on this kind of problem".freeze
 
-  APPROACH_NEXT_STEP_WALKTHROUGH = "a short paragraph of two or three sentences: how an experienced engineer would start on this kind of problem, " \
-                                   "then one specific thing to study".freeze
+  APPROACH_NEXT_STEP = "a short paragraph of three or four sentences: #{APPROACH_START}, " \
+                       "where this answer followed that start and where it did not, then #{NEXT_STEP}".freeze
+
+  APPROACH_NEXT_STEP_WALKTHROUGH = "a short paragraph of two or three sentences: #{APPROACH_START}, then #{NEXT_STEP}".freeze
 
   def self.day_system(coach:, sections:)
     others = sections.size - 1
