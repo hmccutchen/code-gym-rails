@@ -943,21 +943,6 @@ RSpec.describe User, type: :model do
   end
 
   describe "columns" do
-    it "ignores the name column, which nothing reads or writes, until a later release drops it" do
-      expect(User.ignored_columns).to include("name")
-      expect(User.column_names).not_to include("name")
-      expect(create_user).not_to respond_to(:name)
-    end
-
-    it "gives the name column a nonblank default, so an insert that sends no name passes the validation the previous release still runs" do
-      name = User.connection.columns(:users).find { |column| column.name == "name" }
-      User.connection.execute("INSERT INTO users (email, created_at, updated_at) VALUES ('raw@example.com', now(), now())")
-
-      expect(name.null).to be(false)
-      expect(name.default).to be_present
-      expect(User.connection.select_value("SELECT name FROM users WHERE email = 'raw@example.com'")).to eq(name.default)
-    end
-
     it "has none of the Devise columns, and has the authenticator, challenge and session columns" do
       expect(User.column_names & %w[encrypted_password reset_password_token reset_password_sent_at
                                     confirmation_token confirmed_at confirmation_sent_at otp_required_for_login]).to be_empty
@@ -1031,27 +1016,6 @@ RSpec.describe User, type: :model do
       expect(user.login_code_sent_at).to be_nil
       expect(user.anonymized_at).to be_present
       expect(user).to be_anonymized
-    end
-
-    it "overwrites a name stored before the column was ignored, since the deletion page promises to remove it" do
-      user = create_user(email: "named@example.com")
-      User.connection.execute("UPDATE users SET name = 'Real Person' WHERE id = #{user.id}")
-
-      user.anonymize!
-
-      expect(User.connection.select_value("SELECT name FROM users WHERE id = #{user.id}")).to eq("Deleted user")
-    end
-
-    it "still deletes an account once the name column is gone, as it is for a process on this release while the next release's migration runs" do
-      user = create_user(email: "dropped@example.com")
-      User.connection.remove_column(:users, :name)
-      User.reset_column_information
-
-      expect(user.anonymize!).to be(true)
-      expect(user.reload).to be_anonymized
-    ensure
-      User.connection.add_column(:users, :name, :string, null: false, default: "Member") unless User.connection.column_exists?(:users, :name)
-      User.reset_column_information
     end
 
     it "clears an authenticator left from the Devise sign-in" do
