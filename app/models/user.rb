@@ -430,6 +430,8 @@ class User < ApplicationRecord
   private
 
   def scrub_legacy_name
+    return unless self.class.connection.column_exists?(:users, :name)
+
     self.class.where(id: id).update_all([ "name = ?", LEGACY_NAME_ON_DELETION ])
   end
 

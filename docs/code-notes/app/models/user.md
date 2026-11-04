@@ -10,8 +10,13 @@ them needs `RAILS_MASTER_KEY` or the credentials file.
 `User` ignores `users.name`, so `update!` can no longer overwrite it. A name
 stored before the change would survive account deletion, while the deletion
 page promises to remove it. `scrub_legacy_name` writes "Deleted user" with a
-plain `update_all` inside the same lock, as the previous release did. It goes
-with the column when a later release drops it (#686).
+plain `update_all` inside the same lock, as the previous release did. It first
+asks the database whether the column exists. The next release's migration drops
+the column before that release takes traffic, so for a few minutes processes on
+this release still serve deletions against a table with no `name`, and an
+unconditional update would fail the whole deletion. The check reads the table,
+not Active Record's cached columns, which this process loaded before the drop.
+The method goes with the column when that release lands (#686).
 
 ## `before_save :bump_section_kind_preferences_version` and `#section_kind_settings`
 

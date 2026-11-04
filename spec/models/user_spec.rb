@@ -1042,6 +1042,18 @@ RSpec.describe User, type: :model do
       expect(User.connection.select_value("SELECT name FROM users WHERE id = #{user.id}")).to eq("Deleted user")
     end
 
+    it "still deletes an account once the name column is gone, as it is for a process on this release while the next release's migration runs" do
+      user = create_user(email: "dropped@example.com")
+      User.connection.remove_column(:users, :name)
+      User.reset_column_information
+
+      expect(user.anonymize!).to be(true)
+      expect(user.reload).to be_anonymized
+    ensure
+      User.connection.add_column(:users, :name, :string, null: false, default: "Member") unless User.connection.column_exists?(:users, :name)
+      User.reset_column_information
+    end
+
     it "clears an authenticator left from the Devise sign-in" do
       user = create_user
       user.update_columns(otp_secret: "stored-ciphertext", consumed_timestep: 59_000_000, otp_backup_codes: [ "digest" ],
