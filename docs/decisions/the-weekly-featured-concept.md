@@ -106,13 +106,21 @@ diagnostics. Three rules use it:
   A spec holds that each language's list teaches at least two concepts, so a
   skip can never leave nothing to pick.
 - `ConceptVocabulary.selectable_for_section(..., featured:)` leaves it out of a
-  kind whose `.concept_hidden_in_plan?(mode:)` is true, and only when the
-  featured row's bucket is the kind's own bucket. A kind answers for itself
+  kind whose `.concept_hidden_in_plan?(mode:)` is true. A kind answers for itself
   (`plan_review` and `ambiguity_hunt` always, `code_review` on a bug-hunt day),
   so no shared code branches on kind. A spec holds that every hiding kind still
   has a concept to offer whichever one is featured, at every rung.
 - A kind that shows its concept keeps it, so the week's concept can still be
   practiced where it is allowed.
+
+Both rules match the concept's name and ignore the bucket, because the guard
+they replace compares names (`concepts_withheld_before_submission`). A mixed-
+language user whose week features `array_mutation_pitfalls` under Ruby would
+otherwise still get a JavaScript bug hunt on it, and the callout would vanish.
+Only the Ruby and JavaScript bug-hunt lists share names (three of them);
+`plan_review` and `ambiguity_hunt` names appear in no other list, so the rule
+costs nothing there. `FeaturedConcept#marks?` still compares the bucket, since
+it marks sections and not hides them.
 
 **What it costs.** `DayHosts` reads those vocabularies, so a featured
 `plan_review` or `ambiguity_hunt` concept has no host that week. These kinds
@@ -128,7 +136,12 @@ before: every prompt snapshot is unchanged.
 **Which week.** The pick is for the week of `Date.current` in the user's zone,
 which the jobs set with `Time.use_zone(user.effective_time_zone)`, the same day
 the set is dated and the same week the dashboard asks about. A set generated
-on a Monday uses Monday's week. A paused user's held set that
+on a Monday uses Monday's week. A generation that starts just before local
+midnight on Sunday and writes after it is planned against the old week, because
+`GenerateDailyExercisesJob#write_set` reads the date again when it saves. The
+window is one generation long, once a week, and only matters if the new week's
+pick is also a hidden concept, so the guards cover it rather than the job
+carrying a target date through the draft. A paused user's held set that
 `User#carry_held_set_forward!` moves into a new week was generated under the
 old week's pick and is not regenerated, so the new week's concept can be one of
 its hidden concepts.

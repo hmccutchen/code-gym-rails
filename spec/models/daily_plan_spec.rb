@@ -787,6 +787,17 @@ RSpec.describe DailyPlan do
       expect(result.featured).to eq(featured)
     end
 
+    it "skips the concept by name for a mixed-language user whose week features it under the other language" do
+      shared = (BugHuntGotchas.concepts("ruby_rails") & BugHuntGotchas.concepts("javascript")).first
+      featured = FeaturedConcept.new(concept: shared, bucket: "ruby_rails")
+      user.update!(language: "mixed")
+
+      result = plan(language: "javascript", featured: featured)
+
+      expect(BugHuntGotchas.for_language("javascript").first.concept).to eq(shared)
+      expect(result.code_review_gotcha.concept).not_to eq(shared)
+    end
+
     it "carries no featured concept unless one is passed" do
       expect(plan.featured).to be_nil
     end

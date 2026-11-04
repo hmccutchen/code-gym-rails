@@ -140,7 +140,7 @@ module ConceptVocabulary
         for_section(section_key, language) - [ gotcha&.concept ]
       end
 
-    excluded = excluded_concepts_for(section_key) + withheld_featured(section_key, language, mode, featured)
+    excluded = excluded_concepts_for(section_key) + withheld_featured(section_key, mode, featured)
     remaining = excluded.empty? ? vocabulary : vocabulary - excluded
     ExerciseSection.for(section_key).narrow_vocabulary(remaining, rung: rung) & remaining
   end
@@ -155,10 +155,8 @@ module ConceptVocabulary
   end
   private_class_method :code_review_vocabulary
 
-  def self.withheld_featured(section_key, language, mode, featured)
-    return [] unless featured && ExerciseSection.for(section_key).concept_hidden_in_plan?(mode: mode)
-
-    featured.bucket == ConceptBucket.for(section_key, language) ? [ featured.concept ] : []
+  def self.withheld_featured(section_key, mode, featured)
+    featured && ExerciseSection.for(section_key).concept_hidden_in_plan?(mode: mode) ? [ featured.concept ] : []
   end
   private_class_method :withheld_featured
 

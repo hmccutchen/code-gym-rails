@@ -108,9 +108,15 @@ RSpec.describe BugHuntGotchas do
         expect(picked).to eq(rest.last)
       end
 
-      it "ignores a featured concept recorded under another bucket" do
-        expect(described_class.pick("ruby_rails", last_seen: {}, featured: featured(entries.first.concept, bucket: "javascript")))
-          .to eq(entries.first)
+      it "skips the concept by name whichever bucket the week features it under, as the callout guard compares names" do
+        shared = (described_class.concepts("ruby_rails") & described_class.concepts("javascript")).first
+        javascript = described_class.for_language("javascript")
+
+        picked = described_class.pick("javascript", last_seen: {}, featured: featured(shared, bucket: "ruby_rails"))
+
+        expect(javascript.first.concept).to eq(shared)
+        expect(picked.concept).not_to eq(shared)
+        expect(picked).to eq(javascript.find { |entry| entry.concept != shared })
       end
 
       it "ignores a featured concept no entry teaches" do

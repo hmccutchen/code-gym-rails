@@ -302,8 +302,15 @@ RSpec.describe ConceptVocabulary do
         end
       end
 
-      it "ignores a featured concept recorded under another bucket" do
-        expect(described_class.selectable_for_section("plan_review", "ruby_rails", featured: featured(ConceptVocabulary::PLAN_REVIEW_CONCEPTS.first, "ruby_rails")))
+      it "leaves it out by name whichever bucket the row records it under, as the callout guard compares names" do
+        concept = ConceptVocabulary::PLAN_REVIEW_CONCEPTS.first
+
+        expect(described_class.selectable_for_section("plan_review", "ruby_rails", featured: featured(concept, "ruby_rails")))
+          .to eq(ConceptVocabulary::PLAN_REVIEW_CONCEPTS - [ concept ])
+      end
+
+      it "changes nothing when the featured concept is not in the kind's vocabulary" do
+        expect(described_class.selectable_for_section("plan_review", "ruby_rails", featured: featured("n_plus_one", "ruby_rails")))
           .to eq(ConceptVocabulary::PLAN_REVIEW_CONCEPTS)
       end
 
