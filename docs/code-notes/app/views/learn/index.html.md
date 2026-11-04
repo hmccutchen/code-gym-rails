@@ -38,7 +38,9 @@ selector whose last part names one of those three classes,
 
 The featured concept renders above the filter and the list, so opening this tab
 and reading one thing takes no decision. The filter shares its row on a
-desktop.
+desktop. It is left off when `featured_shown_beside_todays_set?` is false:
+today's set, or a paused user's held set, hides that concept until it is
+submitted, and the dashboard leaves its callout off then too (#680).
 
 ## Prepare prompt
 

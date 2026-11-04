@@ -238,8 +238,6 @@ keeps its size. When the light palette wraps the mark in a `picture` element,
 that element is the flex item, so it shrinks and the mark follows it through
 `max-width`.
 
-## `nav .nav-links` inside the container query
-
 ## `.btn`
 
 A `.btn` with no variant gets the raised fill, so a `button_to` that only

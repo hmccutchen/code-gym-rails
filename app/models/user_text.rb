@@ -33,15 +33,12 @@ module UserText
   end
 
   # Capped here too because older rows were never backfilled to the write-boundary caps.
-  def self.tagged(value, blank: "(skipped)", inline: false, limit: MAX_ANSWER_LENGTH)
+  def self.tagged(value, blank: "(skipped)", limit: MAX_ANSWER_LENGTH)
     text = clean(value, limit: limit)
     return blank if text.strip.empty?
 
-    # Only inline strips: block text can be indentation-sensitive, and the grader must read what the page shows.
-    text = text.strip if inline
     fenced = text.gsub(%r{<\s*/?\s*#{TAG}\b[^<>]*>}i) { |tag| tag.tr("<>", "[]") }
-    break_at = inline ? "" : "\n"
-    "<#{TAG}>#{break_at}#{fenced}#{break_at}</#{TAG}>"
+    "<#{TAG}>\n#{fenced}\n</#{TAG}>"
   end
 
   def self.tag_history(history, limit: MAX_ANSWER_LENGTH)

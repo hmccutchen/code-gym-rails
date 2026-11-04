@@ -60,10 +60,6 @@ RSpec.describe UserText do
       expect(fenced).to include("\n    if x:\n        return 1\n")
     end
 
-    it "strips an inline value, which has to stay on one prompt line" do
-      expect(described_class.tagged("  Ada  ", inline: true)).to eq("<#{described_class::TAG}>Ada</#{described_class::TAG}>")
-    end
-
     it "reads a value that is only whitespace as blank" do
       expect(described_class.tagged("   \n  ")).to eq("(skipped)")
     end
