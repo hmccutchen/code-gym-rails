@@ -272,6 +272,75 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
     end
   end
 
+  describe "the stored key" do
+    let(:section) do
+      two_files.merge("file_1_code" => "total = order.line_items.sum(&:price)\nputs total",
+                      "file_2_code" => "order.line_items.each { |item| item.destroy }\nputs order.id")
+    end
+    let(:key_text) { { "issue" => "i", "why_it_matters" => "w", "fix" => "f" } }
+    let(:evidence) do
+      [ { "file" => "app/models/order.rb", "quote" => "total = order.line_items.sum(&:price)" },
+        { "file" => "app/models/item.rb", "quote" => "order.line_items.each { |item| item.destroy }" } ]
+    end
+
+    def key_with(files: %w[app/models/order.rb app/models/item.rb], evidence: self.evidence)
+      key_text.merge("files" => files, "evidence" => evidence)
+    end
+
+    def normalized(key) = described_class.normalize_planted_key(section.merge("answer_key" => key))
+
+    def reason_for(key)
+      cleaned = normalized(key)
+      described_class.unusable_key_reason(section, cleaned, language: "ruby_rails")
+    end
+
+    it "keeps the files and the evidence beside the three texts" do
+      expect(normalized(key_with)).to eq(key_with)
+      expect(reason_for(key_with)).to be_nil
+    end
+
+    it "keeps only the three texts on a single-file section" do
+      single = { "snippet" => "x = 1", "answer_key" => key_with }
+
+      expect(described_class.normalize_planted_key(single)).to eq(key_text)
+      expect(described_class.unusable_key_reason(single, key_text, language: "ruby_rails")).to be_nil
+    end
+
+    it "drops entries of the wrong shape and caps each list" do
+      key = key_with(files: [ "app/models/order.rb", 7, "app/models/item.rb", "a", "b" ],
+                     evidence: [ evidence[0], "loose", { "file" => "x" }, evidence[1], evidence[0], evidence[1] ])
+
+      expect(normalized(key)).to eq(key_with(files: [ "app/models/order.rb", "app/models/item.rb", "a" ],
+                                             evidence: [ evidence[0], evidence[1], evidence[0], evidence[1] ]))
+    end
+
+    it "names files_unmatched when files names fewer than two of the section's paths" do
+      expect(reason_for(key_with(files: %w[app/models/order.rb app/models/other.rb]))).to eq("files_unmatched")
+      expect(reason_for(key_text)).to eq("files_unmatched")
+    end
+
+    it "names evidence_unlocated when fewer than two quotes are found in their own files" do
+      moved = [ evidence[0], evidence[1].merge("file" => "app/models/order.rb") ]
+      unnamed = [ evidence[0], evidence[1].merge("file" => "app/models/cart.rb") ]
+
+      expect(reason_for(key_with(evidence: [ evidence[0] ]))).to eq("evidence_unlocated")
+      expect(reason_for(key_with(evidence: moved))).to eq("evidence_unlocated")
+      expect(reason_for(key_with(evidence: unnamed))).to eq("evidence_unlocated")
+    end
+
+    it "names evidence_unlocated when the quotes found cover only one file" do
+      same_file = [ evidence[0], { "file" => "app/models/order.rb", "quote" => "total = order.line_items" } ]
+
+      expect(reason_for(key_with(evidence: same_file))).to eq("evidence_unlocated")
+    end
+
+    it "counts a quote only with 12 characters besides whitespace, since it is searched in a whole file" do
+      short = [ evidence[0], { "file" => "app/models/item.rb", "quote" => "puts order" } ]
+
+      expect(reason_for(key_with(evidence: short))).to eq("evidence_unlocated")
+    end
+  end
+
   describe ".arrange!" do
     it "drops a diagram from a multi-file section and keeps one on a single-file section" do
       multi = two_files.merge("diagram" => "graph TD; A-->B")
@@ -320,6 +389,41 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file sections" do
 
       expect(attachment).to include("1 | a = 1")
       expect(attachment).not_to include("never copy")
+    end
+  end
+
+  describe "what the judge is told" do
+    let(:single) { { "snippet" => "x = 1" } }
+    let(:bug_hunt) { { "snippet" => "x = 1", "purpose" => "Adds one." } }
+
+    it "gives a section with files its own task and paragraph" do
+      expect(described_class.judge_task_for(two_files)).to eq(described_class::MultiFile::JUDGE_TASK)
+      expect(described_class.judge_guidance_for(two_files)).to eq(described_class::MultiFile::JUDGE_GUIDANCE)
+    end
+
+    it "asks the judge to solve first, reject a one-file problem or an exploit, and never change the files" do
+      expect(described_class::MultiFile::JUDGE_GUIDANCE).to include("Solve it before judging", "one file alone", "exploit",
+                                                                    "Never change a path, a file's code or its changed lines")
+    end
+
+    it "leaves the single-file and bug hunt sections as they were" do
+      expect(described_class.judge_task_for(single)).to eq(described_class.judge_task)
+      expect(described_class.judge_guidance_for(single)).to be_nil
+      expect(described_class.judge_guidance_for(bug_hunt)).to eq(described_class::BugHunt::Prompt::JUDGE_GUIDANCE)
+    end
+  end
+
+  describe ".grading_note" do
+    it "grades a section with files on the interaction across them, with no key to lean on" do
+      note = described_class.grading_note(section: two_files, answer: "a")
+
+      expect(note).to eq(described_class::MultiFile::GRADING_NOTE)
+      expect(note).to include("both sides", "confined to one file", "never where the problem is")
+      expect(note).not_to include("answer_key", "key")
+    end
+
+    it "leaves the single-file note as it was" do
+      expect(described_class.grading_note(section: { "snippet" => "x = 1" }, answer: "a")).to start_with("Main point: the one planted issue")
     end
   end
 
@@ -447,11 +551,14 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file generation" do
       expect(described_class.schema_fragment(label: "Ruby/Rails", file_range: 1..1)).to eq(described_class.schema_fragment(label: "Ruby/Rails"))
     end
 
-    it "asks for files in place of a snippet and a diagram, with today's answer key" do
+    it "asks for files in place of a snippet and a diagram, and a key naming the files and quoting them" do
       expect(fragment(2..2).keys).to eq(%w[question teaching_note concept scenario file_1_path file_1_code file_1_changed
                                            file_2_path file_2_code file_2_changed answer_key])
       expect(fragment(2..2)["file_1_changed"]).to be_an(Array)
-      expect(fragment(2..2)["answer_key"]).to eq(fragment(1..1)["answer_key"])
+      expect(fragment(2..2)["answer_key"]).to eq(fragment(1..1)["answer_key"].merge("files" => fragment(2..2)["answer_key"]["files"],
+                                                                               "evidence" => fragment(2..2)["answer_key"]["evidence"]))
+      expect(fragment(2..2)["answer_key"]["files"]).to be_an(Array)
+      expect(fragment(2..2)["answer_key"]["evidence"].sole.keys).to eq(%w[file quote])
     end
 
     it "offers a third file only when the range allows three" do

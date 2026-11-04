@@ -16,19 +16,19 @@ RSpec.describe GenerationDiagnostics, "quote tally on [planted_key] lines" do
     quotes = tally("`AdoptPet.call` and `Adoption.create!` and `Redis` and `:null_store`")
     note = ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "quote_missing", quotes: quotes)
 
-    lines = logged_lines { described_class.new(user).key_notes([ note ], attempt: "draft", code_review_mode: :test_file) }
+    lines = logged_lines { described_class.new(user).key_notes([ note ], attempt: "draft", code_review_mode: :test_file, code_review_files: 1..1) }
 
     expect(lines).to eq([ "[planted_key] answer_key=quote_missing kind=code_review language=ruby_rails attempt=draft " \
-                          "code_review_mode=test_file verbatim=1 reference=1 scenario=1 unresolved=1 user=#{user.id}" ])
+                          "code_review_mode=test_file code_review_files=single verbatim=1 reference=1 scenario=1 unresolved=1 user=#{user.id}" ])
     expect(lines.sole).not_to include("null_store", "AdoptPet", "Redis")
   end
 
   it "logs no counts for a note without a tally, so a dropped key's line is unchanged" do
     note = ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "missing", quotes: nil)
 
-    lines = logged_lines { described_class.new(user).key_notes([ note ], attempt: "draft", code_review_mode: :application_code) }
+    lines = logged_lines { described_class.new(user).key_notes([ note ], attempt: "draft", code_review_mode: :application_code, code_review_files: 1..1) }
 
     expect(lines).to eq([ "[planted_key] answer_key=missing kind=code_review language=ruby_rails attempt=draft " \
-                          "code_review_mode=application_code user=#{user.id}" ])
+                          "code_review_mode=application_code code_review_files=single user=#{user.id}" ])
   end
 end

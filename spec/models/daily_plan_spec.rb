@@ -716,8 +716,8 @@ RSpec.describe DailyPlan do
       DailyPlan.for(user, language: "ruby_rails", judged: true)
     end
 
-    it "keeps every day single-file until the multi-file weight is raised" do
-      expect(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).to eq(single: 1.0, multi: 0.0)
+    it "rolls multi-file on a quarter of the days that can show files" do
+      expect(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).to eq(single: 0.75, multi: 0.25)
     end
 
     it "carries the files roll on a toy day" do

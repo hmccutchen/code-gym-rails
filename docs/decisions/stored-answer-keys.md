@@ -105,8 +105,15 @@ Two checks, neither of which changes a key:
   catches a key that quotes code that isn't there, not one that quotes the
   right line and misreads it. Every keyed winning section logs one
   `[planted_key]` line with its kind, language, outcome (`ok`, `missing`,
-  `too_long` or `quote_missing`), `attempt` (`draft` or `retry`) and the day's
-  `code_review_mode`. The threshold is counted from those lines: more than 2
+  `too_long` or `quote_missing`, and for a multi-file key `files_unmatched`
+  or `evidence_unlocated`), `attempt` (`draft` or `retry`) and the day's
+  `code_review_mode`, and since the multi-file launch its
+  `code_review_files` (`single` or `multi`). The threshold is counted from
+  single-file lines only: a line with `code_review_files=single`, or one
+  written before the field existed. A multi-file key quotes whole files, so
+  its lines are counted apart, by `script/split_code_review_results.rb`
+  (`docs/decisions/multi-file-code-review.md`), and the lines already counted
+  toward the first 10 stay counted. More than 2
   `quote_missing` in the first 10 drafted Ruby sections of a kind that
   quotes (`code_review`, `security_review`, `plan_review`) stops the work,
   and `missing` is reported beside it (owner's decision, 2026-10-28). A
@@ -136,7 +143,9 @@ Two checks, neither of which changes a key:
   say little about the check. PR 2's single-file samples, its
   `--keyed-only` export and its calibration leave `bug_hunt` sections out the
   same way (`CodeReview.bug_hunt?`), and its keyed `code_review` note gains a
-  fourth harm clause for them (`docs/decisions/bug-hunt.md`). The generation prompt adds
+  fourth harm clause for them (`docs/decisions/bug-hunt.md`). They leave
+  multi-file sections out too (`CodeReview.files` finds files), since those
+  get their own comparison (`docs/decisions/multi-file-code-review.md`). The generation prompt adds
   three rules to every keyed kind's hidden-key line
   (`PlantedKey::GROUNDING`): every claim follows from what is shown, the
   scenario included, and the planted flaw is never stated in the scenario;

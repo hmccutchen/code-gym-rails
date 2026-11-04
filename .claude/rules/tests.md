@@ -107,7 +107,7 @@ CLI (cached on `spec/playwright/package-lock.json`), while the `test` job runs
 everything else via `--exclude-pattern "system/**/*_spec.rb"` — the two halves
 run in parallel so unit/request feedback isn't gated behind browser setup.
 
-`spec/support/roll_defaults.rb` pins two of `DailyPlan`'s rolls for every
+`spec/support/roll_defaults.rb` pins three of `DailyPlan`'s rolls for every
 example, since each changes what the plan or ingest produce:
 
 - **The real-source sub-roll** lands `:toy`. Without it, every example
@@ -120,9 +120,15 @@ example, since each changes what the plan or ingest produce:
   `bug_hunt`, or any other particular mode, calls `pin_code_review_mode`
   (`spec/support/code_review_mode_helpers.rb`), which stubs both the judged
   and unjudged mode weights.
+- **The files roll lands `:single`.** At `multi: 0.25` a day could otherwise
+  ask for files, and a spec's canned single-file `code_review` reply would be
+  refused.
+  A spec that drives the multi-file shape stubs `:multi` itself. The pin
+  lives here, after the catch-all `and_call_original`, because a later
+  catch-all hides every pin made before it.
 
 A `WeightedRoll.pick` stub without `with(...)` matches every roll, so it
-replaces both pins without failing.
+replaces all three pins without failing.
 
 CI runs the suite against Postgres 18, the major version production runs, on every PR (see `.github/workflows/ci.yml`).
 

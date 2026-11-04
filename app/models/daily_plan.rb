@@ -26,7 +26,7 @@ class DailyPlan
 
   UNJUDGED_CODE_REVIEW_MODE_WEIGHTS = CODE_REVIEW_MODE_WEIGHTS.except(ExerciseSection::CodeReview::BugHunt::MODE).freeze
 
-  CODE_REVIEW_FILE_WEIGHTS = { single: 1.0, multi: 0.0 }.freeze
+  CODE_REVIEW_FILE_WEIGHTS = { single: 0.75, multi: 0.25 }.freeze
 
   SCENARIO_FLAVOR_WEIGHTS = { everyday: 0.5, general: 0.5 }.freeze
 

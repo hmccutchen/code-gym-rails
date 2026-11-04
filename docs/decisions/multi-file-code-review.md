@@ -59,7 +59,7 @@ replaces the earlier "launch B waits for PR 2" order.
 
 - **Launch A (built, #622):** rendering, caps, refusal codes and generation,
   with `CODE_REVIEW_FILE_WEIGHTS = { single: 1.0, multi: 0.0 }`.
-- **Live with guards (next):** one PR that turns the mode on at
+- **Live with guards (built, 2026-11-04):** one PR that turns the mode on at
   `{ single: 0.75, multi: 0.25 }`, with:
   - **the key stored from the first multi-file day,** unread by the grader
     until PR 2, as PR 1 did for single-file keys (below)
@@ -74,6 +74,11 @@ replaces the earlier "launch B waits for PR 2" order.
     from #639, since every reply behind `JUDGE_MEASURED_MAX_OUTPUT_TOKENS`
     came from a single-file section, and a reply past a third of
     `JUDGE_MAX_TOKENS` sends the cap back to the owner
+  The split script also gives `bug_hunt` sections a row of their own, since
+  they are not mastery evidence and would blur the single-file figures the
+  multi-file ones are compared with. `FakeService` answers a prompt that asks
+  for files with a canned two-file section, so a local day that rolls
+  multi-file still has a `code_review`.
 - **With PR 2:** the grader reads multi-file keys too, the refusal rule for a
   failed multi-file key joins, a multi-file calibration fixture is added, and
   the early grades are compared with keyed ones (below).

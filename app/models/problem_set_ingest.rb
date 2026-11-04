@@ -37,7 +37,7 @@ class ProblemSetIngest
     @fixed_concepts     = fixed_concepts
     @suggested_concepts = []
     @unusable_sections  = []
-    @too_long_keys      = Set.new
+    @dropped_keys       = {}
   end
 
   def call
@@ -69,11 +69,18 @@ class ProblemSetIngest
       kind = ExerciseSection.find(key)
       next unless kind&.planted_key? && section.is_a?(Hash)
 
-      cleaned  = kind.normalize_planted_key(section)
-      too_long = PlantedKey.too_long?(cleaned)
-      @too_long_keys << key if too_long
-      PlantedKey.store!(section, (cleaned unless too_long))
+      cleaned = kind.normalize_planted_key(section)
+      reason  = dropped_key_reason(kind, section, cleaned)
+      @dropped_keys[key] = reason if reason
+      PlantedKey.store!(section, (cleaned unless reason))
     end
+  end
+
+  def dropped_key_reason(kind, section, cleaned)
+    return if cleaned.nil?
+    return "too_long" if PlantedKey.too_long?(cleaned)
+
+    kind.unusable_key_reason(section, cleaned, language: @language)
   end
 
   # Last, so the quote check reads the code as formatted and the schema the server stamped; winners only, the sample measured.
@@ -85,7 +92,7 @@ class ProblemSetIngest
   end
 
   def key_note(key, kind, section)
-    return KeyNote.new(key: key, language: @language, outcome: "too_long", quotes: nil) if @too_long_keys.include?(key)
+    return KeyNote.new(key: key, language: @language, outcome: @dropped_keys[key], quotes: nil) if @dropped_keys.key?(key)
     return KeyNote.new(key: key, language: @language, outcome: "missing", quotes: nil) unless section.key?(PlantedKey::FIELD)
 
     quotes = kind.quote_tally(section, language: @language)

@@ -1,6 +1,38 @@
 module ExerciseSection::CodeReview::MultiFile
   HIDDEN_KEY_LINE = PlantedKey.hidden_key_line(fields: %w[question scenario teaching_note], before: "reads the files", quoted: "the code").freeze
 
+  MAX_EVIDENCE = 4
+
+  MIN_EVIDENCE = 2
+
+  MIN_FILES = 2
+
+  MIN_EVIDENCE_QUOTE_LENGTH = 12
+
+  ANSWER_KEY_SCHEMA = ExerciseSection::CodeReview.answer_key_schema(
+    %("files":          ["string — the path of each file the problem spans, at least #{MIN_FILES}, exactly as shown"]),
+    %("evidence":       [{ "file": "string — one of the paths in files", "quote": "string — a line copied exactly from that file that shows the problem" }])
+  ).freeze
+
+  JUDGE_TASK = "Find the one planted problem in how the files fit together and say how to fix it.".freeze
+
+  JUDGE_GUIDANCE = <<~GUIDANCE.squish.freeze
+    This section shows several files as they stand after one change, with the lines the change added or edited marked, and
+    plants one problem in how they fit together. Solve it before judging: find what one file assumes that another breaks,
+    and the fix. Reject it as reasoning_failure when the problem shows in one file alone, without reading another, and as
+    scope_mismatch when the problem is an exploit, such as an injection or mass assignment, rather than a broken contract
+    between files. Never change a path, a file's code or its changed lines.
+  GUIDANCE
+
+  GRADING_NOTE = "Main point: the one planted problem in how the files fit together: what one file assumes that another breaks.\n" \
+                 "Essential pieces: both sides of that interaction, why it goes wrong in this code, and a fix in the right file or files.\n" \
+                 "A finding confined to one file earns credit only as far as it goes. The changed lines show where the change is, " \
+                 "never where the problem is.".freeze
+
+  KEY_LINE = "- In \"answer_key\", \"files\" names every file the problem spans, and \"evidence\" gives #{MIN_EVIDENCE} to #{MAX_EVIDENCE} " \
+             "quotes, each copied exactly from the file it names and long enough to appear only once there, covering at least " \
+             "#{MIN_FILES} files.".freeze
+
   SUBTLETY = {
     "mid_level"          => "- Nothing in the question or the code points at the problem; reading the second file closely finds it.",
     "senior"             => "- The broken assumption sits in a file the change didn't touch.",
@@ -18,9 +50,31 @@ module ExerciseSection::CodeReview::MultiFile
       "- Copy each changed line exactly as it reads in its file, and make sure it appears only once in its file, so it marks one line.",
       ("- Write each file in #{code_style}." if code_style),
       *shared_lines,
+      KEY_LINE,
       ("- An `authorization` flaw here is a broken contract between files, never an injection or mass-assignment exploit." if
         vocabulary.include?("authorization"))
     ].compact.join("\n")
+  end
+
+  def self.key_lists(key)
+    {
+      "files"    => PlantedKey.list(key["files"], max: ExerciseSection::CodeReview::FILE_SLOTS.size) { |path| PlantedKey.text(path) },
+      "evidence" => PlantedKey.list(key["evidence"], max: MAX_EVIDENCE) { |entry| PlantedKey.fields(entry, %w[file quote]) }
+    }
+  end
+
+  def self.unusable_key_reason(shown, key, language:)
+    named = Array(key["files"]) & shown.map(&:path)
+    return "files_unmatched" if named.size < MIN_FILES
+
+    located = Array(key["evidence"]).select { |entry| named.include?(entry["file"]) && located?(shown, entry, language) }
+    "evidence_unlocated" if located.size < MIN_EVIDENCE || located.map { |entry| entry["file"] }.uniq.size < MIN_FILES
+  end
+
+  def self.located?(shown, entry, language)
+    code = shown.find { |file| file.path == entry["file"] }.code
+    KeyQuote.normalize(entry["quote"], language: language).length >= MIN_EVIDENCE_QUOTE_LENGTH &&
+      KeyQuote.find(code, entry["quote"], language: language).present?
   end
 
   def self.file_count(file_range) = "#{file_range.minmax.uniq.join(" or ")} files"
@@ -58,5 +112,5 @@ module ExerciseSection::CodeReview::MultiFile
     ].join(",\n    ")
   end
 
-  private_class_method :file_count, :shape_line, :file_fields
+  private_class_method :located?, :file_count, :shape_line, :file_fields
 end
