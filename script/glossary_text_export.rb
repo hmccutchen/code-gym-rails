@@ -4,8 +4,8 @@ require_relative "review_baseline_export"
 class GlossaryTextExport
   EXERCISE_FIELDS = { "scenario" => "scenario", "question" => "question", "options" => "option", "request" => "request",
                       "problem_statement" => "problem_statement", "why" => "why", "plan_excerpt" => "plan_excerpt" }.freeze
-  REFERENCE_FIELDS = { "tagline" => "reference_tagline", "explanation" => "reference_explanation",
-                       "tradeoffs" => "reference_tradeoff", "senior_lens" => "reference_senior_lens" }.freeze
+  SECTION_REFERENCE_FIELDS = { "tagline" => "reference_tagline", "explanation" => "reference_explanation",
+                               "tradeoffs" => "reference_tradeoff", "senior_lens" => "reference_senior_lens" }.freeze
 
   def initialize(out:)
     @out = out
@@ -38,7 +38,7 @@ class GlossaryTextExport
 
       id = "#{exercise.id}:#{section}"
       reference = data["reference"].is_a?(Hash) ? data["reference"] : {}
-      text_rows(data, EXERCISE_FIELDS, id) + text_rows(reference, REFERENCE_FIELDS, id)
+      text_rows(data, EXERCISE_FIELDS, id) + text_rows(reference, SECTION_REFERENCE_FIELDS, id)
     end
   end
 

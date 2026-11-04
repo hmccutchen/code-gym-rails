@@ -10,10 +10,10 @@ class DashboardController < ApplicationController
     @trial_status = TrialStatus.for(current_user) if current_user.on_trial?
     @daily_kind_pickers = DailyKindSwap::Picker.for_day(current_user, exercise: @exercise, response: @response)
 
-    return @missing_set_state = :generating if @exercise&.regenerating?
+    return @content_state = :generating if @exercise&.regenerating?
 
     @regeneration_failed = @exercise.present? && current_user.last_generation_error_date == Date.current
-    @missing_set_state = settle_missing_set if @exercise.nil?
+    @content_state = settle_missing_set if @exercise.nil?
   end
 
   # GET /dashboard/status — polled by dashboard/_generating.

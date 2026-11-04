@@ -17,7 +17,7 @@
     <%= render "dashboard/trial_banner", status: @trial_status %>
   <% end %>
   <div id="dashboard-content">
-    <% case @missing_set_state %>
+    <% case @content_state %>
     <% when :trial_ended %>
       <%= render "dashboard/trial_ended", status: @trial_status %>
     <% when :generating %>

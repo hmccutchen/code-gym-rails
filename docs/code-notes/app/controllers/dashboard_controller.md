@@ -23,6 +23,9 @@ rule: an ended trial first, then a missing provider, a fresh manual trigger
 failure, the weekend, and the pause. The controller only reads the user and
 the clock into plain values, enqueues `GenerateDailyExercisesJob` when the
 state is `:start_generation` and shows that as `:generating`. A regenerating
-set shows `:generating` too, before any of that runs. With no provider the
-state is `:awaiting_provider`, which the view has no branch for, so it
-renders the exercise partial with no set, as it did before the extraction.
+set shows `:generating` too, before any of that runs, so the view reads
+`@content_state` for what the content area shows. No request reaches
+`:awaiting_provider`: `ApplicationController#require_provider` lets through
+only a user who is `provider_ready?` or `trial?`, and a keyless trial that
+isn't active is `trial_ended?`, which comes first. The view has no branch for
+it, so a change that makes it reachable needs one.
