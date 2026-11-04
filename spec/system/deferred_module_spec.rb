@@ -28,11 +28,15 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     stalled[:modules] = true
 
     page.driver.with_playwright_page do |pw|
-      pw.goto(url, waitUntil: "commit")
-      wait_for { pw.evaluate("document.readyState") != "loading" }
+      goto_once_parsed(pw, url)
       expect(pw.evaluate("document.readyState")).to eq("interactive")
       yield pw
     end
+  end
+
+  def goto_once_parsed(pw, url)
+    pw.goto(url, waitUntil: "commit")
+    wait_for { pw.evaluate("document.readyState") != "loading" }
   end
 
   def deliver_html_in_two_parts
@@ -151,7 +155,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       stalled[:held] = "comparison_answer_controller"
 
       page.driver.with_playwright_page do |pw|
-        pw.goto(url, waitUntil: "commit")
+        goto_once_parsed(pw, url)
         pw.evaluate(<<~JS)
           (() => {
             const box = document.querySelector('[data-comparison-answer="design_comparison"]');
@@ -258,7 +262,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       stalled[:controller] = "answer_form_controller"
 
       page.driver.with_playwright_page do |pw|
-        pw.goto(url, waitUntil: "commit")
+        goto_once_parsed(pw, url)
         unpending_before_connect = pw.evaluate(<<~JS)
           (async () => {
             const box = document.querySelector('textarea[data-field="code_review"]');
@@ -429,7 +433,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     stalled[:controller] = "loading_form_controller"
 
     page.driver.with_playwright_page do |pw|
-      pw.goto(url, waitUntil: "commit")
+      goto_once_parsed(pw, url)
       pw.evaluate(%(document.querySelector("#delete-account-form button").click()))
       expect(pw.evaluate(%(document.querySelector("#delete-account-form button").disabled))).to be(true)
     end
@@ -469,7 +473,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       stalled[:controller] = "push_enable_controller"
 
       page.driver.with_playwright_page do |pw|
-        pw.goto(url, waitUntil: "commit")
+        goto_once_parsed(pw, url)
         expect(pw.evaluate(%(document.querySelector("#push-enable").disabled))).to be(true)
       end
 

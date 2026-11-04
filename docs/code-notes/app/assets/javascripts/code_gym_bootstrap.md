@@ -180,7 +180,8 @@ recorder would mean rewriting those specs first.
 ## What holds it
 
 `spec/system/deferred_module_spec.rb` stalls the module assets, navigates with
-`waitUntil: "commit"` and asserts the document is still `interactive`. Inside
+`waitUntil: "commit"`, waits for the HTML to finish parsing and asserts the
+document is still `interactive` (#674). Inside
 that window it moves a Setup slider, which the early-edit recorder counts as
 pending before the modules arrive, and expects the save to land once
 `exercise_mix_controller` connects and adopts the edit.
