@@ -47,6 +47,10 @@ read it before changing that area.
   never touches code (`code_example`, a worked example's code, `<code>` spans).
   A word in `Glossary::FORMS` resolves to its key's definition, and a new entry
   is one sentence of at most 180 characters.
+  An answer-form section's prose goes through `section_glossary_wrap`, which
+  leaves it plain before submission when the kind's
+  `.glossary_before_submission?` is false: plan review and ambiguity hunt,
+  whose hidden answers are the kind of gap a definition names (#564).
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
   `ConceptGroup` or language-independent bucket gets one shared
   `RecognitionGuide` on how to look for that kind of problem. It teaches a

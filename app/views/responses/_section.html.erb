@@ -17,10 +17,10 @@
   <% if !submitted && kind_about_on_form?(key) %>
     <%= render "responses/kind_about", key: key %>
   <% end %>
-  <% if data["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(data["scenario"]) %></div><% end %>
-  <div class="question"><%= glossary_wrap(data["question"]) %></div>
+  <% if data["scenario"].present? %><div class="section-scenario"><%= section_glossary_wrap(data["scenario"], kind: kind, submitted: submitted) %></div><% end %>
+  <div class="question"><%= section_glossary_wrap(data["question"], kind: kind, submitted: submitted) %></div>
 
-  <%= render kind.body_partial, data: data, exercise: exercise, response: response, submitted: submitted %>
+  <%= render kind.body_partial, kind: kind, data: data, exercise: exercise, response: response, submitted: submitted %>
   <%= render "shared/mermaid_diagram", source: data["diagram"] %>
 
   <% if concept_shown && (ref = concept_reference_for(data["concept"], bucket)) %>

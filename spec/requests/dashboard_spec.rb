@@ -481,6 +481,47 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(terms).to eq(Set["service object", "background job"])
     end
 
+    describe "on a kind whose hidden answer is a gap (#564)" do
+      let(:replica) { "A copy of a database that can lag behind the primary." }
+      let(:prose) { "Read the replica first." }
+      let(:gap_sections) do
+        {
+          "plan_review" => { "title" => "Plan", "scenario" => prose, "question" => prose, "plan_excerpt" => prose },
+          "ambiguity_hunt" => { "title" => "Ask", "scenario" => prose, "question" => prose, "request" => prose,
+                                "planted_ambiguities" => [ "Which replica is unstated" ] }
+        }
+      end
+
+      def gap_day(kind)
+        base_problem_set.deep_merge("pattern" => { "why" => prose }, kind => gap_sections.fetch(kind))
+      end
+
+      def gloss_terms_in(kind)
+        Nokogiri::HTML5(response.body).css(%(details.section[data-section-fold="#{kind}"] .gloss-term)).map(&:text).uniq
+      end
+
+      before { stub_glossary("replica" => replica) }
+
+      %w[plan_review ambiguity_hunt].each do |kind|
+        it "underlines no term in #{kind} before submission, while the day's other kinds keep theirs" do
+          create_exercise(problem_set: gap_day(kind))
+
+          get root_path
+
+          expect(gloss_terms_in(kind)).to be_empty
+          expect(gloss_terms_in("pattern")).to eq([ "replica" ])
+        end
+
+        it "underlines #{kind}'s terms once the day is submitted" do
+          create_response(create_exercise(problem_set: gap_day(kind)))
+
+          get root_path
+
+          expect(gloss_terms_in(kind)).to eq([ "replica" ])
+        end
+      end
+    end
+
     it "renders an old exercise with a populated but now-unused glossary field without error" do
       ps = base_problem_set
       ps["code_review"]["glossary"] = [ { "term" => "closure", "definition" => "stale AI-generated definition" } ]

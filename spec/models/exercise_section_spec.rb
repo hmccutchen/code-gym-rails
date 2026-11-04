@@ -99,6 +99,19 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".glossary_before_submission?" do
+    it "is false for plan_review and ambiguity_hunt, whose hidden answers are the kind of gap a definition names" do
+      expect(ExerciseSection::PlanReview.glossary_before_submission?).to be(false)
+      expect(ExerciseSection::AmbiguityHunt.glossary_before_submission?).to be(false)
+    end
+
+    it "is true for every other kind" do
+      (ExerciseSection.all - [ ExerciseSection::PlanReview, ExerciseSection::AmbiguityHunt ]).each do |kind|
+        expect(kind.glossary_before_submission?).to be(true), "#{kind} withheld its glossary unexpectedly"
+      end
+    end
+  end
+
   describe ".excluded_vocabulary_keys" do
     it "withholds nothing from any kind but parsons_problem" do
       (ExerciseSection.all - [ ExerciseSection::ParsonsProblem ]).each do |kind|
