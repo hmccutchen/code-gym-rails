@@ -20,6 +20,7 @@ render: `accounts/_push_reminders`, `accounts/_authenticator` and
 - The title and the identity card (`.account-id-card`, a class rather than a
   position, so a card added above it can't take its place) span the row.
 - The other cards pair up in page order, and stretch, so each pair shares a
-  height. Without push reminders the Reminders card is absent, the pairs
-  reflow, and the Danger zone sits alone at half width.
+  height. With push reminders there are seven such cards, so the Danger zone
+  sits alone at half width. Without them the Reminders card is absent, the
+  pairs reflow, and every card has a partner.
 - Below 900px nothing changes: a centered 480px column from 600px.

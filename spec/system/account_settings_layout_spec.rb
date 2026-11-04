@@ -93,7 +93,7 @@ RSpec.describe "Account and Settings layout", type: :system do
 
   describe "Account on a desktop" do
     [ 900, 1280, 1920 ].each do |width|
-      it "spans the title and the identity card, then pairs the cards with push at #{width}px" do
+      it "spans the title and the identity card, then pairs the cards with push, the Danger zone alone at #{width}px" do
         visit_page(account_path, width: width, push: true)
         full = [ 1040, width - 48 ].min
         expect(content_width).to be_within(0.5).of(full)
@@ -101,24 +101,23 @@ RSpec.describe "Account and Settings layout", type: :system do
         identity, *rest = account_cards
         expect(identity["width"]).to be_within(0.5).of(full)
         expect(rect(".account-page > h1")["width"]).to be_within(0.5).of(full)
-        expect(rest.size).to eq(6)
-        rest.each_slice(2) do |left, right|
+        expect(rest.size).to eq(7)
+        rest.first(6).each_slice(2) do |left, right|
           expect(right["top"]).to be_within(0.5).of(left["top"])
           expect(right["height"]).to be_within(0.5).of(left["height"])
           expect(right["left"] - left["right"]).to be_within(0.5).of(16)
           expect(left["width"]).to be_within(0.5).of((full - 16) / 2.0)
         end
+        expect(rest.last["top"]).to be > rest[4]["bottom"]
+        expect(rest.last["width"]).to be_within(0.5).of((full - 16) / 2.0)
       end
     end
 
-    it "lets the Danger zone sit alone at half width when there's no Reminders card" do
+    it "pairs every card when there's no Reminders card" do
       visit_page(account_path, width: 1280)
       _identity, *rest = account_cards
-      expect(rest.size).to eq(5)
-      rest.first(4).each_slice(2) { |left, right| expect(right["top"]).to be_within(0.5).of(left["top"]) }
-      danger = rest.last
-      expect(danger["top"]).to be > rest[2]["bottom"]
-      expect(danger["width"]).to be_within(0.5).of((1040 - 16) / 2.0)
+      expect(rest.size).to eq(6)
+      rest.each_slice(2) { |left, right| expect(right["top"]).to be_within(0.5).of(left["top"]) }
     end
   end
 

@@ -362,7 +362,7 @@ RSpec.describe "Small screen layout", type: :system do
         apply_text_spacing if prefs.any?
 
         expect(page_width).to eq(width)
-        card_edges(count: 7).each { |edges| expect(edges).to all(be_within(0.5).of(0)) }
+        card_edges(count: 8).each { |edges| expect(edges).to all(be_within(0.5).of(0)) }
         expect(visible_heights(".btn-block").size).to eq(6)
         expect(visible_heights(".btn-block")).to all(be >= 48)
         button_and_card_content_widths.each { |button, content| expect(button).to be_within(1).of(content) }
@@ -405,7 +405,7 @@ RSpec.describe "Small screen layout", type: :system do
       set_safe_area(left: 44, right: 44)
       visit_account_with_every_card
 
-      card_edges(count: 7).each { |edges| expect(edges).to all(be_within(0.5).of(44)) }
+      card_edges(count: 8).each { |edges| expect(edges).to all(be_within(0.5).of(44)) }
       expect(page_width).to eq(390)
     end
 
@@ -414,7 +414,7 @@ RSpec.describe "Small screen layout", type: :system do
       set_safe_area(left: 20, right: 0)
       visit_account_with_every_card
 
-      card_edges(count: 7).each do |left, right|
+      card_edges(count: 8).each do |left, right|
         expect(left).to be_within(0.5).of(20)
         expect(right).to be_within(0.5).of(0)
       end
@@ -427,7 +427,7 @@ RSpec.describe "Small screen layout", type: :system do
       visit_account_with_every_card
 
       expect(card_widths).to all(be_within(0.5).of(480))
-      card_edges(count: 7).each { |left, right| expect(left).to be_within(1).of(right) }
+      card_edges(count: 8).each { |left, right| expect(left).to be_within(1).of(right) }
     end
 
     it "toggles the nudges switch from a tap on its text" do
