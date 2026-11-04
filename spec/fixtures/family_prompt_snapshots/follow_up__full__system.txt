@@ -28,4 +28,4 @@ The original exercise asked: Find the N+1
 The review you gave:
 What you got right: Spotted the loop
 What you missed: The association is loaded per row; No eager load
-Next step: Try includes
+Approach and next step: Try includes
