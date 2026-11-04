@@ -644,6 +644,53 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  describe "glossary terms in an architecture section's inline reference" do
+    let(:twice) { "A closure holds scope, and a closure outlives its frame." }
+
+    def reference_body
+      get root_path
+      Nokogiri::HTML5(response.body).css("details.ref").find { |ref| ref.at_css("summary").text.include?("Datastore") }
+    end
+
+    before do
+      stub_glossary("closure" => "A function bundled with its surrounding variables.")
+      ps = base_problem_set.except("challenge")
+      ps["architecture"] = {
+        "title" => "Datastore", "question" => "Which approach?", "scenario" => "10x traffic",
+        "reference" => { "tagline" => twice, "explanation" => twice, "tradeoffs" => [ twice, twice ], "senior_lens" => twice,
+                         "diagram" => "flowchart TD\n  A[closure] --> B[API]" }
+      }
+      create_exercise(problem_set: ps)
+      login_as(user)
+    end
+
+    it "wraps the first term in the tagline, explanation, each tradeoff and the senior lens" do
+      ref = reference_body
+
+      fields = [ ref.at_css(".ref-body p.ref-lead strong"), *ref.css(".ref-body p.ref-lead")[1..], *ref.css(".ref-body ul li"), ref.css(".ref-body > p").last ]
+      expect(fields.map { |field| field.css(".gloss-term").size }).to eq([ 1, 1, 1, 1, 1 ])
+      expect(ref.css("summary .gloss-term, .mermaid-diagram .gloss-term")).to be_empty
+    end
+
+    it "puts no glossary term inside an interactive element" do
+      ref = reference_body
+
+      expect(ref.css(".gloss-term")).not_to be_empty
+      expect(ref.css("a .gloss-term, button .gloss-term, summary .gloss-term, label .gloss-term, :not(body)[data-action*=click] .gloss-term")).to be_empty
+    end
+
+    it "escapes markup in a wrapped reference field" do
+      exercise = DailyExercise.last
+      exercise.problem_set["architecture"]["reference"]["explanation"] = "Use <b>raw</b> closure"
+      exercise.save!
+
+      get root_path
+
+      expect(response.body).to include("&lt;b&gt;raw&lt;/b&gt;")
+      expect(response.body).not_to include("<b>raw</b>")
+    end
+  end
+
   describe "regenerate button" do
     it "shows a light confirm when there are no answers yet" do
       create_exercise

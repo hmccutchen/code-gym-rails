@@ -4,6 +4,8 @@ require_relative "review_baseline_export"
 class GlossaryTextExport
   EXERCISE_FIELDS = { "scenario" => "scenario", "question" => "question", "options" => "option", "request" => "request",
                       "problem_statement" => "problem_statement", "why" => "why", "plan_excerpt" => "plan_excerpt" }.freeze
+  REFERENCE_FIELDS = { "tagline" => "reference_tagline", "explanation" => "reference_explanation",
+                       "tradeoffs" => "reference_tradeoff", "senior_lens" => "reference_senior_lens" }.freeze
 
   def initialize(out:)
     @out = out
@@ -34,10 +36,14 @@ class GlossaryTextExport
     exercise.problem_set.flat_map do |section, data|
       next [] unless data.is_a?(Hash)
 
-      EXERCISE_FIELDS.flat_map do |key, field|
-        Array(data[key]).grep(String).reject(&:blank?).map { |text| row("exercise", "#{exercise.id}:#{section}", field, text) }
-      end
+      id = "#{exercise.id}:#{section}"
+      reference = data["reference"].is_a?(Hash) ? data["reference"] : {}
+      text_rows(data, EXERCISE_FIELDS, id) + text_rows(reference, REFERENCE_FIELDS, id)
     end
+  end
+
+  def text_rows(data, fields, id)
+    fields.flat_map { |key, field| Array(data[key]).grep(String).reject(&:blank?).map { |text| row("exercise", id, field, text) } }
   end
 
   def row(source, id, field, text) = { source: source, id: id, field: field, text: text }

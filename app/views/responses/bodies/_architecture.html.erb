@@ -8,12 +8,12 @@
   <details class="ref">
     <summary><%= t("sections.architecture.reference_summary", title: data["title"]) %></summary>
     <div class="ref-body">
-      <p class="ref-lead"><strong><%= data.dig("reference", "tagline") %></strong></p>
-      <p class="ref-lead"><%= data.dig("reference", "explanation") %></p>
+      <p class="ref-lead"><strong><%= section_glossary_wrap(data.dig("reference", "tagline"), kind: kind, submitted: submitted) %></strong></p>
+      <p class="ref-lead"><%= section_glossary_wrap(data.dig("reference", "explanation"), kind: kind, submitted: submitted) %></p>
       <% if data.dig("reference", "tradeoffs").present? %>
-        <ul><% data.dig("reference", "tradeoffs").each do |t| %><li><%= t %></li><% end %></ul>
+        <ul><% data.dig("reference", "tradeoffs").each do |tradeoff| %><li><%= section_glossary_wrap(tradeoff, kind: kind, submitted: submitted) %></li><% end %></ul>
       <% end %>
-      <p>🔭 <%= data.dig("reference", "senior_lens") %></p>
+      <p>🔭 <%= section_glossary_wrap(data.dig("reference", "senior_lens"), kind: kind, submitted: submitted) %></p>
       <%= render "shared/mermaid_diagram", source: data.dig("reference", "diagram"), collapsible: false %>
     </div>
   </details>
