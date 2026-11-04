@@ -73,8 +73,6 @@ RSpec.describe FakeService do
     before do
       user.update!(skill_level: "mid_level")
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).and_return(:multi)
-      set = described_class::EXERCISE_PROBLEM_SET.merge("code_review" => CodeReviewMultiFile::SECTION)
-      stub_const("FakeService::REPLIES", described_class::REPLIES.merge("generate_exercise" => set.to_json))
     end
 
     it "delivers the files with their changed lines resolved to line numbers" do
@@ -84,6 +82,13 @@ RSpec.describe FakeService do
       expect(judged.dropped_sections).to be_empty
       expect(ExerciseSection::CodeReview.files(section).map(&:path)).to eq(%w[app/models/customer.rb app/jobs/loyalty_report_job.rb])
       expect(section["file_1_changed_lines"]).to be_present.and(all(be_an(Integer)))
+      expect(section["answer_key"].keys).to include("files", "evidence")
+    end
+
+    it "keeps the single-file code review for a prompt that asks for no files" do
+      reply = JSON.parse(described_class::REPLIES.fetch("generate_exercise").call("a prompt with a snippet"))
+
+      expect(reply["code_review"]).to eq(described_class::EXERCISE_PROBLEM_SET["code_review"])
     end
   end
 

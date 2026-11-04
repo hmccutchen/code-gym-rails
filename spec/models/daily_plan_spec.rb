@@ -709,15 +709,21 @@ RSpec.describe DailyPlan do
   describe "#code_review_files on the plan" do
     let(:user) { User.create!(email: "files@example.com") }
 
-    def plan(source_roll: :toy, files_roll: :multi)
+    def plan(source_roll: :toy, files_roll: :multi, judged: true)
       pin_code_review_mode(:application_code)
       allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(source_roll)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).and_return(files_roll)
-      DailyPlan.for(user, language: "ruby_rails", judged: true)
+      DailyPlan.for(user, language: "ruby_rails", judged: judged)
     end
 
-    it "keeps every day single-file until the multi-file weight is raised" do
-      expect(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).to eq(single: 1.0, multi: 0.0)
+    it "is single, without rolling, on a day the judge won't check" do
+      expect(WeightedRoll).not_to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS)
+
+      expect(plan(judged: false).code_review_files).to eq(:single)
+    end
+
+    it "rolls multi-file on a quarter of the days that can show files" do
+      expect(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).to eq(single: 0.75, multi: 0.25)
     end
 
     it "carries the files roll on a toy day" do

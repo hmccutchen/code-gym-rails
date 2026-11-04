@@ -4942,6 +4942,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     allow(WeightedRoll).to receive(:pick).and_call_original
     allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
     allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).and_return(:single)
   end
 
   it "hands back the plan's notes on both generation paths" do

@@ -19,14 +19,15 @@ class ExerciseDraft
 
     reply = provider.generate.call(user, "generate_exercise", language, prompt.render,
                                    subject: "problem set", blocking: blocking, deadline: deadline)
+    files = code_review_files(plan, difficulty, user)
     ingested = ProblemSetIngest.call(
       reply, language: language, expected_keys: kinds.map(&:key), daily: plan.daily_kinds, code_review_source: plan.code_review_source,
-      code_review_files: code_review_files(plan, difficulty, user), code_review_mode: plan.code_review_mode, pitched_at: difficulty.rungs(skill_level: user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
+      code_review_files: files, code_review_mode: plan.code_review_mode, pitched_at: difficulty.rungs(skill_level: user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
     )
 
     diagnostics = GenerationDiagnostics.new(user)
     diagnostics.unusable_sections(ingested.unusable_sections)
-    diagnostics.key_notes(ingested.key_notes, attempt: "draft", code_review_mode: plan.code_review_mode)
+    diagnostics.key_notes(ingested.key_notes, attempt: "draft", code_review_mode: plan.code_review_mode, code_review_files: files)
     Draft.new(user: user, language: language, problem_set: ingested.problem_set, plan: plan, kinds: kinds,
               difficulty: difficulty, ladders: ladders, history: history,
               suggested_concepts: ingested.suggested_concepts, unusable_sections: ingested.unusable_sections)
@@ -40,15 +41,17 @@ class ExerciseDraft
                                    subject: "#{kind.key} retry",
                                    deadline: deadline.leaving(CallProfiles.worst_case_seconds_for("judge_section")))
 
+    files = code_review_files(draft.plan, draft.difficulty, user)
     ingested = ProblemSetIngest.call(
       reply, language: language,
       expected_keys: [ kind.key ], daily: draft.plan.daily_kinds, fixed_concepts: { kind.key => concept },
-      code_review_source: draft.plan.code_review_source, code_review_files: code_review_files(draft.plan, draft.difficulty, user),
+      code_review_source: draft.plan.code_review_source, code_review_files: files,
       code_review_mode: draft.plan.code_review_mode,
       pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
       eased_for: eased_concepts_for(draft.plan, draft.difficulty).slice(kind.key)
     )
-    GenerationDiagnostics.new(user).key_notes(ingested.key_notes, attempt: "retry", code_review_mode: draft.plan.code_review_mode)
+    GenerationDiagnostics.new(user).key_notes(ingested.key_notes, attempt: "retry", code_review_mode: draft.plan.code_review_mode,
+                                                                  code_review_files: files)
     ingested.problem_set[kind.key]
   end
 

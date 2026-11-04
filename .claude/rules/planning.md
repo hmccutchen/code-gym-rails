@@ -44,7 +44,7 @@ read it before changing that area.
   both rating adjustments, first exposure included. Targets and locks change
   prompt text only: `DailyPlan`, `ConceptMastery` and `User#concepts_*` never
   read `KindDifficulty`. `DailyPlan` rolls `code_review_files`
-  (`CODE_REVIEW_FILE_WEIGHTS`, `:single` on a `RealSource` day) without
+  (`CODE_REVIEW_FILE_WEIGHTS`, `:single` on a `RealSource` or unjudged day) without
   reading `KindDifficulty`; `CodeReview.file_range` turns it into a count
   with the rung later. Weights and difficulty share
   `section_kind_preferences_version`. `POST /learn/prepare_ladders` is the one

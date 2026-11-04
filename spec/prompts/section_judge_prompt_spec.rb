@@ -33,7 +33,7 @@ RSpec.describe SectionJudgePrompt do
 
   it "shows a multi-file code review's files with the changed line numbers the page marks, and none of the provider's quotes" do
     quotes = ExerciseSection::CodeReview::CHANGED_PART
-    section = CodeReviewMultiFile::SECTION.deep_dup
+    section = FakeService::MULTI_FILE_CODE_REVIEW.deep_dup
     section["file_1_#{quotes}"] = [ "def lifetime_total_cents", "SENTINEL-UNMARKED-QUOTE" ]
     ExerciseSection::CodeReview.reject_unusable!(section, language: "ruby_rails", file_range: 2..2)
 

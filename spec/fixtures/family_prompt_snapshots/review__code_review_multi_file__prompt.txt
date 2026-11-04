@@ -1,8 +1,9 @@
 Grade ONLY the "code_review" section from the day's context above.
 Pitched at: senior — the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
 
-Main point: the one planted issue — the defect in the snippet, the smell in the test file, or the flaw in the migration.
-Essential pieces: why it is a problem in this code, and a fix that would work as written.
+Main point: the one planted problem in how the files fit together: what one file assumes that another breaks.
+Essential pieces: both sides of that interaction, why it goes wrong in this code, and a fix in the right file or files.
+A finding confined to one file earns credit only as far as it goes. The changed lines show where the change is, never where the problem is.
 
 Return a single JSON object (NOT wrapped in a "code_review" key) with:
 - "rating": "beginner" | "developing" | "solid" | "strong"

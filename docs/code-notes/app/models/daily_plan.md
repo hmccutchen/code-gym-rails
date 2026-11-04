@@ -28,7 +28,7 @@ The real-source choice is a second roll inside the mode, so `CODE_REVIEW_MODE_WE
 
 ## `CODE_REVIEW_FILE_WEIGHTS`
 
-The files roll says only whether today's `code_review` may show several files; it gives no count. The count depends on the rung `code_review` is pitched at, which `DailyPlan` never reads (it reads no `KindDifficulty`), so `ExerciseSection::CodeReview.file_range` turns the roll and the rung into a range later, in `GenerationPrompt` and `ExerciseDraft`. A day grounded in a `RealSource` excerpt is always `:single` and skips the roll, so an excerpt is never split into files. The weight stays at `multi: 0.0` until keyed grading for `code_review` is in place, so no real day asks for files yet; `spec/support/code_review_files_default.rb` pins the roll to `:single` for every example, so specs stay deterministic once the weight is raised.
+The files roll says only whether today's `code_review` may show several files; it gives no count. The count depends on the rung `code_review` is pitched at, which `DailyPlan` never reads (it reads no `KindDifficulty`), so `ExerciseSection::CodeReview.file_range` turns the roll and the rung into a range later, in `GenerationPrompt` and `ExerciseDraft`. A day grounded in a `RealSource` excerpt is always `:single` and skips the roll, so an excerpt is never split into files. The weight is `multi: 0.25` since the launch with guards (`docs/decisions/multi-file-code-review.md`); setting it back to `0.0` turns the shape off for new days. `spec/support/roll_defaults.rb` pins the roll to `:single` for every example, so specs stay deterministic.
 
 ## `.hostable_buckets`
 

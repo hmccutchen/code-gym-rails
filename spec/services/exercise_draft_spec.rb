@@ -109,7 +109,7 @@ RSpec.describe ExerciseDraft do
     keyed = draft.problem_set.keys.select { |key| ExerciseSection.find(key).planted_key? }
     expect(keyed).not_to be_empty
     expect(lines.map { |line| line[/kind=(\w+)/, 1] }).to match_array(keyed)
-    expect(lines).to all(include("attempt=draft"))
+    expect(lines).to all(include("attempt=draft", "code_review_files=single"))
   end
 
   it "logs the key note of a retried section, and still returns only the section" do
@@ -134,7 +134,8 @@ RSpec.describe ExerciseDraft do
 
     lines = planted_key_lines { described_class.retry_section(draft, ExerciseSection::CodeReview, "n_plus_one", provider: provider) }
 
-    expect(lines.sole).to start_with("[planted_key] answer_key=ok kind=code_review language=ruby_rails attempt=retry code_review_mode=schema_review")
+    expect(lines.sole).to start_with("[planted_key] answer_key=ok kind=code_review language=ruby_rails attempt=retry code_review_mode=schema_review " \
+                                     "code_review_files=single")
   end
 
   it "hands ingest the day's code_review mode, on the draft and on a retry" do
@@ -172,7 +173,7 @@ RSpec.describe ExerciseDraft do
     it "holds a retry to the same range as its draft" do
       user.update!(section_kind_levels: { "code_review" => "senior" })
       draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
-      reply.replace("code_review" => CodeReviewMultiFile::SECTION.deep_dup)
+      reply.replace("code_review" => FakeService::MULTI_FILE_CODE_REVIEW.deep_dup)
 
       section = described_class.retry_section(draft, ExerciseSection::CodeReview, "n_plus_one", provider: provider)
 
