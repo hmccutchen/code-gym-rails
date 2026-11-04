@@ -10,7 +10,7 @@
 
 <%# Design notes: docs/code-notes/app/views/learn/index.html.md %>
 <div class="learn-top">
-  <% if featured_concept %>
+  <% if featured_shown_beside_todays_set? %>
     <%= render "shared/featured_concept", featured: featured_concept %>
   <% end %>
   <div class="card learn-filter">

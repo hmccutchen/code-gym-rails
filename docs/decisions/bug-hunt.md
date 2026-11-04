@@ -51,7 +51,10 @@ setting turns it off or weights it (owner's decision).
     checks every section's concept against that list.
   - The weekly featured-concept callout is left off the dashboard that day
     when it features the trap's concept (`featured_callout_shown?`). The
-    Learn tab still shows it.
+    Learn tab leaves its featured block off too
+    (`featured_shown_beside_todays_set?`), reading today's set or a paused
+    user's held one, so the missing callout can't be read against Learn
+    (#680; it applies to every kind that hides its concept).
   - Every other kind's vocabulary leaves out the picked trap's concept
     (`ConceptVocabulary.selectable_for_section(..., gotcha:)`), so the
     prompt never offers it to another section. `DayHosts` reads the same

@@ -15,6 +15,12 @@ module FeaturedConceptHelper
       (exercise.nil? || day_response&.submitted? || exercise.concepts_withheld_before_submission.exclude?(featured_concept.concept))
   end
 
+  # Learn reads today's set, or a paused user's held one, without carrying it forward as the dashboard does.
+  def featured_shown_beside_todays_set?
+    exercise = current_user.daily_exercises.for_date.first || current_user.held_exercise
+    featured_callout_shown?(exercise, exercise&.daily_response)
+  end
+
   # The tagline can describe what a section asks the engineer to find, so it waits until the day is submitted.
   def featured_tagline_shown?(day_response)
     day_response.nil? || day_response.submitted?

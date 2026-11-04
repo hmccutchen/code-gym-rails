@@ -101,7 +101,8 @@ read it before changing that area.
   is the one list the page reads: no section whose concept is on it renders
   a concept reference or featured marker before submission, and the
   dashboard's featured callout is left off when it features one
-  (`featured_callout_shown?`). The goal line is plain text, never
+  (`featured_callout_shown?`), and so is Learn's featured block
+  (`featured_shown_beside_todays_set?`, today's set or a held one). The goal line is plain text, never
   glossary-wrapped. A request spec fails if the concept's name appears
   anywhere on the unsubmitted dashboard.
 - **The weekly featured concept**
