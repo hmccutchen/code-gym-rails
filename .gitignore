@@ -44,5 +44,3 @@
 # RSpec --only-failures state, one file per parallel_tests process
 /spec/examples*.txt
 
-# intent-log staging: raw prompts, which can hold pasted secrets
-.intent/

@@ -12,17 +12,6 @@ A push runs the unit suite through the pre-push hook (`lefthook.yml`), so give
 `git push` a timeout of at least five minutes, and don't push while another
 spec run on this machine is using the test database.
 
-**Every PR gets an intent log entry before it merges.** Use the `intent-log`
-skill (`.claude/skills/intent-log/SKILL.md`): once the PR is open, append the
-day's entry to your own `docs/intent/<github-login>.md`, tag it with the PR
-number, run the skill's `compose.rb` and `check.rb`, and commit the result to
-the PR's branch. The entry records what you asked for and why, read from your
-own prompts, so a reviewer can tell your decisions from the agent's. Run it on
-the PR's branch, not a detached HEAD, and with `gh` signed in, since `check.rb`
-reads the PR list from GitHub. It answers only for PRs you opened since the date
-in `docs/intent/_since`. Never edit `docs/intent-log.md` by hand, since
-`compose.rb` generates it.
-
 **Every PR gets two reviews once the implementation is done, each run by a
 separate agent.** After the suites pass and before the PR is marked ready,
 start a subagent for each review. The session that wrote the code has
