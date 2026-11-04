@@ -1111,6 +1111,29 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#generation_failed_today?" do
+    let(:user) { User.create!(email: "failed-today@example.com", time_zone: "America/Los_Angeles") }
+
+    it "is true only when the last generation failure is dated today" do
+      expect(user.generation_failed_today?).to be(false)
+
+      user.update!(last_generation_error_date: Date.current)
+      expect(user.generation_failed_today?).to be(true)
+
+      user.update!(last_generation_error_date: Date.current - 1)
+      expect(user.generation_failed_today?).to be(false)
+    end
+
+    it "reads today in the zone the request runs in" do
+      travel_to(Time.utc(2026, 11, 4, 5, 0)) do
+        user.update!(last_generation_error_date: Date.new(2026, 11, 3))
+
+        expect(Time.use_zone("America/Los_Angeles") { user.generation_failed_today? }).to be(true)
+        expect(Time.use_zone("UTC") { user.generation_failed_today? }).to be(false)
+      end
+    end
+  end
+
   describe "#todays_or_held_exercise" do
     include ActiveSupport::Testing::TimeHelpers
 

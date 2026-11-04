@@ -12,7 +12,7 @@ class DashboardController < ApplicationController
 
     return @content_state = :generating if @exercise&.regenerating?
 
-    @regeneration_failed = @exercise.present? && current_user.last_generation_error_date == Date.current
+    @regeneration_failed = @exercise.present? && current_user.generation_failed_today?
     @content_state = settle_missing_set if @exercise.nil?
   end
 
@@ -24,7 +24,7 @@ class DashboardController < ApplicationController
       render json: { status: "pending" }
     elsif exercise
       render json: { status: "ready" }
-    elsif current_user.last_generation_error_date == Date.current
+    elsif current_user.generation_failed_today?
       render json: { status: "failed", message: current_user.generation_failure_message(surface: :generation) }
     else
       render json: { status: "pending" }
@@ -54,7 +54,7 @@ class DashboardController < ApplicationController
   def settle_missing_set
     state = MissingSetState.for(
       trial_ended: current_user.trial_ended?, provider_ready: current_user.provider_ready?,
-      manual_trigger: flash[:generating].present?, failed_today: current_user.last_generation_error_date == Date.current,
+      manual_trigger: flash[:generating].present?, failed_today: current_user.generation_failed_today?,
       weekend: Date.current.on_weekend?, paused: current_user.paused_generation_at?
     )
     return state unless state == :start_generation
