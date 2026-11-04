@@ -2,7 +2,7 @@ require "rails_helper"
 require Rails.root.join("script/code_review_split")
 
 RSpec.describe CodeReviewSplit do
-  let(:user) { User.create!(email: "split@example.com", name: "Split") }
+  let(:user) { User.create!(email: "split@example.com") }
   let(:out) { StringIO.new }
   let(:single) { { "snippet" => "x = 1", "question" => "q", "pitched_at" => "mid_level", "answer_key" => { "issue" => "SECRET" } } }
   let(:multi) { FakeService::MULTI_FILE_CODE_REVIEW.deep_dup.merge("pitched_at" => "mid_level", "file_1_changed_lines" => [ 4 ]) }
