@@ -1,5 +1,3 @@
-<%= t("user_mailer.second_factor_changed.greeting", name: @user.name) %>
-
 <%= t("user_mailer.second_factor_changed.#{@change}", time: l(@changed_at, format: :long)) %>
 
 <%= t("user_mailer.second_factor_changed.not_you") %>

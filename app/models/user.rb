@@ -413,6 +413,8 @@ class User < ApplicationRecord
 
   def section_kind_settings = SectionKindSettings.for(self)
 
+  def todays_or_held_exercise(todays = daily_exercises.for_date.first) = todays || held_exercise
+
   def held_exercise
     return nil unless paused_generation_at?
 

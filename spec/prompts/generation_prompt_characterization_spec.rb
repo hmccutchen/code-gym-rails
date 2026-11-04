@@ -228,8 +228,8 @@ RSpec.describe "generation prompt characterization" do
     },
     "case__ruby_rails__profile_blank" => {
       render:   -> { render_case("ruby_rails", pattern: :pattern, third: :challenge, as: profile(name: "", skill_level: "junior", focus_areas: [])) },
-      includes: [ "- Name: (not given)", "- Priority focus areas: general Ruby/Rails patterns" ],
-      excludes: [ "<engineer_text>" ]
+      includes: [ "- Priority focus areas: general Ruby/Rails patterns" ],
+      excludes: [ "<engineer_text>", "- Name:" ]
     },
     "case__ruby_rails__rungs_targeted" => {
       render:   -> { render_case("ruby_rails", pattern: :pattern, third: :challenge,
@@ -276,9 +276,9 @@ RSpec.describe "generation prompt characterization" do
     "case__javascript__profile_populated" => {
       render:   -> { render_case("javascript", pattern: :pattern, third: :parsons_problem,
                                  as: profile(name: "Ada Lovelace", skill_level: "senior", focus_areas: %w[hooks closures])) },
-      includes: [ "- Name: <engineer_text>Ada Lovelace</engineer_text>", "- Skill level: senior", "- Priority focus areas: hooks, closures",
+      includes: [ "- Skill level: senior", "- Priority focus areas: hooks, closures",
                   "Sections at senior: code_review, design_comparison, pattern, parsons_problem" ],
-      excludes: [ "Sections at junior" ]
+      excludes: [ "Sections at junior", "Ada Lovelace" ]
     },
     "case__javascript__flavor_everyday" => {
       render:   -> { render_case("javascript", third: :architecture, fourth: :ambiguity_hunt, scenario_flavor: :everyday) },

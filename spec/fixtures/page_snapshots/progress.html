@@ -40,7 +40,6 @@
     "controllers/level_suggestion_controller": "/assets/controllers/level_suggestion_controller-DIGEST.js",
     "controllers/loading_form_controller": "/assets/controllers/loading_form_controller-DIGEST.js",
     "controllers/mermaid_controller": "/assets/controllers/mermaid_controller-DIGEST.js",
-    "controllers/name_editor_controller": "/assets/controllers/name_editor_controller-DIGEST.js",
     "controllers/nav_menu_controller": "/assets/controllers/nav_menu_controller-DIGEST.js",
     "controllers/parsons_controller": "/assets/controllers/parsons_controller-DIGEST.js",
     "controllers/profile_preferences_controller": "/assets/controllers/profile_preferences_controller-DIGEST.js",
@@ -84,7 +83,6 @@
 <link rel="modulepreload" href="/assets/controllers/level_suggestion_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/loading_form_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/mermaid_controller-DIGEST.js" nonce="NONCE">
-<link rel="modulepreload" href="/assets/controllers/name_editor_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/nav_menu_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/parsons_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/profile_preferences_controller-DIGEST.js" nonce="NONCE">
@@ -143,11 +141,10 @@
     @media (prefers-contrast: more), (forced-colors: active) {
       #background-pattern { display: none; }
     }
-    /* The app's one standalone-mode test; .nav-links in the selector outranks the later nav .name-editor rule. */
+    /* The app's one standalone-mode test. */
     @media (display-mode: standalone) {
       html, body { overscroll-behavior-y: none; }
       body { -webkit-tap-highlight-color: transparent; }
-      nav .nav-links .name-editor { display: none; }
       body .pull-refresh { display: flex; }
       nav, .tab-bar, .btn, .rating-btn, summary { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
       @media (max-width: 48rem) {
@@ -184,7 +181,6 @@
     nav .nav-links { display: flex; gap: .25rem; font-size: .9rem; color: var(--muted); align-items: center; min-width: 0; }
     nav .nav-links a { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-weight: 500; padding: .35rem .7rem; border-radius: 999px; transition: background-color .15s, color .15s; }
     nav .nav-links a:hover, nav .nav-links a[aria-current="page"] { color: var(--text); background: var(--surface-raised); text-decoration: none; }
-    nav .name-editor { display: flex; align-items: center; min-width: 0; }
     nav .nav-toggle { display: none; }
 
     @container (max-width: 42em) {
@@ -207,7 +203,6 @@
         box-shadow: var(--shadow);
       }
       nav .nav-links[data-open] a { padding: .75rem; border-radius: var(--radius-sm); }
-      nav .nav-links[data-open] .name-editor-input { width: 100%; }
     }
 
     .flash { padding: .75rem 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; font-size: .9rem; }
@@ -459,24 +454,6 @@
     .review-section { margin-top: 1.5rem; }
     .history-pill { border: 1px solid var(--border); border-radius: 999px; padding: .15rem .5rem; font-size: .85rem; color: var(--muted); }
 
-    .name-editor-input {
-      background: transparent;
-      border: 1px solid transparent;
-      color: var(--text);
-      font-size: var(--input-font-size);
-      font-family: inherit;
-      padding: .15rem .3rem;
-      width: 9rem;
-      min-width: 0;
-      min-height: 44px;
-      border-radius: 6px;
-    }
-    .name-editor-input:focus {
-      background: rgba(124, 106, 247, .06);
-      border-color: var(--border);
-    }
-    .name-editor-status { font-size: .75rem; color: var(--muted); margin-left: .4rem; }
-
     .learn-back { display: inline-block; padding-block: 4px; }
     .learn-intro, .learn-bucket-label, .learn-no-guide { color: var(--muted); }
     .learn-status { font-size: .75rem; color: var(--muted); margin-left: .5rem; }
@@ -541,21 +518,6 @@
         <span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span>
       </button>
       <div class="nav-links" id="nav-links" data-nav-menu-target="links">
-        <span class="name-editor"
-              data-controller="name-editor"
-              data-name-editor-url-value="/profile"
-              data-name-editor-saved-text-value="Saved ✓"
-              data-name-editor-error-text-value="Couldn&#39;t save">
-          <input type="text"
-                 id="nav-name-input"
-                 class="name-editor-input"
-                 value="Existing"
-                 aria-label="Your display name"
-                 data-name-editor-target="input"
-                 data-action="blur->name-editor#save">
-          <span id="nav-name-status" class="name-editor-status" aria-live="polite"
-                data-name-editor-target="status"></span>
-        </span>
           <a href="/">Today</a>
           <a href="/learn">Learn</a>
           <a aria-current="page" href="/progress">Progress</a>
@@ -568,7 +530,7 @@
 
   <div class="container container-wide" data-pull-content>
     <main id="main-content" tabindex="-1">
-      <div class="flash notice" id="flash-notice">Welcome back, Existing!</div>
+      <div class="flash notice" id="flash-notice">Welcome back.</div>
 
     
 <div class="card-page progress-page">

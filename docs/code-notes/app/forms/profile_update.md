@@ -14,7 +14,7 @@ catch, and leaves which values a field allows to `User`:
   Strong params drop a value of the wrong shape, so without this check the
   request would return 200 having saved nothing for that field. A nested
   value inside an object is kept by `permit(key: {})`, so `User` refuses it.
-- `skill_level`, `name` and `time_zone` must each be a string or null, for
+- `skill_level` and `time_zone` must each be a string or null, for
   the same reason.
 - `daily_section_count` must be an Integer, a string of digits or
   `"automatic"`. Active Record's integer cast would read `""` as nil, which

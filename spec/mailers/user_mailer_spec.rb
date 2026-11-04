@@ -26,10 +26,11 @@ RSpec.describe UserMailer, type: :mailer do
       expect(mail.body.encoded).to match(/browser where you requested it/i)
     end
 
-    it "greets the user and states when the code expires" do
+    it "opens with the code's introduction, not the user's name, and states when the code expires" do
       body = mail.body.encoded
 
-      expect(body).to include("Hi Dev,")
+      expect(body).to start_with("Your Coding Gym login code is:")
+      expect(body).not_to include("Dev")
       expect(body).to include("It expires in #{User.login_code_expiry_in_words}.")
     end
 

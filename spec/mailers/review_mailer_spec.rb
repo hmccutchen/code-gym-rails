@@ -38,9 +38,9 @@ RSpec.describe ReviewMailer, type: :mailer do
       expect(mail.subject).to eq("Your Coding Gym review — Friday, July 10")
     end
 
-    it "greets the user by name and signs off" do
+    it "opens with the review's introduction, not the user's name, and signs off" do
       body = mail.body.encoded
-      expect(body).to include("Hi Dev,")
+      expect(body).not_to include("Dev")
       expect(body).to include("Here's your Coding Gym review from Friday, July 10, 2026.")
       expect(body).to include("— Coding Gym")
     end

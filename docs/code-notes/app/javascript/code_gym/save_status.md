@@ -148,10 +148,9 @@ accepts the same payload twice. It would be wrong for the track proposal's
 answer count, which increments on every request, and that is why retrying is
 opt-in per queue rather than the default.
 
-`quiet` keeps a queued save's failures out of the banner. The nav name editor
-shows its own "couldn't save" line beside the field, and the layout's one-shot
-time-zone detection is something the user never asked for, so neither should
-raise the banner. Both still queue, under `name` and `time_zone`, so an older
+`quiet` keeps a queued save's failures out of the banner. The layout's
+one-shot time-zone detection is something the user never asked for, so it
+should not raise the banner. It still queues, under `time_zone`, so an older
 write can't land after a newer one; Setup's time-zone select shares the
 `time_zone` key with the detection.
 

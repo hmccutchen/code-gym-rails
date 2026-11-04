@@ -79,7 +79,7 @@ RSpec.describe "Focusable controls are large enough not to trigger iOS zoom", ty
       visit_as(user)
       expect(page).to have_css("textarea.answer")
 
-      expect_no_undersized_controls(minimum_controls: 7)
+      expect_no_undersized_controls(minimum_controls: 6)
     end
   end
 

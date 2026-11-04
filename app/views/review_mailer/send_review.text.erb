@@ -1,5 +1,3 @@
-<%= t("review_mailer.send_review.greeting", name: @response.user.name) %>
-
 <%= t("review_mailer.send_review.intro", app_name: t("app_name"), date: @response.date.strftime("%A, %B %-d, %Y")) %>
 
 <% @response.ai_review.each do |section, fb| -%>

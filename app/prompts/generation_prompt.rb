@@ -31,7 +31,6 @@ class GenerationPrompt
       Generate a daily Code Gym exercise set for this engineer.
 
       Engineer profile:
-      - Name: #{profile_name}
       - Skill level: #{@user.skill_level} (#{User::SKILL_LEVELS.join(" → ")})
       - Priority focus areas: #{focus}
 
@@ -103,10 +102,6 @@ class GenerationPrompt
 
   def kinds_for(only)
     only ? [ only ] : @plan.kinds
-  end
-
-  def profile_name
-    UserText.tagged(@user.name, blank: "(not given)", inline: true, limit: UserText::MAX_NAME_LENGTH)
   end
 
   def focus

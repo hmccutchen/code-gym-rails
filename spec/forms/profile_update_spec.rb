@@ -14,9 +14,9 @@ RSpec.describe ProfileUpdate, type: :model do
   end
 
   it "saves the posted fields and reports it" do
-    expect(save(user: { name: " Renamed ", time_zone: " UTC " }).status).to eq(:saved)
+    expect(save(user: { time_zone: " America/Chicago " }).status).to eq(:saved)
 
-    expect(user.reload).to have_attributes(name: "Renamed", time_zone: "UTC")
+    expect(user.reload).to have_attributes(time_zone: "America/Chicago")
   end
 
   describe "the posted shape" do
@@ -25,9 +25,9 @@ RSpec.describe ProfileUpdate, type: :model do
 
       [ { section_kind_weights: [] }, { excluded_section_kinds: [ { "a" => 1 } ] }, { section_kind_levels: nil },
         { locked_section_kinds: nil }, { display_preferences: "light" },
-        { skill_level: [ "senior" ] }, { level_suggestions: "yes" }, { name: [ "x" ] }, { time_zone: {} },
+        { skill_level: [ "senior" ] }, { level_suggestions: "yes" }, { time_zone: {} },
         { daily_section_count: "2.5" }, { daily_section_count: "" }, { daily_section_count: nil }, { daily_section_count: 2.0 } ]
-        .each { |payload| refused({ name: "Not saved" }.merge(payload)) }
+        .each { |payload| refused({ time_zone: "America/Chicago" }.merge(payload)) }
 
       expect(user.reload.attributes).to eq(original)
     end

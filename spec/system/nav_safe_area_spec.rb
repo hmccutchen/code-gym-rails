@@ -50,7 +50,7 @@ RSpec.describe "Nav in a notched landscape phone", type: :system do
       find("#nav-toggle").click
       expect(page).to have_link("Settings", visible: :visible)
 
-      edges("nav .nav-links[data-open] a, nav .nav-links[data-open] .name-editor-input").each do |from_left, from_right|
+      edges("nav .nav-links[data-open] a").each do |from_left, from_right|
         expect(from_left).to be >= [ left, 12 ].max - 0.5
         expect(from_right).to be >= [ right, 12 ].max - 0.5
       end

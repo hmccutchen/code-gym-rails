@@ -51,6 +51,47 @@ RSpec.describe "A bug_hunt section on the dashboard", type: :request do
     expect(response.body).not_to include("Memoization")
   end
 
+  describe "the featured block on Learn" do
+    def featured_block = response.body[%r{<div class="featured-concept">.*?</div>}m].to_s
+
+    it "leaves it off while today's unsubmitted puzzle is hiding the featured concept" do
+      submit_set_showing(user, "memoization", date: Date.current - 10)
+      todays_set
+
+      get learn_path
+
+      expect(featured_block).to be_empty
+    end
+
+    it "shows it again once the day is submitted" do
+      submit_set_showing(user, "memoization", date: Date.current - 10)
+      todays_set(submitted: true)
+
+      get learn_path
+
+      expect(featured_block).to include("Memoization")
+    end
+
+    it "shows it when today's set hides a different concept" do
+      submit_set_showing(user, "god_object", date: Date.current - 10)
+      todays_set
+
+      get learn_path
+
+      expect(featured_block).to include("God object")
+    end
+
+    it "leaves it off while a paused user's held set is hiding it, before the dashboard carries the set forward" do
+      submit_set_showing(user, "memoization", date: Date.current - 10)
+      travel_to(Date.current - 1) { todays_set }
+      user.update!(paused_generation_at: 2.days.ago)
+
+      get learn_path
+
+      expect(featured_block).to be_empty
+    end
+  end
+
   it "shows the featured callout again once the day is submitted" do
     submit_set_showing(user, "memoization", date: Date.current - 10)
     todays_set(submitted: true)

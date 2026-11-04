@@ -98,6 +98,16 @@ RSpec.describe DailyKindSwap do
       exercise.update!(regenerated_at: Time.current)
       expect(swap(kind: "challenge").want_it_today).to be_nil
     end
+
+    it "looks up today's set once for the event row and the line" do
+      response_for(todays_set, answers: { "code_review" => "x" * 20 })
+      lookups = 0
+      count = ->(*, payload) { lookups += 1 if payload[:sql].match?(/FROM "daily_exercises" WHERE/) }
+
+      ActiveSupport::Notifications.subscribed(count, "sql.active_record") { swap }
+
+      expect(lookups).to eq(1)
+    end
   end
 
   describe "the event row" do

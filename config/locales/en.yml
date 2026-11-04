@@ -56,7 +56,7 @@ en:
       code_placeholder: "123456"
       submit: "Verify code"
     code_sent: "Check your email for a 6-digit login code. It expires in %{expiry}."
-    welcome_back: "Welcome back, %{name}!"
+    welcome_back: "Welcome back."
     code_rejected_retry: "Incorrect or expired code. Try again, or start again to get a new one."
     code_rejected_request_new: "That code has expired. Enter your email to get a new one."
     logged_out: "Logged out."
@@ -111,7 +111,6 @@ en:
   user_mailer:
     login_code:
       subject: "Your Coding Gym login code"
-      greeting: "Hi %{name},"
       intro: "Your Coding Gym login code is:"
       where_and_when: |-
         Enter it in the browser where you requested it — the code will not work
@@ -120,7 +119,6 @@ en:
       sign_off: "— Coding Gym"
     second_factor_changed:
       subject: "Your Coding Gym sign-in settings changed"
-      greeting: "Hi %{name},"
       enabled: "An authenticator app was turned on for your Coding Gym account on %{time}. Every other device was signed out."
       disabled: "The authenticator app was turned off for your Coding Gym account on %{time}. Every other device was signed out, and signing in now needs only the emailed code."
       recovery_codes: "New recovery codes were made for your Coding Gym account on %{time}. The old ones no longer work."
@@ -800,7 +798,6 @@ en:
   review_mailer:
     send_review:
       subject: "Your %{app_name} review — %{date}"
-      greeting: "Hi %{name},"
       intro: "Here's your %{app_name} review from %{date}."
       rating: "Rating: %{rating}"
       sign_off: "— %{app_name}"
@@ -810,11 +807,6 @@ en:
     attributes:
       user:
         daily_section_count: "Daily sections"
-  profile:
-    name:
-      saved: "Saved ✓"
-      error: "Couldn't save"
-      aria_label: "Your display name"
   authenticators:
     show:
       page_title: "Authenticator app"

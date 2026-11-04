@@ -710,18 +710,15 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
-  describe "editable nav name" do
-    it "renders the name as an editable field wired to the profile endpoint" do
+  describe "the nav" do
+    it "shows no name field and no name" do
       user = create_user_with_key(email: "edit@example.com", name: "Editable")
       login_as(user)
 
       get root_path
 
-      expect(response.body).to include('id="nav-name-input"')
-      expect(response.body).to include('value="Editable"')
-      expect(response.body).to include('data-controller="name-editor"')
-      expect(response.body).to include(%(data-name-editor-url-value="#{profile_path}"))
-      expect(response.body).to include("blur->name-editor#save")
+      expect(response.body).not_to include("name-editor")
+      expect(response.body).not_to include("Editable")
     end
   end
 

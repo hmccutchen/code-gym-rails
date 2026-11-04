@@ -1,7 +1,6 @@
 Generate a daily Code Gym exercise set for this engineer.
 
 Engineer profile:
-- Name: <engineer_text>Ada Lovelace</engineer_text>
 - Skill level: senior (junior → mid_level → senior → principal_engineer)
 - Priority focus areas: hooks, closures
 

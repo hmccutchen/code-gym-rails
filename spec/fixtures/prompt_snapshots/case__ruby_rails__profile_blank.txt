@@ -1,7 +1,6 @@
 Generate a daily Code Gym exercise set for this engineer.
 
 Engineer profile:
-- Name: (not given)
 - Skill level: junior (junior → mid_level → senior → principal_engineer)
 - Priority focus areas: general Ruby/Rails patterns
 

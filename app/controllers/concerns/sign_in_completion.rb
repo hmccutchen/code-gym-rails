@@ -41,7 +41,7 @@ module SignInCompletion
     destination = start_new_session_for(user, checked_at)
     return finish_pending_trial(user, trial) if trial
 
-    redirect_to destination || root_path, notice: t("sessions.welcome_back", name: user.name)
+    redirect_to destination || root_path, notice: t("sessions.welcome_back")
   end
 
   def start_second_factor_challenge(user, issued_at: nil)
