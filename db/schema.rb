@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_04_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_04_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -411,6 +411,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_130000) do
     t.integer "login_code_attempts", default: 0, null: false
     t.string "login_code_digest"
     t.datetime "login_code_sent_at"
+    t.string "name"
     t.datetime "paused_generation_at"
     t.string "provider"
     t.boolean "push_reminders_enabled", default: false, null: false

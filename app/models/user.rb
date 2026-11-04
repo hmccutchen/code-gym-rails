@@ -13,7 +13,7 @@ class User < ApplicationRecord
   has_many :daily_kind_swap_events, dependent: :destroy
   belongs_to :invite_code, optional: true
 
-  self.ignored_columns += %w[learning_track]
+  self.ignored_columns += %w[learning_track name]
 
   serialize :api_keys, coder: JSON
   encrypts :api_keys

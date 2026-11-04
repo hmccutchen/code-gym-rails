@@ -943,8 +943,18 @@ RSpec.describe User, type: :model do
   end
 
   describe "columns" do
-    it "has no name column, since nothing reads or writes one" do
+    it "ignores the name column, which nothing reads or writes, until a later release drops it" do
+      expect(User.ignored_columns).to include("name")
       expect(User.column_names).not_to include("name")
+      expect(create_user).not_to respond_to(:name)
+    end
+
+    it "leaves the name column nullable, so a release that no longer sends a name can still insert a user" do
+      name = User.connection.columns(:users).find { |column| column.name == "name" }
+
+      expect(name.null).to be(true)
+      expect { User.connection.execute("INSERT INTO users (email, created_at, updated_at) VALUES ('raw@example.com', now(), now())") }
+        .not_to raise_error
     end
 
     it "has none of the Devise columns, and has the authenticator, challenge and session columns" do
