@@ -762,13 +762,13 @@ RSpec.describe "Small screen layout", type: :system do
       wait_for { user.reload.level_suggestions == false }
     end
 
-    it "applies a provider chosen on its segment when Save key is pressed" do
+    it "applies a provider chosen on its segment when Save is pressed" do
       user = three_key_user
       resize(390)
       visit_settings_open(user)
 
       find("#provider-choice .segment", text: "Gemini").click
-      click_button "Save key"
+      click_button "Save", exact: true
 
       expect(page).to have_no_current_path(setup_path)
       expect(user.reload.provider).to eq("gemini")

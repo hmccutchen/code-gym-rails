@@ -3,10 +3,10 @@
 ## Card order
 
 The page is four cards on `.phone-page`: Connection (the key, the provider
-choice, the exercise language and Save key), Your day (time zone, Daily
+choice, the exercise language and Save), Your day (time zone, Daily
 sections, Track), then the Exercise mix and Display disclosures, which are
 `details.card`. The Connection heading carries a "Tap Save to apply" tag
-(`.card-heading` and `.card-tag`), because Save key is the one control on the
+(`.card-heading` and `.card-tag`), because Save is the one control on the
 page that waits for a tap, and the controls below it save by themselves.
 
 ## Muted paragraphs: `:where(...) p:not(.card-note)`
@@ -111,7 +111,7 @@ snapshot, taken for an account with a key, doesn't carry the guide.
   nothing when a save works. A failure shows in the fixed `#save-status`
   banner, except a Daily sections choice the server refuses, which shows
   inside the open chooser so the person can change it there.
-- Save key, the provider choice and the language redirect with a flash
+- Save, the provider choice and the language redirect with a flash
   notice, because they go through a full form post.
 
 ## Saved time zones

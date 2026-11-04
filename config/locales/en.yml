@@ -950,7 +950,7 @@ en:
         javascript: "JavaScript (vanilla + React)"
         mixed: "Mixed (alternates daily)"
       language_hint: 'Choose the language your daily exercise sets are generated in. "Mixed" alternates between Ruby/Rails and JavaScript one full day at a time.'
-      save_key: "Save key"
+      save: "Save"
       time_zone_label: "Time zone"
       time_zone_detect: "— detect automatically —"
       time_zones:
