@@ -132,7 +132,7 @@ module ConceptVocabulary
     end
   end
 
-  def self.selectable_for_section(section_key, language, mode: nil, rung: nil, gotcha: nil)
+  def self.selectable_for_section(section_key, language, mode: nil, rung: nil, gotcha: nil, featured_concept: nil)
     vocabulary =
       if mode && section_key == ExerciseSection::CodeReview.key
         code_review_vocabulary(language, mode, gotcha)
@@ -140,7 +140,7 @@ module ConceptVocabulary
         for_section(section_key, language) - [ gotcha&.concept ]
       end
 
-    excluded = excluded_concepts_for(section_key)
+    excluded = excluded_concepts_for(section_key) + withheld_featured(section_key, mode, featured_concept)
     remaining = excluded.empty? ? vocabulary : vocabulary - excluded
     ExerciseSection.for(section_key).narrow_vocabulary(remaining, rung: rung) & remaining
   end
@@ -154,6 +154,11 @@ module ConceptVocabulary
     end
   end
   private_class_method :code_review_vocabulary
+
+  def self.withheld_featured(section_key, mode, featured_concept)
+    featured_concept && ExerciseSection.for(section_key).concept_hidden_in_plan?(mode: mode) ? [ featured_concept ] : []
+  end
+  private_class_method :withheld_featured
 
   def self.security_for_language(language) = language_entry(language).fetch(:security_concepts)
   private_class_method :security_for_language

@@ -136,6 +136,31 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".concept_hidden_in_plan?" do
+    it "is true for plan_review and ambiguity_hunt in any mode, whose concept names the hidden gap" do
+      [ ExerciseSection::PlanReview, ExerciseSection::AmbiguityHunt ].each do |kind|
+        expect(kind.concept_hidden_in_plan?(mode: nil)).to be(true), kind.name
+        expect(kind.concept_hidden_in_plan?(mode: :bug_hunt)).to be(true), kind.name
+      end
+    end
+
+    it "is false for every other kind except code_review on a bug_hunt day" do
+      (ExerciseSection.all - [ ExerciseSection::PlanReview, ExerciseSection::AmbiguityHunt, ExerciseSection::CodeReview ]).each do |kind|
+        expect(kind.concept_hidden_in_plan?(mode: :bug_hunt)).to be(false), kind.name
+      end
+    end
+
+    it "agrees with what the page withholds, for every kind on every day mode: a kind hides its concept in the plan when it hides it from a section" do
+      DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key do |mode|
+        section = mode == ExerciseSection::CodeReview::BugHunt::MODE ? { "purpose" => "Sum the prices." } : {}
+
+        ExerciseSection.all.each do |kind|
+          expect(kind.concept_hidden_in_plan?(mode: mode)).to eq(!kind.concept_shown_before_submission?(section)), "#{kind.name} on #{mode}"
+        end
+      end
+    end
+  end
+
   describe ".excluded_vocabulary_keys" do
     it "withholds nothing from any kind but parsons_problem" do
       (ExerciseSection.all - [ ExerciseSection::ParsonsProblem ]).each do |kind|

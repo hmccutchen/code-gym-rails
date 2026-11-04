@@ -13,6 +13,17 @@ language fail as `SetupError` before any planning work.
 `ConceptVocabulary::UnknownLanguage` is a `SetupError` too, so the check
 changes when the failure happens, not how it's classified.
 
+Before planning it asks `FeaturedConcept.for(user)`, which can store the
+week's pick, and passes its concept name to `DailyPlan.for(featured_concept:)`.
+A database error from that lookup is logged and planning goes on with no
+featured concept, since a missing exclusion costs one hidden-kind callout
+mismatch the guards already cover, and a failed lookup should not stop the
+day's set. The plan carries
+it to the prompt, the ladders, the host checks and a retry, so all of them see
+the same concept, and generation leaves it out of the sections that hide their
+concept (#687). The lookup is here, in the service, so the pure plan reads no
+table.
+
 History is fetched once and handed to the prompt as a whole value, so the
 logged "requested" history can't diverge from what the prompt contained.
 

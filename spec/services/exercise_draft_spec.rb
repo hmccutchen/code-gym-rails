@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe ExerciseDraft do
+  include MetConceptHelpers
+
   let(:user) { User.create!(email: "draft@example.com", skill_level: "senior") }
   let(:generated) { [] }
   let(:rendered) { [] }
@@ -26,7 +28,7 @@ RSpec.describe ExerciseDraft do
   end
 
   def draft_for(language: "ruby_rails", mode: :application_code)
-    described_class::Draft.new(user: user, language: language, problem_set: {}, plan: Struct.new(:code_review_mode, :code_review_gotcha).new(mode, nil),
+    described_class::Draft.new(user: user, language: language, problem_set: {}, plan: Struct.new(:code_review_mode, :code_review_gotcha, :featured_concept).new(mode, nil, nil),
                                kinds: [], difficulty: KindDifficulty.none, ladders: {}, history: [],
                                suggested_concepts: [], unusable_sections: [])
   end
@@ -34,6 +36,45 @@ RSpec.describe ExerciseDraft do
   it "keeps the draft to its user and language, the plan, the drafted inputs and the ingest results" do
     expect(described_class::Draft.members)
       .to eq(%i[user language problem_set plan kinds difficulty ladders history suggested_concepts unusable_sections])
+  end
+
+  it "asks for the week's featured concept and plans the day around it, so a hiding kind is never offered it" do
+    featured = ConceptVocabulary::PLAN_REVIEW_CONCEPTS.first
+    allow(FeaturedConcept).to receive(:for).with(user).and_return(FeaturedConcept.new(concept: featured, bucket: "plan_review"))
+    allow(DailyPlan).to receive(:for).and_call_original
+
+    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+
+    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", judged: true, featured_concept: featured)
+    expect(draft.plan.featured_concept).to eq(featured)
+  end
+
+  it "never gives a bug_hunt section the concept the week features, using the real weekly pick" do
+    first = BugHuntGotchas.for_language("ruby_rails").first
+    submit_set_showing(user, first.concept, date: Date.current - 2)
+    pin_code_review_mode(:bug_hunt)
+
+    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+
+    expect(FeaturedConcept.for(user)&.concept).to eq(first.concept)
+    expect(draft.plan.featured_concept).to eq(first.concept)
+    expect(draft.plan.code_review_gotcha.concept).not_to eq(first.concept)
+  end
+
+  it "plans with no featured concept when the user has none yet" do
+    allow(FeaturedConcept).to receive(:for).with(user).and_return(nil)
+
+    expect(described_class.call(user, language: "ruby_rails", provider: provider, judged: true).plan.featured_concept).to be_nil
+  end
+
+  it "generates with no featured concept, and logs, when the weekly lookup raises a database error" do
+    allow(FeaturedConcept).to receive(:for).with(user).and_raise(ActiveRecord::StatementInvalid, "boom")
+    allow(Rails.logger).to receive(:warn)
+
+    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+
+    expect(draft.plan.featured_concept).to be_nil
+    expect(Rails.logger).to have_received(:warn).with(/featured concept.*user #{user.id}/i)
   end
 
   it "takes the provider calls as callables and the draft as its only retry context" do
@@ -226,7 +267,7 @@ RSpec.describe ExerciseDraft do
 
       described_class.send(:retry_ladders, draft_for(language: "javascript", mode: :schema_review), ExerciseSection::CodeReview)
 
-      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil)
+      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil, featured_concept: nil)
     end
   end
 end

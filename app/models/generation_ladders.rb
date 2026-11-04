@@ -1,9 +1,10 @@
 # Design notes: docs/code-notes/app/models/generation_ladders.md
 class GenerationLadders
-  def self.for(rungs, language, code_review_mode, gotcha: nil)
+  def self.for(rungs, language, code_review_mode, gotcha: nil, featured_concept: nil)
     requests = rungs.map do |kind, rung|
       { level: rung, bucket: ConceptBucket.for(kind.key, language),
-        concepts: ConceptVocabulary.selectable_for_section(kind.key, language, mode: code_review_mode, rung: rung, gotcha: gotcha) }
+        concepts: ConceptVocabulary.selectable_for_section(kind.key, language, mode: code_review_mode, rung: rung,
+                                                           gotcha: gotcha, featured_concept: featured_concept) }
     end
     pairs = requests.flat_map { |request| request[:concepts].map { |concept| [ request[:bucket], concept ] } }.uniq
 

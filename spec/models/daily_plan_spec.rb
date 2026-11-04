@@ -296,10 +296,10 @@ RSpec.describe DailyPlan do
       user.concept_masteries.create!(concept: "scope_creep", language: "plan_review", tier: :standard,
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 1)
-      expect(DailyPlan.send(:overdue_retention_check_pending_for_bucket?, user, "plan_review")).to be(false)
+      expect(DailyPlan.send(:overdue_retention_check_pending_for_bucket?, user, "plan_review", hostable: ->(*) { true })).to be(false)
 
       user.concept_masteries.find_by(concept: "scope_creep").update!(next_retention_check_on: Date.current - 10)
-      expect(DailyPlan.send(:overdue_retention_check_pending_for_bucket?, user, "plan_review")).to be(true)
+      expect(DailyPlan.send(:overdue_retention_check_pending_for_bucket?, user, "plan_review", hostable: ->(*) { true })).to be(true)
     end
   end
 
@@ -336,7 +336,7 @@ RSpec.describe DailyPlan do
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 1)
       allow(user).to receive(:concepts_needing_reinforcement).and_call_original
-      allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
+      allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review", hostable: anything)
         .and_return([ { concept: "unjustified_constant", bucket: "plan_review", tier: "standard" } ])
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
 
@@ -350,7 +350,7 @@ RSpec.describe DailyPlan do
 
     it "caps fourth-slot reinforcement at the slot's single capacity" do
       allow(user).to receive(:concepts_needing_reinforcement).and_call_original
-      allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
+      allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review", hostable: anything)
         .and_return([ { concept: "scope_creep", bucket: "plan_review", tier: "standard" },
                       { concept: "unjustified_constant", bucket: "plan_review", tier: "standard" },
                       { concept: "unflagged_behavior_change", bucket: "plan_review", tier: "standard" } ])
@@ -367,7 +367,7 @@ RSpec.describe DailyPlan do
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 10)
       allow(user).to receive(:concepts_needing_reinforcement).and_call_original
-      allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
+      allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review", hostable: anything)
         .and_return([ { concept: "unjustified_constant", bucket: "plan_review", tier: "standard" } ])
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
 
@@ -738,10 +738,10 @@ RSpec.describe DailyPlan do
   describe "a bug_hunt day" do
     let(:user) { User.create!(email: "hunt-plan@example.com") }
 
-    def plan(judged: true, language: "ruby_rails")
+    def plan(judged: true, language: "ruby_rails", featured_concept: nil)
       allow(WeightedRoll).to receive(:pick).and_call_original
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:bug_hunt)
-      DailyPlan.for(user, language: language, judged: judged)
+      DailyPlan.for(user, language: language, judged: judged, featured_concept: featured_concept)
     end
 
     it "rolls bug_hunt only on a judged day" do
@@ -776,6 +776,29 @@ RSpec.describe DailyPlan do
       expect(result.notes["bug_hunt"]).to eq(result.code_review_gotcha.id)
     end
 
+    it "skips the week's featured concept when it picks the gotcha, and carries the featured concept on the plan" do
+      first = BugHuntGotchas.for_language("ruby_rails").first
+      result = plan(featured_concept: first.concept)
+
+      expect(result.code_review_gotcha.concept).not_to eq(first.concept)
+      expect(result.code_review_gotcha).to eq(BugHuntGotchas.for_language("ruby_rails").find { |entry| entry.concept != first.concept })
+      expect(result.featured_concept).to eq(first.concept)
+    end
+
+    it "skips the concept by name for a mixed-language user whose Ruby week features a concept JavaScript teaches too" do
+      shared = (BugHuntGotchas.concepts("ruby_rails") & BugHuntGotchas.concepts("javascript")).first
+      user.update!(language: "mixed")
+
+      result = plan(language: "javascript", featured_concept: shared)
+
+      expect(BugHuntGotchas.for_language("javascript").first.concept).to eq(shared)
+      expect(result.code_review_gotcha.concept).not_to eq(shared)
+    end
+
+    it "carries no featured concept unless one is passed" do
+      expect(plan.featured_concept).to be_nil
+    end
+
     it "picks no gotcha on a day without a code_review section" do
       user.update!(daily_section_count: 1, daily_section_kinds: %w[design_comparison code_review])
 
@@ -792,7 +815,7 @@ RSpec.describe DailyPlan do
 
       plan
 
-      expect(DayHosts).to have_received(:new).with("ruby_rails", mode: :bug_hunt, gotcha: nil)
+      expect(DayHosts).to have_received(:new).with("ruby_rails", mode: :bug_hunt, gotcha: nil, featured_concept: nil)
     end
 
     it "picks no gotcha on any other mode" do
@@ -1236,6 +1259,21 @@ RSpec.describe DailyPlan, "retention checks left waiting" do
       { bucket: "architecture", concept: "service_boundaries", reason: :no_host },
       { bucket: "plan_review", concept: "scope_creep", reason: :no_host }
     )
+  end
+
+  it "gives the featured fourth-bucket concept no host, so its due check waits where it would have been planned" do
+    user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+    due("scope_creep", "plan_review")
+    featured = "scope_creep"
+
+    unfeatured = described_class.for(user, language: "ruby_rails", judged: true)
+    held_back  = described_class.for(user, language: "ruby_rails", judged: true, featured_concept: featured)
+
+    expect(unfeatured.fourth_due_checks.map(&:concept)).to eq(%w[scope_creep])
+    expect(held_back.fourth_due_checks).to eq([])
+    expect(held_back.waiting_checks.map { |w| w.slice(:bucket, :concept, :reason) })
+      .to eq([ { bucket: "plan_review", concept: "scope_creep", reason: :no_host } ])
   end
 
   it "says no_slot when a section could tag the check but reinforcement took every host" do

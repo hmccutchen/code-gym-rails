@@ -86,7 +86,8 @@ read it before changing that area.
   160 characters, deleted on every other mode, so it marks the section) and
   at most `BugHunt::MAX_LINES` shown lines of core Ruby or ES-module
   JavaScript with one trap from `BugHuntGotchas`, picked never-seen-first
-  into `plan_notes["bug_hunt"]`, never the section. Rolled on judged days
+  into `plan_notes["bug_hunt"]`, never the section, and never the week's
+  featured concept (`BugHuntGotchas.pick(featured_concept:)`). Rolled on judged days
   only (`DailyPlan.for(judged:)`), single-file, never `RealSource`; its
   vocabulary is the picked entry's concept, and every other kind's
   vocabulary that day leaves that concept out. No output: ingest refuses a
