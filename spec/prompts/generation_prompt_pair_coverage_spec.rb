@@ -5,7 +5,7 @@ RSpec.describe "Generation prompt over every reachable daily pair" do
   # ConceptGuidance's idiom line names a kind's answer shape, not a sibling section; kept on purpose (kind-named-prompt-sections.md).
   KIND_IDIOM_PHRASES = [ "The challenge section is the exception" ].freeze
 
-  let(:user) { User.new(email: "pairs@example.com", name: "Pairs", skill_level: "junior", focus_areas: []) }
+  let(:user) { User.new(email: "pairs@example.com", skill_level: "junior", focus_areas: []) }
 
   def reachable_pairs
     ExerciseSection.all.combination(DailyKinds::COUNT).select { |pair| DailyKinds.problems_with(pair.map(&:key)).empty? }

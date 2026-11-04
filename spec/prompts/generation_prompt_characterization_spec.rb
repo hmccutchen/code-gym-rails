@@ -8,7 +8,6 @@ RSpec.describe "generation prompt characterization" do
   let(:user) do
     User.new(
       email:       "snapshot@example.com",
-      name:        "Snapshot",
       skill_level: "junior",
       focus_areas: []
     )
@@ -348,7 +347,7 @@ RSpec.describe "generation prompt characterization" do
   end
 
   def profile(name:, skill_level:, focus_areas:)
-    User.new(email: "snapshot@example.com", name: name, skill_level: skill_level, focus_areas: focus_areas)
+    User.new(email: "snapshot@example.com", skill_level: skill_level, focus_areas: focus_areas)
   end
 
   def schema_keys(prompt)

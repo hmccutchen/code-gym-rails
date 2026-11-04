@@ -10,12 +10,12 @@ RSpec.describe RepeatTrackChosenAtBackfill do
 
   it "marks an account that answered the old welcome page after the first backfill, and keeps every recorded time" do
     created = Time.utc(2026, 10, 15, 12)
-    answered_late = User.create!(email: "late@example.com", name: "Late", created_at: created)
+    answered_late = User.create!(email: "late@example.com", created_at: created)
     write_learning_track(answered_late, "none")
     recorded = Time.utc(2026, 10, 16, 9)
-    chosen = User.create!(email: "chosen@example.com", name: "Chosen", track_chosen_at: recorded)
+    chosen = User.create!(email: "chosen@example.com", track_chosen_at: recorded)
     write_learning_track(chosen, "none")
-    undecided = User.create!(email: "new@example.com", name: "New")
+    undecided = User.create!(email: "new@example.com")
 
     migrate(:up)
 

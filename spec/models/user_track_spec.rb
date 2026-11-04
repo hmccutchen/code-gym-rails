@@ -4,7 +4,7 @@ RSpec.describe User, "track", type: :model do
   around { |example| travel_to(Time.utc(2026, 10, 16, 15)) { example.run } }
 
   def new_account(**attrs)
-    User.create!({ email: "new-#{SecureRandom.hex(3)}@example.com", name: "New", time_zone: "UTC" }.merge(attrs))
+    User.create!({ email: "new-#{SecureRandom.hex(3)}@example.com", time_zone: "UTC" }.merge(attrs))
   end
 
   def chosen(**attrs) = new_account(track_chosen_at: 1.day.ago, **attrs)

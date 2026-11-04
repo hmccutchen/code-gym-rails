@@ -631,6 +631,27 @@ RSpec.describe ProblemSetIngest do
           .to eq("flowchart TD\n  A --> B")
       end
 
+      it "keeps only string prose in a reference, and only nonblank string tradeoffs" do
+        reference = { "tagline" => "t", "explanation" => [ "e" ], "senior_lens" => 42,
+                      "tradeoffs" => [ "a", { "odd" => 1 }, " ", 7 ] }
+        set = { "architecture" => { "reference" => reference } }
+
+        expect(step(set)["architecture"]["reference"]).to eq("tagline" => "t", "tradeoffs" => [ "a" ])
+      end
+
+      it "drops a reference that is not a hash" do
+        [ "a stray string", [ "t" ], 42 ].each do |bad|
+          set = { "architecture" => { "question" => "q", "reference" => bad } }
+          expect(step(set)["architecture"]).not_to have_key("reference")
+        end
+      end
+
+      it "drops a reference's tradeoffs when none is a usable string" do
+        set = { "architecture" => { "reference" => { "tagline" => "t", "tradeoffs" => "one string" } } }
+
+        expect(step(set)["architecture"]["reference"]).to eq("tagline" => "t")
+      end
+
       it "drops an architecture reference diagram MermaidSource refuses, keeping the rest of the reference" do
         [ "", "sequenceDiagram\n  A->>B: hi", "%%{init: {}}%%\nflowchart TD\n  A --> B" ].each do |bad|
           set = { "architecture" => { "reference" => { "tagline" => "t", "diagram" => bad } } }

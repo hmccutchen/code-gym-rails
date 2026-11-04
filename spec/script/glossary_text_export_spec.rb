@@ -3,11 +3,14 @@ require Rails.root.join("script/glossary_text_export")
 require Rails.root.join("script/glossary_sense_listing_report")
 
 RSpec.describe GlossaryTextExport do
-  let(:user) { User.create!(email: "glossary-export@example.com", name: "Export") }
+  let(:user) { User.create!(email: "glossary-export@example.com") }
   let(:out) { StringIO.new }
   let(:sections) do
     { "code_review" => { "scenario" => "A webhook retries.", "question" => "What's wrong?" },
-      "architecture" => { "question" => "Which design?", "options" => [ "A queue", "A cron job" ] },
+      "architecture" => { "question" => "Which design?", "options" => [ "A queue", "A cron job" ],
+                         "reference" => { "tagline" => "Queue the work.", "explanation" => "A worker drains it.",
+                                          "tradeoffs" => [ "More moving parts." ], "senior_lens" => "Watch the backlog.",
+                                          "diagram" => "flowchart TD\n  DIAGRAM-SENTINEL" } },
       "ambiguity_hunt" => { "question" => "What's unclear?", "request" => "Add a callback after save." },
       "pseudocode_to_code" => { "question" => "Write it.", "problem_statement" => "Sum the totals." },
       "pattern" => { "question" => "Which pattern?", "why" => "A service object keeps the controller thin." },
@@ -48,6 +51,10 @@ RSpec.describe GlossaryTextExport do
       { "source" => "exercise", "id" => "#{exercise_id}:architecture", "field" => "question", "text" => "Which design?" },
       { "source" => "exercise", "id" => "#{exercise_id}:architecture", "field" => "option", "text" => "A queue" },
       { "source" => "exercise", "id" => "#{exercise_id}:architecture", "field" => "option", "text" => "A cron job" },
+      { "source" => "exercise", "id" => "#{exercise_id}:architecture", "field" => "reference_tagline", "text" => "Queue the work." },
+      { "source" => "exercise", "id" => "#{exercise_id}:architecture", "field" => "reference_explanation", "text" => "A worker drains it." },
+      { "source" => "exercise", "id" => "#{exercise_id}:architecture", "field" => "reference_tradeoff", "text" => "More moving parts." },
+      { "source" => "exercise", "id" => "#{exercise_id}:architecture", "field" => "reference_senior_lens", "text" => "Watch the backlog." },
       { "source" => "exercise", "id" => "#{exercise_id}:ambiguity_hunt", "field" => "question", "text" => "What's unclear?" },
       { "source" => "exercise", "id" => "#{exercise_id}:ambiguity_hunt", "field" => "request", "text" => "Add a callback after save." },
       { "source" => "exercise", "id" => "#{exercise_id}:pseudocode_to_code", "field" => "question", "text" => "Write it." },

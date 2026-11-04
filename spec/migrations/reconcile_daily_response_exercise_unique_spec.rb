@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Reconciling the response index after the track migration version collision" do
   let(:connection) { ActiveRecord::Base.connection }
   let(:migration_context) { connection.pool.migration_context }
-  let(:user) { User.create!(email: "reconcile@example.com", name: "Reconcile") }
+  let(:user) { User.create!(email: "reconcile@example.com") }
   let(:exercise) do
     DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
                           problem_set: { "code_review" => { "question" => "q" } })

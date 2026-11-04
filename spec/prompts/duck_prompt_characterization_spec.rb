@@ -2,7 +2,7 @@ require "rails_helper"
 
 # Rebaseline with UPDATE_PROMPT_SNAPSHOTS=1 only when a duck prompt change is the intended deliverable.
 RSpec.describe "duck prompt characterization" do
-  let(:user) { User.create!(email: "duck-snapshot@example.com", name: "Duck Snapshot") }
+  let(:user) { User.create!(email: "duck-snapshot@example.com") }
 
   let(:exercise) do
     DailyExercise.new(language: "ruby_rails", problem_set: {

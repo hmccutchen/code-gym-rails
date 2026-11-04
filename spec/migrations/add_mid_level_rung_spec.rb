@@ -19,7 +19,7 @@ RSpec.describe AddMidLevelRung do
     mappings = { "beginner" => "junior", "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer" }
     expected = mappings.merge(KindDifficulty::LEVELS.index_with(&:itself))
     users = expected.keys.map.with_index do |_level, index|
-      User.create!(email: "level#{index}@example.com", name: "Level", skill_level: "junior")
+      User.create!(email: "level#{index}@example.com", skill_level: "junior")
     end
 
     rerun_migration do
@@ -47,7 +47,7 @@ RSpec.describe AddMidLevelRung do
 
   it "rolls back mid-level skills without downgrading other current levels" do
     users = KindDifficulty::LEVELS.map.with_index do |level, index|
-      User.create!(email: "rollback#{index}@example.com", name: "Level", skill_level: level)
+      User.create!(email: "rollback#{index}@example.com", skill_level: level)
     end
 
     rerun_migration do

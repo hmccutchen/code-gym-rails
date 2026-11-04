@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe GenerationDiagnostics, "quote tally on [planted_key] lines" do
-  let(:user) { User.create!(email: "quote-tally@example.com", name: "Quote Tally") }
+  let(:user) { User.create!(email: "quote-tally@example.com") }
 
   def logged_lines
     lines = []

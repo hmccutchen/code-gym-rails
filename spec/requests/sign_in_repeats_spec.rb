@@ -226,7 +226,7 @@ RSpec.describe "A repeated sign-in post", type: :request do
 
     it "keeps a pending trial when a repeated emailed code still needs the authenticator step" do
       stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
-      trial_user = User.create!(email: "trial@example.com", name: "Trial", track_chosen_at: Time.current)
+      trial_user = User.create!(email: "trial@example.com", track_chosen_at: Time.current)
       trial_secret, _codes = enroll_second_factor(trial_user)
       invite, invite_code = mint_trial_code
       post start_trial_path, params: { email: trial_user.email, invite_code: invite_code, provider: "fake", consent: "1" }

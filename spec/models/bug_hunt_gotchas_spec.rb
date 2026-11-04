@@ -88,7 +88,7 @@ RSpec.describe BugHuntGotchas do
   end
 
   describe ".last_seen_for" do
-    let(:user) { User.create!(email: "hunt@example.com", name: "Hunt") }
+    let(:user) { User.create!(email: "hunt@example.com") }
 
     def exercise_on(date, gotcha:, code_review: { "concept" => "memoization", "purpose" => "Return the cached total." })
       user.daily_exercises.create!(
@@ -125,7 +125,7 @@ RSpec.describe BugHuntGotchas do
     end
 
     it "is scoped to the one user" do
-      other = User.create!(email: "other-hunt@example.com", name: "Other")
+      other = User.create!(email: "other-hunt@example.com")
       other.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
                                     problem_set: { "code_review" => {} }, plan_notes: { "bug_hunt" => "rb_memo_falsy" })
 

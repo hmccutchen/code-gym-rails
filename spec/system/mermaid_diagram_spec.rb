@@ -60,6 +60,6 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
 
     wait_for { count(EMPTY_DIAGRAMS).zero? }
     expect(page).to have_css("details.ref", text: /Reference/i)
-    expect(count(%q{document.body.innerHTML.includes("Sharding complicates joins")})).to be(true)
+    expect(count(%q{document.body.textContent.includes("Sharding complicates joins")})).to be(true)
   end
 end

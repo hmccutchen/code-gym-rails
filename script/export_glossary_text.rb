@@ -6,8 +6,9 @@ USAGE = <<~TEXT.freeze
 
   Writes the stored review and exercise text the pages run through glossary_wrap, one JSON object per line
   with source, id, field and text: each reviewed section's review points, difficulty reason and saved
-  alternate explanations, and each exercise section's scenario, question, options, request, problem
-  statement, pattern reasoning and plan excerpt. Feed the file to script/glossary_sense_listing.rb.
+  alternate explanations, and each exercise section's scenario, question, options, stored reference
+  (only architecture shows it), request, problem statement, pattern reasoning and plan excerpt.
+  Feed the file to script/glossary_sense_listing.rb.
   It reads no answer, rating, answer key or user column, but generated text can quote an engineer's answer
   or use their name, so keep the file outside the repository and delete it when the listing is read.
 TEXT

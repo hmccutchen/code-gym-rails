@@ -28,6 +28,14 @@ A refused section is removed on its own. The next shape in its slot then resolve
 
 A diagram is rendered into an HTML data attribute, so it is held to `MermaidSource`. An unusable diagram is deleted rather than repaired.
 
+## `#normalize_reference_prose!`
+
+A section's `reference` block reaches the page through `glossary_wrap`, which
+needs strings. A `reference` that isn't a hash is deleted. Its tagline, explanation and senior lens are deleted when they
+aren't strings, and its tradeoffs keep only nonblank strings, or are deleted
+when none is left. It reads every section's `reference`, so a kind that adds
+one needs no change here.
+
 ## `#key_notes`
 
 Runs last, after `ground_code_review!` has stamped the server's own

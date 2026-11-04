@@ -1,14 +1,14 @@
 require "rails_helper"
 
 RSpec.describe ReviewHelper, type: :helper do
-  let(:user) { User.create!(email: "review-helper@example.com", name: "R") }
+  let(:user) { User.create!(email: "review-helper@example.com") }
   let(:exercise) do
     DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
                           problem_set: { "code_review" => { "question" => "q" }, "pattern" => { "question" => "p" } })
   end
 
   describe "#review_provider_label" do
-    let(:openai_user) { User.create!(email: "label@example.com", name: "L", provider: "openai", api_keys: { "openai" => "sk-proj-x" }) }
+    let(:openai_user) { User.create!(email: "label@example.com", provider: "openai", api_keys: { "openai" => "sk-proj-x" }) }
 
     it "names the provider that wrote the review" do
       expect(helper.review_provider_label(DailyResponse.new(user: openai_user, review_provider: "anthropic"))).to eq("Claude")

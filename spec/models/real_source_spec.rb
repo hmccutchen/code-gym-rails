@@ -252,7 +252,7 @@ RSpec.describe RealSource do
   end
 
   describe ".last_seen_for" do
-    let(:user) { User.create!(email: "seen@example.com", name: "Seen") }
+    let(:user) { User.create!(email: "seen@example.com") }
 
     def exercise_on(date, source:)
       user.daily_exercises.create!(
@@ -285,7 +285,7 @@ RSpec.describe RealSource do
     end
 
     it "is scoped to the one user" do
-      other = User.create!(email: "other@example.com", name: "Other")
+      other = User.create!(email: "other@example.com")
       other.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
                                     problem_set: { "code_review" => { "source" => "a#one" } })
 

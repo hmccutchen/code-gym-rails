@@ -5,12 +5,12 @@ RSpec.describe "Trial isolation", type: :model do
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 
   def own_key_twin
-    User.create!(email: "own@example.com", name: "Twin", time_zone: "UTC", provider: "fake",
+    User.create!(email: "own@example.com", time_zone: "UTC", provider: "fake",
                  api_keys: { "fake" => "fake-test-key" }, language: "ruby_rails", track_chosen_at: Time.current)
   end
 
   def trial_twin
-    create_trial_user(email: "trial@example.com", name: "Twin", provider: "fake", house_key: "fake-test-key").tap do |user|
+    create_trial_user(email: "trial@example.com", provider: "fake", house_key: "fake-test-key").tap do |user|
       user.update!(language: "ruby_rails")
     end
   end

@@ -22,7 +22,7 @@ RSpec.describe DailyPlan do
       expect(DailyPlan::FOURTH_BUCKET_FOR.values.uniq.size).to eq(DailyPlan::FOURTH_BUCKET_FOR.size)
     end
   end
-  let(:user) { User.create!(email: "prompt@example.com", name: "Prompt") }
+  let(:user) { User.create!(email: "prompt@example.com") }
 
   def due_slice
     user.concepts_due_for_retention_check_in(ConceptBucket.slice_for("mixed"))
@@ -408,7 +408,7 @@ RSpec.describe DailyPlan do
   end
 
   describe "#scenario_flavor on the plan" do
-    let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
+    let(:user) { User.create!(email: "plan@example.com") }
 
     it "rolls every skill level from the same weights" do
       allow(WeightedRoll).to receive(:pick).and_call_original
@@ -429,7 +429,7 @@ RSpec.describe DailyPlan do
   end
 
   describe ".for with a variable-length day" do
-    let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
+    let(:user) { User.create!(email: "plan@example.com") }
 
     before { allow(SectionCount).to receive(:for).and_return(2) }
 
@@ -506,7 +506,7 @@ RSpec.describe DailyPlan do
 
   describe "the Daily sections setting" do
     it "passes a fixed choice through to DaySize, which overrides completion and the gate" do
-      user = User.create!(email: "fixed@example.com", name: "Fixed", daily_section_count: 3)
+      user = User.create!(email: "fixed@example.com", daily_section_count: 3)
       allow(SectionCount).to receive(:for).and_return(ExerciseSection::MAX_SECTIONS)
       stub_gate(SectionCount::FLOOR, :brake)
       expect(DaySize).to receive(:for).with(hash_including(setting: 3)).and_call_original
@@ -518,7 +518,7 @@ RSpec.describe DailyPlan do
     end
 
     it "gives a user who chose the largest day every slot" do
-      user = User.create!(email: "full@example.com", name: "Full", daily_section_count: ExerciseSection::MAX_SECTIONS)
+      user = User.create!(email: "full@example.com", daily_section_count: ExerciseSection::MAX_SECTIONS)
 
       plan = described_class.for(user, language: "ruby_rails", judged: true)
 
@@ -527,7 +527,7 @@ RSpec.describe DailyPlan do
     end
 
     it "plans a single daily section under a setting of 1, the one the user kept" do
-      user = User.create!(email: "single@example.com", name: "Single", daily_section_count: 1,
+      user = User.create!(email: "single@example.com", daily_section_count: 1,
                           daily_section_kinds: %w[design_comparison code_review])
 
       plan = described_class.for(user, language: "ruby_rails", judged: true)
@@ -538,7 +538,7 @@ RSpec.describe DailyPlan do
     end
 
     it "plans a single fourth-slot section, with no main-track section to hold language concepts" do
-      user = User.create!(email: "single-fourth@example.com", name: "Single", daily_section_count: 1,
+      user = User.create!(email: "single-fourth@example.com", daily_section_count: 1,
                           daily_section_kinds: %w[plan_review code_review])
 
       plan = described_class.for(user, language: "ruby_rails", judged: true)
@@ -548,7 +548,7 @@ RSpec.describe DailyPlan do
     end
 
     it "puts the chosen extra sections in every set and rotates none" do
-      user = User.create!(email: "chosen@example.com", name: "Chosen", daily_section_count: 4,
+      user = User.create!(email: "chosen@example.com", daily_section_count: 4,
                           daily_section_kinds: %w[code_review design_comparison pattern plan_review])
 
       plan = described_class.for(user, language: "ruby_rails", judged: true)
@@ -560,7 +560,7 @@ RSpec.describe DailyPlan do
     end
 
     it "offers the shared concept to the pair alone when extra sections are chosen" do
-      user = User.create!(email: "shared-extra@example.com", name: "Shared", daily_section_count: 3,
+      user = User.create!(email: "shared-extra@example.com", daily_section_count: 3,
                           daily_section_kinds: %w[code_review design_comparison pattern])
       expect(SharedConcept).to receive(:pick).with(anything, anything, anything, hash_including(daily: DailyKinds::DEFAULT))
                                              .and_call_original
@@ -569,14 +569,14 @@ RSpec.describe DailyPlan do
     end
 
     it "offers no shared concept to a single section" do
-      user = User.create!(email: "shared-single@example.com", name: "Single", daily_section_count: 1)
+      user = User.create!(email: "shared-single@example.com", daily_section_count: 1)
       expect(SharedConcept).to receive(:pick).with(anything, anything, anything, hash_including(daily: [])).and_call_original
 
       described_class.for(user, language: "ruby_rails", judged: true)
     end
 
     it "rotates a place a larger setting adds when no extra section was chosen for it" do
-      user = User.create!(email: "unchosen@example.com", name: "Unchosen", daily_section_count: 4,
+      user = User.create!(email: "unchosen@example.com", daily_section_count: 4,
                           daily_section_kinds: %w[code_review design_comparison pattern])
 
       plan = described_class.for(user, language: "ruby_rails", judged: true)
@@ -586,7 +586,7 @@ RSpec.describe DailyPlan do
     end
 
     it "leaves sizing Automatic for a user who never chose" do
-      user = User.create!(email: "auto@example.com", name: "Auto")
+      user = User.create!(email: "auto@example.com")
       expect(DaySize).to receive(:for).with(hash_including(setting: nil)).and_call_original
 
       expect(described_class.for(user, language: "ruby_rails", judged: true).size.automatic?).to be(true)
@@ -594,7 +594,7 @@ RSpec.describe DailyPlan do
   end
 
   describe "the day's size" do
-    let(:user) { User.create!(email: "size@example.com", name: "Size") }
+    let(:user) { User.create!(email: "size@example.com") }
 
     def optional_kinds(plan) = plan.rotation.values.compact
 
@@ -649,7 +649,7 @@ RSpec.describe DailyPlan do
   end
 
   describe "#code_review_mode on the plan" do
-    let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
+    let(:user) { User.create!(email: "plan@example.com") }
 
     it "is carried on the Result" do
       allow(WeightedRoll).to receive(:rand).and_return(0.67)
@@ -658,7 +658,7 @@ RSpec.describe DailyPlan do
   end
 
   describe "#code_review_source on the plan" do
-    let(:user) { User.create!(email: "source@example.com", name: "Source") }
+    let(:user) { User.create!(email: "source@example.com") }
 
     def plan(language: "ruby_rails", mode: :application_code, roll: :real)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(mode)
@@ -707,7 +707,7 @@ RSpec.describe DailyPlan do
   end
 
   describe "#code_review_files on the plan" do
-    let(:user) { User.create!(email: "files@example.com", name: "Files") }
+    let(:user) { User.create!(email: "files@example.com") }
 
     def plan(source_roll: :toy, files_roll: :multi, judged: true)
       pin_code_review_mode(:application_code)
@@ -742,7 +742,7 @@ RSpec.describe DailyPlan do
   end
 
   describe "a bug_hunt day" do
-    let(:user) { User.create!(email: "hunt-plan@example.com", name: "Hunt") }
+    let(:user) { User.create!(email: "hunt-plan@example.com") }
 
     def plan(judged: true, language: "ruby_rails")
       allow(WeightedRoll).to receive(:pick).and_call_original
@@ -906,7 +906,7 @@ RSpec.describe DailyPlan do
 end
 
 RSpec.describe DailyPlan, "drilled concepts" do
-  let(:user) { User.create!(email: "plan-drill@example.com", name: "Plan") }
+  let(:user) { User.create!(email: "plan-drill@example.com") }
 
   def submit(concept, section: "code_review", date:)
     exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
@@ -1048,7 +1048,7 @@ RSpec.describe DailyPlan, "drilled concepts" do
 end
 
 RSpec.describe DailyPlan, "same-named concepts across language buckets" do
-  let(:user) { User.create!(email: "plan-mixed@example.com", name: "Plan", language: "mixed") }
+  let(:user) { User.create!(email: "plan-mixed@example.com", language: "mixed") }
 
   it "lets a ruby retention check stand when only the javascript occurrence is in reinforcement" do
     exercise = user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "javascript",
@@ -1104,7 +1104,7 @@ RSpec.describe DailyPlan::Result, "#notes" do
 end
 
 RSpec.describe DailyPlan, "the shared concept" do
-  let(:user) { User.create!(email: "plan-shared@example.com", name: "Plan") }
+  let(:user) { User.create!(email: "plan-shared@example.com") }
 
   before do
     pin_code_review_mode(:application_code)
@@ -1216,7 +1216,7 @@ end
 RSpec.describe DailyPlan, "retention checks left waiting" do
   include DailyPlanGateStubs
 
-  let(:user) { User.create!(email: "plan-waiting@example.com", name: "Plan") }
+  let(:user) { User.create!(email: "plan-waiting@example.com") }
 
   # Otherwise the coverage exception would read the stubbed day as floored with a check to host.
   before do
@@ -1294,7 +1294,7 @@ RSpec.describe DailyPlan, "the coverage exception" do
   include ActiveSupport::Testing::TimeHelpers
   include DailyPlanGateStubs
 
-  let(:user) { User.create!(email: "plan-coverage@example.com", name: "Plan") }
+  let(:user) { User.create!(email: "plan-coverage@example.com") }
 
   around { |example| travel_to(Time.zone.local(2026, 10, 7, 9)) { example.run } }
 
@@ -1460,7 +1460,7 @@ RSpec.describe DailyPlan, "the coverage exception" do
 end
 
 RSpec.describe DailyPlan, "reinforcement no section can host" do
-  let(:user) { User.create!(email: "plan-unhosted@example.com", name: "Plan") }
+  let(:user) { User.create!(email: "plan-unhosted@example.com") }
 
   before { allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil) }
 
@@ -1491,7 +1491,7 @@ end
 
 RSpec.describe DailyPlan, "a pair whose only regular section is architecture" do
   let(:user) do
-    User.create!(email: "plan-architecture-pair@example.com", name: "Plan", daily_section_kinds: %w[architecture plan_review])
+    User.create!(email: "plan-architecture-pair@example.com", daily_section_kinds: %w[architecture plan_review])
   end
 
   before do

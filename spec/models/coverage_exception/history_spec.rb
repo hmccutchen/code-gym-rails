@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe CoverageException::History do
   include ActiveSupport::Testing::TimeHelpers
 
-  let(:user) { User.create!(email: "coverage-history@example.com", name: "History") }
+  let(:user) { User.create!(email: "coverage-history@example.com") }
 
   around { |example| travel_to(Time.zone.local(2026, 10, 7, 9)) { example.run } }
 

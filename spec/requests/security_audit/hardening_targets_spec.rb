@@ -87,14 +87,6 @@ RSpec.describe "Security hardening targets", type: :request do
         .to include(UserText::PROMPT_RULE)
     end
 
-    it "leaves a stored name, however long, out of the generation prompt (finding A1)" do
-      user.update_column(:name, "N" * 5_000)
-
-      prompt = render_generation_prompt(user.reload, "ruby_rails")
-
-      expect(prompt).not_to include("N" * 20)
-    end
-
     it "caps a follow-up turn stored before the cap shipped when the thread is replayed (finding A1)" do
       exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "q" } })
       resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => { "missed" => [] } })

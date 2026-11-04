@@ -125,7 +125,7 @@ RSpec.describe "Second-factor sign-in", type: :request do
 
   it "keeps a pending trial through the second step" do
     stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
-    trial_user = User.create!(email: "trial@example.com", name: "Trial", track_chosen_at: Time.current)
+    trial_user = User.create!(email: "trial@example.com", track_chosen_at: Time.current)
     trial_secret, _codes = enroll_second_factor(trial_user)
     invite, code = mint_trial_code
     post start_trial_path, params: { email: trial_user.email, invite_code: code, provider: "fake", consent: "1" }

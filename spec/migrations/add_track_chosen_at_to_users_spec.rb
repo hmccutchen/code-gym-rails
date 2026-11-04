@@ -19,11 +19,11 @@ RSpec.describe AddTrackChosenAtToUsers do
 
   it "marks every account that answered the welcome question as having chosen, at its creation time" do
     created = Time.utc(2026, 9, 1, 12)
-    junior = User.create!(email: "junior@example.com", name: "Junior", created_at: created)
+    junior = User.create!(email: "junior@example.com", created_at: created)
     write_learning_track(junior, "junior")
-    backfilled = User.create!(email: "none@example.com", name: "None", created_at: created)
+    backfilled = User.create!(email: "none@example.com", created_at: created)
     write_learning_track(backfilled, "none")
-    undecided = User.create!(email: "new@example.com", name: "New")
+    undecided = User.create!(email: "new@example.com")
     migrate(:down)
 
     migrate(:up)
@@ -34,7 +34,7 @@ RSpec.describe AddTrackChosenAtToUsers do
   end
 
   it "rolls back by removing the column and leaving learning_track as it was" do
-    user = User.create!(email: "kept@example.com", name: "Kept")
+    user = User.create!(email: "kept@example.com")
     write_learning_track(user, "junior")
 
     migrate(:down)

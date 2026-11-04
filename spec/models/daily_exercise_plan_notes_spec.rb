@@ -14,7 +14,7 @@ RSpec.describe "Every path that writes a daily exercise records its pair" do
 
   let(:pair) { %w[architecture code_review] }
   let(:user) do
-    User.create!(email: "pair-writer@example.com", name: "Pair", provider: "fake", api_keys: { "fake" => "fake-key" },
+    User.create!(email: "pair-writer@example.com", provider: "fake", api_keys: { "fake" => "fake-key" },
                  time_zone: "UTC", daily_section_kinds: pair)
   end
 

@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe Claimable do
-  let(:user) { User.create!(email: "claimable-#{SecureRandom.hex(3)}@example.com", name: "C") }
+  let(:user) { User.create!(email: "claimable-#{SecureRandom.hex(3)}@example.com") }
   let(:exercise) do
     DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
                           problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } })

@@ -1,5 +1,6 @@
 class ProblemSetIngest
   SERVER_STAMPS = %w[pitched_at eased source].freeze
+  REFERENCE_PROSE_FIELDS = %w[tagline explanation senior_lens].freeze
 
   Suggestion = Data.define(:bucket, :name)
 
@@ -52,6 +53,7 @@ class ProblemSetIngest
     normalize_concepts!
     normalize_answer_scaffolds!
     normalize_diagrams!
+    normalize_reference_prose!
     arrange_sections!
     strip_current_schemas!
     strip_server_stamps!
@@ -234,6 +236,22 @@ class ProblemSetIngest
       reference = section_data["reference"]
       keep_usable_diagram(reference, allowed: true) if reference.is_a?(Hash) && reference.key?("diagram")
     end
+  end
+
+  def normalize_reference_prose!
+    @problem_set.each_value do |section_data|
+      next unless section_data.is_a?(Hash) && section_data.key?("reference")
+      next section_data.delete("reference") unless section_data["reference"].is_a?(Hash)
+
+      reference = section_data["reference"]
+      REFERENCE_PROSE_FIELDS.each { |field| reference.delete(field) if reference.key?(field) && !reference[field].is_a?(String) }
+      keep_string_tradeoffs(reference) if reference.key?("tradeoffs")
+    end
+  end
+
+  def keep_string_tradeoffs(reference)
+    tradeoffs = reference["tradeoffs"].is_a?(Array) ? reference["tradeoffs"].grep(String).reject(&:blank?) : []
+    tradeoffs.present? ? reference["tradeoffs"] = tradeoffs : reference.delete("tradeoffs")
   end
 
   def keep_usable_diagram(holder, allowed:)

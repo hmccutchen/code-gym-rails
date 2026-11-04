@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe GenerationDiagnostics do
-  let(:user) { User.create!(email: "diagnostics@example.com", name: "Diagnostics") }
+  let(:user) { User.create!(email: "diagnostics@example.com") }
   let(:sentinel) { "ANSWER-KEY-SENTINEL" }
   let(:rotation) { { pattern: :pattern, third: :challenge, fourth: :plan_review } }
   let(:kinds) { ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: rotation) }

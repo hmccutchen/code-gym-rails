@@ -4,7 +4,7 @@ migration_path = Rails.root.join("db/migrate/20261002170100_add_review_provider_
 require migration_path.to_s
 
 RSpec.describe AddReviewProviderToDailyResponses do
-  let(:user) { User.create!(email: "reviewed@example.com", name: "Reviewed", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }) }
+  let(:user) { User.create!(email: "reviewed@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }) }
 
   def response_for(date, ai_review:)
     exercise = user.daily_exercises.create!(date: date, problem_set: { "code_review" => {} }, generated_at: Time.current)

@@ -67,7 +67,7 @@ RSpec.describe FeaturedConcept, type: :model do
   end
 
   it "picks for each user from that user's own work" do
-    other = create_user_with_key(email: "other@example.com", name: "Other")
+    other = create_user_with_key(email: "other@example.com")
     meet("n_plus_one", date: monday - 3)
     meet("memoization", date: monday - 3, owner: other)
 

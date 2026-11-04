@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe PushDelivery, type: :service do
-  let(:user) { User.create!(email: "push@example.com", name: "Push") }
+  let(:user) { User.create!(email: "push@example.com") }
   let(:subscription) do
     PushSubscription.register!(user: user, endpoint: "https://push.example.com/abc", p256dh_key: "p256", auth_key: "auth")
   end

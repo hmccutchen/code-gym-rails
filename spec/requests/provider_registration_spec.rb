@@ -14,7 +14,7 @@ RSpec.describe "AI provider registration", type: :request do
     end
     stub_const("ExampleService", provider)
     allow(AiProvider).to receive(:all).and_return(AiProvider.all + [ provider ])
-    user = User.create!(email: "provider-registration@example.com", name: "Provider registration")
+    user = User.create!(email: "provider-registration@example.com")
     login_as(user)
 
     patch setup_path, params: { api_key: "example-test-key" }

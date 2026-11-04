@@ -100,7 +100,7 @@ RSpec.describe "Swapping a daily section kind", type: :request do
   end
 
   it "renders no panels for another user's set" do
-    other = User.create!(email: "other@example.com", name: "Other")
+    other = User.create!(email: "other@example.com")
     theirs = DailyExercise.create!(user: other, date: Date.current, language: "ruby_rails", generated_at: Time.current,
                                    problem_set: { "code_review" => { "question" => "q" } },
                                    plan_notes: { "daily_kinds" => %w[code_review design_comparison], "size" => 2 })

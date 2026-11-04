@@ -62,7 +62,7 @@ RSpec.describe DisplayPreferences do
   end
 
   describe "on User" do
-    let(:user) { User.create!(email: "display@example.com", name: "Display") }
+    let(:user) { User.create!(email: "display@example.com") }
 
     it "stores nothing for a default and keeps the store sparse" do
       user.update!(display_preferences: { "theme" => "light", "text_size" => "100" })
