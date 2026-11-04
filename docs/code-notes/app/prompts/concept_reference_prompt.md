@@ -15,3 +15,18 @@ design principles keep it.
 
 `medium` is nil for a concept with no code of its own (see
 `ConceptVocabulary.language_agnostic?`).
+
+## `DATA_MODELING_NOTE`
+
+The prompts name a concept only by its key and the coach's language, so in a
+JavaScript prompt a model read `unsafe_migration` as React's `UNSAFE_`
+lifecycle methods (#559). Every concept in
+`ConceptVocabulary::DATA_MODELING_CONCEPTS` is about a database schema in
+either stack, so the reference and reframe prompts say so for each of them,
+appended to their first line. Other concepts get nothing appended, so their
+prompts stay byte for byte as recorded. A refresh never rewrites a fully
+written row, so `DeleteJavascriptUnsafeMigrationReference` deletes the one
+stored row known to teach the wrong thing; Learn's prepare button, or the next
+submitted section tagged with the concept, writes it again with the note. The
+other four JavaScript data-modeling rows were left: their names have no second
+meaning in JavaScript, and the 2026-10-25 audit read `missing_index` as right.
