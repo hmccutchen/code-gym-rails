@@ -44,6 +44,15 @@ with no wrapping. It wraps the prose between the spans and passes one `seen`
 set through all of them, so a term used before and after a code span is
 underlined once in that paragraph.
 
+## `#section_glossary_wrap`
+
+The answer form's section views call this for every prose field, and a
+convention spec fails on a raw `glossary_wrap` there. Before the day is
+submitted, it returns the text plain when the kind's
+`.glossary_shown_before_submission?` is false, so plan review and ambiguity
+hunt show no tooltips while their hidden gaps are still to be found. After
+submission, it wraps like `#glossary_wrap`.
+
 ## Why code is never wrapped
 
 A term inside code is an identifier or a literal, not a use of the word. A

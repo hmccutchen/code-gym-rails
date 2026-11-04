@@ -99,6 +99,43 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".glossary_shown_before_submission?" do
+    it "is false for plan_review and ambiguity_hunt, whose hidden answers are the kind of gap a definition names" do
+      expect(ExerciseSection::PlanReview.glossary_shown_before_submission?).to be(false)
+      expect(ExerciseSection::AmbiguityHunt.glossary_shown_before_submission?).to be(false)
+    end
+
+    it "is true for every other kind" do
+      (ExerciseSection.all - [ ExerciseSection::PlanReview, ExerciseSection::AmbiguityHunt ]).each do |kind|
+        expect(kind.glossary_shown_before_submission?).to be(true), "#{kind} withheld its glossary unexpectedly"
+      end
+    end
+
+    it "is a recorded decision, with the concept's, for every kind with an answer key, so a new keyed kind shows neither by default" do
+      decided = {
+        ExerciseSection::PlanReview => { glossary: false, concept: false },
+        ExerciseSection::AmbiguityHunt => { glossary: false, concept: false },
+        ExerciseSection::PseudocodeToCode => { glossary: true, concept: true },
+        ExerciseSection::CodeReview => { glossary: true, concept: true },
+        ExerciseSection::SecurityReview => { glossary: true, concept: true },
+        ExerciseSection::DesignComparison => { glossary: true, concept: true }
+      }
+
+      expect(ExerciseSection.all.select { |kind| kind.answer_key_fields.any? }).to match_array(decided.keys)
+      decided.each do |kind, shown|
+        expect(kind.glossary_shown_before_submission?).to be(shown[:glossary]), "#{kind.name} glossary"
+        expect(kind.concept_shown_before_submission?({})).to be(shown[:concept]), "#{kind.name} concept"
+      end
+    end
+  end
+
+  describe ".concept_shown_before_submission?" do
+    it "is false for plan_review and ambiguity_hunt, whose concept is the category of the hidden gap" do
+      expect(ExerciseSection::PlanReview.concept_shown_before_submission?({})).to be(false)
+      expect(ExerciseSection::AmbiguityHunt.concept_shown_before_submission?({})).to be(false)
+    end
+  end
+
   describe ".excluded_vocabulary_keys" do
     it "withholds nothing from any kind but parsons_problem" do
       (ExerciseSection.all - [ ExerciseSection::ParsonsProblem ]).each do |kind|

@@ -1,4 +1,4 @@
-<%# Locals: data, exercise, response, submitted. %>
+<%# Locals: kind, data, exercise, response, submitted. %>
 <% files = ExerciseSection::CodeReview.files(data) %>
 <% if ExerciseSection::CodeReview.bug_hunt?(data) %>
 <div class="section-scenario bug-hunt-goal"><strong><%= t("sections.code_review.goal") %></strong> <%= data["purpose"] %></div>

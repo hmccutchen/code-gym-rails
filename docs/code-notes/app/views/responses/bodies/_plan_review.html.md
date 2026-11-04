@@ -2,4 +2,4 @@
 
 ## Plan excerpt
 
-`plan_excerpt` goes through `glossary_wrap` like every other prose field in the app. It is prose, not code, so there is no reason to withhold glossary tooltips from it.
+`plan_excerpt` goes through `section_glossary_wrap`, so it has no glossary tooltips until the day is submitted. The hidden answer key lists the plan's flaws, and a definition that states a consequence ("a replica can lag") could name one before the engineer finds it. `.claude/rules/learn.md` has the rule.

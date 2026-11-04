@@ -2,20 +2,11 @@ class DashboardController < ApplicationController
   # no-store, or Back after submit → review replays the cached empty form with a Submit button that re-posts it.
   before_action :no_store, only: :show
 
-  def show # rubocop:disable Metrics/MethodLength
+  def show
     return redirect_to(welcome_path) if current_user.first_run?
 
-    # Re-read after the move: a second first-load of the day can lose the race and move nothing.
-    @exercise = current_user.daily_exercises.for_date.first
-    if @exercise.nil?
-      current_user.carry_held_set_forward!
-      @exercise = current_user.daily_exercises.for_date.first
-    end
-    @response = @exercise&.daily_response&.tap { |stored| stored.user = current_user } ||
-                @exercise && DailyResponse.new(user: current_user, daily_exercise: @exercise, date: Date.current)
-    @level_suggestion = LevelSuggestion.for(current_user) if current_user.suggests_level_moves? && @response&.submitted?
-    @size_change = SizeForecast.for(current_user, @exercise) if @response&.submitted?
-
+    load_todays_set
+    load_submitted_day_notes
     @trial_status = TrialStatus.for(current_user) if current_user.on_trial?
     @daily_kind_pickers = DailyKindSwap::Picker.for_day(current_user, exercise: @exercise, response: @response)
 
@@ -25,9 +16,45 @@ class DashboardController < ApplicationController
     end
 
     @regeneration_failed = @exercise.present? && current_user.last_generation_error_date == Date.current
+    settle_missing_set if @exercise.nil?
+  end
 
-    return unless @exercise.nil?
+  # GET /dashboard/status — polled by dashboard/_generating.
+  def status
+    exercise = current_user.daily_exercises.for_date.first
 
+    if exercise&.regenerating?
+      render json: { status: "pending" }
+    elsif exercise
+      render json: { status: "ready" }
+    elsif current_user.last_generation_error_date == Date.current
+      render json: { status: "failed", message: current_user.generation_failure_message(surface: :generation) }
+    else
+      render json: { status: "pending" }
+    end
+  end
+
+  private
+
+  def load_todays_set
+    # Re-read after the move: a second first-load of the day can lose the race and move nothing.
+    @exercise = current_user.daily_exercises.for_date.first
+    if @exercise.nil?
+      current_user.carry_held_set_forward!
+      @exercise = current_user.daily_exercises.for_date.first
+    end
+    @response = @exercise&.daily_response&.tap { |stored| stored.user = current_user } ||
+                @exercise && DailyResponse.new(user: current_user, daily_exercise: @exercise, date: Date.current)
+  end
+
+  def load_submitted_day_notes
+    return unless @response&.submitted?
+
+    @level_suggestion = LevelSuggestion.for(current_user) if current_user.suggests_level_moves?
+    @size_change = SizeForecast.for(current_user, @exercise)
+  end
+
+  def settle_missing_set
     if current_user.trial_ended?
       @trial_ended = true
       return
@@ -47,21 +74,6 @@ class DashboardController < ApplicationController
     else
       GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
       @generating = true
-    end
-  end
-
-  # GET /dashboard/status — polled by dashboard/_generating.
-  def status
-    exercise = current_user.daily_exercises.for_date.first
-
-    if exercise&.regenerating?
-      render json: { status: "pending" }
-    elsif exercise
-      render json: { status: "ready" }
-    elsif current_user.last_generation_error_date == Date.current
-      render json: { status: "failed", message: current_user.generation_failure_message(surface: :generation) }
-    else
-      render json: { status: "pending" }
     end
   end
 end

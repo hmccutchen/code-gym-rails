@@ -83,7 +83,7 @@ class ConceptMastery < ApplicationRecord
   end
   private_class_method :skipped_check_scopes
 
-  def self.evaluate_concept!(user, concept, bucket, response, sections) # rubocop:disable Metrics/MethodLength
+  def self.evaluate_concept!(user, concept, bucket, response, sections)
     ai_ratings = sections.map { |s| response.ai_rating_for(s) }
     return if ai_ratings.any?(&:nil?)
 
@@ -98,10 +98,25 @@ class ConceptMastery < ApplicationRecord
     improving = prev.present? && AI_RATING_RANK.fetch(rep_ai, -1) > AI_RATING_RANK.fetch(prev, -1)
 
     if mastered
-      cm.assign_attributes(tier: :standard, streak: 0, cooldown_remaining: 0)
-      cm.clear_drill
-      cm.assign_attributes(**retention_schedule_for(cm, response.date))
-    elsif improving || prev.blank?
+      record_mastered(cm, response.date)
+    else
+      record_unmastered(cm, streak_resets: improving || prev.blank?)
+    end
+
+    cm.last_rating = rep_ai
+    cm.save!
+  end
+
+  def self.record_mastered(cm, on_date)
+    cm.assign_attributes(tier: :standard, streak: 0, cooldown_remaining: 0)
+    cm.clear_drill
+    cm.assign_attributes(**retention_schedule_for(cm, on_date))
+  end
+  private_class_method :record_mastered
+
+  def self.record_unmastered(cm, streak_resets:)
+    cm.assign_attributes(next_retention_check_on: nil, retention_interval_days: nil)
+    if streak_resets
       cm.streak = 0
     else
       cm.streak += 1
@@ -111,14 +126,8 @@ class ConceptMastery < ApplicationRecord
         cm.assign_attributes(tier: :paused, streak: 0, cooldown_remaining: 2)
       end
     end
-
-    unless mastered
-      cm.assign_attributes(next_retention_check_on: nil, retention_interval_days: nil)
-    end
-
-    cm.last_rating = rep_ai
-    cm.save!
   end
+  private_class_method :record_unmastered
 
   # Grow only when the check was due on the work's date; count the next check forward from today, not that date.
   def self.retention_schedule_for(cm, on_date)
