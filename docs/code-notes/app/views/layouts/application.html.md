@@ -49,14 +49,6 @@ of a page, and the grey flash on tap. They are scoped to the installed app
 rather than applied everywhere, so a Safari tab keeps its pull-to-refresh and
 its tap feedback.
 
-The nav name editor goes with them, for space rather than for feel: the
-installed app has no browser chrome above the nav, so the row is at its
-tightest exactly where the brand and the links matter most. The whole
-`.name-editor` is hidden, not just its input, because the status readout it
-flashes has nothing to report once its field is gone. This is the only way to
-rename yourself, so the installed app has no way to rename. That is a
-deliberate trade, and renaming is unchanged in a browser tab.
-
 On a phone-width installed app the destinations move to a bottom tab bar
 (`shared/_tab_bar`), the layout every native iOS and Android app uses, and the
 collapsed menu and its button are hidden, so there is one way to navigate.
@@ -71,10 +63,8 @@ preview, while answers, code and prose stay selectable.
 This media query is the app's one standalone-mode test, and a second mechanism
 could disagree with it. The pull-to-refresh script reads its answer from
 whether `.pull-refresh` is displayed for the same reason; `body` outranks that
-element's hidden base rule further down, as `.nav-links` does here. The name
-editor is selected through `.nav-links` to outrank `nav .name-editor`, which
-sets a display of its own further down the sheet: a media query adds no
-specificity, so the later rule would otherwise win.
+element's hidden base rule further down: a media query adds no specificity, so
+the later rule would otherwise win.
 
 ## Focus ring for fields and sliders
 
@@ -181,12 +171,9 @@ one place. From 900px `desktop.css` replaces the cap with the wide page's
 
 ## `nav .brand`
 
-The brand refuses to shrink or wrap. Squeezed against the name editor in a
-wide browser tab, it otherwise broke into three lines (the bolt, then "Code",
-then "Gym"). The name editor absorbs the squeeze instead: a truncated name
-still reads and still edits, while a stacked wordmark reads as broken.
-`min-width: 0` all the way down is what lets it, since a flex item will not
-shrink below its content otherwise.
+The brand refuses to shrink or wrap. Squeezed against the nav's name field
+(removed in #681), it once broke into three lines (the bolt, then "Code",
+then "Gym"), and a stacked wordmark reads as broken.
 
 ## `nav .brand:hover`
 
@@ -224,8 +211,8 @@ hidden from screen readers.
 
 ## `@container (max-width: 42em)`
 
-Below this width the row cannot hold the brand, the name field and the six
-destinations at once, so the destinations fold behind the button and the
+Below this width the row cannot hold the brand and the six destinations at
+once, so the destinations fold behind the button and the
 brand stays on one line. `nav .inner` is the query container, so the width
 is measured inside its padding, in em against its own text, and a larger
 text size moves the fold out with it. Until #612 the query measured `nav` at
@@ -234,9 +221,8 @@ same window width wherever the row isn't capped: 720px at the default size.
 It was 37.5em on `nav` until Settings joined the row, which overflowed it by
 22px at the default text size, and 40em until Today joined it (#615). The
 links themselves need about 38em at the default size and 37.6em at 112%
-(measured with the fold switched off), so the spare room goes to the name
-field, which shrinks to its padding just above the fold; the user's name
-doesn't change where it falls. The tab bar lists the
+(measured with the fold switched off). The row held a name field too until
+#681 removed it, and the fold stayed where it was. The tab bar lists the
 same destinations, Today included, from the same `nav_destinations`.
 
 ## `nav .nav-toggle`
@@ -253,11 +239,6 @@ that element is the flex item, so it shrinks and the mark follows it through
 `max-width`.
 
 ## `nav .nav-links` inside the container query
-
-Only `.nav-links` itself ever carries a display in this block, never a child.
-The standalone block hides the name editor through
-`nav .nav-links .name-editor`, and any rule of higher specificity in this
-block would put it back in the installed app.
 
 ## `.btn`
 
@@ -523,7 +504,7 @@ still wins the guide's spacing.
 
 Every behavior this layout used to carry as an inline script is now a
 Stimulus controller, mounted by a `data-controller` attribute: `nav-menu`,
-`name-editor`, `time-zone` and `loading-form`, plus `glossary code-lines
+`time-zone` and `loading-form`, plus `glossary code-lines
 mermaid` on `<body>`. Each controller's reasoning lives in its own note under
 `docs/code-notes/app/javascript/controllers/`, so it is not restated here.
 The layout has no `yield :page_scripts` slot any more, since no view has a

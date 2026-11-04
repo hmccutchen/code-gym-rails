@@ -14,8 +14,8 @@ page script reaching either global in that window gets a `ReferenceError`.
 The dashboard was where that cost the most, before its submit handler moved
 into `answer_form_controller`: the inline handler set the form `inert` before
 awaiting `CodeGymRequest.send`, so the throw stranded the day with nothing
-saved. Once the layout's name editor moved into `name_editor_controller`,
-no inline script reached the globals any more.
+saved. Once the layout's name editor moved into a controller (since removed,
+#681), no inline script reached the globals any more.
 
 This file restores the old guarantee in one place. It is served by Propshaft
 and included with `javascript_include_tag` immediately before the importmap
@@ -116,12 +116,10 @@ compared with its `defaultValue` and a checkbox or radio with its
 states and the group lock before saving, since none of that ran while the
 modules were loading.
 
-`comparison_answer_controller` and `name_editor_controller` follow the same
-rule. The name field is the one that showed the race is not confined to a
-stalled asset: its controller used to read `value` on connect, so a name typed
-and blurred in the ordinary load gap was captured as the already-saved value
-and never sent. Reading `defaultValue` instead makes the typed name a
-difference the controller saves.
+`comparison_answer_controller` follows the same rule. The nav's old name
+field, removed in #681, showed the race is not confined to a stalled asset:
+its controller read `value` on connect, so a name typed and blurred in the
+ordinary load gap was captured as the already-saved value and never sent.
 
 A controller with no such check leaves its field unsaved until the user touches
 it again, which is the pre-#357 behaviour for every control that had no inline

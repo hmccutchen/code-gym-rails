@@ -5,10 +5,7 @@ Account's styles: its phone rules, then its desktop rules in one
 with the page's phone rules. The layout links it on Account only, through
 `page_stylesheet` (`docs/decisions/page-stylesheets.md`).
 
-The page's own rules come first, the Name card's among them: it holds the
-shared `shared/_name_editor` partial the nav also renders, widened to the card
-and given a visible border, since the nav hides its own field where the row
-is too tight (#681). Then come the rules of the partials in the order they
+The page's own rules come first, then those of the partials in the order they
 render: `accounts/_push_reminders`, `accounts/_authenticator` and
 `accounts/_api_usage`. Each partial renders on Account only.
 
@@ -20,7 +17,6 @@ render: `accounts/_push_reminders`, `accounts/_authenticator` and
 - The title and the identity card (`.account-id-card`, a class rather than a
   position, so a card added above it can't take its place) span the row.
 - The other cards pair up in page order, and stretch, so each pair shares a
-  height. With push reminders there are seven such cards, so the Danger zone
-  sits alone at half width. Without them the Reminders card is absent, the
-  pairs reflow, and every card has a partner.
+  height. Without push reminders the Reminders card is absent, the pairs
+  reflow, and the Danger zone sits alone at half width.
 - Below 900px nothing changes: a centered 480px column from 600px.

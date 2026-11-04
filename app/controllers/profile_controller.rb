@@ -38,7 +38,7 @@ class ProfileController < ApplicationController
   def rendered_exclusions = ExerciseSection.rotatable(daily: DailyKinds.for(current_user)).map(&:key)
 
   def saved_body
-    body = { name: current_user.name, time_zone: current_user.time_zone,
+    body = { time_zone: current_user.time_zone,
              daily_section_count: current_user.daily_section_count }
     body.merge!(daily_kinds: DailyKinds.for(current_user).map(&:key), rotates: DailyKinds.rotates?(current_user)) if daily_sections_update?
     return body unless preference_update? || track_update?

@@ -23,7 +23,7 @@ RSpec.describe "PATCH /profile skill_level", type: :request do
     patch_profile(skill_level: "senior")
 
     body = response.parsed_body
-    expect(body).to include("name" => "Dev", "time_zone" => "UTC", "daily_section_count" => nil, "kept_own_level" => "")
+    expect(body).to include("time_zone" => "UTC", "daily_section_count" => nil, "kept_own_level" => "")
     expect(body["kind_rungs"]).to eq(user.reload.kind_rungs)
     expect(body["preferences"]).to include("section_kind_levels" => {}, "section_kind_preferences_version" => 0)
   end
@@ -36,7 +36,7 @@ RSpec.describe "PATCH /profile skill_level", type: :request do
     it "refuses #{value.inspect} without saving anything else in the request" do
       original = user.reload.attributes
 
-      patch_profile(skill_level: value, name: "Not saved")
+      patch_profile(skill_level: value, time_zone: "America/Chicago")
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body).to eq("status" => "error", "error" => "Skill level must be one of #{User::SKILL_LEVELS.join(', ')}")

@@ -40,7 +40,6 @@ class ProfileUpdate
     return "Locked section kinds must be a list of strings" unless list_of_strings?(:locked_section_kinds)
     return "Display preferences must use the listed options" unless object?(:display_preferences)
     return full_rule(:skill_level, User::SKILL_LEVEL_RULE) unless text_or_null?(:skill_level)
-    return "Name must be text" unless text_or_null?(:name)
     return "Time zone must be text" unless text_or_null?(:time_zone)
     return "Change the track and the exercise mix in separate saves." if mixed_track_save?
     return "Level suggestions must be true or false" unless boolean?(:level_suggestions)
@@ -162,11 +161,10 @@ class ProfileUpdate
   def shown_moves = shown_steps.to_a.to_h { |step| [ step.kind, step.to ] }
 
   def profile_attributes
-    permitted = @user_params.permit(:name, :time_zone, :daily_section_count, :skill_level, :level_suggestions,
+    permitted = @user_params.permit(:time_zone, :daily_section_count, :skill_level, :level_suggestions,
                                     section_kind_weights: {}, excluded_section_kinds: [],
                                     section_kind_levels: {}, locked_section_kinds: [],
                                     daily_section_kinds: [], display_preferences: {})
-    permitted[:name] = permitted[:name].to_s.strip if permitted.key?(:name)
     permitted[:time_zone] = permitted[:time_zone].to_s.strip.presence if permitted.key?(:time_zone)
     permitted[:daily_section_count] = nil if permitted[:daily_section_count] == User::AUTOMATIC_SECTION_COUNT
     permitted[:daily_section_kinds] = DailyKinds.stored(permitted[:daily_section_kinds]) if permitted.key?(:daily_section_kinds)

@@ -91,23 +91,6 @@ RSpec.describe "PWA", type: :request do
     end
   end
 
-  describe "the name editor in standalone mode" do
-    let(:standalone_block) do
-      Rails.root.join("app/views/layouts/application.html.erb").read[
-        /@media \(display-mode: standalone\) \{(.*?)\n    \}/m, 1
-      ]
-    end
-
-    it "hides it from inside the app's one standalone-mode media query" do
-      expect(standalone_block).to include("name-editor { display: none; }")
-    end
-
-    # A media query adds no specificity, so the hide needs two class selectors to beat the later base rule.
-    it "outranks the base rule that comes after it" do
-      expect(standalone_block).to include("nav .nav-links .name-editor")
-    end
-  end
-
   describe "the bottom tab bar" do
     let(:layout) { Rails.root.join("app/views/layouts/application.html.erb").read }
     let(:standalone_block) { layout[/@media \(display-mode: standalone\) \{(.*?)\n    \}/m, 1] }

@@ -5,32 +5,20 @@ RSpec.describe "Profile", type: :request do
 
   describe "PATCH /profile" do
     it "requires login" do
-      patch profile_path, params: { user: { name: "New" } }
+      patch profile_path, params: { user: { time_zone: "UTC" } }
       expect(response).to redirect_to(login_path)
     end
 
-    it "updates the name and returns it as JSON" do
-      login_as(user)
-
-      patch profile_path,
-            params: { user: { name: "  Renamed  " } }.to_json,
-            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
-
-      expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)).to eq("name" => "Renamed", "time_zone" => "UTC", "daily_section_count" => nil)
-      expect(user.reload.name).to eq("Renamed")
-    end
-
-    it "rejects a blank name without changing the record" do
+    it "ignores a posted name and leaves it out of the reply" do
       login_as(user)
       original = user.name
 
       patch profile_path,
-            params: { user: { name: "   " } }.to_json,
+            params: { user: { name: "Renamed" } }.to_json,
             headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
-      expect(response).to have_http_status(:unprocessable_content)
-      expect(JSON.parse(response.body)).to include("status" => "error", "error" => be_present)
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)).to eq("time_zone" => "UTC", "daily_section_count" => nil)
       expect(user.reload.name).to eq(original)
     end
 
@@ -195,9 +183,9 @@ RSpec.describe "Profile", type: :request do
       it "leaves the body untouched for a caller that changes no preferences" do
         login_as(user)
 
-        patch_profile(name: "Renamed")
+        patch_profile(time_zone: "UTC")
 
-        expect(response.parsed_body.keys).to contain_exactly("name", "time_zone", "daily_section_count")
+        expect(response.parsed_body.keys).to contain_exactly("time_zone", "daily_section_count")
       end
 
       it "refuses a lock save from a tab that missed another tab's weight save" do
@@ -573,7 +561,7 @@ RSpec.describe "Profile", type: :request do
       user.update!(display_preferences: { "font" => "atkinson" })
 
       patch profile_path,
-            params: { user: { name: "Renamed" } }.to_json,
+            params: { user: { time_zone: "UTC" } }.to_json,
             headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(user.reload.display_preferences).to eq("font" => "atkinson")

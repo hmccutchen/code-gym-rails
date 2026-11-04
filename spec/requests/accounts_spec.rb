@@ -239,13 +239,13 @@ RSpec.describe "Accounts", type: :request do
       Nokogiri::HTML(response.body).css("main .phone-page > .card").map { |card| card.at_css("h2")&.text&.strip }
     end
 
-    it "orders the cards identity, name, practice, reminders, security, usage, session, danger" do
+    it "orders the cards identity, practice, reminders, security, usage, session, danger" do
       with_push_credentials do
         login_as(create_user_with_key(email: "dev@example.com", name: "Dev"))
 
         get account_path
 
-        expect(card_headings).to eq([ nil, "Name", "Daily practice", "Reminders", "Authenticator app", "AI usage", "Session", "Danger zone" ])
+        expect(card_headings).to eq([ nil, "Daily practice", "Reminders", "Authenticator app", "AI usage", "Session", "Danger zone" ])
       end
     end
 
@@ -255,7 +255,7 @@ RSpec.describe "Accounts", type: :request do
 
         get account_path
 
-        expect(card_headings).to eq([ nil, "Name", "Daily practice", "Authenticator app", "AI usage", "Session", "Danger zone" ])
+        expect(card_headings).to eq([ nil, "Daily practice", "Authenticator app", "AI usage", "Session", "Danger zone" ])
       end
     end
 

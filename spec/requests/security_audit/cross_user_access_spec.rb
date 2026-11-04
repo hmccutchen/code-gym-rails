@@ -146,7 +146,7 @@ RSpec.describe "Cross-user access", type: :request do
 
       expect(response).to have_http_status(:ok)
       intruder.reload
-      expect(intruder.name).to eq("Renamed")
+      expect(intruder.name).not_to eq("Renamed")
       expect(intruder.email).to eq("intruder@example.com")
       expect(intruder.provider).to eq("anthropic")
       expect(intruder.api_keys).to eq("anthropic" => "sk-ant-test-key")

@@ -96,9 +96,8 @@ read it before changing that area.
   sheet, and none on Learn sets `display` on an element the filter hides.
   A page's targets stay 44px at every width, apart from a link inside a
   sentence, with no `(pointer: fine)`
-  relaxation (`nav_link_targets_spec` holds the top nav's links to it, and
-  `nav_name_field_target_spec` its name field, which hides from the row
-  rather than shrink under 5rem; the Account page's Name card edits it then).
+  relaxation (`nav_link_targets_spec` holds the top nav's links to it). The
+  nav has no name field and no page shows the user's name (#681).
 - **Push reminders** (`docs/decisions/push-reminders.md`): Optional weekday
   ready and afternoon nudge notifications. Intent (`User#reminder_level`) and
   transport (`PushSubscription`) are separate: an endpoint can die without

@@ -81,20 +81,18 @@ RSpec.describe "Security hardening targets", type: :request do
       expect(context).to include("[/#{UserText::TAG}]")
     end
 
-    # Nothing else asserts that the tag rule travels with the tagged name in the generation prompt.
-    it "states the rule in the generation system prompt, which carries the tagged name (finding A3)" do
+    # Nothing else asserts that the generation system prompt keeps the tag rule.
+    it "states the rule in the generation system prompt (finding A3)" do
       expect(FakeService.new(user).send(:build_system_prompt, "ruby_rails"))
         .to include(UserText::PROMPT_RULE)
     end
 
-    # Nothing backfills names stored before the cap, so the prompt read is the only bound on them.
-    it "caps a name stored before the cap shipped when the generation prompt reads it (finding A1)" do
+    it "leaves a stored name, however long, out of the generation prompt (finding A1)" do
       user.update_column(:name, "N" * 5_000)
 
       prompt = render_generation_prompt(user.reload, "ruby_rails")
 
-      expect(prompt).to include("N" * UserText::MAX_NAME_LENGTH)
-      expect(prompt).not_to include("N" * (UserText::MAX_NAME_LENGTH + 1))
+      expect(prompt).not_to include("N" * 20)
     end
 
     it "caps a follow-up turn stored before the cap shipped when the thread is replayed (finding A1)" do
