@@ -53,19 +53,19 @@ RSpec.describe ConceptReferencePrompt do
   describe "the data-modeling concepts" do
     let(:schema_note) { ConceptReferencePrompt::DATA_MODELING_NOTE }
 
-    def reframe(concept) = described_class.reframe(concept: concept, coach: LanguagePrompts.for("javascript")[:coach],
-                                                   already_read: already_read, prior_alternates: [])[:prompt]
+    def reframe(concept, language) = described_class.reframe(concept: concept, coach: LanguagePrompts.for(language)[:coach],
+                                                             already_read: already_read, prior_alternates: [])[:prompt]
 
     it "tells the model each one is about a database schema, in every language, so a JavaScript reference can't read unsafe_migration as React's UNSAFE_ methods" do
       ConceptVocabulary::DATA_MODELING_CONCEPTS.product(%w[ruby_rails javascript]).each do |concept, language|
         expect(reference_prompt(concept, language)).to include(schema_note), "#{concept} in #{language}"
-        expect(reframe(concept)).to include(schema_note), "#{concept} reframe"
+        expect(reframe(concept, language)).to include(schema_note), "#{concept} reframe in #{language}"
       end
     end
 
     it "leaves every other concept's prompt without the note" do
       expect(reference_prompt("state_lifting", "javascript")).not_to include(schema_note)
-      expect(reframe("n_plus_one")).not_to include(schema_note)
+      expect(reframe("n_plus_one", "ruby_rails")).not_to include(schema_note)
     end
   end
 
