@@ -80,13 +80,20 @@ RSpec.describe "Conventions held over the repository's own files" do
     expect(undocumented).to be_empty, "tables with no row in .claude/rules/models.md: #{undocumented.join(', ')}"
   end
 
-  def entry_tokens(text)
-    text.lines.select { |line| line.start_with?("- `") }.flat_map { |line| line.split(" — ", 2).first.scan(/`([^`\s]+)`/).flatten }.to_set
+  def rooted?(token) = REFERENCE_ROOTS.any? { |root| token.start_with?("#{root}/") }
+
+  def entry_paths(text)
+    text.lines.select { |line| line.start_with?("- `") }.flat_map { |line| resolved_paths(line.split(" — ", 2).first.scan(/`([^`\s]+)`/).flatten) }.to_set
   end
 
-  def file_map_tokens = @file_map_tokens ||= entry_tokens(File.read(Rails.root.join("docs/file-map.md")))
+  def resolved_paths(tokens)
+    folder = tokens.find { |token| rooted?(token) }&.then { |token| File.dirname(token) }
+    tokens.map { |token| rooted?(token) || folder.nil? || token.end_with?("/") ? token : File.join(folder, token) }
+  end
 
-  def mapped?(path, tokens = file_map_tokens) = tokens.any? { |token| path == token || path.end_with?("/#{token}") }
+  def file_map_paths = @file_map_paths ||= entry_paths(File.read(Rails.root.join("docs/file-map.md")))
+
+  def mapped?(path, paths = file_map_paths) = paths.include?(path)
 
   def mappable_files
     tracked = `git -C #{Rails.root} ls-files app lib bin script config`.split("\n")
@@ -99,15 +106,25 @@ RSpec.describe "Conventions held over the repository's own files" do
     expect(unlisted).to be_empty, "files with no entry in docs/file-map.md:\n#{unlisted.join("\n")}"
   end
 
-  it "takes a file's tokens from the file list that opens an entry, not from a name its description mentions" do
-    map = "- `app/javascript/controllers/application.js` — starts Stimulus; `index.js` loads the rest.\n- `a.rb` (+ `b/c.rb`) — grouped.\n"
-    tokens = entry_tokens(map)
+  it "takes a file's paths from the file list that opens an entry, not from a name its description mentions" do
+    map = "- `app/javascript/controllers/application.js` — starts Stimulus; `index.js` loads the rest.\n"
 
-    expect(mapped?("app/javascript/controllers/index.js", tokens)).to be(false)
-    expect(mapped?("app/x/b/c.rb", tokens)).to be(true)
+    expect(mapped?("app/javascript/controllers/index.js", entry_paths(map))).to be(false)
+    expect(mapped?("app/javascript/controllers/application.js", entry_paths(map))).to be(true)
   end
 
-  it "reads a file as listed by its full path or by its path below a shared folder, and an unknown file as unlisted" do
+  it "reads a short name in a grouped entry below the folder of the entry's first full path, and no other folder" do
+    map = "- `app/models/house_keys.rb` / `trial_mode.rb` — keys.\n- `app/models/a/b.rb` (+ `b/c.rb`, `Archspec.rb`) — grouped.\n"
+    paths = entry_paths(map)
+
+    expect(mapped?("app/models/trial_mode.rb", paths)).to be(true)
+    expect(mapped?("app/services/trial_mode.rb", paths)).to be(false)
+    expect(mapped?("app/models/a/b/c.rb", paths)).to be(true)
+    expect(mapped?("app/models/b/c.rb", paths)).to be(false)
+    expect(mapped?("lib/x/b/c.rb", paths)).to be(false)
+  end
+
+  it "reads a file as listed by its full path and an unknown file as unlisted" do
     expect(mapped?("app/models/coverage_exception/history.rb")).to be(true)
     expect(mapped?("app/models/definitely_not_a_file_xyz.rb")).to be(false)
   end
