@@ -106,6 +106,12 @@ RSpec.describe "Conventions held over the repository's own files" do
     expect(unlisted).to be_empty, "files with no entry in docs/file-map.md:\n#{unlisted.join("\n")}"
   end
 
+  it "names only files that exist in every entry's file list, reading folders as written" do
+    missing = file_map_paths.reject { |path| path.end_with?("/") || Rails.root.join(path).exist? }
+
+    expect(missing).to be_empty, "docs/file-map.md names files that do not exist:\n#{missing.sort.join("\n")}"
+  end
+
   it "takes a file's paths from the file list that opens an entry, not from a name its description mentions" do
     map = "- `app/javascript/controllers/application.js` — starts Stimulus; `index.js` loads the rest.\n"
 
