@@ -26,7 +26,7 @@ class DailyPlan
 
   UNJUDGED_CODE_REVIEW_MODE_WEIGHTS = CODE_REVIEW_MODE_WEIGHTS.except(ExerciseSection::CodeReview::BugHunt::MODE).freeze
 
-  CODE_REVIEW_FILE_WEIGHTS = { single: 1.0, multi: 0.0 }.freeze
+  CODE_REVIEW_FILE_WEIGHTS = { single: 0.75, multi: 0.25 }.freeze
 
   SCENARIO_FLAVOR_WEIGHTS = { everyday: 0.5, general: 0.5 }.freeze
 
@@ -57,7 +57,7 @@ class DailyPlan
                                                daily, rotation, tracks, user, language, due: due, hosts_for: hosts_for)
 
     source = code_review_source_for(user, language, code_review_mode)
-    single = source || !ExerciseSection::CodeReview.multi_file_mode?(code_review_mode)
+    single = source || !judged || !ExerciseSection::CodeReview.multi_file_mode?(code_review_mode)
 
     Result.new(daily_kinds: daily, rotation: rotation, **tracks, coverage: coverage, size: size,
                code_review_mode: code_review_mode, code_review_source: source,

@@ -30,7 +30,7 @@ RSpec.describe KeySheetExport do
   end
 
   it "shows a multi-file code review's files, the code its key quotes" do
-    section = CodeReviewMultiFile::SECTION
+    section = FakeService::MULTI_FILE_CODE_REVIEW
 
     expect(described_class.entry("code_review", "ruby_rails", section)["shown"])
       .to eq(section.slice("file_1_code", "file_2_code"))

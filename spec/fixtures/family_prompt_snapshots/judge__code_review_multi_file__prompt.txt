@@ -1,11 +1,13 @@
 Section kind: code_review
-The learner's task for this kind: Find the one planted issue in the snippet and say how to fix it.
+The learner's task for this kind: Find the one planted problem in how the files fit together and say how to fix it.
 This is a discovery task: wording that names where the issue is defeats it.
 Tagged concept: n_plus_one
 Pitched at: senior
 Level meaning: the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
 Prose fields you may rewrite: scenario, question, teaching_note
 Every other field is the artifact and must not change.
+
+This section shows several files as they stand after one change, with the lines the change added or edited marked, and plants one problem in how they fit together. Solve it before judging: find what one file assumes that another breaks, and the fix. Reject it as reasoning_failure when the problem shows in one file alone, without reading another, and as scope_mismatch when the problem is an exploit, such as an injection or mass assignment, rather than a broken contract between files. Never change a path, a file's code or its changed lines.
 
 The section as delivered:
 {

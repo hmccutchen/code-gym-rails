@@ -27,17 +27,21 @@ class ExerciseSection::CodeReview < ExerciseSection
   HIDDEN_KEY_LINE = PlantedKey.hidden_key_line(fields: %w[question scenario teaching_note diagram], before: "reads the snippet",
                                                 quoted: "the code").freeze
 
-  ANSWER_KEY_SCHEMA = <<~SCHEMA.chomp
-    "answer_key": {
-          "issue":          "string — a few sentences: what is wrong and where, quoting the code in backticks",
-          "why_it_matters": "string — a few sentences: what goes wrong because of it in this code",
-          "fix":            "string — a few sentences: a fix that works as written"
-        }
-  SCHEMA
+  KEY_FIELD_SCHEMA = [
+    %("issue":          "string — a few sentences: what is wrong and where, quoting the code in backticks"),
+    %("why_it_matters": "string — a few sentences: what goes wrong because of it in this code"),
+    %("fix":            "string — a few sentences: a fix that works as written")
+  ].freeze
+
+  def self.answer_key_schema(*fields) = %("answer_key": {\n#{(KEY_FIELD_SCHEMA + fields).map { |line| "      #{line}" }.join(",\n")}\n    })
+
+  ANSWER_KEY_SCHEMA = answer_key_schema.freeze
 
   def self.file_range(files:, rung:)
     files == :multi ? MULTI_FILE_RANGES.fetch(rung, MULTI_FILE_RANGES.fetch("junior")) : 1..1
   end
+
+  def self.multi_file_range?(file_range) = file_range.max > 1
 
   def self.day_file_range(plan:, difficulty:, skill_level:)
     file_range(files: plan.code_review_files, rung: difficulty.rung_for(self, skill_level: skill_level))
@@ -49,7 +53,15 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.normalize_planted_key(section)
     key = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
-    key && bug_hunt?(section) ? key.merge(BugHunt.optional_key_fields(section[PlantedKey::FIELD])) : key
+    return key.merge(BugHunt.optional_key_fields(section[PlantedKey::FIELD])) if key && bug_hunt?(section)
+    return key unless key && files(section).any?
+
+    key.merge(MultiFile.key_lists(section[PlantedKey::FIELD]))
+  end
+
+  def self.unusable_key_reason(section, key, language:)
+    shown = files(section)
+    MultiFile.unusable_key_reason(shown, key, language: language) if shown.any?
   end
 
   def self.refusal_codes = %w[snippet_missing snippet_too_long file_count_wrong file_incomplete file_too_long path_invalid
@@ -84,7 +96,7 @@ class ExerciseSection::CodeReview < ExerciseSection
     return reject_bug_hunt!(section) if BugHunt.mode?(mode)
 
     section.delete(BugHunt::PURPOSE_FIELD)
-    if file_range.max == 1
+    unless multi_file_range?(file_range)
       reject_unusable_snippet!(section)
       return drop_file_fields!(section)
     end
@@ -194,6 +206,12 @@ class ExerciseSection::CodeReview < ExerciseSection
     "Find the one planted issue in the snippet and say how to fix it."
   end
 
+  def self.judge_task_for(section) = files(section).any? ? MultiFile::JUDGE_TASK : super
+
+  def self.judge_guidance_for(section) = files(section).any? ? MultiFile::JUDGE_GUIDANCE : super
+
+  def self.ships_unjudged?(section) = files(section).none? && super
+
   def self.discovery?
     true
   end
@@ -212,7 +230,7 @@ class ExerciseSection::CodeReview < ExerciseSection
     return BugHunt::Prompt.guidance(gotcha: gotcha, rung: rung, vocabulary: vocabulary) if BugHunt.mode?(mode)
 
     vocabulary_line = "- Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}"
-    if file_range.max > 1
+    if multi_file_range?(file_range)
       return MultiFile.guidance(file_range: file_range, label: label, mode: mode, artifact: artifact, test_framework: test_framework,
                                 rung: rung, code_style: code_style, vocabulary: vocabulary,
                                 shared_lines: [ vocabulary_line, MultiFile::HIDDEN_KEY_LINE ])
@@ -236,7 +254,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   # Keep the snippet's language out of here: the instruction line above is its one authoritative statement.
   def self.schema_fragment(label:, file_range: 1..1, mode: nil, **)
     return BugHunt::Prompt.schema_fragment if BugHunt.mode?(mode)
-    return MultiFile.schema_fragment(file_range: file_range, answer_key: ANSWER_KEY_SCHEMA) if file_range.max > 1
+    return MultiFile.schema_fragment(file_range: file_range, answer_key: MultiFile::ANSWER_KEY_SCHEMA) if multi_file_range?(file_range)
 
     <<~SCHEMA.chomp
       "code_review": {
@@ -256,6 +274,7 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.grading_note(section:, answer:)
     return BugHunt::Prompt::GRADING_NOTE if bug_hunt?(section)
+    return MultiFile::GRADING_NOTE if files(section).any?
 
     "Main point: the one planted issue — the defect in the snippet, the smell in the test file, or the flaw in the migration.\n" \
     "Essential pieces: why it is a problem in this code, and a fix that would work as written."

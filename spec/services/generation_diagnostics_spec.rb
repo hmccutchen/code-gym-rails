@@ -38,7 +38,7 @@ RSpec.describe GenerationDiagnostics do
       diagnostics.set_size(size)
       diagnostics.unusable_sections([ Struct.new(:key, :reason).new("pattern", "too short") ])
       diagnostics.key_notes([ ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "quote_missing", quotes: nil) ],
-                            attempt: "draft", code_review_mode: :application_code)
+                            attempt: "draft", code_review_mode: :application_code, code_review_files: 1..1)
       diagnostics.finished("ruby_rails", draft, problem_set, dropped_concepts: { "challenge" => "caching" })
     end
 
@@ -51,10 +51,20 @@ RSpec.describe GenerationDiagnostics do
     notes = [ ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "ok", quotes: nil),
               ProblemSetIngest::KeyNote.new(key: "plan_review", language: "javascript", outcome: "missing", quotes: nil) ]
 
-    lines = logged_lines { described_class.new(user).key_notes(notes, attempt: "draft", code_review_mode: :test_file) }
+    lines = logged_lines { described_class.new(user).key_notes(notes, attempt: "draft", code_review_mode: :test_file, code_review_files: 1..1) }
 
-    expect(lines).to eq([ "[planted_key] answer_key=ok kind=code_review language=ruby_rails attempt=draft code_review_mode=test_file user=#{user.id}",
-                          "[planted_key] answer_key=missing kind=plan_review language=javascript attempt=draft code_review_mode=test_file user=#{user.id}" ])
+    expect(lines).to eq([ "[planted_key] answer_key=ok kind=code_review language=ruby_rails attempt=draft code_review_mode=test_file " \
+                          "code_review_files=single user=#{user.id}",
+                          "[planted_key] answer_key=missing kind=plan_review language=javascript attempt=draft code_review_mode=test_file " \
+                          "code_review_files=single user=#{user.id}" ])
+  end
+
+  it "marks a day that asked for several files as multi" do
+    note = ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "evidence_unlocated", quotes: nil)
+
+    lines = logged_lines { described_class.new(user).key_notes([ note ], attempt: "draft", code_review_mode: :test_file, code_review_files: 2..3) }
+
+    expect(lines.sole).to include("answer_key=evidence_unlocated", "code_review_files=multi")
   end
 
   it "keeps the judge's pick, the answer key and the solves out of the payload a judged generation logs" do

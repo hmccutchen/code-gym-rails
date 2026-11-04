@@ -8,6 +8,8 @@ module PlantedKey::Kind
 
   def quoted_key_texts(_key) = raise(NotImplementedError, "#{self} must implement .quoted_key_texts")
 
+  def unusable_key_reason(_section, _key, language:) = nil
+
   def quote_tally(section, language:)
     PlantedKey.quote_tally(quoted_key_texts(section[PlantedKey::FIELD]), within: section.values_at(*key_context_fields),
                            scenario: section["scenario"], language: language)
