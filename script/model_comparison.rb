@@ -710,11 +710,14 @@ class ModelComparison
 
   # DailyPlan.for rolls at random on every call, so candidates would otherwise get different requests.
   def with_fixed_plan(plan)
-    original = DailyPlan.method(:for)
+    original_plan     = DailyPlan.method(:for)
+    original_featured = FeaturedConcept.method(:for)
     DailyPlan.define_singleton_method(:for) { |*, **| plan }
+    FeaturedConcept.define_singleton_method(:for) { |*, **| nil }
     yield
   ensure
-    DailyPlan.define_singleton_method(:for, original)
+    DailyPlan.define_singleton_method(:for, original_plan)
+    FeaturedConcept.define_singleton_method(:for, original_featured)
   end
 
   def print_runs(mode, heading, runs)

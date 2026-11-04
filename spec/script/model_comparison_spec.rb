@@ -2,6 +2,8 @@ require "rails_helper"
 require Rails.root.join("script/model_comparison")
 
 RSpec.describe ModelComparison do
+  include MetConceptHelpers
+
   let(:user) { User.create!(email: "compare@example.com") }
   let(:out) { StringIO.new }
   let(:posted) { [] }
@@ -90,6 +92,22 @@ RSpec.describe ModelComparison do
     comparison.generate(user.id)
 
     expect(posted.map { |body| body["messages"] }.uniq.size).to eq(1)
+  end
+
+  it "writes no featured concept row when generating or judging for a user who has a concept to feature" do
+    submit_set_showing(user, "n_plus_one", date: Date.current - 3)
+
+    comparison.generate(user.id)
+    comparison.judge(user.id)
+
+    expect(user.featured_concepts.count).to eq(0)
+    expect(FeaturedConcept.for(user)).to be_present
+  end
+
+  it "leaves FeaturedConcept.for as it found it" do
+    comparison.generate(user.id)
+
+    expect(FeaturedConcept.method(:for).source_location.first).to end_with("app/models/featured_concept.rb")
   end
 
   it "leaves DailyPlan.for as it found it" do

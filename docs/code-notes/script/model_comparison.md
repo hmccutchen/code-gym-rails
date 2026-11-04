@@ -28,6 +28,16 @@ It takes no `user_id`: each fixture carries its own rung and lock, and the fixtu
 
 When the live judge already edited a stored review, the comparison starts from the grader's original prose under `graded_prose`.
 
+## `#with_fixed_plan`
+
+`DailyPlan.for` rolls at random, so the block holds it to one plan and every
+candidate gets the same request. It also holds `FeaturedConcept.for` to `nil`.
+`ExerciseDraft.call` asks for the week's featured concept before it plans,
+and `FeaturedConcept.for` can insert, update or delete the user's weekly row,
+so a comparison run against a real user would otherwise change it. The fixed
+plan carries no featured concept either, so both candidates plan without one.
+Both methods are put back when the block ends, even if it raises.
+
 ## `#judge_concept`
 
 Drafts are planned in the user's own time zone, the way `GenerateDailyExercisesJob` plans them.
