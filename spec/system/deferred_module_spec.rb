@@ -29,8 +29,38 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
 
     page.driver.with_playwright_page do |pw|
       pw.goto(url, waitUntil: "commit")
+      wait_for { pw.evaluate("document.readyState") != "loading" }
       expect(pw.evaluate("document.readyState")).to eq("interactive")
       yield pw
+    end
+  end
+
+  def deliver_html_in_two_parts
+    allow(Rails.application).to receive(:call).and_wrap_original do |original, env|
+      status, headers, body = original.call(env)
+      next [ status, headers, body ] unless stalled[:modules] && headers["content-type"].to_s.include?("text/html")
+
+      html = +""
+      body.each { |chunk| html << chunk }
+      body.close if body.respond_to?(:close)
+      half = html.size / 2
+      parts = Enumerator.new do |part|
+        part << html[0, half]
+        sleep 1
+        part << html[half..]
+      end
+      [ status, headers, parts ]
+    end
+  end
+
+  it "waits for a page that arrives in parts to finish parsing before checking the modules have not run" do
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      deliver_html_in_two_parts
+
+      reload_with_modules_stalled do |pw|
+        expect(pw.evaluate("document.querySelector('html').hasAttribute('data-js-ready')")).to be(false)
+      end
     end
   end
 
