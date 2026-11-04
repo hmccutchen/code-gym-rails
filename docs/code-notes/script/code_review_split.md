@@ -15,7 +15,9 @@ It prints two things, both counts:
   evidence and would blur the single-file figures the owner compares the
   multi-file ones against. The rung is the section's `pitched_at`; a section
   from before rungs were stamped shows as `unrecorded`. A section left
-  unanswered was walked through, not graded, so it counts as `unrated`.
+  unanswered was walked through, not graded, so it counts as `unrated`, and
+  so does a rating outside the rubric, which grading logs as `invalid` but
+  stores as given, so the buckets always add up to the total.
 - **Multi-file key notes by outcome, from a log.** Why a multi-file key was
   dropped is only in the `[planted_key]` line ingest logs; the stored section
   just lacks its key. So `--log` takes a worker log the owner exported, and

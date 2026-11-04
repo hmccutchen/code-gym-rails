@@ -34,6 +34,14 @@ RSpec.describe CodeReviewSplit do
     expect(out.string).not_to include("SECRET", "My answer", user.email, "orders.sum")
   end
 
+  it "counts a rating outside the rubric as unrated, so the buckets add up to the total" do
+    reviewed(single, rating: "excellent")
+
+    described_class.new(out: out).report
+
+    expect(out.string).to include("single mid_level: 1 (beginner 0, developing 0, solid 0, strong 0, unrated 1)")
+  end
+
   it "leaves out a submitted day that has no review yet" do
     exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
                                      problem_set: { "code_review" => single })

@@ -28,7 +28,7 @@ class CodeReviewSplit
       section = response.daily_exercise.problem_set[KIND.key]
       next unless section.is_a?(Hash) && response.ai_review.is_a?(Hash) && response.ai_review.key?(KIND.key)
 
-      [ shape(section), section["pitched_at"].presence || "unrecorded", response.ai_rating_for(KIND.key) || UNRATED ]
+      [ shape(section), section["pitched_at"].presence || "unrecorded", rating(response) ]
     end
   end
 
@@ -36,6 +36,11 @@ class CodeReviewSplit
     return "bug_hunt" if KIND.bug_hunt?(section)
 
     KIND.files(section).any? ? "multi" : "single"
+  end
+
+  def rating(response)
+    rating = response.ai_rating_for(KIND.key)
+    RATINGS.include?(rating) ? rating : UNRATED
   end
 
   def rung_order(rung) = KindDifficulty::LEVELS.index(rung) || KindDifficulty::LEVELS.size
