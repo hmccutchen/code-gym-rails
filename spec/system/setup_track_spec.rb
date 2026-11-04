@@ -529,7 +529,7 @@ RSpec.describe "Changing the track on Setup", type: :system, with_csrf: true do
   end
 
   it "measures the key guide at phone width without hiding content or shrinking type" do
-    fresh = User.create!(email: "keyless-#{SecureRandom.hex(3)}@example.com", name: "Keyless", **chosen_track(true))
+    fresh = User.create!(email: "keyless-#{SecureRandom.hex(3)}@example.com", **chosen_track(true))
     page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: 390, height: 844) }
     visit_as(fresh)
     visit setup_path

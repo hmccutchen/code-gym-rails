@@ -15,7 +15,7 @@ RSpec.describe SeedLevelSuggestionCutoffs do
   end
 
   it "records every kind at its current rung, from its target or else the skill level" do
-    user = User.create!(email: "seed@example.com", name: "Seed", skill_level: "mid_level")
+    user = User.create!(email: "seed@example.com", skill_level: "mid_level")
     user.update_columns(section_kind_levels: { "pattern" => "senior" })
 
     migrate
@@ -27,7 +27,7 @@ RSpec.describe SeedLevelSuggestionCutoffs do
   end
 
   it "keeps a cutoff the account already has" do
-    user = User.create!(email: "kept@example.com", name: "Kept")
+    user = User.create!(email: "kept@example.com")
     earlier = { "level" => "junior", "through" => "2026-10-10" }
     user.update_columns(level_suggestion_cutoffs: { "code_review" => earlier })
 
@@ -39,7 +39,7 @@ RSpec.describe SeedLevelSuggestionCutoffs do
   end
 
   it "records nothing for a kind at principal engineer, which no suggestion leaves" do
-    user = User.create!(email: "principal@example.com", name: "Principal", skill_level: "principal_engineer")
+    user = User.create!(email: "principal@example.com", skill_level: "principal_engineer")
     user.update_columns(section_kind_levels: { "pattern" => "junior" })
 
     migrate
@@ -48,7 +48,7 @@ RSpec.describe SeedLevelSuggestionCutoffs do
   end
 
   it "reads an unknown stored target as no target" do
-    user = User.create!(email: "odd@example.com", name: "Odd", skill_level: "senior")
+    user = User.create!(email: "odd@example.com", skill_level: "senior")
     user.update_columns(section_kind_levels: { "pattern" => "expert" })
 
     migrate
@@ -57,7 +57,7 @@ RSpec.describe SeedLevelSuggestionCutoffs do
   end
 
   it "hides results from before the migration at the seeded rung" do
-    user = User.create!(email: "hidden@example.com", name: "Hidden")
+    user = User.create!(email: "hidden@example.com")
 
     migrate
 

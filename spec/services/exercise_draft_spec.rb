@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe ExerciseDraft do
   include MetConceptHelpers
 
-  let(:user) { User.create!(email: "draft@example.com", name: "Draft", skill_level: "senior") }
+  let(:user) { User.create!(email: "draft@example.com", skill_level: "senior") }
   let(:generated) { [] }
   let(:rendered) { [] }
   let(:prompt) do

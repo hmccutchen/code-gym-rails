@@ -203,7 +203,7 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
   end
 
   it "sends a first-run trial account to the experience question before the trial page" do
-    fresh = User.create!(email: "fresh@example.com", name: "Fresh")
+    fresh = User.create!(email: "fresh@example.com")
     login_as(fresh)
 
     get trial_path

@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Setup's track control", type: :request do
   let(:user) { create_user_with_key }
-  let(:keyless) { User.create!(email: "keyless@example.com", name: "Keyless", **chosen_track(true)) }
+  let(:keyless) { User.create!(email: "keyless@example.com", **chosen_track(true)) }
   let(:page_html) { Nokogiri::HTML(response.body) }
 
   def give_exercise

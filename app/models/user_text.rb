@@ -9,7 +9,6 @@ module UserText
 
   MAX_ANSWER_LENGTH = 12_000
   MAX_QUESTION_LENGTH = 1_000
-  MAX_NAME_LENGTH = 100
 
   def self.normalize(value)
     value.to_s.unicode_normalize(:nfc).gsub(STRIPPED, "")

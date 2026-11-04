@@ -27,7 +27,7 @@ RSpec.describe AddApiKeysToUsers do
   end
 
   def legacy(email, api_key:, provider:)
-    legacy_user.create!(email: email, name: "Legacy", api_key: api_key, provider: provider)
+    legacy_user.create!(email: email, api_key: api_key, provider: provider)
   end
 
   it "moves each stored key under its provider and keeps it encrypted" do

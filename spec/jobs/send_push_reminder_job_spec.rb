@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe SendPushReminderJob, type: :job do
   let(:user) do
-    User.create!(email: "remind@example.com", name: "Remind", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "UTC", reminder_level: :ready)
+    User.create!(email: "remind@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "UTC", reminder_level: :ready)
   end
 
   around { |example| with_push_credentials { example.run } }

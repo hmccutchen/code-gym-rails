@@ -24,7 +24,7 @@ RSpec.describe "Evidence readers ignore a rating stored on an unanswered section
   end
 
   def result_for(written, with_rating:)
-    user = User.create!(email: "evidence-#{SecureRandom.hex(4)}@example.com", name: "E")
+    user = User.create!(email: "evidence-#{SecureRandom.hex(4)}@example.com")
     response = submitted_day(user, written, with_rating: with_rating)
     yield user, response
   end

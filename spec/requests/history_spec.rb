@@ -359,7 +359,7 @@ RSpec.describe "History", type: :request do
     end
 
     it "lists only the current user's submitted responses, newest first" do
-      other = create_user_with_key(email: "other@example.com", name: "Other")
+      other = create_user_with_key(email: "other@example.com")
       old   = create_session_for(user, date: 3.days.ago.to_date, reviewed: true, section_ratings: {}, legacy_rating: "too_hard")
       newer = create_session_for(user, date: 1.day.ago.to_date)
       create_session_for(user, date: Date.current, submitted: false)

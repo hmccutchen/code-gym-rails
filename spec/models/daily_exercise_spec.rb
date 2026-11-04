@@ -2,7 +2,7 @@
 require "rails_helper"
 
 RSpec.describe DailyExercise, type: :model do
-  let(:user) { User.create!(email: "exercise-owner@example.com", name: "Owner") }
+  let(:user) { User.create!(email: "exercise-owner@example.com") }
 
   it "defaults language to ruby_rails" do
     exercise = DailyExercise.create!(user: user, date: Date.current,
@@ -132,7 +132,7 @@ RSpec.describe DailyExercise, type: :model do
 
   describe "#active_section_keys for a row planned with another pair" do
     let(:pair_user) do
-      User.create!(email: "pair-row@example.com", name: "Pair", daily_section_kinds: %w[architecture code_review])
+      User.create!(email: "pair-row@example.com", daily_section_kinds: %w[architecture code_review])
     end
 
     it "keeps the planned pair and its rotated third, in order, after a reload and after the user's pair changes" do
@@ -173,7 +173,7 @@ RSpec.describe DailyExercise, type: :model do
   end
 
   describe "#with_response_locked" do
-    let(:user) { User.create!(email: "locked-#{SecureRandom.hex(3)}@example.com", name: "L") }
+    let(:user) { User.create!(email: "locked-#{SecureRandom.hex(3)}@example.com") }
     let(:exercise) do
       DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
                             problem_set: { "code_review" => { "question" => "q" } })
@@ -215,7 +215,7 @@ RSpec.describe DailyExercise, type: :model do
   end
 
   describe "#regenerating?" do
-    let(:user) { User.create!(email: "regen-model@example.com", name: "Regen") }
+    let(:user) { User.create!(email: "regen-model@example.com") }
 
     def exercise(regenerating_since: nil)
       DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,

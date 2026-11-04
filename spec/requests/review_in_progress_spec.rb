@@ -53,7 +53,7 @@ RSpec.describe "A review still running when the dashboard loads", type: :request
     end
 
     it "does not answer for another user's response" do
-      other = create_user_with_key(email: "other@example.com", name: "Other")
+      other = create_user_with_key(email: "other@example.com")
 
       get review_status_response_path(submitted_response(owner: other))
 

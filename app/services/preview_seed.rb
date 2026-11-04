@@ -33,7 +33,6 @@ class PreviewSeed
   # create_with applies only on create, so an existing account, real or seeded, is returned untouched.
   def find_or_create_user
     User.create_with(
-      name:        "Preview Reviewer",
       skill_level: "senior",
       language:    "ruby_rails",
       provider:    "anthropic",

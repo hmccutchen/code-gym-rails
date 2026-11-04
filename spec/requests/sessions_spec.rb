@@ -16,7 +16,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "queues the email with the account alone, so the plain code is never stored in the queue or printed by the enqueue log" do
-      user = User.create!(email: "known@example.com", name: "Known")
+      user = User.create!(email: "known@example.com")
 
       expect {
         post login_path, params: { email: "known@example.com" }
@@ -39,7 +39,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "reuses the existing user for a known email" do
-      user = User.create!(email: "known@example.com", name: "Known")
+      user = User.create!(email: "known@example.com")
 
       expect {
         perform_enqueued_jobs { post login_path, params: { email: "KNOWN@example.com" } }
@@ -58,10 +58,10 @@ RSpec.describe "Sessions", type: :request do
       expect { post login_path, params: { email: "first@example.com" } }.not_to change(User, :count)
     end
 
-    it "names a new account after the email's local part" do
-      post login_path, params: { email: "new.dev@example.com" }
+    it "creates a new account from the email alone" do
+      expect { post login_path, params: { email: "new.dev@example.com" } }.to change(User, :count).by(1)
 
-      expect(User.find_by(email: "new.dev@example.com").name).to eq("new.dev")
+      expect(User.find_by(email: "new.dev@example.com")).to be_present
     end
 
     it "rejects an invalid email without creating a user" do
@@ -267,7 +267,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "locks out after 5 wrong attempts, invalidating the code" do
-      user = User.create!(email: "dev@example.com", name: "Dev")
+      user = User.create!(email: "dev@example.com")
       perform_enqueued_jobs do
         post login_path, params: { email: "dev@example.com" }
       end
@@ -326,7 +326,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "discards everything written before sign-in, including the CSRF token", :with_csrf do
-      user = User.create!(email: "dev@example.com", name: "Dev")
+      user = User.create!(email: "dev@example.com")
       get login_path
       post login_path, params: { email: user.email, authenticity_token: response.body[/name="authenticity_token" value="([^"]+)"/, 1] }
       follow_redirect!
@@ -354,7 +354,7 @@ RSpec.describe "Sessions", type: :request do
 
     # The rotation discards the session, so return_to must be read before reset_session.
     it "still points the user at the page they were bounced from" do
-      user = User.create!(email: "dev@example.com", name: "Dev")
+      user = User.create!(email: "dev@example.com")
 
       get history_path
       expect(response).to redirect_to(login_path)

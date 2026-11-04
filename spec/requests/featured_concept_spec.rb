@@ -93,7 +93,7 @@ RSpec.describe "Weekly featured concept", type: :request do
 
   it "shows each user the concept from their own work" do
     submit_set_showing(user, "n_plus_one", date: Date.current - 3)
-    other = create_user_with_key(email: "other@example.com", name: "Other")
+    other = create_user_with_key(email: "other@example.com")
     submit_set_showing(other, "memoization", date: Date.current - 3)
 
     login_as(other)

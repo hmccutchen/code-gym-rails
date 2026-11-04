@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe ConceptMastery, type: :model do
-  let(:user) { User.create!(email: "cm@example.com", name: "CM") }
+  let(:user) { User.create!(email: "cm@example.com") }
 
   def review!(concept:, self_rating:, ai_rating:, date: Date.current, section: "code_review")
     exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
@@ -184,7 +184,7 @@ RSpec.describe ConceptMastery, type: :model do
 
   describe ".record_review! — per-section scoping" do
     it "does not evaluate a concept whose section is excluded from sections:" do
-      user = User.create!(email: "scope_test@example.com", name: "ST")
+      user = User.create!(email: "scope_test@example.com")
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
         problem_set: {
@@ -210,7 +210,7 @@ RSpec.describe ConceptMastery, type: :model do
     end
 
     it "does not decrement paused concepts' cooldown when apply_session_countdown is false" do
-      user = User.create!(email: "countdown_false@example.com", name: "CF")
+      user = User.create!(email: "countdown_false@example.com")
       paused = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
@@ -229,7 +229,7 @@ RSpec.describe ConceptMastery, type: :model do
     end
 
     it "decrements paused concepts' cooldown when apply_session_countdown is true" do
-      user = User.create!(email: "countdown_true@example.com", name: "CT")
+      user = User.create!(email: "countdown_true@example.com")
       paused = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
@@ -414,7 +414,7 @@ RSpec.describe ConceptMastery, type: :model do
 end
 
 RSpec.describe ConceptMastery, "drills", type: :model do
-  let(:user) { User.create!(email: "cm-drill@example.com", name: "CM") }
+  let(:user) { User.create!(email: "cm-drill@example.com") }
 
   def review!(concept:, self_rating:, ai_rating:, date:)
     exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",

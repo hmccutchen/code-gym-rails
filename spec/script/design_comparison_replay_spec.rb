@@ -2,8 +2,8 @@ require "rails_helper"
 require Rails.root.join("script/design_comparison_replay")
 
 RSpec.describe DesignComparisonReplay do
-  let(:user) { User.create!(email: "replay@example.com", name: "Replay") }
-  let(:other_user) { User.create!(email: "replay-other@example.com", name: "Other") }
+  let(:user) { User.create!(email: "replay@example.com") }
+  let(:other_user) { User.create!(email: "replay-other@example.com") }
   let(:out) { StringIO.new }
   let(:api_key) { "sk-ant-replay-runner-key" }
   let(:judged) { [] }
@@ -344,7 +344,7 @@ RSpec.describe DesignComparisonReplay do
 end
 
 RSpec.describe DesignComparisonReplay, "billing" do
-  let(:user) { User.create!(email: "replay-billing@example.com", name: "Billing") }
+  let(:user) { User.create!(email: "replay-billing@example.com") }
   let(:seen) { [] }
 
   # Real connection with only the adapter swapped, so the key header is the one the service sets.

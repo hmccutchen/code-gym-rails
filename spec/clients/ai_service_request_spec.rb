@@ -109,7 +109,7 @@ RSpec.describe AiService, "request values" do
   end
 
   describe "the request each caller hands to #call_and_log" do
-    let(:user) { User.create!(email: "requests@example.com", name: "R", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
+    let(:user) { User.create!(email: "requests@example.com", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
     let(:service) { FakeService.new("fake-key") }
     let(:exercise) do
       DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",

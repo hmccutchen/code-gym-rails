@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe RungLedger, ".for" do
-  let(:user) { User.create!(email: "ledger-loading@example.com", name: "Ledger", language: "ruby_rails") }
+  let(:user) { User.create!(email: "ledger-loading@example.com", language: "ruby_rails") }
   let(:design_answer) { ExerciseSection::DesignComparison.encode_answer("a", "The first piece keeps the query out of the loop.") }
   let(:parsons_answer) { "#{ExerciseSection::ParsonsProblem::ANSWER_PREFIX}2,0,1" }
   let(:long_answer) { "Preload the association so the loop reads loaded rows." }

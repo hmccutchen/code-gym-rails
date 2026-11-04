@@ -2,7 +2,7 @@ require "rails_helper"
 require Rails.root.join("script/review_baseline_export")
 
 RSpec.describe ReviewBaselineExport do
-  let(:user) { User.create!(email: "baseline@example.com", name: "Baseline") }
+  let(:user) { User.create!(email: "baseline@example.com") }
   let(:stamp) { ReviewedSectionResults::RUBRIC_VERSION }
   let(:parsons_blocks) { %w[first second third] }
 
@@ -43,7 +43,7 @@ RSpec.describe ReviewBaselineExport do
 
   it "leaves out unsubmitted days and other accounts" do
     reviewed_day(Date.new(2026, 10, 20), { "code_review" => {} }, submitted: false)
-    reviewed_day(Date.new(2026, 10, 20), { "code_review" => {} }, owner: User.create!(email: "other@example.com", name: "Other"))
+    reviewed_day(Date.new(2026, 10, 20), { "code_review" => {} }, owner: User.create!(email: "other@example.com"))
 
     expect(described_class.new(user_id: user.id).call["days"]).to be_empty
   end
@@ -125,7 +125,7 @@ RSpec.describe ReviewBaselineExport do
   end
 
   it "refuses any write inside its read-only transaction" do
-    expect { described_class.read_only { User.create!(email: "write@example.com", name: "Write") } }
+    expect { described_class.read_only { User.create!(email: "write@example.com") } }
       .to raise_error(ActiveRecord::StatementInvalid, /read-only transaction/)
   end
 

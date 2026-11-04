@@ -465,7 +465,7 @@ RSpec.describe "Learn", type: :request do
       end
 
       it "is not offered to a trial account" do
-        login_as(create_trial_user(name: "Trial"))
+        login_as(create_trial_user)
 
         get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
 

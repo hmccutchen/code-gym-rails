@@ -2,7 +2,7 @@ require "rails_helper"
 require Rails.root.join("script/model_comparison")
 
 RSpec.describe ModelComparison do
-  let(:user) { User.create!(email: "compare@example.com", name: "Compare") }
+  let(:user) { User.create!(email: "compare@example.com") }
   let(:out) { StringIO.new }
   let(:posted) { [] }
   let(:judge_replies) { [] }

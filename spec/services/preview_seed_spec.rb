@@ -70,7 +70,7 @@ RSpec.describe PreviewSeed do
     end
 
     it "never overwrites the API key of a real account at the preview address" do
-      real = User.create!(email: "reviewer@example.com", name: "Real Person")
+      real = User.create!(email: "reviewer@example.com")
       real.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-a-real-key" })
       set_target
 
@@ -79,21 +79,20 @@ RSpec.describe PreviewSeed do
       expect(real.reload.api_key).to eq("sk-ant-a-real-key")
     end
 
-    it "never overwrites an existing name, skill level, or language" do
-      real = User.create!(email: "reviewer@example.com", name: "Real Person",
+    it "never overwrites an existing skill level or language" do
+      real = User.create!(email: "reviewer@example.com",
                           skill_level: "principal_engineer", language: "javascript")
       set_target
 
       PreviewSeed.run!
 
       real.reload
-      expect(real.name).to eq("Real Person")
       expect(real.skill_level).to eq("principal_engineer")
       expect(real.language).to eq("javascript")
     end
 
     it "never overwrites an existing provider" do
-      real = User.create!(email: "reviewer@example.com", name: "Real Person")
+      real = User.create!(email: "reviewer@example.com")
       real.update!(provider: "gemini", api_keys: { "gemini" => "AIzaSyReal" })
       set_target
 
@@ -103,7 +102,7 @@ RSpec.describe PreviewSeed do
     end
 
     it "does not touch users other than the named one" do
-      bystander = User.create!(email: "someone-else@example.com", name: "Bystander",
+      bystander = User.create!(email: "someone-else@example.com",
                                skill_level: "principal_engineer")
       set_target
 
@@ -112,7 +111,7 @@ RSpec.describe PreviewSeed do
 
     # Seeding is create-only, so a real keyless user must not get the dummy key.
     it "does not fill blank attributes on an existing user" do
-      real = User.create!(email: "reviewer@example.com", name: "Real Person")
+      real = User.create!(email: "reviewer@example.com")
       set_target
 
       PreviewSeed.run!
@@ -132,7 +131,7 @@ RSpec.describe PreviewSeed do
     end
 
     it "is false for a real account at the same address, which seeding leaves alone" do
-      real = User.create!(email: "reviewer@example.com", name: "Real Person")
+      real = User.create!(email: "reviewer@example.com")
       real.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-a-real-key" })
       set_target
 
@@ -142,7 +141,7 @@ RSpec.describe PreviewSeed do
     end
 
     it "is false for an account with no API key, and for no account at all" do
-      expect(described_class.seeded?(User.create!(email: "no-key@example.com", name: "No Key"))).to be(false)
+      expect(described_class.seeded?(User.create!(email: "no-key@example.com"))).to be(false)
       expect(described_class.seeded?(nil)).to be(false)
     end
   end
@@ -218,7 +217,7 @@ RSpec.describe PreviewSeed do
     end
 
     it "never overwrites an existing exercise or response for a seeded date" do
-      user = User.create!(email: "reviewer@example.com", name: "Real Person")
+      user = User.create!(email: "reviewer@example.com")
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: 1.day.ago, language: "javascript",
         problem_set: { "code_review" => { "question" => "PRE-EXISTING", "snippet" => "s" } }
@@ -236,7 +235,7 @@ RSpec.describe PreviewSeed do
     end
 
     it "does not fabricate a response against a real user's pre-existing exercise" do
-      user = User.create!(email: "reviewer@example.com", name: "Real Person")
+      user = User.create!(email: "reviewer@example.com")
       DailyExercise.create!(
         user: user, date: Date.current, generated_at: 1.day.ago, language: "javascript",
         problem_set: { "code_review" => { "question" => "REAL", "snippet" => "s" } }
@@ -248,7 +247,7 @@ RSpec.describe PreviewSeed do
     end
 
     it "seeds dates in the user's own time zone, not UTC" do
-      user = User.create!(email: "reviewer@example.com", name: "Reviewer",
+      user = User.create!(email: "reviewer@example.com",
                           time_zone: "Pacific/Kiritimati")
 
       PreviewSeed.run!

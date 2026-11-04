@@ -11,7 +11,6 @@ RSpec.describe "Profile", type: :request do
 
     it "ignores a posted name and leaves it out of the reply" do
       login_as(user)
-      original = user.name
 
       patch profile_path,
             params: { user: { name: "Renamed" } }.to_json,
@@ -19,7 +18,6 @@ RSpec.describe "Profile", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(JSON.parse(response.body)).to eq("time_zone" => "UTC", "daily_section_count" => nil)
-      expect(user.reload.name).to eq(original)
     end
 
     it "updates the time_zone and returns 200" do

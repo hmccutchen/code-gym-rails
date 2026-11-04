@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "A bug_hunt section and concept mastery" do
-  let(:user) { User.create!(email: "hunt-mastery@example.com", name: "Hunt") }
+  let(:user) { User.create!(email: "hunt-mastery@example.com") }
 
   def hunt(concept) = { "concept" => concept, "purpose" => "Return whether the account may sign in.", "snippet" => "x", "pitched_at" => "junior" }
 

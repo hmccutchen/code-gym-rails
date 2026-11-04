@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe User::Authenticator, type: :model do
-  let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
+  let(:user) { User.create!(email: "dev@example.com") }
   let(:authenticator) { described_class.new(user) }
   let(:step_start) { Time.zone.at(1_800_000_000) }
 

@@ -41,20 +41,20 @@ RSpec.describe PendingTrial do
     end
 
     it "starts the trial for the address the form named" do
-      user = User.create!(email: "new@example.com", name: "New")
+      user = User.create!(email: "new@example.com")
 
       expect(pending.start_for(user)).to eq(:started)
       expect(user.reload).to be_trial_active
     end
 
     it "rejects another address" do
-      user = User.create!(email: "other@example.com", name: "Other")
+      user = User.create!(email: "other@example.com")
 
       expect(pending.start_for(user)).to eq(:rejected)
     end
 
     it "rejects a stored consent time it can't read" do
-      user = User.create!(email: "new@example.com", name: "New")
+      user = User.create!(email: "new@example.com")
       unreadable = described_class.load("email" => "new@example.com", "invite_code_id" => invite.id,
                                         "provider" => "fake", "consented_at" => "garbled")
 

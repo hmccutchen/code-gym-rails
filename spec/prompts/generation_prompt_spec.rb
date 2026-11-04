@@ -15,7 +15,7 @@ RSpec.describe GenerationPrompt do
     end
   end
 
-  let(:user) { User.new(email: "render@example.com", name: "Render", skill_level: "senior", focus_areas: %w[caching]) }
+  let(:user) { User.new(email: "render@example.com", skill_level: "senior", focus_areas: %w[caching]) }
 
   let(:history) do
     [ { date: "2026-10-14", concepts: { "code_review" => "n_plus_one", "pattern" => "" }, scenarios: [ "ticket queue" ],
@@ -160,7 +160,7 @@ RSpec.describe GenerationPrompt do
   end
 
   describe "the difficulty block" do
-    let(:user) { User.create!(email: "diagnostics@example.com", name: "Diagnostics") }
+    let(:user) { User.create!(email: "diagnostics@example.com") }
 
     before do
       user.update_columns(section_kind_levels: { "challenge" => "senior" }, locked_section_kinds: [ "challenge" ])

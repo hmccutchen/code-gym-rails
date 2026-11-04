@@ -4,29 +4,28 @@ module AuthHelpers
     InviteCode.mint(seats: seats, expires_at: expires_at, trial_days: days, daily_request_cap: cap)
   end
 
-  def create_trial_user(email: nil, name: "Trial User", time_zone: "UTC", provider: "fake", cap: 12, days: 7,
+  def create_trial_user(email: nil, time_zone: "UTC", provider: "fake", cap: 12, days: 7,
                         house_key: "fake-house-key")
     invite, _code = mint_trial_code(cap: cap, days: days)
     stub_env(HouseKeys.variable(provider, "API_KEY") => house_key)
-    User.create!(email: email || "trial-#{SecureRandom.hex(4)}@example.com", name: name,
+    User.create!(email: email || "trial-#{SecureRandom.hex(4)}@example.com",
                  time_zone: time_zone, **chosen_track(true)).tap do |user|
       user.start_trial!(invite: invite, provider: provider, consented_at: Time.current)
     end
   end
 
   # Accounts have chosen a track, as the dual-write release writes it, unless a first-run spec passes track_chosen: false.
-  def create_user_with_key(email: "dev@example.com", name: "Dev", time_zone: "UTC", track_chosen: true)
-    user = User.create!(email: email, name: name, time_zone: time_zone, **chosen_track(track_chosen))
+  def create_user_with_key(email: "dev@example.com", time_zone: "UTC", track_chosen: true)
+    user = User.create!(email: email, time_zone: time_zone, **chosen_track(track_chosen))
     user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test-key" })
     user
   end
 
   # Every system spec logs in as this fake-provider user; a new account starts at the gate's two-section floor.
-  def create_fake_provider_user(email: nil, name: "Fake User", time_zone: "UTC", track_chosen: true,
+  def create_fake_provider_user(email: nil, time_zone: "UTC", track_chosen: true,
                                 daily_section_count: nil)
     User.create!(
       email: email || "fake-user-#{SecureRandom.hex(4)}@example.com",
-      name: name,
       time_zone: time_zone,
       **chosen_track(track_chosen),
       daily_section_count: daily_section_count,

@@ -6,7 +6,7 @@ RSpec.describe "Per-user timezone", type: :request do
 
   # A UTC Wednesday that is Tuesday in Los Angeles: a weekday in both zones, so a missing zone fix would still generate.
   let(:instant) { Time.utc(2026, 7, 15, 2, 30) }
-  let(:pacific) { create_user_with_key(email: "pac@example.com", name: "Pac", time_zone: "America/Los_Angeles") }
+  let(:pacific) { create_user_with_key(email: "pac@example.com", time_zone: "America/Los_Angeles") }
 
   # The dashboard partial renders every section unconditionally, so a minimal fixture would fail on nil["title"].
   let(:full_problem_set) do
@@ -55,7 +55,7 @@ RSpec.describe "Per-user timezone", type: :request do
 
   describe "auto-detect + manual override UI" do
     it "mounts the detect-once controller only when the zone is blank" do
-      blank = create_user_with_key(email: "blank@example.com", name: "Blank", time_zone: nil)
+      blank = create_user_with_key(email: "blank@example.com", time_zone: nil)
       login_as(blank)
       get root_path
       expect(response.body).to include(%(data-controller="time-zone"))
@@ -64,14 +64,14 @@ RSpec.describe "Per-user timezone", type: :request do
     end
 
     it "does not mount the detect-once controller once a zone is set" do
-      set = create_user_with_key(email: "set@example.com", name: "Set", time_zone: "America/Chicago")
+      set = create_user_with_key(email: "set@example.com", time_zone: "America/Chicago")
       login_as(set)
       get root_path
       expect(response.body).not_to include(%(data-controller="time-zone"))
     end
 
     it "shows a timezone select on the setup page, outside the api-keys form" do
-      login_as(create_user_with_key(email: "setup@example.com", name: "Setup"))
+      login_as(create_user_with_key(email: "setup@example.com"))
       get setup_path
       expect(response.body).to include('id="tz-select"')
       expect(response.body).to include("America/Los_Angeles")
