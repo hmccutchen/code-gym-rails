@@ -21,9 +21,9 @@ RSpec.describe "Conventions held over app/views" do
   def inline_script = /<script\b|\bjavascript_tag\b|\btag\.script\b|\b(?:content_)?tag[ (]\s*[:"']script\b/i
 
   it "sends answer-form section prose through section_glossary_wrap, which holds tooltips a kind withholds before submission" do
-    section_views = [ Rails.root.join("app/views/responses/_section.html.erb").to_s ] + Dir[Rails.root.join("app/views/responses/bodies/*.erb")]
-    offenders = section_views.sort.flat_map do |path|
-      File.readlines(path).filter_map.with_index(1) { |line, number| "#{relative(path)}:#{number}" if line.match?(/(?<!section_)glossary_wrap\(/) }
+    section_views = Dir[Rails.root.join("app/views/responses/**/*.erb")].sort
+    offenders = section_views.flat_map do |path|
+      File.readlines(path).filter_map.with_index(1) { |line, number| "#{relative(path)}:#{number}" if line.match?(/(?<!section_)glossary_wrap(?:_prose)?\b/) }
     end
 
     expect(offenders).to be_empty, "Raw glossary_wrap in a section view: #{offenders.join(', ')}. Use section_glossary_wrap."

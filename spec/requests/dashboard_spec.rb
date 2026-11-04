@@ -555,6 +555,24 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
             expect(response.body).to include("GAP-TAGLINE", concept.humanize)
           end
+
+          it "keeps the featured marker and callout off before submission when the week features the concept" do
+            submit_set_showing(user, concept, date: Date.current - 10, section: kind)
+            create_exercise(problem_set: day)
+
+            get root_path
+
+            expect(response.body).not_to include(%(class="featured-marker"), %(class="featured-concept"))
+          end
+
+          it "shows the featured marker and callout once the day is submitted" do
+            submit_set_showing(user, concept, date: Date.current - 10, section: kind)
+            create_response(create_exercise(problem_set: day))
+
+            get root_path
+
+            expect(response.body).to include(%(class="featured-marker"), %(class="featured-concept"))
+          end
         end
       end
     end

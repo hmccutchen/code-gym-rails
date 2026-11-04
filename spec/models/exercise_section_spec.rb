@@ -111,15 +111,21 @@ RSpec.describe ExerciseSection do
       end
     end
 
-    it "is a recorded decision for every kind with a hidden answer key, so a new keyed kind cannot show tooltips by default" do
+    it "is a recorded decision, with the concept's, for every kind with an answer key, so a new keyed kind shows neither by default" do
       decided = {
-        ExerciseSection::PlanReview => false, ExerciseSection::AmbiguityHunt => false,
-        ExerciseSection::PseudocodeToCode => true, ExerciseSection::CodeReview => true,
-        ExerciseSection::SecurityReview => true, ExerciseSection::DesignComparison => true
+        ExerciseSection::PlanReview => { glossary: false, concept: false },
+        ExerciseSection::AmbiguityHunt => { glossary: false, concept: false },
+        ExerciseSection::PseudocodeToCode => { glossary: true, concept: true },
+        ExerciseSection::CodeReview => { glossary: true, concept: true },
+        ExerciseSection::SecurityReview => { glossary: true, concept: true },
+        ExerciseSection::DesignComparison => { glossary: true, concept: true }
       }
 
       expect(ExerciseSection.all.select { |kind| kind.answer_key_fields.any? }).to match_array(decided.keys)
-      decided.each { |kind, shown| expect(kind.glossary_shown_before_submission?).to be(shown), kind.name }
+      decided.each do |kind, shown|
+        expect(kind.glossary_shown_before_submission?).to be(shown[:glossary]), "#{kind.name} glossary"
+        expect(kind.concept_shown_before_submission?({})).to be(shown[:concept]), "#{kind.name} concept"
+      end
     end
   end
 
