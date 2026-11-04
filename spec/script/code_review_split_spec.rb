@@ -62,6 +62,15 @@ RSpec.describe CodeReviewSplit do
     expect(out.string).to include("multi-file code_review key notes: 4 (evidence_unlocated 2, files_unmatched 1, ok 1)")
   end
 
+  it "reads a line under the tags and timestamp a production worker log puts in front of it" do
+    log = [ "2026-11-04T06:13:07.692Z [ActiveJob] [GenerateDailyExercisesJob] [3f2a] [planted_key] answer_key=ok kind=code_review " \
+            "language=ruby_rails attempt=draft code_review_mode=test_file code_review_files=multi user=1" ]
+
+    described_class.new(out: out, log_lines: log).report
+
+    expect(out.string).to include("multi-file code_review key notes: 1 (ok 1)")
+  end
+
   it "names every outcome the log holds, so the counts always add up to the total" do
     log = [ "[planted_key] answer_key=a_new_reason kind=code_review language=ruby_rails attempt=draft code_review_mode=test_file " \
             "code_review_files=multi user=1" ]

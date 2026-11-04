@@ -6,7 +6,7 @@ class CodeReviewSplit
   SHAPES = %w[single multi bug_hunt].freeze
   RATINGS = ConceptMastery::AI_RATING_RANK.keys.freeze
   UNRATED = "unrated".freeze
-  MULTI_KEY_LINE = /\A\[planted_key\] answer_key=(\w+) kind=code_review .*\bcode_review_files=multi\b/
+  MULTI_KEY_LINE = /\[planted_key\] answer_key=(\w+) kind=code_review .*\bcode_review_files=multi\b/
 
   def initialize(out: $stdout, log_lines: nil)
     @out = out
