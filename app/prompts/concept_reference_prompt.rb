@@ -128,5 +128,6 @@ class ConceptReferencePrompt
     end
   end
 
-  private_class_method :senior_lens_description, :lesson_instruction, :code_example_description, :worked_example_description
+  private_class_method :data_modeling_note, :senior_lens_description, :lesson_instruction, :code_example_description,
+                       :worked_example_description
 end
