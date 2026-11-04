@@ -18,6 +18,9 @@ deletion, which a default accepts. Names already stored are not touched.
 A later release drops the column (#686), once web and worker both run code that
 ignores it.
 
-If a database already dropped the column, an earlier version of this change did
-that on a pull-request app, `up` adds it back with the default, so every
+Earlier versions of this change touched the column on a pull-request app or a
+development database: one dropped it, and one made it nullable. So `up` does
+three things depending on what it finds. A missing column is added back with
+the default. A nullable column becomes required again, with its nulls filled by
+the default. A column that is already required only gains the default. Every
 environment ends in the same shape. `down` removes only the default.

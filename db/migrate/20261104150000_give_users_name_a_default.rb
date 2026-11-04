@@ -5,6 +5,7 @@ class GiveUsersNameADefault < ActiveRecord::Migration[8.1]
   def up
     if column_exists?(:users, :name)
       change_column_default :users, :name, PLACEHOLDER
+      change_column_null :users, :name, false, PLACEHOLDER
     else
       add_column :users, :name, :string, null: false, default: PLACEHOLDER
     end

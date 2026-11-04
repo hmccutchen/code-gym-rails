@@ -32,6 +32,20 @@ RSpec.describe GiveUsersNameADefault do
     expect(connection.select_value("SELECT name FROM users WHERE email = 'nameless@example.com'")).to eq("Member")
   end
 
+  it "makes a column that an earlier version of this change left nullable required again, filling its nulls" do
+    migrate(:down)
+    connection.change_column_null(:users, :name, true)
+    user = User.create!(email: "null@example.com")
+    connection.execute("UPDATE users SET name = NULL WHERE id = #{user.id}")
+
+    migrate(:up)
+
+    expect(name_column).to have_attributes(null: false, default: "Member")
+    expect(connection.select_value("SELECT name FROM users WHERE id = #{user.id}")).to eq("Member")
+  ensure
+    migrate(:up)
+  end
+
   it "leaves the names already stored alone, in both directions" do
     migrate(:up)
     user = User.create!(email: "named@example.com")

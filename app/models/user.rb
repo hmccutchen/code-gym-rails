@@ -16,6 +16,7 @@ class User < ApplicationRecord
   self.ignored_columns += %w[learning_track name]
 
   LEGACY_NAME_ON_DELETION = "Deleted user".freeze
+  private_constant :LEGACY_NAME_ON_DELETION
 
   serialize :api_keys, coder: JSON
   encrypts :api_keys
