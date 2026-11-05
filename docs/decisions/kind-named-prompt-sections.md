@@ -19,9 +19,9 @@ retention block already filtered by kind the same way.
 **How it is held.** `generation_prompt_section_names_spec` fails on an
 ordinal or "last" followed by "section" or "slot" in any prompt snapshot and
 in any Ruby file under `app/` or `lib/`, which covers the judge, review,
-duck and difficulty prompts that have no snapshot. Page copy in
-`config/locales/en.yml` ("Rotating third section") is a settings legend, not
-a prompt, and is out of the scan.
+duck and difficulty prompts that have no snapshot. Setup's settings legends name a rotating group by the kinds it holds, never
+by position (`exercise_mix.rotating_group`), for the same reason: a slot is
+not a place in the day.
 
 **Lines that compare against another section.** Some lines compare one
 section with another: `DesignComparison`'s "the same as the code review's"

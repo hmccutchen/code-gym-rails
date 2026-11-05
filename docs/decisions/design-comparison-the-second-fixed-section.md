@@ -189,6 +189,6 @@ first exposure for every other kind; for this one it names and illustrates
 the principle the grade asks for, so `.reference_opens_before_answer?` is
 false and it stays closed until the engineer opens it.
 
-**Setup.** The Exercise mix groups the user's daily kinds under "In every set"
+**Setup.** The Exercise mix groups the user's daily kinds under "Always in your set"
 (difficulty only), and gives pattern, and any default kind that is not
 daily, a group of its own.

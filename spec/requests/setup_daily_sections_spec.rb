@@ -98,8 +98,32 @@ RSpec.describe "Setup Daily sections control", type: :request do
     legends = page_html.css("#exercise-mix .mix-group > legend").map(&:text)
     expect(legends.first).to eq(I18n.t("exercise_mix.fixed_group"))
     expect(legends.drop(1)).to all(end_with(I18n.t("exercise_mix.unplaced_suffix")))
-    expect(legends).to include("#{I18n.t("exercise_mix.unplaced.design_comparison")}#{I18n.t("exercise_mix.unplaced_suffix")}")
+    expect(legends).to include("#{I18n.t("exercise_mix.unplaced.single", kind: name("design_comparison"))}#{I18n.t("exercise_mix.unplaced_suffix")}")
     expect(page_html.at_css("#exercise-mix .mix-unplaced-note").text).to eq(I18n.t("exercise_mix.unplaced_note", count: 1))
+  end
+
+  def rotating_legends = page_html.css("#exercise-mix .mix-group-rotating > legend").map(&:text)
+
+  def kinds_named(kinds) = kinds.map { |kind| name(kind.key) }.to_sentence(two_words_connector: " or ", last_word_connector: ", or ")
+
+  it "names each rotating group by the kinds it holds, never by a position in the day" do
+    login_as(user)
+
+    get setup_path
+
+    slots = ExerciseSection.optional_slots(daily: DailyKinds.for(user)).select { |_, kinds| kinds.size > 1 }
+    expect(rotating_legends).to eq(slots.map { |_, kinds| I18n.t("exercise_mix.rotating_group", kinds: kinds_named(kinds)) })
+    expect(rotating_legends.join).not_to match(/third|fourth/i)
+  end
+
+  it "leaves a daily extra out of the rotating group it came from, so the group lists only what still rotates" do
+    user.update!(daily_section_count: 3, daily_section_kinds: %w[code_review design_comparison architecture])
+    login_as(user)
+
+    get setup_path
+
+    expect(rotating_legends.join).not_to include(name("architecture"))
+    expect(rotating_legends).to include(a_string_including(name("challenge"), name("security_review")))
   end
 
   it "keeps the in-some-sets labels and no note while the setting leaves a place to rotate" do
@@ -107,7 +131,7 @@ RSpec.describe "Setup Daily sections control", type: :request do
 
     get setup_path
 
-    expect(page_html.css("#exercise-mix .mix-group > legend").map(&:text)).to include(I18n.t("exercise_mix.pattern_group"))
+    expect(page_html.css("#exercise-mix .mix-group > legend").map(&:text)).to include(I18n.t("exercise_mix.single_group", kind: name("pattern")))
     expect(page_html.at_css("#exercise-mix .mix-unplaced-note")).to be_nil
   end
 end

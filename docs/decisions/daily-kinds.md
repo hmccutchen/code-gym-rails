@@ -195,7 +195,7 @@ slots. Every reader takes the pair:
   addition) chose per optional slot. `#fourth` is the day's fourth kind,
   daily or rotated, since the fourth track plans either the same way.
 - The shared-concept prompt line, `DailyExercise#shared_concept_shown?` and
-  the dashboard hint name the row's pair; Setup's "In every set" group and
+  the dashboard hint name the row's pair; Setup's "Always in your set" group and
   the Daily sections hint name the user's current pair.
 
 ## Judge retries are a plan fact
