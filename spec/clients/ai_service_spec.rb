@@ -4956,7 +4956,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
                                     "size_reason" => "gate", "shared_concept" => "feature_envy")
   end
 
-  it "lets the plan read the day itself, so a weekend set is a bug hunt" do
+  it "leaves the day to DailyPlan's clock default, passing no weekend: of its own" do
     allow(DailyPlan).to receive(:for).and_call_original
 
     FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")

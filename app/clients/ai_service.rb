@@ -291,7 +291,6 @@ class AiService
     ExerciseDraft.retry_section(draft, kind, concept, cause: cause, deadline: deadline, provider: exercise_draft_provider)
   end
 
-
   def record_suggested_concept(suggestion) = SuggestedConcept.record!(language: suggestion.bucket, name: suggestion.name)
 
   def generate_problem_set(user, purpose, language, prompt, subject:, blocking: false, deadline: GenerationDeadline::NONE)

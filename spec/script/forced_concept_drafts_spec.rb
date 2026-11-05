@@ -69,7 +69,6 @@ RSpec.describe ForcedConceptDrafts do
     end
   end
 
-
   describe ".todays_plan" do
     it "plans a weekday set on a weekend, so a Saturday run measures what a Tuesday run does" do
       allow(WeightedRoll).to receive(:pick).and_call_original
@@ -90,6 +89,7 @@ RSpec.describe ForcedConceptDrafts do
       expect(zones).to eq([ user.effective_time_zone ])
     end
   end
+
   it "reads the draft guidance line from the concept's design note" do
     expect(described_class.guidance_for(concept)).to start_with("- The proportionality concept")
     expect { described_class.guidance_for("god_object") }.to raise_error(ArgumentError, /No design note/)

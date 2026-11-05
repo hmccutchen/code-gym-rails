@@ -25,8 +25,8 @@ other overrides (a pinned route, a read timeout, the prose judge turned off).
   judging runs a thread per section.
 - **Suggested concepts:** every script records none, since a run is a
   measurement. Today only a full draft (`ExerciseDraft.finish`) records one.
-  `GeminiCapacityProbe` drafts through `AiService#draft_exercise`, which
-  returns from `ExerciseDraft.call` before `finish`, `KeySampleDrafts`
+  `GeminiCapacityProbe` drafts through `ExerciseDraft.call` with
+  `AiService#exercise_draft_provider`, which returns before `finish`, `KeySampleDrafts`
   drafts through `retry_section`, and the calibration only calls
   `generate_concept_reference`. None of them records one, so the stub
   changes nothing for them yet; it covers a script that later finishes a
