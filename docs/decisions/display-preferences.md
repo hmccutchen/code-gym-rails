@@ -83,10 +83,12 @@ every font. OpenDyslexic's letters are about 1.7 times as wide as Atkinson's,
 so its prose rule also breaks long words anywhere in prose, which a
 `SectionKindGuide` summary needs on Learn at a raised browser size. Inline
 code under it wraps as it does in every other font: it breaks only inside the
-elements that already break words for everyone (`.question`,
-`.section-scenario`, `.plan-excerpt`, `.problem-statement`, `.review-block`),
-and `display_stylesheet_spec` holds that list to the layout and every prose
-selector list in `display.css` to each other. The layout specs' largest-text
+elements that already break words for everyone (`pre`, `.question`,
+`.section-scenario`, `.plan-excerpt`, `.problem-statement`, `.review-block`,
+`.file-summary`, `.answer-display`, `.learn-worked-example`), and
+`display_stylesheet_spec` fails unless that list names every layout rule that
+breaks words anywhere. It also holds every prose selector list in
+`display.css` to the others. The layout specs' largest-text
 case (`LayoutHelpers::LARGEST_TEXT`) uses OpenDyslexic, the widest font, and
 Setup's key hint is checked at 320px in all three fonts with a 20px browser
 default and the text-spacing override.

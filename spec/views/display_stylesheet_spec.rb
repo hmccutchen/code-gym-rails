@@ -31,11 +31,12 @@ RSpec.describe "display stylesheet" do
 
   it "keeps inline code unbroken under OpenDyslexic only outside the elements that break words for every font" do
     layout = Rails.root.join("app/views/layouts/application.html.erb").read
-    excluded = css[/code:not\(:is\(([^)]+)\) code\)/, 1].split(",").map(&:strip) - %w[pre]
+    breaking = layout.scan(/^\s*([^{}\n]+?)\s*\{[^}]*overflow-wrap: anywhere/).flatten
+                     .flat_map { |rule| rule.split(",") }.map { |selector| selector.split.last }
+                     .map { |element| element.start_with?("pre") ? "pre" : element[/\.[\w-]+\z/] }.uniq
+    excluded = css[/code:not\(:is\(([^)]+)\) code\)/, 1].split(",").map(&:strip)
 
-    excluded.each do |selector|
-      expect(layout).to match(/^\s*#{Regexp.escape(selector)} \{[^}]*overflow-wrap: anywhere/), "#{selector} no longer breaks words for every font"
-    end
+    expect(excluded).to match_array(breaking)
   end
 
   it "ships the font file behind every @font-face" do

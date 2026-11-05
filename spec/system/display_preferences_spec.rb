@@ -217,13 +217,13 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
       wraps = page.evaluate_script(<<~JS)
         (() => {
           const main = document.querySelector("main");
-          main.insertAdjacentHTML("beforeend", '<p id="plain">x <code>a_very_long_identifier</code></p><div class="question" id="asked">x <code>a_very_long_identifier</code></div>');
+          main.insertAdjacentHTML("beforeend", '<p id="plain">x <code>a_very_long_identifier</code></p><div class="question" id="asked">x <code>a_very_long_identifier</code></div><p class="learn-worked-example" id="worked">x <code>a_very_long_identifier</code></p>');
           const wrap = (selector) => getComputedStyle(document.querySelector(selector)).overflowWrap;
-          return [wrap("#plain"), wrap("#plain code"), wrap("#asked code")];
+          return [wrap("#plain"), wrap("#plain code"), wrap("#asked code"), wrap("#worked code")];
         })()
       JS
 
-      expect(wraps).to eq(%w[anywhere normal anywhere])
+      expect(wraps).to eq(%w[anywhere normal anywhere anywhere])
     end
   end
 

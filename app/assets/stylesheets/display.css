@@ -52,6 +52,7 @@ html[data-font="opendyslexic"] :is(p, li, dd, .question, .section-scenario, .why
 }
 html[data-font="opendyslexic"] :is(p, li, dd, .question, .section-scenario, .why-box, .plan-excerpt,
   .problem-statement, .hint-body, .ref-body, .review-item, .alternate-item, .follow-up-turn, .duck-turn)
-  code:not(:is(pre, .question, .section-scenario, .plan-excerpt, .problem-statement, .review-block) code) {
+  code:not(:is(pre, .question, .section-scenario, .plan-excerpt, .problem-statement, .review-block,
+  .file-summary, .answer-display, .learn-worked-example) code) {
   overflow-wrap: normal;
 }
