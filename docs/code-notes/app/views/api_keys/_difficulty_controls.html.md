@@ -38,7 +38,7 @@ A radio inside a label already has the label's text as its name. The two
 groups need more. The fieldset's `aria-labelledby` pairs the kind's name
 (`mix-name-<kind>`, set in `api_keys/edit` on the weight label, or on a
 name span for a kind with nothing to weigh) with the legend's id, so a screen reader announces "Code
-review, Difficulty target" instead of the bare legend repeated for every kind. The
+review, How hard" instead of the bare legend repeated for every kind. The
 lock switch pairs the same name id with its own text id
 (`lock-text-<kind>`), and so reads "Code review, Lock at this level".
 

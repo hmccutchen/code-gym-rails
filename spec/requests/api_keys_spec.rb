@@ -309,7 +309,7 @@ RSpec.describe "ApiKeys", type: :request do
       get setup_path
       page = Nokogiri::HTML(response.body)
       expect(page.css("#exercise-mix .mix-note")).to be_empty
-      expect(page.css("#exercise-mix .card-note strong").map(&:text)).to eq([ I18n.t("exercise_mix.exclude_heading"), I18n.t("exercise_mix.lock_heading") ])
+      expect(page.css("#exercise-mix .card-note strong").map(&:text)).to eq([ I18n.t("exercise_mix.frequency_heading"), I18n.t("exercise_mix.difficulty_heading") ])
     end
 
     it "puts the trial note inside Connection while a trial runs" do
@@ -441,8 +441,7 @@ RSpec.describe "ApiKeys", type: :request do
       expect(frequency.css("input[type=range], .mix-exclude-box").size).to eq(2)
       expect(resolve.call(frequency)).to eq("#{I18n.t("sections.challenge.name")} #{I18n.t("exercise_mix.frequency_legend")}")
       expect(page.css(".mix-row-fixed .mix-frequency")).to be_empty
-      expect(page.css(".mix-group-rotating > .mix-rotating-hint").size).to eq(page.css(".mix-group-rotating").size)
-      expect(page.css(".mix-group:not(.mix-group-rotating) .mix-rotating-hint")).to be_empty
+      expect(frequency.at_css("> .mix-frequency-controls input[type=range]")).to be_present
     end
 
     it "explains skipping in the same word as the switch" do

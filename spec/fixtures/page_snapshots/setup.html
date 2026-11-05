@@ -722,10 +722,10 @@
   <p class="card-note" id="level-suggestions-hint">When this is off, the dashboard stops suggesting level changes. You can still change levels yourself below, and turn this back on at any time.</p>
   <p class="card-note switch-status" role="status" data-save-switch-target="status"></p>
 </div>
-    <p class="card-note">Two settings per section: how often it comes up, and how hard it is pitched. How many sections a day holds is the Daily sections setting above. Changes save automatically.</p>
+    <p class="card-note">How hard applies to every section. How often applies only to groups that hold several kinds, and sets how often each one is picked compared with the others in its list. How many sections a day holds is the Daily sections setting above. Changes save automatically.</p>
 
     <div>
-      <p class="card-note"><strong>How often (rotating sections only)</strong></p>
+      <p class="card-note"><strong>How often (groups with several kinds)</strong></p>
       <p class="card-note">Skipping is a stronger, different action than turning a slider down. A slider at Much less means rarely — the section can still come up, and it will if you haven&#39;t seen it in a long while, so nothing disappears from your rotation permanently.</p>
       <p class="card-note">Skip means never. The section is removed from rotation entirely and will not appear again until you turn Skip off.</p>
       <p class="card-note">Skipping also makes the whole group come up less often on shorter days. Fewer kinds left means the ones that remain are seen more often and stay fresh, so the group gives way to groups holding something you haven&#39;t seen.</p>
@@ -844,7 +844,7 @@
       </div>
     </fieldset>
       <fieldset class="mix-group">
-        <legend>Pattern, added on some days</legend>
+        <legend>Added on some days: Pattern of the Month</legend>
         <div class="mix-kinds">
           <div class="mix-row mix-row-fixed">
             <span id="mix-name-pattern">Pattern of the Month</span>
@@ -901,25 +901,26 @@
       </fieldset>
 
       <fieldset class="mix-group mix-group-rotating" data-exercise-mix-target="group">
-        <legend>Third section, rotating</legend>
-        <p class="card-note mix-rotating-hint">A day that has this section picks one kind from this list.</p>
+        <legend>Added on some days, one of: Architecture Decision, Security Review, Coding Challenge, or Parsons Problem</legend>
 
         <div class="mix-kinds">
             <div class="mix-row" data-kind="architecture" data-exercise-mix-target="row">
               <label id="mix-name-architecture" for="weight-architecture">Architecture Decision</label>
               <fieldset class="mix-frequency" aria-labelledby="mix-name-architecture mix-frequency-legend-architecture">
                 <legend id="mix-frequency-legend-architecture">How often</legend>
-                <input type="range" id="weight-architecture" min="0" max="4" step="1"
-                       value="2" 
-                       aria-valuetext="Default"
-                       data-action="input->exercise-mix#slide">
-                <output id="weight-label-architecture">Default</output>
-                <label class="switch-row" for="exclude-architecture">
-                  <span id="exclude-text-architecture">Skip this kind</span>
-                  <input type="checkbox" id="exclude-architecture" class="switch mix-exclude-box" role="switch"
-                         aria-labelledby="mix-name-architecture exclude-text-architecture" 
-                         data-action="change->exercise-mix#toggleExclude">
-                </label>
+                <div class="mix-frequency-controls">
+                  <input type="range" id="weight-architecture" min="0" max="4" step="1"
+                         value="2" 
+                         aria-valuetext="Default"
+                         data-action="input->exercise-mix#slide">
+                  <output id="weight-label-architecture">Default</output>
+                  <label class="switch-row" for="exclude-architecture">
+                    <span id="exclude-text-architecture">Skip this kind</span>
+                    <input type="checkbox" id="exclude-architecture" class="switch mix-exclude-box" role="switch"
+                           aria-labelledby="mix-name-architecture exclude-text-architecture" 
+                           data-action="change->exercise-mix#toggleExclude">
+                  </label>
+                </div>
               </fieldset>
               <fieldset class="mix-difficulty" data-kind="architecture"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-architecture mix-level-legend-architecture">
@@ -974,17 +975,19 @@
               <label id="mix-name-security_review" for="weight-security_review">Security Review</label>
               <fieldset class="mix-frequency" aria-labelledby="mix-name-security_review mix-frequency-legend-security_review">
                 <legend id="mix-frequency-legend-security_review">How often</legend>
-                <input type="range" id="weight-security_review" min="0" max="4" step="1"
-                       value="2" 
-                       aria-valuetext="Default"
-                       data-action="input->exercise-mix#slide">
-                <output id="weight-label-security_review">Default</output>
-                <label class="switch-row" for="exclude-security_review">
-                  <span id="exclude-text-security_review">Skip this kind</span>
-                  <input type="checkbox" id="exclude-security_review" class="switch mix-exclude-box" role="switch"
-                         aria-labelledby="mix-name-security_review exclude-text-security_review" 
-                         data-action="change->exercise-mix#toggleExclude">
-                </label>
+                <div class="mix-frequency-controls">
+                  <input type="range" id="weight-security_review" min="0" max="4" step="1"
+                         value="2" 
+                         aria-valuetext="Default"
+                         data-action="input->exercise-mix#slide">
+                  <output id="weight-label-security_review">Default</output>
+                  <label class="switch-row" for="exclude-security_review">
+                    <span id="exclude-text-security_review">Skip this kind</span>
+                    <input type="checkbox" id="exclude-security_review" class="switch mix-exclude-box" role="switch"
+                           aria-labelledby="mix-name-security_review exclude-text-security_review" 
+                           data-action="change->exercise-mix#toggleExclude">
+                  </label>
+                </div>
               </fieldset>
               <fieldset class="mix-difficulty" data-kind="security_review"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-security_review mix-level-legend-security_review">
@@ -1039,17 +1042,19 @@
               <label id="mix-name-challenge" for="weight-challenge">Coding Challenge</label>
               <fieldset class="mix-frequency" aria-labelledby="mix-name-challenge mix-frequency-legend-challenge">
                 <legend id="mix-frequency-legend-challenge">How often</legend>
-                <input type="range" id="weight-challenge" min="0" max="4" step="1"
-                       value="2" 
-                       aria-valuetext="Default"
-                       data-action="input->exercise-mix#slide">
-                <output id="weight-label-challenge">Default</output>
-                <label class="switch-row" for="exclude-challenge">
-                  <span id="exclude-text-challenge">Skip this kind</span>
-                  <input type="checkbox" id="exclude-challenge" class="switch mix-exclude-box" role="switch"
-                         aria-labelledby="mix-name-challenge exclude-text-challenge" 
-                         data-action="change->exercise-mix#toggleExclude">
-                </label>
+                <div class="mix-frequency-controls">
+                  <input type="range" id="weight-challenge" min="0" max="4" step="1"
+                         value="2" 
+                         aria-valuetext="Default"
+                         data-action="input->exercise-mix#slide">
+                  <output id="weight-label-challenge">Default</output>
+                  <label class="switch-row" for="exclude-challenge">
+                    <span id="exclude-text-challenge">Skip this kind</span>
+                    <input type="checkbox" id="exclude-challenge" class="switch mix-exclude-box" role="switch"
+                           aria-labelledby="mix-name-challenge exclude-text-challenge" 
+                           data-action="change->exercise-mix#toggleExclude">
+                  </label>
+                </div>
               </fieldset>
               <fieldset class="mix-difficulty" data-kind="challenge"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-challenge mix-level-legend-challenge">
@@ -1104,17 +1109,19 @@
               <label id="mix-name-parsons_problem" for="weight-parsons_problem">Parsons Problem</label>
               <fieldset class="mix-frequency" aria-labelledby="mix-name-parsons_problem mix-frequency-legend-parsons_problem">
                 <legend id="mix-frequency-legend-parsons_problem">How often</legend>
-                <input type="range" id="weight-parsons_problem" min="0" max="4" step="1"
-                       value="2" 
-                       aria-valuetext="Default"
-                       data-action="input->exercise-mix#slide">
-                <output id="weight-label-parsons_problem">Default</output>
-                <label class="switch-row" for="exclude-parsons_problem">
-                  <span id="exclude-text-parsons_problem">Skip this kind</span>
-                  <input type="checkbox" id="exclude-parsons_problem" class="switch mix-exclude-box" role="switch"
-                         aria-labelledby="mix-name-parsons_problem exclude-text-parsons_problem" 
-                         data-action="change->exercise-mix#toggleExclude">
-                </label>
+                <div class="mix-frequency-controls">
+                  <input type="range" id="weight-parsons_problem" min="0" max="4" step="1"
+                         value="2" 
+                         aria-valuetext="Default"
+                         data-action="input->exercise-mix#slide">
+                  <output id="weight-label-parsons_problem">Default</output>
+                  <label class="switch-row" for="exclude-parsons_problem">
+                    <span id="exclude-text-parsons_problem">Skip this kind</span>
+                    <input type="checkbox" id="exclude-parsons_problem" class="switch mix-exclude-box" role="switch"
+                           aria-labelledby="mix-name-parsons_problem exclude-text-parsons_problem" 
+                           data-action="change->exercise-mix#toggleExclude">
+                  </label>
+                </div>
               </fieldset>
               <fieldset class="mix-difficulty" data-kind="parsons_problem"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-parsons_problem mix-level-legend-parsons_problem">
@@ -1170,25 +1177,26 @@
         <p class="card-note mix-last-note" hidden>At least one section in this group has to stay in rotation.</p>
       </fieldset>
       <fieldset class="mix-group mix-group-rotating" data-exercise-mix-target="group">
-        <legend>Fourth section, rotating</legend>
-        <p class="card-note mix-rotating-hint">A day that has this section picks one kind from this list.</p>
+        <legend>Added on some days, one of: Plan Review, Ambiguity Hunt, or Pseudocode to Code</legend>
 
         <div class="mix-kinds">
             <div class="mix-row" data-kind="plan_review" data-exercise-mix-target="row">
               <label id="mix-name-plan_review" for="weight-plan_review">Plan Review</label>
               <fieldset class="mix-frequency" aria-labelledby="mix-name-plan_review mix-frequency-legend-plan_review">
                 <legend id="mix-frequency-legend-plan_review">How often</legend>
-                <input type="range" id="weight-plan_review" min="0" max="4" step="1"
-                       value="2" 
-                       aria-valuetext="Default"
-                       data-action="input->exercise-mix#slide">
-                <output id="weight-label-plan_review">Default</output>
-                <label class="switch-row" for="exclude-plan_review">
-                  <span id="exclude-text-plan_review">Skip this kind</span>
-                  <input type="checkbox" id="exclude-plan_review" class="switch mix-exclude-box" role="switch"
-                         aria-labelledby="mix-name-plan_review exclude-text-plan_review" 
-                         data-action="change->exercise-mix#toggleExclude">
-                </label>
+                <div class="mix-frequency-controls">
+                  <input type="range" id="weight-plan_review" min="0" max="4" step="1"
+                         value="2" 
+                         aria-valuetext="Default"
+                         data-action="input->exercise-mix#slide">
+                  <output id="weight-label-plan_review">Default</output>
+                  <label class="switch-row" for="exclude-plan_review">
+                    <span id="exclude-text-plan_review">Skip this kind</span>
+                    <input type="checkbox" id="exclude-plan_review" class="switch mix-exclude-box" role="switch"
+                           aria-labelledby="mix-name-plan_review exclude-text-plan_review" 
+                           data-action="change->exercise-mix#toggleExclude">
+                  </label>
+                </div>
               </fieldset>
               <fieldset class="mix-difficulty" data-kind="plan_review"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-plan_review mix-level-legend-plan_review">
@@ -1243,17 +1251,19 @@
               <label id="mix-name-ambiguity_hunt" for="weight-ambiguity_hunt">Ambiguity Hunt</label>
               <fieldset class="mix-frequency" aria-labelledby="mix-name-ambiguity_hunt mix-frequency-legend-ambiguity_hunt">
                 <legend id="mix-frequency-legend-ambiguity_hunt">How often</legend>
-                <input type="range" id="weight-ambiguity_hunt" min="0" max="4" step="1"
-                       value="2" 
-                       aria-valuetext="Default"
-                       data-action="input->exercise-mix#slide">
-                <output id="weight-label-ambiguity_hunt">Default</output>
-                <label class="switch-row" for="exclude-ambiguity_hunt">
-                  <span id="exclude-text-ambiguity_hunt">Skip this kind</span>
-                  <input type="checkbox" id="exclude-ambiguity_hunt" class="switch mix-exclude-box" role="switch"
-                         aria-labelledby="mix-name-ambiguity_hunt exclude-text-ambiguity_hunt" 
-                         data-action="change->exercise-mix#toggleExclude">
-                </label>
+                <div class="mix-frequency-controls">
+                  <input type="range" id="weight-ambiguity_hunt" min="0" max="4" step="1"
+                         value="2" 
+                         aria-valuetext="Default"
+                         data-action="input->exercise-mix#slide">
+                  <output id="weight-label-ambiguity_hunt">Default</output>
+                  <label class="switch-row" for="exclude-ambiguity_hunt">
+                    <span id="exclude-text-ambiguity_hunt">Skip this kind</span>
+                    <input type="checkbox" id="exclude-ambiguity_hunt" class="switch mix-exclude-box" role="switch"
+                           aria-labelledby="mix-name-ambiguity_hunt exclude-text-ambiguity_hunt" 
+                           data-action="change->exercise-mix#toggleExclude">
+                  </label>
+                </div>
               </fieldset>
               <fieldset class="mix-difficulty" data-kind="ambiguity_hunt"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-ambiguity_hunt mix-level-legend-ambiguity_hunt">
@@ -1308,17 +1318,19 @@
               <label id="mix-name-pseudocode_to_code" for="weight-pseudocode_to_code">Pseudocode to Code</label>
               <fieldset class="mix-frequency" aria-labelledby="mix-name-pseudocode_to_code mix-frequency-legend-pseudocode_to_code">
                 <legend id="mix-frequency-legend-pseudocode_to_code">How often</legend>
-                <input type="range" id="weight-pseudocode_to_code" min="0" max="4" step="1"
-                       value="2" 
-                       aria-valuetext="Default"
-                       data-action="input->exercise-mix#slide">
-                <output id="weight-label-pseudocode_to_code">Default</output>
-                <label class="switch-row" for="exclude-pseudocode_to_code">
-                  <span id="exclude-text-pseudocode_to_code">Skip this kind</span>
-                  <input type="checkbox" id="exclude-pseudocode_to_code" class="switch mix-exclude-box" role="switch"
-                         aria-labelledby="mix-name-pseudocode_to_code exclude-text-pseudocode_to_code" 
-                         data-action="change->exercise-mix#toggleExclude">
-                </label>
+                <div class="mix-frequency-controls">
+                  <input type="range" id="weight-pseudocode_to_code" min="0" max="4" step="1"
+                         value="2" 
+                         aria-valuetext="Default"
+                         data-action="input->exercise-mix#slide">
+                  <output id="weight-label-pseudocode_to_code">Default</output>
+                  <label class="switch-row" for="exclude-pseudocode_to_code">
+                    <span id="exclude-text-pseudocode_to_code">Skip this kind</span>
+                    <input type="checkbox" id="exclude-pseudocode_to_code" class="switch mix-exclude-box" role="switch"
+                           aria-labelledby="mix-name-pseudocode_to_code exclude-text-pseudocode_to_code" 
+                           data-action="change->exercise-mix#toggleExclude">
+                  </label>
+                </div>
               </fieldset>
               <fieldset class="mix-difficulty" data-kind="pseudocode_to_code"
           data-exercise-mix-target="difficulty" aria-labelledby="mix-name-pseudocode_to_code mix-level-legend-pseudocode_to_code">
