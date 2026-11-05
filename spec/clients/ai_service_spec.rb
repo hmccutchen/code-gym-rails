@@ -2740,18 +2740,6 @@ RSpec.describe AiService do
       expect(svc.last_read_timeout).to eq(CallProfiles::GENERATION_READ_TIMEOUT)
     end
 
-    it "tightens the budget when a request thread is blocked on the call" do
-      svc = double_class.new(canned_text: full_problem_set.to_json)
-      ExerciseDraft.call(user, language: user.language_for_today, provider: svc.exercise_draft_provider, blocking: true)
-
-      expect(svc.last_read_timeout).to eq(CallProfiles::SYNC_GENERATION_READ_TIMEOUT)
-    end
-
-    it "keeps the blocking budget between the short-call and worker budgets" do
-      expect(CallProfiles::SYNC_GENERATION_READ_TIMEOUT).to be > CallProfiles::READ_TIMEOUT
-      expect(CallProfiles::SYNC_GENERATION_READ_TIMEOUT).to be < CallProfiles::GENERATION_READ_TIMEOUT
-    end
-
     it "computes the worst-case wait for whichever read timeout it is given" do
       expect(CallProfiles.call_budget_seconds(CallProfiles::READ_TIMEOUT))
         .to eq((CallProfiles::READ_TIMEOUT * (CallProfiles::RETRY_MAX + 1)) + (CallProfiles::RETRY_MAX * CallProfiles::RETRY_MAX_INTERVAL))

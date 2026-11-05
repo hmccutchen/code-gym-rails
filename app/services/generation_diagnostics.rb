@@ -26,7 +26,7 @@ class GenerationDiagnostics
     end
   end
 
-  def finished(language, draft, problem_set, dropped_concepts: {}, judge: nil, unhosted: [])
+  def finished(language, draft, problem_set, dropped_concepts:, judge:, unhosted:)
     plan = draft.plan
     fourth_dropped, language_dropped = dropped_concepts
       .partition { |key, _| ExerciseSection.fourths.include?(ExerciseSection.find(key)) }.map(&:to_h)

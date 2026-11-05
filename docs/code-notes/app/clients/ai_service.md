@@ -45,12 +45,8 @@ changes one setting on a built request uses `Data#with`, as
 
 A call site names its purpose and passes only the values that change per
 call: system, prompt, history and response schema. The schema is per call
-because `judge_section`'s depends on the kind. `blocking: true` picks the
-profile's `blocking_read_timeout`, because a request thread waiting on the
-call cannot wait as long as a worker. It raises for a purpose with no
-blocking timeout, so a blocking caller of any other purpose fails at once
-instead of running on a timeout nobody chose for a waiting thread. An unknown
-purpose raises too, at the call site.
+because `judge_section`'s depends on the kind. Every other setting is the
+purpose's profile, unchanged. An unknown purpose raises at the call site.
 
 ## `MAX_LADDER_GUIDANCE_CHARS`
 
@@ -165,11 +161,9 @@ specs' stand-ins) carries none.
 ## `#exercise_draft_provider` and `#generation_prompt`
 
 `#exercise_draft_provider` is public, as `#review_grading_provider` is, so a
-script can draft a set without judging it. `ExerciseDraft.call`'s
-`blocking:` means a request thread is waiting on the call; its timeout is the
-`generate_exercise` profile's `blocking_read_timeout`
-(`SYNC_GENERATION_READ_TIMEOUT`). Only `script/model_comparison.rb` passes it
-now.
+script can draft a set without judging it. A draft always runs on the
+`generate_exercise` profile's timeout: the shorter "blocking" timeout for a
+request thread waiting on it had only a script caller, so it went (#706).
 
 `ExerciseDraft` does the drafting and reaches this class only through the
 provider's two callables. `#generation_prompt` is the one place a

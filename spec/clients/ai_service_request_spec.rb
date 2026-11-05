@@ -45,16 +45,9 @@ RSpec.describe AiService, "request values" do
         .to raise_error(KeyError, /unknown_purpose/)
     end
 
-    it "refuses a blocking request for a purpose with no blocking timeout" do
-      expect { AiService.request_for("judge_review", system: "s", prompt: "p", blocking: true) }
-        .to raise_error(ArgumentError, /judge_review/)
-    end
-
-    it "picks the synchronous timeout for a blocking generation" do
-      request = AiService.request_for("generate_exercise", system: "s", prompt: "p", blocking: true)
-
-      expect(settings_of(request)).to eq(call_site_settings["generate_exercise"].merge(read_timeout: CallProfiles::SYNC_GENERATION_READ_TIMEOUT))
-      expect(request.read_timeout).to eq(CallProfiles::SYNC_GENERATION_READ_TIMEOUT)
+    it "has no blocking variant, since no caller waits on a generation in a request thread" do
+      expect(AiService.method(:request_for).parameters).not_to include(%i[key blocking])
+      expect(CallProfiles::BY_PURPOSE.values.flat_map(&:keys)).not_to include(:blocking_read_timeout)
     end
 
     it "carries the per-call values through unchanged" do
@@ -175,12 +168,6 @@ RSpec.describe AiService, "request values" do
 
         expect(purpose_for(system)).to eq(shares_generation_prompt ? "generate_exercise" : purpose)
       end
-    end
-
-    it "sends a blocking generation on the synchronous timeout" do
-      request = request_sent_for("generate_exercise") { ExerciseDraft.call(user, language: user.language_for_today, provider: service.exercise_draft_provider, blocking: true) }
-
-      expect(settings_of(request)).to eq(call_site_settings["generate_exercise"].merge(read_timeout: CallProfiles::SYNC_GENERATION_READ_TIMEOUT))
     end
 
     it "sends prior turns from the two conversational callers" do

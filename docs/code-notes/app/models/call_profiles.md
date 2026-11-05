@@ -19,9 +19,11 @@ The longest `#review` chain must stay under
 
 ## `GENERATION_READ_TIMEOUT` and `SYNC_GENERATION_READ_TIMEOUT`
 
-Generation runs on the worker and can wait. `SYNC_GENERATION_READ_TIMEOUT` has
-no caller today, but it bounds any future synchronous caller and the
-one-section retries.
+Generation runs on the worker and can wait. `SYNC_GENERATION_READ_TIMEOUT`
+bounds the one-section retries (`RETRY_READ_TIMEOUT`) and the concept
+reference (`CONCEPT_REFERENCE_READ_TIMEOUT`). It was also a "blocking"
+generation timeout for a request thread waiting on a draft; no caller in the
+app ever used it, so it went (#706).
 
 ## `CONCEPT_REFERENCE_READ_TIMEOUT`
 

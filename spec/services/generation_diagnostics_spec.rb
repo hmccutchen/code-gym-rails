@@ -39,7 +39,7 @@ RSpec.describe GenerationDiagnostics do
       diagnostics.unusable_sections([ Struct.new(:key, :reason).new("pattern", "too short") ])
       diagnostics.key_notes([ ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "quote_missing", quotes: nil) ],
                             attempt: "draft", code_review_mode: :application_code, code_review_files: 1..1)
-      diagnostics.finished("ruby_rails", draft, problem_set, dropped_concepts: { "challenge" => "caching" })
+      diagnostics.finished("ruby_rails", draft, problem_set, dropped_concepts: { "challenge" => "caching" }, judge: nil, unhosted: [])
     end
 
     expect(lines.map { |line| line[/\A\[\w+\]/] }.uniq)
@@ -82,7 +82,7 @@ RSpec.describe GenerationDiagnostics do
   it "reports each dropped concept on its own track's retention line" do
     lines = logged_lines do
       described_class.new(user).finished("ruby_rails", draft, problem_set,
-                                         dropped_concepts: { "challenge" => "caching", "plan_review" => "rollout_plan" })
+                                         dropped_concepts: { "challenge" => "caching", "plan_review" => "rollout_plan" }, judge: nil, unhosted: [])
     end
 
     retention = lines.grep(/\A\[retention\].*offered=/)
@@ -95,7 +95,7 @@ RSpec.describe GenerationDiagnostics do
     def waiting_line(check, featured_concept: "scope_creep")
       check = { bucket: "plan_review", concept: "scope_creep", reason: :no_host }.merge(check)
       held  = draft.with(plan: plan.with(featured_concept: featured_concept, waiting_checks: [ check ]))
-      lines = logged_lines { described_class.new(user).finished("ruby_rails", held, problem_set) }
+      lines = logged_lines { described_class.new(user).finished("ruby_rails", held, problem_set, dropped_concepts: {}, judge: nil, unhosted: []) }
       lines.grep(/\A\[retention\].*waiting=/).sole
     end
 

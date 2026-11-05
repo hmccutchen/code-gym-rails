@@ -18,7 +18,6 @@ RSpec.describe "provider request characterization" do
   # Each purpose's per-call values; its settings come from CallProfiles::BY_PURPOSE, so a snapshot proves the profile matches its call site.
   PURPOSE_SHAPES = {
     "generate_exercise"           => {},
-    "generate_exercise_blocking"  => { blocking: true },
     "retry_section"               => {},
     "review_response"             => {},
     "assess_difficulty"           => {},

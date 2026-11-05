@@ -8,7 +8,7 @@ call begun a second before the deadline run its whole worst case past it, and
 the claim window would have to cover that overrun.
 
 It takes the request, not a purpose, and reads `Request#worst_case_seconds`,
-so a blocking request reserves its own shorter read. `AiService#call_and_log`
+so a request built with a shorter read reserves only that. `AiService#call_and_log`
 is the one caller in `app/`, and it checks before anything else, so time spent
 preparing the request (planning, ladders, rendering the prompt) is already
 counted. A judge stopped here becomes a fallback that keeps the draft, and a

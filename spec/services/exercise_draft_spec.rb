@@ -83,13 +83,20 @@ RSpec.describe ExerciseDraft do
       .to eq([ %i[req draft], %i[req kind], %i[req concept], %i[keyreq provider], %i[key cause], %i[key deadline] ])
   end
 
+  it "drafts on the generation budget alone, and finishes only with every log the judged path hands it" do
+    expect(described_class.method(:call).parameters).not_to include(%i[key blocking])
+    expect(described_class.method(:finish).parameters).to include(%i[keyreq dropped_concepts], %i[keyreq judge], %i[keyreq unhosted])
+    expect(GenerationDiagnostics.instance_method(:finished).parameters)
+      .to include(%i[keyreq dropped_concepts], %i[keyreq judge], %i[keyreq unhosted])
+  end
+
   it "drafts the day through one generate_exercise call and returns the ingested set" do
     deadline = GenerationDeadline.new(1.hour.from_now)
 
-    draft = described_class.call(user, language: "ruby_rails", provider: provider, blocking: true, deadline: deadline)
+    draft = described_class.call(user, language: "ruby_rails", provider: provider, deadline: deadline)
 
     expect(generated).to eq([ { user: user, purpose: "generate_exercise", language: "ruby_rails", prompt: "rendered prompt",
-                                subject: "problem set", blocking: true, deadline: deadline } ])
+                                subject: "problem set", deadline: deadline } ])
     expect(rendered).to eq([ { only: nil, fixed_concept: nil } ])
     expect(draft).to have_attributes(user: user, language: "ruby_rails")
     expect(draft.problem_set.keys).to match_array(draft.kinds.map(&:key))
@@ -243,7 +250,7 @@ RSpec.describe ExerciseDraft do
     allow(GenerationDiagnostics).to receive(:new).and_return(instance_double(GenerationDiagnostics, finished: nil))
     allow(Rails.logger).to receive(:warn)
 
-    described_class.finish(draft, {}, provider: failing)
+    described_class.finish(draft, {}, provider: failing, dropped_concepts: {}, judge: nil, unhosted: [])
 
     expect(recorded).to eq(%w[second])
     expect(Rails.logger).to have_received(:warn).with(/SuggestedConcept recording failed: db down/)

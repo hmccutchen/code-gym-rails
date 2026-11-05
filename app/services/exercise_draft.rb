@@ -1,12 +1,12 @@
 # Design notes: docs/code-notes/app/services/exercise_draft.md
 class ExerciseDraft
-  # prompt(user, language, plan:, history:, difficulty:, ladders:) builds a GenerationPrompt; generate(user, purpose, language, prompt, subject:, deadline:, blocking: false) returns the parsed reply; both raise. record_suggestion(suggestion) may raise.
+  # prompt(user, language, plan:, history:, difficulty:, ladders:) builds a GenerationPrompt; generate(user, purpose, language, prompt, subject:, deadline:) returns the parsed reply; both raise. record_suggestion(suggestion) may raise.
   Provider = Data.define(:prompt, :generate, :record_suggestion)
 
   Draft = Data.define(:user, :language, :problem_set, :plan, :kinds, :difficulty, :ladders, :history,
                       :suggested_concepts, :unusable_sections)
 
-  def self.call(user, language:, provider:, blocking: false, deadline: GenerationDeadline::NONE)
+  def self.call(user, language:, provider:, deadline: GenerationDeadline::NONE)
     LanguagePrompts.for(language)
     plan       = DailyPlan.for(user, language: language, featured_concept: featured_concept_name(user))
     GenerationDiagnostics.new(user).set_size(plan.size)
@@ -18,7 +18,7 @@ class ExerciseDraft
     prompt     = provider.prompt.call(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders)
 
     reply = provider.generate.call(user, "generate_exercise", language, prompt.render,
-                                   subject: "problem set", blocking: blocking, deadline: deadline)
+                                   subject: "problem set", deadline: deadline)
     files = code_review_files(plan, difficulty, user)
     ingested = ProblemSetIngest.call(
       reply, language: language, expected_keys: kinds.map(&:key), daily: plan.daily_kinds, code_review_source: plan.code_review_source,
@@ -55,7 +55,7 @@ class ExerciseDraft
     ingested.problem_set[kind.key]
   end
 
-  def self.finish(draft, set, provider:, dropped_concepts: {}, judge: nil, unhosted: [])
+  def self.finish(draft, set, provider:, dropped_concepts:, judge:, unhosted:)
     record_suggested_concepts(draft.suggested_concepts, provider)
     GenerationDiagnostics.new(draft.user).finished(draft.language, draft, set,
                                                    dropped_concepts: dropped_concepts, judge: judge, unhosted: unhosted)
