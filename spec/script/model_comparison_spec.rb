@@ -104,6 +104,35 @@ RSpec.describe ModelComparison do
     expect(FeaturedConcept.for(user)).to be_present
   end
 
+  def plans_drafted
+    plans = []
+    allow(ExerciseDraft).to receive(:call).and_wrap_original { |original, *args, **kwargs| original.call(*args, **kwargs).tap { |draft| plans << draft.plan } }
+    yield
+    plans
+  end
+
+  it "plans as earlier runs did: a weekday in the user's zone, no featured concept, and one file when generating" do
+    submit_set_showing(user, "n_plus_one", date: Date.current - 3)
+    FeaturedConcept.for(user)
+    allow(WeightedRoll).to receive(:pick).and_call_original
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).and_return(:multi)
+
+    plans = travel_to(Time.utc(2026, 10, 17, 12)) { plans_drafted { comparison.generate(user.id) } }
+
+    expect(plans).not_to be_empty
+    expect(plans).to all(have_attributes(featured_concept: nil, code_review_files: :single, code_review_gotcha: nil))
+    expect(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).to have_key(plans.first.code_review_mode)
+  end
+
+  it "plans the judge comparison with no featured concept either" do
+    submit_set_showing(user, "n_plus_one", date: Date.current - 3)
+    FeaturedConcept.for(user)
+
+    plans = plans_drafted { comparison.judge(user.id) }
+
+    expect(plans.map(&:featured_concept)).to eq([ nil ])
+  end
+
   it "leaves FeaturedConcept.for as it found it" do
     comparison.generate(user.id)
 
@@ -204,7 +233,7 @@ end
   end
 
   it "never prints the ambiguity hunt's planted answer key while judging" do
-    rolled = DailyPlan.for(user, language: "ruby_rails", judged: true)
+    rolled = DailyPlan.for(user, language: "ruby_rails")
     plan   = rolled.with(rotation: rolled.rotation.merge(fourth: :ambiguity_hunt))
     allow(DailyPlan).to receive(:for).and_return(plan)
 

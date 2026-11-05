@@ -119,7 +119,7 @@ class GeminiCapacityProbe
 
   def tester_day(day)
     @out.puts "--- tester-day #{day}"
-    draft = step(day, "draft") { service.send(:draft_exercise, @user, language: language, blocking: false, judged: true) }
+    draft = step(day, "draft") { ExerciseDraft.call(@user, language: language, provider: service.exercise_draft_provider) }
     return false if stopped?
     return true if draft.nil?
 

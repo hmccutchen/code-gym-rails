@@ -84,11 +84,13 @@ large provider output.
 nil only on a bare subclass, such as a spec double, whose usage rows then carry
 no provider.
 
-## `#generate_exercise`
+## `#generate_judged_exercise`
 
-`blocking:` means a request thread is waiting on the call. The timeout for
-that case is the `generate_exercise` profile's `blocking_read_timeout` in
-`CallProfiles::BY_PURPOSE` (`SYNC_GENERATION_READ_TIMEOUT`).
+The one way the app generates a set: draft, then judge (#703). A
+single-stage method (`#generate_exercise`, `#generate_unjudged_exercise`)
+used to sit beside it for weekend sets. Once every day was judged, only a
+measurement script called it, so it went. A script that wants a draft alone
+calls `ExerciseDraft.call` with `#exercise_draft_provider`.
 
 ## `#review_grading_provider`
 
@@ -157,12 +159,17 @@ model its replies report.
 
 ## `JudgedSet`
 
-`solves` defaults to an empty list, so a set built without a judge (the
-unjudged path, and the job specs' stand-ins) carries none.
-`#generate_unjudged_exercise` still passes `solves: []` so the path reads the
-way it behaves.
+`solves` defaults to an empty list, so a set built without a judge (the job
+specs' stand-ins) carries none.
 
 ## `#exercise_draft_provider` and `#generation_prompt`
+
+`#exercise_draft_provider` is public, as `#review_grading_provider` is, so a
+script can draft a set without judging it. `ExerciseDraft.call`'s
+`blocking:` means a request thread is waiting on the call; its timeout is the
+`generate_exercise` profile's `blocking_read_timeout`
+(`SYNC_GENERATION_READ_TIMEOUT`). Only `script/model_comparison.rb` passes it
+now.
 
 `ExerciseDraft` does the drafting and reaches this class only through the
 provider's two callables. `#generation_prompt` is the one place a

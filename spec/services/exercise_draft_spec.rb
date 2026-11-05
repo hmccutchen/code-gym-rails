@@ -43,9 +43,9 @@ RSpec.describe ExerciseDraft do
     allow(FeaturedConcept).to receive(:for).with(user).and_return(FeaturedConcept.new(concept: featured, bucket: "plan_review"))
     allow(DailyPlan).to receive(:for).and_call_original
 
-    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+    draft = described_class.call(user, language: "ruby_rails", provider: provider)
 
-    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", judged: true, featured_concept: featured)
+    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", featured_concept: featured)
     expect(draft.plan.featured_concept).to eq(featured)
   end
 
@@ -54,7 +54,7 @@ RSpec.describe ExerciseDraft do
     submit_set_showing(user, first.concept, date: Date.current - 2)
     pin_code_review_mode(:bug_hunt)
 
-    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+    draft = described_class.call(user, language: "ruby_rails", provider: provider)
 
     expect(FeaturedConcept.for(user)&.concept).to eq(first.concept)
     expect(draft.plan.featured_concept).to eq(first.concept)
@@ -64,14 +64,14 @@ RSpec.describe ExerciseDraft do
   it "plans with no featured concept when the user has none yet" do
     allow(FeaturedConcept).to receive(:for).with(user).and_return(nil)
 
-    expect(described_class.call(user, language: "ruby_rails", provider: provider, judged: true).plan.featured_concept).to be_nil
+    expect(described_class.call(user, language: "ruby_rails", provider: provider).plan.featured_concept).to be_nil
   end
 
   it "generates with no featured concept, and logs, when the weekly lookup raises a database error" do
     allow(FeaturedConcept).to receive(:for).with(user).and_raise(ActiveRecord::StatementInvalid, "boom")
     allow(Rails.logger).to receive(:warn)
 
-    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+    draft = described_class.call(user, language: "ruby_rails", provider: provider)
 
     expect(draft.plan.featured_concept).to be_nil
     expect(Rails.logger).to have_received(:warn).with(/featured concept.*user #{user.id}/i)
@@ -86,7 +86,7 @@ RSpec.describe ExerciseDraft do
   it "drafts the day through one generate_exercise call and returns the ingested set" do
     deadline = GenerationDeadline.new(1.hour.from_now)
 
-    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true, blocking: true, deadline: deadline)
+    draft = described_class.call(user, language: "ruby_rails", provider: provider, blocking: true, deadline: deadline)
 
     expect(generated).to eq([ { user: user, purpose: "generate_exercise", language: "ruby_rails", prompt: "rendered prompt",
                                 subject: "problem set", blocking: true, deadline: deadline } ])
@@ -104,7 +104,7 @@ RSpec.describe ExerciseDraft do
 
   it "logs a key note for each keyed section of the drafted day" do
     draft = nil
-    lines = planted_key_lines { draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true) }
+    lines = planted_key_lines { draft = described_class.call(user, language: "ruby_rails", provider: provider) }
 
     keyed = draft.problem_set.keys.select { |key| ExerciseSection.find(key).planted_key? }
     expect(keyed).not_to be_empty
@@ -113,7 +113,7 @@ RSpec.describe ExerciseDraft do
   end
 
   it "logs the key note of a retried section, and still returns only the section" do
-    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+    draft = described_class.call(user, language: "ruby_rails", provider: provider)
 
     section = nil
     lines = planted_key_lines { section = described_class.retry_section(draft, ExerciseSection::CodeReview, "n_plus_one", provider: provider) }
@@ -123,7 +123,7 @@ RSpec.describe ExerciseDraft do
   end
 
   it "checks a retried migration section's key against the schema the server stamps" do
-    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+    draft = described_class.call(user, language: "ruby_rails", provider: provider)
     migration = instance_double(RealSource::Migration, scenario: "s", id: "db/migrate/1_add_owner.rb",
                                                        current_schema: %(create_table "things" do |t|\n  t.bigint "owner_id"\nend\n))
     draft = draft.with(plan: draft.plan.with(code_review_source: migration, code_review_mode: :schema_review))
@@ -146,7 +146,7 @@ RSpec.describe ExerciseDraft do
     end
     pin_code_review_mode(:test_file)
 
-    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+    draft = described_class.call(user, language: "ruby_rails", provider: provider)
     described_class.retry_section(draft, ExerciseSection::CodeReview, draft.problem_set.dig("code_review", "concept"), provider: provider)
 
     expect(modes).to eq(%i[test_file test_file])
@@ -165,14 +165,14 @@ RSpec.describe ExerciseDraft do
     end
 
     it "holds the draft to the range its rung gives a multi-file day" do
-      described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+      described_class.call(user, language: "ruby_rails", provider: provider)
 
       expect(ranges).to eq([ 2..2 ])
     end
 
     it "holds a retry to the same range as its draft" do
       user.update!(section_kind_levels: { "code_review" => "senior" })
-      draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+      draft = described_class.call(user, language: "ruby_rails", provider: provider)
       reply.replace("code_review" => FakeService::MULTI_FILE_CODE_REVIEW.deep_dup)
 
       section = described_class.retry_section(draft, ExerciseSection::CodeReview, "n_plus_one", provider: provider)
@@ -183,12 +183,12 @@ RSpec.describe ExerciseDraft do
   end
 
   it "refuses an unsupported language before it plans or calls" do
-    expect { described_class.call(user, language: "cobol", provider: provider, judged: true) }.to raise_error(SetupError)
+    expect { described_class.call(user, language: "cobol", provider: provider) }.to raise_error(SetupError)
     expect(generated).to be_empty
   end
 
   it "retries one kind with its concept fixed, keeping back time for the re-judge" do
-    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+    draft = described_class.call(user, language: "ruby_rails", provider: provider)
     generated.clear
     rendered.clear
     ends_at = 1.hour.from_now
@@ -204,7 +204,7 @@ RSpec.describe ExerciseDraft do
   end
 
   it "hands the retry prompt the recorded cause of the rejection, when there is one" do
-    draft = described_class.call(user, language: "ruby_rails", provider: provider, judged: true)
+    draft = described_class.call(user, language: "ruby_rails", provider: provider)
     rendered.clear
     reply.replace("pattern" => FakeService::EXERCISE_PROBLEM_SET["pattern"].deep_dup)
 
@@ -217,7 +217,7 @@ RSpec.describe ExerciseDraft do
     real_prompt = provider.with(prompt: lambda { |*args, **options|
       GenerationPrompt.new(*args, **options, retention_annotation: ->(*) { })
     })
-    draft = described_class.call(user, language: "ruby_rails", provider: real_prompt, judged: true)
+    draft = described_class.call(user, language: "ruby_rails", provider: real_prompt)
     rejected = draft.problem_set.fetch("design_comparison").merge(
       "piece_a" => "def rejected_piece_alpha = 1", "piece_b" => "def rejected_piece_beta = 2",
       "scenario" => "REJECTED-SCENARIO", "answer_key" => { "better" => "a", "deciding_fact" => "REJECTED-FACT" }

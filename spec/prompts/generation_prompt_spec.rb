@@ -180,7 +180,7 @@ RSpec.describe GenerationPrompt do
         logged = message if message.is_a?(String) && message.start_with?("[difficulty_diagnostics]")
       end
 
-      FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+      FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set
 
       kinds = ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: nil, third: :challenge, fourth: :plan_review })
       expect(rendered.size).to eq(2)

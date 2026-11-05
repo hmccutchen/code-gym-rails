@@ -43,13 +43,13 @@ class DailyPlan
 
   NO_FOURTH_TRACK = { fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
 
-  def self.for(user, language:, judged:, featured_concept: nil)
+  def self.for(user, language:, featured_concept: nil, weekend: Date.current.on_weekend?)
     history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
     size             = size_for(user, history)
     preferences      = KindPreferences.for(user)
     daily            = DailyKinds.for(user)
     rotation         = SectionRotation.for(history, count: size.count, preferences: preferences, daily: daily)
-    code_review_mode = WeightedRoll.pick(code_review_mode_weights(judged))
+    code_review_mode = WeightedRoll.pick(weekend ? WEEKEND_CODE_REVIEW_MODE_WEIGHTS : CODE_REVIEW_MODE_WEIGHTS)
     trap             = code_review_gotcha_for(user, language, code_review_mode, featured_concept)
     hosts_for        = lambda do |day_rotation, featured = featured_concept|
       DayHosts.new(language, mode: code_review_mode, gotcha: day_gotcha(trap, daily, day_rotation), featured_concept: featured)
@@ -63,7 +63,7 @@ class DailyPlan
                                                unfeatured_for: unfeatured_for)
 
     source = code_review_source_for(user, language, code_review_mode)
-    single = source || !judged || !ExerciseSection::CodeReview.multi_file_mode?(code_review_mode)
+    single = source || !ExerciseSection::CodeReview.multi_file_mode?(code_review_mode)
 
     Result.new(daily_kinds: daily, rotation: rotation, **tracks, coverage: coverage, size: size,
                code_review_mode: code_review_mode, code_review_source: source,
@@ -71,11 +71,6 @@ class DailyPlan
                code_review_gotcha: day_gotcha(trap, daily, rotation), featured_concept: featured_concept,
                scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS))
   end
-
-  def self.code_review_mode_weights(judged)
-    judged && Date.current.on_weekend? ? WEEKEND_CODE_REVIEW_MODE_WEIGHTS : CODE_REVIEW_MODE_WEIGHTS
-  end
-  private_class_method :code_review_mode_weights
 
   def self.code_review_gotcha_for(user, language, mode, featured_concept)
     return nil unless ExerciseSection::CodeReview::BugHunt.mode?(mode)

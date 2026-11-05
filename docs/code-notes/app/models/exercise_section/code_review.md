@@ -8,7 +8,7 @@ The cap is `RealSource::MAX_LINES` (40) rather than a tighter number. A grounded
 
 Lines are counted after `ProblemSetIngest#format_code!`, so the cap measures the code as shown, and blank lines don't count, the same rule design comparison's `MAX_PIECE_LINES` uses (`ExerciseSection.shown_lines`).
 
-A snippet over the cap is refused, never cut, since cutting code could cut out the planted flaw. `code_review` is a daily kind, so on a judged day a refusal gets up to two retries with its concept fixed before the section is dropped; the single-stage path, which only scripts use now, drops it straight away. The refusal message carries the line count and none of the code. A missing or blank snippet is refused the same way.
+A snippet over the cap is refused, never cut, since cutting code could cut out the planted flaw. `code_review` is a daily kind, so a refusal gets up to two retries with its concept fixed before the section is dropped. The refusal message carries the line count and none of the code. A missing or blank snippet is refused the same way.
 
 ## Two shapes: one snippet, or two to three files
 
@@ -54,7 +54,7 @@ A `RealSource` day is always single-file, so the multi-file guidance never meets
 
 ## The judge
 
-A section with files gets its own task and paragraph (`MultiFile::JUDGE_TASK`, `MultiFile::JUDGE_GUIDANCE`) through `.judge_task_for` and `.judge_guidance_for`, which fall back through `super` to the bug-hunt hooks and then the base, so a single-file or bug-hunt section's judge prompt is unchanged. The paragraph asks the judge to solve the section first, to reject one that a single file explains, or whose problem is an exploit rather than a broken contract between files, and never to change a path, a file's code or its changed lines. The judge is that guard, so a section with files never ships without it: `DailyPlan` rolls files only on a judged day, and `.ships_unjudged?` is false for a section with files, so a judge failure drops it, as it drops a bug hunt. The blind solve stays off for `code_review`.
+A section with files gets its own task and paragraph (`MultiFile::JUDGE_TASK`, `MultiFile::JUDGE_GUIDANCE`) through `.judge_task_for` and `.judge_guidance_for`, which fall back through `super` to the bug-hunt hooks and then the base, so a single-file or bug-hunt section's judge prompt is unchanged. The paragraph asks the judge to solve the section first, to reject one that a single file explains, or whose problem is an exploit rather than a broken contract between files, and never to change a path, a file's code or its changed lines. The judge is that guard, so a section with files never ships without it: every set is judged, files never roll on a `bug_hunt` or `RealSource` day, and `.ships_unjudged?` is false for a section with files, so a judge failure drops it, as it drops a bug hunt. The blind solve stays off for `code_review`.
 
 The judge sees each file through `File#prompt_text`, after the section's JSON: `.judge_hidden_fields` names every `file_N_*` field, which `SectionJudgePrompt` leaves out of the JSON, and `.judge_attachment` returns the numbered files under a line saying "Changed lines" are the lines the page marks (#630). So the judge sees the changed line numbers the page marks and never the provider's quotes (#625): a quote that matched no line, or several, marks nothing on the page, so showing it would describe a change the engineer never sees. `section_judge_prompt_spec` snapshots the prompt for an ingested multi-file section.
 

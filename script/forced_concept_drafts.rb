@@ -7,7 +7,9 @@ class ForcedConceptDrafts
   NOTES = { "proportionality" => Rails.root.join("docs/proportionality-concept-2026-10-07.md") }.freeze
 
   def self.todays_plan(user, language)
-    DailyPlan.for(user, language: language, judged: true, featured_concept: stored_featured_concept(user))
+    Time.use_zone(user.effective_time_zone) do
+      DailyPlan.for(user, language: language, weekend: false, featured_concept: stored_featured_concept(user))
+    end
   end
 
   def self.stored_featured_concept(user)

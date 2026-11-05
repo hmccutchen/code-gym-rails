@@ -34,8 +34,13 @@ When the live judge already edited a stored review, the comparison starts from t
 candidate gets the same request. It also holds `FeaturedConcept.for` to `nil`.
 `ExerciseDraft.call` asks for the week's featured concept before it plans,
 and `FeaturedConcept.for` can insert, update or delete the user's weekly row,
-so a comparison run against a real user would otherwise change it. The fixed
-plan carries no featured concept either, so both candidates plan without one.
+so a comparison run against a real user would otherwise change it.
+
+The plan itself is `#comparison_plan`: a weekday (`weekend: false`) in the
+user's zone, with no featured concept, so a run on any day sends the same
+kind of request as earlier recorded runs (#704). `generate` also pins one
+file, as the single-stage path it used to call did; `judge` keeps the files
+roll, as before.
 Both methods are put back when the block ends, even if it raises.
 
 ## `#judge_concept`

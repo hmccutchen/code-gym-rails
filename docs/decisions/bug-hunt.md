@@ -48,11 +48,13 @@ setting turns it off or weights it (owner's decision).
   - **The day is read once.** `GenerateDailyExercisesJob#generate_for` takes
     the date before the judged run and stamps the row with it, so a run
     started late on Sunday writes Sunday's set, not a bug hunt dated Monday.
-  - **How it is wired:** a model may not name `AiService`, so `DailyPlan.for`
-    takes `judged:` from the path that called it and reads the day itself
-    (`Date.current.on_weekend?`). An unjudged plan, which only
-    `#generate_unjudged_exercise` and its script callers make now, rolls the
-    weekday weights on any day.
+  - **How it is wired:** `DailyPlan.for` takes `weekend:`, which defaults to
+    `Date.current.on_weekend?` in the zone the caller runs under; the jobs
+    run under the user's. Every set is judged, so the plan no longer asks
+    which path called it: the single-stage path is gone (#703). The
+    measurement scripts plan in the user's zone with `weekend: false`, so a
+    run on a Saturday measures the same kind of set as a run on a Tuesday
+    (#704).
 - **Single-file.** A `bug_hunt` day never rolls multi-file and is never
   grounded in a `RealSource` excerpt.
 - **Core Ruby and core JavaScript only.** No Rails, TypeScript, framework,
@@ -201,8 +203,8 @@ schedule.
 - **When it can't answer:** a `bug_hunt` section is dropped, never shipped
   unjudged (`ships_unjudged?`, read by `JudgedGeneration` on the first pass
   and on a retry's re-judge). Every other kind keeps its draft. The judge is
-  the only check that the code is wrong as written, which is why an
-  unjudged plan never rolls the mode. The cost: on a judge outage the day loses its
+  the only check that the code is wrong as written, which is why every
+  set that can hold one is judged. The cost: on a judge outage the day loses its
   `code_review` section, and nothing replaces it (owner's decision,
   2026-11-02).
 

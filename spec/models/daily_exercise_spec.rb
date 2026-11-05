@@ -137,7 +137,7 @@ RSpec.describe DailyExercise, type: :model do
 
     it "keeps the planned pair and its rotated third, in order, after a reload and after the user's pair changes" do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil, design_comparison: nil)
-      plan = DailyPlan.for(pair_user, language: "ruby_rails", judged: true)
+      plan = DailyPlan.for(pair_user, language: "ruby_rails")
       set  = plan.kinds.to_h { |kind| [ kind.key, { "question" => "?" } ] }
       exercise = DailyExercise.create!(user: pair_user, date: Date.current, generated_at: Time.current,
                                        problem_set: set, plan_notes: plan.notes)

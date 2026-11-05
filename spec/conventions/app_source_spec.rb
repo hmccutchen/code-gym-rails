@@ -195,6 +195,33 @@ RSpec.describe "Conventions held over app/ source" do
     expect(level_writes("rungs(skill_level: user.skill_level); User.new(skill_level: 'junior')").size).to eq(0)
   end
 
+  def unjudged_draft_calls(source)
+    found = []
+    visit = lambda do |node|
+      if node.is_a?(Prism::CallNode)
+        draft = node.name == :call && node.receiver.is_a?(Prism::ConstantReadNode) && node.receiver.name == :ExerciseDraft
+        found << node.location.start_line if draft || node.name == :exercise_draft_provider
+      end
+      node.compact_child_nodes.each(&visit)
+    end
+    visit.call(Prism.parse(source).value)
+    found
+  end
+
+  it "drafts a set only inside AiService, which judges every draft, so no bug hunt or multi-file section ships unjudged" do
+    offenders = app_files.reject { |path| relative(path) == "app/clients/ai_service.rb" }.flat_map do |path|
+      unjudged_draft_calls(File.read(path)).map { |line| "#{relative(path)}:#{line}" }
+    end
+
+    expect(offenders).to be_empty, "a draft taken outside AiService: #{offenders.join(', ')}"
+  end
+
+  it "finds a draft call or a reach for the draft provider, and not a mention in a comment or string" do
+    expect(unjudged_draft_calls("ExerciseDraft.call(user, language: \"ruby_rails\", provider: p)")).to eq([ 1 ])
+    expect(unjudged_draft_calls("service.exercise_draft_provider")).to eq([ 1 ])
+    expect(unjudged_draft_calls("# ExerciseDraft.call\n\"exercise_draft_provider\"\nExerciseDraft.finish(d, s, provider: p)")).to eq([])
+  end
+
   it "names Faraday only inside app/clients, where the provider requests are built" do
     offenders = app_files.reject { |path| relative(path).start_with?("app/clients/") }.select { |path| File.read(path).match?(/\bFaraday\b/) }
 

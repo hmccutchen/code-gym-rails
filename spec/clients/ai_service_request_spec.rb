@@ -140,7 +140,7 @@ RSpec.describe AiService, "request values" do
 
     def drive(purpose)
       case purpose
-      when "generate_exercise"           then service.generate_exercise(user)
+      when "generate_exercise"           then service.generate_judged_exercise(user).problem_set
       when "retry_section"               then retry_one_section
       when "review_response"             then service.review_sections(user, exercise, response, sections: %w[code_review])
       when "assess_difficulty"           then service.send(:assess_difficulty, user, exercise, sections: %w[code_review])
@@ -158,7 +158,7 @@ RSpec.describe AiService, "request values" do
     end
 
     def retry_one_section
-      draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false, judged: true)
+      draft = service.then { |svc| ExerciseDraft.call(user, language: "ruby_rails", provider: svc.exercise_draft_provider) }
       service.send(:retry_section, draft, ExerciseSection::Pattern, "service_objects")
     end
 
@@ -178,7 +178,7 @@ RSpec.describe AiService, "request values" do
     end
 
     it "sends a blocking generation on the synchronous timeout" do
-      request = request_sent_for("generate_exercise") { service.generate_exercise(user, blocking: true) }
+      request = request_sent_for("generate_exercise") { ExerciseDraft.call(user, language: user.language_for_today, provider: service.exercise_draft_provider, blocking: true) }
 
       expect(settings_of(request)).to eq(call_site_settings["generate_exercise"].merge(read_timeout: CallProfiles::SYNC_GENERATION_READ_TIMEOUT))
     end

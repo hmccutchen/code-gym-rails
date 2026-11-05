@@ -160,7 +160,7 @@ RSpec.describe KeySampleDrafts do
 
   it "measures the plan's retry input from the prompt a real retry sends, ladders included" do
     sent = []
-    plan = DailyPlan.for(User.new, language: "ruby_rails", judged: true)
+    plan = DailyPlan.for(User.new, language: "ruby_rails")
     allow(DailyPlan).to receive(:for).and_return(plan)
     allow_any_instance_of(ClaudeService).to receive(:request_body).and_wrap_original do |original, request|
       sent << "#{request.system}#{request.prompt}" if request.purpose == "retry_section"

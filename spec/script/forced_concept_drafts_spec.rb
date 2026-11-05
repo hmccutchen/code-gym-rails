@@ -69,6 +69,27 @@ RSpec.describe ForcedConceptDrafts do
     end
   end
 
+  describe ".todays_plan" do
+    it "plans a weekday set on a weekend, so a Saturday run measures what a Tuesday run does" do
+      allow(WeightedRoll).to receive(:pick).and_call_original
+
+      plan = travel_to(Time.utc(2026, 10, 17, 12)) { described_class.todays_plan(user, "ruby_rails") }
+
+      expect(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).to have_key(plan.code_review_mode)
+      expect(plan.code_review_gotcha).to be_nil
+    end
+
+    it "plans in the user's zone, not the app's" do
+      user.update!(time_zone: "Auckland")
+      zones = []
+      allow(DailyPlan).to receive(:for).and_wrap_original { |original, *args, **kwargs| zones << Time.zone.name; original.call(*args, **kwargs) }
+
+      described_class.todays_plan(user, "ruby_rails")
+
+      expect(zones).to eq([ user.effective_time_zone ])
+    end
+  end
+
   it "reads the draft guidance line from the concept's design note" do
     expect(described_class.guidance_for(concept)).to start_with("- The proportionality concept")
     expect { described_class.guidance_for("god_object") }.to raise_error(ArgumentError, /No design note/)
@@ -133,7 +154,7 @@ RSpec.describe ForcedConceptDrafts do
     end
 
     def ordinary_prompt(service)
-      service.generate_exercise(user, language: "ruby_rails")
+      service.generate_judged_exercise(user, language: "ruby_rails").problem_set
       service.sent_prompts.last
     end
 

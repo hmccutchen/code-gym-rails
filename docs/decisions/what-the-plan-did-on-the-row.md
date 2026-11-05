@@ -16,11 +16,8 @@ figure on that day until the row is replaced. The size is the planned count befo
 coverage addition, so a coverage day never reads as a larger planned size;
 `DailyExercise#planned_size` reads it and `.planned_size_before(date)` finds
 the latest earlier one. It is server-owned and written with the row
-from the plan that produced it, never recomputed while rendering: both
-generation paths hand it back on `AiService::JudgedSet#plan_notes`
-(`#generate_unjudged_exercise` on the single-stage path, which only scripts use now,
-`#generate_judged_exercise` on the judged one; `#generate_exercise` still
-returns only the set).
+from the plan that produced it, never recomputed while rendering:
+`#generate_judged_exercise` hands it back on `AiService::JudgedSet#plan_notes`.
 `RegenerateExerciseJob` rewrites it from the new plan, clearing it when the
 new plan recorded nothing, and carry-forward moves it with the row because
 it is on the row. No backfill: no earlier plan added a section or shared a
