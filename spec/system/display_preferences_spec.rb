@@ -195,6 +195,38 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     expect(stored { |values| values["theme"] == "device" }).to eq("theme" => "device")
   end
 
+  it "sets prose in OpenDyslexic when it is the reading font, and leaves code monospace" do
+    user.update!(display_preferences: { "font" => "opendyslexic" })
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_css("pre.snippet")
+
+      family = ->(selector) { page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).fontFamily") }
+      expect(family.call(".question")).to include("OpenDyslexic")
+      expect(family.call("pre.snippet")).to eq("monospace, monospace")
+      expect(page.evaluate_script("document.fonts.load('16px OpenDyslexic').then((faces) => faces.length)")).to be > 0
+    end
+  end
+
+  it "breaks a long word in prose under OpenDyslexic, but wraps inline code as every other font does" do
+    user.update!(display_preferences: { "font" => "opendyslexic" })
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      wraps = page.evaluate_script(<<~JS)
+        (() => {
+          const main = document.querySelector("main");
+          main.insertAdjacentHTML("beforeend", '<p id="plain">x <code>a_very_long_identifier</code></p><div class="question" id="asked">x <code>a_very_long_identifier</code></div><p class="learn-worked-example" id="worked">x <code>a_very_long_identifier</code></p>');
+          const wrap = (selector) => getComputedStyle(document.querySelector(selector)).overflowWrap;
+          return [wrap("#plain"), wrap("#plain code"), wrap("#asked code"), wrap("#worked code")];
+        })()
+      JS
+
+      expect(wraps).to eq(%w[anywhere normal anywhere anywhere])
+    end
+  end
+
   it "keeps code in its monospace font under a reading font" do
     user.update!(display_preferences: { "font" => "atkinson" })
 

@@ -4,7 +4,7 @@ class DisplayPreferences
     "theme"        => %w[dark light device],
     "text_size"    => %w[100 112 125 140],
     "line_spacing" => %w[default relaxed loose],
-    "font"         => %w[default atkinson],
+    "font"         => %w[default atkinson opendyslexic],
     "background_pattern" => %w[on off]
   }.freeze
 

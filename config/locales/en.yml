@@ -617,6 +617,7 @@ en:
       options:
         default: "Default"
         atkinson: "Atkinson Hyperlegible"
+        opendyslexic: "OpenDyslexic"
     background_pattern:
       legend: "Background pattern"
       options:

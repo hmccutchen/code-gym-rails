@@ -22,3 +22,10 @@ partial renders on Settings only.
   kind in a pair.
 - The card notes in both disclosures hold to `65ch`.
 - Below 900px nothing changes: a centered 480px column from 600px.
+
+## `.form-field .card-note a`
+
+The key hint links to each provider's console, and each link text is one
+unbreakable word. At a 320px width with large text it ran past the screen in
+every font, so the links may break inside the word when nothing else fits.
+The reasoning is in `docs/decisions/display-preferences.md` ("Long words").

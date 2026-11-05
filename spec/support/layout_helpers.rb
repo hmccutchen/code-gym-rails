@@ -1,5 +1,6 @@
 module LayoutHelpers
-  LARGEST_TEXT = { "text_size" => "140", "line_spacing" => "loose", "font" => "atkinson" }.freeze
+  LARGEST_TEXT = { "text_size" => "140", "line_spacing" => "loose", "font" => "opendyslexic" }.freeze
+  LARGEST_TEXTS = [ LARGEST_TEXT, LARGEST_TEXT.merge("font" => "atkinson").freeze ].freeze
   LAYOUT_WIDTHS = [ 320, 390, 768, 899, 900, 1280, 1920 ].freeze
 
   def resize(width, height: 844)

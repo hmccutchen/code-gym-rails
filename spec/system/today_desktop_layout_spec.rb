@@ -40,8 +40,8 @@ RSpec.describe "Today's desktop layout", type: :system do
 
   describe "sideways scroll" do
     LayoutHelpers::LAYOUT_WIDTHS.each do |width|
-      [ {}, LayoutHelpers::LARGEST_TEXT ].each do |prefs|
-        it "keeps an open and a submitted day inside a #{width}px window#{' with the largest text' if prefs.any?}" do
+      [ {}, *LayoutHelpers::LARGEST_TEXTS ].each do |prefs|
+        it "keeps an open and a submitted day inside a #{width}px window#{" with the largest text in #{prefs["font"]}" if prefs.any?}" do
           visit_today(width: width, prefs: prefs)
           expect(sideways_overflow).to eq(0)
           submit_the_day
