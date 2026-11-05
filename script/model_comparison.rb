@@ -57,7 +57,7 @@ class ModelComparison
     plan     = comparison_plan(user, language).with(code_review_files: :single)
 
     compare("generate", heading: "user #{user.id}, #{language}") do |service|
-      problem_set = with_fixed_plan(plan) { fixed_draft(service, user, language, blocking: false).problem_set }
+      problem_set = with_fixed_plan(plan) { fixed_draft(service, user, language).problem_set }
       # Printed output gets pasted around, which is the storage ExerciseSection.without_answer_keys keeps the key out of.
       ExerciseSection.without_answer_keys(problem_set)
     end
@@ -97,7 +97,7 @@ class ModelComparison
     plan       = comparison_plan(user, language)
     difficulty = KindDifficulty.for(user)
 
-    draft = with_fixed_plan(plan) { fixed_draft(pinned_service(CANDIDATES.fetch("generate").first, []), user, language, blocking: true) }
+    draft = with_fixed_plan(plan) { fixed_draft(pinned_service(CANDIDATES.fetch("generate").first, []), user, language) }
 
     runs = compare("judge", heading: "user #{user.id}, #{language}") do |service|
       judge_draft(service, user, draft, difficulty)
@@ -710,8 +710,8 @@ class ModelComparison
     Time.use_zone(user.effective_time_zone) { DailyPlan.for(user, language: language, weekend: false) }
   end
 
-  def fixed_draft(service, user, language, blocking:)
-    ExerciseDraft.call(user, language: language, blocking: blocking, provider: service.exercise_draft_provider)
+  def fixed_draft(service, user, language)
+    ExerciseDraft.call(user, language: language, provider: service.exercise_draft_provider)
   end
 
   # DailyPlan.for rolls at random on every call, so candidates would otherwise get different requests.

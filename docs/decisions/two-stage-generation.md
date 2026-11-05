@@ -50,7 +50,7 @@ start, so a slow pickup comes out of the same budget.
   call's own worst case (`AiService::Request#worst_case_seconds`, retries
   included) must still end in time, or it raises `ProviderError::DeadlineError`,
   a `TimeoutError`. The worst case comes from the request itself, so a
-  blocking request reserves its shorter read and not the profile's. It shares
+  request with a shorter read reserves only that. It shares
   one formula with `CallProfiles.worst_case_seconds_for`, which the constants
   above use. Checking the worst case rather than the clock alone makes the
   deadline a ceiling on the job: a call begun just before it can't overrun.

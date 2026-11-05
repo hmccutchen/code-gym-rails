@@ -4,10 +4,10 @@ module CallProfiles
   READ_TIMEOUT = 45
 
   GENERATION_READ_TIMEOUT      = 300
-  SYNC_GENERATION_READ_TIMEOUT = 90
-  RETRY_READ_TIMEOUT           = SYNC_GENERATION_READ_TIMEOUT
+  SHORT_GENERATION_READ_TIMEOUT = 90
+  RETRY_READ_TIMEOUT            = SHORT_GENERATION_READ_TIMEOUT
 
-  CONCEPT_REFERENCE_READ_TIMEOUT = SYNC_GENERATION_READ_TIMEOUT
+  CONCEPT_REFERENCE_READ_TIMEOUT = SHORT_GENERATION_READ_TIMEOUT
 
   REVIEW_READ_TIMEOUT = 120
 
@@ -44,7 +44,7 @@ module CallProfiles
   REVIEW_JUDGE_MAX_TOKENS = 1_500
 
   BY_PURPOSE = {
-    "generate_exercise"           => { read_timeout: GENERATION_READ_TIMEOUT, blocking_read_timeout: SYNC_GENERATION_READ_TIMEOUT },
+    "generate_exercise"           => { read_timeout: GENERATION_READ_TIMEOUT },
     "retry_section"               => { read_timeout: RETRY_READ_TIMEOUT },
     "review_response"             => { cache_system: true, read_timeout: REVIEW_READ_TIMEOUT },
     "assess_difficulty"           => { max_tokens: DIFFICULTY_ASSESSMENT_MAX_TOKENS },

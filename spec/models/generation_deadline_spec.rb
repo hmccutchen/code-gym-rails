@@ -7,7 +7,7 @@ RSpec.describe GenerationDeadline do
 
   def deadline_in(seconds) = described_class.new(start + seconds, clock: clock)
 
-  def request(purpose, blocking: false) = AiService.request_for(purpose, system: "s", prompt: "p", blocking: blocking)
+  def request(purpose) = AiService.request_for(purpose, system: "s", prompt: "p")
 
   def worst(purpose) = CallProfiles.worst_case_seconds_for(purpose)
 
@@ -21,11 +21,11 @@ RSpec.describe GenerationDeadline do
         .to raise_error(ProviderError::DeadlineError)
     end
 
-    it "reserves what the request itself can take, so a blocking draft needs its shorter read, not the full one" do
-      blocking = request("generate_exercise", blocking: true)
+    it "reserves what the request itself can take, read from its own settings" do
+      short = AiService::Request.build(purpose: "generate_exercise", system: "s", prompt: "p", read_timeout: CallProfiles::READ_TIMEOUT)
 
-      expect(blocking.worst_case_seconds).to be < worst("generate_exercise")
-      expect { deadline_in(blocking.worst_case_seconds).ensure_fits!(blocking) }.not_to raise_error
+      expect(short.worst_case_seconds).to be < worst("generate_exercise")
+      expect { deadline_in(short.worst_case_seconds).ensure_fits!(short) }.not_to raise_error
     end
 
     it "is a timeout to everything that classifies provider failures" do

@@ -219,7 +219,7 @@ RSpec.describe "Conventions held over app/ source" do
   it "finds a draft call or a reach for the draft provider, and not a mention in a comment or string" do
     expect(unjudged_draft_calls("ExerciseDraft.call(user, language: \"ruby_rails\", provider: p)")).to eq([ 1 ])
     expect(unjudged_draft_calls("service.exercise_draft_provider")).to eq([ 1 ])
-    expect(unjudged_draft_calls("# ExerciseDraft.call\n\"exercise_draft_provider\"\nExerciseDraft.finish(d, s, provider: p)")).to eq([])
+    expect(unjudged_draft_calls("# ExerciseDraft.call\n\"exercise_draft_provider\"\nExerciseDraft.finish(d, s, provider: p, dropped_concepts: {}, judge: nil, unhosted: [])")).to eq([])
   end
 
   it "names Faraday only inside app/clients, where the provider requests are built" do

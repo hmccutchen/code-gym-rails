@@ -26,13 +26,9 @@ class AiService
     def worst_case_seconds = CallProfiles.call_worst_case_seconds(read_timeout: read_timeout, single_attempt: single_attempt)
   end
 
-  def self.request_for(purpose, system:, prompt:, history: [], response_schema: nil, blocking: false)
-    profile  = CallProfiles.fetch(purpose)
-    settings = profile.except(:blocking_read_timeout)
-    if blocking
-      settings[:read_timeout] = profile.fetch(:blocking_read_timeout) { raise ArgumentError, "#{purpose} has no blocking read timeout" }
-    end
-    Request.build(purpose: purpose, system: system, prompt: prompt, history: history, response_schema: response_schema, **settings)
+  def self.request_for(purpose, system:, prompt:, history: [], response_schema: nil)
+    Request.build(purpose: purpose, system: system, prompt: prompt, history: history, response_schema: response_schema,
+                  **CallProfiles.fetch(purpose))
   end
 
   MAX_LADDER_GUIDANCE_CHARS = 54_000
@@ -293,8 +289,8 @@ class AiService
 
   def record_suggested_concept(suggestion) = SuggestedConcept.record!(language: suggestion.bucket, name: suggestion.name)
 
-  def generate_problem_set(user, purpose, language, prompt, subject:, blocking: false, deadline: GenerationDeadline::NONE)
-    request = AiService.request_for(purpose, blocking: blocking, system: build_system_prompt(language), prompt: prompt)
+  def generate_problem_set(user, purpose, language, prompt, subject:, deadline: GenerationDeadline::NONE)
+    request = AiService.request_for(purpose, system: build_system_prompt(language), prompt: prompt)
     parse_json_object(call_and_log(user, request, deadline: deadline)[:text], subject: subject, log_raw: false)
   end
 
