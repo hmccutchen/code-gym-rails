@@ -450,6 +450,19 @@ RSpec.describe "Small screen layout", type: :system do
       open_every_disclosure
     end
 
+    %w[default atkinson opendyslexic].each do |font|
+      it "keeps the key hint's provider links on screen at 320px in the #{font} font, with larger browser text and the spacing override" do
+        user = User.create!(email: "hint-#{font}@example.com", time_zone: "UTC", track_chosen_at: Time.current)
+        user.update!(display_preferences: LayoutHelpers::LARGEST_TEXT.merge("font" => font))
+        resize(320)
+        set_default_font_size(20)
+        visit_settings_open(user)
+        apply_text_spacing
+
+        expect(page_width).to eq(320)
+      end
+    end
+
     def rem(multiple)
       multiple * page.evaluate_script("parseFloat(getComputedStyle(document.documentElement).fontSize)")
     end

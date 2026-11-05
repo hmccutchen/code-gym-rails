@@ -50,3 +50,8 @@ html[data-font="opendyslexic"] :is(p, li, dd, .question, .section-scenario, .why
   font-family: "OpenDyslexic", sans-serif;
   overflow-wrap: anywhere;
 }
+html[data-font="opendyslexic"] :is(p, li, dd, .question, .section-scenario, .why-box, .plan-excerpt,
+  .problem-statement, .hint-body, .ref-body, .review-item, .alternate-item, .follow-up-turn, .duck-turn)
+  code:not(:is(pre, .question, .section-scenario, .plan-excerpt, .problem-statement, .review-block) code) {
+  overflow-wrap: normal;
+}

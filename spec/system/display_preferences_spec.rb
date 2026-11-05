@@ -209,6 +209,24 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     end
   end
 
+  it "breaks a long word in prose under OpenDyslexic, but wraps inline code as every other font does" do
+    user.update!(display_preferences: { "font" => "opendyslexic" })
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      wraps = page.evaluate_script(<<~JS)
+        (() => {
+          const main = document.querySelector("main");
+          main.insertAdjacentHTML("beforeend", '<p id="plain">x <code>a_very_long_identifier</code></p><div class="question" id="asked">x <code>a_very_long_identifier</code></div>');
+          const wrap = (selector) => getComputedStyle(document.querySelector(selector)).overflowWrap;
+          return [wrap("#plain"), wrap("#plain code"), wrap("#asked code")];
+        })()
+      JS
+
+      expect(wraps).to eq(%w[anywhere normal anywhere])
+    end
+  end
+
   it "keeps code in its monospace font under a reading font" do
     user.update!(display_preferences: { "font" => "atkinson" })
 

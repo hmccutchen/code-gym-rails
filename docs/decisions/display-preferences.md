@@ -63,15 +63,30 @@ font data is unchanged apart from compression. The author now distributes
 WOFF2 files in the repository's `compiled` folder
 (`forge.hackers.town/antijingoist/opendyslexic`), so the app ships
 `OpenDyslexic-Regular.woff2` and `OpenDyslexic-Bold.woff2` byte for byte,
-renamed only on disk, with the license beside them. Those files are the
+renamed only on disk, with the license beside them. They and `OFL.txt` were
+taken at commit `48218028cc8bd9f4f244cd4ce4049e6c879d4d1a` (2025-11-29), the
+last change to each file there, so a later check can compare against it. Those files are the
 Original Version, so the name stands. Fontsource's processed copies, which
 #235 first looked at, are not used. `display_stylesheet_spec` pins each
-file's SHA-256, so a converted or subset copy dropped in later fails before
-it ships under the reserved name. The files are 103 KB and 108 KB, and as
+file's SHA-256, the license included, so a converted or subset copy dropped
+in later fails before it ships under the reserved name, and the license text
+that condition 2 requires stays whole. The files are 103 KB and 108 KB, and as
 with Atkinson a browser fetches one only when the page uses the font.
 
-OpenDyslexic's letters are wide, so at the largest text a long unbroken
-word, such as a provider's key address on Setup, no longer fits a 320px
-screen. Its prose rule adds `overflow-wrap: anywhere`, which breaks a word
-only when it cannot fit, and the layout specs' largest-text case
-(`LayoutHelpers::LARGEST_TEXT`) now uses OpenDyslexic, the widest choice.
+**Long words.** The key hint on Setup links to each provider's console
+(`console.anthropic.com` and the like), and each link is one unbreakable
+word. At a 320px width it ran past the screen at the largest text in
+OpenDyslexic, and in every font once the browser's own text size was raised
+as well. `pages/settings.css` lets those links break (`overflow-wrap:
+anywhere`, which breaks a word only when it cannot fit), so the fix holds for
+every font. OpenDyslexic's letters are about 1.7 times as wide as Atkinson's,
+so its prose rule also breaks long words anywhere in prose, which a
+`SectionKindGuide` summary needs on Learn at a raised browser size. Inline
+code under it wraps as it does in every other font: it breaks only inside the
+elements that already break words for everyone (`.question`,
+`.section-scenario`, `.plan-excerpt`, `.problem-statement`, `.review-block`),
+and `display_stylesheet_spec` holds that list to the layout and every prose
+selector list in `display.css` to each other. The layout specs' largest-text
+case (`LayoutHelpers::LARGEST_TEXT`) uses OpenDyslexic, the widest font, and
+Setup's key hint is checked at 320px in all three fonts with a 20px browser
+default and the text-spacing override.
