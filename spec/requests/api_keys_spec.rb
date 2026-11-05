@@ -432,6 +432,19 @@ RSpec.describe "ApiKeys", type: :request do
       expect(names.uniq).to eq(names)
     end
 
+    it "groups a rotating kind's slider and Skip under How often, and gives a daily kind no How often" do
+      get setup_path
+
+      page = Nokogiri::HTML(response.body)
+      frequency = page.at_css("fieldset.mix-frequency:has(#weight-challenge)")
+      resolve = ->(node) { node["aria-labelledby"].split.map { |id| page.at_css("##{id}").text.strip }.join(" ") }
+      expect(frequency.css("input[type=range], .mix-exclude-box").size).to eq(2)
+      expect(resolve.call(frequency)).to eq("#{I18n.t("sections.challenge.name")} #{I18n.t("exercise_mix.frequency_legend")}")
+      expect(page.css(".mix-row-fixed .mix-frequency")).to be_empty
+      expect(page.css(".mix-group-rotating > .mix-rotating-hint").size).to eq(page.css(".mix-group-rotating").size)
+      expect(page.css(".mix-group:not(.mix-group-rotating) .mix-rotating-hint")).to be_empty
+    end
+
     it "explains skipping in the same word as the switch" do
       get setup_path
 
@@ -452,7 +465,7 @@ RSpec.describe "ApiKeys", type: :request do
       lock = page.at_css("#lock-code_review")
       expect(fieldset["aria-labelledby"]).to eq("mix-name-code_review mix-level-legend-code_review")
       expect(page.at_css("#mix-name-code_review").text.strip).to eq(I18n.t("sections.code_review.name"))
-      expect(page.at_css("#mix-level-legend-code_review").text.strip).to eq("Difficulty target")
+      expect(page.at_css("#mix-level-legend-code_review").text.strip).to eq("How hard")
       expect(lock["role"]).to eq("switch")
       expect(lock["class"].split).to include("switch", "mix-lock-box")
       expect(lock["aria-labelledby"]).to eq("mix-name-code_review lock-text-code_review")

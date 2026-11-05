@@ -143,19 +143,19 @@ RSpec.describe "Exercise mix", type: :system do
 
     heights = page.evaluate_script("Array.from(document.querySelectorAll('.mix-exclude-box')).map(box => box.closest('.switch-row').getBoundingClientRect().height)")
     widths = page.evaluate_script("Array.from(document.querySelectorAll('.mix-exclude-box')).map(box => box.offsetWidth)")
-    name_and_stop = page.evaluate_script(<<~JS)
+    slider_and_stop = page.evaluate_script(<<~JS)
       (() => {
-        const name = document.querySelector("label[for='weight-challenge']").getBoundingClientRect();
+        const slider = document.querySelector("#weight-challenge").getBoundingClientRect();
         const stop = document.querySelector("#weight-label-challenge").getBoundingClientRect();
-        return [name.top, stop.top, name.right, stop.right];
+        return [slider.top + slider.height / 2, stop.top + stop.height / 2, slider.right, stop.left];
       })()
     JS
 
     expect(heights.size).to be > 1
     expect(heights).to all(be >= 48)
     expect(widths).to all(be >= 44)
-    expect(name_and_stop[1]).to be_within(1).of(name_and_stop[0])
-    expect(name_and_stop[3]).to be >= name_and_stop[2]
+    expect(slider_and_stop[1]).to be_within(2).of(slider_and_stop[0])
+    expect(slider_and_stop[3]).to be >= slider_and_stop[2]
   end
 
   it "refuses a save from a page whose controls predate another save, and re-syncs the controls" do

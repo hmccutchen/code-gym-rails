@@ -156,6 +156,7 @@
     <% ExerciseSection.optional_slots(daily: DailyKinds.for(current_user)).select { |_, kinds| kinds.size > 1 }.each do |slot, kinds| %>
       <fieldset class="mix-group mix-group-rotating" data-exercise-mix-target="group">
         <legend><%= group_legend.(slot) %></legend>
+        <p class="card-note mix-rotating-hint"><%= t("exercise_mix.rotating_hint") %></p>
 
         <div class="mix-kinds">
           <% kinds.each do |kind| %>
@@ -166,17 +167,20 @@
             %>
             <div class="mix-row" data-kind="<%= kind.key %>" data-exercise-mix-target="row">
               <label id="mix-name-<%= kind.key %>" for="weight-<%= kind.key %>"><%= t("sections.#{kind.key}.name") %></label>
-              <input type="range" id="weight-<%= kind.key %>" min="0" max="<%= KindPreferences::MULTIPLIERS.size - 1 %>" step="1"
-                     value="<%= index %>" <%= "disabled" if excluded %>
-                     aria-valuetext="<%= t("exercise_mix.stops")[index] %>"
-                     data-action="input->exercise-mix#slide">
-              <output id="weight-label-<%= kind.key %>"><%= t("exercise_mix.stops")[index] %></output>
-              <label class="switch-row" for="exclude-<%= kind.key %>">
-                <span id="exclude-text-<%= kind.key %>"><%= t("exercise_mix.exclude_label") %></span>
-                <input type="checkbox" id="exclude-<%= kind.key %>" class="switch mix-exclude-box" role="switch"
-                       aria-labelledby="mix-name-<%= kind.key %> exclude-text-<%= kind.key %>" <%= "checked" if excluded %>
-                       data-action="change->exercise-mix#toggleExclude">
-              </label>
+              <fieldset class="mix-frequency" aria-labelledby="mix-name-<%= kind.key %> mix-frequency-legend-<%= kind.key %>">
+                <legend id="mix-frequency-legend-<%= kind.key %>"><%= t("exercise_mix.frequency_legend") %></legend>
+                <input type="range" id="weight-<%= kind.key %>" min="0" max="<%= KindPreferences::MULTIPLIERS.size - 1 %>" step="1"
+                       value="<%= index %>" <%= "disabled" if excluded %>
+                       aria-valuetext="<%= t("exercise_mix.stops")[index] %>"
+                       data-action="input->exercise-mix#slide">
+                <output id="weight-label-<%= kind.key %>"><%= t("exercise_mix.stops")[index] %></output>
+                <label class="switch-row" for="exclude-<%= kind.key %>">
+                  <span id="exclude-text-<%= kind.key %>"><%= t("exercise_mix.exclude_label") %></span>
+                  <input type="checkbox" id="exclude-<%= kind.key %>" class="switch mix-exclude-box" role="switch"
+                         aria-labelledby="mix-name-<%= kind.key %> exclude-text-<%= kind.key %>" <%= "checked" if excluded %>
+                         data-action="change->exercise-mix#toggleExclude">
+                </label>
+              </fieldset>
               <%= render "api_keys/difficulty_controls", kind: kind, excluded: excluded %>
               <%= render "responses/kind_about", key: kind.key %>
             </div>

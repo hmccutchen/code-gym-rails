@@ -166,6 +166,18 @@ The rotating groups are derived from the slot roster, as
 candidate has nothing to bias, and a future multi-kind slot gets its controls
 without an edit here.
 
+## How often, and how hard
+
+Each row asks two separate questions, and each gets its own labelled
+fieldset. A rotating row has "How often" (the weight slider and Skip) and
+"How hard" (the difficulty target and lock); a row that is always in the set,
+or alone in its slot, has only "How hard", since there is nothing to weigh.
+The two intro notes use the same two names, so a reader can match the text
+to the controls. The kind's name heads the row above both fieldsets, and each
+fieldset's accessible name is the kind's name plus its legend. A rotating
+group's hint says a day with that section takes one kind from the list, since
+"rotating" alone left people unsure which section they were setting.
+
 ## Where the behavior lives
 
 This page carries no script. Its controls are wired by four Stimulus
