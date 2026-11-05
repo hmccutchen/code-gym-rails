@@ -50,7 +50,7 @@ end
 group :development do
   gem "web-console"
 
-  gem "archspec", "~> 1.1", require: false
+  gem "archspec", "~> 1.2", require: false
 
   gem "lefthook", "~> 2.2", require: false
 end
