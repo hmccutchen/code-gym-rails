@@ -780,6 +780,15 @@ RSpec.describe DailyPlan do
       end
     end
 
+    it "plans a bug_hunt on a judged Saturday with the real weekend roll, not the suite's weekday stand-in" do
+      allow(WeightedRoll).to receive(:pick).and_call_original
+
+      plan = travel_to(Time.zone.local(2026, 10, 17, 9)) { DailyPlan.for(user, language: "ruby_rails", judged: true) }
+
+      expect(plan.code_review_mode).to eq(:bug_hunt)
+      expect(plan.code_review_gotcha).to be_present
+    end
+
     it "never rolls a bug_hunt unjudged, even on a weekend, since nothing would reject a broken one" do
       roll_on(Time.zone.local(2026, 10, 17, 9), judged: false)
 

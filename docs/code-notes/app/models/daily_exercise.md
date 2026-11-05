@@ -37,7 +37,7 @@ case would end after it, so no healthy job outlives the claim, and a judged
 day's full budget (2,302 s) never has to fit in the window.
 
 The deadline bounds provider calls only. After the last one, the job still
-ingests (on the single-stage path that includes `CodeFormat`, whose Prettier
+ingests (which includes `CodeFormat`, whose Prettier
 run is capped at `CodeFormat::Javascript::TIMEOUT_SECONDS`, 20 s), writes the
 `ExerciseDraft.finish` diagnostics, waits for the response and exercise locks
 behind any autosave or submit, and updates the row. If the claim went stale in

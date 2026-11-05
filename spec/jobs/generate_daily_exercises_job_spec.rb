@@ -309,6 +309,18 @@ RSpec.describe GenerateDailyExercisesJob do
     end
   end
 
+  it "dates the set by the day it was planned for, when the judged run crosses midnight" do
+    svc = stub_provider
+    allow(svc).to receive(:generate_judged_exercise) do
+      travel(30.minutes)
+      AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {}, plan_notes: {})
+    end
+
+    travel_to(Time.utc(2026, 10, 18, 23, 40)) { described_class.new.perform(user_id: user.id) }
+
+    expect(DailyExercise.where(user: user).pluck(:date)).to eq([ Date.new(2026, 10, 18) ])
+  end
+
   it "skips an anonymized user on the on-demand path" do
     user.anonymize!
     expect(AiService).not_to receive(:for)

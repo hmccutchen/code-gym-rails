@@ -38,7 +38,16 @@ setting turns it off or weights it (owner's decision).
   since an unjudged `bug_hunt` would ship with nothing to reject code that
   is correct as written, a second trap, or code outside the core language.
   The cost is the judged path's provider calls and longer wait on a weekend
-  set, which is generated only when the user asks for one.
+  set, which is generated only when the user asks for one. A trial account
+  pays for it from the house key, under the same `/generate` request limits.
+  - **Button-only (owner's decision, 2026-11-05).** Nothing generates a set
+    on a weekend by itself: the morning job runs Monday to Friday, and the
+    weekend dashboard only offers "Generate anyway". So most users will
+    rarely see a bug hunt. Auto-generating weekend sets, or keeping a small
+    weekday share, were offered and not taken.
+  - **The day is read once.** `GenerateDailyExercisesJob#generate_for` takes
+    the date before the judged run and stamps the row with it, so a run
+    started late on Sunday writes Sunday's set, not a bug hunt dated Monday.
   - **How it is wired:** a model may not name `AiService`, so `DailyPlan.for`
     takes `judged:` from the path that called it and reads the day itself
     (`Date.current.on_weekend?`). An unjudged plan, which only
@@ -158,7 +167,7 @@ schedule.
 - **What still counts:** the section is an exposure, and it is still
   `code_review` evidence at its rung for the competency gate and level
   suggestions.
-- **The cost:** on about one judged day in five, `code_review` carries no
+- **The cost:** on every weekend set, `code_review` carries no
   reinforcement or retention check. On a two-section day most code
   concepts then wait a day.
 
