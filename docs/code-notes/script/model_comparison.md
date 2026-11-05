@@ -20,6 +20,8 @@ A result is kept whole, failures included, so a model's summary counts every inp
 
 When one section fails, its error is printed in its place, so a single bad section never loses the rest of a candidate's output.
 
+The draft it judges runs on the `generate_exercise` profile's read timeout (300 seconds), as production's does. It used a 90-second "blocking" timeout until #706, so a hung draft now takes longer to give up.
+
 ## `#judge_fixtures`
 
 It takes no `user_id`: each fixture carries its own rung and lock, and the fixture user is never persisted.

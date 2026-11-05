@@ -162,8 +162,7 @@ specs' stand-ins) carries none.
 
 `#exercise_draft_provider` is public, as `#review_grading_provider` is, so a
 script can draft a set without judging it. A draft always runs on the
-`generate_exercise` profile's timeout: the shorter "blocking" timeout for a
-request thread waiting on it had only a script caller, so it went (#706).
+`generate_exercise` profile's timeout.
 
 `ExerciseDraft` does the drafting and reaches this class only through the
 provider's two callables. `#generation_prompt` is the one place a

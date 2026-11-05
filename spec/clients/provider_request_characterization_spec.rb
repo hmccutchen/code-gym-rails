@@ -40,7 +40,7 @@ RSpec.describe "provider request characterization" do
     return AiService::Request.build(**per_call, **KEYWORD_SHAPES.fetch(shape)) unless shape.start_with?("purpose__")
 
     purpose_shape = shape.delete_prefix("purpose__")
-    AiService.request_for(purpose_shape.delete_suffix("_blocking"), **per_call, **PURPOSE_SHAPES.fetch(purpose_shape))
+    AiService.request_for(purpose_shape, **per_call, **PURPOSE_SHAPES.fetch(purpose_shape))
   end
 
   # Captures the posted body without a network call. Returns [service, bodies].
@@ -96,8 +96,7 @@ RSpec.describe "provider request characterization" do
   end
 
   it "has a purpose shape for every ApiUsage purpose and for nothing else" do
-    purposes = PURPOSE_SHAPES.keys.map { |shape| shape.delete_suffix("_blocking") }.uniq
-    expect(purposes.sort).to eq(ApiUsage::PURPOSES.sort)
+    expect(PURPOSE_SHAPES.keys.sort).to eq(ApiUsage::PURPOSES.sort)
   end
 
   it "has no snapshot left behind for a shape that no longer exists" do

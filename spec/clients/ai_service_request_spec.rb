@@ -45,8 +45,9 @@ RSpec.describe AiService, "request values" do
         .to raise_error(KeyError, /unknown_purpose/)
     end
 
-    it "has no blocking variant, since no caller waits on a generation in a request thread" do
-      expect(AiService.method(:request_for).parameters).not_to include(%i[key blocking])
+    it "takes only the per-call values, so every setting comes from the purpose's profile" do
+      expect(AiService.method(:request_for).parameters)
+        .to eq([ %i[req purpose], %i[keyreq system], %i[keyreq prompt], %i[key history], %i[key response_schema] ])
       expect(CallProfiles::BY_PURPOSE.values.flat_map(&:keys)).not_to include(:blocking_read_timeout)
     end
 

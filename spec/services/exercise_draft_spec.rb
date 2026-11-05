@@ -83,11 +83,15 @@ RSpec.describe ExerciseDraft do
       .to eq([ %i[req draft], %i[req kind], %i[req concept], %i[keyreq provider], %i[key cause], %i[key deadline] ])
   end
 
-  it "drafts on the generation budget alone, and finishes only with every log the judged path hands it" do
-    expect(described_class.method(:call).parameters).not_to include(%i[key blocking])
-    expect(described_class.method(:finish).parameters).to include(%i[keyreq dropped_concepts], %i[keyreq judge], %i[keyreq unhosted])
-    expect(GenerationDiagnostics.instance_method(:finished).parameters)
-      .to include(%i[keyreq dropped_concepts], %i[keyreq judge], %i[keyreq unhosted])
+  it "drafts with no timeout of its own: only the user, language, provider and deadline" do
+    expect(described_class.method(:call).parameters).to eq([ %i[req user], %i[keyreq language], %i[keyreq provider], %i[key deadline] ])
+  end
+
+  it "finishes only with every log the judged path hands it" do
+    logs = [ %i[keyreq dropped_concepts], %i[keyreq judge], %i[keyreq unhosted] ]
+
+    expect(described_class.method(:finish).parameters).to include(*logs)
+    expect(GenerationDiagnostics.instance_method(:finished).parameters).to include(*logs)
   end
 
   it "drafts the day through one generate_exercise call and returns the ingested set" do

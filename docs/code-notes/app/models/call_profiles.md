@@ -17,13 +17,12 @@ do vary by provider, such as a provider's own quota day.
 The longest `#review` chain must stay under
 `DailyResponse::REVIEW_CLAIM_STALE_AFTER`, and `ai_service_spec` asserts it.
 
-## `GENERATION_READ_TIMEOUT` and `SYNC_GENERATION_READ_TIMEOUT`
+## `GENERATION_READ_TIMEOUT` and `SHORT_GENERATION_READ_TIMEOUT`
 
-Generation runs on the worker and can wait. `SYNC_GENERATION_READ_TIMEOUT`
-bounds the one-section retries (`RETRY_READ_TIMEOUT`) and the concept
-reference (`CONCEPT_REFERENCE_READ_TIMEOUT`). It was also a "blocking"
-generation timeout for a request thread waiting on a draft; no caller in the
-app ever used it, so it went (#706).
+A day's draft runs on the worker and can wait for `GENERATION_READ_TIMEOUT`.
+`SHORT_GENERATION_READ_TIMEOUT` bounds the calls that write one thing: a
+one-section retry (`RETRY_READ_TIMEOUT`) and a concept reference
+(`CONCEPT_REFERENCE_READ_TIMEOUT`).
 
 ## `CONCEPT_REFERENCE_READ_TIMEOUT`
 
