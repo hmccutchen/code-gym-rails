@@ -195,6 +195,20 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     expect(stored { |values| values["theme"] == "device" }).to eq("theme" => "device")
   end
 
+  it "sets prose in OpenDyslexic when it is the reading font, and leaves code monospace" do
+    user.update!(display_preferences: { "font" => "opendyslexic" })
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_css("pre.snippet")
+
+      family = ->(selector) { page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).fontFamily") }
+      expect(family.call(".question")).to include("OpenDyslexic")
+      expect(family.call("pre.snippet")).to eq("monospace, monospace")
+      expect(page.evaluate_script("document.fonts.load('16px OpenDyslexic').then((faces) => faces.length)")).to be > 0
+    end
+  end
+
   it "keeps code in its monospace font under a reading font" do
     user.update!(display_preferences: { "font" => "atkinson" })
 

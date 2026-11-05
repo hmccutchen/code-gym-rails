@@ -12,6 +12,15 @@ RSpec.describe "display stylesheet" do
     end
   end
 
+  it "ships OpenDyslexic exactly as its author releases it, since only an unmodified copy may keep the name" do
+    {
+      "opendyslexic-regular.woff2" => "5a7c8f7e613bfdb8d3dd3df6151635dc454b8a58293402a78acda493c7bf383d",
+      "opendyslexic-bold.woff2" => "078d02b066bb2d495dc3bcecb90734360415292bdfef60a3d68012e81311b50d"
+    }.each do |file, digest|
+      expect(Digest::SHA256.file(Rails.root.join("app/assets/fonts", file)).hexdigest).to eq(digest), "#{file} differs from the release"
+    end
+  end
+
   it "ships the font file behind every @font-face" do
     css.scan(/url\("([^"]+)"\)/).flatten.each do |file|
       expect(Rails.root.join("app/assets/fonts", file)).to exist

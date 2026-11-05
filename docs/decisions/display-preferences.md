@@ -2,9 +2,7 @@
 
 theme (dark, light, match my device), background
 pattern (on/off), text size (100/112/125/140%), line spacing and a reading
-font (Atkinson Hyperlegible;
-OpenDyslexic is deferred to #235, pending its license's rule on renamed and
-converted copies). They live in a Display disclosure on Setup and save
+font (Atkinson Hyperlegible or OpenDyslexic). They live in a Display disclosure on Setup and save
 through `PATCH /profile`. `DisplayPreferences` is the one list of choices,
 defaults first. `users.display_preferences` is sparse jsonb, since a default
 stores no key, and `User` refuses anything outside the lists, while
@@ -55,3 +53,25 @@ code-colored panels take `--code-bg`, and highlighting takes the palette
 plus `--code-symbol` and `--code-builtin`, so each palette states them once;
 code is sized in rem, so text size scales it. `palette_contrast_spec`
 holds both palettes to WCAG AA, every highlighting color on code included.
+
+**OpenDyslexic is the author's own WOFF2 files, unchanged** (#235). The
+font is under the SIL Open Font License 1.1 with the Reserved Font Name
+"OpenDyslexic", and the license counts changing formats as making a
+Modified Version, which may not use that name. The OFL FAQ (2.2, shipped in
+the font's own repository) allows a WOFF copy to keep the name only when the
+font data is unchanged apart from compression. The author now distributes
+WOFF2 files in the repository's `compiled` folder
+(`forge.hackers.town/antijingoist/opendyslexic`), so the app ships
+`OpenDyslexic-Regular.woff2` and `OpenDyslexic-Bold.woff2` byte for byte,
+renamed only on disk, with the license beside them. Those files are the
+Original Version, so the name stands. Fontsource's processed copies, which
+#235 first looked at, are not used. `display_stylesheet_spec` pins each
+file's SHA-256, so a converted or subset copy dropped in later fails before
+it ships under the reserved name. The files are 103 KB and 108 KB, and as
+with Atkinson a browser fetches one only when the page uses the font.
+
+OpenDyslexic's letters are wide, so at the largest text a long unbroken
+word, such as a provider's key address on Setup, no longer fits a 320px
+screen. Its prose rule adds `overflow-wrap: anywhere`, which breaks a word
+only when it cannot fit, and the layout specs' largest-text case
+(`LayoutHelpers::LARGEST_TEXT`) now uses OpenDyslexic, the widest choice.

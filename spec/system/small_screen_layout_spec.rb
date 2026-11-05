@@ -83,7 +83,7 @@ RSpec.describe "Small screen layout", type: :system do
     resize(320)
     visit_as(user)
 
-    [ {}, { "text_size" => "140", "line_spacing" => "loose", "font" => "atkinson" } ].each do |prefs|
+    [ {}, LayoutHelpers::LARGEST_TEXT ].each do |prefs|
       user.update!(display_preferences: prefs)
       visit learn_path
 

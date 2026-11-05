@@ -33,3 +33,20 @@ html[data-font="atkinson"] :is(p, li, dd, .question, .section-scenario, .why-box
   .problem-statement, .hint-body, .ref-body, .review-item, .alternate-item, .follow-up-turn, .duck-turn) {
   font-family: "Atkinson Hyperlegible", sans-serif;
 }
+
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("opendyslexic-regular.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("opendyslexic-bold.woff2") format("woff2");
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+
+html[data-font="opendyslexic"] :is(p, li, dd, .question, .section-scenario, .why-box, .plan-excerpt,
+  .problem-statement, .hint-body, .ref-body, .review-item, .alternate-item, .follow-up-turn, .duck-turn) {
+  font-family: "OpenDyslexic", sans-serif;
+  overflow-wrap: anywhere;
+}
