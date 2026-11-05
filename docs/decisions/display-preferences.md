@@ -88,7 +88,9 @@ elements that already break words for everyone (`pre`, `.question`,
 `.file-summary`, `.answer-display`, `.learn-worked-example`), and
 `display_stylesheet_spec` fails unless that list names every layout rule that
 breaks words anywhere. It also holds every prose selector list in
-`display.css` to the others. The layout specs' largest-text
-case (`LayoutHelpers::LARGEST_TEXT`) uses OpenDyslexic, the widest font, and
-Setup's key hint is checked at 320px in all three fonts with a 20px browser
+`display.css` to the others. The layout specs' page-width
+loops run the largest text in two fonts (`LayoutHelpers::LARGEST_TEXTS`):
+OpenDyslexic, the widest, and Atkinson, which keeps long words whole and so
+catches an overflow OpenDyslexic's breaking would hide. Setup's key hint is
+also checked at 320px in all three fonts with a 20px browser
 default and the text-spacing override.

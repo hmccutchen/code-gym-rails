@@ -40,8 +40,8 @@ RSpec.describe "Account and Settings layout", type: :system do
 
   describe "sideways scroll" do
     LayoutHelpers::LAYOUT_WIDTHS.each do |width|
-      [ {}, LayoutHelpers::LARGEST_TEXT ].each do |prefs|
-        it "keeps Account and Settings inside a #{width}px window#{' with the largest text' if prefs.any?}" do
+      [ {}, *LayoutHelpers::LARGEST_TEXTS ].each do |prefs|
+        it "keeps Account and Settings inside a #{width}px window#{" with the largest text in #{prefs["font"]}" if prefs.any?}" do
           visit_page(account_path, width: width, prefs: prefs, push: true)
           expect(sideways_overflow).to eq(0)
           visit setup_path

@@ -83,7 +83,7 @@ RSpec.describe "Small screen layout", type: :system do
     resize(320)
     visit_as(user)
 
-    [ {}, LayoutHelpers::LARGEST_TEXT ].each do |prefs|
+    [ {}, *LayoutHelpers::LARGEST_TEXTS ].each do |prefs|
       user.update!(display_preferences: prefs)
       visit learn_path
 
@@ -123,8 +123,8 @@ RSpec.describe "Small screen layout", type: :system do
     end
   end
 
-  [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
-    it "keeps History inside a #{width}px screen#{' with the largest text' if prefs.any?} when a question, review or answer holds a long path" do
+  [ [ 390, {} ], *LayoutHelpers::LARGEST_TEXTS.map { |largest| [ 320, largest ] } ].each do |width, prefs|
+    it "keeps History inside a #{width}px screen#{" with the largest text in #{prefs["font"]}" if prefs.any?} when a question, review or answer holds a long path" do
       travel_to(a_weekday) do
         user = create_fake_provider_user
         user.update!(display_preferences: prefs)
@@ -184,8 +184,8 @@ RSpec.describe "Small screen layout", type: :system do
   end
 
   # A field sharing a row with its buttons must wrap them below rather than shrink to a sliver.
-  [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
-    it "keeps the duck's field wide enough to read at #{width}px#{' with the largest text' if prefs.any?}" do
+  [ [ 390, {} ], *LayoutHelpers::LARGEST_TEXTS.map { |largest| [ 320, largest ] } ].each do |width, prefs|
+    it "keeps the duck's field wide enough to read at #{width}px#{" with the largest text in #{prefs["font"]}" if prefs.any?}" do
       travel_to(a_weekday) do
         user = create_fake_provider_user
         user.update!(display_preferences: prefs)
@@ -199,7 +199,7 @@ RSpec.describe "Small screen layout", type: :system do
       end
     end
 
-    it "keeps the follow-up field wide enough to read at #{width}px#{' with the largest text' if prefs.any?}" do
+    it "keeps the follow-up field wide enough to read at #{width}px#{" with the largest text in #{prefs["font"]}" if prefs.any?}" do
       travel_to(a_weekday) do
         user = create_fake_provider_user
         user.update!(display_preferences: prefs)
@@ -354,8 +354,8 @@ RSpec.describe "Small screen layout", type: :system do
       wait_for_js
     end
 
-    [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
-      it "lays Account out in full-width cards with 48px buttons at #{width}px#{' with the largest text' if prefs.any?}" do
+    [ [ 390, {} ], *LayoutHelpers::LARGEST_TEXTS.map { |largest| [ 320, largest ] } ].each do |width, prefs|
+      it "lays Account out in full-width cards with 48px buttons at #{width}px#{" with the largest text in #{prefs["font"]}" if prefs.any?}" do
         user.update!(display_preferences: prefs)
         resize(width)
         visit_account_with_every_card
@@ -556,8 +556,8 @@ RSpec.describe "Small screen layout", type: :system do
       end
     end
 
-    [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
-      describe "at #{width}px#{' with the largest text' if prefs.any?}" do
+    [ [ 390, {} ], *LayoutHelpers::LARGEST_TEXTS.map { |largest| [ 320, largest ] } ].each do |width, prefs|
+      describe "at #{width}px#{" with the largest text in #{prefs["font"]}" if prefs.any?}" do
         it "lays Settings' first two cards out" do
           user = create_fake_provider_user
           user.update!(display_preferences: prefs)

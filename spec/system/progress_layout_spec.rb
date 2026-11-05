@@ -33,8 +33,8 @@ RSpec.describe "Progress layout", type: :system do
 
   describe "sideways scroll" do
     LayoutHelpers::LAYOUT_WIDTHS.each do |width|
-      [ {}, LayoutHelpers::LARGEST_TEXT ].each do |prefs|
-        it "keeps Progress inside a #{width}px window#{' with the largest text' if prefs.any?}, with every disclosure open" do
+      [ {}, *LayoutHelpers::LARGEST_TEXTS ].each do |prefs|
+        it "keeps Progress inside a #{width}px window#{" with the largest text in #{prefs["font"]}" if prefs.any?}, with every disclosure open" do
           visit_progress(width: width, prefs: prefs)
           expect(sideways_overflow).to eq(0)
           open_every_disclosure
@@ -72,8 +72,8 @@ RSpec.describe "Progress layout", type: :system do
   end
 
   describe "on a phone" do
-    [ [ 390, {} ], [ 320, LayoutHelpers::LARGEST_TEXT ] ].each do |width, prefs|
-      it "lays the legend and groups out as full-width cards with 48px rows and 44px links at #{width}px#{' with the largest text' if prefs.any?}" do
+    [ [ 390, {} ], *LayoutHelpers::LARGEST_TEXTS.map { |largest| [ 320, largest ] } ].each do |width, prefs|
+      it "lays the legend and groups out as full-width cards with 48px rows and 44px links at #{width}px#{" with the largest text in #{prefs["font"]}" if prefs.any?}" do
         visit_progress(width: width, prefs: prefs)
 
         expect(page).to have_css(".progress-legend-card:not([open])")

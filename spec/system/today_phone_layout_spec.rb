@@ -30,8 +30,8 @@ RSpec.describe "Today's phone layout", type: :system do
 
   describe "the section cards" do
     [ 320, 390 ].each do |width|
-      [ {}, LayoutHelpers::LARGEST_TEXT ].each do |prefs|
-        it "runs each section as a full-width card, 16px apart, at #{width}px#{' with the largest text' if prefs.any?}" do
+      [ {}, *LayoutHelpers::LARGEST_TEXTS ].each do |prefs|
+        it "runs each section as a full-width card, 16px apart, at #{width}px#{" with the largest text in #{prefs["font"]}" if prefs.any?}" do
           visit_today(width: width, prefs: prefs)
 
           expect(cards.size).to eq(ExerciseSection::MAX_SECTIONS)
