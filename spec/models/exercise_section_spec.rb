@@ -151,7 +151,7 @@ RSpec.describe ExerciseSection do
     end
 
     it "agrees with what the page withholds, for every kind on every day mode: a kind hides its concept in the plan when it hides it from a section" do
-      DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key do |mode|
+      DailyPlan::CODE_REVIEW_MODES.each do |mode|
         section = mode == ExerciseSection::CodeReview::BugHunt::MODE ? { "purpose" => "Sum the prices." } : {}
 
         ExerciseSection.all.each do |kind|

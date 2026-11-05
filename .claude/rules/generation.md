@@ -31,11 +31,11 @@ Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;
 read it before changing that area.
 
-- **Two-stage generation** (`docs/decisions/two-stage-generation.md`): Weekday
-  generation, regeneration included, drafts a set, then `JudgedGeneration`
-  judges each section: keep, edit prose (`.prose_fields` only, never code or
-  the planted defect) or reject; `AiService.judged_on?` names the judged days,
-  for both jobs. Weekend sets stay single-stage.
+- **Two-stage generation** (`docs/decisions/two-stage-generation.md`): Every
+  generation, weekends and regeneration included, drafts a set, then
+  `JudgedGeneration` judges each section: keep, edit prose (`.prose_fields`
+  only, never code or the planted defect) or reject. Both jobs always take the
+  judged path; `#generate_unjudged_exercise` is left to scripts.
   `RegenerateExerciseJob` runs under a `GenerationDeadline` measured from its
   claim (`DailyExercise::REGENERATION_DEADLINE`; the claim window adds
   `WRITE_MARGIN` for the write after the last call): `#call_and_log` starts
@@ -65,9 +65,9 @@ read it before changing that area.
 - **JSONB problem sets**: `problem_set` column stores `{ code_review: {...}, pattern: {...}, challenge: {...} }`. Accessed via convenience methods on `DailyExercise`.
 - **Closed concept vocabulary**: each section is tagged with one concept from a fixed per-language list (`ConceptVocabulary::RAILS_CONCEPTS` / `JS_CONCEPTS`), narrowed further at generation time for a schema-review `code_review` day (see below); anything a provider invents is normalized to `"other"` so concept history stays aggregatable.
 - **`code_review` content modes**
-  (`docs/decisions/code-review-content-modes.md`): `code_review` rolls
-  `application_code`, `test_file`, `schema_review` or `bug_hunt`
-  (`DailyPlan::CODE_REVIEW_MODE_WEIGHTS`); only `schema_review` narrows to
+  (`docs/decisions/code-review-content-modes.md`): a weekday's `code_review` rolls
+  `application_code`, `test_file` or `schema_review`
+  (`DailyPlan::CODE_REVIEW_MODE_WEIGHTS`), and a weekend's is `bug_hunt`; only `schema_review` narrows to
   `DATA_MODELING_CONCEPTS` via `ConceptVocabulary.selectable_for_section`. A
   Ruby `application_code` or `schema_review` day may be grounded in a
   `RealSource` excerpt; `test_file` has no pool. Ingest stamps the server's
@@ -93,8 +93,8 @@ read it before changing that area.
   at most `BugHunt::MAX_LINES` shown lines of core Ruby or ES-module
   JavaScript with one trap from `BugHuntGotchas`, picked never-seen-first
   into `plan_notes["bug_hunt"]`, never the section, and never the week's
-  featured concept (`BugHuntGotchas.pick(featured_concept:)`). Rolled on judged days
-  only (`DailyPlan.for(judged:)`), single-file, never `RealSource`; its
+  featured concept (`BugHuntGotchas.pick(featured_concept:)`). Every judged weekend
+  day, never a weekday or an unjudged plan (`DailyPlan.for(judged:)`), single-file, never `RealSource`; its
   vocabulary is the picked entry's concept, and every other kind's
   vocabulary that day leaves that concept out. No output: ingest refuses a
   result comment. The key adds an optional code `witness`

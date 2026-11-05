@@ -453,31 +453,18 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(AiService).not_to have_received(:for)
   end
 
-  it "regenerates a weekend set single-stage, as a weekend set is generated", :own_clock do
+  it "regenerates a weekend set judged, as a weekend set is generated", :own_clock do
     travel_to Time.utc(2026, 10, 17, 15, 0, 0) do
       claimed_exercise
       fake_service = stub_provider({ "code_review" => { "question" => "new" } })
       allow(fake_service).to receive(:generate_unjudged_exercise)
-        .and_return(unjudged({ "code_review" => { "question" => "weekend" } }))
 
       described_class.new.perform(user_id: user.id)
 
-      expect(fake_service).to have_received(:generate_unjudged_exercise)
+      expect(fake_service).to have_received(:generate_judged_exercise)
         .with(user, hash_including(deadline: an_instance_of(GenerationDeadline)))
-      expect(fake_service).not_to have_received(:generate_judged_exercise)
+      expect(fake_service).not_to have_received(:generate_unjudged_exercise)
     end
-  end
-
-  it "asks AiService which days are judged rather than deciding itself" do
-    claimed_exercise
-    fake_service = stub_provider({ "code_review" => { "question" => "new" } })
-    allow(fake_service).to receive(:generate_unjudged_exercise).and_return(unjudged({ "code_review" => { "question" => "new" } }))
-    allow(AiService).to receive(:judged_on?).and_return(false)
-
-    described_class.new.perform(user_id: user.id)
-
-    expect(AiService).to have_received(:judged_on?).with(Date.current)
-    expect(fake_service).to have_received(:generate_unjudged_exercise)
   end
 
   it "hands the provider a deadline measured from the claim, not from when the job started" do
@@ -599,14 +586,14 @@ RSpec.describe RegenerateExerciseJob, type: :job do
       expect(JudgeSolve.count).to eq(0)
     end
 
-    it "writes none for an unjudged weekend set", :own_clock do
+    it "writes them for a weekend set too, which is judged like a weekday's", :own_clock do
       travel_to Time.utc(2026, 10, 17, 15, 0, 0) do
         claimed_exercise
         stub_judged([ live_solve ])
 
         described_class.new.perform(user_id: user.id)
 
-        expect(JudgeSolve.count).to eq(0)
+        expect(JudgeSolve.count).to eq(1)
       end
     end
 

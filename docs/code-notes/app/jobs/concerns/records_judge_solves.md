@@ -15,4 +15,4 @@ attribute names, never row values.
 
 `draft_model` is read only when there is something to record, from the
 service that drafted the set (`AiService#model_for("generate_exercise")`).
-An unjudged weekend set has no solves and records nothing.
+A set with no solves records nothing.

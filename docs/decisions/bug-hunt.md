@@ -19,22 +19,40 @@ setting turns it off or weights it (owner's decision).
 
 ## What the owner decided (2026-11-02)
 
-- **Weights:** `CODE_REVIEW_MODE_WEIGHTS = { application_code: 0.24,
-  test_file: 0.23, schema_review: 0.33, bug_hunt: 0.20 }`.
-  - That is about one judged set in five.
-  - `schema_review` keeps 0.33, so data-modeling retention keeps its host
-    rate.
-  - Ruby `RealSource` days fall from about 23% to about 20%.
-- **Judged days only.** A weekend (unjudged) day rolls
-  `UNJUDGED_CODE_REVIEW_MODE_WEIGHTS`, the same weights without `bug_hunt`,
+- **Weekends only (owner's decision, 2026-11-05).** Every weekend set's
+  `code_review` is a `bug_hunt` (`WEEKEND_CODE_REVIEW_MODE_WEIGHTS`), and a
+  weekday never rolls one (`CODE_REVIEW_MODE_WEIGHTS = { application_code:
+  0.30, test_file: 0.29, schema_review: 0.41 }`, the earlier weekday split
+  with `bug_hunt`'s 0.20 spread in proportion). A bug hunt is short and
+  light, which suits a weekend. It replaced a 0.20 share of every judged day
+  (2026-11-02), which was about one weekday set in five.
+  - The owner found the old share hard to see: a bug hunt is a mode of
+    `code_review`, so nothing in Setup names it or says how often it comes.
+    A fixed day makes it predictable.
+  - Weekdays now hold more `schema_review` (41% of `code_review` sections,
+    up from 33%), so data-modeling retention gains host days. Weekends hold
+    none, and on a `bug_hunt` day `code_review` hosts nothing (below).
+- **Weekends are judged, so a bug hunt still never ships unjudged.** Weekend
+  generation and regeneration used to be single-stage. They now take the
+  judged path like a weekday (`docs/decisions/two-stage-generation.md`),
   since an unjudged `bug_hunt` would ship with nothing to reject code that
   is correct as written, a second trap, or code outside the core language.
+  The cost is the judged path's provider calls and longer wait on a weekend
+  set, which is generated only when the user asks for one. A trial account
+  pays for it from the house key, under the same `/generate` request limits.
+  - **Button-only (owner's decision, 2026-11-05).** Nothing generates a set
+    on a weekend by itself: the morning job runs Monday to Friday, and the
+    weekend dashboard only offers "Generate anyway". So most users will
+    rarely see a bug hunt. Auto-generating weekend sets, or keeping a small
+    weekday share, were offered and not taken.
+  - **The day is read once.** `GenerateDailyExercisesJob#generate_for` takes
+    the date before the judged run and stamps the row with it, so a run
+    started late on Sunday writes Sunday's set, not a bug hunt dated Monday.
   - **How it is wired:** a model may not name `AiService`, so `DailyPlan.for`
-    takes a required `judged:` from the path that called it.
-  - **If weekend days are allowed later:** remove `judged:` and the second
-    constant. The weekend `schema_review` share then falls from about 41%
-    back to 33%. A weekend `bug_hunt` would ship with only ingest's checks,
-    and the registry would drain faster.
+    takes `judged:` from the path that called it and reads the day itself
+    (`Date.current.on_weekend?`). An unjudged plan, which only
+    `#generate_unjudged_exercise` and its script callers make now, rolls the
+    weekday weights on any day.
 - **Single-file.** A `bug_hunt` day never rolls multi-file and is never
   grounded in a `RealSource` excerpt.
 - **Core Ruby and core JavaScript only.** No Rails, TypeScript, framework,
@@ -149,7 +167,7 @@ schedule.
 - **What still counts:** the section is an exposure, and it is still
   `code_review` evidence at its rung for the competency gate and level
   suggestions.
-- **The cost:** on about one judged day in five, `code_review` carries no
+- **The cost:** on every weekend set, `code_review` carries no
   reinforcement or retention check. On a two-section day most code
   concepts then wait a day.
 
@@ -183,8 +201,8 @@ schedule.
 - **When it can't answer:** a `bug_hunt` section is dropped, never shipped
   unjudged (`ships_unjudged?`, read by `JudgedGeneration` on the first pass
   and on a retry's re-judge). Every other kind keeps its draft. The judge is
-  the only check that the code is wrong as written, which is why weekends
-  don't roll the mode. The cost: on a judge outage the day loses its
+  the only check that the code is wrong as written, which is why an
+  unjudged plan never rolls the mode. The cost: on a judge outage the day loses its
   `code_review` section, and nothing replaces it (owner's decision,
   2026-11-02).
 

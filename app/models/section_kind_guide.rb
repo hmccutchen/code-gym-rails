@@ -7,8 +7,8 @@ module SectionKindGuide
                "This builds the habit of reading a change closely before you approve it.",
       example: "You see a ten-line method from a library app that emails members about overdue books. " \
                "The question asks what's wrong with it and how you'd fix it. " \
-               "On some days the code is a test file or a database migration instead, " \
-               "or a few lines with a stated goal, where the bug is a trap in the language itself."
+               "On some weekdays the code is a test file or a database migration instead, " \
+               "and on weekends it's a bug hunt: a few lines with a stated goal, where the bug is a trap in the language itself."
     },
     "design_comparison" => {
       short: "Both work — pick the one that suits the system.",

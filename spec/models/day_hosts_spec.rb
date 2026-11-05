@@ -33,7 +33,7 @@ RSpec.describe DayHosts do
   end
 
   it "never hides the concept of a kind that hosts a main-track bucket, which is why the retention annotation needs no featured concept" do
-    DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key do |mode|
+    DailyPlan::CODE_REVIEW_MODES.each do |mode|
       ExerciseSection.all.select { |kind| kind.concept_hidden_in_plan?(mode: mode) }.each do |kind|
         expect(kind.fourth? || !kind.planning_host?(mode: mode)).to be(true), "#{kind.name} on #{mode} hides its concept and hosts a main-track bucket"
       end
@@ -59,7 +59,7 @@ RSpec.describe DayHosts do
 
   it "reads the strictest vocabulary, which every rung's vocabulary contains on every mode and trap" do
     %w[ruby_rails javascript].each do |language|
-      days = DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys.map { |mode| [ mode, nil ] } +
+      days = DailyPlan::CODE_REVIEW_MODES.map { |mode| [ mode, nil ] } +
              BugHuntGotchas.for_language(language).map { |gotcha| [ :bug_hunt, gotcha ] }
       ExerciseSection.all.product(KindDifficulty::LEVELS, days).each do |kind, rung, (mode, gotcha)|
         plain = ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, gotcha: gotcha)

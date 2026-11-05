@@ -13,7 +13,7 @@ class DailyKindSwap::Consequences
   end
 
   def self.shares_a_concept?(pair, languages)
-    languages.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys).any? do |language, mode|
+    languages.product(DailyPlan::CODE_REVIEW_MODES).any? do |language, mode|
       hosts  = DayHosts.new(language, mode: mode)
       bucket = ConceptBucket.for(pair.first.key, language)
       ConceptVocabulary.selectable_for_section(pair.first.key, language, mode: mode)

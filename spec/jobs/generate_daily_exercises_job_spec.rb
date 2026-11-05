@@ -5,7 +5,6 @@ RSpec.describe GenerateDailyExercisesJob do
 
   let(:user) { User.create!(email: "cronuser@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "UTC") }
 
-  # Examples without travel_to may run on a weekday or weekend, so these stubs answer both paths.
   def stub_provider(u = user, problem_set: { "code_review" => {} })
     judged = AiService::JudgedSet.new(problem_set: problem_set, dropped_sections: [], outcomes: {}, plan_notes: {})
     svc = instance_double(ClaudeService, generate_unjudged_exercise: judged, generate_judged_exercise: judged)
@@ -15,7 +14,6 @@ RSpec.describe GenerateDailyExercisesJob do
 
   def stub_provider_failure(error, message, u = user)
     svc = instance_double(ClaudeService)
-    allow(svc).to receive(:generate_unjudged_exercise).and_raise(*[ error, message ].compact)
     allow(svc).to receive(:generate_judged_exercise).and_raise(*[ error, message ].compact)
     allow(AiService).to receive(:for).with(u).and_return(svc)
   end
@@ -163,7 +161,6 @@ RSpec.describe GenerateDailyExercisesJob do
 
   it "persists a failure and writes no day when the judge rejects every section" do
     allow_any_instance_of(ClaudeService).to receive(:generate_judged_exercise).and_raise(ProviderError::AllSectionsRejectedError)
-    allow_any_instance_of(ClaudeService).to receive(:generate_unjudged_exercise).and_raise(ProviderError::AllSectionsRejectedError)
     allow(Rails.logger).to receive(:error)
 
     described_class.new.perform(user_id: user.id)
@@ -296,20 +293,32 @@ RSpec.describe GenerateDailyExercisesJob do
     end
   end
 
-  it "does not judge an on-demand generation on a weekend" do
+  it "judges an on-demand generation on a weekend too, since its code review is a bug hunt" do
     user.update!(language: "javascript")
     svc = stub_provider
-    allow(svc).to receive(:generate_unjudged_exercise).and_return(
+    allow(svc).to receive(:generate_judged_exercise).and_return(
       AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [ "design_comparison" ], outcomes: {}, plan_notes: {})
     )
 
     travel_to(Time.utc(2026, 7, 18, 12, 0)) do
       described_class.new.perform(user_id: user.id)
 
-      expect(svc).to have_received(:generate_unjudged_exercise).with(user, language: "javascript")
-      expect(svc).not_to have_received(:generate_judged_exercise)
+      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript")
+      expect(svc).not_to have_received(:generate_unjudged_exercise)
       expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([ "design_comparison" ])
     end
+  end
+
+  it "dates the set by the day it was planned for, when the judged run crosses midnight" do
+    svc = stub_provider
+    allow(svc).to receive(:generate_judged_exercise) do
+      travel(30.minutes)
+      AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {}, plan_notes: {})
+    end
+
+    travel_to(Time.utc(2026, 10, 18, 23, 40)) { described_class.new.perform(user_id: user.id) }
+
+    expect(DailyExercise.where(user: user).pluck(:date)).to eq([ Date.new(2026, 10, 18) ])
   end
 
   it "skips an anonymized user on the on-demand path" do
@@ -587,14 +596,13 @@ RSpec.describe GenerateDailyExercisesJob do
                                              draft_model: "claude-opus-5-5", judge_model: "claude-sonnet-5-5"))
     end
 
-    it "writes none for an unjudged weekend set" do
+    it "writes them for a weekend set too, which is judged like a weekday's" do
       svc = stub_judged(solves)
 
       travel_to(Time.utc(2026, 7, 18, 15, 0)) { described_class.new.perform(user_id: user.id) }
 
-      expect(svc).to have_received(:generate_unjudged_exercise)
-      expect(DailyExercise.exists?(user: user, date: Date.new(2026, 7, 18))).to be(true)
-      expect(JudgeSolve.count).to eq(0)
+      expect(svc).to have_received(:generate_judged_exercise)
+      expect(DailyExercise.find_by!(user: user, date: Date.new(2026, 7, 18)).judge_solves.count).to eq(solves.size)
     end
 
     it "keeps the set when a record is refused, and logs the refusal without the section or its key" do

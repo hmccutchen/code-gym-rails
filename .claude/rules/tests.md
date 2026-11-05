@@ -114,12 +114,15 @@ example, since each changes what the plan or ingest produce:
   asserting on a delivered set is nondeterministic at the roll's weight. A
   spec that exercises the grounded `code_review` path opts out with its own
   `:real` stub.
-- **The mode roll never lands `bug_hunt`.** It rolls the other three modes as
-  before. A `bug_hunt` day changes main-track capacity, and ingest refuses the
-  canned `code_review` section, which has no `purpose`. A spec that needs
-  `bug_hunt`, or any other particular mode, calls `pin_code_review_mode`
-  (`spec/support/code_review_mode_helpers.rb`), which stubs both the judged
-  and unjudged mode weights.
+- **The mode roll never lands `bug_hunt`.** A weekend day's one-entry
+  `WEEKEND_CODE_REVIEW_MODE_WEIGHTS` roll is turned into a weekday roll, so a
+  spec behaves the same on whatever day CI runs it. A `bug_hunt` day changes
+  main-track capacity, and ingest refuses the canned `code_review` section,
+  which has no `purpose`. A spec that needs `bug_hunt`, or any other
+  particular mode, calls `pin_code_review_mode`
+  (`spec/support/code_review_mode_helpers.rb`), which stubs both the weekday
+  and weekend mode tables. A catch-all `pick` stub hides this pin, so a spec
+  with one pins the mode itself through the helper.
 - **The files roll lands `:single`.** At `multi: 0.25` a day could otherwise
   ask for files, and a spec's canned single-file `code_review` reply would be
   refused.

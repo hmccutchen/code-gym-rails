@@ -8,8 +8,8 @@ rollback.
 
 ## `#generate`
 
-A weekday regeneration is judged and a weekend one is not, the same split
-first generation makes. Both run under the deadline measured from the claim,
+Every regeneration is judged, as first generation is; a weekend one makes a
+`bug_hunt`, which never ships unjudged. It runs under the deadline measured from the claim,
 so a slow queue pickup comes out of the same budget instead of extending how
 long the claim must stay fresh.
 

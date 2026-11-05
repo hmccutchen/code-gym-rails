@@ -143,8 +143,8 @@ instead:
 - `spec/models/daily_exercise_plan_notes_spec.rb` lists every file under
   `app/` and `lib/` that writes a problem set, and fails when a new one
   appears. It checks each path with a non-default pair, so the fallback cannot
-  make it pass: the cron and on-demand generation job (judged weekday and
-  unjudged weekend), `RegenerateExerciseJob`, the held-set carry-forward
+  make it pass: the cron and on-demand generation job (judged on
+  every day), `RegenerateExerciseJob`, the held-set carry-forward
   (which moves the row and keeps its own pair) and `PreviewSeed`.
 
 A model validation on create was considered and not added. Specs create

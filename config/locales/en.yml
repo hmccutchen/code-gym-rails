@@ -334,6 +334,7 @@ en:
       details: "Details"
     weekend_empty:
       message: "No exercises are generated automatically on weekends — the morning job runs Monday–Friday."
+      bug_hunt: "A weekend set's code review is a bug hunt: a few lines of code with one planted trap to find."
     teaching_hint:
       summary: "Need a nudge? 💡"
       locked: "Available after you attempt this section"

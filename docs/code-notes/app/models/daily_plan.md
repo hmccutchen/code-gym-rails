@@ -46,9 +46,9 @@ Reinforcement and due checks carry stronger prompt annotations, so any concept t
 
 The query builds one condition per bucket and ORs them, so a language concept cannot qualify by matching the architecture list.
 
-## `CODE_REVIEW_MODE_WEIGHTS` and `UNJUDGED_CODE_REVIEW_MODE_WEIGHTS`
+## `CODE_REVIEW_MODE_WEIGHTS`, `WEEKEND_CODE_REVIEW_MODE_WEIGHTS` and `CODE_REVIEW_MODES`
 
-`bug_hunt` is rolled only on a judged day. `.for` takes `judged:` from the path that called it (`AiService#generate_judged_exercise` passes true, `#generate_unjudged_exercise` false), because a model may not name `AiService` to ask `.judged_on?` itself. An unjudged day rolls `UNJUDGED_CODE_REVIEW_MODE_WEIGHTS`, the same weights without `bug_hunt`: a weekend `bug_hunt` would ship with no judge to reject a snippet that is correct as written, holds a second trap, or uses code outside the core language. `WeightedRoll` divides by the remaining total. It is its own constant so a spec can pin the roll on either path (`pin_code_review_mode` stubs both).
+A weekday rolls `CODE_REVIEW_MODE_WEIGHTS`, which holds no `bug_hunt`. A judged weekend day takes `WEEKEND_CODE_REVIEW_MODE_WEIGHTS`, whose one entry is `bug_hunt`, so every weekend `code_review` is a bug hunt (`docs/decisions/bug-hunt.md`). `.for` takes `judged:` from the path that called it, because a model may not name `AiService`, and reads the day from `Date.current`. An unjudged plan rolls the weekday weights on any day, since a `bug_hunt` with no judge would ship code that may be correct as written. The weekend roll goes through `WeightedRoll` with a one-entry table, rather than naming the mode, so a spec can pin it like any other roll (`pin_code_review_mode` stubs both tables, and `roll_defaults` turns the weekend one into a weekday roll). `CODE_REVIEW_MODES` lists every mode once, for the readers that ask what any day could hold (`ConceptHosts`, `DailyKindSwap::Consequences`).
 
 ## `.code_review_gotcha_for`
 

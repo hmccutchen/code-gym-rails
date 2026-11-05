@@ -56,8 +56,6 @@ class RegenerateExerciseJob < ApplicationJob
   end
 
   def generate(service, user, language, deadline)
-    return service.generate_unjudged_exercise(user, language: language, deadline: deadline) unless AiService.judged_on?(Date.current)
-
     service.generate_judged_exercise(user, language: language, deadline: deadline)
   end
 

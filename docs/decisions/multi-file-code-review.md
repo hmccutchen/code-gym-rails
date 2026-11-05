@@ -76,7 +76,8 @@ replaces the earlier "launch B waits for PR 2" order.
     `JUDGE_MAX_TOKENS` sends the cap back to the owner
   The judge is one of the guards, so a section with files never ships
   without it (owner's decision, 2026-11-04, as for `bug_hunt`): `DailyPlan`
-  rolls files only on a judged day, so a weekend day is single-file, and a
+  rolls files only on a judged day (and a weekend day is a single-file
+  `bug_hunt`), and a
   section with files whose judge call fails is dropped
   (`CodeReview.ships_unjudged?`), which costs that day its `code_review`.
   The shares below are of judged days.
@@ -89,12 +90,12 @@ replaces the earlier "launch B waits for PR 2" order.
   failed multi-file key joins, a multi-file calibration fixture is added, and
   the early grades are compared with keyed ones (below).
 
-At `mid_level` and above, 0.25 makes about 15% of judged Ruby `code_review` days
-multi-file and about 20% of JavaScript days. A `bug_hunt` day (20% of days)
-is always single-file, and `RealSource` keeps about 20% of Ruby days single,
-so a quarter of the remaining 60% of Ruby days and 80% of JavaScript days
-roll multi. Before `bug_hunt` (`docs/decisions/bug-hunt.md`), the figures
-were 19% and 25%. A `junior` rung's range is
+At `mid_level` and above, 0.25 makes about 19% of weekday Ruby `code_review`
+days multi-file and 25% of weekday JavaScript days. `RealSource` keeps about
+a quarter of Ruby weekdays single, so a quarter of the remaining Ruby days
+and of every JavaScript day roll multi. A weekend set's `code_review` is a
+`bug_hunt` (`docs/decisions/bug-hunt.md`), which is always single-file. While
+`bug_hunt` was a 20% weekday roll, the weekday figures were about 15% and 20%. A `junior` rung's range is
 one file, so a junior day stays single-file whatever the roll. Setting the
 weight back to `multi: 0.0` turns the mode off for new days.
 

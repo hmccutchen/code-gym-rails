@@ -32,7 +32,7 @@ class GenerateDailyExercisesJob < ApplicationJob
     if (exercise = DailyExercise.find_by(user: user, date: Date.current))
       nudge_if_due(user, exercise)
     else
-      generate_for(user, judge: AiService.judged_on?(Date.current))
+      generate_for(user)
       remind(user)
     end
   end
@@ -61,16 +61,16 @@ class GenerateDailyExercisesJob < ApplicationJob
 
   def generate_now(user)
     return if DailyExercise.exists?(user: user, date: Date.current)
-    generate_for(user, judge: AiService.judged_on?(Date.current))
+    generate_for(user)
   end
 
-  def generate_for(user, judge: false)
+  def generate_for(user)
+    date     = Date.current
     language = user.language_for_today
     service  = AiService.for(user)
-    judged   = judge ? service.generate_judged_exercise(user, language: language)
-                     : service.generate_unjudged_exercise(user, language: language)
+    judged   = service.generate_judged_exercise(user, language: language)
 
-    write_set(user, judged, language, service)
+    write_set(user, judged, language, service, date: date)
     user.clear_generation_failure! if user.last_generation_error_date.present?
 
     Rails.logger.info("Generated exercise for user #{user.id} on #{Date.current}")
@@ -88,11 +88,12 @@ class GenerateDailyExercisesJob < ApplicationJob
     Rails.logger.info("Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)")
   end
 
-  def write_set(user, judged, language, service)
+  # date: the day the set was planned for, read before a judged run that can cross midnight (and a weekend's edge).
+  def write_set(user, judged, language, service, date:)
     DailyExercise.transaction do
       exercise = DailyExercise.create!(
         user:             user,
-        date:             Date.current,
+        date:             date,
         problem_set:      judged.problem_set,
         dropped_sections: judged.dropped_sections,
         plan_notes:       judged.plan_notes,
