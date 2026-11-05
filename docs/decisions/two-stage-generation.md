@@ -24,7 +24,7 @@ A weekend "generate anyway" set is judged too (2026-11-05): its
 `code_review` is always a `bug_hunt`, which never ships unjudged
 (`docs/decisions/bug-hunt.md`). Before that, weekends took the single-stage
 path and `AiService.judged_on?` named the judged days; with every day judged,
-the predicate went.
+the predicate went, and then the single-stage path itself (#703).
 
 **Regeneration is judged, under a deadline.**
 `RegenerateExerciseJob` calls `#generate_judged_exercise` on every day, as

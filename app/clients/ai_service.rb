@@ -107,22 +107,8 @@ class AiService
 
   def model_for(purpose) = routed_model(purpose)
 
-  def generate_exercise(user, language: user.language_for_today, blocking: false)
-    generate_unjudged_exercise(user, language: language, blocking: blocking).problem_set
-  end
-
-  def generate_unjudged_exercise(user, language: user.language_for_today, blocking: false, deadline: GenerationDeadline::NONE)
-    draft   = draft_exercise(user, language: language, blocking: blocking, deadline: deadline, judged: false)
-    planned = draft.kinds.map(&:key)
-    dropped = draft.unusable_sections.select { |section| planned.include?(section.key) }
-    ExerciseDraft.finish(draft, draft.problem_set, provider: exercise_draft_provider,
-                                                   dropped_concepts: dropped.to_h { |section| [ section.key, section.concept ] })
-    JudgedSet.new(problem_set: draft.problem_set, dropped_sections: dropped.map(&:key), outcomes: {},
-                  plan_notes: draft.plan.notes, solves: [])
-  end
-
   def generate_judged_exercise(user, language: user.language_for_today, deadline: GenerationDeadline::NONE)
-    draft = draft_exercise(user, language: language, blocking: false, deadline: deadline, judged: true)
+    draft = ExerciseDraft.call(user, language: language, deadline: deadline, provider: exercise_draft_provider)
     JudgedGeneration.call(
       user: user, draft: draft,
       providers: -> { fresh_service.judged_generation_provider(deadline) },
@@ -281,6 +267,14 @@ class AiService
     "http_#{error.http_status}" if error.instance_of?(ProviderError) && error.http_status
   end
 
+  def exercise_draft_provider
+    ExerciseDraft::Provider.new(
+      prompt: ->(*args, **options) { generation_prompt(*args, **options) },
+      generate: ->(*args, **options) { generate_problem_set(*args, **options) },
+      record_suggestion: ->(suggestion) { record_suggested_concept(suggestion) }
+    )
+  end
+
   protected
 
   def judged_generation_provider(deadline = GenerationDeadline::NONE)
@@ -293,21 +287,10 @@ class AiService
 
   private
 
-  def draft_exercise(user, language:, blocking:, judged:, deadline: GenerationDeadline::NONE)
-    ExerciseDraft.call(user, language: language, blocking: blocking, deadline: deadline, judged: judged, provider: exercise_draft_provider)
-  end
-
   def retry_section(draft, kind, concept, cause = nil, deadline: GenerationDeadline::NONE)
     ExerciseDraft.retry_section(draft, kind, concept, cause: cause, deadline: deadline, provider: exercise_draft_provider)
   end
 
-  def exercise_draft_provider
-    ExerciseDraft::Provider.new(
-      prompt: ->(*args, **options) { generation_prompt(*args, **options) },
-      generate: ->(*args, **options) { generate_problem_set(*args, **options) },
-      record_suggestion: ->(suggestion) { record_suggested_concept(suggestion) }
-    )
-  end
 
   def record_suggested_concept(suggestion) = SuggestedConcept.record!(language: suggestion.bucket, name: suggestion.name)
 

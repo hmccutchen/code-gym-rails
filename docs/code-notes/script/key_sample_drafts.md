@@ -119,7 +119,8 @@ is the number to record.
 measurement in `docs/code-notes/script/bug_hunt_measure.md`. Each draft's
 plan is the day's plan with the mode, the entry's `code_review_gotcha`, no
 `RealSource` excerpt and a single file, and `ForcedConceptDrafts.todays_plan`
-builds it with `judged: true`, since every draft is judged. The script walks the
+builds it as a weekday plan in the user's zone (#704), so the mode is never
+the weekend's. The script walks the
 language's `BugHuntGotchas` registry in list order, one kept section per
 entry, with the entry's concept fixed. A rejected or failed draft tries
 the same entry again, within the usual two attempts a section, so the

@@ -106,7 +106,7 @@ RSpec.describe "per-purpose model routing" do
     end
     service.instance_variable_set(:@conn, connection)
 
-    service.generate_exercise(user, language: "ruby_rails")
+    service.generate_judged_exercise(user, language: "ruby_rails").problem_set
 
     expect(bodies.sole["model"]).to eq(ClaudeService::MODEL_FOR_PURPOSE.fetch("generate_exercise")[:model])
   end

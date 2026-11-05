@@ -75,12 +75,11 @@ replaces the earlier "launch B waits for PR 2" order.
     came from a single-file section, and a reply past a third of
     `JUDGE_MAX_TOKENS` sends the cap back to the owner
   The judge is one of the guards, so a section with files never ships
-  without it (owner's decision, 2026-11-04, as for `bug_hunt`): `DailyPlan`
-  rolls files only on a judged day (and a weekend day is a single-file
-  `bug_hunt`), and a
+  without it (owner's decision, 2026-11-04, as for `bug_hunt`): every set is
+  judged (a weekend day is a single-file `bug_hunt`), and a
   section with files whose judge call fails is dropped
   (`CodeReview.ships_unjudged?`), which costs that day its `code_review`.
-  The shares below are of judged days.
+  The shares below are of weekdays.
   The split script also gives `bug_hunt` sections a row of their own, since
   they are not mastery evidence and would blur the single-file figures the
   multi-file ones are compared with. `FakeService` answers a prompt that asks

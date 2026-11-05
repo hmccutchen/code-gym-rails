@@ -8,7 +8,7 @@ The cap is `RealSource::MAX_LINES` (40) rather than a tighter number. A grounded
 
 Lines are counted after `ProblemSetIngest#format_code!`, so the cap measures the code as shown, and blank lines don't count, the same rule design comparison's `MAX_PIECE_LINES` uses (`ExerciseSection.shown_lines`).
 
-A snippet over the cap is refused, never cut, since cutting code could cut out the planted flaw. `code_review` is a daily kind, so on a judged day a refusal gets up to two retries with its concept fixed before the section is dropped; the single-stage path, which only scripts use now, drops it straight away. The refusal message carries the line count and none of the code. A missing or blank snippet is refused the same way.
+A snippet over the cap is refused, never cut, since cutting code could cut out the planted flaw. `code_review` is a daily kind, so on a judged day a refusal gets up to two retries with its concept fixed before the section is dropped. The refusal message carries the line count and none of the code. A missing or blank snippet is refused the same way.
 
 ## Two shapes: one snippet, or two to three files
 

@@ -219,9 +219,9 @@ RSpec.describe AiService do
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
       }.to_json
 
-      spy_class.new(canned_text: full_problem_set.to_json).generate_exercise(user)
+      spy_class.new(canned_text: full_problem_set.to_json).then { |svc| ExerciseDraft.call(user, language: "ruby_rails", provider: svc.exercise_draft_provider) }
       retry_draft = spy_class.new(canned_text: full_problem_set.to_json)
-                            .send(:draft_exercise, user, language: "ruby_rails", blocking: false, judged: true)
+                            .then { |svc| ExerciseDraft.call(user, language: "ruby_rails", provider: svc.exercise_draft_provider) }
       spy_class.new(canned_text: { "pattern" => FakeService::EXERCISE_PROBLEM_SET["pattern"].deep_dup }.to_json)
                .send(:retry_section, retry_draft, ExerciseSection::Pattern, "service_objects")
       spy_class.new(canned_text: review_json).review_sections(user, exercise, response, sections: %w[code_review])
@@ -403,7 +403,7 @@ RSpec.describe AiService do
       svc = double_class.new(input_tokens: 900, output_tokens: 8_000, truncated: true)
 
       expect {
-        expect { svc.generate_exercise(user) }.to raise_error(ProviderError::TruncatedResponseError)
+        expect { svc.generate_judged_exercise(user).problem_set }.to raise_error(ProviderError::TruncatedResponseError)
       }.to change { ApiUsage.where(purpose: "generate_exercise").count }.by(1)
 
       usage = ApiUsage.last
@@ -416,7 +416,7 @@ RSpec.describe AiService do
       allow(svc).to receive(:call).and_return(text: nil, input_tokens: 700, output_tokens: 0, truncated: false, refusal: "cyber")
 
       expect {
-        expect { svc.generate_exercise(user) }.to raise_error(ProviderError::RefusalError, /cyber/)
+        expect { svc.generate_judged_exercise(user).problem_set }.to raise_error(ProviderError::RefusalError, /cyber/)
       }.to change { ApiUsage.where(purpose: "generate_exercise").count }.by(1)
 
       expect(ApiUsage.last.tokens_in).to eq(700)
@@ -426,7 +426,7 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: '{"code_review": {"correct": ["half a sen', truncated: true)
 
       expect {
-        svc.generate_exercise(user)
+        svc.generate_judged_exercise(user).problem_set
       }.to raise_error(ProviderError::TruncatedResponseError, /did not finish its reply \(\d+ output tokens, thinking included\)/i)
     end
 
@@ -1575,7 +1575,7 @@ RSpec.describe AiService do
       pin_code_review_mode(:schema_review)
       allow(GenerationLadders).to receive(:for).and_call_original
 
-      FakeService.new("fake-key").send(:draft_exercise, user, language: "javascript", blocking: false, judged: true)
+      FakeService.new("fake-key").then { |svc| ExerciseDraft.call(user, language: "javascript", provider: svc.exercise_draft_provider) }
 
       expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil, featured_concept: nil)
     end
@@ -1711,27 +1711,27 @@ RSpec.describe AiService do
         "pattern"     => { "question" => "q", "concept" => "memoization", "diagram" => "flowchart TD\n  A --> B" }
       ).to_json)
 
-      problem_set = svc.generate_exercise(user)
+      problem_set = svc.generate_judged_exercise(user).problem_set
 
       expect(problem_set["code_review"]).not_to have_key("diagram")
       expect(problem_set["pattern"]["diagram"]).to eq("flowchart TD\n  A --> B")
     end
 
-    it "drops a section ingest refused on the single-stage path, records it, and logs the reason only" do
+    it "drops a section ingest refused, records it, and logs the reason only" do
       broken = design_comparison_section.merge("other_piece" => "", "scenario" => "SECRET scenario text")
       svc = double_class.new(canned_text: full_problem_set("code_review" => { "snippet" => "x = 1", "concept" => "n_plus_one" },
                                                            "design_comparison" => broken).to_json)
       logged = []
       allow(Rails.logger).to receive(:warn) { |message| logged << message }
 
-      generated = svc.generate_unjudged_exercise(user)
+      generated = svc.generate_judged_exercise(user)
 
       expect(generated.problem_set).not_to have_key("design_comparison")
       expect(generated.dropped_sections).to eq([ "design_comparison" ])
       expect(logged.grep(/\[unusable_section\]/).sole)
         .to eq("[unusable_section] user=#{user.id} section=design_comparison reason=Design comparison returned no usable other_piece")
       expect(logged.join).not_to include("SECRET")
-      expect(svc.generate_exercise(user)).not_to have_key("design_comparison")
+      expect(svc.generate_judged_exercise(user).problem_set).not_to have_key("design_comparison")
     end
 
     it "writes the SuggestedConcept rows ingest reports" do
@@ -1739,7 +1739,7 @@ RSpec.describe AiService do
         "code_review" => { "snippet" => "x = 1", "question" => "q", "concept" => "Invented Concept!!" }
       ).to_json)
 
-      expect { svc.generate_exercise(user) }.to change(SuggestedConcept, :count).by(1)
+      expect { svc.generate_judged_exercise(user).problem_set }.to change(SuggestedConcept, :count).by(1)
       expect(SuggestedConcept.last.display_name).to eq("Invented Concept!!")
       expect(SuggestedConcept.last.language).to eq("ruby_rails")
     end
@@ -1752,7 +1752,7 @@ RSpec.describe AiService do
 
       allow(Rails.logger).to receive(:warn)
       expect(Rails.logger).to receive(:warn).with(/SuggestedConcept recording failed.*db down/)
-      expect(svc.generate_exercise(user)["code_review"]["concept"]).to eq("other")
+      expect(svc.generate_judged_exercise(user).problem_set["code_review"]["concept"]).to eq("other")
     end
 
     it "keeps recording the remaining suggestions after one of them fails" do
@@ -1767,7 +1767,7 @@ RSpec.describe AiService do
 
       allow(Rails.logger).to receive(:warn)
 
-      expect { svc.generate_exercise(user) }.to change(SuggestedConcept, :count).by(1)
+      expect { svc.generate_judged_exercise(user).problem_set }.to change(SuggestedConcept, :count).by(1)
       expect(SuggestedConcept).to have_received(:record!).with(hash_including(name: "First Invention!!"))
       expect(SuggestedConcept.last.display_name).to eq("Second Invention!!")
     end
@@ -1779,7 +1779,7 @@ RSpec.describe AiService do
         "code_review" => { "snippet" => "x = 1", "question" => "q", "concept" => "Invented Concept!!" }
       ).to_json)
 
-      expect { svc.generate_exercise(user) }.not_to change(SuggestedConcept, :count)
+      expect { svc.generate_judged_exercise(user).problem_set }.not_to change(SuggestedConcept, :count)
       expect(handed.map(&:name)).to eq([ "Invented Concept!!" ])
     end
 
@@ -1789,14 +1789,14 @@ RSpec.describe AiService do
         "ambiguity_hunt" => { "request" => "vague", "planted_ambiguities" => [] }
       }.to_json)
 
-      expect { svc.generate_exercise(user) }.to raise_error(ProviderError::InvalidResponseError)
+      expect { svc.generate_judged_exercise(user).problem_set }.to raise_error(ProviderError::InvalidResponseError)
     end
 
     it "keeps an unparseable draft out of the log and the error message" do
       svc = double_class.new(canned_text: "not json: SENTINEL-DRAFT")
       expect(Rails.logger).not_to receive(:error).with(/Invalid JSON from provider/)
 
-      expect { svc.generate_exercise(user) }
+      expect { svc.generate_judged_exercise(user).problem_set }
         .to raise_error(ProviderError::InvalidResponseError, "Provider returned invalid JSON for the problem set")
     end
 
@@ -1806,7 +1806,7 @@ RSpec.describe AiService do
         "ambiguity_hunt" => { "request" => "vague", "planted_ambiguities" => [] }
       }.to_json)
 
-      expect { svc.generate_exercise(user) rescue nil }.not_to change(SuggestedConcept, :count)
+      expect { svc.generate_judged_exercise(user).problem_set rescue nil }.not_to change(SuggestedConcept, :count)
     end
   end
 
@@ -1905,14 +1905,14 @@ RSpec.describe AiService do
     end
   end
 
-  describe "#generate_exercise" do
+  describe "#generate_judged_exercise, the drafted set" do
     before { user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS) }
 
     it "refuses an unsupported language with a setup error before planning" do
       allow(DailyPlan).to receive(:for).and_call_original
       svc = double_class.new(canned_text: "{}")
 
-      expect { svc.generate_exercise(user, language: "mixed") }
+      expect { svc.generate_judged_exercise(user, language: "mixed").problem_set }
         .to raise_error(SetupError, /Unsupported generation language/)
       expect(DailyPlan).not_to have_received(:for)
     end
@@ -1924,7 +1924,7 @@ RSpec.describe AiService do
               "parsons_problem" => { "blocks" => %w[a b c d e] }, "plan_review" => {} }
       svc = double_class.new(canned_text: set.to_json)
 
-      result = svc.generate_exercise(user)
+      result = svc.generate_judged_exercise(user).problem_set
 
       order = result["parsons_problem"]["display_order"]
       expect(order).to match_array([ 0, 1, 2, 3, 4 ])
@@ -1938,7 +1938,7 @@ RSpec.describe AiService do
               "architecture" => {}, "plan_review" => {} }
       svc = double_class.new(canned_text: set.to_json)
 
-      result = svc.generate_exercise(user)
+      result = svc.generate_judged_exercise(user).problem_set
       expect(result).not_to have_key("parsons_problem")
     end
 
@@ -1946,7 +1946,7 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: '["not", "a", "problem set"]')
 
       expect {
-        svc.generate_exercise(user)
+        svc.generate_judged_exercise(user).problem_set
       }.to raise_error(ProviderError::InvalidResponseError, /Array instead of a JSON object/)
     end
 
@@ -1954,10 +1954,10 @@ RSpec.describe AiService do
       set = full_problem_set("code_review" => { "snippet" => "x = 1", "concept" => "bogus" })
       svc = double_class.new(canned_text: set.to_json, input_tokens: 5, output_tokens: 7)
 
-      result = svc.generate_exercise(user)
+      result = svc.generate_judged_exercise(user).problem_set
 
       expect(result["code_review"]["concept"]).to eq("other")
-      usage = ApiUsage.last
+      usage = ApiUsage.where(purpose: "generate_exercise").last
       expect(usage.tokens_in).to eq(5)
       expect(usage.tokens_out).to eq(7)
       expect(usage.purpose).to eq("generate_exercise")
@@ -1967,7 +1967,7 @@ RSpec.describe AiService do
       set = full_problem_set("code_review" => { "snippet" => "x = 1", "concept" => "closures" })
       svc = double_class.new(canned_text: set.to_json)
 
-      result = svc.generate_exercise(user, language: "javascript")
+      result = svc.generate_judged_exercise(user, language: "javascript").problem_set
 
       expect(result["code_review"]["concept"]).to eq("closures")
     end
@@ -1977,7 +1977,7 @@ RSpec.describe AiService do
       set = full_problem_set("code_review" => { "snippet" => "x = 1", "concept" => "closures" })
       svc = double_class.new(canned_text: set.to_json)
 
-      result = svc.generate_exercise(user)
+      result = svc.generate_judged_exercise(user).problem_set
 
       expect(result["code_review"]["concept"]).to eq("closures")
     end
@@ -1988,7 +1988,7 @@ RSpec.describe AiService do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :architecture, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
-      svc.generate_exercise(user)
+      svc.generate_judged_exercise(user).problem_set
 
       expect(svc.last_prompt).to include('"architecture": {', 'The "architecture" section is an ARCHITECTURE decision')
       expect(svc.last_prompt).not_to include('"challenge": {', '"pattern": {')
@@ -2015,7 +2015,7 @@ RSpec.describe AiService do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
-      svc.generate_exercise(user, language: "ruby_rails")
+      svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
 
       expect(svc.last_prompt).to include("Retention checks due today: memoization")
     end
@@ -2045,7 +2045,7 @@ RSpec.describe AiService do
         allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: third, fourth: :plan_review)
         allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
-        svc.generate_exercise(user, language: "ruby_rails")
+        svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
         svc.last_prompt
       end
 
@@ -2106,7 +2106,7 @@ RSpec.describe AiService do
       expect(Rails.logger).to receive(:info).with(/\[set_size\]/)
       expect(Rails.logger).to receive(:info).with(/\[retention\].*offered=memoization.*honored=memoization/)
       expect(Rails.logger).to receive(:info).with(/\[difficulty_diagnostics\]/)
-      svc.generate_exercise(user, language: "ruby_rails")
+      svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
     end
 
     it "logs an empty honored list when the model ignored the due concept" do
@@ -2119,7 +2119,7 @@ RSpec.describe AiService do
       expect(Rails.logger).to receive(:info).with(/\[set_size\]/)
       expect(Rails.logger).to receive(:info).with(/\[retention\].*offered=memoization.*honored=-.*tagged=n_plus_one/)
       expect(Rails.logger).to receive(:info).with(/\[difficulty_diagnostics\]/)
-      svc.generate_exercise(user, language: "ruby_rails")
+      svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
     end
 
     it "logs nothing when no check is due" do
@@ -2128,7 +2128,7 @@ RSpec.describe AiService do
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
       expect(Rails.logger).not_to receive(:info).with(/\[retention\]/)
-      svc.generate_exercise(user, language: "ruby_rails")
+      svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
     end
 
     it "logs the fourth slot's offer under its own bucket" do
@@ -2146,7 +2146,7 @@ RSpec.describe AiService do
         logged << msg if msg.is_a?(String) && msg.start_with?("[retention]")
       end
 
-      svc.generate_exercise(user, language: "ruby_rails")
+      svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
 
       expect(logged).to include(/bucket=plan_review.*offered=scope_creep.*honored=scope_creep/)
     end
@@ -2158,7 +2158,7 @@ RSpec.describe AiService do
       allow(Rails.logger).to receive(:info) do |msg|
         logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
       end
-      svc.generate_exercise(user, language: "ruby_rails")
+      svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
       JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
     end
 
@@ -2173,7 +2173,7 @@ RSpec.describe AiService do
         logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
       end
 
-      svc.generate_exercise(user, language: "ruby_rails")
+      svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
 
       expect(logged).not_to be_nil
       payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
@@ -2192,7 +2192,7 @@ RSpec.describe AiService do
       expect(payload["requested"]["fourth"]).to eq("plan_review")
       expect(payload["requested"]["section_count"]).to eq(4)
       without_stamps = payload["delivered"].transform_values { |section| section.is_a?(Hash) ? section.except("pitched_at", "eased") : section }
-      expect(without_stamps.except("design_comparison")).to eq(JSON.parse(set.except("pattern", "design_comparison").to_json))
+      expect(without_stamps.except("design_comparison")).to eq(JSON.parse(set.slice("code_review", "challenge", "plan_review").to_json))
       expect(without_stamps["design_comparison"]).to include("piece_a", "piece_b")
       expect(payload["delivered"]["code_review"]["pitched_at"]).to eq("junior")
     end
@@ -2213,7 +2213,7 @@ RSpec.describe AiService do
         logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
       end
 
-      svc.generate_exercise(user, language: "ruby_rails")
+      svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
 
       payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
       expect(payload["requested"]["due_checks"]).to eq([ "memoization" ])
@@ -2237,7 +2237,7 @@ RSpec.describe AiService do
         logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
       end
 
-      problem_set = svc.generate_exercise(user, language: "ruby_rails")
+      problem_set = svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
 
       expect(logged).not_to include("secret ambiguity")
       payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
@@ -2258,7 +2258,7 @@ RSpec.describe AiService do
       allow(Rails.logger).to receive(:info) { |msg| logged << msg }
       allow(Rails.logger).to receive(:warn) { |msg| logged << msg }
 
-      problem_set = svc.generate_exercise(user, language: "ruby_rails")
+      problem_set = svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
 
       expect(logged.join("\n")).not_to include("secret")
       expect(logged.join("\n")).not_to include("\"better\"")
@@ -2282,7 +2282,7 @@ RSpec.describe AiService do
         logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
       end
 
-      svc.generate_exercise(user, language: "ruby_rails")
+      svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
 
       expect(svc.last_prompt).to include("The code_review snippet must be a Rails migration")
 
@@ -2305,7 +2305,7 @@ RSpec.describe AiService do
         logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
       end
 
-      problem_set = svc.generate_exercise(user, language: "ruby_rails")
+      problem_set = svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
 
       expect(svc.last_prompt).to include("MODIFIED COPY of this real method")
       expect(svc.last_prompt).to include(excerpt.text.strip_heredoc.chomp)
@@ -2735,14 +2735,14 @@ RSpec.describe AiService do
 
     it "sends the generation call with the long generation budget" do
       svc = double_class.new(canned_text: full_problem_set.to_json)
-      svc.generate_exercise(user)
+      ExerciseDraft.call(user, language: user.language_for_today, provider: svc.exercise_draft_provider)
 
       expect(svc.last_read_timeout).to eq(CallProfiles::GENERATION_READ_TIMEOUT)
     end
 
     it "tightens the budget when a request thread is blocked on the call" do
       svc = double_class.new(canned_text: full_problem_set.to_json)
-      svc.generate_exercise(user, blocking: true)
+      ExerciseDraft.call(user, language: user.language_for_today, provider: svc.exercise_draft_provider, blocking: true)
 
       expect(svc.last_read_timeout).to eq(CallProfiles::SYNC_GENERATION_READ_TIMEOUT)
     end
@@ -4299,7 +4299,7 @@ RSpec.describe AiService do
     end
   end
 
-  describe "#generate_exercise threads the fourth slot through" do
+  describe "#generate_judged_exercise threads the fourth slot through" do
     it "asks the provider for a fourth section matching the plan's rolled kind" do
       allow(DailyPlan).to receive(:for).and_call_original
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :ambiguity_hunt)
@@ -4316,7 +4316,7 @@ RSpec.describe AiService do
         }
       }.to_json)
 
-      problem_set = svc.generate_exercise(user)
+      problem_set = svc.generate_judged_exercise(user).problem_set
 
       expect(ExerciseSection.resolved_key(problem_set, ExerciseSection.fourths)).to eq("ambiguity_hunt")
       expect(svc.last_prompt).to include("\"ambiguity_hunt\"")
@@ -4700,26 +4700,26 @@ RSpec.describe AiService, "rung stamps on a generated set" do
     user.update!(section_kind_levels: { "code_review" => "principal_engineer" },
                  daily_section_count: ExerciseSection::MAX_SECTIONS)
 
-    problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+    problem_set = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set
 
     expect(problem_set["code_review"]["pitched_at"]).to eq("principal_engineer")
     expect(problem_set["pattern"]["pitched_at"]).to eq("senior")
   end
 
   it "marks a section eased when its concept was offered as reduced reinforcement in an unlocked kind" do
-    concept = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails").dig("code_review", "concept")
+    concept = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set.dig("code_review", "concept")
     user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :reduced)
     allow(DailyPlan).to receive(:for).and_wrap_original do |m, *args, **kw|
       m.call(*args, **kw).with(reinforcement: [ { concept: concept, bucket: "ruby_rails", tier: "reduced" } ])
     end
 
-    problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+    problem_set = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set
 
     expect(problem_set["code_review"]["eased"]).to be(true)
   end
 
   it "stamps a rung on every section the provider returned, so a slot won by precedence is not left blank" do
-    problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+    problem_set = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set
 
     ExerciseSection.keys.select { |key| problem_set[key].is_a?(Hash) && problem_set[key].any? }.each do |key|
       expect(problem_set[key]["pitched_at"]).to eq("senior"), "#{key} carries no rung"
@@ -4727,13 +4727,13 @@ RSpec.describe AiService, "rung stamps on a generated set" do
   end
 
   it "does not mark a section eased when its kind is locked" do
-    concept = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails").dig("code_review", "concept")
+    concept = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set.dig("code_review", "concept")
     user.update!(section_kind_levels: { "code_review" => "senior" }, locked_section_kinds: [ "code_review" ])
     allow(DailyPlan).to receive(:for).and_wrap_original do |m, *args, **kw|
       m.call(*args, **kw).with(reinforcement: [ { concept: concept, bucket: "ruby_rails", tier: "reduced" } ])
     end
 
-    problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+    problem_set = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set
 
     expect(problem_set["code_review"]).not_to have_key("eased")
   end
@@ -4945,29 +4945,23 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).and_return(:single)
   end
 
-  it "hands back the plan's notes on both generation paths" do
+  it "hands back the plan's notes" do
     allow(DailyPlan).to receive(:for).and_wrap_original do |original, *args, **kwargs|
       original.call(*args, **kwargs).with(shared_concept: "feature_envy")
     end
 
     judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
-    single = FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
 
-    notes = { "daily_kinds" => %w[code_review design_comparison], "size" => SectionCount::FLOOR, "size_reason" => "gate",
-              "shared_concept" => "feature_envy" }
-    expect(judged.plan_notes).to eq(notes)
-    expect(single.plan_notes).to eq(notes)
-    expect(single.dropped_sections).to eq([])
+    expect(judged.plan_notes).to eq("daily_kinds" => %w[code_review design_comparison], "size" => SectionCount::FLOOR,
+                                    "size_reason" => "gate", "shared_concept" => "feature_envy")
   end
 
-  it "tells the plan which path it is on, so bug_hunt is rolled on the judged path only" do
+  it "lets the plan read the day itself, so a weekend set is a bug hunt" do
     allow(DailyPlan).to receive(:for).and_call_original
 
     FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
-    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", judged: true, featured_concept: nil)
 
-    FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
-    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", judged: false, featured_concept: nil)
+    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", featured_concept: nil)
   end
 
   { "b" => true, "a" => false }.each do |better, matched|
@@ -4994,10 +4988,6 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(judged.problem_set["security_review"]).not_to have_key("answer_key")
   end
 
-  it "hands back no solves from an unjudged generation" do
-    expect(FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails").solves).to eq([])
-  end
-
   describe "under a deadline" do
     let(:purposes) { [] }
     let(:start) { Time.current }
@@ -5010,29 +5000,25 @@ RSpec.describe AiService, "#generate_judged_exercise" do
       end
     end
 
-    it "makes no call on either path once the deadline leaves no room for the draft" do
+    it "makes no call once the deadline leaves no room for the draft" do
       expired = GenerationDeadline.new(start - 1)
 
       expect { FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails", deadline: expired) }
         .to raise_error(ProviderError::DeadlineError)
-      expect { FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails", deadline: expired) }
-        .to raise_error(ProviderError::DeadlineError)
       expect(purposes).to be_empty
     end
 
-    { judged: :generate_judged_exercise, unjudged: :generate_unjudged_exercise }.each do |path, method|
-      it "checks the draft against the time left after planning, not before it (#{path})" do
-        now = [ start ]
-        deadline = GenerationDeadline.new(start + CallProfiles.worst_case_seconds_for("generate_exercise"), clock: -> { now.first })
-        allow(DailyPlan).to receive(:for).and_wrap_original do |original, *args, **kwargs|
-          original.call(*args, **kwargs).tap { now[0] = start + 1 }
-        end
-
-        expect { FakeService.new("fake-key").public_send(method, user, language: "ruby_rails", deadline: deadline) }
-          .to raise_error(ProviderError::DeadlineError)
-        expect(DailyPlan).to have_received(:for)
-        expect(purposes).to be_empty
+    it "checks the draft against the time left after planning, not before it" do
+      now = [ start ]
+      deadline = GenerationDeadline.new(start + CallProfiles.worst_case_seconds_for("generate_exercise"), clock: -> { now.first })
+      allow(DailyPlan).to receive(:for).and_wrap_original do |original, *args, **kwargs|
+        original.call(*args, **kwargs).tap { now[0] = start + 1 }
       end
+
+      expect { FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails", deadline: deadline) }
+        .to raise_error(ProviderError::DeadlineError)
+      expect(DailyPlan).to have_received(:for)
+      expect(purposes).to be_empty
     end
 
     it "stops a judge call that no longer fits once the draft is back, keeping the drafted sections" do
@@ -5048,7 +5034,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     it "checks a retry against the time left after its ladders load, so no retry request starts" do
       service = FakeService.new("fake-key")
-      draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false, judged: true)
+      draft = service.then { |svc| ExerciseDraft.call(user, language: "ruby_rails", provider: svc.exercise_draft_provider) }
       now = [ start ]
       retry_and_judge = CallProfiles.worst_case_seconds_for("retry_section") + CallProfiles.worst_case_seconds_for("judge_section")
       deadline = GenerationDeadline.new(start + retry_and_judge, clock: -> { now.first })
@@ -5064,7 +5050,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     it "starts a retry only when its re-judge fits after it, so a retried section is never shipped unjudged" do
       service = FakeService.new("fake-key")
-      draft = service.send(:draft_exercise, user, language: "ruby_rails", blocking: false, judged: true)
+      draft = service.then { |svc| ExerciseDraft.call(user, language: "ruby_rails", provider: svc.exercise_draft_provider) }
       retry_alone = GenerationDeadline.new(Time.current + CallProfiles.worst_case_seconds_for("retry_section"))
 
       expect { service.send(:retry_section, draft, ExerciseSection::Pattern, "service_objects", deadline: retry_alone) }
@@ -5633,7 +5619,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
   end
 
   it "records a dropped section's planned concept as unhosted in the retention log" do
-    concept = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails").dig("pattern", "concept")
+    concept = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set.dig("pattern", "concept")
     user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :standard, mastered_at: 1.month.ago,
                                    retention_interval_days: 7, next_retention_check_on: Date.current - 3)
     allow(user).to receive(:concepts_needing_reinforcement).and_return([])
@@ -5677,7 +5663,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
   end
 
   it "names the judge's outcomes and the unhosted planned concept in the diagnostics payload" do
-    concept = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails").dig("pattern", "concept")
+    concept = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set.dig("pattern", "concept")
     user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :standard, mastered_at: 1.month.ago,
                                    retention_interval_days: 7, next_retention_check_on: Date.current - 3)
     allow(user).to receive(:concepts_needing_reinforcement).and_return([])
@@ -5715,19 +5701,6 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     expect(payload["judge"]["pattern"]).to include("evidence" => "the question names the missing index",
                                                    "reason" => "It says where to look.")
-  end
-
-  it "leaves the single-stage path's diagnostics without a judge" do
-    logged = nil
-    allow(Rails.logger).to receive(:info) do |msg|
-      logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
-    end
-
-    FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
-    payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
-
-    expect(payload["judge"]).to be_nil
-    expect(payload["unhosted"]).to eq([])
   end
 end
 
@@ -6008,7 +5981,7 @@ RSpec.describe AiService, "the shared concept" do
   it "logs the pairing as honored when both delivered fixed sections carry it" do
     plan_sharing("n_plus_one")
 
-    lines = logged("[shared_concept]") { service_tagging_design_comparison("n_plus_one").generate_exercise(user, language: "ruby_rails") }
+    lines = logged("[shared_concept]") { service_tagging_design_comparison("n_plus_one").generate_judged_exercise(user, language: "ruby_rails").problem_set }
 
     expect(lines).to eq([ "[shared_concept] user=#{user.id} concept=n_plus_one reason=reduced_tier honored=true" ])
   end
@@ -6016,13 +5989,13 @@ RSpec.describe AiService, "the shared concept" do
   it "logs the pairing as not honored when the model placed it in one section only" do
     plan_sharing("n_plus_one")
 
-    lines = logged("[shared_concept]") { FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails") }
+    lines = logged("[shared_concept]") { FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set }
 
     expect(lines).to eq([ "[shared_concept] user=#{user.id} concept=n_plus_one reason=reduced_tier honored=false" ])
   end
 
   it "logs nothing on a day without a pairing" do
-    lines = logged("[shared_concept]") { FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails") }
+    lines = logged("[shared_concept]") { FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set }
 
     expect(lines).to eq([])
   end
@@ -6030,7 +6003,7 @@ RSpec.describe AiService, "the shared concept" do
   it "carries the concept in the diagnostics payload" do
     plan_sharing("n_plus_one")
 
-    lines = logged("[difficulty_diagnostics]") { FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails") }
+    lines = logged("[difficulty_diagnostics]") { FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set }
 
     expect(JSON.parse(lines.last.delete_prefix("[difficulty_diagnostics] "))["requested"]["shared_concept"]).to eq("n_plus_one")
   end
@@ -6047,7 +6020,7 @@ RSpec.describe AiService, "waiting retention checks" do
     lines = []
     allow(Rails.logger).to receive(:info) { |msg| lines << msg if msg.is_a?(String) && msg.start_with?("[retention]") }
 
-    FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set
 
     expect(lines).to eq([ "[retention] user=#{user.id} date=#{Date.current} waiting=architecture:service_boundaries(no_host)" ])
   end
@@ -6059,7 +6032,7 @@ RSpec.describe AiService, "the coverage exception" do
   def lines_from(prefix)
     lines = []
     allow(Rails.logger).to receive(:info) { |msg| lines << msg if msg.is_a?(String) && msg.start_with?(prefix) }
-    FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set
     lines
   end
 
@@ -6093,7 +6066,7 @@ RSpec.describe AiService, "the day's size" do
   end
 
   def generated_lines(prefix)
-    lines_from(prefix) { FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails") }
+    lines_from(prefix) { FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set }
   end
 
   def decision_from(lines)
@@ -6109,7 +6082,7 @@ RSpec.describe AiService, "the day's size" do
   it "logs the decision and the gate's evidence before the provider is contacted" do
     failing = Class.new(FakeService) { def call(_request) = raise(ProviderError, "provider down") }.new("fake-key")
     lines = lines_from("[set_size]") do
-      expect { failing.generate_exercise(user, language: "ruby_rails") }.to raise_error(ProviderError, "provider down")
+      expect { failing.generate_judged_exercise(user, language: "ruby_rails").problem_set }.to raise_error(ProviderError, "provider down")
     end
 
     decision = decision_from(lines)
@@ -6120,10 +6093,10 @@ RSpec.describe AiService, "the day's size" do
     expect(decision["gate"]["evidence"]).to include("to_four", "brake", "optional", "levels")
   end
 
-  it "logs on the judged and the single-stage paths alike" do
+  it "logs once for each generated set" do
     lines = lines_from("[set_size]") do
       FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
-      FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
+      FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
     end
 
     expect(lines.grep(/\A\[set_size\] user=#{user.id} date=/).size).to eq(2)

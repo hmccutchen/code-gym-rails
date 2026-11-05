@@ -54,10 +54,10 @@ class ModelComparison
   def generate(user_id)
     user     = User.find(user_id)
     language = user.language_for_today
-    plan     = DailyPlan.for(user, language: language, judged: false)
+    plan     = ForcedConceptDrafts.todays_plan(user, language)
 
     compare("generate", heading: "user #{user.id}, #{language}") do |service|
-      problem_set = with_fixed_plan(plan) { service.generate_exercise(user, language: language) }
+      problem_set = with_fixed_plan(plan) { draft(service, user, language, blocking: false).problem_set }
       # Printed output gets pasted around, which is the storage ExerciseSection.without_answer_keys keeps the key out of.
       ExerciseSection.without_answer_keys(problem_set)
     end
@@ -94,12 +94,10 @@ class ModelComparison
   def judge(user_id)
     user       = User.find(user_id)
     language   = user.language_for_today
-    plan       = DailyPlan.for(user, language: language, judged: true)
+    plan       = ForcedConceptDrafts.todays_plan(user, language)
     difficulty = KindDifficulty.for(user)
 
-    draft = with_fixed_plan(plan) do
-      pinned_service(CANDIDATES.fetch("generate").first, []).send(:draft_exercise, user, language: language, blocking: true, judged: true)
-    end
+    draft = with_fixed_plan(plan) { draft(pinned_service(CANDIDATES.fetch("generate").first, []), user, language, blocking: true) }
 
     runs = compare("judge", heading: "user #{user.id}, #{language}") do |service|
       judge_draft(service, user, draft, difficulty)
@@ -709,6 +707,10 @@ class ModelComparison
   end
 
   # DailyPlan.for rolls at random on every call, so candidates would otherwise get different requests.
+  def draft(service, user, language, blocking:)
+    ExerciseDraft.call(user, language: language, blocking: blocking, provider: service.exercise_draft_provider)
+  end
+
   def with_fixed_plan(plan)
     original_plan     = DailyPlan.method(:for)
     original_featured = FeaturedConcept.method(:for)

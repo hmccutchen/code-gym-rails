@@ -19,9 +19,9 @@ RSpec.describe FakeService do
     expect { AiService.for(user) }.to raise_error(SetupError, /test-only fake provider/)
   end
 
-  describe "#generate_exercise" do
+  describe "#generate_judged_exercise" do
     it "answers with every ExerciseSection kind, and delivers sections with valid, non-'other' concepts" do
-      problem_set = described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")
+      problem_set = described_class.new(user.api_key).generate_judged_exercise(user, language: "ruby_rails").problem_set
 
       # Derived from the registry so "every kind" stays true when a kind is added.
       expect(described_class::EXERCISE_PROBLEM_SET.keys).to match_array(ExerciseSection.keys)
@@ -39,9 +39,7 @@ RSpec.describe FakeService do
     end
 
     it "resolves to the architecture third when persisted, since architecture has top precedence" do
-      user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
-      problem_set = described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")
-      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: problem_set,
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: described_class::EXERCISE_PROBLEM_SET,
                                         language: "ruby_rails", generated_at: Time.current)
 
       expect(ExerciseSection.resolved_key(exercise.problem_set, ExerciseSection.thirds)).to eq("architecture")
@@ -52,7 +50,7 @@ RSpec.describe FakeService do
     end
 
     it "delivers no more sections than a day holds" do
-      problem_set = described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")
+      problem_set = described_class.new(user.api_key).generate_judged_exercise(user, language: "ruby_rails").problem_set
       exercise = DailyExercise.new(problem_set: problem_set)
 
       expect(exercise.active_section_keys.size).to be <= ExerciseSection::MAX_SECTIONS
@@ -60,12 +58,10 @@ RSpec.describe FakeService do
 
     it "logs API usage with zero cost" do
       expect {
-        described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")
-      }.to change(ApiUsage, :count).by(1)
+        described_class.new(user.api_key).generate_judged_exercise(user, language: "ruby_rails").problem_set
+      }.to change(ApiUsage.where(purpose: "generate_exercise"), :count).by(1)
 
-      usage = ApiUsage.last
-      expect(usage.tokens_in).to eq(0)
-      expect(usage.tokens_out).to eq(0)
+      expect(ApiUsage.pluck(:tokens_in, :tokens_out).uniq).to eq([ [ 0, 0 ] ])
     end
   end
 

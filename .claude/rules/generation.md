@@ -34,8 +34,8 @@ read it before changing that area.
 - **Two-stage generation** (`docs/decisions/two-stage-generation.md`): Every
   generation, weekends and regeneration included, drafts a set, then
   `JudgedGeneration` judges each section: keep, edit prose (`.prose_fields`
-  only, never code or the planted defect) or reject. Both jobs always take the
-  judged path; `#generate_unjudged_exercise` is left to scripts.
+  only, never code or the planted defect) or reject. There is no single-stage
+  path (#703); a script that wants a draft alone calls `ExerciseDraft.call`.
   `RegenerateExerciseJob` runs under a `GenerationDeadline` measured from its
   claim (`DailyExercise::REGENERATION_DEADLINE`; the claim window adds
   `WRITE_MARGIN` for the write after the last call): `#call_and_log` starts
@@ -84,8 +84,8 @@ read it before changing that area.
   `multi: 0.25` with guards: the key adds `files` and `evidence`, and one
   that fails (`files_unmatched`, `evidence_unlocated`) is dropped with the
   section kept until keyed grading; the judge gets `MultiFile::JUDGE_GUIDANCE`
-  and the grader `MultiFile::GRADING_NOTE`, which reads no key. Files roll
-  only on judged days, and a section with files is dropped when its judge
+  and the grader `MultiFile::GRADING_NOTE`, which reads no key. Files never
+  roll on a `bug_hunt` day, and a section with files is dropped when its judge
   fails (`.ships_unjudged?`), as a bug hunt is.
 - **`bug_hunt`, the fourth `code_review` mode**
   (`docs/decisions/bug-hunt.md`): A goal line (`purpose`, at most
@@ -93,8 +93,8 @@ read it before changing that area.
   at most `BugHunt::MAX_LINES` shown lines of core Ruby or ES-module
   JavaScript with one trap from `BugHuntGotchas`, picked never-seen-first
   into `plan_notes["bug_hunt"]`, never the section, and never the week's
-  featured concept (`BugHuntGotchas.pick(featured_concept:)`). Every judged weekend
-  day, never a weekday or an unjudged plan (`DailyPlan.for(judged:)`), single-file, never `RealSource`; its
+  featured concept (`BugHuntGotchas.pick(featured_concept:)`). Every weekend
+  day, never a weekday (`DailyPlan.for(weekend:)`), single-file, never `RealSource`; its
   vocabulary is the picked entry's concept, and every other kind's
   vocabulary that day leaves that concept out. No output: ingest refuses a
   result comment. The key adds an optional code `witness`

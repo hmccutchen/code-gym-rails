@@ -18,7 +18,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
                           regenerating_since: Time.current)
   end
 
-  def unjudged(problem_set, dropped: [])
+  def judged_set(problem_set, dropped: [])
     AiService::JudgedSet.new(problem_set: problem_set, dropped_sections: dropped, outcomes: {}, plan_notes: {})
   end
 
@@ -28,7 +28,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     if result.is_a?(StandardError)
       allow(fake_service).to receive(:generate_judged_exercise).and_raise(result)
     else
-      allow(fake_service).to receive(:generate_judged_exercise).and_return(unjudged(result))
+      allow(fake_service).to receive(:generate_judged_exercise).and_return(judged_set(result))
     end
     fake_service
   end
@@ -63,7 +63,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
       allow(fake_service).to receive(:generate_judged_exercise) do
         exercise.update_columns(regenerating_since: nil)
-        unjudged({ "code_review" => { "question" => "new" } })
+        judged_set({ "code_review" => { "question" => "new" } })
       end
       described_class.new.perform(user_id: user.id)
       expect_logged_by_id
@@ -138,7 +138,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
     allow(fake_service).to receive(:generate_judged_exercise) do
       exercise.update_columns(regenerating_since: nil)
-      unjudged({ "code_review" => { "question" => "new" } })
+      judged_set({ "code_review" => { "question" => "new" } })
     end
 
     described_class.new.perform(user_id: user.id)
@@ -160,7 +160,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
     allow(fake_service).to receive(:generate_judged_exercise) do
       exercise.update_columns(regenerating_since: newer_claim)
-      unjudged({ "code_review" => { "question" => "new" } })
+      judged_set({ "code_review" => { "question" => "new" } })
     end
 
     described_class.new.perform(user_id: user.id)
@@ -275,7 +275,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     fake_service = stub_provider({ "code_review" => { "question" => "new" } })
     allow(fake_service).to receive(:generate_judged_exercise) do
       daily_response.destroy
-      unjudged({ "code_review" => { "question" => "new" } })
+      judged_set({ "code_review" => { "question" => "new" } })
     end
 
     expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
@@ -300,7 +300,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     exercise = claimed_exercise
     stub_provider({ "code_review" => { "question" => "new" } })
     allow(AiService.for(user)).to receive(:generate_judged_exercise)
-      .and_return(unjudged({ "code_review" => { "question" => "new" } }, dropped: [ "design_comparison" ]))
+      .and_return(judged_set({ "code_review" => { "question" => "new" } }, dropped: [ "design_comparison" ]))
 
     described_class.new.perform(user_id: user.id)
 
@@ -457,13 +457,11 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     travel_to Time.utc(2026, 10, 17, 15, 0, 0) do
       claimed_exercise
       fake_service = stub_provider({ "code_review" => { "question" => "new" } })
-      allow(fake_service).to receive(:generate_unjudged_exercise)
 
       described_class.new.perform(user_id: user.id)
 
       expect(fake_service).to have_received(:generate_judged_exercise)
         .with(user, hash_including(deadline: an_instance_of(GenerationDeadline)))
-      expect(fake_service).not_to have_received(:generate_unjudged_exercise)
     end
   end
 
@@ -475,7 +473,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     handed = nil
     allow(fake_service).to receive(:generate_judged_exercise) do |_user, deadline:, **|
       handed = deadline
-      unjudged({ "code_review" => { "question" => "new" } })
+      judged_set({ "code_review" => { "question" => "new" } })
     end
 
     described_class.new.perform(user_id: user.id)
@@ -533,7 +531,6 @@ RSpec.describe RegenerateExerciseJob, type: :job do
       fake_service = instance_double(ClaudeService)
       allow(fake_service).to receive(:model_for).with("generate_exercise").and_return("claude-opus-5-5")
       allow(fake_service).to receive(:generate_judged_exercise) { before_return&.call; judged }
-      allow(fake_service).to receive(:generate_unjudged_exercise) { judged.with(solves: []) }
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
     end
 
