@@ -15,7 +15,7 @@ class ConceptHosts
   def self.offerable_pairs(kind, languages, rungs)
     languages.flat_map do |language|
       bucket = ConceptBucket.for(kind.key, language)
-      DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys.product(rungs)
+      DailyPlan::CODE_REVIEW_MODES.product(rungs)
         .flat_map { |mode, rung| ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: rung) }
         .map { |concept| [ concept, bucket ] }
     end.uniq

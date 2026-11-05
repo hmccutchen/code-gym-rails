@@ -18,7 +18,7 @@ RSpec.describe LadderCoverage do
   it "covers code_review across every mode" do
     pairs = described_class.for(user).for_kind(ExerciseSection::CodeReview).pairs.map(&:first)
 
-    DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key do |mode|
+    DailyPlan::CODE_REVIEW_MODES.each do |mode|
       expect(pairs).to include(*ConceptVocabulary.selectable_for_section("code_review", "ruby_rails", mode: mode))
     end
   end

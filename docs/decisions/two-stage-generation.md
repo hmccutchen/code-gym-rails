@@ -20,13 +20,15 @@ was cron-only at first, but a user who opened the dashboard before their
 an early riser was rarely judged. The cost of the change is a longer
 spinner on the dashboard, which is why `dashboard/_generating` polls for
 `CallProfiles::JUDGED_GENERATION_BUDGET` rather than the draft's budget alone.
-A weekend "generate anyway" set stays on the single-stage path.
+A weekend "generate anyway" set is judged too (2026-11-05): its
+`code_review` is always a `bug_hunt`, which never ships unjudged
+(`docs/decisions/bug-hunt.md`). Before that, weekends took the single-stage
+path and `AiService.judged_on?` named the judged days; with every day judged,
+the predicate went.
 
-**Regeneration is judged on a weekday, under a deadline.**
-`RegenerateExerciseJob` calls `#generate_judged_exercise` on a day
-`AiService.judged_on?` and `#generate_unjudged_exercise` otherwise, the same
-predicate first generation asks, so the two can't disagree on which days are
-judged.
+**Regeneration is judged, under a deadline.**
+`RegenerateExerciseJob` calls `#generate_judged_exercise` on every day, as
+first generation does.
 Regeneration is the way to get a saved pair of daily kinds into today, so it
 should not ship sections first generation would have rejected. A judged day
 can take `JUDGED_GENERATION_BUDGET`, 2,302 s, and a claim window that long

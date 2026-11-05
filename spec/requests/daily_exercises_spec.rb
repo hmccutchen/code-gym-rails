@@ -141,7 +141,7 @@ RSpec.describe "DailyExercises", type: :request do
 
     # Walks the whole loop so a mismatch between what the controller enqueues and the job expects cannot pass.
     { "on a weekday, through the judged path" => [ Time.utc(2026, 10, 14, 15), :generate_judged_exercise ],
-      "at a weekend, single-stage" => [ Time.utc(2026, 10, 17, 15), :generate_unjudged_exercise ] }.each do |day, (at, path)|
+      "at a weekend, judged too" => [ Time.utc(2026, 10, 17, 15), :generate_judged_exercise ] }.each do |day, (at, path)|
       context day do
         around { |example| travel_to(at) { example.run } }
 

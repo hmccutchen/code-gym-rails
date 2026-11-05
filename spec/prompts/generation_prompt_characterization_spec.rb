@@ -29,7 +29,7 @@ RSpec.describe "generation prompt characterization" do
   DailyExercise::LANGUAGES.each do |language|
     ExerciseSection.thirds.map { |kind| kind.key.to_sym }.each do |third|
       ExerciseSection.fourths.map { |kind| kind.key.to_sym }.each do |fourth|
-        DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key do |mode|
+        DailyPlan::CODE_REVIEW_MODES.each do |mode|
           context "#{language} / #{third} / #{fourth} / #{mode}" do
             let(:prompt) { render(language, third, fourth, mode) }
             let(:path)   { snapshot_path(language, third, fourth, mode) }
@@ -74,7 +74,7 @@ RSpec.describe "generation prompt characterization" do
     .freeze
 
   SHAPE_FIXTURES = DailyExercise::LANGUAGES.flat_map { |language|
-    DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key.flat_map { |mode|
+    DailyPlan::CODE_REVIEW_MODES.flat_map { |mode|
       PLANNED_SHAPES.map do |slots|
         name = [ "shape", language, mode, *slots.values_at(:pattern, :third, :fourth).map { |kind| kind || "none" } ].join("__")
         [ name, { language: language, mode: mode, slots: slots } ]
@@ -141,7 +141,7 @@ RSpec.describe "generation prompt characterization" do
     }
   ).freeze
 
-  MULTI_FILE_MODES = DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys.select { |mode| ExerciseSection::CodeReview.multi_file_mode?(mode) }.freeze
+  MULTI_FILE_MODES = DailyPlan::CODE_REVIEW_MODES.select { |mode| ExerciseSection::CodeReview.multi_file_mode?(mode) }.freeze
 
   MULTI_FILE_FIXTURES = DailyExercise::LANGUAGES.product(MULTI_FILE_MODES, MULTI_FILE_RUNGS.keys)
     .to_h { |language, mode, rung|
@@ -421,7 +421,7 @@ RSpec.describe "generation prompt characterization" do
     expected = DailyExercise::LANGUAGES.flat_map { |language|
       ExerciseSection.thirds.map { |kind| kind.key.to_sym }.flat_map { |third|
         ExerciseSection.fourths.map { |kind| kind.key.to_sym }.flat_map { |fourth|
-          DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key.map { |mode| snapshot_path(language, third, fourth, mode).basename.to_s }
+          DailyPlan::CODE_REVIEW_MODES.map { |mode| snapshot_path(language, third, fourth, mode).basename.to_s }
         }
       }
     }

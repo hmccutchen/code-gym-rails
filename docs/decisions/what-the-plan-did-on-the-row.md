@@ -18,7 +18,7 @@ coverage addition, so a coverage day never reads as a larger planned size;
 the latest earlier one. It is server-owned and written with the row
 from the plan that produced it, never recomputed while rendering: both
 generation paths hand it back on `AiService::JudgedSet#plan_notes`
-(`#generate_unjudged_exercise` on the single-stage path,
+(`#generate_unjudged_exercise` on the single-stage path, which only scripts use now,
 `#generate_judged_exercise` on the judged one; `#generate_exercise` still
 returns only the set).
 `RegenerateExerciseJob` rewrites it from the new plan, clearing it when the

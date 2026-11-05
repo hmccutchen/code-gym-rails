@@ -880,6 +880,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         }.not_to have_enqueued_job(GenerateDailyExercisesJob)
 
         expect(response.body).to include("No exercises are generated automatically on weekends")
+        expect(response.body).to include(ERB::Util.h(I18n.t("dashboard.weekend_empty.bug_hunt")))
         expect(response.body).to include("Generate today&#39;s set anyway")
       end
 

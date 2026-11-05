@@ -1623,7 +1623,7 @@ RSpec.describe AiService do
       end
 
       it "holds the largest block any day can render" do
-        shapes = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys, day_shapes)
+        shapes = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODES, day_shapes)
 
         expect(shapes.map { |shape| largest_block_for(*shape) }.max).to be <= AiService::MAX_LADDER_GUIDANCE_CHARS
       end
@@ -4940,7 +4940,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
   before do
     allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
     allow(WeightedRoll).to receive(:pick).and_call_original
-    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+    pin_code_review_mode(:application_code)
     allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
     allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).and_return(:single)
   end
@@ -5816,14 +5816,6 @@ RSpec.describe AiService, "#judge_review_prose" do
   it "says which providers judge" do
     expect([ AiService, ClaudeService, GeminiService, OpenaiService, FakeService ].map(&:judges_review_prose?))
       .to eq([ false, true, false, false, true ])
-  end
-end
-
-RSpec.describe AiService, ".judged_on?" do
-  it "judges a weekday's set and leaves a weekend's single-stage" do
-    expect(described_class.judged_on?(Date.new(2026, 10, 16))).to be(true)
-    expect(described_class.judged_on?(Date.new(2026, 10, 17))).to be(false)
-    expect(described_class.judged_on?(Date.new(2026, 10, 18))).to be(false)
   end
 end
 

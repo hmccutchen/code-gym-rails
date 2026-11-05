@@ -150,7 +150,7 @@ RSpec.describe GenerationPrompt do
 
     it "changes nothing for a kind other than code_review, at every language, mode and rung" do
       others = ExerciseSection.all - [ ExerciseSection::CodeReview ]
-      combinations = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys, KindDifficulty::LEVELS, others)
+      combinations = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODES, KindDifficulty::LEVELS, others)
 
       combinations.each do |language, mode, rung, kind|
         expect(guidance_for(kind, language, mode, rung)).to eq(guidance_for(kind, language, nil, rung)),

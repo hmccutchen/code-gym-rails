@@ -32,7 +32,7 @@ RSpec.describe "Every path that writes a daily exercise records its pair" do
     expect(user.daily_exercises.sole.plan_notes["daily_kinds"]).to eq(pair)
   end
 
-  it "records the user's pair on an unjudged weekend set" do
+  it "records the user's pair on a weekend set" do
     travel_to(Time.utc(2026, 10, 17, 9)) { GenerateDailyExercisesJob.perform_now(user_id: user.id) }
 
     expect(user.daily_exercises.sole.plan_notes["daily_kinds"]).to eq(pair)

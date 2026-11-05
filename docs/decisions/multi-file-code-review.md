@@ -76,7 +76,8 @@ replaces the earlier "launch B waits for PR 2" order.
     `JUDGE_MAX_TOKENS` sends the cap back to the owner
   The judge is one of the guards, so a section with files never ships
   without it (owner's decision, 2026-11-04, as for `bug_hunt`): `DailyPlan`
-  rolls files only on a judged day, so a weekend day is single-file, and a
+  rolls files only on a judged day (and a weekend day is a single-file
+  `bug_hunt`), and a
   section with files whose judge call fails is dropped
   (`CodeReview.ships_unjudged?`), which costs that day its `code_review`.
   The shares below are of judged days.

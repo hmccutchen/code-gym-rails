@@ -26,8 +26,6 @@ class AiService
     def worst_case_seconds = CallProfiles.call_worst_case_seconds(read_timeout: read_timeout, single_attempt: single_attempt)
   end
 
-  def self.judged_on?(date) = date.on_weekday?
-
   def self.request_for(purpose, system:, prompt:, history: [], response_schema: nil, blocking: false)
     profile  = CallProfiles.fetch(purpose)
     settings = profile.except(:blocking_read_timeout)

@@ -28,11 +28,11 @@ RSpec.describe DailyKindSwap::Consequences do
     end
 
     it "answers the same with bug_hunt among the modes as without it, since code_review tags nothing on a bug_hunt day" do
-      without_bug_hunt = DailyPlan::CODE_REVIEW_MODE_WEIGHTS.except(:bug_hunt)
+      without_bug_hunt = DailyPlan::CODE_REVIEW_MODES - [ :bug_hunt ]
       pairs = ExerciseSection.all.permutation(2).map(&:to_a)
       answers = pairs.map { |pair| described_class.shares_a_concept?(pair, %w[ruby_rails javascript]) }
 
-      stub_const("DailyPlan::CODE_REVIEW_MODE_WEIGHTS", without_bug_hunt)
+      stub_const("DailyPlan::CODE_REVIEW_MODES", without_bug_hunt)
 
       expect(pairs.map { |pair| described_class.shares_a_concept?(pair, %w[ruby_rails javascript]) }).to eq(answers)
     end

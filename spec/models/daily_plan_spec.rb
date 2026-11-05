@@ -379,18 +379,24 @@ RSpec.describe DailyPlan do
   end
 
   describe "CODE_REVIEW_MODE_WEIGHTS" do
-    it "splits four ways as decided, summing to 1.0" do
-      expect(DailyPlan::CODE_REVIEW_MODE_WEIGHTS)
-        .to eq(application_code: 0.24, test_file: 0.23, schema_review: 0.33, bug_hunt: 0.20)
+    it "splits a weekday three ways as decided, summing to 1.0, with no bug_hunt" do
+      expect(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).to eq(application_code: 0.30, test_file: 0.29, schema_review: 0.41)
       expect(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.values.sum).to be_within(0.001).of(1.0)
     end
 
-    it "reaches every mode" do
+    it "reaches every weekday mode" do
       allow(WeightedRoll).to receive(:pick).and_call_original
-      { 0.0 => :application_code, 0.24 => :test_file, 0.47 => :schema_review, 0.80 => :bug_hunt }.each do |value, expected|
+      { 0.0 => :application_code, 0.30 => :test_file, 0.59 => :schema_review }.each do |value, expected|
         allow(WeightedRoll).to receive(:rand).and_return(value)
         expect(WeightedRoll.pick(DailyPlan::CODE_REVIEW_MODE_WEIGHTS)).to eq(expected)
       end
+    end
+
+    it "makes every weekend code review a bug_hunt, and lists every mode once" do
+      allow(WeightedRoll).to receive(:pick).and_call_original
+
+      expect(WeightedRoll.pick(DailyPlan::WEEKEND_CODE_REVIEW_MODE_WEIGHTS)).to eq(:bug_hunt)
+      expect(DailyPlan::CODE_REVIEW_MODES).to contain_exactly(:application_code, :test_file, :schema_review, :bug_hunt)
     end
   end
 
@@ -661,7 +667,7 @@ RSpec.describe DailyPlan do
     let(:user) { User.create!(email: "source@example.com") }
 
     def plan(language: "ruby_rails", mode: :application_code, roll: :real)
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(mode)
+      pin_code_review_mode(mode)
       allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(roll)
       DailyPlan.for(user, language: language, judged: true)
     end
@@ -692,7 +698,7 @@ RSpec.describe DailyPlan do
 
     it "never rolls at all when the gate closes" do
       expect(WeightedRoll).not_to receive(:pick).with(RealSource::WEIGHTS)
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:test_file)
+      pin_code_review_mode(:test_file)
 
       DailyPlan.for(user, language: "ruby_rails", judged: true)
     end
@@ -746,18 +752,38 @@ RSpec.describe DailyPlan do
 
     def plan(judged: true, language: "ruby_rails", featured_concept: nil)
       allow(WeightedRoll).to receive(:pick).and_call_original
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:bug_hunt)
+      pin_code_review_mode(:bug_hunt)
       DailyPlan.for(user, language: language, judged: judged, featured_concept: featured_concept)
     end
 
-    it "rolls bug_hunt only on a judged day" do
+    def roll_on(time, judged:)
       allow(WeightedRoll).to receive(:pick).and_call_original
+      travel_to(time) { DailyPlan.for(user, language: "ruby_rails", judged: judged) }
+    end
 
-      DailyPlan.for(user, language: "ruby_rails", judged: false)
+    def expect_rolled(weights, not_rolled)
+      expect(WeightedRoll).to have_received(:pick).with(weights)
+      expect(WeightedRoll).not_to have_received(:pick).with(not_rolled)
+    end
 
-      expect(DailyPlan::UNJUDGED_CODE_REVIEW_MODE_WEIGHTS).to eq(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.except(:bug_hunt))
-      expect(WeightedRoll).to have_received(:pick).with(DailyPlan::UNJUDGED_CODE_REVIEW_MODE_WEIGHTS)
-      expect(WeightedRoll).not_to have_received(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS)
+    it "rolls the weekday weights, which hold no bug_hunt, on a judged weekday" do
+      roll_on(Time.zone.local(2026, 10, 16, 9), judged: true)
+
+      expect_rolled(DailyPlan::CODE_REVIEW_MODE_WEIGHTS, DailyPlan::WEEKEND_CODE_REVIEW_MODE_WEIGHTS)
+    end
+
+    [ Time.zone.local(2026, 10, 17, 9), Time.zone.local(2026, 10, 18, 9) ].each do |time|
+      it "makes the code review a bug_hunt on a judged #{time.strftime("%A")}" do
+        roll_on(time, judged: true)
+
+        expect_rolled(DailyPlan::WEEKEND_CODE_REVIEW_MODE_WEIGHTS, DailyPlan::CODE_REVIEW_MODE_WEIGHTS)
+      end
+    end
+
+    it "never rolls a bug_hunt unjudged, even on a weekend, since nothing would reject a broken one" do
+      roll_on(Time.zone.local(2026, 10, 17, 9), judged: false)
+
+      expect_rolled(DailyPlan::CODE_REVIEW_MODE_WEIGHTS, DailyPlan::WEEKEND_CODE_REVIEW_MODE_WEIGHTS)
     end
 
     it "is single-file without rolling, and grounded in no real excerpt" do

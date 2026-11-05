@@ -52,10 +52,12 @@ read it before changing that area.
   through the shared `ConceptReference`, and is never offered to a trial
   account (`User#prepares_ladders?`). `AiService::MAX_LADDER_GUIDANCE_CHARS`
   bounds the ladder block.
-- **`bug_hunt` days** (`docs/decisions/bug-hunt.md`): `DailyPlan.for` takes
-  `judged:` from the generation path and rolls
-  `UNJUDGED_CODE_REVIEW_MODE_WEIGHTS` (no `bug_hunt`) when it is false. A
-  `bug_hunt` day is single-file without rolling. `code_review` is not a
+- **`bug_hunt` days** (`docs/decisions/bug-hunt.md`): every judged weekend
+  day is a `bug_hunt` day (`WEEKEND_CODE_REVIEW_MODE_WEIGHTS`), and a weekday
+  or an unjudged plan rolls `CODE_REVIEW_MODE_WEIGHTS`, which holds none.
+  `DailyPlan.for` takes `judged:` from the generation path and reads the day
+  itself. `CODE_REVIEW_MODES` lists every mode for readers asking what any day
+  could hold. A `bug_hunt` day is single-file without rolling. `code_review` is not a
   planning host on it (`ExerciseSection.planning_host?`, read through
   `DayHosts`; main-track capacity counts planning hosts only), so no
   reinforcement entry, retention check, coverage check or shared concept

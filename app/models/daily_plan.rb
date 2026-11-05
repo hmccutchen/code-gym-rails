@@ -21,10 +21,12 @@ class DailyPlan
   ROTATED_JUDGE_RETRIES = 1
 
   CODE_REVIEW_MODE_WEIGHTS = {
-    application_code: 0.24, test_file: 0.23, schema_review: 0.33, bug_hunt: 0.20
+    application_code: 0.30, test_file: 0.29, schema_review: 0.41
   }.freeze
 
-  UNJUDGED_CODE_REVIEW_MODE_WEIGHTS = CODE_REVIEW_MODE_WEIGHTS.except(ExerciseSection::CodeReview::BugHunt::MODE).freeze
+  WEEKEND_CODE_REVIEW_MODE_WEIGHTS = { ExerciseSection::CodeReview::BugHunt::MODE => 1.0 }.freeze
+
+  CODE_REVIEW_MODES = (CODE_REVIEW_MODE_WEIGHTS.keys + WEEKEND_CODE_REVIEW_MODE_WEIGHTS.keys).freeze
 
   CODE_REVIEW_FILE_WEIGHTS = { single: 0.75, multi: 0.25 }.freeze
 
@@ -71,7 +73,7 @@ class DailyPlan
   end
 
   def self.code_review_mode_weights(judged)
-    judged ? CODE_REVIEW_MODE_WEIGHTS : UNJUDGED_CODE_REVIEW_MODE_WEIGHTS
+    judged && Date.current.on_weekend? ? WEEKEND_CODE_REVIEW_MODE_WEIGHTS : CODE_REVIEW_MODE_WEIGHTS
   end
   private_class_method :code_review_mode_weights
 
