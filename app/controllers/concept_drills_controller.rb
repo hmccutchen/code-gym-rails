@@ -7,7 +7,7 @@ class ConceptDrillsController < ApplicationController
     bucket  = validated_bucket
     concept = validated_concept(bucket)
 
-    start(concept.humanize) { ConceptDrills.start!(current_user, concept: concept, bucket: bucket) }
+    start(concept.humanize) { ConceptDrills.start(current_user, concept: concept, bucket: bucket) }
     redirect_to learn_concept_path(bucket: bucket, concept: concept)
   end
 
@@ -26,7 +26,7 @@ class ConceptDrillsController < ApplicationController
     bucket = validated_bucket
     group  = validated_group(bucket)
 
-    start(t("learn.groups.#{group}")) { ConceptDrills.start_group!(current_user, group: group, bucket: bucket) }
+    start(t("learn.groups.#{group}")) { ConceptDrills.start_group(current_user, group: group, bucket: bucket) }
     redirect_to learn_path(anchor: helpers.learn_group_anchor(bucket, group))
   end
 
@@ -43,10 +43,15 @@ class ConceptDrillsController < ApplicationController
   private
 
   def start(name)
-    started = yield
-    flash[:notice] = t(started ? "learn.drill.started" : "learn.drill.already", name: name)
-  rescue ConceptDrills::LimitReached
-    flash[:alert] = t("learn.drill.full", drills: helpers.drill_names(ConceptDrills.for(current_user)))
+    outcome = yield
+    case outcome.status
+    when :started, :already, :already_reserved
+      flash[:notice] = t("learn.drill.#{outcome.status}", name: name)
+    when :full
+      flash[:alert] = helpers.drill_message("full", outcome.drills)
+    else
+      raise ArgumentError, "Unknown drill outcome: #{outcome.status}"
+    end
   end
 
   def validated_group(bucket)

@@ -28,6 +28,15 @@ paths:
 
 ## Migrations
 
+- Mastery reconciliation ships S (columns), C (complete compatible writers,
+  initiation false), then separately gated A (initiation true). Before A,
+  positively verify web and worker SUCCESS at C or descendants and remove
+  every pre-C writer, including replicas/one-offs. Existing receipts/suffixes
+  always select reconciliation under the user lock, even with initiation off.
+  Rollback A → C is supported; rollback earlier or deleting receipts is not.
+  Keep #726 open through verified A deployment. The exact gates and costs
+  are in `docs/decisions/daily-mastery-reconciliation.md`.
+
 - The worker's pre-deploy waits for a schema, not for pending migrations, so
   a new column ships a release before any code reads it, and a column being
   removed is ignored by the model for one release before a migration drops

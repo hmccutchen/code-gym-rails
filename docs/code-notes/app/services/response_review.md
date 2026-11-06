@@ -27,13 +27,15 @@ The missing sections are counted again after the row is reloaded under the claim
 another request may have finished the last section between the first check
 and the claim.
 
-The response is locked before the results are written. Start over and
+The user and then response are locked before results are written. Start over and
 regeneration refuse while the claim is fresh, but once it goes stale either can
 destroy the row during the provider call, which comes back as `:set_cleared`.
 
 ## `#store`
 
-Re-checks the claim under the response lock before writing anything. A review
+Locks a fresh user row, then reloads and re-checks the claim under the
+response lock before writing anything. It does not reload the provider-bearing
+user captured by the paid call. A review
 that overran its window may find another review has taken the claim over; it
 then writes neither grades nor mastery, leaves the claim alone and reports
 `:busy`, because the review that now holds the claim will grade the same
@@ -42,11 +44,17 @@ sections. Without the check both would record mastery for the same answers.
 Inside that lock, the writer compares assessed core answers before and after
 the successful merge. Only the transition from none to at least one counts
 down paused concepts. A supplementary bug hunt, walkthrough-only or invalid
-first batch leaves the countdown for a later valid core answer. Only newly successful assessed sections
-move mastery; retries never replay prior successes. The response save,
-mastery changes and skipped-check deferral stay in the same transaction.
-The pre-existing same-concept retry-order gap is tracked separately in #726;
-the intended once-per-concept/day aggregate is unchanged.
+first batch leaves the countdown for a later valid core answer. The actual
+pre-merge review keys initialize a response's legacy cutoff. Newly consumed
+successes revise enrolled daily contributions through pure transitions;
+they never add an accumulated aggregate to already-mutated columns.
+The response save, receipt, mastery suffixes and skipped-check attempts stay
+in the same transaction. Mastery rows lock in ascending ID order.
+Authoritative receipt/suffix validation occurs here, after the provider
+call. Pre-existing corruption can reject storage on every retry and incur
+further calls until repaired. There is no preflight or zero-billing promise.
+The default-off compatibility/activation contract and legacy-prefix limit
+are in `docs/decisions/daily-mastery-reconciliation.md`.
 
 ## `#after_review`
 

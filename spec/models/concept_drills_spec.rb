@@ -7,6 +7,55 @@ RSpec.describe ConceptDrills do
     user.concept_masteries.find_by(concept: concept, language: bucket)
   end
 
+  describe "Start outcomes" do
+    it "distinguishes a new single drill from an active repeat without restamping it" do
+      expect(described_class.start(user, concept: "n_plus_one", bucket: "ruby_rails").status).to eq(:started)
+      stamp = row("n_plus_one").drilled_at
+      expect(described_class.start(user, concept: "n_plus_one", bucket: "ruby_rails").status).to eq(:already)
+      expect(row("n_plus_one").drilled_at).to eq(stamp)
+    end
+
+    it "distinguishes a new group from an active repeat without restamping its members" do
+      expect(described_class.start_group(user, group: "module_design", bucket: "ruby_rails").status).to eq(:started)
+      stamps = user.concept_masteries.order(:id).pluck(:drilled_at)
+      expect(described_class.start_group(user, group: "module_design", bucket: "ruby_rails").status).to eq(:already)
+      expect(user.concept_masteries.order(:id).pluck(:drilled_at)).to eq(stamps)
+    end
+
+    it "names a reserved single repeat without reactivating it" do
+      described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+      partially_review_concept!(user, concept: "n_plus_one")
+
+      expect(described_class.start(user, concept: "n_plus_one", bucket: "ruby_rails").status).to eq(:already_reserved)
+      expect(row("n_plus_one").drilled_at).to be_nil
+    end
+
+    it "names a reserved group repeat without re-adding its hidden member" do
+      described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
+      partially_review_concept!(user, concept: "shallow_module")
+
+      expect(described_class.start_group(user, group: "module_design", bucket: "ruby_rails").status).to eq(:already_reserved)
+      expect(row("shallow_module").drilled_at).to be_nil
+    end
+
+    [ [ :start, { concept: "transaction_safety" } ], [ :start_group, { group: "module_design" } ] ].each do |command, target|
+      it "captures #{command}'s cap refusal and reservation facts before a subsequent Stop" do
+        described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+        described_class.start!(user, concept: "memoization", bucket: "ruby_rails")
+        partially_review_concept!(user, concept: "n_plus_one")
+
+        outcome = described_class.public_send(command, user, bucket: "ruby_rails", **target)
+        described_class.stop!(user, concept: "n_plus_one", bucket: "ruby_rails")
+
+        expect(outcome.status).to eq(:full)
+        expect(outcome.drills).to be_full.and be_reservations
+        expect(outcome.drills.entries.flat_map(&:concepts)).to contain_exactly("n_plus_one", "memoization")
+        expect(described_class.for(user)).not_to be_full
+        expect(user.concept_masteries.where.not(concept: %w[n_plus_one memoization])).to be_empty
+      end
+    end
+  end
+
   describe ".start!" do
     it "creates the row in the never-encountered state for a concept the user has never met" do
       described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
@@ -70,7 +119,7 @@ RSpec.describe ConceptDrills do
 
     it "rejoins a member to its group when the group is drilled" do
       described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
-      row("shallow_module").clear_drill!
+      row("shallow_module").update!(drilled_at: nil, drill_group: nil)
 
       described_class.start!(user, concept: "shallow_module", bucket: "ruby_rails")
 
@@ -128,7 +177,7 @@ RSpec.describe ConceptDrills do
 
     it "returns false and leaves every member untouched when the group is already drilled" do
       described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
-      row("shallow_module").clear_drill!
+      row("shallow_module").update!(drilled_at: nil, drill_group: nil)
       stamps = user.concept_masteries.drilling.pluck(:concept, :drilled_at)
 
       expect(described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")).to be(false)
@@ -155,7 +204,7 @@ RSpec.describe ConceptDrills do
     it "follows what start! and start_group! would accept, cap included" do
       described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
       described_class.start!(user, concept: "memoization", bucket: "ruby_rails")
-      row("shallow_module").clear_drill!
+      row("shallow_module").update!(drilled_at: nil, drill_group: nil)
 
       drills = described_class.for(user)
 
@@ -254,6 +303,203 @@ RSpec.describe ConceptDrills do
 
       expect(drills.entries).to eq([])
       expect(drills).not_to be_full
+    end
+
+    describe "accepted intent during an unfinished review" do
+      let(:bucket) { "ruby_rails" }
+
+      def partial(concept, date: Date.current, grade: "strong")
+        exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: bucket,
+          problem_set: %w[code_review pattern].index_with { { "concept" => concept } })
+        response = user.daily_responses.create!(date: date, daily_exercise: exercise, submitted_at: Time.current,
+          answers: %w[code_review pattern].index_with { "An answer" },
+          section_ratings: %w[code_review pattern].index_with { "right_level" },
+          concept_tags: %w[code_review pattern].index_with { concept })
+        apply_review(response, "pattern" => grade)
+        response
+      end
+
+      def apply_review(response, grades)
+        reviewer = double(review_sections: grades.transform_values { |grade| { ok: true, review: { "rating" => grade } } })
+        allow(ConceptMastery).to receive(:record_review!).and_wrap_original { |method, *args, **kwargs| method.call(*args, **kwargs, initiate: true) }
+        ResponseReview.new(response, user: user, reviewer: reviewer).call
+      end
+
+      def start(concept) = described_class.start!(user, concept: concept, bucket: bucket)
+      def stop(concept) = described_class.stop!(user, concept: concept, bucket: bucket)
+      def drills = described_class.for(user)
+
+      it "reserves a provisional clear before admitting another request" do
+        start("n_plus_one")
+        start("memoization")
+        response = partial("n_plus_one")
+        expect { start("transaction_safety") }.to raise_error(ConceptDrills::LimitReached)
+        expect(drills.count).to eq(2)
+        expect(drills.reserved?("n_plus_one", bucket)).to be(true)
+        expect(row("n_plus_one").drilled_at).to be_nil
+        apply_review(response, "code_review" => "developing")
+        expect(row("n_plus_one").drilled_at).to be_present
+        expect(drills.count).to eq(2)
+      end
+
+      it "releases a reservation on Stop and never resurrects it after admitting another request" do
+        start("n_plus_one")
+        start("memoization")
+        response = partial("n_plus_one")
+        stop("n_plus_one")
+        expect(start("transaction_safety")).to be(true)
+        apply_review(response, "code_review" => "developing")
+        expect(row("n_plus_one").drilled_at).to be_nil
+        expect(drills.entries.flat_map(&:concepts)).to contain_exactly("memoization", "transaction_safety")
+      end
+
+      it "keeps reserved repeats inactive, but retains a later explicit restart's timestamp" do
+        start("n_plus_one")
+        response = partial("n_plus_one")
+        expect(start("n_plus_one")).to be(false)
+        expect(row("n_plus_one").drilled_at).to be_nil
+        stop("n_plus_one")
+        travel 2.hours do
+          start("n_plus_one")
+          stamp = row("n_plus_one").drilled_at
+          apply_review(response, "code_review" => "developing")
+          expect(row("n_plus_one").drilled_at).to eq(stamp)
+        end
+      end
+
+      it "counts mixed active/reserved group members once and stops all of them" do
+        described_class.start_group!(user, group: "module_design", bucket: bucket)
+        start("memoization")
+        response = partial("shallow_module")
+        expect(drills.count).to eq(2)
+        expect(drills.entries.find { |entry| entry.group == "module_design" }.reserved_concepts).to eq(%w[shallow_module])
+        expect(stop("shallow_module")).to eq("module_design")
+        apply_review(response, "code_review" => "developing")
+        expect(drills.entries.flat_map(&:concepts)).to eq(%w[memoization])
+      end
+
+      it "does not let a delayed group stop reach a member restarted alone" do
+        described_class.start_group!(user, group: "module_design", bucket: bucket)
+        response = partial("shallow_module")
+        described_class.stop_group!(user, group: "module_design", bucket: bucket)
+        start("shallow_module")
+        stamp = row("shallow_module").drilled_at
+        described_class.stop_group!(user, group: "module_design", bucket: bucket)
+        apply_review(response, "code_review" => "developing")
+        expect(row("shallow_module")).to have_attributes(drilled_at: stamp, drill_group: nil)
+      end
+
+      it "absorbs a reserved lone request into a new group without resurrecting its old identity" do
+        start("shallow_module")
+        start("memoization")
+        response = partial("shallow_module")
+        expect(described_class.start_group!(user, group: "module_design", bucket: bucket)).to be(true)
+        apply_review(response, "code_review" => "developing")
+        expect(row("shallow_module").drill_group).to eq("module_design")
+        expect(drills.count).to eq(2)
+      end
+
+      it "holds an entirely reserved group as one slot and lets a cleared member rejoin it" do
+        described_class.start_group!(user, group: "module_design", bucket: bucket)
+        concepts = described_class.concepts_in("module_design", bucket)
+        responses = concepts.each_with_index.map { |concept, index| partial(concept, date: Date.current + index) }
+        start("memoization")
+        expect(drills.entries.find { |entry| entry.group == "module_design" }.reserved_concepts).to match_array(concepts)
+        expect { start("transaction_safety") }.to raise_error(ConceptDrills::LimitReached)
+        expect(described_class.start_group!(user, group: "module_design", bucket: bucket)).to be(false)
+        expect(user.concept_masteries.where(concept: concepts).drilling).to be_empty
+        apply_review(responses.first, "code_review" => "strong")
+        expect(start(concepts.first)).to be(true)
+        expect(row(concepts.first).drill_group).to eq("module_design")
+        expect(drills.count).to eq(2)
+        described_class.stop_group!(user, group: "module_design", bucket: bucket)
+        responses.drop(1).each { |response| apply_review(response, "code_review" => "developing") }
+        expect(drills.entries.flat_map(&:concepts)).to eq(%w[memoization])
+      end
+
+      it "retains active repeat intent without restamping or re-adding a cleared group member" do
+        described_class.start_group!(user, group: "module_design", bucket: bucket)
+        first = partial("shallow_module")
+        apply_review(first, "code_review" => "strong")
+        second = partial("pass_through_method", date: Date.current + 1, grade: "developing")
+        stamp = row("pass_through_method").drilled_at
+        expect(described_class.start_group!(user, group: "module_design", bucket: bucket)).to be(false)
+        apply_review(second, "code_review" => "strong")
+        expect(row("pass_through_method").drilled_at).to eq(stamp)
+        expect(row("shallow_module").drilled_at).to be_nil
+      end
+
+      it "uses a later concept Stop to stop a restarted lone request" do
+        described_class.start_group!(user, group: "module_design", bucket: bucket)
+        response = partial("shallow_module")
+        stop("shallow_module")
+        start("shallow_module")
+        stop("shallow_module")
+        apply_review(response, "code_review" => "developing")
+        expect(drills).not_to be_any
+      end
+
+      [ false, true ].each do |group_start|
+        it "retains #{group_start ? 'group' : 'single'} start pause semantics after correction" do
+          user.concept_masteries.create!(concept: "shallow_module", language: bucket,
+            tier: :reduced, streak: 1, last_rating: "developing")
+          response = partial("shallow_module")
+          if group_start
+            described_class.start_group!(user, group: "module_design", bucket: bucket)
+          else
+            start("shallow_module")
+          end
+          stamp = row("shallow_module").drilled_at
+          apply_review(response, "code_review" => "developing")
+          expect(row("shallow_module")).to have_attributes(tier: group_start ? "paused" : "reduced",
+            cooldown_remaining: group_start ? 2 : 0, drilled_at: stamp)
+        end
+      end
+
+      it "honors reservations and explicit releases when the returning writer's default is off" do
+        start("n_plus_one")
+        start("memoization")
+        response = partial("n_plus_one")
+        expect(ConceptMastery::INITIATE_RECONCILIATION).to be(false)
+        expect { start("transaction_safety") }.to raise_error(ConceptDrills::LimitReached)
+        stop("n_plus_one")
+        start("transaction_safety")
+        allow(ConceptMastery).to receive(:record_review!).and_call_original
+        reviewer = double(review_sections: { "code_review" => { ok: true, review: { "rating" => "developing" } } })
+        expect(ResponseReview.new(response, user: user, reviewer: reviewer).call.status).to eq(:ready)
+        expect(drills.count).to eq(2)
+        expect(row("n_plus_one").drilled_at).to be_nil
+      end
+
+      [ :group, :member ].each do |route|
+        it "releases every member of an entirely reserved group through the #{route} Stop" do
+          described_class.start_group!(user, group: "module_design", bucket: bucket)
+          concepts = described_class.concepts_in("module_design", bucket)
+          responses = concepts.each_with_index.map { |concept, index| partial(concept, date: Date.current + index) }
+          expect(user.concept_masteries.drilling).to be_empty
+          expect(drills.count).to eq(1)
+          if route == :group
+            described_class.stop_group!(user, group: "module_design", bucket: bucket)
+          else
+            stop(concepts.first)
+          end
+          responses.each { |response| apply_review(response, "code_review" => "developing") }
+          expect(drills).not_to be_any
+          expect(user.concept_masteries.drilling).to be_empty
+        end
+      end
+
+      [ nil, [], "bad", false, 1, { "version" => 999 } ].each do |bad|
+        it "refuses malformed reservation state #{bad.inspect} instead of showing spare capacity" do
+          start("n_plus_one")
+          target = row("n_plus_one")
+          quoted = ConceptMastery.connection.quote(bad.to_json)
+          ConceptMastery.where(id: target.id).update_all("drilled_at = NULL, review_reconciliation = #{quoted}::jsonb")
+          expect { drills }.to raise_error(ArgumentError)
+          expect { start("memoization") }.to raise_error(ArgumentError)
+          expect(row("memoization")).to be_nil
+        end
+      end
     end
   end
 end

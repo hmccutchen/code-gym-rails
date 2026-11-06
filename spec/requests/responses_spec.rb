@@ -63,7 +63,7 @@ RSpec.describe "Responses", type: :request do
 
     it "cannot make history disagree with mastery after review" do
       saved_response.update!(ai_review: { "code_review" => { "rating" => "strong" }, "pattern" => { "rating" => "beginner" } })
-      ConceptMastery.record_review!(saved_response, sections: %w[code_review pattern], apply_session_countdown: true)
+      apply_mastery_review!(saved_response, sections: %w[code_review pattern], apply_session_countdown: true)
       evidence = user.concept_masteries.map(&:attributes)
 
       post responses_path, params: stale_payload, as: :json
@@ -148,7 +148,7 @@ RSpec.describe "Responses", type: :request do
       saved = user.daily_responses.sole
       saved.update!(ai_review: { "code_review" => { "rating" => "strong" }, "pattern" => { "rating" => "beginner" } })
 
-      ConceptMastery.record_review!(saved, sections: saved.section_keys, apply_session_countdown: true)
+      apply_mastery_review!(saved, sections: saved.section_keys, apply_session_countdown: true)
 
       expect(skipped.reload.next_retention_check_on).to eq(Date.current + skipped.retention_interval_days)
       expect(skipped.attributes.except("next_retention_check_on", "updated_at")).to eq(knowledge)

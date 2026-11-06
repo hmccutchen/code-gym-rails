@@ -1,5 +1,6 @@
 ---
 paths:
+  - "app/models/concept_mastery/**"
   - "app/models/adaptation_history.rb"
   - "spec/models/adaptation_history_spec.rb"
   - "app/models/{daily_plan,section_rotation,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,reviewed_section_results,weighted_roll,generation_ladders}.rb"
@@ -27,6 +28,15 @@ paths:
 ---
 
 # Day planning, sizing and mastery
+
+The default-off compatible mastery writer and all drill commands follow
+`docs/decisions/daily-mastery-reconciliation.md`. Receipt/suffix enrollment
+is checked fresh under the user lock. Active plus restorable accepted drill
+intent counts toward the existing cap; planning reads materialized drill
+columns only. Preserve the legacy prefix and first-core countdown guards.
+Mastery eligibility must imply adaptation eligibility across registered
+kinds and supported modes, so a response's own tick precedes its mastery.
+A future mastery-only kind needs an explicit ordering decision.
 
 Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;

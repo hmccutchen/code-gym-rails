@@ -322,6 +322,9 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/models/api_usage.rb` — `ApiUsage`: one row per provider request. It is the authority for the `PURPOSES` and `FAILURES` vocabularies, and it totals a user's own-key requests and cost per provider and counts requests on a day.
 - `app/models/application_record.rb` — `ApplicationRecord`: the abstract base class every model inherits from.
 - `app/models/concept_mastery.rb` — `ConceptMastery`: a user's per-concept mastery row, with tier (standard, reduced, paused), streaks and retention-check scheduling. `.record_review!` updates it from a reviewed response, and the `RETENTION_*` constants set the check intervals.
+- `app/models/concept_mastery/daily_evidence.rb` — `ConceptMastery::DailyEvidence`: projects accepted same-concept/bucket daily assessment evidence and retryable siblings.
+- `app/models/concept_mastery/transition.rb` — `ConceptMastery::Transition`: pure current-policy mastery, countdown, skip and drill transitions with explicit clocks.
+- `app/models/concept_mastery/reconciliation.rb` — `ConceptMastery::Reconciliation`: validates and replaces versioned correction suffixes, compacts irrevocable prefixes and exposes restorable drill intent.
 - `app/models/concept_reference.rb` — `ConceptReference`: the stored reference, guide, ladder and lesson text for one concept and language. It is the authority for the field lists (`REFERENCE_FIELDS`, `GUIDE_FIELDS`, `LADDER_FIELDS`) and for when a row counts as `fully_written?`.
 - `app/models/concerns/.keep` — empty placeholder that keeps the `concerns` directory in git.
 - `app/models/daily_exercise.rb` — `DailyExercise`: one user's generated problem set for a date. It holds the plan notes, the regeneration claim and its deadline constants, and the readers for the planned size, coverage and draft scope.

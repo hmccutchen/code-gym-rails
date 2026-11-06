@@ -12,6 +12,95 @@ RSpec.describe "Concept drills", type: :request do
     user.concept_masteries.find_by(concept: concept, language: bucket)
   end
 
+  describe "reserved drill controls" do
+    before do
+      ConceptDrills.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+      @pending_response = partially_review_concept!(user, concept: "n_plus_one")
+    end
+
+    it "explains a reserved slot without claiming the concept is prioritized" do
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+      expect(response.body).to include("slot is reserved", "not currently prioritized", "Stop drilling")
+      expect(response.body).not_to include("You're drilling this", ">Drill this<")
+      delete learn_concept_drill_path(bucket: "ruby_rails", concept: "n_plus_one")
+      expect(ConceptDrills.for(user)).not_to be_reservations
+    end
+
+    it "answers a stale Start truthfully and does not reactivate the drill" do
+      post learn_concept_drill_path(bucket: "ruby_rails", concept: "n_plus_one")
+      expect(flash[:notice]).to include("already reserved", "review is unfinished")
+      expect(row("n_plus_one").drilled_at).to be_nil
+    end
+
+    it "keeps the reserved-repeat outcome when a correction commits after Start" do
+      injected = false
+      expect(ConceptDrills).to receive(:start).and_wrap_original do |method, *args, **kwargs|
+        result = method.call(*args, **kwargs)
+        reviewer = double("reviewer", review_sections: { "code_review" => { ok: true, review: { "rating" => "developing" } } })
+        expect(ResponseReview.new(@pending_response, user: user, reviewer: reviewer).call.status).to eq(:ready)
+        injected = true
+        result
+      end
+
+      post learn_concept_drill_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(injected).to be(true)
+      expect(row("n_plus_one").drilled_at).to be_present
+      expect(flash[:notice]).to include("already reserved")
+    end
+
+    it "keeps the reserved-repeat outcome when Stop commits after Start" do
+      injected = false
+      expect(ConceptDrills).to receive(:start).and_wrap_original do |method, *args, **kwargs|
+        result = method.call(*args, **kwargs)
+        ConceptDrills.stop!(user, concept: "n_plus_one", bucket: "ruby_rails")
+        injected = true
+        result
+      end
+
+      post learn_concept_drill_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(injected).to be(true)
+      expect(ConceptDrills.for(user)).not_to be_any
+      expect(flash[:notice]).to include("already reserved")
+      expect(flash[:notice]).not_to include("You're already drilling")
+    end
+
+    [ :start, :start_group ].each do |command|
+      it "keeps #{command}'s cap-refusal facts when Stop releases a slot after the command" do
+        ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+        injected = false
+        expect(ConceptDrills).to receive(command).and_wrap_original do |method, *args, **kwargs|
+          result = method.call(*args, **kwargs)
+          ConceptDrills.stop!(user, concept: "n_plus_one", bucket: "ruby_rails")
+          injected = true
+          result
+        end
+
+        path = if command == :start
+          learn_concept_drill_path(bucket: "ruby_rails", concept: "transaction_safety")
+        else
+          learn_group_drill_path(bucket: "ruby_rails", group: "module_design")
+        end
+        post path
+
+        expect(injected).to be(true)
+        expect(ConceptDrills.for(user)).not_to be_reservations
+        expect(user.concept_masteries.where.not(concept: %w[n_plus_one memoization])).to be_empty
+        expect(flash[:alert]).to include("slots are held", "N plus one", "Memoization")
+      end
+    end
+
+    it "explains cap refusal using held requests and lets Stop release the slot" do
+      ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+      post learn_concept_drill_path(bucket: "ruby_rails", concept: "transaction_safety")
+      expect(flash[:alert]).to include("slots are held", "N plus one", "Memoization")
+      delete learn_concept_drill_path(bucket: "ruby_rails", concept: "n_plus_one")
+      post learn_concept_drill_path(bucket: "ruby_rails", concept: "transaction_safety")
+      expect(row("transaction_safety").drilled_at).to be_present
+    end
+  end
+
   describe "POST /learn/:bucket/:concept/drill" do
     it "starts the drill and returns to the concept page" do
       post learn_concept_drill_path(bucket: "ruby_rails", concept: "n_plus_one")
@@ -74,6 +163,24 @@ RSpec.describe "Concept drills", type: :request do
   end
 
   describe "POST and DELETE /learn/:bucket/groups/:group/drill" do
+    it "keeps a group's reserved-repeat outcome when Stop commits after the command" do
+      ConceptDrills.start_group!(user, group: "module_design", bucket: "ruby_rails")
+      partially_review_concept!(user, concept: "shallow_module")
+      injected = false
+      expect(ConceptDrills).to receive(:start_group).and_wrap_original do |method, *args, **kwargs|
+        result = method.call(*args, **kwargs)
+        ConceptDrills.stop_group!(user, group: "module_design", bucket: "ruby_rails")
+        injected = true
+        result
+      end
+
+      post learn_group_drill_path(bucket: "ruby_rails", group: "module_design")
+
+      expect(injected).to be(true)
+      expect(ConceptDrills.for(user)).not_to be_any
+      expect(flash[:notice]).to include("already reserved", "Module design")
+    end
+
     it "starts and stops a group drill from the index" do
       post learn_group_drill_path(bucket: "ruby_rails", group: "module_design")
 
@@ -133,7 +240,7 @@ RSpec.describe "Concept drills", type: :request do
     it "still offers to rejoin a cleared member of a drilled group when the cap is full" do
       ConceptDrills.start_group!(user, group: "module_design", bucket: "ruby_rails")
       ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
-      row("shallow_module").clear_drill!
+      row("shallow_module").update!(drilled_at: nil, drill_group: nil)
 
       get learn_concept_path(bucket: "ruby_rails", concept: "shallow_module")
 

@@ -289,6 +289,32 @@ class DailyResponse < ApplicationRecord
 
   def assessed_adaptation_sections = assessed_sections & adaptation_section_keys
 
+  MASTERY_APPLICATION_FIELDS = %w[version legacy_sections processed_sections session_counted skip_attempts].freeze
+
+  def self.decode_mastery_application(value)
+    return {} if value == {}
+
+    valid = value.is_a?(Hash) && value.keys.sort == MASTERY_APPLICATION_FIELDS.sort && value["version"] == 1
+    valid &&= [ true, false ].include?(value["session_counted"])
+    valid &&= %w[legacy_sections processed_sections].all? do |field|
+      keys = value[field]
+      keys.is_a?(Array) && keys.uniq == keys && keys.all? { |key| ExerciseSection.keys.include?(key) }
+    end
+    valid &&= value["skip_attempts"].is_a?(Array) && value["skip_attempts"].uniq == value["skip_attempts"]
+    valid &&= value["skip_attempts"].all? { |pair| pair.is_a?(Array) && pair.size == 2 && pair.all? { |item| item.is_a?(String) } }
+    raise ArgumentError, "Invalid mastery application format" unless valid
+
+    value.deep_dup
+  end
+
+  def mastery_receipt(previous_review_keys:)
+    receipt = self.class.decode_mastery_application(mastery_application)
+    return receipt unless receipt == {}
+
+    { "version" => 1, "legacy_sections" => previous_review_keys.dup, "processed_sections" => [],
+      "session_counted" => (previous_review_keys & assessed_adaptation_sections).any?, "skip_attempts" => [] }
+  end
+
   def completion_evidence?(sections: nil)
     assessed = assessed_sections
     return false if assessed.empty?
@@ -302,6 +328,14 @@ class DailyResponse < ApplicationRecord
   end
 
   def mastery_evidence?(section) = ExerciseSection.for(section).mastery_evidence?(daily_exercise&.problem_set&.dig(section.to_s))
+
+  def mastery_tag(section)
+    return unless concept_tags.is_a?(Hash) && mastery_evidence?(section)
+
+    concept = concept_tags[section]
+    bucket = ConceptBucket.for(section, daily_exercise.language)
+    [ bucket, concept ] if concept != "other" && ConceptBucket.vocabulary_for(bucket).include?(concept)
+  end
 
   def submit_blocker
     answered = answered_sections

@@ -52,8 +52,14 @@ The locked review merge counts a session only on its first assessed
 adaptation-answer transition. A bug-only batch cannot spend a paused
 concept's cooldown, and a later first core batch still counts once.
 The model also guards countdown against successful keys outside that
-subset. Existing concept mastery filtering and aggregation remain; #726's
-least-favourable reconciliation is separate. Historical materialized
+subset. Enrolled users reconcile least-favourable daily contributions at
+their original position with captured clocks, preserving subsequent
+sessions, reviews, skips and manual commands. Untouched users retain
+per-batch orchestration with no receipt/suffix state while C's initiation
+default is false. Both modes filter retired/off-vocabulary tags through the
+shared projection and use per-section bucket identity.
+`daily-mastery-reconciliation.md` specifies the durable receipt, legacy
+prefix, reserved drill slots and separate activation gate. Historical materialized
 bug-only countdown effects are not rebuilt, and mixed-version deployments
 cannot identify an old decrement from stored grades alone.
 
@@ -68,8 +74,9 @@ genuinely useful check when someone skips it; that is the accepted cost.
 A concept answered anywhere on that response is excluded, even if that
 section's review is still pending. Only successful sections in the current
 batch qualify. The transaction locks the matching mastery rows, and the new
-due date is beyond the work date, so retries and later skipped duplicate
-batches cannot defer the same day's check again.
+due date is beyond the work date. In reconciliation mode a receipt also
+deduplicates the attempted skip per response/concept/bucket, even if a later
+correction changes whether the original attempt was applicable.
 
 No assignment metadata is stored: `DailyPlan` offers concepts and ingest
 stores the provider's actual tags, not which offers it honored. The rule

@@ -50,7 +50,7 @@ RSpec.describe "Evidence readers ignore a rating stored on an unanswered section
   it "gives ConceptMastery.record_review! the same rows" do
     unanswered_sections.each_value do |written|
       same_either_way(written) do |user, response|
-        ConceptMastery.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
+        apply_mastery_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
         user.concept_masteries.order(:concept).map { |cm| cm.attributes.except("id", "user_id", "created_at", "updated_at") }
       end
     end

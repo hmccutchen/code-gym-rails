@@ -42,7 +42,7 @@
 
 <% if @drills.any? %>
   <div class="card learn-drills">
-    <p><%= t("learn.drill.current", drills: drill_names(@drills)) %> <%= t("learn.drill.current_note") %>
+    <p><%= drill_message("current", @drills) %> <%= t(@drills.reservations? ? "learn.drill.reserved_note" : "learn.drill.current_note") %>
       <% if @drills.full? %><%= t("learn.drill.at_cap") %><% end %></p>
     <% @drills.entries.each do |entry| %>
       <%= button_to t("learn.drill.stop_named", name: drill_label(entry)), drill_stop_path(entry),
@@ -90,7 +90,7 @@
                 <span class="learn-seen"><%= t("learn.encountered") %></span>
               <% end %>
               <% if @drills.drilling?(concept, bucket[:key]) %>
-                <span class="learn-drilling"><%= t("learn.drill.marker") %></span>
+                <span class="learn-drilling"><%= t(@drills.reserved?(concept, bucket[:key]) ? "learn.drill.reserved_marker" : "learn.drill.marker") %></span>
               <% end %>
               <%# Separate markers: the bulk count reads row existence, so it never counts a row that lacks only a guide. %>
               <% reference = @references[[ concept, bucket[:key] ]] %>

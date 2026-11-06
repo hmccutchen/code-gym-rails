@@ -1,6 +1,17 @@
 require "rails_helper"
 
 RSpec.describe ExerciseSection do
+  it "requires mastery evidence to imply adaptation evidence for every kind and supported code-review mode" do
+    DailyPlan::CODE_REVIEW_MODES.each do |mode|
+      section = ExerciseSection::CodeReview::BugHunt.mode?(mode) ? { "purpose" => "Find a trap." } : {}
+      described_class.all.each do |kind|
+        next unless kind.mastery_evidence?(section)
+
+        expect(kind.adaptation_evidence?(section)).to be(true), "#{kind.key} on #{mode} needs an own-session ordering decision"
+      end
+    end
+  end
+
   it "says a kind fixes its rating exactly when it overrides the fixed_rating hook" do
     described_class.all.each do |kind|
       expect(kind.rating_fixed?).to eq(kind.method(:fixed_rating).owner != described_class.singleton_class), kind.key

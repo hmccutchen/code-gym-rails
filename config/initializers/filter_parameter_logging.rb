@@ -4,7 +4,8 @@ Rails.application.config.filter_parameters += [
 
 # `code` is anchored because entries match as substrings; a bare :code would also hide pseudocode and code_review.
 Rails.application.config.filter_parameters += [
-  /\Acode\z/, :answers, :message, :question, :pseudocode, :prior_alternates, :thread, :p256dh, :auth
+  /\Acode\z/, :answers, :message, :question, :pseudocode, :prior_alternates, :thread, :p256dh, :auth,
+  :mastery_application, :review_reconciliation
 ]
 
 # Anchored like `code`: a bare :name would hide every key that contains it.

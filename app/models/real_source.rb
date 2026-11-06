@@ -216,7 +216,7 @@ class RealSource
     Method.new("app/clients/ai_service.rb", "annotate_retention_concept"),
     Method.new("app/models/user.rb", "resume_generation!"),
     Method.new("app/models/user.rb", "held_exercise"),
-    Method.new("app/models/concept_mastery.rb", "retention_schedule_for"),
+    Method.new("app/models/concept_mastery/transition.rb", "retention_interval"),
     Method.new("app/models/concept_mastery.rb", "record_review!"),
     Method.new("app/models/daily_plan.rb", "retention_checks_for"),
     Method.new("app/models/daily_response.rb", "improved_code_visible?"),

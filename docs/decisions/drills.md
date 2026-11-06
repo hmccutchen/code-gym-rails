@@ -25,8 +25,9 @@ which drill was offered is never recorded, like every other offer.
 
 **A drill clears on the existing mastery signal and nothing else.** The
 same co-favorable rating that sets a row to standard in
-`ConceptMastery.evaluate_concept!` — self-rating "right level" or "too easy"
-AND AI "solid" or "strong", on one occurrence — also clears the drill. That
+`ConceptMastery::Transition` — self-rating "right level" or "too easy"
+AND AI "solid" or "strong", across occurrences in the applied batch or
+reconciled day — also clears the drill. That
 can be a single day, and no drill-specific count exists on purpose: the
 retention schedule takes over from there exactly as it does for any
 mastered concept.
@@ -74,10 +75,28 @@ lone drills of its own members, and a member stops as its group, so one gap
 is never two entries and a group is never half-labelled.
 
 **Drilling a paused concept from its own page ends the pause**, through
-the same exit an expired cooldown takes (`ConceptMastery#end_pause`), and
+the same pure exit an expired cooldown takes (`ConceptMastery::Transition`), and
 that page says so before the click — the one deliberate look at tier state
 on the Learn tab, since a silent override would be worse than naming it. A
 group drill states no such thing, so it leaves a paused member paused and
 picks it up when the cooldown ends. A concept that reaches the paused tier
 while drilled keeps its drill but waits out the cooldown; `concepts_needing_reinforcement` skips paused rows whether
 drilled or not, and the page says it is waiting.
+
+## Unfinished reviews and reserved slots
+
+For enrolled reconciliation users, a partial success clears the materialized
+drill immediately while its accepted request can remain reserved. The cap
+counts active plus reserved intent, grouped once; planning still reads only
+the materialized drill. Stop releases a reservation permanently, and a later
+Start records new intent. All four commands lock the user, then concrete
+mastery targets in ascending ID order, and use the shared transition path.
+An active repeat retains intent without restamping; a reserved repeat never
+reactivates practice. Learn explains the held slot and keeps Stop available.
+The HTTP-facing `.start` and `.start_group` return the locked status and
+admission projection; the controller never re-queries to explain a repeat
+or refusal. Existing bang methods delegate and keep true/false and
+`LimitReached`. Corrupt selected suffixes fail the read or command
+explicitly rather than fabricating capacity.
+`docs/decisions/daily-mastery-reconciliation.md` owns the full group,
+restart, legacy-prefix and default-off deployment rules.

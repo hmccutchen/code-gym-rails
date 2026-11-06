@@ -8,9 +8,11 @@ class ConceptMastery < ApplicationRecord
   scope :in_bucket, ->(bucket) { where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket)) }
   scope :in_buckets, ->(buckets) { buckets.map { |bucket| in_bucket(bucket) }.reduce(none, :or) }
   scope :drilling, -> { where.not(drilled_at: nil) }
+  scope :reconciling, -> { where.not(review_reconciliation: {}) }
   scope :due_for_retention_check, -> { where.not(next_retention_check_on: nil).where(next_retention_check_on: ..Date.current) }
 
   AI_RATING_RANK = { "beginner" => 0, "developing" => 1, "solid" => 2, "strong" => 3 }.freeze
+  INITIATE_RECONCILIATION = false
 
   # Capped at 60 days, where a re-check stops measuring retention; never derive this from vocabulary size (#98).
   RETENTION_INITIAL_INTERVAL_DAYS = 7
@@ -21,150 +23,116 @@ class ConceptMastery < ApplicationRecord
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: [ :user_id, :language ] }
 
-  # Count down only on the locked transition from no assessed core answers to at least one.
-  def self.record_review!(response, sections:, apply_session_countdown:)
+  # The caller holds user then response locks and saves the response in this same transaction.
+  def self.record_review!(response, sections:, apply_session_countdown:, previous_review_keys:, initiate: INITIATE_RECONCILIATION)
     return unless response.submitted?
-
-    user = response.user
-    assessed = sections & response.assessed_sections
-
-    count_down_paused_concepts!(user) if apply_session_countdown && (assessed & response.assessed_adaptation_sections).any?
-    return unless response.concept_tags.is_a?(Hash)
-
-    defer_skipped_checks!(response, sections)
-
-    sections_by_concept = Hash.new { |h, k| h[k] = [] }
-    response.concept_tags.slice(*assessed).each do |section, concept|
-      next if concept.blank? || concept == "other"
-      next unless response.mastery_evidence?(section)
-
-      sections_by_concept[concept] << section
-    end
-
-    sections_by_concept.each do |concept, secs|
-      bucket = ConceptBucket.for(secs, response.daily_exercise.language)
-      evaluate_concept!(user, concept, bucket, response, secs)
-    end
-  end
-
-  def self.count_down_paused_concepts!(user)
-    user.concept_masteries.tier_paused.each do |cm|
-      remaining = cm.cooldown_remaining - 1
-      if remaining <= 0
-        cm.end_pause
-        cm.save!
-      else
-        cm.update!(cooldown_remaining: remaining)
-      end
-    end
-  end
-  private_class_method :count_down_paused_concepts!
-
-  def self.defer_skipped_checks!(response, sections)
-    return unless response.submitted?
-
-    scopes = skipped_check_scopes(response, sections)
-    return if scopes.empty?
 
     Time.use_zone(response.user.effective_time_zone) do
-      transaction do
-        scopes.reduce(:or).where(next_retention_check_on: ..response.date)
-          .where("retention_interval_days > 0").lock.each do |cm|
-          cm.update!(next_retention_check_on: [ Date.current, response.date ].max + cm.retention_interval_days)
-        end
-      end
+      reconcile = reconciliation_active?(response.user, initiate: initiate)
+      receipt = response.mastery_receipt(previous_review_keys: previous_review_keys) if reconcile
+      accepted = receipt ? sections - receipt.fetch("legacy_sections") - receipt.fetch("processed_sections") : sections
+      next if accepted.empty?
+
+      contributions = daily_contributions(response, accepted, receipt)
+      skips = skipped_checks(response, accepted)
+      countdown = apply_session_countdown && (accepted & response.assessed_adaptation_sections).any? && !receipt&.fetch("session_counted")
+      rows = locked_rows(response.user, contributions, skips, countdown: countdown, reconcile: reconcile)
+      apply_batch(response, rows, contributions, skips, countdown: countdown, receipt: receipt)
+      receipt["processed_sections"] |= accepted if receipt
+      response.mastery_application = receipt if receipt
     end
   end
-  private_class_method :defer_skipped_checks!
 
-  def self.skipped_check_scopes(response, sections)
+  def self.reconciliation_active?(user, initiate:)
+    uncached do
+      receipts = user.daily_responses.where.not(mastery_application: {})
+      enrolled = receipts.exists?
+      DailyResponse.decode_mastery_application(receipts.pick(:mastery_application)) if enrolled
+      initiate || enrolled || user.concept_masteries.reconciling.exists?
+    end
+  end
+  private_class_method :reconciliation_active?
+
+  def self.daily_contributions(response, accepted, receipt)
+    all_accepted = receipt ? receipt.fetch("processed_sections") | accepted : accepted
+    DailyEvidence.for(response, accepted_sections: all_accepted, legacy_sections: receipt ? receipt.fetch("legacy_sections") : [])
+      .select { |entry| accepted_for(response, entry, accepted).any? }
+  end
+  private_class_method :daily_contributions
+
+  def self.accepted_for(response, entry, accepted)
+    return [] unless response.concept_tags.is_a?(Hash)
+
+    accepted.select do |key|
+      response.concept_tags[key] == entry.concept && ConceptBucket.for(key, response.daily_exercise.language) == entry.bucket
+    end
+  end
+  private_class_method :accepted_for
+
+  def self.skipped_checks(response, sections)
+    return [] unless response.concept_tags.is_a?(Hash)
+
     answered = response.answered_concept_tags.select { |section, _| response.mastery_evidence?(section) }.values
-    tags = response.concept_tags.slice(*(sections & response.section_keys))
-      .select { |section, concept| response.mastery_evidence?(section) && response.section_reviewed?(section) && !answered.include?(concept) }
-    tags.group_by { |section, _| ConceptBucket.for(section, response.daily_exercise.language) }
-      .map do |bucket, pairs|
-        response.user.concept_masteries.in_bucket(bucket).where(concept: pairs.map(&:last))
-      end
+    response.concept_tags.slice(*(sections & response.section_keys)).filter_map do |section, concept|
+      next unless response.section_reviewed?(section) && !answered.include?(concept)
+
+      response.mastery_tag(section)
+    end.uniq
   end
-  private_class_method :skipped_check_scopes
+  private_class_method :skipped_checks
 
-  def self.evaluate_concept!(user, concept, bucket, response, sections)
-    ai_ratings = sections.map { |s| response.ai_rating_for(s) }
-    return if ai_ratings.any?(&:nil?)
-
-    rep_ai   = ai_ratings.min_by { |r| AI_RATING_RANK.fetch(r, -1) }
-    self_fav = sections.all? { |s| response.self_rating_favorable?(s) }
-
-    cm = user.concept_masteries.find_or_initialize_by(concept: concept, language: bucket)
-    return if cm.tier_paused?
-
-    prev      = cm.last_rating
-    mastered  = self_fav && DailyResponse::AI_RATING_FAVORABLE.include?(rep_ai)
-    improving = prev.present? && AI_RATING_RANK.fetch(rep_ai, -1) > AI_RATING_RANK.fetch(prev, -1)
-
-    if mastered
-      record_mastered(cm, response.date)
-    else
-      record_unmastered(cm, streak_resets: improving || prev.blank?)
+  def self.locked_rows(user, contributions, skips, countdown:, reconcile:)
+    scope = user.concept_masteries
+    selected = scope.none
+    selected = selected.or(scope.tier_paused) if countdown
+    selected = selected.or(scope.reconciling) if reconcile
+    (contributions.map { |entry| [ entry.bucket, entry.concept ] } | skips).each do |bucket, concept|
+      selected = selected.or(scope.where(language: bucket, concept: concept))
     end
+    rows = selected.order(:id).lock.to_a
+    rows.each { |row| Reconciliation.decode(row.review_reconciliation) }
+    contributions.each do |entry|
+      next if rows.any? { |row| row.language == entry.bucket && row.concept == entry.concept }
 
-    cm.last_rating = rep_ai
-    cm.save!
-  end
-
-  def self.record_mastered(cm, on_date)
-    cm.assign_attributes(tier: :standard, streak: 0, cooldown_remaining: 0)
-    cm.clear_drill
-    cm.assign_attributes(**retention_schedule_for(cm, on_date))
-  end
-  private_class_method :record_mastered
-
-  def self.record_unmastered(cm, streak_resets:)
-    cm.assign_attributes(next_retention_check_on: nil, retention_interval_days: nil)
-    if streak_resets
-      cm.streak = 0
-    else
-      cm.streak += 1
-      if cm.tier_standard? && cm.streak >= 3
-        cm.assign_attributes(tier: :reduced, streak: 0)
-      elsif cm.tier_reduced? && cm.streak >= 2
-        cm.assign_attributes(tier: :paused, streak: 0, cooldown_remaining: 2)
-      end
+      rows << scope.new(language: entry.bucket, concept: entry.concept)
     end
+    rows
   end
-  private_class_method :record_unmastered
+  private_class_method :locked_rows
 
-  # Grow only when the check was due on the work's date; count the next check forward from today, not that date.
-  def self.retention_schedule_for(cm, on_date)
-    due = cm.next_retention_check_on.present? && cm.next_retention_check_on <= on_date
-
-    interval =
-      if cm.retention_interval_days.blank?
-        RETENTION_INITIAL_INTERVAL_DAYS
-      elsif due
-        [ cm.retention_interval_days * RETENTION_GROWTH_FACTOR, RETENTION_MAX_INTERVAL_DAYS ].min
-      else
-        cm.retention_interval_days
+  def self.apply_batch(response, rows, contributions, skips, countdown:, receipt:)
+    clocks = { "work_on" => response.date.iso8601, "reviewed_on" => Date.current.iso8601,
+      "occurred_at" => Time.current.utc.iso8601(6) }
+    if countdown
+      rows.select { |row| row.persisted? && (row.tier_paused? || row.review_reconciliation != {}) }.each do |row|
+        row.apply_mastery_operation("type" => "session", "response_id" => response.id)
       end
-
-    {
-      mastered_at:             cm.mastered_at || Time.current,
-      retention_interval_days: interval,
-      next_retention_check_on: Date.current + interval
-    }
+      receipt["session_counted"] = true if receipt
+    end
+    apply_skips(response, rows, skips, clocks, receipt)
+    contributions.each do |entry|
+      row = rows.find { |candidate| candidate.language == entry.bucket && candidate.concept == entry.concept }
+      operation = clocks.merge("type" => "review", "response_id" => response.id,
+        "sections" => entry.sections, "pending_sections" => receipt ? entry.pending_sections : [])
+      row.apply_mastery_operation(operation)
+    end
+    rows.each { |row| row.save! if row.changed? }
   end
-  private_class_method :retention_schedule_for
+  private_class_method :apply_batch
 
-  def end_pause
-    assign_attributes(tier: :reduced, streak: 0, cooldown_remaining: 0)
+  def self.apply_skips(response, rows, skips, clocks, receipt)
+    skips -= receipt.fetch("skip_attempts") if receipt
+    skips.each do |bucket, concept|
+      row = rows.find { |candidate| candidate.language == bucket && candidate.concept == concept }
+      row&.apply_mastery_operation(clocks.slice("work_on", "reviewed_on").merge("type" => "skip", "response_id" => response.id))
+    end
+    receipt["skip_attempts"] |= skips if receipt
   end
+  private_class_method :apply_skips
 
-  def clear_drill
-    assign_attributes(drilled_at: nil, drill_group: nil)
-  end
-
-  def clear_drill!
-    clear_drill
-    save!
+  # Manual callers hold the user lock and lock their concrete targets in ascending ID order.
+  def apply_mastery_operation(operation)
+    result = Reconciliation.apply(current: Reconciliation.snapshot(self), journal: review_reconciliation, operation: operation)
+    assign_attributes(result.state.merge("review_reconciliation" => result.journal))
   end
 end

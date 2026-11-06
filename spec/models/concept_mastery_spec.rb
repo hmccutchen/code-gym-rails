@@ -12,10 +12,10 @@ RSpec.describe ConceptMastery, type: :model do
       answers: { "code_review" => "x" }, concept_tags: { "code_review" => "n_plus_one" },
       section_ratings: { "code_review" => "right_level" }, ai_review: { "code_review" => { "rating" => "strong" } })
     original = target.attributes
-    described_class.record_review!(response, sections: [ "code_review" ], apply_session_countdown: true)
+    apply_mastery_review!(response, sections: [ "code_review" ], apply_session_countdown: true)
     expect(target.reload.attributes).to eq(original)
     response.update!(submitted_at: Time.current, ai_review: { "code_review" => { "rating" => "invalid" } })
-    described_class.record_review!(response, sections: [ "code_review" ], apply_session_countdown: true)
+    apply_mastery_review!(response, sections: [ "code_review" ], apply_session_countdown: true)
     expect(target.reload.attributes).to eq(original)
     expect(paused.reload.cooldown_remaining).to eq(2)
   end
@@ -28,7 +28,7 @@ RSpec.describe ConceptMastery, type: :model do
       section_ratings: { section => self_rating },
       concept_tags: { section => concept },
       ai_review: { section => { "rating" => ai_rating } })
-    described_class.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
+    apply_mastery_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
     user.concept_masteries.find_by(concept: concept, language: "ruby_rails")
   end
 
@@ -87,7 +87,7 @@ RSpec.describe ConceptMastery, type: :model do
       section_ratings: { "code_review" => "right_level", "pattern" => "too_hard" },
       concept_tags: { "code_review" => "n_plus_one", "pattern" => "n_plus_one" },
       ai_review: { "code_review" => { "rating" => "strong" }, "pattern" => { "rating" => "developing" } })
-    described_class.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
+    apply_mastery_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
     cm = user.concept_masteries.find_by(concept: "n_plus_one", language: "ruby_rails")
     # least-favorable: rep_ai = developing, self not all-favorable → not mastered, baseline records developing
     expect(cm.last_rating).to eq("developing")
@@ -105,7 +105,7 @@ RSpec.describe ConceptMastery, type: :model do
     response = user.daily_responses.create!(daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
       answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" },
       concept_tags: { "code_review" => "n_plus_one" }, ai_review: {})
-    described_class.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
+    apply_mastery_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
     expect(user.concept_masteries.find_by(concept: "n_plus_one")).to be_nil
   end
 
@@ -220,7 +220,7 @@ RSpec.describe ConceptMastery, type: :model do
         }
       )
 
-      ConceptMastery.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
+      apply_mastery_review!(response, sections: %w[code_review], apply_session_countdown: true)
 
       expect(user.concept_masteries.find_by(concept: "n_plus_one")).to be_present
       expect(user.concept_masteries.find_by(concept: "memoization")).to be_nil
@@ -240,7 +240,7 @@ RSpec.describe ConceptMastery, type: :model do
         ai_review: { "code_review" => { "rating" => "solid" } }
       )
 
-      ConceptMastery.record_review!(response, sections: %w[code_review], apply_session_countdown: false)
+      apply_mastery_review!(response, sections: %w[code_review], apply_session_countdown: false)
 
       expect(paused.reload.cooldown_remaining).to eq(2)
     end
@@ -259,7 +259,7 @@ RSpec.describe ConceptMastery, type: :model do
         ai_review: { "code_review" => { "rating" => "solid" } }
       )
 
-      ConceptMastery.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
+      apply_mastery_review!(response, sections: %w[code_review], apply_session_countdown: true)
 
       expect(paused.reload.cooldown_remaining).to eq(1)
     end
@@ -278,7 +278,7 @@ RSpec.describe ConceptMastery, type: :model do
                               concept_tags: { "code_review" => "n_plus_one" },
                               ai_review: { "code_review" => { "rating" => "beginner" } })
 
-      described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
+      apply_mastery_review!(response, sections: %w[code_review], apply_session_countdown: true)
 
       expect(user.concept_masteries.find_by(concept: "n_plus_one")).to be_nil
     end
@@ -290,7 +290,7 @@ RSpec.describe ConceptMastery, type: :model do
                               concept_tags: { "code_review" => "n_plus_one" },
                               ai_review: { "code_review" => { "rating" => "beginner" } })
 
-      described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
+      apply_mastery_review!(response, sections: %w[code_review], apply_session_countdown: true)
 
       expect(cm.reload).to have_attributes(tier: "standard", streak: 2, last_rating: "solid")
     end
@@ -305,7 +305,7 @@ RSpec.describe ConceptMastery, type: :model do
                               concept_tags: { "code_review" => "n_plus_one" },
                               ai_review: { "code_review" => { "rating" => "beginner" } })
 
-      described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
+      apply_mastery_review!(response, sections: %w[code_review], apply_session_countdown: true)
 
       expect(cm.reload).to have_attributes(next_retention_check_on: Date.current + 7, retention_interval_days: 7,
         tier: "standard", streak: 2, last_rating: "strong", mastered_at: mastered_at)
@@ -320,7 +320,7 @@ RSpec.describe ConceptMastery, type: :model do
                               concept_tags: { "code_review" => "n_plus_one" },
                               ai_review: { "code_review" => { "missed" => [ "x" ] } })
 
-      described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
+      apply_mastery_review!(response, sections: %w[code_review], apply_session_countdown: true)
 
       expect(cm.reload).to have_attributes(next_retention_check_on: Date.current + 7, retention_interval_days: 7,
         tier: "standard", streak: 2, last_rating: "strong")
@@ -331,10 +331,10 @@ RSpec.describe ConceptMastery, type: :model do
         retention_interval_days: 7, next_retention_check_on: Date.current)
       response = reviewed_day(answers: {}, concept_tags: { "code_review" => "n_plus_one" },
         ai_review: { "code_review" => { "rating" => "beginner" } })
-      described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: false)
+      apply_mastery_review!(response, sections: %w[code_review], apply_session_countdown: false)
       deferred_date = Date.current + 7
       travel_to(20.days.from_now) do
-        described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: false)
+        apply_mastery_review!(response, sections: %w[code_review], apply_session_countdown: false)
         expect(cm.reload.next_retention_check_on).to eq(deferred_date)
       end
     end
@@ -348,7 +348,7 @@ RSpec.describe ConceptMastery, type: :model do
           ai_review: { "code_review" => { "rating" => "beginner" } })
         response.update!(date: Date.new(2026, 9, 12))
 
-        described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: false)
+        apply_mastery_review!(response, sections: %w[code_review], apply_session_countdown: false)
 
         expect(cm.reload.next_retention_check_on).to eq(Date.new(2026, 9, 25))
       end
@@ -362,10 +362,10 @@ RSpec.describe ConceptMastery, type: :model do
         section_ratings: { "pattern" => "right_level" },
         ai_review: { "code_review" => { "rating" => "beginner" } })
 
-      described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: false)
+      apply_mastery_review!(response, sections: %w[code_review], apply_session_countdown: false)
       expect(cm.reload.next_retention_check_on).to eq(Date.current)
       response.ai_review["pattern"] = { "rating" => "strong" }
-      described_class.record_review!(response, sections: %w[pattern], apply_session_countdown: false)
+      apply_mastery_review!(response, sections: %w[pattern], apply_session_countdown: false)
       expect(cm.reload.retention_interval_days).to eq(14)
     end
 
@@ -379,11 +379,11 @@ RSpec.describe ConceptMastery, type: :model do
         concept_tags: { "code_review" => tagged[0], "pattern" => tagged[1], "challenge" => tagged[2] },
         ai_review: { "code_review" => { "rating" => "beginner" }, "challenge" => { "rating" => "beginner" } })
       response.update!(submitted_at: nil)
-      described_class.record_review!(response, sections: %w[code_review pattern], apply_session_countdown: false)
+      apply_mastery_review!(response, sections: %w[code_review pattern], apply_session_countdown: false)
       expect(masteries.map { |cm| cm.reload.next_retention_check_on }).to all(eq(Date.current))
 
       response.update!(submitted_at: Time.current)
-      described_class.record_review!(response, sections: %w[code_review pattern], apply_session_countdown: false)
+      apply_mastery_review!(response, sections: %w[code_review pattern], apply_session_countdown: false)
       expect(masteries.map { |cm| cm.reload.next_retention_check_on }).to eq([ Date.current + 7, Date.current, Date.current ])
     end
 
@@ -396,7 +396,7 @@ RSpec.describe ConceptMastery, type: :model do
         ai_review: { "code_review" => {}, "pattern" => {} })
       before = [ cm.attributes, retired.attributes ]
 
-      described_class.record_review!(response, sections: %w[code_review pattern], apply_session_countdown: false)
+      apply_mastery_review!(response, sections: %w[code_review pattern], apply_session_countdown: false)
 
       expect([ cm.reload.attributes, retired.reload.attributes ]).to eq(before)
     end
@@ -408,7 +408,7 @@ RSpec.describe ConceptMastery, type: :model do
                               ai_review: { "code_review" => { "rating" => "strong" },
                                            "pattern"     => { "rating" => "beginner" } })
 
-      described_class.record_review!(response, sections: %w[code_review pattern], apply_session_countdown: true)
+      apply_mastery_review!(response, sections: %w[code_review pattern], apply_session_countdown: true)
 
       cm = user.concept_masteries.find_by(concept: "n_plus_one", language: "ruby_rails")
       expect(cm.last_rating).to eq("strong")
@@ -439,7 +439,7 @@ RSpec.describe ConceptMastery, "drills", type: :model do
     response = user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
       answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => self_rating },
       concept_tags: { "code_review" => concept }, ai_review: { "code_review" => { "rating" => ai_rating } })
-    described_class.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
+    apply_mastery_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
     user.concept_masteries.find_by(concept: concept, language: "ruby_rails")
   end
 

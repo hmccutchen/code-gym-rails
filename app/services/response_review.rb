@@ -54,20 +54,25 @@ class ResponseReview
 
   def store(successes, failures)
     ActiveRecord::Base.transaction do
+      User.lock.find(@response.user_id)
       @response.lock!
       next false unless @response.reviewing_since == @claim
 
-      if successes.any?
-        unassessed = @response.assessed_adaptation_sections.empty?
-        @response.ai_review = (@response.ai_review || {}).merge(successes.transform_values { |result| result[:review] })
-        @response.review_provider = @user.provider
-        first_assessment = unassessed && @response.assessed_adaptation_sections.any?
-        ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_assessment)
-      end
+      store_successes(successes) if successes.any?
       @response.review_errors = @response.review_errors.except(*successes.keys)
                                          .merge(failures.transform_values { |result| stored_failure(result) })
       @response.save!
     end
+  end
+
+  def store_successes(successes)
+    previous_keys = @response.ai_review.is_a?(Hash) ? @response.ai_review.keys : []
+    unassessed = @response.assessed_adaptation_sections.empty?
+    @response.ai_review = (@response.ai_review || {}).merge(successes.transform_values { |result| result[:review] })
+    @response.review_provider = @user.provider
+    first_assessment = unassessed && @response.assessed_adaptation_sections.any?
+    ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_assessment,
+      previous_review_keys: previous_keys)
   end
 
   def status_for(successes, failures)

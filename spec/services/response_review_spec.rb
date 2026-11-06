@@ -23,6 +23,426 @@ RSpec.describe ResponseReview do
     described_class.new(subject_response, user: user, reviewer: reviewer).call
   end
 
+  describe "daily mastery reconciliation" do
+    before { stub_const("ConceptMastery::INITIATE_RECONCILIATION", true) }
+
+    around do |example|
+      Time.use_zone("America/New_York") do
+        travel_to(Time.zone.local(2026, 11, 5, 12)) { example.run }
+      end
+    end
+
+    let(:exercise) do
+      user.daily_exercises.create!(date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: %w[code_review pattern].index_with { { "concept" => "n_plus_one", "question" => "Find the repeated query." } })
+    end
+    let(:response) do
+      user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+        answers: %w[code_review pattern].index_with { "Preload the records." },
+        section_ratings: %w[code_review pattern].index_with { "right_level" },
+        concept_tags: %w[code_review pattern].index_with { "n_plus_one" })
+    end
+    let!(:mastery) do
+      user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :standard,
+        streak: 2, last_rating: "developing", drilled_at: 1.day.ago, mastered_at: 30.days.ago,
+        retention_interval_days: 7, next_retention_check_on: Date.current)
+    end
+    let!(:paused) do
+      user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
+    end
+
+    def batch(target, grades = nil, initiate: true, **ratings)
+      grades ||= ratings
+      allow(ConceptMastery).to receive(:record_review!).and_wrap_original do |method, *args, **kwargs|
+        method.call(*args, **kwargs, initiate: initiate)
+      end
+      allow(reviewer).to receive(:review_sections) do |*_args, sections:|
+        sections.index_with { |key| grades.key?(key) ? review_result(grades.fetch(key)) : failed_result }
+      end
+      described_class.new(target, user: target.user, reviewer: reviewer).call
+    end
+
+    def another_day(offset, concept: "caching", answer: "An answer", keys: %w[pattern], owner: user)
+      date = response.date + offset
+      exercise = owner.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: keys.index_with { { "concept" => concept } })
+      owner.daily_responses.create!(date: date, daily_exercise: exercise, submitted_at: Time.current,
+        answers: keys.index_with { answer }, concept_tags: keys.index_with { concept },
+        section_ratings: keys.index_with { "right_level" })
+    end
+
+    def domain(row) = ConceptMastery::Reconciliation.snapshot(row.reload)
+
+    [ :two_sessions, :later_review, :skipped_day, :start, :stop_restart ].each do |interleaving|
+      it "matches a full-at-first-commit control across all nine fields after #{interleaving}" do
+        mastery.update!(tier: :reduced, streak: 1)
+        control = User.create!(email: "control-726@example.com", time_zone: user.time_zone)
+        control_mastery = control.concept_masteries.create!(concept: mastery.concept, language: mastery.language,
+          **mastery.attributes.slice(*ConceptMastery::Transition::FIELDS))
+        control_response = another_day(0, concept: "n_plus_one", keys: %w[code_review pattern], owner: control)
+        batch(response, "pattern" => "strong")
+        batch(control_response, "pattern" => "strong", "code_review" => "developing")
+        travel 1.day
+        [ user, control ].each do |owner|
+          case interleaving
+          when :two_sessions
+            [ 1, 2 ].each { |offset| batch(another_day(offset, owner: owner), "pattern" => "strong") }
+          when :later_review
+            batch(another_day(1, owner: owner, concept: "n_plus_one"), "pattern" => "strong")
+          when :skipped_day
+            batch(another_day(1, owner: owner, concept: "n_plus_one", answer: ""), "pattern" => nil)
+          when :start
+            ConceptDrills.stop!(owner, concept: "n_plus_one", bucket: "ruby_rails")
+            ConceptDrills.start!(owner, concept: "n_plus_one", bucket: "ruby_rails")
+          when :stop_restart
+            ConceptDrills.stop!(owner, concept: "n_plus_one", bucket: "ruby_rails")
+            ConceptDrills.start!(owner, concept: "n_plus_one", bucket: "ruby_rails")
+            ConceptDrills.stop!(owner, concept: "n_plus_one", bucket: "ruby_rails")
+          end
+        end
+        travel 1.day
+        batch(response, "code_review" => "developing")
+        expect(domain(mastery)).to eq(domain(control_mastery))
+      end
+    end
+
+    [ %w[pattern code_review], %w[code_review pattern] ].each do |order|
+      [ nil, "too_hard" ].each do |self_rating|
+        it "aggregates favourable grades with #{self_rating.inspect} effort in #{order.inspect} order" do
+          response.update!(section_ratings: { "pattern" => self_rating, "code_review" => "right_level" })
+          order.each { |key| batch(response, key => "strong") }
+          expect(mastery.reload).to have_attributes(last_rating: "strong", streak: 0, tier: "standard",
+            retention_interval_days: nil, next_retention_check_on: nil)
+          expect(mastery.drilled_at).to be_present
+        end
+      end
+    end
+
+    it "does not prioritize a reserved drill in planning or reinforcement" do
+      batch(response, "pattern" => "strong")
+      expect(ConceptDrills.for(user).reserved?("n_plus_one", "ruby_rails")).to be(true)
+      expect(user.concept_masteries.drilling.where(concept: "n_plus_one")).to be_empty
+      expect(user.concepts_needing_reinforcement.map { |entry| entry[:concept] }).not_to include("n_plus_one")
+      expect(user.concept_masteries.due_for_retention_check.where(concept: "n_plus_one")).to be_empty
+    end
+
+    it "keeps an untouched default-off user on batch semantics without receipts or suffixes" do
+      batch(response, { "pattern" => "strong" }, initiate: false)
+      batch(response, { "code_review" => "developing" }, initiate: false)
+      expect(response.reload.mastery_application).to eq({})
+      expect(mastery.reload.review_reconciliation).to eq({})
+      expect(mastery).to have_attributes(tier: "standard", streak: 1, drilled_at: nil)
+    end
+
+    it "ignores an existing retired concept row with initiation off and creates no reconciliation state" do
+      retired = user.concept_masteries.create!(concept: "retired_concept", language: "ruby_rails",
+        last_rating: "developing", streak: 1)
+      original = retired.attributes
+      response.update!(concept_tags: %w[code_review pattern].index_with { "retired_concept" })
+
+      expect(batch(response, { "code_review" => "developing", "pattern" => "developing" }, initiate: false).status).to eq(:ready)
+
+      expect(retired.reload.attributes).to eq(original)
+      expect(response.reload.mastery_application).to eq({})
+      expect(user.concept_masteries.pluck(:review_reconciliation)).to all(eq({}))
+    end
+
+    it "excludes a skipped concept answered elsewhere even when the answer has an invalid grade" do
+      response.update!(answers: { "code_review" => "An answer", "pattern" => "" })
+      original = domain(mastery)
+
+      batch(response, "code_review" => "invalid", "pattern" => nil)
+
+      expect(domain(mastery)).to eq(original)
+      expect(response.reload.mastery_application["skip_attempts"]).to eq([])
+      expect(ConceptMastery::DailyEvidence.for(response, accepted_sections: response.ai_review.keys, legacy_sections: [])).to eq([])
+    end
+
+    it "records an unrelated default-off session in the whole user's open correction suffix" do
+      mastery.update!(tier: :reduced, streak: 1)
+      batch(response, "pattern" => "strong")
+      [ 1, 2 ].each do |offset|
+        later = another_day(offset)
+        batch(later, { "pattern" => "strong" }, initiate: false)
+      end
+      expect(mastery.reload.review_reconciliation["operations"].map { |op| op["type"] }).to eq(%w[review session session])
+      batch(response, { "code_review" => "developing" }, initiate: false)
+      expect(mastery.reload).to have_attributes(tier: "reduced", streak: 0, cooldown_remaining: 0, last_rating: "developing")
+    end
+
+    it "keeps enrollment through compaction and starts a new suffix with initiation off" do
+      batch(response, "pattern" => "strong", "code_review" => "strong")
+      expect(mastery.reload.review_reconciliation).to eq({})
+      later = another_day(1, concept: "n_plus_one", keys: %w[code_review pattern])
+      batch(later, { "pattern" => "strong" }, initiate: false)
+      expect(later.reload.mastery_application["processed_sections"]).to eq(%w[pattern])
+      expect(mastery.reload.review_reconciliation["operations"].first["response_id"]).to eq(later.id)
+    end
+
+    [ :newest_first, :oldest_first ].each do |order|
+      it "closes two persisted open contributions #{order} without losing the earlier correction" do
+        original_drill = mastery.drilled_at
+        batch(response, "pattern" => "strong")
+        later = another_day(1, concept: "n_plus_one", keys: %w[code_review pattern])
+        travel 1.day
+        batch(later, "pattern" => "strong")
+        targets = order == :newest_first ? [ later, response ] : [ response, later ]
+        batch(targets.first, "code_review" => "developing")
+        reviews = mastery.reload.review_reconciliation["operations"].select { |operation| operation["type"] == "review" }
+        expect(reviews.size).to eq(order == :newest_first ? 2 : 1)
+        batch(targets.last, "code_review" => "developing")
+        expect(mastery.reload).to have_attributes(tier: "reduced", streak: 1, last_rating: "developing",
+          drilled_at: original_drill, retention_interval_days: nil, next_retention_check_on: nil, review_reconciliation: {})
+        expect(targets.map { |target| target.reload.mastery_application["processed_sections"].sort })
+          .to eq([ %w[code_review pattern], %w[code_review pattern] ])
+      end
+    end
+
+    it "uses a suffix even if its response receipt is missing" do
+      batch(response, "pattern" => "strong")
+      response.update!(mastery_application: {})
+      later = another_day(1)
+      batch(later, { "pattern" => "strong" }, initiate: false)
+      expect(mastery.reload.review_reconciliation["operations"].last).to eq("type" => "session", "response_id" => later.id)
+    end
+
+    it "locks user before response and existing mastery rows in ascending order" do
+      statements = []
+      subscriber = ->(_name, _start, _finish, _id, payload) { statements << payload[:sql] if payload[:sql].include?("FOR UPDATE") }
+      ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { batch(response, "pattern" => "strong") }
+      expect(statements[0]).to include('FROM "users"')
+      expect(statements[1]).to include('FROM "daily_responses"')
+      expect(statements[2]).to include('FROM "concept_masteries"', 'ORDER BY "concept_masteries"."id" ASC')
+    end
+
+    it "keeps a durable receipt idempotent after a complete day and fresh reload" do
+      batch(response, "pattern" => "strong", "code_review" => "strong")
+      before = domain(mastery)
+      fresh = DailyResponse.find(response.id)
+      apply_mastery_review!(fresh, sections: %w[code_review pattern], apply_session_countdown: true,
+        previous_review_keys: %w[code_review pattern], initiate: false)
+      expect(domain(mastery)).to eq(before)
+      expect(paused.reload.cooldown_remaining).to eq(1)
+      expect(fresh.mastery_application["processed_sections"]).to contain_exactly("pattern", "code_review")
+    end
+
+    it "closes a pending invalid success without letting it grade or count another session" do
+      batch(response, "pattern" => "strong")
+      before = domain(mastery)
+      batch(response, "code_review" => "off_list")
+      expect(domain(mastery)).to eq(before)
+      expect(mastery.review_reconciliation).to eq({})
+      expect(response.reload.mastery_application["processed_sections"]).to contain_exactly("pattern", "code_review")
+      expect(paused.reload.cooldown_remaining).to eq(1)
+    end
+
+    it "does not mark failed sections processed or enroll a wholly failed review" do
+      batch(response, {})
+      expect(response.reload.mastery_application).to eq({})
+      batch(response, "pattern" => "strong")
+      expect(response.reload.mastery_application["processed_sections"]).to eq(%w[pattern])
+    end
+
+    [ %w[code_review pattern], %w[pattern code_review] ].each do |order|
+      it "keeps the first-core service and receipt guards for bug/core order #{order.inspect}" do
+        exercise.update!(problem_set: exercise.problem_set.deep_merge("code_review" => { "purpose" => "Find the trap" }))
+        batch(response, order.first => "strong")
+        expect(paused.reload.cooldown_remaining).to eq(order.first == "pattern" ? 1 : 2)
+        batch(response, { order.last => "strong" }, initiate: false)
+        expect(paused.reload.cooldown_remaining).to eq(1)
+        expect(response.reload.mastery_application["session_counted"]).to be(true)
+      end
+    end
+
+    it "guards direct new-writer countdown against a successful supplementary-only subset" do
+      exercise.update!(problem_set: exercise.problem_set.deep_merge("code_review" => { "purpose" => "Find the trap" }))
+      response.ai_review = { "code_review" => { "rating" => "strong" }, "pattern" => { "rating" => "solid" } }
+      apply_mastery_review!(response, sections: %w[code_review], previous_review_keys: [], apply_session_countdown: true, initiate: true)
+      expect(paused.reload.cooldown_remaining).to eq(2)
+      expect(response.reload.mastery_application["session_counted"]).to be(false)
+    end
+
+    it "leaves a fully reviewed legacy submission untouched without contacting a provider" do
+      response.update!(ai_review: %w[code_review pattern].index_with { { "rating" => "strong" } })
+      original = domain(mastery)
+      expect(reviewer).not_to receive(:review_sections)
+      expect(review.status).to eq(:already_reviewed)
+      expect(response.reload.mastery_application).to eq({})
+      expect(domain(mastery)).to eq(original)
+    end
+
+    it "takes a legacy partial as baseline without reapplying its keys or countdown" do
+      batch(response, { "pattern" => "strong" }, initiate: false)
+      batch(response, { "code_review" => "developing" }, initiate: true)
+      expect(mastery.reload).to have_attributes(tier: "standard", streak: 1, last_rating: "developing", drilled_at: nil)
+      expect(response.reload.mastery_application).to include("legacy_sections" => %w[pattern],
+        "processed_sections" => %w[code_review], "session_counted" => true)
+      expect(paused.reload.cooldown_remaining).to eq(1)
+    end
+
+    [ nil, "invalid" ].each do |grade|
+      it "counts once after an unassessed legacy #{grade.inspect} prefix" do
+        response.update!(ai_review: { "code_review" => { "rating" => grade } })
+        batch(response, "pattern" => "strong")
+        expect(paused.reload.cooldown_remaining).to eq(1)
+        expect(response.reload.mastery_application["session_counted"]).to be(true)
+      end
+    end
+
+    it "retains later same-concept evidence and its original date through a weak correction" do
+      mastery.update!(streak: 1)
+      batch(response, "pattern" => "strong")
+      later = another_day(1, concept: "n_plus_one")
+      travel 1.day
+      batch(later, "pattern" => "strong")
+      travel 4.days
+      batch(response, "code_review" => "developing")
+      expect(mastery.reload).to have_attributes(tier: "standard", last_rating: "strong",
+        retention_interval_days: 7, next_retention_check_on: Date.new(2026, 11, 13))
+    end
+
+    it "uses the first local application date through a retry over midnight and DST" do
+      travel_to Time.utc(2026, 11, 1, 5, 59, 59)
+      mastery.update!(next_retention_check_on: Date.current)
+      batch(response, "pattern" => "strong")
+      original = domain(mastery)
+      travel_to Time.utc(2026, 11, 2, 5, 1)
+      batch(response, "code_review" => "strong")
+      expect(domain(mastery)).to eq(original)
+      expect(mastery.next_retention_check_on).to eq(Date.new(2026, 11, 15))
+    end
+
+    it "schedules an initial late review from its actual local review day" do
+      response
+      travel 4.days
+      batch(response, "pattern" => "strong", "code_review" => "strong")
+      expect(mastery.reload.next_retention_check_on).to eq(Date.current + 14)
+    end
+
+    it "keeps eased comfortable success on current retention policy" do
+      mastery.update!(tier: :reduced)
+      exercise.update!(problem_set: exercise.problem_set.transform_values { |entry| entry.merge("eased" => true) })
+      batch(response, "pattern" => "strong", "code_review" => "strong")
+      expect(mastery.reload).to have_attributes(tier: "standard", retention_interval_days: 14, next_retention_check_on: Date.current + 14)
+    end
+
+    it "retains one skipped attempt even if another batch and correction later make it relevant" do
+      batch(response, "pattern" => "strong")
+      skipped = another_day(20, concept: "n_plus_one", answer: "", keys: %w[code_review pattern])
+      travel 20.days
+      batch(skipped, "code_review" => nil)
+      batch(skipped, "pattern" => nil)
+      operations = mastery.reload.review_reconciliation["operations"]
+      expect(operations.count { |op| op["type"] == "skip" }).to eq(1)
+      expect(skipped.reload.mastery_application["skip_attempts"]).to eq([ %w[ruby_rails n_plus_one] ])
+      batch(response, "code_review" => "developing")
+      expect(mastery.reload.next_retention_check_on).to be_nil
+    end
+
+    it "re-evaluates an initially not-due skip after corrected pauses shorten the later schedule" do
+      mastery.update!(tier: :reduced, streak: 1)
+      batch(response, "pattern" => "strong")
+      [ 1, 2 ].each do |offset|
+        later = another_day(offset, concept: "n_plus_one")
+        travel 1.day
+        batch(later, "pattern" => "strong")
+      end
+      skipped = another_day(9, concept: "n_plus_one", answer: "", keys: %w[code_review pattern])
+      travel 7.days
+      original_due = mastery.reload.next_retention_check_on
+      batch(skipped, "code_review" => nil)
+      batch(skipped, "pattern" => nil)
+      expect(mastery.reload.next_retention_check_on).to eq(original_due)
+      expect(mastery.review_reconciliation["operations"].count { |operation| operation["type"] == "skip" }).to eq(1)
+      batch(response, "code_review" => "developing")
+      expect(mastery.reload).to have_attributes(tier: "standard", last_rating: "strong", retention_interval_days: 7,
+        next_retention_check_on: response.date + 16, review_reconciliation: {})
+    end
+
+    it "rolls back both mastery rows and the receipt if saving the merged response fails" do
+      original = domain(mastery)
+      allow(response).to receive(:save!).and_raise(ActiveRecord::RecordInvalid.new(response))
+      expect { batch(response, "pattern" => "strong") }.to raise_error(ActiveRecord::RecordInvalid)
+      expect(domain(mastery)).to eq(original)
+      expect(mastery.review_reconciliation).to eq({})
+      expect(paused.reload.cooldown_remaining).to eq(2)
+      expect(response.reload).to have_attributes(ai_review: nil, mastery_application: {}, reviewing_since: nil)
+    end
+
+    it "preserves a stolen claim and writes no receipt or suffix" do
+      takeover = 1.second.from_now.floor(6)
+      allow(reviewer).to receive(:review_sections) do
+        response.update_columns(reviewing_since: takeover)
+        { "pattern" => review_result("strong") }
+      end
+      expect(review.status).to eq(:busy)
+      expect(response.reload).to have_attributes(mastery_application: {}, ai_review: nil, reviewing_since: takeover)
+      expect(mastery.reload.review_reconciliation).to eq({})
+      expect(paused.reload.cooldown_remaining).to eq(2)
+    end
+
+    [ nil, [], "text", false, 0, { "version" => 999 } ].each do |bad|
+      it "rejects an invalid enrollment receipt from another response: #{bad.inspect}" do
+        unrelated = another_day(1)
+        quoted = DailyResponse.connection.quote(bad.to_json)
+        DailyResponse.where(id: unrelated.id).update_all("mastery_application = #{quoted}::jsonb")
+        expect { batch(response, { "pattern" => "strong" }, initiate: false) }.to raise_error(ArgumentError)
+        expect(response.reload.mastery_application).to eq({})
+        expect(paused.reload.cooldown_remaining).to eq(2)
+      end
+
+      %i[mastery_application review_reconciliation].each do |column|
+        it "refuses stored #{column} #{bad.inspect} with initiation off" do
+          record = column == :mastery_application ? response : mastery
+          quoted = record.class.connection.quote(bad.to_json)
+          record.class.where(id: record.id).update_all("#{column} = #{quoted}::jsonb")
+          original = domain(mastery)
+          expect { batch(response, { "pattern" => "strong" }, initiate: false) }.to raise_error(ArgumentError)
+          expect(domain(mastery)).to eq(original)
+          expect(paused.reload.cooldown_remaining).to eq(2)
+          expect(response.reload.ai_review).to be_nil
+        end
+      end
+    end
+
+    [ [ %w[code_review pattern] ], [ %w[code_review], %w[pattern] ], [ %w[pattern], %w[code_review] ] ].each do |batches|
+      it "reconciles one concept for batches #{batches.inspect}" do
+        grades = { "code_review" => "developing", "pattern" => "strong" }
+        original_drill = mastery.drilled_at
+        original_mastery_time = mastery.mastered_at
+        batch_index = 0
+        allow(reviewer).to receive(:review_sections) do |*_args, sections:|
+          successful = batches.fetch(batch_index)
+          batch_index += 1
+          sections.index_with { |key| successful.include?(key) ? review_result(grades.fetch(key)) : failed_result }
+        end
+
+        batches.each_with_index do |_, index|
+          expect(review.status).to eq(index == batches.length - 1 ? :ready : :partial)
+          expect(response.reload.reviewing_since).to be_nil
+          expect(paused.reload.cooldown_remaining).to eq(1)
+          next unless index.zero? && batches.length > 1
+
+          expect(mastery.reload.last_rating).to eq(grades.fetch(batches.first.first))
+          expect(response).not_to be_fully_reviewed
+          if batches.first == %w[code_review]
+            expect(mastery.tier).to eq("reduced")
+          else
+            expect(mastery.retention_interval_days).to eq(14)
+            expect(mastery.drilled_at).to be_nil
+          end
+        end
+
+        expect(mastery.reload).to have_attributes(tier: "reduced", streak: 0, last_rating: "developing",
+          drilled_at: original_drill, retention_interval_days: nil, next_retention_check_on: nil,
+          mastered_at: original_mastery_time)
+        expect(response.ai_review.transform_values { |r| r["rating"] }).to eq(grades)
+        expect(review.status).to eq(:already_reviewed)
+        expect(paused.reload.cooldown_remaining).to eq(1)
+      end
+    end
+  end
+
   [ %w[code_review pattern], %w[pattern code_review] ].each do |order|
     it "counts only the first core assessment with batches #{order.inspect}" do
       paused = user.concept_masteries.create!(concept: "caching", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
@@ -59,7 +479,7 @@ RSpec.describe ResponseReview do
       paused = user.concept_masteries.create!(concept: "caching", language: "ruby_rails", tier: :paused, cooldown_remaining: 1)
       exercise.update!(problem_set: exercise.problem_set.deep_merge("code_review" => { "purpose" => "Find the trap" }))
       response.ai_review = { "code_review" => { "rating" => "strong" } }
-      ConceptMastery.record_review!(response, sections: [ "code_review" ], apply_session_countdown: true)
+      apply_mastery_review!(response, sections: [ "code_review" ], apply_session_countdown: true)
       expect(paused.reload).to have_attributes(tier: "paused", cooldown_remaining: 1)
     end
   end
@@ -154,7 +574,7 @@ RSpec.describe ResponseReview do
     review
 
     expect(ConceptMastery).to have_received(:record_review!)
-      .with(response, sections: %w[code_review pattern], apply_session_countdown: true)
+      .with(response, sections: %w[code_review pattern], apply_session_countdown: true, previous_review_keys: [])
   end
 
   it "does not count the session again on a later batch" do
@@ -165,7 +585,7 @@ RSpec.describe ResponseReview do
     review
 
     expect(ConceptMastery).to have_received(:record_review!)
-      .with(response, sections: %w[pattern], apply_session_countdown: false)
+      .with(response, sections: %w[pattern], apply_session_countdown: false, previous_review_keys: %w[code_review])
   end
 
   it "reads today in the user's zone, so a caller outside a request clears the right day's error" do
