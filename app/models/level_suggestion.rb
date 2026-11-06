@@ -9,7 +9,9 @@ class LevelSuggestion
   STEP_BACK_TOO_HARD = 2
   IN_PLACE_ANSWERS = 3
 
-  Result = Data.define(:date, :level, :ai_rating, :self_rating) do
+  Result = Data.define(:date, :level, :ai_rating, :self_rating, :rotated) do
+    def initialize(rotated: false, **ratings) = super
+
     # The AI rating alone, unlike ReviewedSectionResults.favourable?: docs/code-notes/app/models/level_suggestion.md
     def ai_favourable? = ReviewedSectionResults.at_or_above?(ai_rating, ReviewedSectionResults::FAVOURABLE_BAR)
     def too_hard? = ReviewedSectionResults.too_hard?(self_rating)
@@ -22,8 +24,8 @@ class LevelSuggestion
   Proposal = Data.define(:basis, :steps)
   Summary = Data.define(:window_size, :favourable, :too_hard_latest3, :newest_result_on)
 
-  def self.for(user)
-    proposal(levels: user.kind_rungs, locked: user.locked_section_kinds, results: Evidence.for(user).results,
+  def self.for(user, results: Evidence.for(user).results)
+    proposal(levels: user.kind_rungs, locked: user.locked_section_kinds, results: results,
              cutoffs: user.level_suggestion_cutoffs, pooled: pooled_kinds(user))
   end
 
@@ -97,7 +99,7 @@ class LevelSuggestion
   end
 
   def pooled_step(key, to, at_level, too_hard)
-    return unless @pooled.include?(key)
+    return unless @pooled.include?(key) && at_level.size < WINDOW
 
     window = pooled_window(@levels[key])
     return unless window.passes? && window.carries?(key)
@@ -107,7 +109,7 @@ class LevelSuggestion
   end
 
   def pooled_window(level)
-    @pooled_windows[level] ||= PooledWindow.new(@pooled.select { |key| @levels[key] == level }.index_with { |key| evidence(key) })
+    @pooled_windows[level] ||= PooledWindow.new(@pooled.select { |key| @levels[key] == level }.index_with { |key| evidence(key).select(&:rotated) })
   end
 
   # The engineer's too_hard proposes the move; AI ratings of solid or better on every one of them veto it.

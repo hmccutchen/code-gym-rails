@@ -42,6 +42,17 @@ RSpec.describe LevelSuggestion::Evidence do
     expect(results["code_review"].last.ai_rating).to eq("strong")
   end
 
+  it "marks a result rotated when its kind was outside that day's recorded daily kinds" do
+    day(1, { "code_review" => { rung: "junior" }, "pattern" => { rung: "junior" } })
+    day(2, { "code_review" => { rung: "junior" }, "pattern" => { rung: "junior" } }).daily_exercise
+      .update!(plan_notes: { "daily_kinds" => %w[pattern design_comparison] })
+
+    results = described_class.for(user).results
+
+    expect(results["pattern"].map(&:rotated)).to eq([ true, false ])
+    expect(results["code_review"].map(&:rotated)).to eq([ false, true ])
+  end
+
   it "leaves out skipped, eased, historically unstamped and unreviewed sections" do
     day(1, { "code_review" => { rung: "junior", answered: false } })
     day(2, { "code_review" => { rung: "junior", eased: true } })

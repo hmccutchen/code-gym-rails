@@ -3,8 +3,8 @@ require "rails_helper"
 RSpec.describe LevelSuggestion do
   let(:today) { Date.new(2026, 10, 14) }
 
-  def result(days_ago, level: "junior", ai: "solid", self_rating: "right_level")
-    described_class::Result.new(date: today - days_ago, level: level, ai_rating: ai, self_rating: self_rating)
+  def result(days_ago, level: "junior", ai: "solid", self_rating: "right_level", rotated: false)
+    described_class::Result.new(date: today - days_ago, level: level, ai_rating: ai, self_rating: self_rating, rotated: rotated)
   end
 
   def good(n, level: "junior", from: 0) = Array.new(n) { |i| result(from + i, level: level) }
@@ -252,8 +252,23 @@ RSpec.describe LevelSuggestion do
     let(:rotated) { ExerciseSection.keys - %w[code_review design_comparison] }
     let(:five_kinds) { %w[pattern challenge architecture security_review plan_review] }
 
+    def turn(days_ago, **ratings) = result(days_ago, rotated: true, **ratings)
+
     def one_each(kinds, level: "junior", from: 0)
-      kinds.each_with_index.to_h { |kind, i| [ kind, [ result(from + i, level: level) ] ] }
+      kinds.each_with_index.to_h { |kind, i| [ kind, [ turn(from + i, level: level) ] ] }
+    end
+
+    it "leaves out results from days the kind was daily" do
+      results = { "architecture" => [ turn(0) ], "pattern" => [ result(1), result(2) ], "challenge" => [ result(3), result(4) ] }
+
+      expect(propose(results: results, pooled: rotated)).to be_nil
+    end
+
+    it "judges a kind with five results of its own on those alone" do
+      own = [ turn(0), turn(3, ai: "developing"), turn(4, ai: "developing"), turn(5), turn(6) ]
+      results = { "pattern" => own, "challenge" => [ turn(1), turn(2) ], "architecture" => [ turn(1), turn(2) ] }
+
+      expect(kinds_in(propose(results: results, pooled: rotated))).to eq(%w[challenge architecture])
     end
 
     it "offers every rotated kind in a passing window of five, on one result each" do
@@ -270,7 +285,7 @@ RSpec.describe LevelSuggestion do
     end
 
     it "never pools a kind that is not rotated" do
-      results = one_each(%w[pattern challenge architecture security_review]).merge("code_review" => [ result(4) ])
+      results = one_each(%w[pattern challenge architecture security_review]).merge("code_review" => [ turn(4) ])
 
       expect(propose(results: results, pooled: rotated)).to be_nil
     end
@@ -281,28 +296,28 @@ RSpec.describe LevelSuggestion do
 
     it "needs four of the five solid or better" do
       results = one_each(five_kinds)
-      results["pattern"] = [ result(0, ai: "developing") ]
-      results["challenge"] = [ result(1, ai: "developing") ]
+      results["pattern"] = [ turn(0, ai: "developing") ]
+      results["challenge"] = [ turn(1, ai: "developing") ]
 
       expect(propose(results: results, pooled: rotated)).to be_nil
     end
 
     it "leaves out the kind whose own result in the window was below solid" do
       results = one_each(five_kinds)
-      results["pattern"] = [ result(0, ai: "developing") ]
+      results["pattern"] = [ turn(0, ai: "developing") ]
 
       expect(kinds_in(propose(results: results, pooled: rotated))).to eq(five_kinds - [ "pattern" ])
     end
 
     it "leaves out a kind with no result in the window" do
-      results = one_each(five_kinds).merge("parsons_problem" => [ result(9) ])
+      results = one_each(five_kinds).merge("parsons_problem" => [ turn(9) ])
 
       expect(kinds_in(propose(results: results, pooled: rotated))).to eq(five_kinds)
     end
 
     it "leaves out a kind with two too_hard self-ratings in its own latest three" do
       results = one_each(five_kinds)
-      results["pattern"] = [ result(0, ai: "strong", self_rating: "too_hard"), result(7, ai: "strong", self_rating: "too_hard") ]
+      results["pattern"] = [ turn(0, ai: "strong", self_rating: "too_hard"), turn(7, ai: "strong", self_rating: "too_hard") ]
 
       expect(kinds_in(propose(results: results, pooled: rotated))).to eq(five_kinds - [ "pattern" ])
     end

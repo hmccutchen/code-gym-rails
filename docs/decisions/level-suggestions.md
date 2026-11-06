@@ -42,14 +42,20 @@ own results it almost never earned a card (#712). So the kinds the account
 does not hold daily (`LevelSuggestion.pooled_kinds`, every kind outside
 `DailyKinds.for`) share a window at each rung, `LevelSuggestion::PooledWindow`:
 the latest five results across the rotated kinds at that rung, each kind's
-results counted only at its current rung and after its own cutoff. When four
+results counted only at its current rung and after its own cutoff. A result
+enters the window only when its kind was outside the daily kinds its own day
+was planned with (`Result#rotated`, from the row's `plan_notes`, as the
+competency gate reads it), so a swap or a change of the Daily sections
+setting never turns a former daily kind's dense history into pool
+evidence. Results from one day keep registry order, which decides the fifth
+place when two rotated kinds tie on a four-section day. When four
 of the five are solid or better, the card lists each rotated kind that has a
 result in the window, has no result there below solid, is unlocked, and has
 fewer than two too-hard ratings among its own latest three. A kind with no
 result in the window waits, so no kind moves on other kinds' work alone. A
 locked kind's results still count in the window. A rotated kind with five
-results of its own is judged on them first, and the card words that move as
-its own.
+results of its own at the rung is judged on those alone, pass or fail, so
+more evidence about a kind never lowers the standard it is held to.
 
 On three-section days the first card for rotated kinds can come after five
 reviewed days, the pace of the daily kinds. On a two-section day the
@@ -65,8 +71,9 @@ kind's own results.
 
 A pooled move's step carries `pooled: true` and the window's favourable
 count, which the card shows. Its event row carries the kind's own counts
-like any other row, so a `suggestion` row with `window_size` below five
-was a pooled move.
+like any other row. An own move needs a full window and a pooled move
+needs a short one, so a `suggestion` row was a pooled move exactly when
+its `window_size` is below five.
 
 **A cutoff keeps the same work from proposing another move.**
 Not now records each kind's current rung and the newest reviewed response

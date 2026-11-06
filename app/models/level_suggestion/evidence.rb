@@ -14,14 +14,18 @@ class LevelSuggestion
 
     def initialize(responses)
       @newest_date = responses.first&.date
-      @results = responses.flat_map { |response| ReviewedSectionResults.for(response, require_rubric: true) }
-                          .group_by(&:kind).transform_values { |results| results.map { |result| track_result(result) } }
+      @results = responses.flat_map { |response| day_results(response) }.group_by(&:first).transform_values { |pairs| pairs.map(&:last) }
     end
 
     private
 
-    def track_result(result)
-      Result.new(date: result.date, level: result.level, ai_rating: result.ai_rating, self_rating: result.self_rating)
+    def day_results(response)
+      daily = response.daily_exercise&.daily_kinds.to_a.map(&:key)
+
+      ReviewedSectionResults.for(response, require_rubric: true).map do |result|
+        [ result.kind, Result.new(date: result.date, level: result.level, ai_rating: result.ai_rating,
+                                  self_rating: result.self_rating, rotated: daily.exclude?(result.kind)) ]
+      end
     end
   end
 end
