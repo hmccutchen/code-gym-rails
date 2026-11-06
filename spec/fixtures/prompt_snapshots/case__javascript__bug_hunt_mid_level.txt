@@ -61,9 +61,9 @@ Instructions:
 
 
 
-Difficulty by section. Pitch each section named below at its level; where it differs from the skill level in the engineer profile above, the section's level wins.
-Keep each kind's format: levels change reasoning, not length, files, blocks, flaw counts or unstated requirements.
-Concept ladders refine these baselines; they never override the kind's format or expectations.
+Difficulty by section. Each section's level overrides the profile's.
+Reasoning deepens within each kind's stated format and size limits, without unstated requirements.
+Concept ladders refine, never override, the applicable baseline and format.
 
 Sections at junior: design_comparison, pattern
 Baseline: one clearly visible instance of the concept in a small scenario.
@@ -72,7 +72,7 @@ Baseline: one clearly visible instance of the concept in a small scenario.
 
 Sections at mid_level: code_review
 Baseline: one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.
-- code_review: One bounded language trap. Pitch it so the input the purpose suggests first gives the right result by accident, and another input it covers fails.
+- code_review: One bounded language trap. The input the purpose suggests first gives the right result by accident, and another input it covers fails.
 
 A retention check or established concept placed in one of these sections is pitched at that section's level, with no easing.
 Unlocked (code_review, design_comparison, pattern): tier annotations and rating adjustments above still apply to these sections, eased or raised from the section's level rather than from the profile's skill level.

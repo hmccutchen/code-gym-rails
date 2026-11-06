@@ -18,11 +18,13 @@ targeted kinds only, and an untargeted kind got nothing but the profile's
 
 ## `.level_difficulty_paragraph`
 
-Each kind returns its composed `difficulty_definition`. Equal shared
-standards are printed once within a level, followed by each kind's
-expectation. Both parts remain present with or without concept ladders;
-listed ladders refine them. Kind-owned context handles the bounded
-bug-hunt exception without a branch in this renderer.
+Each kind returns its composed `difficulty_definition`. Equal effective
+rungs share a baseline within a configured level, followed by each kind's
+expectation. A conditional heading names the owners of the concept guidance
+directly below that baseline. Only identical concept/text pairs within the
+group are deduplicated; different effective rungs keep separate lists.
+Both baseline parts remain present without references. Kind-owned context
+handles the bounded bug-hunt exception without a branch in this renderer.
 
 ## `.locked_difficulty_line`
 

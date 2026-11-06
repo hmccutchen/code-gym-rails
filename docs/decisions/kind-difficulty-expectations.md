@@ -16,11 +16,13 @@ the pattern's name.
 
 Each kind owns `RUNG_GUIDANCE`. `ExerciseSection.difficulty_definition`
 takes `rung:`, optional generation `mode:`, and optional review `section:`.
-It returns a small immutable value with `standard` and `expectation`;
-its string form joins the two. The generation renderer groups equal
-standards to avoid repeating them, then names each kind's expectation.
-Review and unanswered walkthroughs use that same value's string form.
-Neither prompt branches on kind or mode.
+It returns a small immutable value with the effective `rung` and concrete
+`expectation`; `standard` reads the shared meaning for that rung, and the
+string form joins standard and expectation. Within a configured level,
+generation groups equal effective rungs, names each kind's expectation,
+then labels the owners of any concept guidance. The section judge, review
+and unanswered walkthroughs use the same value's string form. Shared
+prompts never branch on kind or mode.
 
 The code-review bug-hunt hook resolves context through the existing
 `BugHunt.mode?` and `BugHunt.section?`. It reads `Prompt::RUNG_LINES` and
@@ -38,6 +40,22 @@ the shared standard was phrased as a fallback for an unlisted concept,
 and most kinds had no explicit expectations. A ladder cannot override a
 kind's format or expectations. Locks, easing and retention rules still
 apply as before.
+
+`GenerationLadders` selects reference text at the definition's effective
+rung and keeps each kind's ownership. This repairs the inherited principal
+bug-hunt lookup, which previously paired a senior-equivalent expectation
+with principal reference text. The generic/no-pick API can offer one concept
+to both a principal bug hunt and an ordinary principal kind; each keeps its
+own text in either input order. Normal picked-gotcha plans still exclude
+the trap's concept from other kinds. Missing references add no guidance.
+No configured target, captured rung, `pitched_at`, reference record or
+historical eligibility changes.
+
+Shared expectations describe the task, rather than telling a generator
+to pitch it or telling a grader to conceal missed ambiguities. Answer-hiding
+rules remain in the generation format. The judge no longer needs a second
+principal-as-senior exception paragraph; its answerability, key safety
+and prose-only editing contracts are unchanged.
 
 ## What varies, and what stays fixed
 
@@ -189,11 +207,12 @@ limitations for independent review.
 ## Prompt size and available ladder coverage
 
 The existing exhaustive `MAX_LADDER_GUIDANCE_CHARS` spec measured **53,668**
-characters before and **53,940** after: **+272 characters** in its largest
-difficulty block. The ceiling remains **54,000**, with the original
-assertion intact. This is the difference of worst-case maxima; the change
-for an individual shape varies. It is not a measured token count or
-dollar cost and excludes other prompt text.
+characters at the merged-main base, **53,940** at the first implementation
+and **53,943** after review corrections: **+275 characters** from base,
+**+3** from the first implementation. The ceiling remains **54,000**, with
+the original assertion intact and **57 characters** of headroom. These are
+differences of maxima, not every shape's change, measured tokens or dollars.
+They exclude other prompt text, including the newly shared judge definition.
 Removing the old comparison and bug-hunt rung lines also removes
 duplication outside the measured block.
 
@@ -208,6 +227,21 @@ assignments; it does not fetch private exercises. Mode is now forwarded
 to the measured renderer, so the bug-hunt definition is measured too.
 Set `MEASURE_DIFFICULTY_BLOCK=1` when running that example to print the
 maximizing shape.
+
+The unchanged enumeration covers 28 default-pair shapes and 43,136 rung
+assignments across both languages and all modes. Lock-subset maximization
+and the separate exhaustive lock-overhead check remain. Synthetic ladders
+now use the real builder's kind-keyed representation and the real renderer's
+grouping, with no vocabulary or branch removed to fit the budget.
+
+One additional valid fixed-four shape was measured separately:
+`pattern`, `challenge`, `design_comparison`, `parsons_problem`. Its 2,048
+assignments across both languages and all modes, with lock subsets
+maximized, peak at **47,802** after corrections versus **47,795** at the
+first implementation and **47,508** at base. Headroom is **6,198**.
+The current maximum uses JavaScript/application code, levels senior, mid,
+principal, junior respectively, with pattern locked. This is bounded
+customized coverage, not an enumeration of every customized list or order.
 
 Coverage was read locally from shared `ConceptReference` identity and
 nonblank-ladder metadata only, on PostgreSQL **14.22 (Homebrew)**. The

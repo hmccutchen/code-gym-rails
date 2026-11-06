@@ -9,8 +9,8 @@ module ExerciseSection::CodeReview::BugHunt::KindHooks
 
     level = BugHunt::Prompt::RUNG_FOR.fetch(rung, rung)
     ExerciseSection::DifficultyDefinition.new(
-      standard: KindDifficulty::LEVEL_DEFINITIONS.fetch(level),
-      expectation: "One bounded language trap. #{BugHunt::Prompt.rung_line(rung).delete_prefix('- ')}"
+      rung: level,
+      expectation: BugHunt::Prompt.expectation(rung)
     )
   end
 

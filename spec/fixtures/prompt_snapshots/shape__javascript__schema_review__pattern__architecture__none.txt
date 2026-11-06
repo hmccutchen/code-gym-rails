@@ -59,9 +59,9 @@ Instructions:
 
 
 
-Difficulty by section. Pitch each section named below at its level; where it differs from the skill level in the engineer profile above, the section's level wins.
-Keep each kind's format: levels change reasoning, not length, files, blocks, flaw counts or unstated requirements.
-Concept ladders refine these baselines; they never override the kind's format or expectations.
+Difficulty by section. Each section's level overrides the profile's.
+Reasoning deepens within each kind's stated format and size limits, without unstated requirements.
+Concept ladders refine, never override, the applicable baseline and format.
 
 Sections at junior: code_review, design_comparison, pattern, architecture
 Baseline: one clearly visible instance of the concept in a small scenario.

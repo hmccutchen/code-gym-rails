@@ -2,7 +2,8 @@
 class GenerationLadders
   def self.for(rungs, language, code_review_mode, gotcha: nil, featured_concept: nil)
     requests = rungs.map do |kind, rung|
-      { level: rung, bucket: ConceptBucket.for(kind.key, language),
+      { kind: kind, level: kind.difficulty_definition(rung: rung, mode: code_review_mode).rung,
+        bucket: ConceptBucket.for(kind.key, language),
         concepts: ConceptVocabulary.selectable_for_section(kind.key, language, mode: code_review_mode, rung: rung,
                                                            gotcha: gotcha, featured_concept: featured_concept) }
     end
@@ -18,7 +19,7 @@ class GenerationLadders
         reference = references[[ request[:bucket], concept ]]
         [ concept, reference.public_send(field).truncate(ConceptReference::MAX_LADDER_RUNG_LENGTH) ] if reference
       end.to_h
-      (ladders[request[:level]] ||= {}).merge!(rungs)
+      ladders[request[:kind]] = rungs
     end
   end
 end

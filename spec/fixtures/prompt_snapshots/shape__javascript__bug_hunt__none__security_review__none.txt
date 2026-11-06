@@ -63,13 +63,13 @@ Instructions:
 
 
 
-Difficulty by section. Pitch each section named below at its level; where it differs from the skill level in the engineer profile above, the section's level wins.
-Keep each kind's format: levels change reasoning, not length, files, blocks, flaw counts or unstated requirements.
-Concept ladders refine these baselines; they never override the kind's format or expectations.
+Difficulty by section. Each section's level overrides the profile's.
+Reasoning deepens within each kind's stated format and size limits, without unstated requirements.
+Concept ladders refine, never override, the applicable baseline and format.
 
 Sections at junior: code_review, design_comparison, security_review
 Baseline: one clearly visible instance of the concept in a small scenario.
-- code_review: One bounded language trap. Pitch it so the input the purpose suggests first already gives a visibly wrong result.
+- code_review: One bounded language trap. The input the purpose suggests first already gives a visibly wrong result.
 - design_comparison: the deciding fact is in the question, in a line or two, and points plainly at one piece.
 - security_review: Explain one vulnerability on a visible path from input to unsafe use and a mitigation that closes it.
 

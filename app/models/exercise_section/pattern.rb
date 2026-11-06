@@ -2,7 +2,7 @@
 class ExerciseSection::Pattern < ExerciseSection
   RUNG_GUIDANCE = {
     "junior" => "Apply the named pattern to a direct need, with a workable structure and calling interface.",
-    "mid_level" => "Keep the pattern named; work out its application and interface from the scenario's requirements.",
+    "mid_level" => "The pattern is named; its application and interface must be worked out from the scenario's requirements.",
     "senior" => "Adapt the named pattern's structure and interface to an interacting constraint the question states.",
     "principal_engineer" => "Weigh the costs of the boundary the named pattern introduces for the stated system; give a workable interface."
   }.freeze

@@ -9,7 +9,7 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
   PLANTED_FIELD = "planted_ambiguities".freeze
 
   RUNG_GUIDANCE = {
-    "junior" => "Ask about concrete missing behavior in the request; keep the full planted set, without hinting at its answers.",
+    "junior" => "The task is to clarify the full planted set of concrete missing behaviors in the request.",
     "mid_level" => "To find the planted gaps, trace the request through realistic use and ask what remains undefined.",
     "senior" => "Find the planted gaps where interacting requirements leave behavior undefined; ask questions rather than inventing answers.",
     "principal_engineer" => "Find the planted gaps whose answers have system-wide consequences; clarify the choices without inventing requirements."

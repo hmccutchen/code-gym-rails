@@ -38,7 +38,7 @@ RSpec.describe GenerationPrompt do
   end
 
   let(:ladders) do
-    { "principal_engineer" => { "memoization" => "a principal rung" }, "senior" => { "n_plus_one" => "a senior rung" } }
+    { ExerciseSection::Challenge => { "memoization" => "a principal rung" }, ExerciseSection::CodeReview => { "n_plus_one" => "a senior rung" } }
   end
 
   def build(language = "ruby_rails")
@@ -76,15 +76,23 @@ RSpec.describe GenerationPrompt do
     prompt.render(only: ExerciseSection::Challenge, fixed_concept: "memoization")
   end
 
+  it "keeps level-dependent file counts compatible with the shared reasoning instruction" do
+    user.skill_level = "principal_engineer"
+    text = render_generation_prompt(user, code_review_files: :multi, only: ExerciseSection::CodeReview)
+
+    expect(text).to include("shows 2 or 3 files", "within each kind's stated format and size limits")
+    expect(text).not_to include("levels change reasoning, not length, files")
+  end
+
   it "always carries the shared and kind baseline, with ladders refining rather than replacing it" do
-    [ {}, { "senior" => { "n_plus_one" => "trace a query hidden in a helper" } } ].each do |ladders|
+    [ {}, { ExerciseSection::CodeReview => { "n_plus_one" => "trace a query hidden in a helper" } } ].each do |ladders|
       prompt = GenerationPrompt.new(user, "ruby_rails", plan: plan, history: [], delivered_history: [],
                                    difficulty: difficulty, ladders: ladders,
                                    retention_annotation: generation_retention_annotation).render
       definition = ExerciseSection::CodeReview.difficulty_definition(rung: "senior")
 
       expect(prompt).to include(definition.standard, definition.expectation)
-      expect(prompt).to include("Concept ladders refine these baselines; they never override the kind's format or expectations.")
+      expect(prompt).to include("Concept ladders refine, never override, the applicable baseline and format.")
       expect(prompt).not_to include("For a concept not listed")
     end
   end
@@ -99,7 +107,7 @@ RSpec.describe GenerationPrompt do
     [ prompt.render, prompt.render(only: ExerciseSection::CodeReview) ].each do |text|
       expect(text).to include(definition.standard, definition.expectation)
       expect(text).not_to include(ExerciseSection::CodeReview.difficulty_definition(rung: "senior").expectation)
-      expect(text.scan(ExerciseSection::CodeReview::BugHunt::Prompt.rung_line("senior").delete_prefix("- ")).size).to eq(1)
+      expect(text.scan(ExerciseSection::CodeReview::BugHunt::Prompt.expectation("senior")).size).to eq(1)
     end
   end
 

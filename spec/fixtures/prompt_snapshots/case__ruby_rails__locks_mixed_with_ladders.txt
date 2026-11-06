@@ -54,9 +54,9 @@ Instructions:
 
 
 
-Difficulty by section. Pitch each section named below at its level; where it differs from the skill level in the engineer profile above, the section's level wins.
-Keep each kind's format: levels change reasoning, not length, files, blocks, flaw counts or unstated requirements.
-Concept ladders refine these baselines; they never override the kind's format or expectations.
+Difficulty by section. Each section's level overrides the profile's.
+Reasoning deepens within each kind's stated format and size limits, without unstated requirements.
+Concept ladders refine, never override, the applicable baseline and format.
 
 Sections at junior: design_comparison
 Baseline: one clearly visible instance of the concept in a small scenario.
@@ -64,13 +64,15 @@ Baseline: one clearly visible instance of the concept in a small scenario.
 
 Sections at mid_level: pattern
 Baseline: one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.
-- pattern: Keep the pattern named; work out its application and interface from the scenario's requirements.
+- pattern: The pattern is named; its application and interface must be worked out from the scenario's requirements.
+Concept ladders for pattern:
 - n_plus_one: a mid_level n_plus_one rung
 
 Sections at senior: code_review, challenge
 Baseline: the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
 - code_review: Diagnose why the issue matters under a stated constraint; the fix must respect that constraint.
 - challenge: Implement interacting requirements, preserving each stated behavior when they meet.
+Concept ladders for code_review, challenge:
 - memoization: a senior memoization rung
 - n_plus_one: a senior n_plus_one rung
 

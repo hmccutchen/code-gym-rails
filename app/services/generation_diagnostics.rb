@@ -129,7 +129,7 @@ class GenerationDiagnostics
     per_kind = rungs.to_h do |kind, rung|
       vocabulary = ConceptVocabulary.selectable_for_section(kind.key, language, mode: draft.plan.code_review_mode, rung: rung,
                                                                                 gotcha: draft.plan.code_review_gotcha, featured_concept: draft.plan.featured_concept)
-      grounded   = vocabulary & draft.ladders.fetch(rung, {}).keys
+      grounded   = vocabulary & draft.ladders.fetch(kind, {}).keys
       chosen     = problem_set.dig(kind.key, "concept")
       [ kind.key, { level: rung, targeted: draft.difficulty.targeted?(kind), locked: draft.difficulty.locked?(kind),
                     ladder_coverage: "#{grounded.size}/#{vocabulary.size}",

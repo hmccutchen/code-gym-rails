@@ -60,9 +60,9 @@ Instructions:
 
 Established concept for the "pseudocode_to_code" section (well past first mastery, survived a retention check): missing_base_case
 - If you were already going to select this for the "pseudocode_to_code" section's concept, keep the teaching_note minimal and pitch at full difficulty, the same as you would for any other established concept.
-Difficulty by section. Pitch each section named below at its level; where it differs from the skill level in the engineer profile above, the section's level wins.
-Keep each kind's format: levels change reasoning, not length, files, blocks, flaw counts or unstated requirements.
-Concept ladders refine these baselines; they never override the kind's format or expectations.
+Difficulty by section. Each section's level overrides the profile's.
+Reasoning deepens within each kind's stated format and size limits, without unstated requirements.
+Concept ladders refine, never override, the applicable baseline and format.
 
 Sections at junior: code_review, design_comparison, challenge, pseudocode_to_code
 Baseline: one clearly visible instance of the concept in a small scenario.

@@ -1,5 +1,5 @@
 Walk through the "pattern" section from the day's context above. No answer was given for this section, so it must not be rated. Return "correct" as an empty array, since nothing was written.
-Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label. Keep the pattern named; work out its application and interface from the scenario's requirements.
+Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label. The pattern is named; its application and interface must be worked out from the scenario's requirements.
 
 Return a single JSON object (NOT wrapped in a "pattern" key) with:
 - "correct": array of strings — always empty

@@ -57,9 +57,9 @@ Instructions:
 
 
 
-Difficulty by section. Pitch each section named below at its level; where it differs from the skill level in the engineer profile above, the section's level wins.
-Keep each kind's format: levels change reasoning, not length, files, blocks, flaw counts or unstated requirements.
-Concept ladders refine these baselines; they never override the kind's format or expectations.
+Difficulty by section. Each section's level overrides the profile's.
+Reasoning deepens within each kind's stated format and size limits, without unstated requirements.
+Concept ladders refine, never override, the applicable baseline and format.
 
 Sections at junior: code_review, design_comparison, pattern, challenge, ambiguity_hunt
 Baseline: one clearly visible instance of the concept in a small scenario.
@@ -67,7 +67,7 @@ Baseline: one clearly visible instance of the concept in a small scenario.
 - design_comparison: the deciding fact is in the question, in a line or two, and points plainly at one piece.
 - pattern: Apply the named pattern to a direct need, with a workable structure and calling interface.
 - challenge: Write a direct implementation of the stated behavior using any supplied starter.
-- ambiguity_hunt: Ask about concrete missing behavior in the request; keep the full planted set, without hinting at its answers.
+- ambiguity_hunt: The task is to clarify the full planted set of concrete missing behaviors in the request.
 
 A retention check or established concept placed in one of these sections is pitched at that section's level, with no easing.
 Unlocked (code_review, design_comparison, pattern, challenge, ambiguity_hunt): tier annotations and rating adjustments above still apply to these sections, eased or raised from the section's level rather than from the profile's skill level.

@@ -80,8 +80,10 @@ read it before changing that area.
 - **Kind difficulty expectations**
   (`docs/decisions/kind-difficulty-expectations.md`): every kind supplies
   `difficulty_definition(rung:, mode:, section:)`, composing the shared
-  standard with its own `RUNG_GUIDANCE`. Generation passes mode; grading
-  and walkthroughs pass the stored section. Baselines remain with ladders,
+  standard with its own `RUNG_GUIDANCE`. Generation passes mode; the section
+  judge, grading and walkthroughs pass the stored section. The same value
+  supplies the effective reference rung; ladders retain kind ownership
+  until the renderer groups compatible guidance. Baselines remain with ladders,
   which cannot override them or the format. Reuse comparison guidance
   and bug-hunt `RUNG_LINES`/`RUNG_FOR`, including principal as senior;
   never dispatch by kind or mode in shared prompts. Preserve format

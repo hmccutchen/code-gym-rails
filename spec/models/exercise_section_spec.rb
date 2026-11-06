@@ -4,7 +4,7 @@ RSpec.describe ExerciseSection do
   describe ".difficulty_definition" do
     {
       "code_review" => [ "visible local issue", "trace the code", "stated constraint", "system-wide costs" ],
-      "pattern" => [ "named pattern", "work out its application", "interacting constraint", "costs of the boundary" ],
+      "pattern" => [ "named pattern", "application and interface must be worked out", "interacting constraint", "costs of the boundary" ],
       "challenge" => [ "direct implementation", "derive the steps", "interacting requirements", "system-wide costs" ],
       "architecture" => [ "explicit tradeoffs", "infer the tradeoffs", "constraints interact", "costs on both sides" ],
       "security_review" => [ "visible path from input to unsafe use", "trace the input", "stated deployment constraint", "system-wide mitigation costs" ],
@@ -47,7 +47,7 @@ RSpec.describe ExerciseSection do
         stored = kind.difficulty_definition(rung: rung, section: { "purpose" => "Sum all prices." })
 
         expect(generated).to eq(stored)
-        expect(generated.expectation).to include(kind::BugHunt::Prompt.rung_line(rung).delete_prefix("- "))
+        expect(generated.expectation).to eq(kind::BugHunt::Prompt.expectation(rung))
         expect(generated.to_s).not_to include("system scale", "system-wide costs")
       end
       expect(kind.difficulty_definition(rung: "principal_engineer", mode: :bug_hunt))

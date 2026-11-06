@@ -58,9 +58,9 @@ Retention checks due today: denormalization_tradeoffs (design_comparison, patter
 
 
 
-Difficulty by section. Pitch each section named below at its level; where it differs from the skill level in the engineer profile above, the section's level wins.
-Keep each kind's format: levels change reasoning, not length, files, blocks, flaw counts or unstated requirements.
-Concept ladders refine these baselines; they never override the kind's format or expectations.
+Difficulty by section. Each section's level overrides the profile's.
+Reasoning deepens within each kind's stated format and size limits, without unstated requirements.
+Concept ladders refine, never override, the applicable baseline and format.
 
 Sections at junior: code_review, challenge
 Baseline: one clearly visible instance of the concept in a small scenario.
@@ -69,7 +69,7 @@ Baseline: one clearly visible instance of the concept in a small scenario.
 
 Sections at mid_level: pattern
 Baseline: one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.
-- pattern: Keep the pattern named; work out its application and interface from the scenario's requirements.
+- pattern: The pattern is named; its application and interface must be worked out from the scenario's requirements.
 
 Sections at principal_engineer: design_comparison
 Baseline: the concept framed as a decision with costs on both sides at system scale.

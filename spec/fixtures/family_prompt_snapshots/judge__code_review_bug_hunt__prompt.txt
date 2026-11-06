@@ -3,11 +3,11 @@ The learner's task for this kind: Find the one planted language trap: an input t
 This is a discovery task: wording that names where the issue is defeats it.
 Tagged concept: array_mutation_pitfalls
 Pitched at: principal_engineer
-Level meaning: the concept framed as a decision with costs on both sides at system scale.
+Level meaning: the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context. One bounded language trap. The failure shows only on an edge the purpose covers, such as empty, repeated or boundary values, or the obvious fix carries a second trap of its own.
 Prose fields you may rewrite: scenario, question, teaching_note
 Every other field is the artifact and must not change.
 
-This section is a bug hunt: a short puzzle with one trap planted in the core language, a one-line "purpose" saying what the code is meant to do, and no program output. Solve it before judging: find an input the purpose covers that the code gets wrong. Reject it as reasoning_failure when the code is correct as written for every input the purpose covers, when it holds a second planted trap, when the snippet, purpose, question or teaching_note shows program output, or when the purpose names or hints at the trap. Reject it as unstated_prerequisite when it uses Rails, TypeScript, a framework or anything else outside the core language, and as underdetermined when the code calls something it doesn't define apart from the language's built-ins. A bug hunt pitches principal_engineer exactly as senior, one trap that shows only on an edge the purpose covers, so judge it against that and never against a decision at system scale. The purpose and the snippet are the artifact: never change them.
+This section is a bug hunt: a short puzzle with one trap planted in the core language, a one-line "purpose" saying what the code is meant to do, and no program output. Solve it before judging: find an input the purpose covers that the code gets wrong. Reject it as reasoning_failure when the code is correct as written for every input the purpose covers, when it holds a second planted trap, when the snippet, purpose, question or teaching_note shows program output, or when the purpose names or hints at the trap. Reject it as unstated_prerequisite when it uses Rails, TypeScript, a framework or anything else outside the core language, and as underdetermined when the code calls something it doesn't define apart from the language's built-ins. The purpose and the snippet are the artifact: never change them.
 
 The section as delivered:
 {

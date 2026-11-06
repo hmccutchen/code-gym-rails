@@ -114,8 +114,9 @@ RSpec.describe "generation prompt characterization" do
   )
 
   LADDERS = {
-    "senior"    => { "n_plus_one" => "a senior n_plus_one rung", "memoization" => "a senior memoization rung" },
-    "mid_level" => { "n_plus_one" => "a mid_level n_plus_one rung" }
+    ExerciseSection::CodeReview => { "n_plus_one" => "a senior n_plus_one rung", "memoization" => "a senior memoization rung" },
+    ExerciseSection::Challenge => { "n_plus_one" => "a senior n_plus_one rung", "memoization" => "a senior memoization rung" },
+    ExerciseSection::Pattern => { "n_plus_one" => "a mid_level n_plus_one rung" }
   }.freeze
 
   MULTI_FILE_RUNGS = { "mid_level" => [ "2 files", '"file_3_path"' ], "senior" => [ "2 or 3 files", "the structure this snippet describes" ] }.freeze

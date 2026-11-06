@@ -1448,7 +1448,7 @@ RSpec.describe AiService do
       [ { date: "2026-09-01", sections: [], completion: { answered: 1, total: 3, skipped_sections: [] } } ]
     end
     let(:difficulty) { KindDifficulty.new(levels: { "challenge" => "senior", "pattern" => "mid_level" }, locked: %w[challenge]) }
-    let(:draft_ladders) { { "senior" => { "memoization" => "the draft's senior rung" } } }
+    let(:draft_ladders) { { ExerciseSection::Challenge => { "memoization" => "the draft's senior rung" } } }
     let(:draft) do
       ExerciseDraft::Draft.new(user: user, skill_level: user.skill_level, language: "ruby_rails", problem_set: {}, plan: plan,
                                kinds: ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review }),
@@ -1481,7 +1481,7 @@ RSpec.describe AiService do
       expect(prompt).to include("Sections at senior: challenge", "Locked (challenge)", "- memoization: a fresh senior rung")
       expect(prompt).not_to include("Sections at mid_level", "the draft's senior rung", "a mid-level pattern rung")
       expect(draft.ladders).to equal(draft_ladders)
-      expect(draft_ladders).to eq("senior" => { "memoization" => "the draft's senior rung" })
+      expect(draft_ladders).to eq(ExerciseSection::Challenge => { "memoization" => "the draft's senior rung" })
     end
   end
 
@@ -1497,7 +1497,7 @@ RSpec.describe AiService do
 
     it "pitches every section at the skill level for a user with no targets" do
       expect(user.skill_level).to eq("junior")
-      expect(untargeted).to include("Difficulty by section. Pitch each section named below at its level")
+      expect(untargeted).to include("Difficulty by section. Each section's level overrides the profile's.")
       expect(untargeted).to include("Sections at junior: code_review, design_comparison, pattern, challenge, plan_review")
       expect(untargeted).to include("Baseline: #{KindDifficulty::LEVEL_DEFINITIONS['junior']}")
       expect(untargeted).not_to include("Locked (")
@@ -1505,7 +1505,7 @@ RSpec.describe AiService do
 
     it "renders a target equal to the skill level exactly as no target" do
       preset = KindDifficulty.new(levels: ExerciseSection.keys.index_with { "junior" }, locked: [])
-      ladders = { "junior" => { "n_plus_one" => "one visible query in a loop" } }
+      ladders = { ExerciseSection::CodeReview => { "n_plus_one" => "one visible query in a loop" } }
 
       expect(render(difficulty: preset, ladders: ladders)).to eq(render(difficulty: KindDifficulty.none, ladders: ladders))
     end
@@ -1521,12 +1521,13 @@ RSpec.describe AiService do
       difficulty = KindDifficulty.new(levels: { "architecture" => "senior", "ambiguity_hunt" => "junior" },
                                       locked: [ "architecture" ])
 
-      expect(render(difficulty: difficulty, ladders: { "senior" => { "n_plus_one" => "rung" } })).to eq(untargeted)
+      expect(render(difficulty: difficulty, ladders: { ExerciseSection::Architecture => { "service_boundaries" => "rung" } })).to eq(untargeted)
     end
 
     it "lists one concept once for sections sharing a level" do
       difficulty = KindDifficulty.new(levels: { "code_review" => "senior", "challenge" => "senior" }, locked: [])
-      prompt = render(difficulty: difficulty, ladders: { "senior" => { "n_plus_one" => "hidden behind a helper" } })
+      ladders = [ ExerciseSection::CodeReview, ExerciseSection::Challenge ].index_with { { "n_plus_one" => "hidden behind a helper" } }
+      prompt = render(difficulty: difficulty, ladders: ladders)
 
       expect(prompt).to include("Sections at senior: code_review, challenge")
       expect(prompt.scan("- n_plus_one: hidden behind a helper").size).to eq(1)
@@ -1592,7 +1593,7 @@ RSpec.describe AiService do
           difficulty = KindDifficulty.new(levels: placed.to_h { |kind, level| [ kind.key, level ] }, locked: kinds.map(&:key))
           ladders = placed.each_with_object({}) do |(kind, level), acc|
             vocabulary = ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: level)
-            (acc[level] ||= {}).merge!(vocabulary.index_with { "x" * ConceptReference::MAX_LADDER_RUNG_LENGTH })
+            acc[kind] = vocabulary.index_with { "x" * ConceptReference::MAX_LADDER_RUNG_LENGTH }
           end
 
           [ difficulty_block(placed.to_h, difficulty, ladders, mode: mode).length, levels ]
@@ -1650,7 +1651,7 @@ RSpec.describe AiService do
                    "challenge" => "principal_engineer", "pseudocode_to_code" => "junior" }
         ladders = kinds.each_with_object({}) do |kind, acc|
           vocabulary = ConceptVocabulary.selectable_for_section(kind.key, "javascript", mode: :application_code)
-          (acc[levels.fetch(kind.key)] ||= {}).merge!(vocabulary.index_with { "x" * ConceptReference::MAX_LADDER_RUNG_LENGTH })
+          acc[kind] = vocabulary.index_with { "x" * ConceptReference::MAX_LADDER_RUNG_LENGTH }
         end
         difficulty = KindDifficulty.new(levels: levels, locked: [ "code_review" ])
         mixed = difficulty_block(kinds.to_h { |kind| [ kind, levels.fetch(kind.key) ] }, difficulty, ladders).length
@@ -1660,7 +1661,7 @@ RSpec.describe AiService do
 
       it "isolates lock overhead from every level assignment in the rendered block" do
         kinds = ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: nil, third: :challenge, fourth: :pseudocode_to_code })
-        rungs = KindDifficulty::LEVELS.index_with { { "example" => "x" * ConceptReference::MAX_LADDER_RUNG_LENGTH } }
+        rungs = kinds.index_with { { "example" => "x" * ConceptReference::MAX_LADDER_RUNG_LENGTH } }
 
         KindDifficulty::LEVELS.repeated_permutation(kinds.size).each do |levels|
           targets = kinds.map(&:key).zip(levels).to_h
@@ -4856,14 +4857,14 @@ RSpec.describe AiService, "#judge_section" do
       captured.prompt
     end
 
-    it "leaves the prompt as it has always read when the kind has none" do
+    it "renders the composed level meaning without an additional guidance block when the kind has none" do
       expect(judge_prompt_for(ExerciseSection::Pattern)).to eq(<<~PROMPT)
         Section kind: pattern
         The learner's task for this kind: #{ExerciseSection::Pattern.judge_task}
         Naming the concept is expected for this kind.
         Tagged concept: n_plus_one
         Pitched at: senior
-        Level meaning: #{KindDifficulty::LEVEL_DEFINITIONS.fetch("senior")}
+        Level meaning: #{ExerciseSection::Pattern.difficulty_definition(rung: "senior", section: section)}
         Prose fields you may rewrite: #{ExerciseSection::Pattern.prose_fields.join(', ')}
         Every other field is the artifact and must not change.
 

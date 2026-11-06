@@ -46,6 +46,18 @@ RSpec.describe ReviewPrompt do
     [ graded, walked ].each { |text| expect(text).not_to include("system scale", "SECRET_KEY") }
   end
 
+  it "describes the task without telling a reviewer to pitch it or conceal missed ambiguities", :aggregate_failures do
+    [ [ "pattern", "mid_level", {} ], [ "ambiguity_hunt", "junior", {} ],
+      [ "code_review", "principal_engineer", { "purpose" => "Remove even numbers." } ] ].each do |key, rung, section|
+      graded = described_class.section_prompt(key: key, section: section, answer: long, rung: rung)
+      walked = described_class.walkthrough_prompt(key: key, section: section, rung: rung)
+
+      [ graded, walked ].each do |text|
+        expect(text).not_to include("Keep the pattern named", "Pitch it so", "without hinting at its answers", "keep the full planted set")
+      end
+    end
+  end
+
   it "renders a keyed section's review exactly as it renders the same section without its key, for every kind that plants one" do
     ExerciseSection.all.select(&:planted_key?).each do |kind|
       keyed = FakeService::EXERCISE_PROBLEM_SET.fetch(kind.key).deep_dup.merge("rounds" => {})
