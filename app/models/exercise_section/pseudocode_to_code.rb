@@ -14,6 +14,13 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
 
   MAX_MISSABLE_REQUIREMENTS = 3
 
+  RUNG_GUIDANCE = {
+    "junior" => "The engineer plans a direct decomposition covering the stated missable requirement, before any code exists.",
+    "mid_level" => "The engineer must derive the decomposition from the stated behavior, including the missable case.",
+    "senior" => "The engineer plans for interacting requirements, preserving the stated ordering, boundary or failure behavior.",
+    "principal_engineer" => "The engineer devises a bounded plan weighing system-wide costs under stated constraints; assess reasoning, not translated syntax."
+  }.freeze
+
   def self.vocabulary_key
     :pseudocode_to_code
   end

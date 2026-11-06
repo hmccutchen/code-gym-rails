@@ -245,11 +245,13 @@ RSpec.describe "generation prompt characterization" do
     },
     "case__ruby_rails__locks_mixed_with_ladders" => {
       render:   -> { render_case("ruby_rails", pattern: :pattern, third: :challenge, difficulty: MIXED_LOCKS, ladders: LADDERS) },
-      includes: [ "Sections at junior: design_comparison\nPitch these problems at this level. A junior problem is:",
-                  "Sections at mid_level: pattern\nPitch these problems at this level for whichever concept you choose:\n- n_plus_one: a mid_level n_plus_one rung",
+      includes: [ "Sections at junior: design_comparison\nBaseline: #{KindDifficulty::LEVEL_DEFINITIONS.fetch('junior')}",
+                  "Sections at mid_level: pattern\nBaseline: #{KindDifficulty::LEVEL_DEFINITIONS.fetch('mid_level')}",
+                  "- pattern: #{ExerciseSection::Pattern.difficulty_definition(rung: 'mid_level').expectation}",
+                  "- n_plus_one: a mid_level n_plus_one rung",
                   "Sections at senior: code_review, challenge", "- memoization: a senior memoization rung",
                   "Unlocked (design_comparison, pattern)", "Locked (code_review, challenge)" ],
-      excludes: []
+      excludes: [ "For a concept not listed" ]
     },
     "case__ruby_rails__fourth_reinforcement" => {
       render:   -> { render_case("ruby_rails", third: :challenge, fourth: :plan_review,

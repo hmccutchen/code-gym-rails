@@ -76,6 +76,39 @@ RSpec.describe GenerationPrompt do
     prompt.render(only: ExerciseSection::Challenge, fixed_concept: "memoization")
   end
 
+  it "always carries the shared and kind baseline, with ladders refining rather than replacing it" do
+    [ {}, { "senior" => { "n_plus_one" => "trace a query hidden in a helper" } } ].each do |ladders|
+      prompt = GenerationPrompt.new(user, "ruby_rails", plan: plan, history: [], delivered_history: [],
+                                   difficulty: difficulty, ladders: ladders,
+                                   retention_annotation: generation_retention_annotation).render
+      definition = ExerciseSection::CodeReview.difficulty_definition(rung: "senior")
+
+      expect(prompt).to include(definition.standard, definition.expectation)
+      expect(prompt).to include("Concept ladders refine these baselines; they never override the kind's format or expectations.")
+      expect(prompt).not_to include("For a concept not listed")
+    end
+  end
+
+  it "passes the bug-hunt mode into the baseline on an initial render and a single-kind retry" do
+    gotcha = BugHuntGotchas.for_language("ruby_rails").first
+    bug_plan = plan.with(code_review_mode: :bug_hunt, code_review_source: nil, code_review_gotcha: gotcha)
+    prompt = GenerationPrompt.new(user, "ruby_rails", plan: bug_plan, history: [], delivered_history: [],
+                                  difficulty: difficulty, ladders: {}, retention_annotation: generation_retention_annotation)
+    definition = ExerciseSection::CodeReview.difficulty_definition(rung: "senior", mode: :bug_hunt)
+
+    [ prompt.render, prompt.render(only: ExerciseSection::CodeReview) ].each do |text|
+      expect(text).to include(definition.standard, definition.expectation)
+      expect(text).not_to include(ExerciseSection::CodeReview.difficulty_definition(rung: "senior").expectation)
+      expect(text.scan(ExerciseSection::CodeReview::BugHunt::Prompt.rung_line("senior").delete_prefix("- ")).size).to eq(1)
+    end
+  end
+
+  it "states the comparison's level expectations once, in the shared baseline block" do
+    text = build.render
+
+    expect(text.scan(ExerciseSection::DesignComparison::RUNG_GUIDANCE.fetch("senior")).size).to eq(1)
+  end
+
   def sql_during
     statements = []
     subscription = ActiveSupport::Notifications.subscribe("sql.active_record") do |event|

@@ -31,8 +31,10 @@ Today, `SectionRotation` selects optional kinds using history, weights and
 exclusions; `DailyPlan` does not use track or per-kind difficulty to bias
 the mix. `KindDifficulty#rung_for` resolves each kind's target or baseline,
 and `GenerationPrompt::DifficultyGuidance` expresses those levels.
-Sharing kinds across tracks does not establish that every kind's prompts
-adequately distinguish levels: #718 owns that difficulty-definition work.
+Each kind now supplies concrete expectations beside the shared rung
+standard, reused by generation and grading (#718,
+`docs/decisions/kind-difficulty-expectations.md`). The offline checks do
+not establish live-provider calibration or equal difficulty across kinds.
 Demonstrated practice needs and explicit preferences guide frequency under
 the protected-practice and variety direction in #714, whose implementation
 is separate from this decision.

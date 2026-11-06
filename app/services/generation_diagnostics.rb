@@ -138,6 +138,6 @@ class GenerationDiagnostics
 
     { kind_difficulty: per_kind,
       kind_difficulty_chars: GenerationPrompt::DifficultyGuidance.render(rungs: rungs, difficulty: draft.difficulty,
-                                                                         ladders: draft.ladders).length }
+                                                                         ladders: draft.ladders, mode: draft.plan.code_review_mode).length }
   end
 end

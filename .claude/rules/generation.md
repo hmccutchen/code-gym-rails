@@ -77,6 +77,15 @@ read it before changing that area.
   code review's files, every line numbered).
 - **JSONB problem sets**: `problem_set` column stores `{ code_review: {...}, pattern: {...}, challenge: {...} }`. Accessed via convenience methods on `DailyExercise`.
 - **Closed concept vocabulary**: each section is tagged with one concept from a fixed per-language list (`ConceptVocabulary::RAILS_CONCEPTS` / `JS_CONCEPTS`), narrowed further at generation time for a schema-review `code_review` day (see below); anything a provider invents is normalized to `"other"` so concept history stays aggregatable.
+- **Kind difficulty expectations**
+  (`docs/decisions/kind-difficulty-expectations.md`): every kind supplies
+  `difficulty_definition(rung:, mode:, section:)`, composing the shared
+  standard with its own `RUNG_GUIDANCE`. Generation passes mode; grading
+  and walkthroughs pass the stored section. Baselines remain with ladders,
+  which cannot override them or the format. Reuse comparison guidance
+  and bug-hunt `RUNG_LINES`/`RUNG_FOR`, including principal as senior;
+  never dispatch by kind or mode in shared prompts. Preserve format
+  counts, hidden keys, actual-problem grading and historical evidence.
 - **`code_review` content modes**
   (`docs/decisions/code-review-content-modes.md`): a weekday's `code_review` rolls
   `application_code`, `test_file` or `schema_review`

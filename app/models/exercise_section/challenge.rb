@@ -1,4 +1,11 @@
 class ExerciseSection::Challenge < ExerciseSection
+  RUNG_GUIDANCE = {
+    "junior" => "Write a direct implementation of the stated behavior using any supplied starter.",
+    "mid_level" => "Read the requirements to derive the steps and handle the stated cases using any supplied starter.",
+    "senior" => "Implement interacting requirements, preserving each stated behavior when they meet.",
+    "principal_engineer" => "Implement the stated behavior while weighing its system-wide costs; no unstated production features are required."
+  }.freeze
+
   def self.diagrammable?
     true
   end

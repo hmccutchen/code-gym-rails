@@ -61,7 +61,7 @@ class ReviewPrompt
 
     <<~PROMPT
       Grade ONLY the "#{key}" section from the day's context above.
-      Pitched at: #{rung} — #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}
+      Pitched at: #{rung} — #{kind.difficulty_definition(rung: rung, section: section)}
 
       #{kind.grading_note(section: section, answer: answer)}
 
@@ -81,7 +81,7 @@ class ReviewPrompt
 
     <<~PROMPT
       Walk through the "#{key}" section from the day's context above. No answer was given for this section, so it must not be rated. Return "correct" as an empty array, since nothing was written.
-      Pitched at: #{rung} — #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}
+      Pitched at: #{rung} — #{kind.difficulty_definition(rung: rung, section: section)}
 
       #{walkthrough_note_block(kind, section)}#{json_header(key)}
       - "correct": array of strings — always empty

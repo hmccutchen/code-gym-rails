@@ -1,5 +1,5 @@
 Grade ONLY the "pattern" section from the day's context above.
-Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.
+Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label. Keep the pattern named; work out its application and interface from the scenario's requirements.
 
 Main point: the structure the problem calls for.
 Essential pieces: a structure and interface that would work for the stated problem. The answer scaffold names what to cover (Where this logic lives today; How you would call the service object; What you would test first), whether or not the answer kept the labels; a part it leaves out is an essential gap only when the design would not work without it.

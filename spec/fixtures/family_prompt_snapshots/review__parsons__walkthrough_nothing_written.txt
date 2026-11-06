@@ -1,5 +1,5 @@
 Walk through the "parsons_problem" section from the day's context above. No answer was given for this section, so it must not be rated. Return "correct" as an empty array, since nothing was written.
-Pitched at: junior — one clearly visible instance of the concept in a small scenario.
+Pitched at: junior — one clearly visible instance of the concept in a small scenario. Order the supplied coherent blocks by direct data dependencies; no written explanation is required.
 
 Correct blocks, in order: 1. total = 0 / 2. items.each { |i| total += i } / 3. total
 

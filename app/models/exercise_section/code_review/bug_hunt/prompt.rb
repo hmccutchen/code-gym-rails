@@ -71,7 +71,6 @@ module ExerciseSection::CodeReview::BugHunt::Prompt
         "from the language's built-ins. Keep each line under 45 characters where you can and never past 60, since it is read on a phone.",
       "- Show no program output anywhere: no result comments such as `# => 3`, no `puts` or `console.log` of a result, and no " \
         "output in the question, the purpose or the teaching_note.",
-      rung_line(rung),
       "- For this section, the #{ExerciseSection::CodeReview::BugHunt::MAX_LINES}-line limit and the purpose come before what " \
         "the difficulty guidance says about realistic constraints or decisions at system scale.",
       "- Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}",

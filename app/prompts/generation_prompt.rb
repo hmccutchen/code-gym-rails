@@ -76,7 +76,7 @@ class GenerationPrompt
       #{retention_block(kinds, rungs)}
       #{established_block}
       #{fourth_retention_block(kinds)}
-      #{fourth_established_block(kinds)}#{DifficultyGuidance.render(rungs: rungs, difficulty: @difficulty, ladders: @ladders)}
+      #{fourth_established_block(kinds)}#{DifficultyGuidance.render(rungs: rungs, difficulty: @difficulty, ladders: @ladders, mode: @plan.code_review_mode)}
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 

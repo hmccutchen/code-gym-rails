@@ -1499,7 +1499,7 @@ RSpec.describe AiService do
       expect(user.skill_level).to eq("junior")
       expect(untargeted).to include("Difficulty by section. Pitch each section named below at its level")
       expect(untargeted).to include("Sections at junior: code_review, design_comparison, pattern, challenge, plan_review")
-      expect(untargeted).to include("A junior problem is: #{KindDifficulty::LEVEL_DEFINITIONS['junior']}")
+      expect(untargeted).to include("Baseline: #{KindDifficulty::LEVEL_DEFINITIONS['junior']}")
       expect(untargeted).not_to include("Locked (")
     end
 
@@ -1530,13 +1530,15 @@ RSpec.describe AiService do
 
       expect(prompt).to include("Sections at senior: code_review, challenge")
       expect(prompt.scan("- n_plus_one: hidden behind a helper").size).to eq(1)
-      expect(prompt).to include("For a concept not listed, a senior problem is: #{KindDifficulty::LEVEL_DEFINITIONS['senior']}")
+      expect(prompt).to include("Baseline: #{KindDifficulty::LEVEL_DEFINITIONS['senior']}")
+      expect(prompt).to include(ExerciseSection::CodeReview.difficulty_definition(rung: "senior").expectation)
     end
 
-    it "falls back to the definition alone when nothing at a level is grounded" do
+    it "keeps the shared and kind baseline when nothing at a level is grounded" do
       difficulty = KindDifficulty.new(levels: { "pattern" => "junior" }, locked: [])
 
-      expect(render(difficulty: difficulty)).to include("A junior problem is: #{KindDifficulty::LEVEL_DEFINITIONS['junior']}")
+      expect(render(difficulty: difficulty)).to include("Baseline: #{KindDifficulty::LEVEL_DEFINITIONS['junior']}",
+                                                       ExerciseSection::Pattern.difficulty_definition(rung: "junior").expectation)
     end
 
     it "defines full difficulty for retention checks in targeted sections" do
@@ -1585,7 +1587,7 @@ RSpec.describe AiService do
     describe "MAX_LADDER_GUIDANCE_CHARS" do
       # Renders every level assignment at maximum rung length, since headings and overhead vary; a proxy misses the max.
       def largest_block_for(language, mode, kinds)
-        KindDifficulty::LEVELS.repeated_permutation(kinds.size).map do |levels|
+        assignments = KindDifficulty::LEVELS.repeated_permutation(kinds.size).map do |levels|
           placed = kinds.zip(levels)
           difficulty = KindDifficulty.new(levels: placed.to_h { |kind, level| [ kind.key, level ] }, locked: kinds.map(&:key))
           ladders = placed.each_with_object({}) do |(kind, level), acc|
@@ -1593,12 +1595,18 @@ RSpec.describe AiService do
             (acc[level] ||= {}).merge!(vocabulary.index_with { "x" * ConceptReference::MAX_LADDER_RUNG_LENGTH })
           end
 
-          difficulty_block(placed.to_h, difficulty, ladders).length
-        end.max + lock_subsets(kinds).map { |locked| lock_overhead(kinds, locked) }.max
+          [ difficulty_block(placed.to_h, difficulty, ladders, mode: mode).length, levels ]
+        end
+        length, levels = assignments.max_by(&:first)
+        locked = lock_subsets(kinds).max_by { |subset| lock_overhead(kinds, subset) }
+        length += lock_overhead(kinds, locked)
+        (@block_measurements ||= []) << { characters: length, language: language, mode: mode,
+                                         rungs: kinds.map(&:key).zip(levels).to_h, locked: locked.map(&:key) }
+        length
       end
 
-      def difficulty_block(rungs, difficulty, ladders)
-        GenerationPrompt::DifficultyGuidance.render(rungs: rungs, difficulty: difficulty, ladders: ladders)
+      def difficulty_block(rungs, difficulty, ladders, mode: nil)
+        GenerationPrompt::DifficultyGuidance.render(rungs: rungs, difficulty: difficulty, ladders: ladders, mode: mode)
       end
 
       def lock_subsets(kinds)
@@ -1628,6 +1636,7 @@ RSpec.describe AiService do
         shapes = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODES, day_shapes)
 
         expect(shapes.map { |shape| largest_block_for(*shape) }.max).to be <= AiService::MAX_LADDER_GUIDANCE_CHARS
+        warn @block_measurements.max_by { |entry| entry.fetch(:characters) }.to_json if ENV["MEASURE_DIFFICULTY_BLOCK"]
       end
 
       it "counts only day shapes a plan can produce" do

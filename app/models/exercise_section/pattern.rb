@@ -1,5 +1,12 @@
 # Scaffolded because a design answer has predictable parts; nothing validates against the scaffold.
 class ExerciseSection::Pattern < ExerciseSection
+  RUNG_GUIDANCE = {
+    "junior" => "Apply the named pattern to a direct need, with a workable structure and calling interface.",
+    "mid_level" => "Keep the pattern named; work out its application and interface from the scenario's requirements.",
+    "senior" => "Adapt the named pattern's structure and interface to an interacting constraint the question states.",
+    "principal_engineer" => "Weigh the costs of the boundary the named pattern introduces for the stated system; give a workable interface."
+  }.freeze
+
   # Fallback for rows predating answer_scaffold and for a provider that omits or mangles it.
   DEFAULT_SCAFFOLD = [
     "Your approach:",

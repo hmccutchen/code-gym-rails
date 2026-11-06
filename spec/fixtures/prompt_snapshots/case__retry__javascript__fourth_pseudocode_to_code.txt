@@ -57,9 +57,12 @@ Retention check due for the "pseudocode_to_code" section today: missing_base_cas
 - Use a completely FRESH scenario — never reuse a prior framing. Pitch at FULL difficulty, no extra scaffolding — the engineer is not struggling with this, making it easier defeats the point of checking.
 
 Difficulty by section. Pitch each section named below at its level; where it differs from the skill level in the engineer profile above, the section's level wins.
+Keep each kind's format: levels change reasoning, not length, files, blocks, flaw counts or unstated requirements.
+Concept ladders refine these baselines; they never override the kind's format or expectations.
 
 Sections at junior: pseudocode_to_code
-Pitch these problems at this level. A junior problem is: one clearly visible instance of the concept in a small scenario.
+Baseline: one clearly visible instance of the concept in a small scenario.
+- pseudocode_to_code: The engineer plans a direct decomposition covering the stated missable requirement, before any code exists.
 
 A retention check or established concept placed in one of these sections is pitched at that section's level, with no easing.
 Unlocked (pseudocode_to_code): tier annotations and rating adjustments above still apply to these sections, eased or raised from the section's level rather than from the profile's skill level.

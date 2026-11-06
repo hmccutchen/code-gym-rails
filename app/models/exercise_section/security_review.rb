@@ -6,6 +6,13 @@ class ExerciseSection::SecurityReview < ExerciseSection
 
   KEY_FIELDS = %w[vulnerability exploit mitigation].freeze
 
+  RUNG_GUIDANCE = {
+    "junior" => "Explain one vulnerability on a visible path from input to unsafe use and a mitigation that closes it.",
+    "mid_level" => "For one vulnerability, trace the input through the code to explain exploitation and a working mitigation.",
+    "senior" => "Explain one vulnerability and a mitigation that works under the stated deployment constraint or interacting behavior.",
+    "principal_engineer" => "Weigh system-wide mitigation costs for the one vulnerability under stated trust boundaries; this is not a wider audit."
+  }.freeze
+
   MAX_SNIPPET_LINES = ExerciseSection::CodeReview::MAX_SNIPPET_LINES
 
   def self.key_context_fields = %w[snippet]

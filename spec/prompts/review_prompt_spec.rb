@@ -23,6 +23,29 @@ RSpec.describe ReviewPrompt do
 
   def day_sections(entries) = entries.map { |entry| entry.slice(:key, :section, :answer, :rating).merge(section: entry[:section].merge("rounds" => {})) }
 
+  it "shares every kind's composed baseline with generation, in grading and unanswered walkthroughs at every rung" do
+    ExerciseSection.all.product(KindDifficulty::LEVELS).each do |kind, rung|
+      section = { "blocks" => %w[a b c] }
+      definition = kind.difficulty_definition(rung: rung, section: section)
+      generated = GenerationPrompt::DifficultyGuidance.render(rungs: { kind => rung }, difficulty: KindDifficulty.none, ladders: {})
+      graded = described_class.section_prompt(key: kind.key, section: section, answer: long, rung: rung)
+      walked = described_class.walkthrough_prompt(key: kind.key, section: section, rung: rung)
+
+      expect([ generated, graded, walked ]).to all(include(definition.standard, definition.expectation)), "#{kind.key}/#{rung}"
+      expect([ graded, walked ]).to all(include("Pitched at: #{rung} — #{definition}"))
+    end
+  end
+
+  it "keeps principal bug hunts bounded in both review paths and reads no hidden key to choose the definition" do
+    section = { "purpose" => "Sum all prices.", "snippet" => "prices.sum", "answer_key" => { "issue" => "SECRET_KEY" } }
+    definition = ExerciseSection::CodeReview.difficulty_definition(rung: "principal_engineer", mode: :bug_hunt)
+    graded = described_class.section_prompt(key: "code_review", section: section, answer: long, rung: "principal_engineer")
+    walked = described_class.walkthrough_prompt(key: "code_review", section: section, rung: "principal_engineer")
+
+    expect([ graded, walked ]).to all(include(definition.to_s))
+    [ graded, walked ].each { |text| expect(text).not_to include("system scale", "SECRET_KEY") }
+  end
+
   it "renders a keyed section's review exactly as it renders the same section without its key, for every kind that plants one" do
     ExerciseSection.all.select(&:planted_key?).each do |kind|
       keyed = FakeService::EXERCISE_PROBLEM_SET.fetch(kind.key).deep_dup.merge("rounds" => {})
@@ -65,7 +88,7 @@ RSpec.describe ReviewPrompt do
 
     def recorded(name) = File.read(PromptSnapshotHelpers::PROMPT_SNAPSHOT_DIR.join("#{name}.txt"))
 
-    it "renders today's prompts byte for byte when approach is off, compared with the files recorded before the switch existed" do
+    it "renders the baseline snapshots byte for byte when approach is off" do
       day_a.each do |entry|
         args = { key: entry[:key], section: entry[:section], answer: entry[:answer], rung: entry[:rung] }
         today = recorded("review__day_a__#{entry[:key]}__prompt")

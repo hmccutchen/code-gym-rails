@@ -4,6 +4,13 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
 
   TOKEN_LENGTH = 16
 
+  RUNG_GUIDANCE = {
+    "junior" => "Order the supplied coherent blocks by direct data dependencies; no written explanation is required.",
+    "mid_level" => "Order the supplied blocks by following control flow: trace state rather than matching labels.",
+    "senior" => "Order the supplied blocks by resolving interacting dependencies or a stated failure path.",
+    "principal_engineer" => "Order the supplied blocks under a stated system-wide constraint, such as retry safety; no extra blocks or written answer."
+  }.freeze
+
   NO_BLOCKS_WALKTHROUGH =
     "This section's blocks are missing from the stored exercise, so say only that the exercise data is unavailable.".freeze
 
