@@ -200,18 +200,29 @@ slots. Every reader takes the pair:
 
 ## Pattern's rotating role
 
-When the user has not chosen pattern as a regular kind, it is an ordinary
-rotating kind (#710, decided 2026-11-05). Its former default daily status
-does not justify special priority, a dedicated minimum cadence or preferred
-slot ranking. Users can still choose it as a regular kind through the
-existing daily-kind controls; their explicit settings remain authoritative.
+When the user has not chosen pattern as a daily kind, it is an ordinary
+rotating kind (#710, decided 2026-11-05). Its place in every day before
+adaptive rotation justifies no special priority, dedicated minimum cadence
+or preferred slot ranking.
 
-Its single-kind optional slot and separate Exercise mix group describe the
-layout, not a promise of higher or equal frequency compared with another
-kind or a whole multi-kind group. `SectionRotation` ranks every optional
-slot by its stalest eligible kind, with layout order breaking ties, then
-selects a kind within each winning slot. This decision changes none of those
-rules. The qualitative slot-frequency explanation remains in
+Ordinary rotation means the same slot-staleness ranking, not membership in
+`ExerciseSection.rotatable`, which includes only kinds in multi-kind
+pools. Pattern's singleton currently has no How often or Skip controls.
+Its frequency-related choices are daily-kind selection and the Daily
+sections count; level and lock settings govern difficulty separately.
+Existing explicit settings remain authoritative.
+
+`SectionRotation` ranks every optional slot by its stalest eligible kind,
+then selects a kind within each winning slot. The inherited layout order
+puts non-daily pattern first on exact staleness ties when optional capacity
+exists. That order is unchanged here; it is neither a frequency guarantee
+nor an entitlement from pattern's place in every day before adaptive
+rotation. It creates no optional place on a two-section day already filled
+by its daily kinds.
+
+Pattern's single-kind optional slot and separate Exercise mix group promise
+no higher or equal frequency compared with another kind or a whole
+multi-kind group. The qualitative slot-frequency explanation remains in
 `docs/decisions/section-kind-weight-preferences.md`; historical measurements
 are not cadence guarantees.
 

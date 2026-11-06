@@ -14,10 +14,11 @@ the maximum, and `ExerciseSection.resolved_keys` caps a stored row at
 `MAX_SECTIONS`, daily kinds first, so a requested section is never the one
 cut. Below the maximum an unrequested extra is still kept and warned about.
 
-Pattern's former daily role gives it no special rotation priority. Unless
-the user chooses it as a regular kind, it rotates under the ordinary rules.
+Pattern's place in every day before adaptive rotation justifies no special
+priority. Unless chosen as a daily kind, it uses ordinary slot-staleness
+ranking, with the inherited first-place tie-breaker unchanged.
 `docs/decisions/daily-kinds.md` ("Pattern's rotating role") records that
-decision and its boundary with future protected-practice and variety work.
+decision, its controls and the boundary with future practice and variety work.
 
 **The task.** Two working pieces of code that meet the same stated
 behavior, retries and failures included, and differ on one design
