@@ -28,8 +28,12 @@ already decided it is right, so it doesn't review its own work.
   follows the repository's copy of the plugin's review workflow, pinned at
   3.1.0 under `.claude/skills/layered-review/`.
 
-**Findings are checked before any code changes.** Hand both reviews' findings
-to another fresh agent. It checks each finding against the code and reports
+**Findings are checked before any code changes.** A finding counts as
+confirmed once a focused failing spec reproduces it, or, for a finding about
+documentation or configuration, once the file and line it cites show it.
+Hand a finding to another fresh agent only when the session disputes it, or
+when the change is high-risk: it touches concurrency, security, a migration
+or data integrity. That agent checks the finding against the code and reports
 it as confirmed, with the file and line or a failing spec that shows it, or
 as rejected, with the reason. Fix only confirmed findings, test-first. When a
 finding would change the design, the person who asked for the work decides
@@ -41,6 +45,34 @@ working.
 
 Merge only after the full CI suites pass on the final PR commit and GitHub
 review findings are resolved.
+
+## How Work Is Run
+
+These rules apply to every agent working in this repository, Claude Code and
+Copilot alike.
+
+- **A foreman hands out the work.** The main session is the foreman. It
+  splits the work into tasks, gives each one to a subagent with a brief that
+  names the goal, the files and what is already ruled out, checks what comes
+  back, and puts the pieces together. Tasks that share no files and no test
+  database run at the same time. The foreman does a task itself only when it
+  is a few tool calls.
+- **Match the model to the task.** Give mechanical edits and documentation to
+  a faster model. Keep the stronger model for architecture and for the
+  high-risk changes Git Workflow names.
+- **Required behavior and regressions come first.** Record an optional
+  refactor or an unrelated discovery separately, as a GitHub issue. It joins
+  the batch in progress only when the person who asked for the work says so.
+- **Batch related corrections before pushing.** One push carries the whole
+  batch, so CI runs the full suites once, on the final commit. Never skip a
+  hook or a merge gate.
+- **Long jobs run in the background.** Start a suite or any other long job
+  there and keep its ID. After a timeout,
+  reconnect to that job; starting a second copy wastes the first and can
+  collide with it on the test database.
+- **Continue from one stage to the next without asking.** Ask only when a
+  decision would contradict an approved requirement or add material risk,
+  or when a finding would change the design, as Git Workflow says.
 
 ## Code Style
 
