@@ -845,8 +845,7 @@ RSpec.describe AiService do
 
   describe "generation prompt history text" do
     it "reads the section denominator per historical day rather than assuming 3" do
-      history = [ { date: "2026-08-01", concepts: {}, scenarios: [], sections_answered: 2,
-                    sections_total: 4, self_ratings: {}, ai_ratings: {}, feedback: nil } ]
+      history = [ { date: "2026-08-01", sections: [], completion: { answered: 2, total: 4, skipped_sections: [] } } ]
       prompt = render_generation_prompt(user, "ruby_rails", history: history)
       expect(prompt).to include("2/4 answered")
     end
@@ -953,7 +952,7 @@ RSpec.describe AiService do
             end
 
             it "lets a repeated excerpt keep its setting and names despite the variety rule" do
-              prompt = render_generation_prompt(user, "ruby_rails", history: user.recent_performance,
+              prompt = render_generation_prompt(user, "ruby_rails", history: user.recent_performance, delivered_history: user.recent_delivered_content,
                                          code_review_mode: mode, code_review_source: excerpt, scenario_flavor: flavor)
 
               expect(prompt).to include("framings: #{excerpt.scenario}")
@@ -1037,26 +1036,27 @@ RSpec.describe AiService do
       expect(prompt).to include("never asks for an essay about how to debug")
     end
 
-    it "embeds per-session concepts with per-section self and AI ratings" do
+    it "keeps draft ratings out of performance while retaining delivered concepts for repetition" do
       exercise = DailyExercise.create!(user: user, date: Date.current,
-                                       problem_set: { "code_review" => {} }, generated_at: Time.current)
+                                       problem_set: { "code_review" => { "concept" => "n_plus_one" } }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "code_review" => "x" * 20 },
                             section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      prompt = render_generation_prompt(user, history: user.recent_performance,
+      prompt = render_generation_prompt(user, history: user.recent_performance, delivered_history: user.recent_delivered_content,
                                  reinforcement: user.concepts_needing_reinforcement(exclude_buckets: DailyPlan::FOURTH_BUCKETS))
       expect(prompt).to include(ConceptVocabulary::RAILS_CONCEPTS.join(", "))
       expect(prompt).to include("Mastery loop")
-      expect(prompt).to include("code_review→n_plus_one (self: too_hard, ai: unreviewed)")
-      expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one (standard)")
+      expect(prompt).not_to include("self: too_hard", "ai: unreviewed")
+      expect(prompt).to include("No assessed performance history is available.", "code_review — n_plus_one")
+      expect(prompt).to include("Concepts needing reinforcement right now: none")
     end
 
     it "shows the AI's per-section rating alongside the self rating when reviewed" do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                             answers: { "code_review" => "x" * 20 },
                             section_ratings: { "code_review" => "right_level" },
                             concept_tags: { "code_review" => "n_plus_one" },
@@ -1066,17 +1066,19 @@ RSpec.describe AiService do
       expect(prompt).to include("code_review→n_plus_one (self: right_level, ai: developing)")
     end
 
-    it "labels a skipped section's history line 'skipped' rather than 'unreviewed'" do
+    it "lists true skips only after the answered sections have valid grades" do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {}, "pattern" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                            ai_review: { "code_review" => { "rating" => "solid" } },
                             answers: { "code_review" => "x" * 20, "pattern" => "" },
                             section_ratings: { "code_review" => "right_level" },
                             concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" })
 
       prompt = render_generation_prompt(user, history: user.recent_performance)
-      expect(prompt).to include("code_review→n_plus_one (self: right_level, ai: unreviewed)")
-      expect(prompt).to include("pattern→memoization (self: unrated, ai: skipped)")
+      expect(prompt).to include("code_review→n_plus_one (self: right_level, ai: solid)")
+      expect(prompt).to include("skipped: pattern")
+      expect(prompt).not_to include("ai: skipped")
     end
 
     it "reports no concepts needing reinforcement when history is empty" do
@@ -1087,7 +1089,8 @@ RSpec.describe AiService do
     it "lists reinforcement concepts with their tier and omits paused ones" do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                            ai_review: { "code_review" => { "rating" => "developing" } },
                             answers: { "code_review" => "x" * 20 },
                             section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" })
@@ -1442,15 +1445,14 @@ RSpec.describe AiService do
                reinforcement: [ { concept: "caching", bucket: "ruby_rails", tier: "standard" } ])
     end
     let(:history) do
-      [ { date: "2026-09-01", concepts: {}, scenarios: [], sections_answered: 1, sections_total: 3,
-          self_ratings: {}, ai_ratings: {} } ]
+      [ { date: "2026-09-01", sections: [], completion: { answered: 1, total: 3, skipped_sections: [] } } ]
     end
     let(:difficulty) { KindDifficulty.new(levels: { "challenge" => "senior", "pattern" => "mid_level" }, locked: %w[challenge]) }
     let(:draft_ladders) { { "senior" => { "memoization" => "the draft's senior rung" } } }
     let(:draft) do
       ExerciseDraft::Draft.new(user: user, language: "ruby_rails", problem_set: {}, plan: plan,
                                kinds: ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review }),
-                               difficulty: difficulty, ladders: draft_ladders, history: history,
+                               difficulty: difficulty, ladders: draft_ladders, history: history, delivered_history: [],
                                suggested_concepts: [], unusable_sections: [])
     end
     let(:svc) { double_class.new(canned_text: { "challenge" => FakeService::EXERCISE_PROBLEM_SET["challenge"] }.to_json) }
@@ -1999,7 +2001,8 @@ RSpec.describe AiService do
         date = Date.current - (i + 2)
         exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
                                          problem_set: { "code_review" => { "concept" => concept } })
-        DailyResponse.create!(user: user, daily_exercise: exercise, date: date,
+        DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
+                              ai_review: { "code_review" => { "rating" => "developing" } },
                               answers: { "code_review" => "x" * 20 },
                               section_ratings: { "code_review" => "too_hard" },
                               concept_tags: { "code_review" => concept })
@@ -2026,7 +2029,8 @@ RSpec.describe AiService do
           date = Date.current - (i + 2)
           exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
                                            problem_set: { "code_review" => { "concept" => concept } })
-          DailyResponse.create!(user: user, daily_exercise: exercise, date: date,
+          DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
+                                ai_review: { "code_review" => { "rating" => "developing" } },
                                 answers: { "code_review" => "x" * 20 },
                                 section_ratings: { "code_review" => "too_hard" },
                                 concept_tags: { "code_review" => concept })

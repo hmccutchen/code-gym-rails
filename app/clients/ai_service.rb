@@ -294,8 +294,8 @@ class AiService
     parse_json_object(call_and_log(user, request, deadline: deadline)[:text], subject: subject, log_raw: false)
   end
 
-  def generation_prompt(user, language, plan:, history:, difficulty:, ladders:)
-    GenerationPrompt.new(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders,
+  def generation_prompt(user, language, plan:, history:, delivered_history:, difficulty:, ladders:)
+    GenerationPrompt.new(user, language, plan: plan, history: history, delivered_history: delivered_history, difficulty: difficulty, ladders: ladders,
                          retention_annotation: method(:annotate_retention_concept))
   end
 

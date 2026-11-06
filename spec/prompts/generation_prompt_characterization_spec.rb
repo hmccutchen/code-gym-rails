@@ -88,19 +88,24 @@ RSpec.describe "generation prompt characterization" do
 
   SNAPSHOT_HISTORY = [
     { date: "2026-10-14",
-      concepts: { "code_review" => "n_plus_one", "design_comparison" => "memoization", "pattern" => "memoization", "challenge" => "" },
-      scenarios: [ "inventory restocking service", "ticket queue" ], sections_answered: 3, sections_total: 4,
-      self_ratings: { "code_review" => "too_hard", "design_comparison" => "right_level" },
-      ai_ratings: { "code_review" => "developing", "design_comparison" => "solid" },
-      answered_sections: %w[code_review design_comparison pattern] },
+      sections: [ { key: "code_review", concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing" },
+                  { key: "design_comparison", concept: "memoization", self_rating: "right_level", ai_rating: "solid" } ],
+      completion: nil },
     { date: "2026-10-13",
-      concepts: { "code_review" => "transaction_safety", "pattern" => "caching" },
-      scenarios: [ "parking meter" ], sections_answered: 1, sections_total: 2,
-      self_ratings: { "code_review" => "right_level" }, ai_ratings: { "code_review" => "solid" },
-      answered_sections: %w[code_review] },
-    { date: "2026-10-10",
-      concepts: { "code_review" => "memoization" }, sections_answered: 1, sections_total: 3,
-      self_ratings: {}, ai_ratings: {} }
+      sections: [ { key: "code_review", concept: "transaction_safety", self_rating: "right_level", ai_rating: "solid" } ],
+      completion: { answered: 1, total: 2, skipped_sections: %w[pattern] } }
+  ].freeze
+
+  SNAPSHOT_DELIVERED = [
+    { date: "2026-10-14", sections: [
+      { key: "code_review", concept: "n_plus_one", scenario: "inventory restocking service" },
+      { key: "design_comparison", concept: "memoization", scenario: "ticket queue" },
+      { key: "pattern", concept: "memoization" }, { key: "challenge" }
+    ] },
+    { date: "2026-10-13", sections: [
+      { key: "code_review", concept: "transaction_safety", scenario: "parking meter" }, { key: "pattern", concept: "caching" }
+    ] },
+    { date: "2026-10-10", sections: [ { key: "code_review", concept: "memoization" } ] }
   ].freeze
 
   MIXED_LOCKS = KindDifficulty.new(
@@ -211,14 +216,13 @@ RSpec.describe "generation prompt characterization" do
       excludes: []
     },
     "case__ruby_rails__history" => {
-      render:   -> { render_case("ruby_rails", pattern: :pattern, third: :challenge, history: SNAPSHOT_HISTORY) },
-      includes: [ "2026-10-14: 3/4 answered | code_review→n_plus_one (self: too_hard, ai: developing), " \
-                  "design_comparison→memoization (self: right_level, ai: solid), pattern→memoization (self: unrated, ai: unreviewed) " \
-                  "| framings: inventory restocking service; ticket queue",
-                  "2026-10-13: 1/2 answered | code_review→transaction_safety (self: right_level, ai: solid), " \
-                  "pattern→caching (self: unrated, ai: skipped) | framings: parking meter",
-                  "2026-10-10: 1/3 answered | code_review→memoization (self: unrated, ai: unreviewed)\n" ],
-      excludes: [ "No history yet" ]
+      render:   -> { render_case("ruby_rails", pattern: :pattern, third: :challenge, history: SNAPSHOT_HISTORY, delivered_history: SNAPSHOT_DELIVERED) },
+      includes: [ "2026-10-14: code_review→n_plus_one (self: too_hard, ai: developing) | " \
+                  "design_comparison→memoization (self: right_level, ai: solid)",
+                  "2026-10-13: 1/2 answered | code_review→transaction_safety (self: right_level, ai: solid) | skipped: pattern",
+                  "framings: inventory restocking service", "framings: ticket queue", "framings: parking meter",
+                  "2026-10-10: code_review — memoization\n" ],
+      excludes: [ "No assessed performance", "ai: unreviewed", "3/4 answered", "1/3 answered" ]
     },
     "case__ruby_rails__flavor_everyday" => {
       render:   -> { render_case("ruby_rails", pattern: :pattern, third: :challenge, scenario_flavor: :everyday) },

@@ -18,6 +18,13 @@ paths:
 
 # Review and grading
 
+Basic adaptation reads `DailyResponse#assessed_sections`; valid partial
+answers act immediately, while malformed or missing grades act nowhere.
+Completion waits only for answered active sections, unlike UI walkthrough
+completeness. The locked `ResponseReview` merge counts a session only on its
+first assessed-answer transition. The intended least-favourable daily
+mastery aggregate remains; #726 separately tracks retry-order dependence.
+
 Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;
 read it before changing that area.

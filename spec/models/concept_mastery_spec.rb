@@ -3,6 +3,23 @@ require "rails_helper"
 RSpec.describe ConceptMastery, type: :model do
   let(:user) { User.create!(email: "cm@example.com") }
 
+  it "ignores direct draft and invalid-grade calls, including cooldown and drill state" do
+    paused = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
+    target = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", drilled_at: Time.current, last_rating: "solid")
+    exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+      problem_set: { "code_review" => { "concept" => "n_plus_one" } })
+    response = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
+      answers: { "code_review" => "x" }, concept_tags: { "code_review" => "n_plus_one" },
+      section_ratings: { "code_review" => "right_level" }, ai_review: { "code_review" => { "rating" => "strong" } })
+    original = target.attributes
+    described_class.record_review!(response, sections: [ "code_review" ], apply_session_countdown: true)
+    expect(target.reload.attributes).to eq(original)
+    response.update!(submitted_at: Time.current, ai_review: { "code_review" => { "rating" => "invalid" } })
+    described_class.record_review!(response, sections: [ "code_review" ], apply_session_countdown: true)
+    expect(target.reload.attributes).to eq(original)
+    expect(paused.reload.cooldown_remaining).to eq(2)
+  end
+
   def review!(concept:, self_rating:, ai_rating:, date: Date.current, section: "code_review")
     exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
       problem_set: { section => { "concept" => concept } })

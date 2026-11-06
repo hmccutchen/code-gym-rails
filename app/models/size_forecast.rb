@@ -5,8 +5,7 @@ class SizeForecast
   def self.for(user, exercise)
     return nil unless user.daily_section_count.nil? && exercise.planned_size && !exercise.planned_by_setting?
 
-    history = user.recent_exercise_history(limit: SectionRotation::LOOKBACK, before: exercise.date.next_day)
-    change(delivered_or_planned(exercise), DailyPlan.size_for(user, history))
+    change(delivered_or_planned(exercise), DailyPlan.size_for(user, before: exercise.date.next_day))
   end
 
   # Ingest can keep an unrequested extra and the judge can drop one, so take the larger of planned and shown.

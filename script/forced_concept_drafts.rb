@@ -31,7 +31,7 @@ class ForcedConceptDrafts
     history    = user.recent_performance
 
     ExerciseDraft::Draft.new(user: user, language: language, problem_set: {}, plan: plan, kinds: kinds,
-                             difficulty: difficulty, ladders: ladders, history: history,
+                             difficulty: difficulty, ladders: ladders, history: history, delivered_history: user.recent_delivered_content,
                              suggested_concepts: [], unusable_sections: [])
   end
 

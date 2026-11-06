@@ -14,7 +14,7 @@ RSpec.describe GenerationDiagnostics do
   end
   let(:draft) do
     ExerciseDraft::Draft.new(user: user, language: "ruby_rails", problem_set: {}, plan: plan, kinds: kinds,
-                             difficulty: KindDifficulty.none, ladders: {}, history: [], suggested_concepts: [], unusable_sections: [])
+                             difficulty: KindDifficulty.none, ladders: {}, history: [], delivered_history: [], suggested_concepts: [], unusable_sections: [])
   end
 
   # Every section carries every answer-key field any kind declares, so a new kind or a new field is covered unchanged.
@@ -45,6 +45,27 @@ RSpec.describe GenerationDiagnostics do
     expect(lines.map { |line| line[/\A\[\w+\]/] }.uniq)
       .to contain_exactly("[set_size]", "[unusable_section]", "[planted_key]", "[retention]", "[shared_concept]", "[coverage]", "[difficulty_diagnostics]")
     expect(lines).to all(satisfy { |line| line.exclude?(sentinel) })
+  end
+
+  it "logs only assessed performance, without pending ratings or delivered repetition notes" do
+    exercise = user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current, language: "ruby_rails",
+      problem_set: { "code_review" => { "concept" => "caching", "scenario" => "REPETITION-ONLY" },
+                     "pattern" => { "concept" => "memoization" } })
+    user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+      answers: { "code_review" => "Bound the cache", "pattern" => "Pending answer" },
+      concept_tags: { "code_review" => "caching", "pattern" => "memoization" },
+      section_ratings: { "code_review" => "UNRECOGNIZED", "pattern" => "too_hard" },
+      ai_review: { "code_review" => { "rating" => "solid" } })
+    captured = draft.with(history: user.recent_performance, delivered_history: user.recent_delivered_content)
+    lines = logged_lines do
+      described_class.new(user).finished("ruby_rails", captured, problem_set, dropped_concepts: {}, judge: nil, unhosted: [])
+    end
+    payload = JSON.parse(lines.grep(/\A\[difficulty_diagnostics\]/).sole.delete_prefix("[difficulty_diagnostics] "))
+    history = payload.fetch("requested").fetch("recent_performance")
+
+    expect(history).to eq([ { "date" => exercise.date.to_s, "completion" => nil,
+                             "sections" => [ { "key" => "code_review", "concept" => "caching", "ai_rating" => "solid" } ] } ])
+    expect(lines.join).not_to include("REPETITION-ONLY", "UNRECOGNIZED", "Pending answer")
   end
 
   it "logs one line per key note, with its kind, language and outcome" do

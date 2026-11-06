@@ -21,15 +21,20 @@ class ConceptMastery < ApplicationRecord
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: [ :user_id, :language ] }
 
-  # Pass apply_session_countdown: true only on a response's first successful batch, so retries never re-run Step A.
+  # Count down only on the locked transition from no assessed answers to at least one.
   def self.record_review!(response, sections:, apply_session_countdown:)
-    user = response.user
+    return unless response.submitted?
 
-    count_down_paused_concepts!(user) if apply_session_countdown
+    user = response.user
+    assessed = sections & response.assessed_sections
+
+    count_down_paused_concepts!(user) if apply_session_countdown && assessed.any?
+    return unless response.concept_tags.is_a?(Hash)
+
     defer_skipped_checks!(response, sections)
 
     sections_by_concept = Hash.new { |h, k| h[k] = [] }
-    response.answered_concept_tags.slice(*sections).each do |section, concept|
+    response.concept_tags.slice(*assessed).each do |section, concept|
       next if concept.blank? || concept == "other"
       next unless response.mastery_evidence?(section)
 

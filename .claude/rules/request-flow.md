@@ -20,7 +20,8 @@ User logs in (address, then an emailed 6-digit code or, once it is on, an authen
 8am weekdays (Solid Queue cron via config/recurring.yml):
   GenerateDailyExercisesJob
     └→ AiService.for(user) → ClaudeService | GeminiService | OpenaiService
-         reads: user.recent_performance (last 10 sessions + ratings + concepts)
+         reads: user.recent_performance (latest qualifying assessed answers)
+                user.recent_delivered_content (repetition-only notes)
          calls: the user's provider with a personalized prompt, in the user's
                 chosen language (user.language_for_today)
          saves: DailyExercise { problem_set: jsonb, language } on success, or

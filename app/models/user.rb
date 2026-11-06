@@ -272,29 +272,44 @@ class User < ApplicationRecord
     self.skill_level = level
   end
 
-  def recent_performance(limit: 10)
-    recent_daily_responses(limit).map do |r|
-      problem_set = r.daily_exercise&.problem_set || {}
-      scenarios = ExerciseSection.keys.filter_map do |section|
-        problem_set.dig(section, "scenario").presence
+  PERFORMANCE_HISTORY_LIMIT = 10
+
+  def recent_performance(limit: PERFORMANCE_HISTORY_LIMIT)
+    AdaptationHistory.recent(self, limit: limit) do |response|
+      sections = response.assessed_sections.map do |section|
+        concept = response.concept_tags[section] if response.concept_tags.is_a?(Hash)
+        { key: section, concept: history_concept(concept, section, response.daily_exercise.language),
+          self_rating: response.self_rating_for(section), ai_rating: response.ai_rating_for(section) }.compact
       end
-      ai_ratings = r.answered_concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
-      {
-        date:              r.date.to_s,
-        concepts:          r.concept_tags,
-        scenarios:         scenarios,
-        sections_answered: r.answered_sections.size,
-        sections_total:    r.section_keys.size,
-        self_ratings:      r.section_ratings,
-        ai_ratings:        ai_ratings,
-        answered_sections: r.answered_sections
-      }
+      completion = if response.completion_evidence?
+        { answered: response.answered_sections.size, total: response.section_keys.size,
+          skipped_sections: response.section_keys - response.answered_sections }
+      end
+      { date: response.date.to_s, sections: sections, completion: completion }
     end
   end
 
+  def recent_delivered_content(limit: PERFORMANCE_HISTORY_LIMIT)
+    daily_exercises.order(date: :desc, id: :desc).limit(limit).filter_map do |exercise|
+      next unless exercise.problem_set.is_a?(Hash) && exercise.plan_notes.is_a?(Hash)
+
+      sections = exercise.active_section_keys.map do |section|
+        data = exercise.problem_set.fetch(section)
+        { key: section, concept: history_concept(data["concept"], section, exercise.language),
+          scenario: (data["scenario"].presence if data["scenario"].is_a?(String)) }.compact
+      end
+      { date: exercise.date.to_s, sections: sections }
+    end
+  end
+
+  def history_concept(concept, section, language)
+    bucket = ConceptBucket.for(section, language)
+    concept if concept.is_a?(String) && concept != "other" && bucket && still_in_vocabulary?(concept, bucket)
+  end
+  private :history_concept
+
   def recent_exercise_history(limit:, before: Date.current)
     daily_exercises
-      .includes(:daily_response)
       .where(date: ...before)
       .order(date: :desc)
       .limit(limit)
@@ -303,43 +318,57 @@ class User < ApplicationRecord
         ExerciseHistoryEntry.new(
           section_keys:           delivered + exercise.dropped_sections,
           delivered_section_keys: delivered,
-          answered:               exercise.daily_response&.answered_sections&.size,
           dropped:                exercise.dropped_sections.size
         )
       end
   end
 
+  def recent_completion_history(limit: SectionCount::WINDOW, before: Date.current)
+    AdaptationHistory.recent(self, limit: limit, before: before) do |response|
+      exercise = response.daily_exercise
+      next unless response.completion_evidence? && exercise.dropped_sections.is_a?(Array)
+
+      ExerciseHistoryEntry::Completion.new(answered: response.answered_sections.size,
+        delivered_section_keys: exercise.active_section_keys, dropped: exercise.dropped_sections.size)
+    end
+  end
+
   def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [], hostable: nil)
     result   = drilled_reinforcement(bucket, exclude_buckets, hostable)
     resolved = result.to_h { |h| [ [ h[:concept], h[:bucket] ], true ] }
+    entries = AdaptationHistory.recent(self, limit: limit) do |response|
+      reinforcement_entries(response, bucket, exclude_buckets, hostable)
+    end.flatten
+    tiers = concept_masteries.where(concept: entries.pluck(:concept), language: entries.pluck(:bucket))
+                             .pluck(:concept, :language, :tier).to_h { |concept, language, tier| [ [ concept, language ], tier ] }
+    entries.each do |entry|
+      key = entry.values_at(:concept, :bucket)
+      next if resolved.key?(key)
+      resolved[key] = true
+      next if entry[:favorable]
 
-    recent_daily_responses(limit).each do |r|
-      r.answered_concept_tags.each do |section, concept|
-        next if concept.blank? || concept == "other"
-        next unless r.mastery_evidence?(section)
-
-        tag_bucket = ConceptBucket.for(section, r.daily_exercise&.language)
-        next unless still_in_vocabulary?(concept, tag_bucket)
-        next if resolved.key?([ concept, tag_bucket ])
-        resolved[[ concept, tag_bucket ]] = true
-
-        next if r.self_rating_for(section).nil? && r.ai_rating_for(section).nil?
-
-        next if r.self_rating_favorable?(section) && r.ai_rating_favorable?(section)
-
-        next if bucket && tag_bucket != bucket
-        next if exclude_buckets.include?(tag_bucket)
-        next if hostable && !hostable.call(concept, tag_bucket)
-
-        tier = concept_masteries.find_by(concept: concept, language: tag_bucket)&.tier || "standard"
-        next if tier == "paused"
-
-        result << { concept: concept, bucket: tag_bucket, tier: tier }
-      end
+      tier = tiers[key] || "standard"
+      result << entry.slice(:concept, :bucket).merge(tier: tier) unless tier == "paused"
     end
-
     result
   end
+
+  def reinforcement_entries(response, bucket, exclude_buckets, hostable)
+    return [] unless response.concept_tags.is_a?(Hash)
+
+    response.assessed_sections.filter_map do |section|
+      concept = response.concept_tags[section]
+      tag_bucket = ConceptBucket.for(section, response.daily_exercise.language)
+      next if concept.blank? || concept == "other" || !response.mastery_evidence?(section)
+      next unless still_in_vocabulary?(concept, tag_bucket)
+      next if bucket && tag_bucket != bucket
+      next if exclude_buckets.include?(tag_bucket) || (hostable && !hostable.call(concept, tag_bucket))
+
+      { concept: concept, bucket: tag_bucket,
+        favorable: response.self_rating_favorable?(section) && response.ai_rating_favorable?(section) }
+    end
+  end
+  private :reinforcement_entries
 
   def drilled_reinforcement(bucket, exclude_buckets, hostable)
     buckets = bucket ? [ bucket ] : ConceptBucket.slice_for(language) - exclude_buckets
@@ -461,10 +490,6 @@ class User < ApplicationRecord
   def still_in_vocabulary?(concept, bucket)
     return true if bucket.nil?
     ConceptBucket.vocabulary_for(bucket).include?(concept)
-  end
-
-  def recent_daily_responses(limit)
-    daily_responses.includes(:daily_exercise).order(date: :desc).limit(limit)
   end
 
   def time_zone_must_be_loadable

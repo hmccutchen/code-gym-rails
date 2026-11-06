@@ -1,6 +1,6 @@
 # Pure over responses given newest first, and never compares to today, so time alone changes no answer.
 class RungLedger
-  RESPONSE_COLUMNS = %i[id daily_exercise_id date answers concept_tags section_ratings ai_review].freeze
+  RESPONSE_COLUMNS = %i[id daily_exercise_id date submitted_at answers concept_tags section_ratings ai_review].freeze
 
   # Exercises load whole because their problem_set holds the rungs.
   def self.for(user)
@@ -36,10 +36,11 @@ class RungLedger
 
   # The day's sections grouped under the (concept, bucket, rung) each attempted.
   def attempts(response)
+    return {} unless response.concept_tags.is_a?(Hash)
+
     exercise = response.daily_exercise
-    response.answered_concept_tags.each_with_object(Hash.new { |h, k| h[k] = [] }) do |(section, concept), grouped|
+    response.concept_tags.slice(*response.assessed_sections).each_with_object(Hash.new { |h, k| h[k] = [] }) do |(section, concept), grouped|
       next if concept.blank? || concept == "other"
-      next if response.ai_rating_for(section).nil?
 
       data = exercise.problem_set[section]
       next unless data.is_a?(Hash) && data["pitched_at"].present? && !data["eased"]

@@ -14,6 +14,11 @@ An excerpt reads its text off local disk when the prompt is built, so the text i
 
 The pick takes never-seen excerpts first, in list order, then the one seen longest ago. That order bounds the longest wait before any excerpt comes round again by the size of the pool.
 
+The retired `SectionCount.capped_window` excerpt was removed with #719's
+absence-to-zero inference. Remaining entries keep their relative order and
+ids; no replacement was inserted into its position. Historical source ids
+remain readable and no longer participate in picking.
+
 ## `.last_seen_for`
 
 A stored id is matched to the current excerpt by file name and method, ignoring the folder, so moving a source file between `app/` folders keeps its rotation history. That only works while file name plus method is unique across the pool, which a spec checks. An id that matches nothing comes back unchanged, and `pick` never asks about it. The reason is in `docs/decisions/folders-by-layer.md`.

@@ -239,11 +239,12 @@ RSpec.describe User, type: :model do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)
       daily_response = DailyResponse.create!(
-        user: user, daily_exercise: exercise, date: Date.current,
+        user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+        ai_review: { "code_review" => { "rating" => "solid" } },
         answers: { "code_review" => "Found the N+1 in the loop", "pattern" => " " * 20, "challenge" => "short" }
       )
 
-      expect(user.recent_performance.first[:sections_answered])
+      expect(user.recent_performance.first[:completion][:answered])
         .to eq(daily_response.answered_sections.size)
     end
   end
@@ -254,11 +255,12 @@ RSpec.describe User, type: :model do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {}, "pattern" => {} }, generated_at: Time.current)
       daily_response = DailyResponse.create!(
-        user: user, daily_exercise: exercise, date: Date.current,
+        user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+        ai_review: { "code_review" => { "rating" => "solid" } },
         answers: { "code_review" => "Found the N+1 in the loop", "pattern" => "" }
       )
 
-      expect(user.recent_performance.first[:answered_sections]).to eq(daily_response.answered_sections)
+      expect(user.recent_performance.first[:completion][:skipped_sections]).to eq(daily_response.section_keys - daily_response.answered_sections)
     end
   end
 
@@ -268,9 +270,10 @@ RSpec.describe User, type: :model do
       exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
                                        problem_set: { "code_review" => {}, "pattern" => {}, "challenge" => {}, "plan_review" => {} })
       DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+                            ai_review: { "code_review" => { "rating" => "solid" } },
                             answers: { "code_review" => "a" * 20 })
 
-      expect(user.recent_performance.first[:sections_total]).to eq(4)
+      expect(user.recent_performance.first[:completion][:total]).to eq(4)
     end
   end
 
@@ -279,22 +282,24 @@ RSpec.describe User, type: :model do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                            ai_review: { "code_review" => { "rating" => "solid" } },
                             answers: { "code_review" => "x" * 20 },
                             concept_tags: { "code_review" => "memoization" })
 
       perf = user.recent_performance
-      expect(perf.first[:concepts]).to eq({ "code_review" => "memoization" })
+      expect(perf.first[:sections]).to eq([ { key: "code_review", concept: "memoization", ai_rating: "solid" } ])
     end
 
     it "never yields nil concept_tags (column is NOT NULL with {} default)" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                            ai_review: { "code_review" => { "rating" => "solid" } },
                             answers: { "code_review" => "x" * 20 })
 
-      expect(user.recent_performance.first[:concepts]).to eq({})
+      expect(user.recent_performance.first[:sections]).to eq([ { key: "code_review", ai_rating: "solid" } ])
 
       expect {
         DailyResponse.connection.execute(
@@ -304,7 +309,7 @@ RSpec.describe User, type: :model do
     end
   end
 
-  describe "#recent_performance scenarios" do
+  describe "#recent_delivered_content scenarios" do
     it "includes each session's scenarios read from the stored problem_set" do
       user = create_user
       exercise = DailyExercise.create!(
@@ -318,7 +323,7 @@ RSpec.describe User, type: :model do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "code_review" => "x" * 20 })
 
-      expect(user.recent_performance.first[:scenarios])
+      expect(user.recent_delivered_content.first[:sections].filter_map { |s| s[:scenario] })
         .to eq([ "billing reconciliation", "search ranking" ])
     end
 
@@ -329,7 +334,7 @@ RSpec.describe User, type: :model do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "code_review" => "x" * 20 })
 
-      expect(user.recent_performance.first[:scenarios]).to eq([])
+      expect(user.recent_delivered_content.first[:sections].filter_map { |s| s[:scenario] }).to eq([])
     end
 
     it "includes the architecture section's scenario when the third section is architecture" do
@@ -342,7 +347,7 @@ RSpec.describe User, type: :model do
         })
       DailyResponse.create!(user: user, daily_exercise: ex, date: Date.current, answers: {})
 
-      expect(user.recent_performance.first[:scenarios]).to eq([ "billing", "multi-region failover" ])
+      expect(user.recent_delivered_content.first[:sections].filter_map { |s| s[:scenario] }).to eq([ "billing", "multi-region failover" ])
     end
 
     it "includes a security_review section's scenario in recent_performance's framings" do
@@ -354,25 +359,25 @@ RSpec.describe User, type: :model do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current - 1,
                             answers: { "security_review" => "x" * 20 })
 
-      performance = user.recent_performance
-      expect(performance.first[:scenarios]).to include("a legacy GraphQL layer needs a fix")
+      delivered = user.recent_delivered_content
+      expect(delivered.first[:sections].filter_map { |s| s[:scenario] }).to include("a legacy GraphQL layer needs a fix")
     end
   end
 
   describe "#recent_performance section_ratings" do
-    it "surfaces each section's AI-assessed rating alongside the self-rating, nil-safe when unreviewed" do
+    it "surfaces only assessed sections" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {}, "pattern" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                             answers: { "code_review" => "x" * 20 },
                             concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
                             ai_review: { "code_review" => { "rating" => "developing" } })
 
-      expect(user.recent_performance.first[:ai_ratings]).to eq({ "code_review" => "developing" })
+      expect(user.recent_performance.first[:sections]).to eq([ { key: "code_review", concept: "n_plus_one", ai_rating: "developing" } ])
     end
 
-    it "is an empty hash when the response was never reviewed" do
+    it "has no performance row when the response was never reviewed" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)
@@ -380,31 +385,54 @@ RSpec.describe User, type: :model do
                             answers: { "code_review" => "x" * 20 },
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      expect(user.recent_performance.first[:ai_ratings]).to eq({})
+      expect(user.recent_performance).to eq([])
     end
 
-    it "leaves a skipped section's AI grade out of ai_ratings while still listing its concept" do
+    it "leaves a skipped section's grade and concept out of performance" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {}, "pattern" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                             answers: { "code_review" => "x" * 20, "pattern" => "" },
                             concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
                             ai_review: { "code_review" => { "rating" => "developing" },
                                          "pattern"     => { "rating" => "beginner" } })
 
       entry = user.recent_performance.first
-      expect(entry[:ai_ratings]).to eq("code_review" => "developing")
-      expect(entry[:concepts]).to eq("code_review" => "n_plus_one", "pattern" => "memoization")
+      expect(entry[:sections]).to eq([ { key: "code_review", concept: "n_plus_one", ai_rating: "developing" } ])
+      expect(entry[:completion][:skipped_sections]).to eq([ "pattern" ])
     end
   end
 
   describe "#recent_performance per-section ratings" do
-    it "emits self_ratings and ai_ratings per entry, without a whole-day rating key" do
+    it "keeps partial completion unknown and projects delivered content independently without keys" do
+      user = create_user
+      exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, problem_set: {
+        "code_review" => { "concept" => "n_plus_one", "scenario" => "billing", "answer_key" => "SECRET" },
+        "pattern" => { "concept" => "memoization", "scenario" => [] }
+      })
+      response = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
+        answers: { "code_review" => "RAW ANSWER", "pattern" => "pending" },
+        section_ratings: { "code_review" => "right_level", "pattern" => "too_hard" },
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
+        ai_review: { "code_review" => { "rating" => "solid", "summary" => "PRIVATE" } })
+      expect(user.recent_performance).to be_empty
+      expect(user.recent_delivered_content).to eq([ { date: exercise.date.to_s, sections: [
+        { key: "code_review", concept: "n_plus_one", scenario: "billing" }, { key: "pattern", concept: "memoization" }
+      ] } ])
+      response.update!(submitted_at: Time.current)
+      expect(user.recent_performance).to eq([ { date: exercise.date.to_s, sections: [
+        { key: "code_review", concept: "n_plus_one", self_rating: "right_level", ai_rating: "solid" }
+      ], completion: nil } ])
+      response.update_column(:concept_tags, [])
+      expect(user.recent_performance.first[:sections].first).not_to have_key(:concept)
+    end
+
+    it "emits ratings per assessed section, without a whole-day rating key" do
       user = User.create!(email: "rp@example.com")
       exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
         problem_set: { "code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" } })
-      user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
         answers: { "code_review" => "x" * 20 },
         section_ratings: { "code_review" => "right_level" },
         concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
@@ -412,22 +440,22 @@ RSpec.describe User, type: :model do
 
       entry = user.recent_performance.first
       expect(entry).not_to have_key(:rating)
-      expect(entry[:self_ratings]).to eq("code_review" => "right_level")
-      expect(entry[:ai_ratings]).to eq("code_review" => "developing")
+      expect(entry[:sections]).to eq([ { key: "code_review", concept: "n_plus_one", self_rating: "right_level", ai_rating: "developing" } ])
     end
 
-    it "keeps a skipped section's self-rating in self_ratings" do
+    it "omits a skipped section's stored self-rating" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {}, "pattern" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                            ai_review: { "code_review" => { "rating" => "solid" } },
                             answers: { "code_review" => "x" * 20, "pattern" => "" },
                             section_ratings: { "code_review" => "right_level", "pattern" => "too_easy" },
                             concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" })
 
-      expect(user.recent_performance.first[:self_ratings]).to eq(
-        "code_review" => "right_level", "pattern" => "too_easy"
-      )
+      expect(user.recent_performance.first[:sections]).to eq([
+        { key: "code_review", concept: "n_plus_one", self_rating: "right_level", ai_rating: "solid" }
+      ])
     end
   end
 
@@ -442,17 +470,45 @@ RSpec.describe User, type: :model do
       exercise
     end
 
-    it "reports nil answered for an exercise that was never opened" do
+    it "keeps unopened delivery separate from completion" do
       exercise_on(Date.current - 1, %w[code_review pattern])
 
-      expect(user.recent_exercise_history(limit: 5).first.answered).to be_nil
+      expect(user.recent_exercise_history(limit: 5).first.section_keys).to eq(%w[code_review pattern])
+      expect(user.recent_completion_history).to be_empty
     end
 
-    it "counts an autosaved draft's answered sections rather than treating it as skipped" do
+    it "does not turn a draft's answers into completion" do
       exercise_on(Date.current - 1, %w[code_review pattern],
                   answers: { "code_review" => "a real answer well past ten characters" })
 
-      expect(user.recent_exercise_history(limit: 5).first.answered).to eq(1)
+      expect(user.recent_completion_history).to be_empty
+    end
+
+    it "backfills qualified completion past drafts and pending answers, ignoring skipped walkthroughs" do
+      old = exercise_on(Date.current - 30, %w[code_review pattern], answers: { "code_review" => "x" })
+      old.daily_response.update!(submitted_at: Time.current, ai_review: { "code_review" => { "rating" => "strong" } })
+      21.times do |i|
+        row = exercise_on(Date.current - i - 1, %w[code_review pattern], answers: { "code_review" => "x", "pattern" => "y" })
+        row.daily_response.update!(submitted_at: Time.current, ai_review: { "code_review" => { "rating" => "solid" } })
+      end
+      expect(user.recent_completion_history(limit: 1).map(&:answered)).to eq([ 1 ])
+      expect(user.recent_exercise_history(limit: 20).size).to eq(20)
+      old.update_column(:dropped_sections, "bad")
+      expect(user.recent_completion_history).to be_empty
+    end
+
+    it "keeps plan size and forecast unchanged when a draft is edited" do
+      allow(CompetencyGate).to receive(:for).with(user).and_return(CompetencyGate::Plan.new(count: 4, reason: :earned, evidence: {}))
+      3.times do |i|
+        row = exercise_on(Date.current - i - 2, %w[code_review pattern], answers: { "code_review" => "x" })
+        row.daily_response.update!(submitted_at: Time.current, ai_review: { "code_review" => { "rating" => "solid" } })
+      end
+      today = exercise_on(Date.current, %w[code_review pattern], answers: { "code_review" => "x" })
+      today.update!(plan_notes: { "size" => 2, "size_reason" => "completion" })
+      before = [ DailyPlan.size_for(user), SizeForecast.for(user, today) ]
+      today.daily_response.update!(answers: { "code_review" => "changed", "pattern" => "y" },
+                                   section_ratings: { "pattern" => "too_hard" })
+      expect([ DailyPlan.size_for(user), SizeForecast.for(user, today) ]).to eq(before)
     end
 
     it "excludes today, which has had no chance to be answered" do
@@ -472,20 +528,20 @@ RSpec.describe User, type: :model do
   end
 
   describe "#concepts_needing_reinforcement" do
-    it "flags a concept whose most recent self-rating was too_hard, even with no AI review" do
+    it "ignores a draft's too-hard rating" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
+      expect(user.concepts_needing_reinforcement).to eq([])
     end
 
     it "flags a concept the AI rated beginner/developing even when the self-rating was favorable (the core gap this fix closes)" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "developing" } })
@@ -496,7 +552,8 @@ RSpec.describe User, type: :model do
     it "skips a tagged concept that is no longer in its bucket's vocabulary, so it can't reinforce forever and block a retention check" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                            ai_review: { "code_review" => { "rating" => "developing" } },
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "retired_concept" })
 
@@ -507,13 +564,15 @@ RSpec.describe User, type: :model do
       user = create_user
       older = DailyExercise.create!(user: user, date: Date.current - 1, language: "ruby_rails",
                                     problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: older, date: Date.current - 1,
+      DailyResponse.create!(user: user, daily_exercise: older, date: Date.current - 1, submitted_at: Time.current,
+                            ai_review: { "code_review" => { "rating" => "developing" } },
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
       newer = DailyExercise.create!(user: user, date: Date.current, language: "javascript",
                                     problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: newer, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: newer, date: Date.current, submitted_at: Time.current,
+                            ai_review: { "code_review" => { "rating" => "strong" } },
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
@@ -523,7 +582,7 @@ RSpec.describe User, type: :model do
     it "keeps reinforcing when self-rating is unfavorable even if the AI review was favorable" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "solid" } })
@@ -534,7 +593,7 @@ RSpec.describe User, type: :model do
     it "excludes a concept once both self-rating and AI review explicitly agree it's solid" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "strong" } })
@@ -542,14 +601,14 @@ RSpec.describe User, type: :model do
       expect(user.concepts_needing_reinforcement).to eq([])
     end
 
-    it "does not treat an unreviewed section as mastered, even with a favorable self-rating" do
+    it "does not infer struggle from a submitted answer awaiting review" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
+      expect(user.concepts_needing_reinforcement).to eq([])
     end
 
     it "excludes a concept with no self-rating and no AI review at all, same as an unrated concept today" do
@@ -566,14 +625,14 @@ RSpec.describe User, type: :model do
       user = create_user
       older_exercise = DailyExercise.create!(user: user, date: Date.current - 1,
                                               problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: older_exercise, date: Date.current - 1,
+      DailyResponse.create!(user: user, daily_exercise: older_exercise, date: Date.current - 1, submitted_at: Time.current,
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "beginner" } })
 
       newer_exercise = DailyExercise.create!(user: user, date: Date.current,
                                               problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: newer_exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: newer_exercise, date: Date.current, submitted_at: Time.current,
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "strong" } })
@@ -584,7 +643,8 @@ RSpec.describe User, type: :model do
     it "excludes the 'other' sentinel concept, even when unfavorable, since it isn't in any real vocabulary" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                            ai_review: { "code_review" => { "rating" => "developing" } },
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "other" })
 
@@ -594,7 +654,7 @@ RSpec.describe User, type: :model do
     it "does not flag a concept whose only occurrence was a skipped section" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                             answers: { "code_review" => "" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "beginner" } })
@@ -605,12 +665,12 @@ RSpec.describe User, type: :model do
     it "lets an older answered occurrence decide when the newer one was skipped" do
       user = create_user
       older = DailyExercise.create!(user: user, date: Date.current - 2, problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: older, date: Date.current - 2,
+      DailyResponse.create!(user: user, daily_exercise: older, date: Date.current - 2, submitted_at: Time.current,
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "strong" } })
       newer = DailyExercise.create!(user: user, date: Date.current - 1, problem_set: { "code_review" => {} }, generated_at: Time.current)
-      DailyResponse.create!(user: user, daily_exercise: newer, date: Date.current - 1,
+      DailyResponse.create!(user: user, daily_exercise: newer, date: Date.current - 1, submitted_at: Time.current,
                             answers: { "code_review" => "" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "beginner" } })
@@ -668,6 +728,43 @@ RSpec.describe User, type: :model do
         concept_tags: { section => concept },
         ai_review: { section => { "rating" => ai_rating } }
       )
+    end
+
+    it "backfills older weak evidence past pending answers without resolving their concepts" do
+      21.times { submit_response(concept: "n_plus_one", section: "code_review", ai_rating: nil) }
+      submit_response(concept: "n_plus_one", section: "code_review")
+
+      expect(user.concepts_needing_reinforcement(limit: 1)).to eq([
+        { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" }
+      ])
+    end
+
+    it "filters the requested bucket before consuming the response window" do
+      submit_response(concept: "n_plus_one", section: "code_review")
+      submit_response(concept: "scope_creep", section: "plan_review")
+
+      expect(user.concepts_needing_reinforcement(limit: 1, bucket: "plan_review").pluck(:concept)).to eq([ "scope_creep" ])
+    end
+
+    it "does not let a pending section on a partial day hide older favourable evidence" do
+      pending = submit_response(concept: "n_plus_one", section: "code_review", ai_rating: nil)
+      pending.daily_exercise.update!(problem_set: pending.daily_exercise.problem_set.merge("pattern" => { "concept" => "memoization" }))
+      pending.update!(answers: pending.answers.merge("pattern" => "x"),
+                      concept_tags: pending.concept_tags.merge("pattern" => "memoization"),
+                      ai_review: pending.ai_review.merge("pattern" => { "rating" => "developing" }))
+      submit_response(concept: "n_plus_one", section: "code_review", self_rating: "right_level", ai_rating: "strong")
+      submit_response(concept: "n_plus_one", section: "code_review")
+
+      expect(user.concepts_needing_reinforcement.pluck(:concept)).to eq([ "memoization" ])
+    end
+
+    it "loads mastery tiers in one batch instead of per occurrence" do
+      submit_response(concept: "n_plus_one", section: "code_review")
+      submit_response(concept: "scope_creep", section: "plan_review")
+      queries = []
+      subscriber = ->(_name, _start, _finish, _id, payload) { queries << payload[:sql] if payload[:sql].include?('FROM "concept_masteries"') }
+      ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { user.concepts_needing_reinforcement }
+      expect(queries.size).to eq(2)
     end
 
     it "with bucket:, includes only concepts from that bucket" do
@@ -1371,16 +1468,20 @@ RSpec.describe User, type: :model do
     end
 
     context "the signals the move exists to correct" do
-      it "stops the held set reading as a skip in #recent_exercise_history" do
+      it "moves delivered history without making a held draft into adaptation evidence" do
         travel_to(wednesday) do
-          exercise_on(Date.current - 1)
+          held = exercise_on(Date.current - 1)
+          user.daily_responses.create!(daily_exercise: held, date: held.date, answers: { "code_review" => "x" },
+                                       section_ratings: { "code_review" => "too_hard" })
           pause_on(Date.current - 1)
 
-          expect(user.recent_exercise_history(limit: 20).map(&:answered)).to eq([ nil ])
+          expect(user.recent_exercise_history(limit: 20).size).to eq(1)
+          expect(user.recent_completion_history).to be_empty
 
           user.resume_generation!
 
           expect(user.recent_exercise_history(limit: 20)).to be_empty
+          expect(user.recent_completion_history(before: Date.tomorrow)).to be_empty
         end
       end
 
@@ -1886,6 +1987,7 @@ RSpec.describe User, "#recent_performance without feedback", type: :model do
     exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, language: "ruby_rails",
                                             problem_set: { "code_review" => { "concept" => "n_plus_one" } })
     user.daily_responses.create!(daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                                 ai_review: { "code_review" => { "rating" => "solid" } },
                                  answers: { "code_review" => "x" * 20 }, concept_tags: { "code_review" => "n_plus_one" })
 
     expect(user.recent_performance.first).not_to have_key(:feedback)

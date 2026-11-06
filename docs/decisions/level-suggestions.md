@@ -25,8 +25,9 @@ judged on its own results only: there is no lead kind and no bundle, so a
 kind without its own five results is never offered a step up. Locked kinds
 are omitted; exclusions remain a scheduling preference.
 
-`LevelSuggestion::Evidence` preloads exercises for the latest 60 submitted
-responses with stored review data. Only reviewed responses and answered,
+`LevelSuggestion::Evidence` uses `AdaptationHistory.recent` to select the
+latest 60 qualifying submitted response days across all kinds, filtering
+before the limit and preloading exercises in cursor batches. Only assessed,
 un-eased sections with a `pitched_at` stamp, an AI rating and the current
 `ReviewedSectionResults::RUBRIC_VERSION` stamp contribute, because the AI rating now
 decides alone and only a rubric grade rates against the stated level.
@@ -42,7 +43,7 @@ appearances answered and un-eased; the others move only when the user
 changes them in Setup.
 
 **A cutoff keeps the same work from proposing another move.**
-Not now records each kind's current rung and the newest reviewed response
+Not now records each kind's current rung and the newest retained strict result
 date, falling back to the user's today, so an offer returns only on newer
 results at that rung, five of them for a step up. Any change to a kind's
 rung, for every account, records the destination rung and today's date in
@@ -124,9 +125,11 @@ is a starting value, not a measured one.
 (`/setup?show=level_suggestions#level-suggestions`, which renders the mix
 open and moves focus to the switch). While it is off the dashboard
 computes no proposal; turning it back on resumes them with every cutoff as
-it was. The submitted dashboard's evidence read is capped at 60 responses,
-so it stays about flat as history grows: about 32 ms at 60 reviewed days
-and 38 ms at 250, measured in a development sandbox.
+it was. At most 60 qualifying response days are retained. Ineligible rows
+cannot displace them or advance the newest result date. Candidate reads are
+uncapped and can span several cursor batches; the old fixed-60-row timing
+claim no longer applies. Other kinds' eligible results still consume this
+global window, before each kind's current-rung and explicit cutoff rules.
 
 **Renamed from the track.** This was `TrackGraduation`, for junior-track
 accounts only. The endpoints moved to `POST /level_suggestion/dismissal`

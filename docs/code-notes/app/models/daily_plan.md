@@ -8,6 +8,12 @@ No `code_review`, pattern or third section can host a fourth bucket's concepts, 
 
 The plan chooses the day's concepts so the caller can compare what was offered with what the provider used (`GenerationDiagnostics`' retention log).
 
+Rotation receives delivered/scheduled history independently of performance.
+`.size_for(user, before:)` loads qualified completion itself, so callers cannot
+pass rotation entries as completion. `SectionCount` keeps its existing
+window, minimum sessions, stretch and capped drop credit; `DaySize` still
+composes that result with the gate and explicit setting.
+
 ## `.concept_tracks`
 
 The fourth track takes the day's fourth kind from the planned kinds, so a daily fourth and a rotated fourth are planned the same way. Under the pair's layout a day never holds two. `Result#fourth` is derived from `#kinds` the same way rather than stored beside the rotation, so a hand-built plan cannot name one fourth kind in its rotation and another in its prompt lines.

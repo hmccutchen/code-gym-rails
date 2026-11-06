@@ -120,14 +120,14 @@ RSpec.describe LevelSuggestion::Evidence do
     expect(evidence.newest_date).to be_nil
   end
 
-  it "reports the newest reviewed date even when that response supplies no eligible sections" do
+  it "reports the newest eligible result date, ignoring review-only activity" do
     day(3)
     day(2, { "code_review" => { rung: "junior", answered: false } })
     day(1, ai_review: {})
     day(0, ai_review: nil)
 
     evidence = described_class.for(user)
-    expect(evidence.newest_date).to eq(today - 2)
+    expect(evidence.newest_date).to eq(today - 3)
     expect(evidence.results["code_review"].map(&:date)).to eq([ today - 3 ])
   end
 
@@ -144,7 +144,7 @@ RSpec.describe LevelSuggestion::Evidence do
     expect(evidence.newest_date).to be_nil
   end
 
-  it "bounds the load to 60 reviewed responses and preloads their exercises" do
+  it "bounds retained evidence to 60 qualifying days and preloads candidate exercises" do
     expect(described_class::RESPONSE_WINDOW).to eq(60)
     (1..described_class::RESPONSE_WINDOW + 1).each { |days_ago| day(days_ago) }
     day(0, ai_review: {})
@@ -161,6 +161,14 @@ RSpec.describe LevelSuggestion::Evidence do
     expect(evidence.newest_date).to eq(today - 1)
     expect(queries.size).to eq(2)
     expect(queries.first).to include("LIMIT")
+  end
+
+  it "backfills strict results past more than sixty ineligible reviewed days" do
+    65.times { |n| day(n, { "code_review" => { rung: "junior", eased: true } }) }
+    5.times { |n| day(65 + n) }
+    evidence = described_class.for(user)
+    expect(evidence.results.fetch("code_review").map(&:date)).to eq((65..69).map { |n| today - n })
+    expect(evidence.newest_date).to eq(today - 65)
   end
 
   describe "LevelSuggestion.for" do

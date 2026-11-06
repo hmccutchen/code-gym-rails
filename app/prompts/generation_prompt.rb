@@ -13,11 +13,12 @@ class GenerationPrompt
     PROMPT
   end
 
-  def initialize(user, language, plan:, history:, difficulty:, ladders:, retention_annotation:)
+  def initialize(user, language, plan:, history:, delivered_history:, difficulty:, ladders:, retention_annotation:)
     @user                 = user
     @language             = language
     @plan                 = plan
     @history              = history
+    @delivered_history    = delivered_history
     @difficulty           = difficulty
     @ladders              = ladders
     @retention_annotation = retention_annotation
@@ -34,13 +35,17 @@ class GenerationPrompt
       - Skill level: #{@user.skill_level} (#{User::SKILL_LEVELS.join(" → ")})
       - Priority focus areas: #{focus}
 
-      Recent performance (last 10 sessions):
+      Reviewed answer evidence:
       #{history_text}
+
+      Delivered content — repetition avoidance only:
+      #{delivered_history_text}
 
       Concepts needing reinforcement right now: #{annotated_concepts(@plan.reinforcement)}
       #{fourth_reinforcement_line(kinds)}
 
       Instructions:
+      - Use delivered notes only to avoid repetition. Delivered content and missing performance evidence imply nothing about difficulty, struggle, success or completion.
       - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
       - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
       - Prioritize focus areas they've missed or rated hard recently.
@@ -109,29 +114,31 @@ class GenerationPrompt
   end
 
   def history_text
-    return "No history yet — this is their first exercise set." if @history.empty?
+    return "No assessed performance history is available." if @history.empty?
 
     @history.map { |h| history_line(h) }.join("\n")
   end
 
   def history_line(h)
-    pairs        = concept_pairs(h)
-    concept_text = pairs.any? ? " | #{pairs.join(', ')}" : ""
-    framings     = h[:scenarios].presence || []
-    framing_text = framings.any? ? " | framings: #{framings.join('; ')}" : ""
-    "#{h[:date]}: #{h[:sections_answered]}/#{h[:sections_total]} answered#{concept_text}#{framing_text}"
+    parts = h[:sections].map do |section|
+      concept = section[:concept] ? "→#{section[:concept]}" : ""
+      ratings = [ ("self: #{section[:self_rating]}" if section[:self_rating]), "ai: #{section[:ai_rating]}" ].compact
+      "#{section[:key]}#{concept} (#{ratings.join(', ')})"
+    end
+    if (completion = h[:completion])
+      parts.unshift("#{completion[:answered]}/#{completion[:total]} answered")
+      parts << "skipped: #{completion[:skipped_sections].join(', ')}" if completion[:skipped_sections].any?
+    end
+    "#{h[:date]}: #{parts.join(' | ')}"
   end
 
-  def concept_pairs(h)
-    return [] unless h[:concepts].respond_to?(:each_pair)
-
-    h[:concepts].each_pair.filter_map do |section, concept|
-      next if concept.blank?
-      self_r  = h[:self_ratings][section].presence || "unrated"
-      skipped = h[:answered_sections] && !h[:answered_sections].include?(section)
-      ai_r    = skipped ? "skipped" : (h[:ai_ratings][section].presence || "unreviewed")
-      "#{section}→#{concept} (self: #{self_r}, ai: #{ai_r})"
-    end
+  def delivered_history_text
+    @delivered_history.map do |day|
+      sections = day[:sections].map do |section|
+        [ section[:key], section[:concept], ("framings: #{section[:scenario]}" if section[:scenario]) ].compact.join(" — ")
+      end
+      "#{day[:date]}: #{sections.join(' | ')}"
+    end.join("\n")
   end
 
   def annotated_concepts(entries)

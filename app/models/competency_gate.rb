@@ -13,7 +13,7 @@ class CompetencyGate
   GROWTH = [ GROW_TO_THREE, GROW_TO_FOUR ].freeze
 
   # :incomplete means at least one optional section went unanswered.
-  OPTIONAL_STATES = %i[none incomplete complete].freeze
+  OPTIONAL_STATES = %i[none unknown incomplete complete].freeze
 
   # Eased results included, in the order the day presented them; daily holds the keys that were daily that day.
   Day = Data.define(:results, :optional, :daily) do
@@ -64,7 +64,7 @@ class CompetencyGate
 
   def add(day)
     day.results.each { |result| record(result, daily: day.daily.include?(result.kind)) }
-    @optional_days = (@optional_days + [ day.optional ]).last(OPTIONAL_RUN) unless day.optional == :none
+    @optional_days = (@optional_days + [ day.optional ]).last(OPTIONAL_RUN) unless %i[none unknown].include?(day.optional)
     @count, @reason = next_step
     restart_growth if @reason == :brake
     self

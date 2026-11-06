@@ -93,6 +93,15 @@ RSpec.describe CompetencyGate do
       pattern.chars.map { |mark| day(mark == "G" ? good : poor, optional: optional) }
     end
 
+    it "does not let unknown optional completion fill or break the qualified optional run" do
+      days = days_with("PPGGGGGG", optional: :none) + [
+        day(good, optional: :complete), day(good, optional: :unknown)
+      ]
+      expect(described_class.plan(days).count).to eq(3)
+      expect(described_class.plan(days).evidence[:optional]).to include(available: 1, complete: 1)
+      expect(described_class.plan(days + [ day(good, optional: :complete) ]).count).to eq(4)
+    end
+
     it "does not reach four on 7 favourable of the latest 10" do
       expect(counts(days_with("PPPGGGGGGG"))).to eq([ 2, 2, 2, 2, 2, 2, 3, 3, 3, 3 ])
     end

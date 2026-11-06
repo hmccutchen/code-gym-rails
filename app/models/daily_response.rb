@@ -205,7 +205,10 @@ class DailyResponse < ApplicationRecord
     end
   end
 
-  def self_rating_for(section) = section_ratings[section.to_s]
+  def self_rating_for(section)
+    rating = section_ratings[section.to_s] if section_ratings.is_a?(Hash)
+    rating if SELF_RATINGS.include?(rating)
+  end
   def self_rating_favorable?(section)  = SELF_RATING_FAVORABLE.include?(self_rating_for(section))
 
   def self.usable_difficulty(assessment)
@@ -221,6 +224,7 @@ class DailyResponse < ApplicationRecord
   end
 
   def ai_rating_for(section)
+    return unless ai_review.is_a?(Hash) && ai_review[section.to_s].is_a?(Hash)
     return unless answered?(section)
 
     ai_review&.dig(section.to_s, AI_RATING_FIELD)
@@ -275,6 +279,17 @@ class DailyResponse < ApplicationRecord
     section_keys.select { |section| answered?(section) }
   end
 
+  def assessed_sections
+    return [] unless submitted? && readable_assessment?
+
+    section_keys.select { |section| ConceptMastery::AI_RATING_RANK.key?(ai_rating_for(section)) }
+  end
+
+  def completion_evidence?
+    assessed = assessed_sections
+    assessed.any? && (answered_sections - assessed).empty?
+  end
+
   def answered_concept_tags
     concept_tags.slice(*answered_sections)
   end
@@ -310,6 +325,11 @@ class DailyResponse < ApplicationRecord
   end
 
   private
+
+  def readable_assessment?
+    answers.is_a?(Hash) && ai_review.is_a?(Hash) &&
+      daily_exercise&.problem_set.is_a?(Hash) && daily_exercise&.plan_notes.is_a?(Hash)
+  end
 
   def holds_pseudocode_critique?(section, token) = token.present? && pseudocode_round(section)["critique_claimed_at"] == token
 end

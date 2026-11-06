@@ -4,13 +4,17 @@ Engineer profile:
 - Skill level: junior (junior → mid_level → senior → principal_engineer)
 - Priority focus areas: general Ruby/Rails patterns
 
-Recent performance (last 10 sessions):
-No history yet — this is their first exercise set.
+Reviewed answer evidence:
+No assessed performance history is available.
+
+Delivered content — repetition avoidance only:
+
 
 Concepts needing reinforcement right now: none
 Concept needing reinforcement in the "pseudocode_to_code" section: none
 
 Instructions:
+- Use delivered notes only to avoid repetition. Delivered content and missing performance evidence imply nothing about difficulty, struggle, success or completion.
 - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
 - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
 - Prioritize focus areas they've missed or rated hard recently.

@@ -2112,12 +2112,13 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
                                                  "why_other_fails" => "w" } } }
   end
 
-  def day(date, planned:, answered: { "code_review" => "a" * 20 }, submitted: true, notes: {})
+  def day(date, planned:, answered: { "code_review" => "a" * 20 }, submitted: true, notes: {}, assessed: false)
     plan_notes = planned ? { "size" => planned, "size_reason" => "gate" }.merge(notes) : {}
     exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
                                      problem_set: problem_set, plan_notes: plan_notes)
     DailyResponse.create!(user: user, daily_exercise: exercise, date: date, answers: answered,
                           section_ratings: answered.transform_values { "right_level" },
+                          ai_review: (answered.transform_values { { "rating" => "solid" } } if assessed),
                           submitted_at: (Time.current if submitted))
   end
 
@@ -2139,9 +2140,9 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
 
   it "says nothing when completion still holds tomorrow at today's size" do
     stub_gate(3, :grew)
-    day(Date.current - 2, planned: 2, answered: {})
-    day(Date.current - 1, planned: 2, answered: {})
-    day(Date.current, planned: 2)
+    day(Date.current - 2, planned: 2, assessed: true)
+    day(Date.current - 1, planned: 2, assessed: true)
+    day(Date.current, planned: 2, assessed: true)
 
     get root_path
 
@@ -2226,12 +2227,17 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
     expect(response.body).not_to include(larger_line)
   end
 
-  it "counts today's submission toward tomorrow's completion" do
+  it "counts today's completion only once all its answered sections are assessed" do
     stub_gate(ExerciseSection::MAX_SECTIONS, :held)
     both = { "code_review" => "a" * 20, "design_comparison" => "b" * 20 }
-    day(Date.current - 2, planned: 3, answered: both)
-    day(Date.current - 1, planned: 3, answered: both)
-    day(Date.current, planned: 3, answered: both)
+    day(Date.current - 2, planned: 3, answered: both, assessed: true)
+    day(Date.current - 1, planned: 3, answered: both, assessed: true)
+    today = day(Date.current, planned: 3, answered: both)
+
+    get root_path
+    expect(response.body).to include(larger_line)
+
+    today.update!(ai_review: both.transform_values { { "rating" => "solid" } })
 
     get root_path
 

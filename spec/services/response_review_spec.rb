@@ -23,6 +23,23 @@ RSpec.describe ResponseReview do
     described_class.new(subject_response, user: user, reviewer: reviewer).call
   end
 
+  [ nil, "invalid" ].each do |grade|
+    it "counts the first assessed answer after an earlier #{grade.inspect} batch exactly once" do
+      paused = user.concept_masteries.create!(concept: "caching", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
+      response.update!(answers: { "code_review" => (grade ? "x" : ""), "pattern" => "y" })
+      allow(reviewer).to receive(:review_sections).and_return(
+        { "code_review" => review_result(grade), "pattern" => failed_result },
+        { "pattern" => review_result("solid") }
+      )
+      expect(review.status).to eq(:partial)
+      expect(paused.reload.cooldown_remaining).to eq(2)
+      expect(review.status).to eq(:ready)
+      expect(paused.reload.cooldown_remaining).to eq(1)
+      expect(review.status).to eq(:already_reviewed)
+      expect(paused.reload.cooldown_remaining).to eq(1)
+    end
+  end
+
   it "reports a response that was never submitted, without calling the provider" do
     response.update!(submitted_at: nil)
     expect(reviewer).not_to receive(:review_sections)

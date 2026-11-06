@@ -18,6 +18,12 @@ paths:
 
 # Tracks, skill level and level suggestions
 
+Suggestion evidence retains sixty qualifying response days across kinds,
+filtering basic and strict eligibility before the limit. The newest date
+comes from retained strict results, so skipped or malformed review-only
+activity cannot advance a dismissal cutoff. Rung and cutoff policies remain
+unchanged (`docs/decisions/level-suggestions.md`).
+
 Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;
 read it before changing that area.

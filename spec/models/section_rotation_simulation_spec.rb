@@ -10,7 +10,7 @@ RSpec.describe SectionRotation, "over every reachable pair" do
     ExerciseSection.all.combination(2).reject { |pair| pair.count(&:fourth?) > 1 }
   end
 
-  def entry(keys) = ExerciseHistoryEntry.new(section_keys: keys, delivered_section_keys: keys, answered: keys.size, dropped: 0)
+  def entry(keys) = ExerciseHistoryEntry.new(section_keys: keys, delivered_section_keys: keys, dropped: 0)
 
   def simulate(daily, count, seed)
     previous = srand(seed)

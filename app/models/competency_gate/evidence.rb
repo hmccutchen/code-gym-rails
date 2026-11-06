@@ -17,7 +17,10 @@ class CompetencyGate
       return enum_for(:each) unless block_given?
 
       responses.find_in_batches(cursor: %i[date id], batch_size: @batch_size) do |batch|
-        batch.each { |response| yield day_for(response) if ReviewedSectionResults.readable?(response) }
+        batch.each do |response|
+          day = day_for(response)
+          yield day if day
+        end
       end
     end
 
@@ -29,15 +32,20 @@ class CompetencyGate
     end
 
     def day_for(response)
+      return unless response.assessed_sections.any? { |section| ReviewedSectionResults.current_rubric?(response.ai_review[section]) }
+
       daily = response.daily_exercise.daily_kinds.map(&:key)
-      Day.new(results: ReviewedSectionResults.for(response, require_rubric: true, include_eased: true),
-              optional: optional_state(response, daily), daily: daily)
+      results = ReviewedSectionResults.for(response, require_rubric: true, include_eased: true)
+      optional = optional_state(response, daily)
+      return if results.empty? && %i[none unknown].include?(optional)
+
+      Day.new(results: results, optional: optional, daily: daily)
     end
 
-    # Assumes well-formed JSON; the readable? check above guarantees it.
     def optional_state(response, daily)
       optional = response.section_keys - daily
       return :none if optional.empty?
+      return :unknown unless response.completion_evidence?
 
       (optional - response.answered_sections).empty? ? :complete : :incomplete
     end

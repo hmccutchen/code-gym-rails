@@ -30,6 +30,19 @@ RSpec.describe CompetencyGate::Evidence do
     described_class.new(user, batch_size: batch_size).to_a
   end
 
+  it "keeps partial stamped grades while optional completion is unknown" do
+    day(0, { "code_review" => {}, "pattern" => { ai: nil } })
+    expect(days.sole.results.map(&:kind)).to eq([ "code_review" ])
+    expect(days.sole.optional).to eq(:unknown)
+  end
+
+  it "does not yield empty events or use a skipped or invalid stamp to qualify completion" do
+    day(0, { "code_review" => { ai: "invalid" }, "pattern" => { ai: nil } })
+    day(1, { "code_review" => { answered: false }, "pattern" => { rubric: nil } })
+    day(2, { "code_review" => { rung: nil } })
+    expect(days).to be_empty
+  end
+
   it "yields a day per reviewed, rubric-stamped response, oldest first, whatever order they were written in" do
     day(2, { "code_review" => { rung: "junior" } })
     day(0, { "code_review" => { ai: "strong" }, "pattern" => { self: "too_hard" } })
