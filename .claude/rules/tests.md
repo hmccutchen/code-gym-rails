@@ -108,11 +108,12 @@ CLI (cached on `spec/playwright/package-lock.json`), while the `test` job runs
 everything else via `--exclude-pattern "system/**/*_spec.rb"` — the two halves
 run in parallel so unit/request feedback isn't gated behind browser setup.
 The `system_test` job is a matrix of four runners. Each runs one group
-(`parallel_rspec -n 4 --only-group N spec/system`) in a single process against
-one database, so no runner shares a CPU between two Chromiums. To reproduce a
-group's failure locally, run that same command with its group number.
-`parallel_tests` groups the files by size, so adding a spec file can move
-others between groups.
+(`parallel_rspec -n 4 --group-by filesize --only-group N spec/system`) in a
+single process against one database, so no runner shares a CPU between two
+Chromiums. `-n` comes from the matrix's length, so the two can't disagree and
+leave a group unrun. To reproduce a group's failure locally, run that same
+command with its group number. The files are grouped by size, so adding a
+spec file can move others between groups.
 
 `spec/support/roll_defaults.rb` pins three of `DailyPlan`'s rolls for every
 example, since each changes what the plan or ingest produce:

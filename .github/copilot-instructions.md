@@ -20,9 +20,10 @@ importmap; a content security policy refuses an inline `<script>`, and
 ## When you write code here
 
 When you are changing this repository, as the Copilot coding agent does,
-CLAUDE.md's "How Work Is Run" and "Git Workflow" sections apply to you as
-written: who hands out tasks, which model takes which task, what joins a
-batch, when to push, and when to ask. They are stated only there.
+follow CLAUDE.md's "How Work Is Run" and "Git Workflow" sections: what joins
+a batch, when to push, never skipping a hook, and when to ask. Where you can
+start subagents or choose a model, the rules there on those apply too. They
+are stated only there.
 
 ## How to review
 

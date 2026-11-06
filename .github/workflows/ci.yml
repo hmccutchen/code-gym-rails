@@ -173,7 +173,7 @@ jobs:
         run: ./spec/playwright/node_modules/.bin/playwright-core install --with-deps chromium
 
       - name: Run system specs
-        run: bundle exec parallel_rspec -n 4 --only-group ${{ matrix.group }} spec/system
+        run: bundle exec parallel_rspec -n ${{ strategy.job-total }} --group-by filesize --only-group ${{ matrix.group }} spec/system
 
       - name: Upload failure screenshots
         if: failure()
