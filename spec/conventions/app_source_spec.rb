@@ -158,7 +158,6 @@ RSpec.describe "Conventions held over app/ source" do
   LEVEL_FIELDS = %i[skill_level section_kind_levels].freeze
   LEVEL_UPDATES = %i[update update! update_columns update_column update_attribute assign_attributes].freeze
   LEVEL_WRITE_EXEMPT = {
-    "app/models/level_change.rb" => { writes: 1, reason: "the track change clearing targets inside ProfileUpdate's save" },
     "app/models/user.rb" => { writes: 1, reason: "#choose_track, which ProfileUpdate calls under the row lock" }
   }.freeze
 
@@ -184,7 +183,7 @@ RSpec.describe "Conventions held over app/ source" do
     counts = sources.transform_values { |source| level_writes(source).size }.reject { |_path, count| count.zero? }
 
     expect(counts).to eq(LEVEL_WRITE_EXEMPT.transform_values { |exemption| exemption[:writes] }),
-      "Only LevelChange and User#choose_track may write a saved user's levels; ProfileUpdate records the cutoffs and events: #{counts}"
+      "Only User#choose_track may assign a level directly; ProfileUpdate records the cutoffs and events: #{counts}"
   end
 
   it "finds a level write however it is spelled, and not a read" do

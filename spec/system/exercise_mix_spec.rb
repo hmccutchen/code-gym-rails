@@ -186,7 +186,7 @@ RSpec.describe "Exercise mix", type: :system do
     expect(user.reload.section_kind_weights).to eq({})
   end
 
-  it "sends a skill level change queued behind a mix save before reloading for another tab's swap" do
+  it "never writes an unconfirmed track selection while a mix conflict reloads another tab's layout" do
     visit_as(user)
     visit setup_path
     find("#exercise-mix summary").click
@@ -195,34 +195,6 @@ RSpec.describe "Exercise mix", type: :system do
       const send = window.fetch;
       window.fetch = (url, options) => {
         const body = options && typeof options.body === "string" ? options.body : "";
-        if (body.includes('"skill_level"')) return new Promise((resolve) => setTimeout(() => resolve(send(url, options)), 500));
-        if (!body.includes('"layout"')) return send(url, options);
-        return new Promise((resolve) => { window.releaseMixSave = () => resolve(send(url, options)); });
-      };
-    JS
-
-    find("#weight-architecture").set(0)
-    wait_for { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
-    user.update!(daily_section_kinds: %w[code_review challenge])
-    level = (User::SKILL_LEVELS - [ user.skill_level ]).first
-    find("#skill-level", visible: :all).select(I18n.t("exercise_mix.levels.#{level}"), visible: :all)
-    page.execute_script("window.releaseMixSave()")
-
-    expect(page).to have_no_css("#weight-challenge")
-    expect(page.evaluate_script("window.renderedBeforeSwap === undefined")).to be(true)
-    expect(user.reload.skill_level).to eq(level)
-  end
-
-  it "keeps the page and the unsaved skill level when the save queued behind the swapped-layout reply fails, and through a repeated conflict" do
-    visit_as(user)
-    visit setup_path
-    find("#exercise-mix summary").click
-    page.execute_script(<<~JS)
-      window.renderedBeforeSwap = true;
-      const send = window.fetch;
-      window.fetch = (url, options) => {
-        const body = options && typeof options.body === "string" ? options.body : "";
-        if (body.includes('"skill_level"')) return new Promise((resolve) => setTimeout(() => resolve(new Response("", { status: 503 })), 500));
         if (!body.includes('"layout"')) return send(url, options);
         return new Promise((resolve) => { window.releaseMixSave = () => resolve(send(url, options)); });
       };
@@ -234,21 +206,162 @@ RSpec.describe "Exercise mix", type: :system do
     stored = user.skill_level
     level = (User::SKILL_LEVELS - [ stored ]).first
     find("#skill-level", visible: :all).select(I18n.t("exercise_mix.levels.#{level}"), visible: :all)
+    expect(page).to have_button("Apply track", disabled: true)
     page.execute_script("window.releaseMixSave()")
+
+    expect(page).to have_no_css("#weight-challenge")
+    expect(page.evaluate_script("window.renderedBeforeSwap === undefined")).to be(true)
+    expect(user.reload.skill_level).to eq(stored)
+    expect(user.level_suggestion_events).to be_empty
+    expect(user.section_kind_weights).to eq({})
+    expect(find("#skill-level", visible: :all).value).to eq(stored)
+  end
+
+  it "finishes a confirmed Apply before the queued mix conflict reloads another tab's layout" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    find("#skill-level", visible: :all).select("Mid-level", visible: :all)
+    expect(page).to have_button("Apply track", disabled: false)
+    page.execute_script(<<~JS)
+      window.renderedBeforeSwap = true;
+      window.mixWrites = 0;
+      window.trackWrites = 0;
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? JSON.parse(options.body) : {};
+        if (url.endsWith("/profile") && body.user?.skill_level) {
+          window.trackWrites++;
+          return send(url, options).then(reply => new Promise(resolve => {
+            window.releaseTrackReply = () => resolve(reply);
+          }));
+        }
+        if (body.layout) window.mixWrites++;
+        return send(url, options);
+      };
+    JS
+    click_button "Apply track"
+    wait_for_js_condition("typeof window.releaseTrackReply === 'function'")
+    user.update!(daily_section_kinds: %w[code_review challenge])
+    find("#weight-architecture").set(0)
+    wait_for_js_condition('window.CodeGymSaveStatus.queued("exercise_mix")')
+
+    expect(page.evaluate_script("[window.trackWrites, window.mixWrites, window.renderedBeforeSwap]")).to eq([ 1, 0, true ])
+    expect(page).to have_css("#skill-level[disabled]", visible: :all)
+    expect(user.reload.skill_level).to eq("mid_level")
+    page.execute_script("window.releaseTrackReply()")
+
+    expect(page).to have_no_css("#weight-challenge")
+    expect(page.evaluate_script("window.renderedBeforeSwap === undefined")).to be(true)
+    expect(user.reload.skill_level).to eq("mid_level")
+    expect(user.section_kind_weights).to eq({})
+    expect(find("#skill-level", visible: :all).value).to eq("mid_level")
+  end
+
+  it "keeps a failed confirmed Apply on the old layout until Cancel permits the reload" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    stored = user.skill_level
+    level = (User::SKILL_LEVELS - [ stored ]).first
+    find("#skill-level", visible: :all).select(I18n.t("exercise_mix.levels.#{level}"), visible: :all)
+    expect(page).to have_button("Apply track", disabled: false)
+    page.execute_script(<<~JS)
+      window.renderedBeforeSwap = true;
+      window.mixWrites = 0;
+      window.trackWrites = 0;
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        const body = options && typeof options.body === "string" ? options.body : "";
+        if (url.endsWith("/profile") && body.includes('"skill_level"')) {
+          window.trackWrites++;
+          return new Promise(resolve => { window.releaseTrackFailure = () => resolve(new Response("", { status: 503 })); });
+        }
+        if (body.includes('"layout"')) window.mixWrites++;
+        return send(url, options);
+      };
+    JS
+
+    click_button "Apply track"
+    wait_for_js_condition("typeof window.releaseTrackFailure === 'function'")
+    user.update!(daily_section_kinds: %w[code_review challenge])
+    find("#weight-architecture").set(0)
+    wait_for_js_condition('window.CodeGymSaveStatus.queued("exercise_mix")')
+    expect(page.evaluate_script("window.mixWrites")).to eq(0)
+    page.execute_script("window.releaseTrackFailure()")
 
     expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))
     expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
     expect(find("#skill-level", visible: :all).value).to eq(level)
     expect(user.reload.skill_level).to eq(stored)
 
-    page.execute_script("window.releaseMixSave = null; window.CodeGymSaveStatus.clear('exercise_mix')")
-    find("#weight-architecture").set(4)
-    wait_for { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
-    page.execute_script("window.releaseMixSave()")
+    expect(page).to have_button("Apply track", disabled: true)
+    expect(page).to have_button("Refresh preview", disabled: false)
+    expect(page.evaluate_script("window.trackWrites")).to eq(1)
+    expect(user.reload.skill_level).to eq(stored)
+    expect(user.level_suggestion_events).to be_empty
 
-    expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))
-    expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
-    expect(find("#skill-level", visible: :all).value).to eq(level)
+    click_button "Cancel track change"
+    expect(page).to have_no_css("#weight-challenge")
+    expect(page.evaluate_script("window.renderedBeforeSwap === undefined")).to be(true)
+    expect(user.reload.skill_level).to eq(stored)
+    expect(find("#skill-level", visible: :all).value).to eq(stored)
+  end
+
+  [ false, true ].each do |failed|
+    it "#{failed ? 'strands the layout reload when' : 'waits to reload the layout until'} an independent time-zone save #{failed ? 'fails' : 'succeeds'}" do
+      visit_as(user)
+      visit setup_path
+      find("#exercise-mix summary").click
+      stored = user.time_zone
+      page.execute_script(<<~JS, failed)
+        const failed = arguments[0], send = window.fetch;
+        window.renderedBeforeSwap = true;
+        window.fetch = (url, options) => {
+          const body = options && typeof options.body === "string" ? JSON.parse(options.body) : {};
+          if (body.user?.time_zone) {
+            return new Promise(resolve => {
+              window.releaseTimeZone = () => resolve(failed ? new Response("", { status: 503 }) : send(url, options));
+            });
+          }
+          if (body.layout) return new Promise(resolve => { window.releaseMixSave = () => resolve(send(url, options)); });
+          return send(url, options);
+        };
+      JS
+      find("#weight-architecture").set(0)
+      wait_for_js_condition("typeof window.releaseMixSave === 'function'")
+      user.update!(daily_section_kinds: %w[code_review challenge])
+      find("#tz-select", visible: :all).select("Hawaii", visible: :all)
+      wait_for_js_condition("typeof window.releaseTimeZone === 'function'")
+      page.execute_script("window.releaseMixSave()")
+
+      expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.conflict"))
+      expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
+      expect(user.reload.time_zone).to eq(stored)
+      page.execute_script("window.releaseTimeZone()")
+
+      if failed
+        expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))
+        expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
+        expect(find("#tz-select", visible: :all).value).to eq("Pacific/Honolulu")
+        expect(user.reload.time_zone).to eq(stored)
+
+        page.execute_script("window.releaseMixSave = null; window.CodeGymSaveStatus.clear('exercise_mix')")
+        find("#weight-architecture").set(4)
+        wait_for_js_condition("typeof window.releaseMixSave === 'function'")
+        page.execute_script("window.releaseMixSave()")
+
+        expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))
+        expect(page.evaluate_script("window.renderedBeforeSwap")).to be(true)
+        expect(find("#tz-select", visible: :all).value).to eq("Pacific/Honolulu")
+        expect(user.reload.time_zone).to eq(stored)
+      else
+        expect(page).to have_no_css("#weight-challenge")
+        expect(page.evaluate_script("window.renderedBeforeSwap === undefined")).to be(true)
+        expect(user.reload.time_zone).to eq("Pacific/Honolulu")
+      end
+      expect(user.reload.section_kind_weights).to eq({})
+    end
   end
 
   it "keeps the page when another control's save failed before the swapped-layout reply arrived" do

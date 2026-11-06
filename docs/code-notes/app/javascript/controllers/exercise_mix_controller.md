@@ -192,10 +192,18 @@ posts the pair the page was rendered for (`layout`, from
 `layout_changed`. The controller reloads when it is true and never compares
 pairs itself; otherwise it re-syncs the controls as before.
 
-The reply arrives while a skill level change may still wait behind it on the
-`exercise_mix` line, so the reload goes through `saveStatus.reloadWhenSaved`
-and happens only once that save has landed. If that save fails, or is still
-running after ten seconds, the banner shows `exercise_mix.layout_stranded` and
-the user reloads. `reloading` keeps a second refused save from starting a second wait,
-and clears when the banner shows, so a later conflict in the same tab starts
-a new wait.
+The reload goes through `saveStatus.reloadWhenSaved`, which waits for every
+pending save, including independent controls such as time zone. A confirmed
+track Apply shares the `exercise_mix` line, so a mix edit made during Apply
+cannot send or trigger a layout reload before the Apply reply is handled.
+If a save fails, or is still running after ten seconds, the banner shows
+`exercise_mix.layout_stranded` and the page stays. `reloading` keeps a second
+refused save from starting a second wait, and clears when the banner shows,
+so a later conflict in the same tab starts a new wait.
+
+Selecting a track alone is no longer a queued write. If a pending mix save
+gets a layout conflict before that selection can preview, the reload cannot
+apply the proposed track: the new page shows the saved baseline. A failed
+explicit Apply instead leaves a `skill_level` save error and the proposed
+selection on the page. Cancel clears that error and lets an already-held
+layout reload resume when the other saves are clean.

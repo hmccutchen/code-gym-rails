@@ -323,7 +323,10 @@ RSpec.describe "ApiKeys", type: :request do
       get setup_path
       expect(first_cards.size).to eq(2)
       first_cards.each { |card| expect(card.css(".hint")).to be_empty }
-      expect(first_cards.sum { |card| card.css(".card-note").count { |note| note.ancestors(".daily-sections-choice").empty? } }).to eq(9)
+      expect(first_cards.sum { |card| card.css(".card-note").count { |note| note.ancestors(".daily-sections-choice").empty? } }).to eq(10)
+      preview_status = first_cards.last.at_css('[data-profile-preferences-target="trackPanel"][hidden] .card-note[role="status"]')
+      expect(preview_status["data-profile-preferences-target"]).to eq("trackStatus")
+      expect(preview_status.text).to be_empty
     end
 
     it "renders each value row's current choice before any script runs, hidden from screen readers" do
