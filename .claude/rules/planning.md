@@ -2,7 +2,7 @@
 paths:
   - "app/models/adaptation_history.rb"
   - "spec/models/adaptation_history_spec.rb"
-  - "app/models/{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,reviewed_section_results,weighted_roll,generation_ladders}.rb"
+  - "app/models/{daily_plan,section_rotation,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,reviewed_section_results,weighted_roll,generation_ladders}.rb"
   - "app/models/competency_gate/**"
   - "app/models/coverage_exception/**"
   - "app/models/{concept_mastery,kind_preferences,kind_difficulty,concept_drills,concept_hosts,ladder_coverage,exercise_history_entry,user,daily_exercise,concept_exposure_index}.rb"
@@ -11,7 +11,7 @@ paths:
   - "app/controllers/concerns/exercise_mix_ladders.rb"
   - "app/views/api_keys/**"
   - "app/javascript/controllers/exercise_mix_controller.js"
-  - "spec/**/*{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,concept_mastery,kind_preferences,kind_difficulty,concept_drills,accounts,user_spec,exercise_mix,generation_ladders,section_kind_settings}*"
+  - "spec/**/*{daily_plan,section_rotation,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,concept_mastery,kind_preferences,kind_difficulty,concept_drills,accounts,user_spec,exercise_mix,generation_ladders,section_kind_settings}*"
   - "app/controllers/dashboard_controller.rb"
   - "app/views/dashboard/**"
   - "app/jobs/{generate_daily_exercises_job,regenerate_exercise_job}.rb"
@@ -104,7 +104,7 @@ read it before changing that area.
   `ExerciseSection.layout(daily:)` or `.optional_slots(daily:)`; never
   re-introduce a global slot list. A default account must stay byte-identical,
   which the prompt, page and request snapshots hold. A daily fourth takes the
-  fourth slot out of rotation. `CompetencyGate` reads each day's own pair. The card's swap control (`DailyKindSwap::Picker`,
+  fourth slot out of rotation. Workload reads active core work from each row, independent of daily membership. The card's swap control (`DailyKindSwap::Picker`,
   `DailyKindSwap::Consequences`) restates no pair rule: option states come
   from `DailyKindSwap.refusal`, sharing from `DayHosts`, the weeks figure
   from `CoverageException.expected_gap_weekdays` (pinned to the real planner
@@ -129,7 +129,7 @@ read it before changing that area.
 - **Daily sections setting** (`docs/decisions/daily-sections-setting.md`):
   `User#daily_section_count` is Automatic (nil) or a count in
   `User::DAILY_SECTION_COUNTS` (1 to 4; Automatic's floors stay at the pair).
-  `DaySize.for` returns a fixed count before completion or the gate, and a
+  `DailyPlan.size_for` returns a fixed count before querying the gate, and a
   fixed count never gains a coverage section. Setup asks which daily section
   a count of 1 keeps and which kinds a larger count adds, and saves the count
   and the place list in one `PATCH /profile` (`DailySectionsChoice`); a count
@@ -140,7 +140,8 @@ read it before changing that area.
 - **What the plan did, on the row**
   (`docs/decisions/what-the-plan-did-on-the-row.md`):
   `daily_exercises.plan_notes` records the planned size and reason on every
-  plan and the day's daily kinds (`daily_kinds`), plus coverage, shared
+  plan and the day's daily kinds (`daily_kinds`), plus captured server
+  `kind_rungs`, coverage, shared
   concept and `brake` when they applied (`DailyPlan::Result#notes`). It is server-owned, written with the row from
   the plan that produced it and never recomputed while rendering; the size
   excludes any coverage addition, and `RegenerateExerciseJob` rewrites it from
@@ -164,23 +165,24 @@ read it before changing that area.
   `no_host` and are logged.
 - **Coverage exception** (`docs/decisions/coverage-exception.md`):
   `CoverageException` (pure) adds one optional section, from the pair's
-  optional slots, to a two-section Automatic day when the brake is off and
+  optional slots, to a two-section Automatic day when the workload safety hold is off and
   no exercise on the previous `CAP_WEEKDAYS` weekdays has `plan_notes["coverage"]`, picking a kind for an
   overdue check or one unseen for `GAP_WEEKDAYS`. It respects exclusions with
   no fallback, unlike rotation, on purpose: an all-excluded pool adds nothing.
   It reads hosting through `DayHosts`, and gives up the addition when the check
   would not land in it.
 - **Competency gate** (`docs/decisions/competency-gate.md`): `CompetencyGate`
-  earns an Automatic day's size from rubric-stamped reviews; `DaySize` takes
-  the lower of it and completion, and a fixed setting wins outright. The fold
-  is pure and runs forward, moves one step a day, resets to two on the brake
-  (which empties the growth windows), and reads levels from `pitched_at`.
-  Eased sections stay out of growth, but their too-hard rating counts toward
-  the brake. Growth counts a result only when its kind was daily on its own
-  day (`Day#daily`, from the row's `plan_notes`), so a change of pair never
-  reclassifies past days or resets an earned size. `ReviewedSectionResults`
-  decides which sections count, and `CompetencyGate::Evidence` reads every
-  stamped day with no cap, since a cap would forget an earned size.
+  owns Automatic size and replays all eligible history without a cap.
+  Growth needs independent five-attempt normal-grade proof per kind plus
+  two full core sets at the current workload. Kind effort tracks known
+  nominal-rung observations separately; eased hard counts, eased comfort
+  does not. Actual skips and broad overload reduce one, retaining kind
+  windows; two comfortable full sets reopen growth. Grade/effort/overload
+  retain current-rubric/rung requirements; basic completion/recovery do
+  not. Server as-planned rung snapshots reset only changed-kind windows,
+  with observed-rung fallback for legacy rows. Supplementary bug hunts
+  affect none of these paths. Coverage remains, blocked by persistent
+  safety hold; protected practice and #264 checkpointing remain separate.
 - **Pausing generation** (`docs/decisions/pausing-generation.md`):
   `User#paused_generation_at` stops only generation the user didn't ask for
   (cron and the dashboard auto-trigger), never submit or review. `PATCH

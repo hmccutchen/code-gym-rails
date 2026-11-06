@@ -22,7 +22,8 @@ Basic adaptation reads `DailyResponse#assessed_sections`; valid partial
 answers act immediately, while malformed or missing grades act nowhere.
 Completion waits only for answered active sections, unlike UI walkthrough
 completeness. The locked `ResponseReview` merge counts a session only on its
-first assessed-answer transition. The intended least-favourable daily
+first assessed-core-answer transition, excluding supplementary bug hunts.
+The model guards countdown with the same subset. The intended least-favourable daily
 mastery aggregate remains; #726 separately tracks retry-order dependence.
 
 Each entry states what a change must not break. An entry that names a
@@ -39,12 +40,13 @@ read it before changing that area.
   its `fixed_rating` hook, and `.rating_fixed?` says which kinds override
   it (a spec checks each kind's answer against the override). `RubricCheck` never rewrites a rating: it logs
   agreement, and its gap list also decides whether the short version shows
-  pitfalls. The competency gate and
-  `LevelSuggestion` read only `RUBRIC_VERSION`-stamped reviews;
+  pitfalls. Workload grade/effort/overload and
+  `LevelSuggestion` require `RUBRIC_VERSION`-stamped reviews; basic core
+  completion and recovery ratings do not.
   `ConceptMastery` and `RungLedger` read all history on purpose, except
   sections whose kind says they are not mastery evidence
   (`DailyResponse#mastery_evidence?`: a `bug_hunt` section, which still
-  counts as an exposure and as kind-level evidence;
+  counts as an exposure but not adaptation evidence;
   `docs/decisions/bug-hunt.md`). A `bug_hunt` section's grading note judges
   against its goal line.
 - **Unanswered sections are reviewed, not graded** (`docs/decisions/grading-rubric.md`):

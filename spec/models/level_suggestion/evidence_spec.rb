@@ -171,6 +171,26 @@ RSpec.describe LevelSuggestion::Evidence do
     expect(evidence.newest_date).to eq(today - 65)
   end
 
+  it "backfills both adaptation readers past supplementary days without losing delivered history" do
+    65.times do |n|
+      row = day(n)
+      row.daily_exercise.update!(problem_set: row.daily_exercise.problem_set.deep_merge("code_review" => { "purpose" => "Find the trap" }))
+    end
+    10.times { |n| day(65 + n) }
+    expect(described_class.for(user).newest_date).to eq(today - 65)
+    expect(described_class.for(user).results.fetch("code_review").size).to eq(10)
+    expect(user.recent_performance.map { |entry| entry[:date] }).to eq((65..74).map { |n| (today - n).to_s })
+    expect(user.recent_delivered_content.first[:date]).to eq(today.to_s)
+  end
+
+  it "projects mixed weekend completion over core even with a pending bug answer" do
+    row = day(0, { "code_review" => { rung: "junior", unreviewed: true }, "pattern" => { rung: "junior" } })
+    row.daily_exercise.update!(problem_set: row.daily_exercise.problem_set.deep_merge("code_review" => { "purpose" => "Find the trap" }))
+    expect(user.recent_performance.sole).to include(
+      sections: [ { key: "pattern", self_rating: "right_level", ai_rating: "solid" } ],
+      completion: { answered: 1, total: 1, skipped_sections: [] })
+  end
+
   it "does not materialize unstamped response days before the newest strict result" do
     day(2)
     day(1, { "code_review" => { rung: "junior", unstamped: true } })

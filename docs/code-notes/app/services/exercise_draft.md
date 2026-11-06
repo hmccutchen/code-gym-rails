@@ -26,6 +26,11 @@ table.
 
 Assessed performance and delivered-content history are each fetched once.
 The draft captures both whole projections and retries reuse them.
+It also captures every kind's effective rung once, before the call, using
+the captured difficulty, and retains the profile's baseline level. Initial
+and retry prompts, ingest, ladders, the judge and requested diagnostics reuse
+these captured values; judged notes persist the map as the period's input snapshot.
+The map and its level strings are frozen independently of the user's fields.
 Diagnostics log only assessed performance under `recent_performance`;
 delivered scenarios are not added to logs.
 

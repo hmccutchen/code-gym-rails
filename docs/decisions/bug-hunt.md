@@ -166,9 +166,20 @@ schedule.
   planning hosts only). So no reinforcement entry, retention check,
   coverage check or shared concept is planned onto a section that can't
   move it. Both hooks read one rule (`mastery_evidence_mode?`).
-- **What still counts:** the section is an exposure, and it is still
-  `code_review` evidence at its rung for the competency gate and level
-  suggestions.
+- **What still counts:** feedback, grading, exposure, trap avoidance and
+  delivered-content repetition history remain. A separate kind-owned
+  `adaptation_evidence?` facet excludes the puzzle from workload grades,
+  effort, overload, completion, recovery, skip explanations, generation
+  performance and level suggestions. Other weekend core work remains
+  eligible. This facet does not alias mastery policy.
+- **Session countdown:** only the first assessed core answer starts a
+  paused-concept countdown, under the existing token-checked review lock.
+  Bug-first, core-first and combined batches count the same one core
+  session; bug-only work counts none. Old materialized countdown effects
+  are not destructively rebuilt.
+- **Historical identification:** the stored `purpose` marker, not a weekend
+  date, identifies a bug hunt. Missing historical markers cannot be
+  reconstructed. Historical read-time workload/proposal results may change.
 - **The cost:** on every weekend set, `code_review` carries no
   reinforcement or retention check. On a two-section day most code
   concepts then wait a day.

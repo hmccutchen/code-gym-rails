@@ -6,6 +6,11 @@ paths:
 
 # Models
 
+Generated exercise plan notes also carry a server-owned `kind_rungs` input
+snapshot captured once for ingest and retries. The workload fold reads it
+without consulting current profile settings. Missing legacy maps use
+observed-rung fallback. The two #726 reserved columns remain unwritten.
+
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |

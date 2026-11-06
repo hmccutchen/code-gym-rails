@@ -1450,9 +1450,9 @@ RSpec.describe AiService do
     let(:difficulty) { KindDifficulty.new(levels: { "challenge" => "senior", "pattern" => "mid_level" }, locked: %w[challenge]) }
     let(:draft_ladders) { { "senior" => { "memoization" => "the draft's senior rung" } } }
     let(:draft) do
-      ExerciseDraft::Draft.new(user: user, language: "ruby_rails", problem_set: {}, plan: plan,
+      ExerciseDraft::Draft.new(user: user, skill_level: user.skill_level, language: "ruby_rails", problem_set: {}, plan: plan,
                                kinds: ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review }),
-                               difficulty: difficulty, ladders: draft_ladders, history: history, delivered_history: [],
+                               difficulty: difficulty, kind_rungs: difficulty.rungs(skill_level: user.skill_level), ladders: draft_ladders, history: history, delivered_history: [],
                                suggested_concepts: [], unusable_sections: [])
     end
     let(:svc) { double_class.new(canned_text: { "challenge" => FakeService::EXERCISE_PROBLEM_SET["challenge"] }.to_json) }
@@ -4890,10 +4890,10 @@ RSpec.describe AiService, "#judge_section given a prose reply" do
   end
 
   it "keeps the draft and records the fallback" do
-    draft = Struct.new(:problem_set, :plan, :kinds, :difficulty, :unusable_sections, keyword_init: true).new(
+    draft = Struct.new(:problem_set, :plan, :kinds, :difficulty, :kind_rungs, :unusable_sections, keyword_init: true).new(
       problem_set: { "code_review" => section }, unusable_sections: [],
       plan: plan_for(due_checks: [], fourth_due_checks: [], reinforcement: [], fourth_reinforcement: nil),
-      kinds: [ ExerciseSection::CodeReview ], difficulty: KindDifficulty.none
+      kinds: [ ExerciseSection::CodeReview ], difficulty: KindDifficulty.none, kind_rungs: KindDifficulty.none.rungs(skill_level: user.skill_level)
     )
     providers = lambda do
       JudgedGeneration::Provider.new(judge_section: service.method(:judge_section), retry_section: ->(*) { raise "no retry expected" },
@@ -4944,8 +4944,9 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
 
-    expect(judged.plan_notes).to eq("daily_kinds" => %w[code_review design_comparison], "size" => SectionCount::FLOOR,
-                                    "size_reason" => "gate", "shared_concept" => "feature_envy")
+    expect(judged.plan_notes).to eq("daily_kinds" => %w[code_review design_comparison], "size" => CompetencyGate::FLOOR,
+                                    "size_reason" => "gate", "shared_concept" => "feature_envy",
+                                    "kind_rungs" => KindDifficulty.for(user).rungs(skill_level: user.skill_level))
   end
 
   it "leaves the day to DailyPlan's clock default, passing no weekend: of its own" do
@@ -6079,10 +6080,9 @@ RSpec.describe AiService, "the day's size" do
 
     decision = decision_from(lines)
 
-    expect(decision).to include("count" => SectionCount::FLOOR, "reason" => "gate", "setting" => "automatic")
-    expect(decision["gate"]["evidence"]["to_three"])
-      .to eq("required" => CompetencyGate::GROW_TO_THREE.of, "available" => 0, "bar_met" => 0, "favourable" => 0, "by_kind" => {})
-    expect(decision["gate"]["evidence"]).to include("to_four", "brake", "optional", "levels")
+    expect(decision).to include("count" => CompetencyGate::FLOOR, "reason" => "gate", "setting" => "automatic")
+    expect(decision["gate"]["evidence"]["kinds"]).to eq({})
+    expect(decision["gate"]["evidence"]).to include("capacity", "overload", "causes", "qualifying_required")
   end
 
   it "logs once for each generated set" do
@@ -6094,13 +6094,13 @@ RSpec.describe AiService, "the day's size" do
     expect(lines.grep(/\A\[set_size\] user=#{user.id} date=/).size).to eq(2)
   end
 
-  it "logs a fixed setting's override with the gate's evidence beside it" do
+  it "logs a fixed setting without fabricating unqueried gate evidence" do
     user.update!(daily_section_count: 3)
 
     decision = decision_from(generated_lines("[set_size]"))
 
     expect(decision).to include("count" => 3, "reason" => "setting", "setting" => 3)
-    expect(decision["gate"]).to include("count" => SectionCount::FLOOR, "reason" => "held")
+    expect(decision["gate"]).to be_nil
   end
 
   it "logs a transition from the previous day's planned size" do
@@ -6112,7 +6112,7 @@ RSpec.describe AiService, "the day's size" do
   end
 
   it "compares against the planned size, not a coverage-added delivered one" do
-    planned_day(Date.current - 1, size: SectionCount::FLOOR, plan_notes: { "coverage" => "pattern", "coverage_reason" => "gap" })
+    planned_day(Date.current - 1, size: CompetencyGate::FLOOR, plan_notes: { "coverage" => "pattern", "coverage_reason" => "gap" })
 
     expect(generated_lines("[set_size]").grep(/from=/)).to eq([])
   end
@@ -6127,8 +6127,8 @@ RSpec.describe AiService, "the day's size" do
   it "carries the same decision in the diagnostics payload" do
     payload = JSON.parse(generated_lines("[difficulty_diagnostics]").last.delete_prefix("[difficulty_diagnostics] "))
 
-    expect(payload["requested"]["size"]).to include("count" => SectionCount::FLOOR, "reason" => "gate")
-    expect(payload["requested"]["size"]["gate"]["evidence"]).to include("to_three", "to_four", "brake")
+    expect(payload["requested"]["size"]).to include("count" => CompetencyGate::FLOOR, "reason" => "gate")
+    expect(payload["requested"]["size"]["gate"]["evidence"]).to include("kinds", "capacity", "overload")
   end
 end
 

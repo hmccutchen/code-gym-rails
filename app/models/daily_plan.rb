@@ -4,10 +4,10 @@ class DailyPlan
                         :fourth_reinforcement, :fourth_due_checks, :fourth_established,
                         :code_review_mode, :code_review_source, :code_review_files, :code_review_gotcha, :featured_concept, :scenario_flavor,
                         :shared_concept, :coverage, :waiting_checks, :size) do
-    def notes
+    def notes(kind_rungs: nil)
       { "daily_kinds" => daily_kinds.map(&:key), "size" => size&.count, "size_reason" => size&.reason&.to_s,
         "brake" => (true if size&.brake?), "coverage" => coverage&.kind&.key, "coverage_reason" => coverage&.reason&.to_s,
-        "shared_concept" => shared_concept, "bug_hunt" => code_review_gotcha&.id }.compact
+        "shared_concept" => shared_concept, "bug_hunt" => code_review_gotcha&.id, "kind_rungs" => kind_rungs }.compact
     end
 
     def kinds = ExerciseSection.for_plan(daily: daily_kinds, rotation: rotation)
@@ -90,8 +90,9 @@ class DailyPlan
   private_class_method :code_review_day?
 
   def self.size_for(user, before: Date.current)
-    history = user.recent_completion_history(before: before)
-    DaySize.for(setting: user.daily_section_count, completion: SectionCount.for(history), gate: CompetencyGate.for(user))
+    return DaySize.for(setting: user.daily_section_count) if user.daily_section_count
+
+    DaySize.for(setting: nil, gate: CompetencyGate.for(user, before: before))
   end
 
   def self.due_buckets(user, language)

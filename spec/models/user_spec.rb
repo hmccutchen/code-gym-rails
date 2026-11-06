@@ -474,14 +474,14 @@ RSpec.describe User, type: :model do
       exercise_on(Date.current - 1, %w[code_review pattern])
 
       expect(user.recent_exercise_history(limit: 5).first.section_keys).to eq(%w[code_review pattern])
-      expect(user.recent_completion_history).to be_empty
+      expect(CompetencyGate::Evidence.new(user).to_a).to be_empty
     end
 
     it "does not turn a draft's answers into completion" do
       exercise_on(Date.current - 1, %w[code_review pattern],
                   answers: { "code_review" => "a real answer well past ten characters" })
 
-      expect(user.recent_completion_history).to be_empty
+      expect(CompetencyGate::Evidence.new(user).to_a).to be_empty
     end
 
     it "backfills qualified completion past drafts and pending answers, ignoring skipped walkthroughs" do
@@ -491,14 +491,13 @@ RSpec.describe User, type: :model do
         row = exercise_on(Date.current - i - 1, %w[code_review pattern], answers: { "code_review" => "x", "pattern" => "y" })
         row.daily_response.update!(submitted_at: Time.current, ai_review: { "code_review" => { "rating" => "solid" } })
       end
-      expect(user.recent_completion_history(limit: 1).map(&:answered)).to eq([ 1 ])
+      expect(CompetencyGate::Evidence.new(user).map { |day| day.completion.answered }).to eq([ 1 ])
       expect(user.recent_exercise_history(limit: 20).size).to eq(20)
       old.update_column(:dropped_sections, "bad")
-      expect(user.recent_completion_history).to be_empty
+      expect(CompetencyGate::Evidence.new(user).map { |day| day.completion.answered }).to eq([ 1 ])
     end
 
     it "keeps plan size and forecast unchanged when a draft is edited" do
-      allow(CompetencyGate).to receive(:for).with(user).and_return(CompetencyGate::Plan.new(count: 4, reason: :earned, evidence: {}))
       3.times do |i|
         row = exercise_on(Date.current - i - 2, %w[code_review pattern], answers: { "code_review" => "x" })
         row.daily_response.update!(submitted_at: Time.current, ai_review: { "code_review" => { "rating" => "solid" } })
@@ -1476,12 +1475,12 @@ RSpec.describe User, type: :model do
           pause_on(Date.current - 1)
 
           expect(user.recent_exercise_history(limit: 20).size).to eq(1)
-          expect(user.recent_completion_history).to be_empty
+          expect(CompetencyGate::Evidence.new(user).to_a).to be_empty
 
           user.resume_generation!
 
           expect(user.recent_exercise_history(limit: 20)).to be_empty
-          expect(user.recent_completion_history(before: Date.tomorrow)).to be_empty
+          expect(CompetencyGate::Evidence.new(user, before: Date.tomorrow).to_a).to be_empty
         end
       end
 
@@ -1668,7 +1667,7 @@ RSpec.describe User, type: :model do
     end
 
     it "never offers fewer sections than the daily kinds every day holds" do
-      expect(SectionCount::FLOOR).to eq(DailyKinds::COUNT)
+      expect(CompetencyGate::FLOOR).to eq(DailyKinds::COUNT)
     end
 
     it "no longer reads the retired adaptive_set_size column" do

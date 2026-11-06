@@ -27,12 +27,17 @@ are omitted; exclusions remain a scheduling preference.
 
 `LevelSuggestion::Evidence` uses `AdaptationHistory.recent` to select the
 latest 60 qualifying submitted response days across all kinds, filtering
-before the limit and preloading exercises in cursor batches. Only assessed,
+before the limit and preloading exercises in cursor batches. Identifiable
+supplementary bug hunts supply no up/down evidence, cannot clear a veto,
+advance newest dates or occupy that window. Other weekend core work keeps
+its effects. Only assessed,
 un-eased sections with a `pitched_at` stamp, an AI rating and the current
 `ReviewedSectionResults::RUBRIC_VERSION` stamp contribute, because the AI rating now
 decides alone and only a rubric grade rates against the stated level.
-Raising `RUBRIC_VERSION` restarts suggestion evidence, as it does for the
-competency gate. The AI rating's calibration for these moves is unverified,
+Raising `RUBRIC_VERSION` restarts suggestion evidence and strict workload
+proof, but basic workload completion/recovery retain unversioned grades.
+Historical bug exclusion may change pending proposals without rolling back
+applied levels. The AI rating's calibration for these moves is unverified,
 and suggestions require an explicit Apply.
 
 The selector applies `.reviewed` and the shared

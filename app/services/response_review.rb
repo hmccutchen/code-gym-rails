@@ -58,10 +58,10 @@ class ResponseReview
       next false unless @response.reviewing_since == @claim
 
       if successes.any?
-        unassessed = @response.assessed_sections.empty?
+        unassessed = @response.assessed_adaptation_sections.empty?
         @response.ai_review = (@response.ai_review || {}).merge(successes.transform_values { |result| result[:review] })
         @response.review_provider = @user.provider
-        first_assessment = unassessed && @response.assessed_sections.any?
+        first_assessment = unassessed && @response.assessed_adaptation_sections.any?
         ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_assessment)
       end
       @response.review_errors = @response.review_errors.except(*successes.keys)

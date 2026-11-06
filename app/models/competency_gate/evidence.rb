@@ -5,8 +5,9 @@ class CompetencyGate
 
     BATCH_SIZE = 100
 
-    def initialize(user, batch_size: BATCH_SIZE)
+    def initialize(user, before: Date.current, batch_size: BATCH_SIZE)
       @user = user
+      @before = before
       @batch_size = batch_size
     end
 
@@ -24,24 +25,37 @@ class CompetencyGate
     private
 
     def responses
-      ReviewedSectionResults.with_current_rubric(@user.daily_responses.submitted.reviewed).preload(:daily_exercise)
+      @user.daily_responses.submitted.reviewed.where(date: ...@before).preload(:daily_exercise)
     end
 
     def day_for(response)
-      return unless response.assessed_sections.any? { |section| ReviewedSectionResults.current_rubric?(response.ai_review[section]) }
-
-      daily = response.daily_exercise.daily_kinds.map(&:key)
       results = ReviewedSectionResults.for(response, require_rubric: true, include_eased: true)
-      day = Day.new(results: results, optional: optional_state(response, daily), daily: daily)
+      day = Day.new(date: response.date, results: results, completion: completion_for(response), rungs: rungs_for(response))
       day if day.evidence?
     end
 
-    def optional_state(response, daily)
-      optional = response.section_keys - daily
-      return :none if optional.empty?
-      return :unknown unless response.completion_evidence?
+    def completion_for(response)
+      keys = response.adaptation_section_keys
+      assessed = response.assessed_adaptation_sections
+      state = if keys.empty?
+        :none
+      elsif !response.completion_evidence?(sections: keys)
+        :unknown
+      else
+        (keys - assessed).empty? ? :complete : :incomplete
+      end
+      ratings = assessed.to_h { |key| [ key, response.self_rating_for(key) ] }
+      Completion.new(state: state, assigned: response.daily_exercise.planned_size, delivered: keys.size,
+        answered: assessed.size, too_hard: ratings.select { |_, rating| ReviewedSectionResults.too_hard?(rating) }.keys,
+        ratings_known: ratings.values.all?(&:present?))
+    end
 
-      (optional - response.answered_sections).empty? ? :complete : :incomplete
+    def rungs_for(response)
+      notes = response.daily_exercise.plan_notes
+      map = notes["kind_rungs"] if notes.is_a?(Hash)
+      return {} unless map.is_a?(Hash)
+
+      map.select { |key, rung| ExerciseSection.keys.include?(key) && KindDifficulty::LEVELS.include?(rung) }
     end
   end
 end

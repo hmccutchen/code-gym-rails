@@ -12,6 +12,8 @@ module ExerciseSection::CodeReview::BugHunt::KindHooks
 
   def mastery_evidence_mode?(mode) = !BugHunt.mode?(mode)
 
+  def adaptation_evidence?(section) = !BugHunt.section?(section)
+
   def judge_task_for(section) = bug_hunt?(section) ? BugHunt::Prompt::JUDGE_TASK : judge_task
 
   def judge_guidance_for(section) = bug_hunt?(section) ? BugHunt::Prompt::JUDGE_GUIDANCE : judge_guidance

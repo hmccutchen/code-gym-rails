@@ -140,6 +140,8 @@ class ExerciseSection
 
     def mastery_evidence?(_section) = true
 
+    def adaptation_evidence?(_section) = true
+
     def ships_unjudged?(_section) = true
 
     def planted_key? = false

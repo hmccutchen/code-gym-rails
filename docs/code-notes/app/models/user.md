@@ -111,7 +111,7 @@ else.
 ## `#recent_performance`
 
 It returns the latest qualifying response days through `AdaptationHistory`,
-with only assessed sections and optional qualified completion. The default
+with only assessed adaptation sections and optional core completion. The default
 `PERFORMANCE_HISTORY_LIMIT` remains ten; malformed concept maps omit names
 without losing otherwise valid grades.
 
@@ -123,10 +123,10 @@ scenario strings, without a response requirement, raw answers or answer keys.
 Rotation reads delivered plus dropped scheduled kinds, never responses.
 `before:` defaults to today.
 
-`#recent_completion_history` returns only qualified completion values, with
-the existing drop credit. Malformed drop containers cannot yield trustworthy
-credit and are excluded. Planning reads earlier than today; `SizeForecast`
-passes the exercise date's next day so today's qualified completion can enter.
+The old separate completion reader is retired. `CompetencyGate::Evidence`
+projects basic core completion independently of strict results, without drop
+credit. Planning reads earlier than today; `SizeForecast` passes the
+exercise date's next day so today's eligible evidence can enter.
 
 ## `#concepts_needing_reinforcement`
 

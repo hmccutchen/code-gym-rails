@@ -207,7 +207,6 @@ class RealSource
   APPLICATION_CODE = [
     Method.new("app/models/weighted_roll.rb", "pick"),
     Method.new("app/models/section_rotation.rb", "pick_kind"),
-    Method.new("app/models/section_count.rb", "for"),
     Method.new("app/models/user.rb", "carry_forward"),
     Method.new("app/models/user.rb", "authenticate_login_code"),
     Method.new("app/models/user.rb", "current_streak"),

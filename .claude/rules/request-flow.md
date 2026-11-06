@@ -33,7 +33,7 @@ User opens dashboard:
   └→ DashboardController#show
        shows today's DailyExercise, or triggers on-demand generation if missing
        (weekdays only; weekends offer a manual "generate anyway" button)
-       2-4 sections, sized from recent completion and the competency gate,
+       2-4 sections, sized by the unified core-workload fold,
        unless the user fixed a count from 1 to 4 in Setup's Daily sections: the
        user's daily kinds (DailyKinds; Code Review and Design Comparison by
        default, one of them under a count of 1, plus any extra sections the

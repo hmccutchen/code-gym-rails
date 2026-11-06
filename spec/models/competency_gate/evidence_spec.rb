@@ -2,169 +2,174 @@ require "rails_helper"
 
 RSpec.describe CompetencyGate::Evidence do
   include AuthHelpers
-
   let(:user) { create_user_with_key }
-  let(:start) { Date.new(2026, 1, 5) }
+  let(:start) { Date.new(2026, 1, 1) }
 
-  def day(offset, sections = { "code_review" => {} }, owner: user, plan_notes: {}, **attributes)
-    date = start + offset
-    exercise = DailyExercise.create!(
-      user: owner, date: date, generated_at: Time.current, plan_notes: plan_notes,
-      problem_set: sections.transform_values do |section|
-        { "question" => "q", "snippet" => "s", "pitched_at" => section.fetch(:rung, "senior"),
-          "eased" => section[:eased] }.compact
+  def row(n, keys: %w[pattern design_comparison], answered: keys, reviewed: answered, rubric: 1,
+          rung: "junior", ratings: {}, notes: { "size" => 2 }, owner: user)
+    exercise = DailyExercise.create!(user: owner, date: start + n, generated_at: Time.current, plan_notes: notes,
+      problem_set: keys.index_with { { "question" => "q", "pitched_at" => rung } })
+    DailyResponse.create!(user: owner, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+      answers: answered.index_with { "\nanswer" }, section_ratings: answered.index_with { "right_level" }.merge(ratings),
+      ai_review: reviewed.index_with { { "rating" => "solid", "rubric" => rubric } })
+  end
+
+  def loaded(**options) = described_class.new(user, before: start + 200, **options).to_a
+
+  it "separates basic completion and recovery ratings from strict proof and overload" do
+    row(0, rubric: nil, ratings: { "pattern" => "too_hard" })
+    event = loaded.sole
+    expect(event.results).to eq([])
+    expect(event.completion).to have_attributes(state: :complete, delivered: 2, answered: 2,
+      ratings_known: true, too_hard: [ "pattern" ])
+  end
+
+  [ nil, 0, "1", [], 2 ].each do |stamp|
+    it "does not smuggle a #{stamp.inspect} sibling into any strict window" do
+      response = row(0, ratings: { "pattern" => "too_hard", "design_comparison" => "too_hard" })
+      response.update!(ai_review: response.ai_review.deep_merge("pattern" => { "rubric" => stamp }))
+      expect(loaded.sole.results.map(&:kind)).to eq([ "design_comparison" ])
+      expect(loaded.sole.completion.too_hard).to match_array(%w[pattern design_comparison])
+      expect(CompetencyGate.plan(loaded).evidence[:hard_tallies]).to eq("design_comparison" => 1)
+    end
+  end
+
+  it "ignores pending and bug-only work while keeping real weekend core evidence" do
+    row(0, reviewed: [])
+    bug = row(1, keys: [ "code_review" ])
+    bug.daily_exercise.update!(problem_set: { "code_review" => { "purpose" => "Find the trap", "pitched_at" => "junior" } })
+    row(2)
+    expect(loaded.map(&:date)).to eq([ start + 2 ])
+  end
+
+  it "keeps strict partials and waits only for answered core siblings for completion" do
+    row(0, reviewed: [ "pattern" ])
+    row(1, answered: [ "pattern" ])
+    expect(loaded.map { |event| event.completion.state }).to eq(%i[unknown incomplete])
+    expect(loaded.first.results.map(&:kind)).to eq([ "pattern" ])
+  end
+
+  it "validates assignment and server-rung context without consulting current targets" do
+    row(0, notes: { "size" => "3", "kind_rungs" => { "pattern" => "senior", "alien" => "junior", "challenge" => [] } })
+    event = loaded.sole
+    expect(event.completion.assigned).to be_nil
+    expect(event.rungs).to eq("pattern" => "senior")
+    user.update!(section_kind_levels: { "pattern" => "principal_engineer" })
+    expect(loaded.sole).to eq(event)
+  end
+
+  it "honors ownership and the exclusive bound for both projections" do
+    row(0, rubric: nil)
+    row(1)
+    row(2, owner: create_user_with_key(email: "other@example.com"))
+    expect(described_class.new(user, before: start + 1).map(&:date)).to eq([ start ])
+    expect(CompetencyGate.for(user, before: start + 1)).to eq(CompetencyGate.plan(described_class.new(user, before: start + 1)))
+  end
+
+  it "replays past sixty days with bounded preloading and no global rubric prefilter" do
+    5.times { |n| row(n) }
+    (5..70).each { |n| row(n, rubric: nil) }
+    counts = Hash.new(0)
+    sql = []
+    callback = ->(*, payload) { counts[payload[:class_name]] += payload[:record_count] }
+    query = ->(*, payload) { sql << payload[:sql] if payload[:sql].match?(/SELECT.*"daily_(responses|exercises)"/) }
+    events = nil
+    ActiveRecord::Base.uncached do
+      ActiveSupport::Notifications.subscribed(callback, "instantiation.active_record") do
+        ActiveSupport::Notifications.subscribed(query, "sql.active_record") { events = loaded(batch_size: 10) }
       end
-    )
-    DailyResponse.create!(
-      user: owner, daily_exercise: exercise, date: date, submitted_at: Time.current,
-      answers: sections.transform_values { |section| section.fetch(:answered, true) ? "a" * 20 : "" },
-      section_ratings: sections.transform_values { |section| section.fetch(:self, "right_level") }.compact,
-      ai_review: sections.transform_values do |section|
-        { "rating" => section.fetch(:ai, "solid"), "rubric" => section.fetch(:rubric, ReviewedSectionResults::RUBRIC_VERSION) }.compact
-      end,
-      **attributes
-    )
-  end
-
-  def days(batch_size: described_class::BATCH_SIZE)
-    described_class.new(user, batch_size: batch_size).to_a
-  end
-
-  it "keeps partial stamped grades while optional completion is unknown" do
-    day(0, { "code_review" => {}, "pattern" => { ai: nil } })
-    expect(days.sole.results.map(&:kind)).to eq([ "code_review" ])
-    expect(days.sole.optional).to eq(:unknown)
-  end
-
-  it "does not yield empty events or use a skipped or invalid stamp to qualify completion" do
-    day(0, { "code_review" => { ai: "invalid" }, "pattern" => { ai: nil } })
-    day(1, { "code_review" => { answered: false }, "pattern" => { rubric: nil } })
-    day(2, { "code_review" => { rung: nil } })
-    expect(days).to be_empty
-  end
-
-  it "yields a day per reviewed, rubric-stamped response, oldest first, whatever order they were written in" do
-    day(2, { "code_review" => { rung: "junior" } })
-    day(0, { "code_review" => { ai: "strong" }, "pattern" => { self: "too_hard" } })
-    day(1)
-
-    expect(days.map { |each_day| each_day.results.map(&:date).uniq }).to eq([ [ start ], [ start + 1 ], [ start + 2 ] ])
-    expect(days.first.results).to eq([
-      ReviewedSectionResults::Result.new(date: start, kind: "code_review", level: "senior",
-                                         ai_rating: "strong", self_rating: "right_level"),
-      ReviewedSectionResults::Result.new(date: start, kind: "pattern", level: "senior",
-                                         ai_rating: "solid", self_rating: "too_hard")
-    ])
-  end
-
-  it "skips drafts, unreviewed responses, other users' work and days graded before the rubric" do
-    day(0, submitted_at: nil)
-    day(1, ai_review: {})
-    day(2, owner: create_user_with_key(email: "other@example.com"))
-    day(3, { "code_review" => { rubric: nil }, "pattern" => { rubric: nil, answered: false } })
-    day(4, { "code_review" => { rubric: ReviewedSectionResults::RUBRIC_VERSION - 1 } })
-
-    expect(days).to eq([])
-  end
-
-  # The brake reads an eased section's self-rating; growth leaves it out.
-  it "carries eased sections, marked as eased" do
-    day(0, { "code_review" => {}, "pattern" => { eased: true, self: "too_hard" } })
-
-    expect(days.sole.results.map { |result| [ result.kind, result.eased, result.self_rating ] })
-      .to eq([ [ "code_review", false, "right_level" ], [ "pattern", true, "too_hard" ] ])
-  end
-
-  # The gate runs on every plan, so a malformed row must not stop the day being built.
-  it "skips a stamped row whose answers or problem set are not objects" do
-    day(0)
-    day(1).update_columns(answers: [])
-    day(2).daily_exercise.update_columns(problem_set: [])
-
-    expect(days.map { |each_day| each_day.results.map(&:date).uniq }).to eq([ [ start ] ])
-  end
-
-  it "keeps a stamped day's optional state even when none of its sections are evidence" do
-    day(0, { "code_review" => { answered: false }, "pattern" => { rung: nil } })
-
-    expect(days).to eq([ CompetencyGate::Day.new(results: [], optional: :complete, daily: %w[code_review design_comparison]) ])
-  end
-
-  it "reads each day's pair from its own row, and the default pair from a row that predates it" do
-    day(0, { "pattern" => {}, "plan_review" => {}, "code_review" => { answered: false } },
-        plan_notes: { "daily_kinds" => %w[pattern plan_review] })
-    day(1, { "code_review" => {}, "design_comparison" => {}, "pattern" => {} })
-
-    expect(days.map { |each_day| [ each_day.daily, each_day.optional ] })
-      .to eq([ [ %w[pattern plan_review], :incomplete ], [ %w[code_review design_comparison], :complete ] ])
-  end
-
-  it "leaves out sections graded before the rubric on a day that is otherwise stamped" do
-    day(0, { "code_review" => {}, "pattern" => { rubric: nil } })
-
-    expect(days.sole.results.map(&:kind)).to eq([ "code_review" ])
-  end
-
-  it "says whether each day answered every optional section it had" do
-    day(0)
-    day(1, { "code_review" => {}, "pattern" => {}, "plan_review" => {} })
-    day(2, { "code_review" => { answered: false }, "pattern" => {}, "plan_review" => { answered: false } })
-
-    expect(days.map(&:optional)).to eq(%i[none complete incomplete])
-  end
-
-  it "reads the whole post-rubric history in batches, preloading each batch's exercises" do
-    7.times { |n| day(n) }
-    queries = []
-    callback = ->(*, payload) { queries << payload[:sql] if payload[:sql].match?(/SELECT.*"daily_(responses|exercises)"/) }
-
-    loaded = nil
-    ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { loaded = days(batch_size: 3) }
-
-    expect(loaded.map { |each_day| each_day.results.sole.date }).to eq((0...7).map { |n| start + n })
-    expect(queries.size).to eq(6)
-  end
-
-  # Replaying only the latest sixty responses would forget a size earned before them.
-  it "keeps a size earned more than sixty responses ago across batch boundaries" do
-    5.times { |n| day(n) }
-    (5..70).each { |n| day(n, { "code_review" => { rung: "principal_engineer", ai: "developing" } }) }
-
-    plans = CompetencyGate.plans(described_class.new(user, batch_size: 7))
-
-    expect(plans.size).to eq(71)
-    expect(plans.map(&:count)).to eq([ 2, 2, 2, 2 ] + [ 3 ] * 67)
-    expect(CompetencyGate.plan(days.last(60)).count).to eq(2)
-  end
-
-  describe "growth to four after a change of pair" do
-    let(:swapped) { { "daily_kinds" => %w[pattern plan_review] } }
-
-    before { 6.times { |n| day(n) } }
-
-    it "reads a swapped-out kind as optional on the rows planned after the swap" do
-      [ 6, 7 ].each { |n| day(n, { "pattern" => {}, "plan_review" => {}, "code_review" => {} }, plan_notes: swapped) }
-
-      expect(CompetencyGate.for(user).count).to eq(4)
     end
-
-    it "holds at three when that optional kind goes unanswered, even though the new pair was answered" do
-      [ 6, 7 ].each { |n| day(n, { "pattern" => {}, "plan_review" => {}, "code_review" => { answered: false } }, plan_notes: swapped) }
-
-      expect(CompetencyGate.for(user).count).to eq(3)
-    end
+    expect(events.size).to eq(71)
+    expect(sql.size).to eq(16)
+    expect(counts.slice("DailyResponse", "DailyExercise")).to eq("DailyResponse" => 71, "DailyExercise" => 71)
+    expect(CompetencyGate.plan(events).count).to eq(3)
   end
 
-  describe "CompetencyGate.for" do
-    it "folds the user's history, each day with its own pair" do
-      5.times { |n| day(n) }
+  it "replays a late review at its original date rather than appending another day" do
+    4.times { |n| row(n) }
+    response = row(4, reviewed: [ "pattern" ])
+    partial = CompetencyGate.plan(loaded)
+    response.update!(ai_review: response.ai_review.merge("design_comparison" => { "rating" => "solid", "rubric" => 1 }))
+    final = CompetencyGate.plan(loaded)
+    expect(loaded.size).to eq(5)
+    expect(final.evidence[:kinds]["design_comparison"][:successes]).to eq(5)
+    expect(partial.evidence[:kinds]["design_comparison"][:successes]).to eq(4)
+    expect(final).to eq(CompetencyGate.plan(loaded(batch_size: 2)))
+  end
 
-      expect(CompetencyGate.for(user)).to eq(CompetencyGate.plan(days))
-      expect(CompetencyGate.for(user).count).to eq(3)
+  it "keeps every adaptation output equal when bugs are added or interleaved" do
+    twin = create_user_with_key(email: "twin@example.com")
+    10.times do |n|
+      keys = n < 5 ? %w[pattern design_comparison] : %w[pattern design_comparison plan_review]
+      notes = { "size" => n < 5 ? 2 : 3 }
+      row(n * 2, keys: keys, notes: notes)
+      copy = row(n * 2, keys: keys, notes: notes, owner: twin)
+      copy.daily_exercise.update!(problem_set: copy.daily_exercise.problem_set.merge(
+        "code_review" => { "purpose" => "Find the trap", "pitched_at" => "junior" }))
+      copy.update!(answers: copy.answers.merge("code_review" => (n % 4 == 2 ? "" : "answer")),
+        section_ratings: copy.section_ratings.merge("code_review" => "too_hard"),
+        ai_review: copy.ai_review.merge("code_review" => { "rating" => [ "strong", "developing", nil, nil ][n % 4], "rubric" => 1 }))
     end
+    71.times do |n|
+      bug = row(n < 10 ? n * 2 + 1 : 21 + n - 10, keys: [ "code_review" ], owner: twin)
+      bug.daily_exercise.update!(problem_set: { "code_review" => { "purpose" => "Find the trap", "pitched_at" => "junior" } })
+    end
+    expect(CompetencyGate.for(twin)).to eq(CompetencyGate.for(user))
+    expected = LevelSuggestion::Evidence.for(user)
+    expect(LevelSuggestion::Evidence.for(twin)).to have_attributes(results: expected.results, newest_date: expected.newest_date)
+    expect(twin.recent_performance).to eq(user.recent_performance)
+    expect(DailyPlan.size_for(twin)).to eq(DailyPlan.size_for(user))
+    original_day = user.daily_exercises.find_by!(date: start + 18)
+    copy_day = twin.daily_exercises.find_by!(date: start + 18)
+    expect(SizeForecast.for(twin, copy_day)).to eq(SizeForecast.for(user, original_day))
+    expect(twin.recent_delivered_content).not_to eq(user.recent_delivered_content)
+    core = twin.daily_responses.find_by!(date: start + 18)
+    core.update!(ai_review: core.ai_review.deep_merge("pattern" => { "rating" => "developing" }))
+    expect(twin.recent_performance).not_to eq(user.recent_performance)
+    expect(CompetencyGate.for(twin)).not_to eq(CompetencyGate.for(user))
+  end
 
-    it "is two with zero evidence for a user without reviewed work" do
-      expect(CompetencyGate.for(user)).to have_attributes(count: 2, reason: :held)
+  it "restores comfortable recovery from unstamped basic completion without adding strict ratings" do
+    5.times { |n| row(n) }
+    2.times { |n| row(n + 5, keys: %w[pattern design_comparison plan_review], answered: [ "pattern" ], notes: { "size" => 3 }) }
+    row(7, rubric: nil, rung: nil)
+    row(8, rubric: nil, rung: nil)
+    plan = CompetencyGate.plan(loaded)
+    expect(plan).to have_attributes(count: 3, safety_hold: false)
+    expect(plan.evidence[:overload]).to eq([])
+  end
+
+  it "uses basic hard ratings to reset recovery without entering strict overload" do
+    5.times { |n| row(n) }
+    2.times { |n| row(n + 5, keys: %w[pattern design_comparison plan_review], answered: [ "pattern" ], notes: { "size" => 3 }) }
+    row(7, rubric: nil)
+    row(8, rubric: nil, ratings: { "pattern" => "too_hard", "design_comparison" => "too_hard" })
+    row(9, rubric: nil)
+    plan = CompetencyGate.plan(loaded)
+    expect(plan).to have_attributes(count: 2, safety_hold: true)
+    expect(plan.evidence[:overload]).to eq([])
+    row(10, rubric: nil)
+    expect(CompetencyGate.plan(loaded)).to have_attributes(count: 3, safety_hold: false)
+  end
+
+  it "bounds default-batch eager loading while replaying every candidate" do
+    (described_class::BATCH_SIZE + 2).times { |n| row(n) }
+    sizes = Hash.new { |hash, key| hash[key] = [] }
+    callback = ->(*, payload) { sizes[payload[:class_name]] << payload[:record_count] }
+    ActiveRecord::Base.uncached do
+      ActiveSupport::Notifications.subscribed(callback, "instantiation.active_record") { expect(loaded.size).to eq(102) }
     end
+    expect(sizes.slice("DailyResponse", "DailyExercise")).to eq("DailyResponse" => [ 100, 2 ], "DailyExercise" => [ 100, 2 ])
+  end
+
+  it "omits malformed rows but retains valid siblings and validates legacy assignment shapes" do
+    [ 42, [], "bad" ].each_with_index do |value, n|
+      response = row(n)
+      response.daily_exercise.update_columns(plan_notes: value)
+    end
+    response = row(3)
+    response.update_columns(ai_review: response.ai_review.merge("pattern" => [ "solid" ]))
+    expect(loaded.map(&:date)).to eq([ start + 3 ])
+    expect(loaded.sole.results.map(&:kind)).to eq([ "design_comparison" ])
   end
 end

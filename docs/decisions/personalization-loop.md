@@ -8,9 +8,11 @@ are absent performance evidence; they never imply poor performance.
 
 `User#recent_performance` returns up to `PERFORMANCE_HISTORY_LIMIT` (the
 existing ten) qualifying response days, newest first. Each has a date,
-assessed sections with valid grades and optional concept/self-rating, and
-optional completion. Completion exists only when every answered active
-section is assessed and at least one was answered. Skipped sections require
+assessed adaptation sections with valid grades and optional concept/self-rating,
+and optional core completion. The kind-owned adaptation facet excludes
+supplementary bug hunts before the ten-day limit. Completion exists only
+when every answered active core section is assessed and at least one core
+answer was assessed. Skipped sections require
 no walkthrough. Unknown completion carries neither a count nor skip labels.
 Missing or malformed self-ratings are absent, including historical skipped
 ratings. Concept names pass the existing bucket vocabulary.
@@ -38,12 +40,22 @@ success or completion. Diagnostics log only the sanitized performance
 projection. `ConceptExposureIndex` retains its existing submitted-day
 exposure convention, including skipped and pending sections.
 
-Workload uses `recent_completion_history` and
-`ExerciseHistoryEntry::Completion`; rotation uses delivered/scheduled
-`ExerciseHistoryEntry` values with no answered field. Unknown days cannot
-take places in the completion window. The old absence-to-zero skip-run
-inference and its cap are retired; all numerical completion, gate,
-retention, drill and difficulty policies remain unchanged.
+Workload's single `CompetencyGate` fold projects basic core completion
+independently of strict current-rubric/rung results, retaining full eligible
+history (`competency-gate.md`). Rotation uses delivered/scheduled
+`ExerciseHistoryEntry` values with no answered field. The independent
+mean/stretch completion ceiling and drop credits are retired. Unknown days
+are absent; actual core skips and broad overload have distinct safety
+triggers. Retention and drill policy remain unchanged.
+
+The locked review merge counts a session only on its first assessed
+adaptation-answer transition. A bug-only batch cannot spend a paused
+concept's cooldown, and a later first core batch still counts once.
+The model also guards countdown against successful keys outside that
+subset. Existing concept mastery filtering and aggregation remain; #726's
+least-favourable reconciliation is separate. Historical materialized
+bug-only countdown effects are not rebuilt, and mixed-version deployments
+cannot identify an old decrement from stored grades alone.
 
 **Skipped retention checks defer without changing knowledge.** When a
 submitted, successfully reviewed skipped section tags a vocabulary-valid

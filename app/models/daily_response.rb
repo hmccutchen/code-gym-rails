@@ -285,9 +285,16 @@ class DailyResponse < ApplicationRecord
     section_keys.select { |section| ConceptMastery::AI_RATING_RANK.key?(ai_rating_for(section)) }
   end
 
-  def completion_evidence?
+  def adaptation_section_keys = daily_exercise&.adaptation_section_keys || []
+
+  def assessed_adaptation_sections = assessed_sections & adaptation_section_keys
+
+  def completion_evidence?(sections: nil)
     assessed = assessed_sections
-    assessed.any? && (answered_sections - assessed).empty?
+    return false if assessed.empty?
+
+    selected = sections.nil? ? section_keys : section_keys & sections
+    (assessed & selected).any? && ((answered_sections & selected) - assessed).empty?
   end
 
   def answered_concept_tags

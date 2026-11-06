@@ -190,19 +190,12 @@ nothing writes or reads it, so it is no longer a server stamp.
 section still reads as scheduled: `User#recent_exercise_history` puts the
 dropped keys back into `section_keys`, so `SectionRotation` sees the kind as
 shown and its staleness does not grow from a delivery failure.
-`ExerciseHistoryEntry#dropped` is added to the answered count in
-`SectionCount`'s mean, but a day's credit never exceeds the sections it
-delivered (`active_section_keys`), so a drop cannot count as finishing
-sections the engineer never saw. That cap means a drop can still shorten
-tomorrow: three planned four-section days that each delivered two sections
-contribute at most two apiece, so the next day gets at most three sections.
-Within the cap, a drop fills in unanswered delivered sections, so on a day
-that lost one section, answering two of the three delivered counts the same
-as answering all three (#215). A day with nothing answered still earns
-zero, so a drop never turns an untouched day into finished work. This
-reverses the rule #215 shipped, which credited a drop only when every
-delivered section was answered: with two fixed kinds that can each be
-dropped, that rule let one rejected section shorten tomorrow. The cost of the rotation trade is the reverse
+Workload now gives drops no completion credit. Its unified fold reads real
+active core volume, assigned base count and qualified completion. A full
+short day supplies no capacity proof and is not a user skip; a skipped
+remaining core section is still an actual skip (`competency-gate.md`).
+This replaces the old mean/stretch rule and its capped drop credit.
+The cost of the rotation trade is the reverse
 of the loop it prevents: a kind the judge keeps rejecting can go unseen for
 a long time without the starvation guarantee noticing. Nothing in the
 rotation compensates, on purpose. The one exception is a two-section

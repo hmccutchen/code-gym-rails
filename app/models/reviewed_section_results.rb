@@ -31,7 +31,7 @@ class ReviewedSectionResults
 
   # Registry order, so a rule taking the latest n results cuts a day at the same place every time.
   def self.for(response, require_rubric: false, include_eased: false)
-    response.assessed_sections.sort_by { |section| ExerciseSection.keys.index(section) }.filter_map do |section|
+    response.assessed_adaptation_sections.sort_by { |section| ExerciseSection.keys.index(section) }.filter_map do |section|
       data = response.daily_exercise.problem_set[section]
       review = response.ai_review[section]
       next unless counts?(data, review, require_rubric, include_eased)

@@ -2102,7 +2102,7 @@ end
 RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
   let(:user) { create_user_with_key }
   let(:larger_line) { I18n.t("dashboard.size_change.larger") }
-  let(:smaller_line) { I18n.t("dashboard.size_change.smaller", count: SectionCount::FLOOR) }
+  let(:smaller_line) { I18n.t("dashboard.size_change.smaller", count: CompetencyGate::FLOOR) }
 
   let(:problem_set) do
     { "code_review" => { "question" => "Find the bug", "snippet" => "def a; end", "concept" => "n_plus_one" },
@@ -2123,7 +2123,7 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
   end
 
   def stub_gate(count, reason)
-    allow(CompetencyGate).to receive(:for).and_return(CompetencyGate::Plan.new(count: count, reason: reason, evidence: {}))
+    allow(CompetencyGate).to receive(:for).and_return(CompetencyGate::Plan.new(count: count, reason: reason, safety_hold: reason == :brake, evidence: {}))
   end
 
   before { login_as(user) }
@@ -2139,7 +2139,6 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
   end
 
   it "says nothing when completion still holds tomorrow at today's size" do
-    stub_gate(3, :grew)
     day(Date.current - 2, planned: 2, assessed: true)
     day(Date.current - 1, planned: 2, assessed: true)
     day(Date.current, planned: 2, assessed: true)
@@ -2150,7 +2149,7 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
   end
 
   it "says tomorrow's set is smaller when the brake lowers it" do
-    stub_gate(SectionCount::FLOOR, :brake)
+    stub_gate(CompetencyGate::FLOOR, :brake)
     day(Date.current, planned: 3)
 
     get root_path
@@ -2179,7 +2178,8 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
 
   it "does not promise a larger set of the size today already showed with a coverage section" do
     stub_gate(3, :grew)
-    day(Date.current, planned: 2, notes: { "coverage" => "pattern", "coverage_reason" => "gap" })
+    today = day(Date.current, planned: 2, notes: { "coverage" => "pattern", "coverage_reason" => "gap" })
+    today.daily_exercise.update!(problem_set: problem_set.merge("pattern" => { "question" => "q", "concept" => "memoization" }))
 
     get root_path
 
@@ -2228,20 +2228,31 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
   end
 
   it "counts today's completion only once all its answered sections are assessed" do
-    stub_gate(ExerciseSection::MAX_SECTIONS, :held)
-    both = { "code_review" => "a" * 20, "design_comparison" => "b" * 20 }
-    day(Date.current - 2, planned: 3, answered: both, assessed: true)
-    day(Date.current - 1, planned: 3, answered: both, assessed: true)
-    today = day(Date.current, planned: 3, answered: both)
-
+    both = { "code_review" => "answer", "design_comparison" => "\nreason" }
+    5.times do |n|
+      prior = day(Date.current - 6 + n, planned: 2, answered: both, assessed: true)
+      prior.daily_exercise.update!(problem_set: problem_set.transform_values { |section| section.merge("pitched_at" => "junior") })
+      prior.update!(ai_review: both.transform_values { { "rating" => "solid", "rubric" => ReviewedSectionResults::RUBRIC_VERSION } })
+    end
+    today = day(Date.current, planned: 3, answered: both.merge("pattern" => "answer"), assessed: false)
+    today.daily_exercise.update!(problem_set: problem_set.merge("pattern" => { "question" => "q", "concept" => "memoization" }))
+    yesterday = day(Date.yesterday, planned: 3, answered: both.merge("pattern" => "answer"), assessed: true)
+    yesterday.daily_exercise.update!(problem_set: problem_set.merge("pattern" => { "question" => "q" }))
+    get root_path
+    expect(response.body).not_to include(larger_line)
+    today.update!(ai_review: today.answers.transform_values { { "rating" => "solid" } })
     get root_path
     expect(response.body).to include(larger_line)
+  end
 
-    today.update!(ai_review: both.transform_values { { "rating" => "solid" } })
-
+  it "explains completion reductions and never calls an unchanged floor smaller" do
+    stub_gate(2, :completion)
+    today = day(Date.current, planned: 3)
     get root_path
-
-    expect(response.body).not_to include(larger_line)
+    expect(response.body).to include(CGI.escapeHTML(smaller_line))
+    today.daily_exercise.update!(plan_notes: { "size" => 2 })
+    get root_path
+    expect(response.body).not_to include(CGI.escapeHTML(smaller_line))
   end
 
   it "keeps both lines free of any score, tier or badge" do

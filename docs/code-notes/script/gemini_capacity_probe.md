@@ -6,7 +6,7 @@ At 15 seconds per request, no rolling minute holds more than five requests, so t
 
 ## `#initialize`
 
-The probe sets `daily_section_count` to `SectionCount::FLOOR` in memory only. That gives a two-section plan without changing the user's stored setting.
+The probe sets `daily_section_count` to `CompetencyGate::FLOOR` in memory only. That gives a two-section plan without changing the user's stored setting.
 
 ## `#run`
 

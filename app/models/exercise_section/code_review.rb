@@ -43,10 +43,6 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.multi_file_range?(file_range) = file_range.max > 1
 
-  def self.day_file_range(plan:, difficulty:, skill_level:)
-    file_range(files: plan.code_review_files, rung: difficulty.rung_for(self, skill_level: skill_level))
-  end
-
   def self.key_context_fields = [ "snippet", "current_schema", *FILE_CODE_FIELDS ]
 
   def self.quoted_key_texts(key) = [ key&.dig("issue") ]

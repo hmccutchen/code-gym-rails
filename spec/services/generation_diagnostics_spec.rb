@@ -13,8 +13,9 @@ RSpec.describe GenerationDiagnostics do
              coverage: Struct.new(:kind, :reason).new(ExerciseSection::Challenge, "gap"), size: size)
   end
   let(:draft) do
-    ExerciseDraft::Draft.new(user: user, language: "ruby_rails", problem_set: {}, plan: plan, kinds: kinds,
-                             difficulty: KindDifficulty.none, ladders: {}, history: [], delivered_history: [], suggested_concepts: [], unusable_sections: [])
+    ExerciseDraft::Draft.new(user: user, skill_level: user.skill_level, language: "ruby_rails", problem_set: {}, plan: plan, kinds: kinds,
+                             difficulty: KindDifficulty.none, kind_rungs: KindDifficulty.none.rungs(skill_level: user.skill_level),
+                             ladders: {}, history: [], delivered_history: [], suggested_concepts: [], unusable_sections: [])
   end
 
   # Every section carries every answer-key field any kind declares, so a new kind or a new field is covered unchanged.
@@ -80,6 +81,23 @@ RSpec.describe GenerationDiagnostics do
                           "code_review_files=single user=#{user.id}" ])
   end
 
+  it "keeps supplementary grades and ratings out of logged performance and completion" do
+    exercise = user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current,
+      problem_set: { "code_review" => { "purpose" => "Find the trap" }, "pattern" => { "question" => "q" } })
+    user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+      answers: { "code_review" => "answer", "pattern" => "answer" },
+      section_ratings: { "code_review" => "too_hard", "pattern" => "right_level" },
+      ai_review: { "code_review" => { "rating" => "developing" }, "pattern" => { "rating" => "solid" } })
+    captured = draft.with(history: user.recent_performance)
+    lines = logged_lines do
+      described_class.new(user).finished("ruby_rails", captured, problem_set, dropped_concepts: {}, judge: nil, unhosted: [])
+    end
+    payload = JSON.parse(lines.grep(/\A\[difficulty_diagnostics\]/).sole.delete_prefix("[difficulty_diagnostics] "))
+    performance = payload.fetch("requested").fetch("recent_performance").sole
+    expect(performance["sections"].map { |section| section["key"] }).to eq([ "pattern" ])
+    expect(performance["completion"]).to eq("answered" => 1, "total" => 1, "skipped_sections" => [])
+  end
+
   it "marks a day that asked for several files as multi" do
     note = ProblemSetIngest::KeyNote.new(key: "code_review", language: "ruby_rails", outcome: "evidence_unlocated", quotes: nil)
 
@@ -111,6 +129,27 @@ RSpec.describe GenerationDiagnostics do
     expect(retention.find { |line| line.include?("bucket=#{DailyPlan::FOURTH_BUCKET_FOR.fetch(:plan_review)}") })
       .to include("dropped=plan_review:rollout_plan")
   end
+
+    it "reports the captured request baseline and per-kind levels after the user changes" do
+      user.skill_level = "senior"
+      provider = ExerciseDraft::Provider.new(
+        prompt: ->(person, language, **options) {
+          GenerationPrompt.new(person, language, **options, retention_annotation: generation_retention_annotation)
+        },
+        generate: ->(*, **) { FakeService::EXERCISE_PROBLEM_SET.deep_dup },
+        record_suggestion: ->(*) { })
+      captured = ExerciseDraft.call(user, language: "ruby_rails", provider: provider)
+      user.skill_level = "junior"
+      lines = logged_lines do
+        ExerciseDraft.finish(captured, captured.problem_set, provider: provider, dropped_concepts: {}, judge: nil, unhosted: [])
+      end
+      payload = JSON.parse(lines.grep(/\A\[difficulty_diagnostics\]/).sole.delete_prefix("[difficulty_diagnostics] "))
+      aggregate_failures do
+        expect(payload.dig("requested", "skill_level")).to eq("senior")
+        expect(payload.dig("requested", "kind_difficulty").transform_values { |kind| kind.fetch("level") })
+          .to eq(captured.kind_rungs.slice(*captured.kinds.map(&:key)))
+      end
+    end
 
   describe "a retention check held back by the featured concept" do
     def waiting_line(check, featured_concept: "scope_creep")

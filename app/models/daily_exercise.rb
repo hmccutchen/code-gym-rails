@@ -34,13 +34,12 @@ class DailyExercise < ApplicationRecord
     plan_notes["coverage_reason"] if active_section_keys.include?(plan_notes["coverage"])
   end
 
-  def planned_size = plan_notes["size"]
+  def planned_size
+    size = plan_notes["size"] if plan_notes.is_a?(Hash)
+    size if size.is_a?(Integer) && User::DAILY_SECTION_COUNTS.cover?(size)
+  end
 
   def draft_scope = "#{id}-#{generated_at.strftime('%s%6N')}"
-
-  def planned_size_with_coverage
-    planned_size && planned_size + (plan_notes["coverage"] ? 1 : 0)
-  end
 
   def planned_by_setting? = plan_notes["size_reason"] == "setting"
 
@@ -57,6 +56,12 @@ class DailyExercise < ApplicationRecord
   # The single authority for section counts; never problem_set.keys, which can hold unrendered alternates.
   def active_section_keys
     ExerciseSection.resolved_keys(problem_set, daily: daily_kinds)
+  end
+
+  def adaptation_section_keys
+    return [] unless problem_set.is_a?(Hash) && plan_notes.is_a?(Hash)
+
+    active_section_keys.select { |key| ExerciseSection.for(key).adaptation_evidence?(problem_set[key]) }
   end
 
   def concepts_withheld_before_submission

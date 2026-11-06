@@ -15,7 +15,8 @@ An excerpt reads its text off local disk when the prompt is built, so the text i
 The pick takes never-seen excerpts first, in list order, then the one seen longest ago. That order bounds the longest wait before any excerpt comes round again by the size of the pool.
 
 The retired `SectionCount.capped_window` excerpt was removed with #719's
-absence-to-zero inference. Remaining entries keep their relative order and
+absence-to-zero inference; the remaining `SectionCount.for` excerpt retired
+with the unified workload fold. Remaining entries keep their relative order and
 ids; no replacement was inserted into its position. Historical source ids
 remain readable and no longer participate in picking.
 

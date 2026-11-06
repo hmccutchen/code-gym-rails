@@ -1,31 +1,32 @@
 require "rails_helper"
 
-RSpec.describe SizeForecast, ".change" do
-  def tomorrow(completion:, gate:, reason: :held)
-    DaySize.for(setting: nil, completion: completion, gate: CompetencyGate::Plan.new(count: gate, reason: reason, evidence: {}))
+RSpec.describe SizeForecast do
+  def tomorrow(count:, reason: :held)
+    DaySize.for(setting: nil, gate: CompetencyGate::Plan.new(count: count, reason: reason, safety_hold: false, evidence: {}))
   end
 
-  def change(today, tomorrow) = described_class.change(today, tomorrow)
-
-  it "is larger, with tomorrow's count, when tomorrow's composed size exceeds today's" do
-    expect(change(2, tomorrow(completion: 4, gate: 3, reason: :grew))).to eq(SizeForecast::Change.new(direction: :larger, count: 3))
+  it "shows a real increase" do
+    expect(described_class.change(2, tomorrow(count: 3))).to eq(described_class::Change.new(direction: :larger, count: 3))
   end
 
-  # The gate grew, but completion still holds tomorrow at today's size.
-  it "is nothing when completion blocks a gate increase" do
-    expect(change(2, tomorrow(completion: 2, gate: 3, reason: :grew))).to be_nil
+  %i[brake completion].each do |reason|
+    it "shows an actual #{reason} reduction but no unchanged floor hold" do
+      expect(described_class.change(3, tomorrow(count: 2, reason: reason))).to eq(described_class::Change.new(direction: :smaller, count: 2))
+      expect(described_class.change(2, tomorrow(count: 2, reason: reason))).to be_nil
+    end
   end
 
-  it "is smaller, with tomorrow's count, when the brake lowers tomorrow below today" do
-    expect(change(3, tomorrow(completion: 4, gate: 2, reason: :brake))).to eq(SizeForecast::Change.new(direction: :smaller, count: 2))
+  it "does not infer a safety reduction from an ordinary held count" do
+    expect(described_class.change(3, tomorrow(count: 2))).to be_nil
   end
 
-  it "is nothing when tomorrow is smaller for any reason but the brake" do
-    expect(change(3, tomorrow(completion: 2, gate: 4))).to be_nil
-    expect(change(3, tomorrow(completion: 4, gate: 2))).to be_nil
-  end
-
-  it "is nothing when the brake is on but the size does not change" do
-    expect(change(2, tomorrow(completion: 4, gate: 2, reason: :brake))).to be_nil
+  it "compares against actual core delivery and the base assignment, never supplementary work" do
+    user = User.new
+    exercise = DailyExercise.new(date: Date.current, plan_notes: { "size" => 2, "coverage" => "pattern" },
+      problem_set: { "code_review" => { "purpose" => "trap" }, "design_comparison" => {}, "pattern" => {} })
+    allow(DailyPlan).to receive(:size_for).with(user, before: Date.tomorrow).and_return(tomorrow(count: 3))
+    expect(described_class.for(user, exercise)).to eq(described_class::Change.new(direction: :larger, count: 3))
+    exercise.problem_set["code_review"].delete("purpose")
+    expect(described_class.for(user, exercise)).to be_nil
   end
 end

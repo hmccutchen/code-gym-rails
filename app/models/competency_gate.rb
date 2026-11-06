@@ -1,48 +1,27 @@
 class CompetencyGate
-  Threshold = Data.define(:at_least, :of) do
-    def met?(window, &qualifies) = window.size == of && window.count(&qualifies) >= at_least
-  end
-
+  FLOOR = DailyKinds::COUNT
   BAR = ReviewedSectionResults::FAVOURABLE_BAR
-  GROW_TO_THREE = Threshold.new(at_least: 4, of: 5)
-  GROW_TO_FOUR = Threshold.new(at_least: 8, of: 10)
-  OPTIONAL_RUN = 2
-  BRAKE = Threshold.new(at_least: 2, of: 4)
+  GRADE_WINDOW = 5
+  GRADE_SUCCESSES = 4
+  EFFORT_WINDOW = 3
+  HARD_OBSERVATIONS = 2
+  FULL_RUN = 2
+  SKIP_RUN = 2
+  OVERLOAD_SETS = 3
+  OVERLOAD_KINDS = 2
 
-  FLOOR = SectionCount::FLOOR
-  GROWTH = [ GROW_TO_THREE, GROW_TO_FOUR ].freeze
+  Completion = Data.define(:state, :assigned, :delivered, :answered, :too_hard, :ratings_known)
 
-  # :incomplete means at least one optional section went unanswered.
-  OPTIONAL_STATES = %i[none unknown incomplete complete].freeze
-
-  # Eased results included, in the order the day presented them; daily holds the keys that were daily that day.
-  Day = Data.define(:results, :optional, :daily) do
-    def initialize(results:, optional:, daily:)
-      raise ArgumentError, "optional must be one of #{OPTIONAL_STATES.inspect}, not #{optional.inspect}" unless
-        OPTIONAL_STATES.include?(optional)
-      raise ArgumentError, "daily must be a list of section keys, not #{daily.inspect}" unless
-        daily.is_a?(Array) && daily.all?(String)
-
-      super
-    end
-
-    def optional_evidence? = !%i[none unknown].include?(optional)
-    def evidence? = results.any? || optional_evidence?
+  Day = Data.define(:date, :results, :completion, :rungs) do
+    def completion_evidence? = %i[complete incomplete].include?(completion.state)
+    def evidence? = results.any? || completion_evidence?
   end
 
-  # evidence is nil unless the caller asked for it.
-  Plan = Data.define(:count, :reason, :evidence)
-
-  Entry = Data.define(:sequence, :result)
-  private_constant :Entry
-
-  # The longest window each rule reads; older results in a run can never matter.
-  GROWTH_MEMORY = GROWTH.map(&:of).max
-  private_constant :GROWTH_MEMORY
-
-  def self.for(user)
-    plan(Evidence.new(user))
+  Plan = Data.define(:count, :reason, :safety_hold, :evidence) do
+    def reduction? = %i[brake completion].include?(reason)
   end
+
+  def self.for(user, before: Date.current) = plan(Evidence.new(user, before: before))
 
   def self.plans(days, evidence: false)
     gate = new
@@ -56,97 +35,94 @@ class CompetencyGate
   end
 
   def initialize
-    @levels = {}
-    @growth_runs = {}
-    @brake_runs = {}
-    @optional_days = []
-    @sequence = 0
     @count = FLOOR
     @reason = :held
+    @growth_hold = :capacity
+    @kinds = {}
+    @overload = []
+    @capacity = Capacity.new
+    @causes = []
   end
 
   def add(day)
     return self unless day.evidence?
+    raise ArgumentError, "evidence dates must increase" if !day.date.is_a?(Date) || (@last_date && day.date <= @last_date)
 
-    day.results.each { |result| record(result, daily: day.daily.include?(result.kind)) }
-    @optional_days = (@optional_days + [ day.optional ]).last(OPTIONAL_RUN) if day.optional_evidence?
-    @count, @reason = next_step
-    restart_growth if @reason == :brake
+    @last_date = day.date
+    record_kinds(day)
+    record_overload(day)
+    @capacity.record(day.completion, count: @count) if day.completion_evidence?
+    @causes = []
+    @causes << :brake if overloaded?
+    @causes << :completion if @capacity.skipping?
+    @causes.any? ? reduce : advance
     self
   end
 
   def plan(evidence: true)
-    Plan.new(count: @count.clamp(FLOOR, ExerciseSection::MAX_SECTIONS), reason: @reason,
-             evidence: (self.evidence if evidence))
+    Plan.new(count: @count, reason: @reason, safety_hold: @capacity.safety_hold?,
+      evidence: (self.evidence if evidence))
   end
 
   def evidence
-    braking = brake_window
-    {
-      to_three: growth_evidence(GROW_TO_THREE),
-      to_four: growth_evidence(GROW_TO_FOUR),
-      brake: { required: BRAKE.of, available: braking.size, too_hard: braking.count(&:too_hard?) },
-      optional: { required: OPTIONAL_RUN, available: @optional_days.size, complete: @optional_days.count(:complete) },
-      levels: @levels.dup
-    }
+    { kinds: @kinds.transform_values(&:evidence), qualifying_required: qualifying_required,
+      capacity: @capacity.evidence.merge(count: @count), overload: @overload.map(&:dup),
+      hard_tallies: hard_tallies, causes: @causes.dup, growth_hold: @growth_hold, last_date: @last_date&.to_s,
+      last_transition: @last_transition&.to_s }
   end
 
   private
 
-  # A level change restarts that kind's runs; eased AI ratings never enter growth but still count toward the brake.
-  def record(result, daily:)
-    reset_runs(result.kind) if @levels.key?(result.kind) && @levels[result.kind] != result.level
-    @levels[result.kind] = result.level
-    entry = Entry.new(sequence: @sequence += 1, result: result)
-    append(@brake_runs, result.kind, entry, BRAKE.of)
-    append(@growth_runs, result.kind, entry, GROWTH_MEMORY) if daily && !result.eased
-  end
+  def qualifying_required = @count - FLOOR + 1
 
-  def reset_runs(kind)
-    @brake_runs[kind] = []
-    @growth_runs[kind] = []
-  end
+  def record_kinds(day)
+    day.rungs.each { |kind, rung| window(kind).at(rung) }
+    day.results.uniq(&:kind).each do |result|
+      next if day.rungs.key?(result.kind) && day.rungs[result.kind] != result.level
 
-  def append(runs, kind, entry, memory)
-    runs[kind] = (runs.fetch(kind, []) + [ entry ]).last(memory)
-  end
-
-  def restart_growth
-    @growth_runs.transform_values! { [] }
-  end
-
-  def next_step
-    if BRAKE.met?(brake_window, &:too_hard?)
-      [ FLOOR, :brake ]
-    elsif @count == FLOOR && grows?(GROW_TO_THREE)
-      [ @count + 1, :grew ]
-    elsif @count == FLOOR + 1 && grows?(GROW_TO_FOUR) && optional_run_complete?
-      [ @count + 1, :grew ]
-    else
-      [ @count, :held ]
+      window(result.kind).at(result.level).add(result)
     end
   end
 
-  def grows?(threshold)
-    threshold.met?(daily_window(threshold)) { |result| result.favourable?(bar: BAR) }
+  def window(kind) = @kinds[kind] ||= KindWindow.new
+
+  def record_overload(day)
+    rated = day.results.uniq(&:kind).select do |result|
+      (DailyResponse::SELF_RATING_FAVORABLE + DailyResponse::SELF_RATING_UNFAVORABLE).include?(result.self_rating)
+    end
+    return if rated.empty?
+
+    @overload = (@overload + [ { date: day.date.to_s, hard: rated.select(&:too_hard?).map(&:kind) } ]).last(OVERLOAD_SETS)
   end
 
-  def optional_run_complete?
-    @optional_days.size == OPTIONAL_RUN && @optional_days.all?(:complete)
+  def hard_tallies = @overload.flat_map { |set| set[:hard] }.tally
+  def overloaded? = hard_tallies.count { |_, count| count >= HARD_OBSERVATIONS } >= OVERLOAD_KINDS
+
+  def reduce
+    @count = [ @count - 1, FLOOR ].max
+    @reason = @causes.first
+    @last_transition = @last_date
+    @overload = []
+    @capacity.reduce
+    @growth_hold = :safety
   end
 
-  def brake_window = latest(@brake_runs, BRAKE.of, @brake_runs.keys)
-  def daily_window(threshold) = latest(@growth_runs, threshold.of, @growth_runs.keys)
+  def advance
+    @reason = :held
+    @growth_hold = if @count >= ExerciseSection::MAX_SECTIONS
+      :maximum
+    elsif @capacity.safety_hold?
+      :safety
+    elsif !@capacity.ready?
+      :capacity
+    elsif @kinds.count { |_, window| window.qualified? } < qualifying_required
+      :kind_proof
+    end
+    return if @growth_hold
 
-  def latest(runs, size, kinds)
-    kinds.flat_map { |kind| runs.fetch(kind, []) }.max_by(size, &:sequence).map(&:result)
-  end
-
-  def growth_evidence(threshold)
-    window = daily_window(threshold)
-    { required: threshold.of, available: window.size,
-      bar_met: window.count { |result| result.at_or_above?(BAR) },
-      favourable: window.count { |result| result.favourable?(bar: BAR) },
-      by_kind: window.map(&:kind).tally }
+    @count += 1
+    @reason = :grew
+    @last_transition = @last_date
+    @capacity.grow
   end
 end

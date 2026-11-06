@@ -2,7 +2,7 @@ require "rails_helper"
 
 # Plain callables, since the pipeline reaches a provider only through JudgedGeneration::Provider.
 RSpec.describe JudgedGeneration do
-  let(:draft_type) { Struct.new(:problem_set, :plan, :kinds, :difficulty, :unusable_sections, keyword_init: true) }
+  let(:draft_type) { Struct.new(:problem_set, :plan, :kinds, :difficulty, :kind_rungs, :unusable_sections, keyword_init: true) }
   let(:due_check) { Struct.new(:concept) }
 
   let(:user) { User.new(id: 42, skill_level: "senior") }
@@ -20,7 +20,7 @@ RSpec.describe JudgedGeneration do
     plan_for(daily_kinds: daily_kinds, due_checks: [ due_check.new("service_objects") ], fourth_due_checks: [],
              reinforcement: [ { concept: "memoization" } ], fourth_reinforcement: nil)
   end
-  let(:draft) { draft_type.new(problem_set: drafted, plan: plan, kinds: kinds, difficulty: KindDifficulty.none) }
+  let(:draft) { draft_type.new(problem_set: drafted, plan: plan, kinds: kinds, difficulty: KindDifficulty.none, kind_rungs: KindDifficulty.none.rungs(skill_level: user.skill_level)) }
   let(:finished) { [] }
   let(:finish) { ->(set, **logs) { finished << [ set, logs ] } }
   let(:judged_calls) { [] }
@@ -534,6 +534,7 @@ RSpec.describe JudgedGeneration do
     it "never rejects a mismatch at principal_engineer, switch or not" do
       stub_const("#{described_class}::REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL", true)
       draft.difficulty = KindDifficulty.new(levels: { "design_comparison" => "principal_engineer" }, locked: [])
+      draft.kind_rungs = draft.difficulty.rungs(skill_level: user.skill_level)
       verdicts["design_comparison"] = [ solve("keep", "a") ]
 
       expect(run.outcomes["design_comparison"]).to include(status: :keep, retries: 0)

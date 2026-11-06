@@ -300,9 +300,7 @@ en:
     shared_concept: "%{sections} today look at the same idea from different sides."
     size_change:
       larger: "Your recent answers qualify you for a larger set."
-      smaller:
-        one: "Your next automatic set will have one section because several recent sections felt too hard."
-        other: "Your next automatic set will have %{count} sections because several recent sections felt too hard."
+      smaller: "Your next automatic set will have %{count} sections to leave more room for practice."
     rating_group: "How hard was %{section} for you?"
     generating_label: "Generating…"
     generate_anyway: "Generate today's set anyway"
@@ -526,7 +524,7 @@ en:
         outgoing_fixed: "Your Daily sections setting is %{count}, so after this swap %{outgoing} won't appear at all. Swap it back, or change the setting in Setup, to see it again."
         outgoing_weeks: "Your sets have two sections right now, so after this swap %{outgoing} will appear about once every %{weeks} weeks, as an extra section. Swap it back to have it every day."
         outgoing_braked: "Your sets have two sections right now, so after this swap %{outgoing} will rarely appear until your sets grow. Swap it back to have it every day."
-        outgoing_gate: "Your two daily sections are also what decides when your sets grow."
+        outgoing_gate: "Your sets grow based on your reviewed answers and the sections you finish."
   daily_sections:
     legend: "Daily sections"
     automatic: "Automatic"

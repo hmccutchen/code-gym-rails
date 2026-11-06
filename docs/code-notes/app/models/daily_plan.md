@@ -9,10 +9,11 @@ No `code_review`, pattern or third section can host a fourth bucket's concepts, 
 The plan chooses the day's concepts so the caller can compare what was offered with what the provider used (`GenerationDiagnostics`' retention log).
 
 Rotation receives delivered/scheduled history independently of performance.
-`.size_for(user, before:)` loads qualified completion itself, so callers cannot
-pass rotation entries as completion. `SectionCount` keeps its existing
-window, minimum sessions, stretch and capped drop credit; `DaySize` still
-composes that result with the gate and explicit setting.
+`.size_for(user, before:)` returns fixed settings before replay, otherwise
+passes one exclusive date bound to `CompetencyGate`. The fold owns both
+strict results and basic core completion. `DaySize` exposes that one count
+and persistent coverage safety hold. `Result#notes(kind_rungs:)` serializes
+the draft's captured input map without making the plan query difficulty.
 
 ## `.concept_tracks`
 

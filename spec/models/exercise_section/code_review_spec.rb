@@ -493,18 +493,6 @@ RSpec.describe ExerciseSection::CodeReview, "multi-file generation" do
     end
   end
 
-  describe ".day_file_range" do
-    it "reads the plan's files roll at the rung code_review is pitched at" do
-      plan = Data.define(:code_review_files).new(code_review_files: :multi)
-      difficulty = KindDifficulty.new(levels: { "code_review" => "senior" }, locked: [])
-
-      expect(described_class.day_file_range(plan: plan, difficulty: difficulty, skill_level: "junior")).to eq(2..3)
-      expect(described_class.day_file_range(plan: plan, difficulty: KindDifficulty.none, skill_level: "mid_level")).to eq(2..2)
-      expect(described_class.day_file_range(plan: plan.with(code_review_files: :single), difficulty: difficulty,
-                                            skill_level: "junior")).to eq(1..1)
-    end
-  end
-
   def guidance(mode: :application_code, file_range: 2..3, rung: "senior", vocabulary: %w[n_plus_one authorization], **options)
     described_class.generation_guidance(vocabulary: vocabulary, label: "Ruby/Rails", mode: mode,
                                         artifact: "a Rails migration", test_framework: "an RSpec-style",

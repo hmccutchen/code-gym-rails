@@ -42,7 +42,7 @@ A multi-file section's review asks for one `improved_code` string with each chan
 
 `.file_range(files:, rung:)` turns the day's files roll (`DailyPlan::Result#code_review_files`) and the rung `code_review` is pitched at into the range of files the day asks for. A `:single` day is `1..1` at every rung. A `:multi` day is `1..1` at `junior`, `2..2` at `mid_level` and `2..3` at `senior` and `principal_engineer`; an unknown or missing rung reads as `junior`. The two top rungs share a count and differ in how subtle the problem is, which keeps the 40-line total in reach. `MULTI_FILE_RANGES` is keyed by every `KindDifficulty::LEVELS` entry, and a spec holds both that and its widest range to `FILE_SLOTS`.
 
-`.day_file_range(plan:, difficulty:, skill_level:)` reads the rung with `KindDifficulty#rung_for`, the same rung the generation prompt's difficulty block and `pitched_at` use. `GenerationPrompt` calls it to shape the prompt and `ExerciseDraft` calls it to hold ingest to the same range, on the draft and on a retry, so the prompt and the boundary check can't disagree. A retry keeps its draft's plan and difficulty, so it gets the same range. Easing changes a concept's tier, never the rung, so an eased section keeps its range too.
+`GenerationPrompt` and `ExerciseDraft` call `.file_range(files:, rung:)` with the plan's files roll and the code-review rung from the captured map. The prompt's schema and ingest therefore use the same range, including on a retry, which reuses its draft's map. Easing changes a concept's tier, never the nominal rung, so an eased section keeps its range too.
 
 ## How the prompt asks for files
 
