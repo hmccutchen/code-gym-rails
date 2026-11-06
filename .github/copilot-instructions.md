@@ -17,6 +17,13 @@ Stimulus controllers under `app/javascript/controllers`, loaded through
 importmap; a content security policy refuses an inline `<script>`, and
 `spec/conventions/app_views_spec.rb` fails on one.
 
+## When you write code here
+
+When you are changing this repository, as the Copilot coding agent does,
+CLAUDE.md's "How Work Is Run" and "Git Workflow" sections apply to you as
+written: who hands out tasks, which model takes which task, what joins a
+batch, when to push, and when to ask. They are stated only there.
+
 ## How to review
 
 Every check below is written as a question with a findable answer. Answer each

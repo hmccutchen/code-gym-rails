@@ -28,10 +28,13 @@ already decided it is right, so it doesn't review its own work.
   follows the repository's copy of the plugin's review workflow, pinned at
   3.1.0 under `.claude/skills/layered-review/`.
 
-**Findings are checked before any code changes.** Hand both reviews' findings
-to another fresh agent. It checks each finding against the code and reports
-it as confirmed, with the file and line or a failing spec that shows it, or
-as rejected, with the reason. Fix only confirmed findings, test-first. When a
+**Findings are checked before any code changes.** For a straightforward
+finding, the check is a focused failing spec that reproduces the defect; fix
+it and verify locally. Hand a finding to another fresh agent only when it is
+disputed, or when the change touches concurrency, security, a migration or
+data integrity. That agent checks the finding against the code and reports it
+as confirmed, with the file and line or a failing spec that shows it, or as
+rejected, with the reason. Fix only confirmed findings, test-first. When a
 finding would change the design, the person who asked for the work decides
 before anything changes. Out-of-scope findings become GitHub issues. Post a
 PR comment listing what was fixed, what was rejected and why, and which
@@ -41,6 +44,32 @@ working.
 
 Merge only after the full CI suites pass on the final PR commit and GitHub
 review findings are resolved.
+
+## How Work Is Run
+
+These rules apply to every agent working in this repository, Claude Code and
+Copilot alike.
+
+- **A foreman hands out the work.** The main session is the foreman. It
+  splits the work into tasks, gives each one to a subagent with a brief that
+  names the goal, the files and what is already ruled out, checks what comes
+  back, and puts the pieces together. Tasks that share no files and no test
+  database run at the same time. The foreman does a task itself only when it
+  is a few tool calls.
+- **Match the model to the task.** Give mechanical edits and documentation to
+  a faster model. Keep the stronger model for architecture and for high-risk
+  work: concurrency, security, migrations and data integrity.
+- **Required behavior and regressions come first.** Record an optional
+  refactor or an unrelated discovery separately, as a GitHub issue. It joins
+  the batch in progress only when the person who asked for the work says so.
+- **Batch related corrections before pushing.** One push carries the whole
+  batch, so CI runs the full suites once, on the final commit. Never skip a
+  hook or a merge gate.
+- **Long jobs run in the background.** Keep the job's ID. After a timeout,
+  reconnect to that job; starting a second copy wastes the first and can
+  collide with it on the test database.
+- **Continue from one stage to the next without asking.** Ask only when a
+  decision would contradict an approved requirement or add material risk.
 
 ## Code Style
 
