@@ -4,6 +4,16 @@ module ExerciseSection::CodeReview::BugHunt::KindHooks
 
   def bug_hunt?(section) = BugHunt.section?(section)
 
+  def difficulty_definition(rung:, mode: nil, section: nil)
+    return super unless BugHunt.mode?(mode) || bug_hunt?(section)
+
+    level = BugHunt::Prompt::RUNG_FOR.fetch(rung, rung)
+    ExerciseSection::DifficultyDefinition.new(
+      rung: level,
+      expectation: BugHunt::Prompt.expectation(rung)
+    )
+  end
+
   def multi_file_mode?(mode) = !BugHunt.mode?(mode)
 
   def planning_host?(mode:) = mastery_evidence_mode?(mode)

@@ -54,10 +54,13 @@ Established concepts (well past first mastery — survived a retention check): s
 - This is advisory, like every other concept instruction here: it does not force you to select one of these concepts, only shapes the section if you do.
 
 
-Difficulty by section. Pitch each section named below at its level; where it differs from the skill level in the engineer profile above, the section's level wins.
+Difficulty by section. Each section's level overrides the profile's.
+Reasoning deepens within each kind's stated format and size limits, without unstated requirements.
+Concept ladders refine, never override, the applicable baseline and format.
 
 Sections at junior: code_review
-Pitch these problems at this level. A junior problem is: one clearly visible instance of the concept in a small scenario.
+Baseline: one clearly visible instance of the concept in a small scenario.
+- code_review: Diagnose a visible local issue, its consequence and a working fix in the shown artifact.
 
 A retention check or established concept placed in one of these sections is pitched at that section's level, with no easing.
 Unlocked (code_review): tier annotations and rating adjustments above still apply to these sections, eased or raised from the section's level rather than from the profile's skill level.

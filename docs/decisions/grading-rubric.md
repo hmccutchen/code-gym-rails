@@ -17,8 +17,10 @@ no blocks to compute from. The hook is the only statement of that rule;
 shared grading code calls it for every kind.
 
 **The grader is told the pitched level.** `ReviewPrompt.section_prompt`
-states the section's `pitched_at` rung and its
-`KindDifficulty::LEVEL_DEFINITIONS` sentence. `AiService#review_rung` falls back to
+states the section's `pitched_at` rung and its composed kind-owned
+`difficulty_definition`, also used by generation and the unanswered
+walkthrough. The shared standard still comes from
+`KindDifficulty::LEVEL_DEFINITIONS`. `AiService#review_rung` falls back to
 `KindDifficulty#rung_for` (target included) for an unstamped section.
 `eased` is never passed; the rubric instead says a problem simpler than
 its level's description is graded on what it actually asks. The day context no
@@ -111,3 +113,9 @@ lands. That includes the design comparison fixture's two extra answers,
 which had not been run before: a matching pick with a vague reason graded
 `beginner` and the other pick with a sound reason graded `developing`,
 both as the kind's grading note asks.
+
+The #718 offline reassessment of all six fixtures and adjacent-level and
+missing-format cases is in `docs/decisions/kind-difficulty-expectations.md`.
+It preserves the actual-problem rule, all four rating meanings,
+`RUBRIC_VERSION` and historical evidence. It is not a repeat of the paid
+October run, and records the comparison fixture's unresolved limitation.

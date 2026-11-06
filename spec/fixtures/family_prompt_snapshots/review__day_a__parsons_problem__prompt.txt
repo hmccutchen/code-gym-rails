@@ -1,5 +1,5 @@
 Grade ONLY the "parsons_problem" section from the day's context above.
-Pitched at: junior — one clearly visible instance of the concept in a small scenario.
+Pitched at: junior — one clearly visible instance of the concept in a small scenario. Order the supplied coherent blocks by direct data dependencies; no written explanation is required.
 
 Correct blocks, in order: 1. a / 2. b / 3. c
 What they misplaced: position 2 has "c" (correct block there: "b"); position 3 has "b" (correct block there: "c")

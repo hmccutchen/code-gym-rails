@@ -53,10 +53,13 @@ Instructions:
 
 
 
-Difficulty by section. Pitch each section named below at its level; where it differs from the skill level in the engineer profile above, the section's level wins.
+Difficulty by section. Each section's level overrides the profile's.
+Reasoning deepens within each kind's stated format and size limits, without unstated requirements.
+Concept ladders refine, never override, the applicable baseline and format.
 
 Sections at senior: code_review
-Pitch these problems at this level. A senior problem is: the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
+Baseline: the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
+- code_review: Diagnose why the issue matters under a stated constraint; the fix must respect that constraint.
 
 A retention check or established concept placed in one of these sections is pitched at that section's level, with no easing.
 Unlocked (code_review): tier annotations and rating adjustments above still apply to these sections, eased or raised from the section's level rather than from the profile's skill level.

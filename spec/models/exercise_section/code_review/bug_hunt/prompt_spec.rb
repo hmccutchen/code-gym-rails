@@ -66,7 +66,9 @@ RSpec.describe ExerciseSection::CodeReview, "judging a bug_hunt section" do
 
   it "states the bug hunt task and guidance for a bug_hunt section only" do
     expect(described_class.judge_task_for(hunt)).to eq(described_class::BugHunt::Prompt::JUDGE_TASK)
-    expect(described_class.judge_guidance_for(hunt)).to include("correct as written", "principal_engineer exactly as senior")
+    expect(described_class.judge_guidance_for(hunt)).to include("correct as written")
+    expect(described_class.difficulty_definition(rung: "principal_engineer", section: hunt))
+      .to eq(described_class.difficulty_definition(rung: "senior", section: hunt))
     expect(described_class.judge_task_for(plain)).to eq(described_class.judge_task)
     expect(described_class.judge_guidance_for(plain)).to be_nil
   end

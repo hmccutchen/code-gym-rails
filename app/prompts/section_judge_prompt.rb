@@ -53,7 +53,7 @@ class SectionJudgePrompt
       #{kind.discovery? ? "This is a discovery task: wording that names where the issue is defeats it." : "Naming the concept is expected for this kind."}
       Tagged concept: #{shown["concept"]}
       Pitched at: #{rung}#{locked ? " (locked: this level was asked for unconditionally)" : ""}
-      Level meaning: #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}
+      Level meaning: #{kind.difficulty_definition(rung: rung, section: section)}
       Prose fields you may rewrite: #{kind.prose_fields.join(', ')}
       Every other field is the artifact and must not change.
       #{guidance_block(kind, section)}

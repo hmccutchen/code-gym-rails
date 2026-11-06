@@ -1,6 +1,72 @@
 require "rails_helper"
 
 RSpec.describe ExerciseSection do
+  describe ".difficulty_definition" do
+    {
+      "code_review" => [ "visible local issue", "trace the code", "stated constraint", "system-wide costs" ],
+      "pattern" => [ "named pattern", "application and interface must be worked out", "interacting constraint", "costs of the boundary" ],
+      "challenge" => [ "direct implementation", "derive the steps", "interacting requirements", "system-wide costs" ],
+      "architecture" => [ "explicit tradeoffs", "infer the tradeoffs", "constraints interact", "costs on both sides" ],
+      "security_review" => [ "visible path from input to unsafe use", "trace the input", "stated deployment constraint", "system-wide mitigation costs" ],
+      "parsons_problem" => [ "direct data dependencies", "trace state", "interacting dependencies", "system-wide constraint" ],
+      "plan_review" => [ "plainly visible", "connect each proposed step", "interacting constraint", "system-wide consequences" ],
+      "ambiguity_hunt" => [ "concrete missing behavior", "trace the request", "interacting requirements", "system-wide consequences" ],
+      "pseudocode_to_code" => [ "direct decomposition", "derive the decomposition", "interacting requirements", "system-wide costs" ]
+    }.each do |key, distinctions|
+      it "makes #{key}'s adjacent levels concrete without replacing the shared standard" do
+        KindDifficulty::LEVELS.zip(distinctions).each do |rung, distinction|
+          definition = described_class.for(key).difficulty_definition(rung: rung)
+
+          expect(definition.standard).to eq(KindDifficulty::LEVEL_DEFINITIONS.fetch(rung))
+          expect(definition.expectation).to include(distinction)
+        end
+      end
+    end
+
+    it "uses the existing design comparison facts rather than a parallel definition" do
+      KindDifficulty::LEVELS.each do |rung|
+        definition = ExerciseSection::DesignComparison.difficulty_definition(rung: rung)
+
+        expect(definition.expectation).to eq(ExerciseSection::DesignComparison::RUNG_GUIDANCE.fetch(rung))
+      end
+    end
+
+    it "assigns decomposition to the engineer rather than asking generation to supply a plan" do
+      KindDifficulty::LEVELS.each do |rung|
+        definition = ExerciseSection::PseudocodeToCode.difficulty_definition(rung: rung)
+
+        expect(definition.expectation).to start_with("The engineer ")
+        expect(definition.expectation).not_to include("Write your own plan")
+      end
+    end
+
+    it "uses the same bounded bug-hunt definition from a generation mode or a stored purpose, including principal" do
+      kind = ExerciseSection::CodeReview
+      KindDifficulty::LEVELS.each do |rung|
+        generated = kind.difficulty_definition(rung: rung, mode: :bug_hunt)
+        stored = kind.difficulty_definition(rung: rung, section: { "purpose" => "Sum all prices." })
+
+        expect(generated).to eq(stored)
+        expect(generated.expectation).to eq(kind::BugHunt::Prompt.expectation(rung))
+        expect(generated.to_s).not_to include("system scale", "system-wide costs")
+      end
+      expect(kind.difficulty_definition(rung: "principal_engineer", mode: :bug_hunt))
+        .to eq(kind.difficulty_definition(rung: "senior", mode: :bug_hunt))
+    end
+
+    it "keeps ordinary code review independent of artifact shape and tolerates historical sections without a purpose" do
+      kind = ExerciseSection::CodeReview
+      expected = kind.difficulty_definition(rung: "senior")
+
+      [ nil, {}, { "snippet" => "Order.all" }, { "file_1_path" => "order.rb", "file_1_code" => "Order.all" } ].each do |section|
+        expect(kind.difficulty_definition(rung: "senior", section: section)).to eq(expected)
+      end
+      %i[application_code test_file schema_review].each do |mode|
+        expect(kind.difficulty_definition(rung: "senior", mode: mode)).to eq(expected)
+      end
+    end
+  end
+
   it "requires mastery evidence to imply adaptation evidence for every kind and supported code-review mode" do
     DailyPlan::CODE_REVIEW_MODES.each do |mode|
       section = ExerciseSection::CodeReview::BugHunt.mode?(mode) ? { "purpose" => "Find a trap." } : {}

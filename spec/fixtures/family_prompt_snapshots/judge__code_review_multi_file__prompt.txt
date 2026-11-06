@@ -3,7 +3,7 @@ The learner's task for this kind: Find the one planted problem in how the files 
 This is a discovery task: wording that names where the issue is defeats it.
 Tagged concept: n_plus_one
 Pitched at: senior
-Level meaning: the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
+Level meaning: the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context. Diagnose why the issue matters under a stated constraint; the fix must respect that constraint.
 Prose fields you may rewrite: scenario, question, teaching_note
 Every other field is the artifact and must not change.
 

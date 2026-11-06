@@ -12,10 +12,10 @@ module ExerciseSection::CodeReview::BugHunt::Prompt
   }.freeze
 
   RUNG_LINES = {
-    "junior"    => "- Pitch it so the input the purpose suggests first already gives a visibly wrong result.",
-    "mid_level" => "- Pitch it so the input the purpose suggests first gives the right result by accident, and another input it covers fails.",
-    "senior"    => "- Pitch it so the failure shows only on an edge the purpose covers, such as empty, repeated or boundary values, " \
-                   "or so the obvious fix carries a second trap of its own."
+    "junior"    => "The input the purpose suggests first already gives a visibly wrong result.",
+    "mid_level" => "The input the purpose suggests first gives the right result by accident, and another input it covers fails.",
+    "senior"    => "The failure shows only on an edge the purpose covers, such as empty, repeated or boundary values, " \
+                   "or the obvious fix carries a second trap of its own."
   }.freeze
 
   RUNG_FOR = { "principal_engineer" => "senior" }.freeze
@@ -42,9 +42,7 @@ module ExerciseSection::CodeReview::BugHunt::Prompt
     holds a second planted trap, when the snippet, purpose, question or teaching_note shows program output, or when the purpose
     names or hints at the trap. Reject it as unstated_prerequisite when it uses Rails, TypeScript, a framework or anything else
     outside the core language, and as underdetermined when the code calls something it doesn't define apart from the
-    language's built-ins. A bug hunt pitches principal_engineer exactly as senior, one trap that shows only on an edge the
-    purpose covers, so judge it against that and never against a decision at system scale. The purpose and the snippet are
-    the artifact: never change them.
+    language's built-ins. The purpose and the snippet are the artifact: never change them.
   GUIDANCE
 
   GRADING_NOTE = "Main point: the planted language trap, judged against the goal line: an input the goal covers that this " \
@@ -55,7 +53,9 @@ module ExerciseSection::CodeReview::BugHunt::Prompt
                  "A different trap that also gives a wrong result for an input the goal covers meets the main point. A style " \
                  "point, a faster way, or input the goal doesn't cover is credited in \"correct\" and doesn't meet it."
 
-  def self.rung_line(rung) = RUNG_LINES.fetch(RUNG_FOR.fetch(rung, rung), RUNG_LINES.fetch("junior"))
+  def self.expectation(rung)
+    "One bounded language trap. #{RUNG_LINES.fetch(RUNG_FOR.fetch(rung, rung), RUNG_LINES.fetch('junior'))}"
+  end
 
   def self.guidance(gotcha:, rung:, vocabulary:)
     raise ArgumentError, "a bug_hunt day needs its picked gotcha" if gotcha.nil?
@@ -71,7 +71,6 @@ module ExerciseSection::CodeReview::BugHunt::Prompt
         "from the language's built-ins. Keep each line under 45 characters where you can and never past 60, since it is read on a phone.",
       "- Show no program output anywhere: no result comments such as `# => 3`, no `puts` or `console.log` of a result, and no " \
         "output in the question, the purpose or the teaching_note.",
-      rung_line(rung),
       "- For this section, the #{ExerciseSection::CodeReview::BugHunt::MAX_LINES}-line limit and the purpose come before what " \
         "the difficulty guidance says about realistic constraints or decisions at system scale.",
       "- Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}",

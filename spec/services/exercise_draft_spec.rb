@@ -355,7 +355,8 @@ RSpec.describe ExerciseDraft do
       described_class.retry_section(draft_for, ExerciseSection::Pattern, "n_plus_one", provider: capturing)
       described_class.retry_section(draft_for, ExerciseSection::PlanReview, "scope_creep", provider: capturing)
 
-      expect(ladders).to eq([ { "junior" => { "n_plus_one" => "j" } }, { "junior" => { "scope_creep" => "j" } } ])
+      expect(ladders).to eq([ { ExerciseSection::Pattern => { "n_plus_one" => "j" } },
+                             { ExerciseSection::PlanReview => { "scope_creep" => "j" } } ])
     end
 
     it "loads a retry's ladders for the draft's language and code_review mode" do
