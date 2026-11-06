@@ -14,6 +14,11 @@ the maximum, and `ExerciseSection.resolved_keys` caps a stored row at
 `MAX_SECTIONS`, daily kinds first, so a requested section is never the one
 cut. Below the maximum an unrequested extra is still kept and warned about.
 
+Pattern's former daily role gives it no special rotation priority. Unless
+the user chooses it as a regular kind, it rotates under the ordinary rules.
+`docs/decisions/daily-kinds.md` ("Pattern's rotating role") records that
+decision and its boundary with future protected-practice and variety work.
+
 **The task.** Two working pieces of code that meet the same stated
 behavior, retries and failures included, and differ on one design
 principle, the tagged concept. The engineer picks the piece the stated
@@ -191,4 +196,6 @@ false and it stays closed until the engineer opens it.
 
 **Setup.** The Exercise mix groups the user's daily kinds under "Always in your set"
 (difficulty only), and gives pattern, and any default kind that is not
-daily, a group of its own.
+daily, a group of its own. "Added on some days" describes both single-kind
+and multi-kind optional groups; a group of its own promises neither a higher
+nor an equal frequency.

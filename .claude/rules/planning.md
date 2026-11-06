@@ -37,6 +37,12 @@ read it before changing that area.
   Exclusion removes a kind from the pool everywhere, `slot_staleness`
   included; validation refuses one that empties a slot. Storage is sparse, so
   an untouched user stays byte-identical to pre-feature behavior.
+- **Pattern's rotating role** (`docs/decisions/daily-kinds.md`): Pattern is
+  ordinary rotation unless chosen as a regular kind. Its former daily status
+  earns no special priority, minimum cadence or preferred slot ranking, and
+  its separate group promises no higher or equal frequency. Explicit user
+  settings still govern. #714's protected-practice and variety policy remains
+  unimplemented; this decision changes no planner behavior.
 - **Difficulty targets and locks**
   (`docs/decisions/difficulty-targets-and-locks.md`): Per-kind level targets
   (`KindDifficulty::LEVELS`) and locks; an unset kind follows `skill_level`
