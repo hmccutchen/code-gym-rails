@@ -6,6 +6,13 @@ The prompt for the judge that checks one generated section before an engineer se
 
 `.visible` strips every answer-key field, every `ProblemSetIngest::SERVER_STAMPS` field and the kind's `.judge_hidden_fields`, so the judge sees one section as the engineer will, with no concept history. It is public because the blind-solve triage script (`script/key_triage.rb`) builds its solve prompt from the same step, so the rule for what a pre-submission AI call may see lives in one place. After the JSON, `.generate` prints the kind's `.judge_attachment`, when it has one: a multi-file code review's files, every line numbered (#630). It returns the kind's verdict schema as `response_schema:`.
 
+## Difficulty definition
+
+The level meaning comes from `kind.difficulty_definition(rung:, section:)`,
+the same value grading and walkthroughs use. The supplied rung remains the
+captured configured target; the kind resolves any effective-rung exception.
+The definition reads visible section context, never an answer key.
+
 ## `PRINCIPLE_GUIDANCE`
 
 Fetched by name in `JudgeVerdict::PRINCIPLES`' order, so a new principle fails

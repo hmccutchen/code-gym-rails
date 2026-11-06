@@ -49,12 +49,11 @@ aren't in the code.
 
 ## `KindHooks`
 
-The hooks `CodeReview` answers differently for `bug_hunt`: `bug_hunt?`,
-`multi_file_mode?`, `planning_host?`, `mastery_evidence?` and the rule both
-read (`mastery_evidence_mode?`), `judge_task_for`, `judge_guidance_for` and
-`snippet_context`. `CodeReview` extends the module, so each one answers as
-the kind's own class method and overrides `ExerciseSection`'s default. They
-live here rather than in `code_review.rb` to keep that file under 300 lines.
+`CodeReview` extends this module for its bug-hunt-specific decisions:
+difficulty, planning and evidence eligibility, concept visibility, judging
+and context. Each hook answers as the kind's own class method and
+overrides the ordinary default. This keeps mode decisions on the kind,
+away from shared callers, without growing `code_review.rb`.
 
 ## `.snippet_context`
 

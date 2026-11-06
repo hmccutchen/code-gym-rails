@@ -1,5 +1,5 @@
 Walk through the "code_review" section from the day's context above. No answer was given for this section, so it must not be rated. Return "correct" as an empty array, since nothing was written.
-Pitched at: senior — the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
+Pitched at: senior — the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context. Diagnose why the issue matters under a stated constraint; the fix must respect that constraint.
 
 Return a single JSON object (NOT wrapped in a "code_review" key) with:
 - "correct": array of strings — always empty

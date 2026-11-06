@@ -1,5 +1,5 @@
 Walk through the "plan_review" section from the day's context above. No answer was given for this section, so it must not be rated. Return "correct" as an empty array, since nothing was written.
-Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.
+Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label. To find the planted flaws, connect each proposed step to the request and explain the needed pushback.
 
 Return a single JSON object (NOT wrapped in a "plan_review" key) with:
 - "correct": array of strings — always empty

@@ -35,7 +35,6 @@ Instructions:
 - "purpose" is one sentence of at most 160 characters saying what the code is meant to do, precise enough to decide which inputs it covers. It never names or hints at the trap.
 - "snippet" is 5 to 10 lines that define everything they call apart from the language's built-ins. Keep each line under 45 characters where you can and never past 60, since it is read on a phone.
 - Show no program output anywhere: no result comments such as `# => 3`, no `puts` or `console.log` of a result, and no output in the question, the purpose or the teaching_note.
-- Pitch it so the failure shows only on an edge the purpose covers, such as empty, repeated or boundary values, or so the obvious fix carries a second trap of its own.
 - For this section, the 10-line limit and the purpose come before what the difficulty guidance says about realistic constraints or decisions at system scale.
 - Choose the code_review concept from this vocabulary, exactly one: promise_chaining
 - "answer_key" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "question", "purpose" or "teaching_note" — doing so would give away the answer before the engineer reads the snippet. Quote the code it points at in backticks, never by line number. Every claim in the key must follow from what the engineer is shown, the scenario included, and a fact that is itself the planted flaw never appears in the scenario. Before you state a consequence, trace it through what is shown, including guards, early returns, locks and validations, and never claim an effect they prevent. When the flaw depends on a setting that isn't shown and that setting is itself the flaw, phrase the key conditionally, for example "both examples can pass only if the test cache stores nothing, so check which store is used", never assert it as fact, and don't put the setting in backticks.
@@ -43,7 +42,6 @@ Instructions:
 - "looks_right_on" is a call on another input the purpose covers where the snippet gives the right result by accident, with the "expected" literal it gives.
 - The "design_comparison" section is a DESIGN COMPARISON: "better_piece" and "other_piece" are two pieces of JavaScript/React code, 12-15 lines each, that meet the same stated behavior, including its retry and failure cases, and differ on exactly one design principle: the tagged concept. Compare what they cost to change or to run, never correct behavior against a defect; a worse piece that is incorrect turns this into a code review.
 - Surface parity: the pieces behave identically, are about the same length, and are equally clean, named and commented. Any difference other than the tested principle is a defect.
-- This section is pitched at junior: the deciding fact is in the question, in a line or two, and points plainly at one piece.
 - The deciding fact must be stated in the section. A hypothetical condition the section never states does not decide anything.
 - When this section's concept is the same as the code review's, test it through a choice between two working designs in a different scenario from the code review, never by restating a defect to find.
 - "answer_key" is HIDDEN grading data. Never restate or hint at it, or at which piece is better, in "title", "scenario" or "question".
@@ -63,13 +61,18 @@ Instructions:
 
 
 
-Difficulty by section. Pitch each section named below at its level; where it differs from the skill level in the engineer profile above, the section's level wins.
+Difficulty by section. Each section's level overrides the profile's.
+Reasoning deepens within each kind's stated format and size limits, without unstated requirements.
+Concept ladders refine, never override, the applicable baseline and format.
 
 Sections at junior: design_comparison, pattern
-Pitch these problems at this level. A junior problem is: one clearly visible instance of the concept in a small scenario.
+Baseline: one clearly visible instance of the concept in a small scenario.
+- design_comparison: the deciding fact is in the question, in a line or two, and points plainly at one piece.
+- pattern: Apply the named pattern to a direct need, with a workable structure and calling interface.
 
 Sections at senior: code_review
-Pitch these problems at this level. A senior problem is: the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
+Baseline: the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
+- code_review: One bounded language trap. The failure shows only on an edge the purpose covers, such as empty, repeated or boundary values, or the obvious fix carries a second trap of its own.
 
 A retention check or established concept placed in one of these sections is pitched at that section's level, with no easing.
 Unlocked (code_review, design_comparison, pattern): tier annotations and rating adjustments above still apply to these sections, eased or raised from the section's level rather than from the profile's skill level.

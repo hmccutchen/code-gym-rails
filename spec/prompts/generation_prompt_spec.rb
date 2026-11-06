@@ -38,7 +38,7 @@ RSpec.describe GenerationPrompt do
   end
 
   let(:ladders) do
-    { "principal_engineer" => { "memoization" => "a principal rung" }, "senior" => { "n_plus_one" => "a senior rung" } }
+    { ExerciseSection::Challenge => { "memoization" => "a principal rung" }, ExerciseSection::CodeReview => { "n_plus_one" => "a senior rung" } }
   end
 
   def build(language = "ruby_rails")
@@ -74,6 +74,47 @@ RSpec.describe GenerationPrompt do
 
   def retry_render(prompt)
     prompt.render(only: ExerciseSection::Challenge, fixed_concept: "memoization")
+  end
+
+  it "keeps level-dependent file counts compatible with the shared reasoning instruction" do
+    user.skill_level = "principal_engineer"
+    text = render_generation_prompt(user, code_review_files: :multi, only: ExerciseSection::CodeReview)
+
+    expect(text).to include("shows 2 or 3 files", "within each kind's stated format and size limits")
+    expect(text).not_to include("levels change reasoning, not length, files")
+  end
+
+  it "always carries the shared and kind baseline, with ladders refining rather than replacing it" do
+    [ {}, { ExerciseSection::CodeReview => { "n_plus_one" => "trace a query hidden in a helper" } } ].each do |ladders|
+      prompt = GenerationPrompt.new(user, "ruby_rails", plan: plan, history: [], delivered_history: [],
+                                   difficulty: difficulty, ladders: ladders,
+                                   retention_annotation: generation_retention_annotation).render
+      definition = ExerciseSection::CodeReview.difficulty_definition(rung: "senior")
+
+      expect(prompt).to include(definition.standard, definition.expectation)
+      expect(prompt).to include("Concept ladders refine, never override, the applicable baseline and format.")
+      expect(prompt).not_to include("For a concept not listed")
+    end
+  end
+
+  it "passes the bug-hunt mode into the baseline on an initial render and a single-kind retry" do
+    gotcha = BugHuntGotchas.for_language("ruby_rails").first
+    bug_plan = plan.with(code_review_mode: :bug_hunt, code_review_source: nil, code_review_gotcha: gotcha)
+    prompt = GenerationPrompt.new(user, "ruby_rails", plan: bug_plan, history: [], delivered_history: [],
+                                  difficulty: difficulty, ladders: {}, retention_annotation: generation_retention_annotation)
+    definition = ExerciseSection::CodeReview.difficulty_definition(rung: "senior", mode: :bug_hunt)
+
+    [ prompt.render, prompt.render(only: ExerciseSection::CodeReview) ].each do |text|
+      expect(text).to include(definition.standard, definition.expectation)
+      expect(text).not_to include(ExerciseSection::CodeReview.difficulty_definition(rung: "senior").expectation)
+      expect(text.scan(ExerciseSection::CodeReview::BugHunt::Prompt.expectation("senior")).size).to eq(1)
+    end
+  end
+
+  it "states the comparison's level expectations once, in the shared baseline block" do
+    text = build.render
+
+    expect(text.scan(ExerciseSection::DesignComparison::RUNG_GUIDANCE.fetch("senior")).size).to eq(1)
   end
 
   def sql_during

@@ -6,6 +6,12 @@ class ExerciseSection
   # Its own fact rather than the slot count: a second daily kind adds a slot without making a day longer.
   MAX_SECTIONS = 4
 
+  DifficultyDefinition = Data.define(:rung, :expectation) do
+    def standard = KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)
+
+    def to_s = "#{standard} #{expectation}"
+  end
+
   def self.all
     [ CodeReview, DesignComparison, Pattern, Challenge, Architecture, SecurityReview, ParsonsProblem,
       PlanReview, AmbiguityHunt, PseudocodeToCode ]
@@ -106,6 +112,10 @@ class ExerciseSection
   end
 
   class << self
+    def difficulty_definition(rung:, mode: nil, section: nil)
+      DifficultyDefinition.new(rung: rung, expectation: self::RUNG_GUIDANCE.fetch(rung))
+    end
+
     def key
       @key ||= name.demodulize.underscore.freeze
     end

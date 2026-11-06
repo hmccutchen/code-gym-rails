@@ -7,10 +7,11 @@ A value of 1 means a check is overdue once it is late by 100% of the concept's o
 ## `.record_review!`
 
 The caller holds user then response locks, supplies actual pre-merge review
-keys, and saves the response in the same transaction. The default-off
-compatibility writer selects reconciliation for an enrolled user through
-fresh uncached receipt/suffix queries under the user lock. Untouched users
-retain legacy per-batch orchestration without new state. Both modes use
+keys, and saves the response in the same transaction. Release A initiates
+reconciliation by default. A compatible writer with initiation explicitly
+off still selects reconciliation for an enrolled user through fresh uncached
+receipt/suffix queries under the user lock. Only untouched users reached by
+that default-off writer retain legacy per-batch orchestration without new state. Both modes use
 the strict projection, excluding retired/off-vocabulary tags and assigning
 each section its own bucket.
 

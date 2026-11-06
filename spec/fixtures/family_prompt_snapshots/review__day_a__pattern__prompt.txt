@@ -1,5 +1,5 @@
 Grade ONLY the "pattern" section from the day's context above.
-Pitched at: junior — one clearly visible instance of the concept in a small scenario.
+Pitched at: junior — one clearly visible instance of the concept in a small scenario. Apply the named pattern to a direct need, with a workable structure and calling interface.
 
 Main point: the structure the problem calls for.
 Essential pieces: a structure and interface that would work for the stated problem. The answer scaffold names what to cover (Your approach; Interface — how would this be called; What would be easy to get wrong or worth testing), whether or not the answer kept the labels; a part it leaves out is an essential gap only when the design would not work without it.

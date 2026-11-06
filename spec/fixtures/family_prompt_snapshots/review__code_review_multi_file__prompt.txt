@@ -1,5 +1,5 @@
 Grade ONLY the "code_review" section from the day's context above.
-Pitched at: senior — the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
+Pitched at: senior — the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context. Diagnose why the issue matters under a stated constraint; the fix must respect that constraint.
 
 Main point: the one planted problem in how the files fit together: what one file assumes that another breaks.
 Essential pieces: both sides of that interaction, why it goes wrong in this code, and a fix in the right file or files.

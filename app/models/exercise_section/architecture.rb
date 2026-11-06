@@ -1,5 +1,12 @@
 # Its review carries no improved_code: a design decision has no single corrected form.
 class ExerciseSection::Architecture < ExerciseSection
+  RUNG_GUIDANCE = {
+    "junior" => "Choose among viable options using explicit tradeoffs against all stated constraints.",
+    "mid_level" => "Choose among viable options; infer the tradeoffs from the stated constraints.",
+    "senior" => "Explain how the stated constraints interact when weighing viable options and making a defensible choice.",
+    "principal_engineer" => "Weigh system-wide costs on both sides of viable options against the same short set of stated constraints."
+  }.freeze
+
   # Fallback only — see ExerciseSection::Pattern::DEFAULT_SCAFFOLD.
   DEFAULT_SCAFFOLD = [
     "Which option, and why:",

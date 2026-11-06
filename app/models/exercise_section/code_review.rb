@@ -24,6 +24,13 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   MULTI_FILE_RANGES = { "junior" => 1..1, "mid_level" => 2..2, "senior" => 2..3, "principal_engineer" => 2..3 }.freeze
 
+  RUNG_GUIDANCE = {
+    "junior" => "Diagnose a visible local issue, its consequence and a working fix in the shown artifact.",
+    "mid_level" => "Diagnose the issue by following calls or data: trace the code to explain the consequence and fix.",
+    "senior" => "Diagnose why the issue matters under a stated constraint; the fix must respect that constraint.",
+    "principal_engineer" => "Weigh the fix's system-wide costs against the issue, using stated facts rather than extra files or defects."
+  }.freeze
+
   HIDDEN_KEY_LINE = PlantedKey.hidden_key_line(fields: %w[question scenario teaching_note diagram], before: "reads the snippet",
                                                 quoted: "the code").freeze
 

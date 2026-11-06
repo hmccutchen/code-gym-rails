@@ -3,7 +3,7 @@ The learner's task for this kind: Design an approach to the stated problem, expl
 Naming the concept is expected for this kind.
 Tagged concept: memoization
 Pitched at: mid_level
-Level meaning: one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.
+Level meaning: one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label. The pattern is named; its application and interface must be worked out from the scenario's requirements.
 Prose fields you may rewrite: title, why, scenario, question, teaching_note
 Every other field is the artifact and must not change.
 

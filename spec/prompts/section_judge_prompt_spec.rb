@@ -64,6 +64,24 @@ RSpec.describe SectionJudgePrompt do
       .to match_array(section.keys - [ "answer_key", "pitched_at", "file_1_changed" ])
   end
 
+  it "shares the kind definition with review and walkthroughs, including bounded principal bug hunts", :aggregate_failures do
+    ExerciseSection.all.product(KindDifficulty::LEVELS).each do |kind, rung|
+      sections = [ FakeService::EXERCISE_PROBLEM_SET.fetch(kind.key) ]
+      sections << cases.fetch("code_review_bug_hunt")[1] if kind == ExerciseSection::CodeReview
+      sections.each do |section|
+        definition = kind.difficulty_definition(rung: rung, section: section)
+        request = described_class.generate(kind: kind, section: section, rung: rung, locked: false)
+        graded = ReviewPrompt.section_prompt(key: kind.key, section: section, answer: "A synthetic answer.", rung: rung)
+        walked = ReviewPrompt.walkthrough_prompt(key: kind.key, section: section, rung: rung)
+
+        expect(request[:prompt]).to include("Level meaning: #{definition}")
+        expect([ graded, walked ]).to all(include(definition.to_s))
+        expect(request).to eq(described_class.generate(kind: kind, section: section.except(*ExerciseSection.all_answer_key_fields),
+                                                       rung: rung, locked: false))
+      end
+    end
+  end
+
   it "sees one section and nothing about the day, the engineer or their history" do
     expect(described_class.method(:generate).parameters)
       .to eq([ [ :keyreq, :kind ], [ :keyreq, :section ], [ :keyreq, :rung ], [ :keyreq, :locked ] ])

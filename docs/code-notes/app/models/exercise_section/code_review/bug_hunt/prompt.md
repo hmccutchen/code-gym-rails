@@ -5,6 +5,15 @@ The generation guidance and schema fragment for a `bug_hunt` day.
 the day's mode is `bug_hunt`, in place of the mode's content line, so a day
 on any other mode renders exactly as before.
 
+## `.expectation`
+
+`RUNG_LINES` describes three tiers, and `RUNG_FOR` maps principal to
+senior: a bounded puzzle has no room for a decision at system scale.
+`CodeReview.difficulty_definition` composes that expectation with the
+effective rung's shared standard. Generation, the section judge, grading
+and walkthroughs read the same definition; `GenerationLadders` reads its
+effective rung when selecting reference text.
+
 ## `.guidance`
 
 - **The trap** comes from the plan's picked `BugHuntGotchas` entry, never
@@ -14,11 +23,8 @@ on any other mode renders exactly as before.
 - **The language line** keys on the gotcha's language. JavaScript snippets
   are ES modules, since `js_arrow_method` depends on module mode and the
   measurement harness runs every snippet as an `.mjs` file.
-- **The rung line** has three tiers, and `principal_engineer` takes the
-  `senior` line (`RUNG_FOR`): a 10-line puzzle has no room for a decision
-  at system scale. A later line says the 10-line limit and the purpose come
-  before the difficulty guidance's realistic constraints, since the concept
-  ladders were written for realistic code.
+- **Format precedence** keeps the line limit and the purpose ahead of
+  concept guidance written for realistic code.
 - **The witness** is asked for as code (`call`, `expected`, `returns`), so
   a script can run it without anyone transcribing prose. For an async
   trap the call returns a snapshot of the state at the moment it returns:
@@ -47,7 +53,7 @@ solve the puzzle first, then names which rejection principle each failure
 falls under: correct as written, a second trap, shown output or a purpose
 that gives the trap away are `reasoning_failure`; code outside the core
 language is `unstated_prerequisite`; calling something undefined is
-`underdetermined`. The judge prompt still prints the generic level meaning
-for the pitched rung, so the guidance says `principal_engineer` is pitched
-as `senior` here. `purpose` is not in `.prose_fields`, so the judge can
+`underdetermined`. The judge's level meaning comes from the same
+kind-owned definition as generation, including principal as senior.
+`purpose` is not in `.prose_fields`, so the judge can
 never rewrite what defines a correct answer.

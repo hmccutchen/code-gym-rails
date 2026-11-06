@@ -12,7 +12,7 @@ class ConceptMastery < ApplicationRecord
   scope :due_for_retention_check, -> { where.not(next_retention_check_on: nil).where(next_retention_check_on: ..Date.current) }
 
   AI_RATING_RANK = { "beginner" => 0, "developing" => 1, "solid" => 2, "strong" => 3 }.freeze
-  INITIATE_RECONCILIATION = false
+  INITIATE_RECONCILIATION = true
 
   # Capped at 60 days, where a re-check stops measuring retention; never derive this from vocabulary size (#98).
   RETENTION_INITIAL_INTERVAL_DAYS = 7
