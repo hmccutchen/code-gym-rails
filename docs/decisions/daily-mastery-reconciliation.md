@@ -217,7 +217,6 @@ deployment are verified; staged PRs use `Refs #726`.
 Rollback from A to C is supported. Rollback before C, deletion of receipts,
 or reverting S after state exists is unsafe. If deployment access/evidence
 is missing, keep initiation false and A unmerged. C's local passing tests
-are not production activation evidence. Final full suites run in CI;
-independent critical/layered reviews precede publication, with an additional
-verifier reserved for disputed or high-risk findings. CI remains advisory,
-not branch protection.
+are not production activation evidence. Final full suites run in CI.
+Follow the review process in `CLAUDE.md` before publication. CI remains
+advisory, not branch protection.
