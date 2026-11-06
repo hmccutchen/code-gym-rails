@@ -73,6 +73,36 @@ RSpec.describe ProfileUpdate, type: :model do
   end
 
   describe "under the user-row lock" do
+    it "checks the confirmation against the reloaded baseline, not the object's earlier snapshot" do
+      stale = User.find(user.id)
+      confirmation = { from: stale.skill_level, to: "senior", preferences_version: stale.section_kind_preferences_version }
+      user.update!(skill_level: "mid_level")
+
+      outcome = save(stale, user: { skill_level: "senior" }, track_change: confirmation)
+
+      expect(outcome.status).to eq(:stale)
+      expect(user.reload.skill_level).to eq("mid_level")
+      expect(user.level_suggestion_events).to be_empty
+    end
+
+    it "checks the confirmation against preferences changed since the object was loaded" do
+      stale = User.find(user.id)
+      confirmation = { from: stale.skill_level, to: "senior", preferences_version: stale.section_kind_preferences_version }
+      user.update!(section_kind_levels: { "pattern" => "mid_level" })
+
+      expect(save(stale, user: { skill_level: "senior" }, track_change: confirmation).status).to eq(:stale)
+      expect(user.reload).to have_attributes(skill_level: "junior", section_kind_levels: { "pattern" => "mid_level" })
+    end
+
+    it "checks first-run status again when another instance has already continued" do
+      account = create_user_with_key(email: "first-race@example.com", track_chosen: false)
+      stale = User.find(account.id)
+      expect(save(account, user: { choose_track: true, skill_level: "mid_level" }).status).to eq(:saved)
+
+      expect(save(stale, user: { choose_track: true, skill_level: "senior" }).status).to eq(:invalid)
+      expect(account.reload.skill_level).to eq("mid_level")
+    end
+
     it "reports a stale version without saving" do
       outcome = save(user: { section_kind_levels: { "pattern" => "senior" }, section_kind_preferences_version: 99 })
 

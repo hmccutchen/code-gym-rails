@@ -1,0 +1,23 @@
+<%# locals: (change:) %>
+<% if change.already_saved? %>
+  <p><%= t("tracks.preview.already_saved") %></p>
+<% else %>
+  <p><%= t("tracks.preview.baseline", from: t("exercise_mix.levels.#{change.from}"), to: t("exercise_mix.levels.#{change.to}")) %></p>
+  <% if change.changed.empty? %>
+    <p><%= t("tracks.preview.baseline_only") %></p>
+  <% else %>
+    <ul>
+      <% change.changed.each do |move| %>
+        <li><%= t("tracks.preview.moves", name: t("sections.#{move[:kind]}.name"), from: t("exercise_mix.levels.#{move[:from]}"), to: t("exercise_mix.levels.#{move[:to]}")) %></li>
+      <% end %>
+    </ul>
+  <% end %>
+<% end %>
+<% if change.retained.any? %>
+  <p><%= t("tracks.preview.retained") %></p>
+  <ul>
+    <% change.retained.each do |target| %>
+      <li><%= t(target[:locked] ? "tracks.kept_locked_section" : "tracks.kept_section", name: t("sections.#{target[:kind]}.name"), level: t("exercise_mix.levels.#{target[:level]}")) %></li>
+    <% end %>
+  </ul>
+<% end %>

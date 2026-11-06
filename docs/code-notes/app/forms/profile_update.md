@@ -4,9 +4,8 @@
 
 `PATCH /profile` used to check each field twice: the controller refused a
 weight, level, skill level, display option or daily count outside its list,
-and `User`'s validators refused the same values again (#434). The form now
-checks only the posted shape, which is what the request boundary has to
-catch, and leaves which values a field allows to `User`:
+and `User`'s validators refused the same values again (#434). The form checks the posted shape, which is what the request boundary has to
+catch, and generally leaves which values a field allows to `User`:
 
 - A map field (`section_kind_weights`, `section_kind_levels`,
   `display_preferences`) must be an object, and a list field
@@ -41,10 +40,10 @@ the skill level and the daily count from the same `User::SKILL_LEVEL_RULE`
 and `User::DAILY_SECTION_COUNT_RULE` (the `Daily sections` attribute name is
 in `config/locales/en.yml`).
 
-A value outside a list is found when `User` validates, which is after the
-locked checks. So a tampered post that also carries a stale version gets the
-409, and a bad level posted with `choose_track` gets the track-choice 422.
-No page sends either.
+A value outside a list is generally found when `User` validates, after the
+locked checks. Skill level is checked against `User::SKILL_LEVELS` before
+confirmation validation, so an invalid level keeps its existing field error.
+A bad level posted with `choose_track` keeps the track-choice 422.
 
 ## `TRACK_CHOICE_KEYS` and `#invalid_track_choice?`
 
@@ -54,6 +53,20 @@ else; any other key refuses the whole request. The level must be one
 never chosen at first run. The choice is checked after the row lock reloads
 the user, because a choice bumps no preference version, so only
 `User#first_run?` read under the lock stops a second tab from choosing twice.
+
+## Manual track confirmation
+
+Every manual `skill_level` post supplies a closed `track_change` object
+containing only `from`, `to`, and `preferences_version`. Levels come from
+`User::SKILL_LEVELS`; the version must be a nonnegative JSON integer, and
+`to` must match the requested level. Missing, malformed or mismatched
+confirmation gets 422 before assignment.
+
+The checks run after the user lock reloads the record. A different saved
+baseline or preference version gets 409 without mutation. Track changes
+preserve targets and never bump the mix version themselves, so the baseline
+comparison cannot be replaced by the version check. The Welcome exception
+does not bypass its exact keys, allowed ladder or first-run guard.
 
 ## A post carrying `learning_track`
 
@@ -67,8 +80,8 @@ nothing.
 An Apply from the dashboard card, and a Setup save opened from the card's
 link, send the moves the page showed as `level_suggestion_steps`
 (`LevelSuggestionStep`). A level suggestion is shown at a kind's rung, which
-for a kind without a target is the skill level, and a skill-level change bumps
-`section_kind_preferences_version` only when it clears a target. So the version alone cannot tell
+for a kind without a target is the skill level, and a skill-level change does
+not bump `section_kind_preferences_version`. So the version alone cannot tell
 that a card is stale. Under the row lock, after the version check,
 `#moved_since_shown?` compares each step's `from` with the stored rung and
 answers stale (409) when any has moved, saving nothing; the card already
@@ -83,7 +96,7 @@ steps, a layout, a track choice, a skill level or targets. The skill level
 and targets matter even without a version: either can move a kind's rung,
 and `LevelChange#record_cutoffs` then merges into `level_suggestion_cutoffs`,
 which the dismissal endpoint also writes under that lock. Without it,
-Setup's skill-level select, which sends no version, could write back a
+Setup's skill-level Apply could write back a
 cutoff map read before a Not now committed and lose that cutoff.
 
 Any Exercise mix field (`PREFERENCE_KEYS`) takes the lock too, with or
@@ -94,11 +107,11 @@ those entries from the locked row, not from a copy a swap may have changed.
 ## `#mixed_track_save?`
 
 A post that carries `skill_level` together with any Exercise mix key, outside
-the welcome choice, is refused with a 422. `TrackChange` runs on the save, so
-it would clear a target the same request had just set when that target equals
-the old or the new track. No page sends both: Setup's track select sends the
-level alone and the mix sends its keys alone. Refusing the pair keeps the
-order of the two from ever deciding what is stored.
+the welcome choice, is refused with a 422. No page sends both: Setup's Apply
+sends the level and its confirmation, while the mix sends its keys alone.
+Refusing combined changes keeps the confirmation tied to the settings the
+preview described; a target edit must settle before new consequences are
+confirmed.
 
 ## The rendered layout is checked as well as the version
 

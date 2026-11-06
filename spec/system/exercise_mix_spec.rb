@@ -286,7 +286,7 @@ RSpec.describe "Exercise mix", type: :system do
       window.setTimeout = (callback, delay, ...rest) => wait(callback, delay === 200 ? 0 : delay, ...rest);
       window.fetch = (url, options) => {
         const body = options && typeof options.body === "string" ? options.body : "";
-        if (body.includes('"skill_level"')) return new Promise(() => {});
+        if (body.includes('"time_zone"')) return new Promise(() => {});
         if (!body.includes('"layout"')) return send(url, options);
         return new Promise((resolve) => { window.releaseMixSave = () => resolve(send(url, options)); });
       };
@@ -295,7 +295,7 @@ RSpec.describe "Exercise mix", type: :system do
     find("#weight-architecture").set(0)
     wait_for { page.evaluate_script("typeof window.releaseMixSave === 'function'") }
     user.update!(daily_section_kinds: %w[code_review challenge])
-    find("#skill-level", visible: :all).select(I18n.t("exercise_mix.levels.#{(User::SKILL_LEVELS - [ user.skill_level ]).first}"), visible: :all)
+    find("#tz-select", visible: :all).select("Hawaii", visible: :all)
     page.execute_script("window.releaseMixSave()")
 
     expect(page).to have_css("#save-status", text: I18n.t("exercise_mix.layout_stranded"))

@@ -6,8 +6,8 @@ The page is four cards on `.phone-page`: Connection (the key, the provider
 choice, the exercise language and Save), Your day (time zone, Daily
 sections, Track), then the Exercise mix and Display disclosures, which are
 `details.card`. The Connection heading carries a "Tap Save to apply" tag
-(`.card-heading` and `.card-tag`), because Save is the one control on the
-page that waits for a tap, and the controls below it save by themselves.
+(`.card-heading` and `.card-tag`). Track has its own inline preview with
+explicit Apply and Cancel; the other preference controls save by themselves.
 
 ## Muted paragraphs: `:where(...) p:not(.card-note)`
 
@@ -107,10 +107,14 @@ snapshot, taken for an account with a key, doesn't carry the guide.
 
 - The level suggestions switch and the Account nudges switch say "Saved" on a
   status line under the switch (`save_switch_controller`).
-- The time zone, Daily sections, Track, exercise mix and Display controls say
+- The time zone, Daily sections, exercise mix and Display controls say
   nothing when a save works. A failure shows in the fixed `#save-status`
   banner, except a Daily sections choice the server refuses, which shows
   inside the open chooser so the person can change it there.
+- Track selection shows loading, unsaved consequences or an error inline.
+  Apply and Cancel are explicit; Refresh preview can recover a lost successful
+  reply. The consequence partial is server-rendered, and Apply stays disabled
+  while loading, on failure or when the proposed track is already saved.
 - Save, the provider choice and the language redirect with a flash
   notice, because they go through a full form post.
 

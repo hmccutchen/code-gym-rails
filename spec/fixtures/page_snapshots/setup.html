@@ -538,6 +538,13 @@
     
 <div class="phone-page settings-page" data-controller="profile-preferences"
      data-profile-preferences-url-value="/profile"
+     data-profile-preferences-preview-url-value="/profile/track_preview"
+     data-profile-preferences-loading-text-value="Loading your saved track and the proposed changes."
+     data-profile-preferences-unsaved-text-value="This track change is not saved. Apply it or cancel."
+     data-profile-preferences-waiting-text-value="Your other settings have not finished saving. Resolve their save errors, then refresh this preview."
+     data-profile-preferences-stale-text-value="Your saved settings changed. Review these updated consequences and Apply again."
+     data-profile-preferences-saving-text-value="Saving your track change."
+     data-profile-preferences-unconfirmed-text-value="The proposed track is not confirmed. Refresh the preview to check what is saved, or cancel."
      data-profile-preferences-label-template-value="Your track (__LEVEL__)">
   <h1>Add your API key</h1>
 
@@ -689,7 +696,7 @@
 </fieldset>
 
 
-    <div class="value-row" data-controller="value-row">
+    <div class="value-row" data-controller="value-row" data-action="profile-preferences:trackRestored->value-row#show">
       <label for="skill-level">Track</label>
       <span class="value-row-value" aria-hidden="true" data-value-row-target="value">Junior</span>
       <select name="skill_level" id="skill-level" autocomplete="off" data-profile-preferences-target="skillLevel" data-action="change-&gt;profile-preferences#saveSkillLevel change-&gt;value-row#show"><option selected="selected" value="junior">Junior</option>
@@ -697,13 +704,20 @@
 <option value="senior">Senior</option>
 <option value="principal_engineer">Principal engineer</option></select>
     </div>
-    <p class="card-note">The level every section uses unless you set one for it in the Exercise mix below. Your ratings nudge each day&#39;s set around it. Changing your track also moves any section set to your old or new level, unless it is locked. When your reviewed answers show a section is ready to move, Coding Gym suggests a level for that section, and you decide. Principal engineer is set only here; Coding Gym never suggests it.</p>
+    <p class="card-note">The level every section uses unless you set one for it in the Exercise mix below. Your ratings nudge each day&#39;s set around it. Select a track to preview the changes, then Apply or Cancel. Explicit targets and locks stay as you set them, even when they match either track. When your reviewed answers show a section is ready to move, Coding Gym suggests a level for that section, and you decide. Principal engineer is set only here; Coding Gym never suggests it.</p>
     <p class="card-note" role="status" data-profile-preferences-target="keptOwnLevel"></p>
+    <div data-profile-preferences-target="trackPanel" hidden>
+      <p class="card-note" role="status" data-profile-preferences-target="trackStatus"></p>
+      <div data-profile-preferences-target="preview"></div>
+      <button type="button" class="btn btn-primary" data-profile-preferences-target="apply" data-action="profile-preferences#applyTrack" disabled>Apply track</button>
+      <button type="button" class="btn btn-secondary" data-profile-preferences-target="cancel" data-action="profile-preferences#cancelTrack">Cancel track change</button>
+      <button type="button" class="btn btn-secondary" data-profile-preferences-target="refresh" data-action="profile-preferences#refreshPreview">Refresh preview</button>
+    </div>
   </section>
 
   <details class="card settings-fields" id="exercise-mix"
            data-controller="exercise-mix"
-           data-action="profile-preferences:trackSaving@document->exercise-mix#holdForTrackSave profile-preferences:trackSaved@document->exercise-mix#adoptTrackChange profile-preferences:trackFailed@document->exercise-mix#settlePrepareButton"
+           data-action="profile-preferences:trackSaving@document->exercise-mix#holdForTrackSave profile-preferences:trackSaved@document->exercise-mix#adoptTrackChange profile-preferences:trackFailed@document->exercise-mix#settlePrepareButton input->profile-preferences#mixEdited change->profile-preferences#mixEdited"
            data-exercise-mix-url-value="/profile"
            data-exercise-mix-layout-value="[&quot;code_review&quot;,&quot;design_comparison&quot;]"
            data-exercise-mix-layout-stranded-text-value="Your daily sections changed in another tab, and another change on this page hasn&#39;t saved. Reload once it saves to see the new sections."

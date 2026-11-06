@@ -5,7 +5,8 @@ RSpec.describe "PATCH /profile skill_level", type: :request do
   let(:headers) { { "Content-Type" => "application/json", "Accept" => "application/json" } }
 
   def patch_profile(user_params)
-    patch profile_path, params: { user: user_params }.to_json, headers: headers
+    confirmation = { from: user.skill_level, to: user_params[:skill_level], preferences_version: user.section_kind_preferences_version }
+    patch profile_path, params: { user: user_params, track_change: confirmation }.to_json, headers: headers
   end
 
   before { login_as(user) }
@@ -28,7 +29,7 @@ RSpec.describe "PATCH /profile skill_level", type: :request do
     expect(body["preferences"]).to include("section_kind_levels" => {}, "section_kind_preferences_version" => 0)
   end
 
-  it "leaves the preference version alone when the track change clears no target" do
+  it "leaves the preference version alone when the track changes" do
     expect { patch_profile(skill_level: "principal_engineer") }.not_to(change { user.reload.section_kind_preferences_version })
   end
 

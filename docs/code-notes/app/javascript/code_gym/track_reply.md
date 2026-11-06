@@ -8,8 +8,8 @@ and importmap loads each controller module on its own, so either can connect
 first. The track select hands its reply to the mix through the
 `profile-preferences:trackSaved` event, but a mix whose module is still loading
 has no listener yet: it would connect showing the targets the server rendered
-and post the version the track change moved past, and its next save would
-409. So `profile_preferences` also records the reply here, and the mix `take`s
+and miss the current preference snapshot or effective rungs. So
+`profile_preferences` also records the reply here, and the mix `take`s
 it in `connect` and adopts it as if the event had reached it.
 
 `take` clears the reply, and the mix also takes it when the event does reach
@@ -26,3 +26,7 @@ failure. The mix reads it in `settlePrepareButton` and in `connect`. A mix that
 connects while a track save is still on the wire never saw `trackSaving`, so
 without this its Prepare AI guidance button would stay enabled and could bill
 jobs for the old levels until the reply arrived.
+
+An already-saved preview also publishes its confirmed snapshot through
+`start`/`finish` and the same adoption event, recovering a lost successful
+Apply reply without another write.

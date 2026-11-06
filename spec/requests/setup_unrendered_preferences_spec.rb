@@ -16,6 +16,13 @@ RSpec.describe "Exercise mix settings Setup does not render", type: :request do
                                   layout: layout }.to_json, headers: json
   end
 
+  def change_track
+    post profile_track_preview_path, params: { user: { skill_level: "senior" } }.to_json, headers: json
+    confirmation = response.parsed_body.fetch("track_change")
+    patch profile_path, params: { user: { skill_level: "senior" }, track_change: confirmation }.to_json, headers: json
+    expect(response).to have_http_status(:ok)
+  end
+
   it "merges a save that carries only weights, exclusions or locks under the user-row lock" do
     user.update!(section_kind_levels: { "architecture" => "senior" })
     outside = User.connection.open_transactions
@@ -74,7 +81,7 @@ RSpec.describe "Exercise mix settings Setup does not render", type: :request do
     user.update!(daily_section_kinds: %w[code_review plan_review])
     rendered = DailyKinds.for(user.reload).map(&:key)
     swap(1, "design_comparison")
-    patch profile_path, params: { user: { skill_level: "senior" } }.to_json, headers: json
+    change_track
     version = JSON.parse(response.body).fetch("section_kind_preferences_version")
 
     patch profile_path, params: { user: { section_kind_weights: {}, excluded_section_kinds: [], section_kind_levels: {},
@@ -97,7 +104,7 @@ RSpec.describe "Exercise mix settings Setup does not render", type: :request do
     expect(JSON.parse(response.body)).to include("layout_changed" => false)
     expect(JSON.parse(response.body).dig("current", "excluded_section_kinds")).to eq([])
 
-    patch profile_path, params: { user: { skill_level: "senior" } }.to_json, headers: json
+    change_track
     expect(JSON.parse(response.body).dig("preferences", "excluded_section_kinds")).to eq([])
     expect(user.reload.excluded_section_kinds).to eq(%w[challenge])
   end

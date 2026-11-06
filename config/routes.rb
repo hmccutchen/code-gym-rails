@@ -57,6 +57,7 @@ Rails.application.routes.draw do
   delete "learn/:bucket/groups/:group/drill", to: "concept_drills#destroy_group"
 
   patch "profile", to: "profile#update", as: :profile
+  post "profile/track_preview", to: "profile#track_preview", as: :profile_track_preview
   patch "daily_kinds/:place", to: "daily_kinds#update", as: :daily_kind
 
   post "level_suggestion/dismissal", to: "level_suggestion_dismissals#create", as: :level_suggestion_dismissal

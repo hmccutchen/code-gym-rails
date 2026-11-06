@@ -38,6 +38,23 @@ en:
     kept_own_level: "These sections kept their own level: %{sections}. Choose Your track for any of them in the Exercise mix to have it follow the track."
     kept_section: "%{name} (%{level})"
     kept_locked_section: "%{name} (%{level}, locked)"
+    preview:
+      invalid_level: "Choose one of the listed tracks."
+      invalid_confirmation: "Preview this track change before applying it."
+      loading: "Loading your saved track and the proposed changes."
+      unsaved: "This track change is not saved. Apply it or cancel."
+      waiting: "Your other settings have not finished saving. Resolve their save errors, then refresh this preview."
+      stale: "Your saved settings changed. Review these updated consequences and Apply again."
+      saving: "Saving your track change."
+      unconfirmed: "The proposed track is not confirmed. Refresh the preview to check what is saved, or cancel."
+      baseline: "Your track will change from %{from} to %{to}."
+      baseline_only: "No section changes level now. This changes the baseline for sections you later choose to follow your track."
+      moves: "%{name}: %{from} → %{to}"
+      retained: "These sections keep their explicit targets and locks:"
+      already_saved: "This is already your saved track."
+      apply: "Apply track"
+      cancel: "Cancel track change"
+      refresh: "Refresh preview"
   app_name: "Coding Gym"
   sessions:
     new:
@@ -964,7 +981,7 @@ en:
         hawaii: "Hawaii"
       time_zone_hint: 'Sets when your day rolls over and when your 8am exercise set is generated. Leave on "detect automatically" to use your browser''s zone.'
       skill_level_label: "Track"
-      skill_level_hint: "The level every section uses unless you set one for it in the Exercise mix below. Your ratings nudge each day's set around it. Changing your track also moves any section set to your old or new level, unless it is locked. When your reviewed answers show a section is ready to move, Coding Gym suggests a level for that section, and you decide. Principal engineer is set only here; Coding Gym never suggests it."
+      skill_level_hint: "The level every section uses unless you set one for it in the Exercise mix below. Your ratings nudge each day's set around it. Select a track to preview the changes, then Apply or Cancel. Explicit targets and locks stay as you set them, even when they match either track. When your reviewed answers show a section is ready to move, Coding Gym suggests a level for that section, and you decide. Principal engineer is set only here; Coding Gym never suggests it."
   history:
     index:
       title: "History"
