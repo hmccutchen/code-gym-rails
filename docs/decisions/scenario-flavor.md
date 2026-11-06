@@ -57,7 +57,7 @@ still follow the general freshness rules.
 
 **Accepted limitation:** `RealSource.pick` prefers never-seen excerpts, then
 the least recently seen, but this is not concept-specific novelty tracking.
-An excerpt can recur, and `recent_performance` supplies its scenario, not
+An excerpt can recur, and `recent_delivered_content` supplies its scenario, not
 its prior planted flaw. The prompt asks for a fresh application; neither
 the picker nor ingest proves it is fresh or that it measures retention.
 Excluding grounded sections from retention would reduce available hosts;

@@ -114,8 +114,8 @@ Improved code is revealed only from a concept's second exposure onward. A sectio
 These state `#reviewed?` and `#section_reviewed?` in SQL, for queries that
 can't load each response. `.reviewed` is `ai_review` neither NULL nor `{}`.
 `ResponseReview` only ever writes a Hash, so that matches `ai_review.present?`
-for every value the column holds. `CompetencyGate::Evidence` and
-`LevelSuggestion::Evidence` read it. `.section_reviewed_condition(section)`
+for every value the column holds. `CompetencyGate::Evidence` uses it as a coarse filter only.
+`.section_reviewed_condition(section)`
 takes an Arel node for the section key and tests
 `jsonb_typeof(ai_review -> section) = 'object'`, which is what
 `#section_reviewed?`'s `is_a?(Hash)` reads. `JudgeSolve.readable` uses it, and
@@ -129,11 +129,26 @@ that reads any other part of the review can't use it: difficulty, prose and
 rubric checks come back missing. `#reviewed?` and `#section_reviewed?` still
 answer as they would on the stored review, since an object section stays an
 object, even when it had no rating. A review or section that isn't an object
-passes through as stored, so the error it raised before still raises. The
+passes through as stored, so assessment readers can reject it. The
 rows are read-only, so a trimmed review is never saved over the stored one.
 `RungLedger.for` uses it (#518), and `daily_response_ai_ratings_only_spec`
 compares it with the stored column across those shapes.
 
 ## `#ai_rating_for`
 
-It returns nil for an unanswered section whatever is stored, so reviews written before unanswered sections stopped being graded read the same as new ones, with no data migration. Readers of a grade go through it, or first restrict themselves to `answered_sections` as `ReviewedSectionResults.for` does.
+It returns nil for an unanswered section or malformed review object.
+Display reads stay independent of submission. Adaptation reads
+`#assessed_sections`, which requires submission, readable structural
+containers, an active answered section and a grade in the canonical rank.
+It requires no self-rating, concept tag, rubric, rung or easing flag;
+stricter consumers own those checks. `#self_rating_for` exposes only
+recognized self-ratings, treating malformed historical values as absent.
+
+## `#completion_evidence?`
+
+Every answered active section must be assessed, and at least one must be
+answered. Skips need no grade or walkthrough, so this may be true while
+`#fully_reviewed?` is false. Neither predicate is memoized: the locked review
+writer must see the before-merge and after-merge states on the same instance.
+Review rendering, replacement protection and missing-section retries keep
+their existing review-presence predicates.

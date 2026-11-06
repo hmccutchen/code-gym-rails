@@ -17,10 +17,11 @@ as before, with `brake: DaySize::Decision#brake?`, so `CoverageException`
 keeps one caller (`DailyPlan.coverage_for`). The decision rides on
 `DailyPlan::Result#size`, and its count and reason go into `plan_notes`.
 `SectionCount` is the completion rule alone; `DaySize` owns a fixed
-setting's precedence. Completion counts answered sections on any past day,
-submitted or not, because it measures how much you engage
-(`spec/models/user_spec.rb`, 'counts an autosaved draft's answered
-sections').
+setting's precedence. Completion reads only submitted days whose answered
+active sections all have valid grades, through `recent_completion_history`.
+Unknown days are absent, never zero, and cannot crowd the qualifying window.
+Skipped sections need no completed walkthrough. The existing drop-credit
+cap, window, minimum-session count and stretch are unchanged.
 
 **Every account starts at two.** The gate reads rubric-stamped reviews
 only, so an account grows past two only as favourable, rubric-graded work
@@ -53,7 +54,7 @@ never infers a change from the reason. The successful
 
 **What the dashboard says.** In the submitted state, on Automatic only,
 `SizeForecast` composes tomorrow's size through `DailyPlan.size_for` with
-today's submission in the completion history and today's review in the
+today's qualified completion in the completion history and today's review in the
 gate, and compares it with the size today's plan delivered: `plan_notes`'
 size plus one when it records a coverage addition
 (`DailyExercise#planned_size_with_coverage`), so a coverage day never
@@ -157,20 +158,34 @@ rules the gate and `LevelSuggestion` read: `at_or_above?` reads
 self-rating's agreement; `CompetencyGate::BAR` is that same constant.
 `ConceptMastery.record_review!` and `RungLedger` predate the class and
 still read the rating lists directly; folding them in is a separate
-change. A row whose
-review, answers, ratings or problem set is not a hash, or a section whose
-review is not one, is skipped rather than raised on, since the gate runs
-on every plan, fixed settings included. `LevelSuggestion::Evidence`
-delegates to it with its 60-response cap, eased sections left out and the
+change. Basic assessment comes from `DailyResponse#assessed_sections`,
+which rejects unreadable answers, reviews, problem sets and plan notes.
+Missing or malformed self-ratings supply no self-rating.
+`LevelSuggestion::Evidence`
+delegates to it with its 60-qualifying-response cap, eased sections left out and the
 rubric stamp required, so generation code never names track code.
 `CompetencyGate::Evidence` asks it for eased sections too, requires the
 current `RUBRIC_VERSION` stamp, and reads every rubric-stamped day with no cap, in
 batches ordered by date and id. A cap would forget a size whose earning days
 had aged out; the batches bound memory, not history, so the query grows
 with post-rubric history. A day graded before the rubric adds neither
-results nor optional-section history. Each day reaches the fold as a
-`CompetencyGate::Day` whose `optional` is `:none`, `:incomplete` or
-`:complete` and whose `daily` holds the keys of the pair the row was
+results nor optional-section history. `ReviewedSectionResults.with_current_rubric`
+owns the SQL stamp prefilter shared with strict adaptation history. It is
+only a coarse filter: an answered, validly graded section must carry the current stamp.
+Optional completion requires basic assessment of every answered section,
+but does not require every answer to carry a rung or current stamp.
+A valid partial strict result can update growth or the brake immediately.
+A response with neither a strict result nor eligible optional completion
+produces no fold event.
+`Day#optional_evidence?` and `#evidence?` own that distinction for both the
+loader and pure fold. `add` ignores an empty day before any state changes,
+including the count, reason and evidence. `.plans` still returns one plan
+per supplied day, repeating the unchanged plan for an empty day.
+
+Each day reaches the fold as a
+`CompetencyGate::Day` whose `optional` is `:none`, `:unknown`, `:incomplete` or
+`:complete`. Unknown optional completion neither fills nor breaks the
+qualified optional-day run. Its `daily` holds the keys of the pair the row was
 planned with. The fold builds a `Plan`'s evidence (required, available,
 AI-bar and favourable counts, per-kind counts and levels) only for a plan a
 caller reads: `.plan` and `.for` return it for the last day, and `.plans`

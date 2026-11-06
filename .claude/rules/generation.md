@@ -27,6 +27,12 @@ paths:
 
 # Generation, judging and section kinds
 
+Generation captures assessed performance and delivered-content history as
+separate inputs and reuses both on retries. Pending answers and draft
+ratings reach neither performance nor its diagnostics; delivered concepts
+and scenarios are repetition-only context and contain no answer keys
+(`docs/decisions/personalization-loop.md`).
+
 Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;
 read it before changing that area.

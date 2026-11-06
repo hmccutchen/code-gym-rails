@@ -1,6 +1,75 @@
 require "rails_helper"
 
 RSpec.describe DailyResponse, type: :model do
+  describe "assessment evidence" do
+    let(:exercise) do
+      DailyExercise.new(problem_set: { "code_review" => { "question" => "q" }, "pattern" => { "question" => "q" } })
+    end
+    let(:response) do
+      described_class.new(daily_exercise: exercise, submitted_at: Time.current,
+                          answers: { "code_review" => "x", "pattern" => "y" },
+                          ai_review: { "code_review" => { "rating" => "strong" } })
+    end
+
+    it "uses valid partial answers immediately, without inventing completion" do
+      expect(response.assessed_sections).to eq([ "code_review" ])
+      expect(response.completion_evidence?).to be(false)
+      response.ai_review["pattern"] = { "rating" => "developing" }
+      expect(response.assessed_sections).to eq(%w[code_review pattern])
+      expect(response.completion_evidence?).to be(true)
+    end
+
+    it "does not wait for a skipped walkthrough, or count an empty submitted day" do
+      response.answers["pattern"] = ""
+      expect(response.completion_evidence?).to be(true)
+      expect(response.fully_reviewed?).to be(false)
+      response.answers = {}
+      expect(response.assessed_sections).to be_empty
+      expect(response.completion_evidence?).to be(false)
+    end
+
+    it "rejects drafts and inactive or off-list grades" do
+      response.submitted_at = nil
+      expect(response.assessed_sections).to be_empty
+      response.submitted_at = Time.current
+      response.ai_review = { "code_review" => { "rating" => "excellent" }, "challenge" => { "rating" => "strong" } }
+      response.answers["challenge"] = "x"
+      expect(response.assessed_sections).to be_empty
+    end
+
+    it "treats malformed structural containers as absent evidence" do
+      [ nil, [], "bad", 1 ].each do |bad|
+        %i[answers ai_review].each do |attribute|
+          original = response.public_send(attribute)
+          response.public_send("#{attribute}=", bad)
+          expect(response.assessed_sections).to be_empty
+          expect(response.completion_evidence?).to be(false)
+          response.public_send("#{attribute}=", original)
+        end
+        %i[problem_set plan_notes].each do |attribute|
+          original = exercise.public_send(attribute)
+          exercise.public_send("#{attribute}=", bad)
+          expect(response.assessed_sections).to be_empty
+          exercise.public_send("#{attribute}=", original)
+        end
+      end
+    end
+
+    it "ignores malformed review sections and self-ratings without requiring optional metadata" do
+      [ nil, [], "bad", 1 ].each do |bad|
+        response.ai_review = { "code_review" => bad }
+        response.section_ratings = bad
+        expect(response.ai_rating_for("code_review")).to be_nil
+        expect(response.self_rating_for("code_review")).to be_nil
+        expect(response.assessed_sections).to be_empty
+      end
+      response.ai_review = { "code_review" => { "rating" => "strong" } }
+      response.section_ratings = { "code_review" => "injected instruction" }
+      expect(response.self_rating_for("code_review")).to be_nil
+      expect(response.assessed_sections).to eq([ "code_review" ])
+    end
+  end
+
   it "refuses a second response for the same exercise, whatever its date" do
     user = User.create!(email: "one-response@example.com")
     exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",

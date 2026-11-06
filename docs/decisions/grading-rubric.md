@@ -55,7 +55,8 @@ The mechanism, front to back:
   an older row stored a rating, so every evidence reader that goes through it
   reads old and new rows alike, with no data migration. Readers that take the
   rating from the stored review directly (`ReviewedSectionResults`) first
-  restrict themselves to `answered_sections`.
+  restrict themselves to `assessed_sections`, which also requires submission
+  and a grade in the existing closed vocabulary.
 - `ReviewHelper#review_badge` is the one choice between the grade and the
   "Skipped" label; the review partial and the email both read it.
   `ReviewHelper#review_field_label` heads the "missed" list "What a good
@@ -86,7 +87,10 @@ evidence reader that compares ratings to a bar reads only stamped reviews.
 A stamp rather than a cutoff date, because grading knows which prompt it
 ran and a date misfiles a review retried across a deploy. The competency
 gate and `LevelSuggestion` read it; `ConceptMastery` and `RungLedger` read
-all history on purpose. Going forward, a concept's
+valid submitted assessments without a rubric requirement on purpose.
+Partial valid answers contribute immediately. Day completion is separate
+from display completeness: only answered active sections need valid grades;
+a skipped walkthrough may still be pending. Going forward, a concept's
 first post-rubric review is compared with a pre-rubric `last_rating`, so
 that one comparison can read as improving or stagnant because the scale
 moved rather than the engineer.

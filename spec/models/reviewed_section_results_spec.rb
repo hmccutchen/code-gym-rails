@@ -67,12 +67,12 @@ RSpec.describe ReviewedSectionResults do
     end
   end
 
-  it "keeps an invalid or missing self-rating as it was stored" do
+  it "treats an invalid or missing self-rating as absent" do
     results = described_class.for(response({
       "code_review" => { rung: "junior", self: nil }, "pattern" => { rung: "junior", self: "meh" }
     }))
 
-    expect(results.map(&:self_rating)).to eq([ nil, "meh" ])
+    expect(results.map(&:self_rating)).to eq([ nil, nil ])
   end
 
   it "reads nothing from a draft" do

@@ -1,5 +1,7 @@
 ---
 paths:
+  - "app/models/adaptation_history.rb"
+  - "spec/models/adaptation_history_spec.rb"
   - "app/models/{daily_plan,section_rotation,section_count,competency_gate,day_size,size_forecast,coverage_exception,shared_concept,day_hosts,reviewed_section_results,weighted_roll,generation_ladders}.rb"
   - "app/models/competency_gate/**"
   - "app/models/coverage_exception/**"
@@ -190,10 +192,15 @@ read it before changing that area.
   set. At most one set carries forward, so an older stray still breaks
   `#current_streak`, and re-pausing never moves the `#held_exercise` floor.
 - **Personalization loop** (`docs/decisions/personalization-loop.md`):
-  `User#recent_performance` feeds the last 10 sessions into the generation
-  prompt. A skipped section is reviewed but never graded: ratings,
-  `ConceptMastery.record_review!` and reinforcement read
-  `DailyResponse#answered_concept_tags`, and only where today can host them.
+  `DailyResponse#assessed_sections` requires submitted, answered, validly
+  graded sections; valid partial reviews contribute immediately.
+  `AdaptationHistory.recent` filters before each consumer's unchanged count
+  window. Completion requires every answered active section assessed, with
+  skips owing no walkthrough. Unknown completion is absent, never zero.
+  Delivered/scheduled rotation history stays independent of performance.
+  `User#recent_performance` and `#recent_delivered_content` feed separate
+  assessment and repetition-only prompt inputs. Reinforcement resolves only
+  eligible hostable evidence; explicit drills remain independent.
   A skipped, due retention check is
   deferred one interval without changing tier, streak or rating, and only for
   a concept answered nowhere on that response.

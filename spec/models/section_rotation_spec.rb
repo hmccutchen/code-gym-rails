@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe SectionRotation do
   def history(*key_sets)
     key_sets.map do |keys|
-      ExerciseHistoryEntry.new(section_keys: keys, delivered_section_keys: keys, answered: keys.size, dropped: 0)
+      ExerciseHistoryEntry.new(section_keys: keys, delivered_section_keys: keys, dropped: 0)
     end
   end
 

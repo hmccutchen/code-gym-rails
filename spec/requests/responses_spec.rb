@@ -69,7 +69,7 @@ RSpec.describe "Responses", type: :request do
       post responses_path, params: stale_payload, as: :json
 
       expect(user.concept_masteries.reload.map(&:attributes)).to eq(evidence)
-      expect(user.recent_performance.first[:answered_sections]).to eq([ "code_review" ])
+      expect(user.recent_performance.first[:sections].pluck(:key)).to eq([ "code_review" ])
       expect(user.concepts_needing_reinforcement).to be_empty
     end
   end
@@ -155,8 +155,9 @@ RSpec.describe "Responses", type: :request do
       expect(user.concept_masteries.find_by(concept: "n_plus_one")).to have_attributes(last_rating: "strong")
       expect(saved.answered_concept_tags).to eq("code_review" => "n_plus_one")
       expect(saved.concept_tags).to include("pattern" => "memoization")
-      expect(user.recent_performance.first).to include(
-        self_ratings: { "code_review" => "right_level" }, ai_ratings: { "code_review" => "strong" })
+      expect(user.recent_performance.first[:sections]).to eq([
+        { key: "code_review", concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong" }
+      ])
     end
   end
 

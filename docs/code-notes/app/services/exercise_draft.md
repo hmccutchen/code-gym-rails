@@ -24,8 +24,10 @@ the same concept, and generation leaves it out of the sections that hide their
 concept (#687). The lookup is here, in the service, so the pure plan reads no
 table.
 
-History is fetched once and handed to the prompt as a whole value, so the
-logged "requested" history can't diverge from what the prompt contained.
+Assessed performance and delivered-content history are each fetched once.
+The draft captures both whole projections and retries reuse them.
+Diagnostics log only assessed performance under `recent_performance`;
+delivered scenarios are not added to logs.
 
 ## `.retry_section`
 

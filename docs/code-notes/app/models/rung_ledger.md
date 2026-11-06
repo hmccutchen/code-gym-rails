@@ -25,11 +25,15 @@ holding only each section's `rating`, the one field of the review the fold
 reads, through `ai_rating_for`. Postgres still reads the whole stored review,
 but the review prose is no longer sent, parsed or kept in memory. A review,
 or a section of one, that is not a JSON object is passed through as stored,
-so a malformed row fails the same way it did with the whole column. The rows
+so shared assessment eligibility rejects it just as with the whole column. The rows
 are read-only, so the trimmed review can never be saved over the stored one.
+`submitted_at` stays in the selected columns because `assessed_sections`
+checks submission, even when the caller supplied a response directly.
+Valid partial and unversioned grades still count; the ledger adds no rubric
+requirement.
 
 Each exercise loads whole through
-`.preload(:daily_exercise)`, since `DailyResponse#answered_concept_tags`,
+`.preload(:daily_exercise)`, since `DailyResponse#assessed_sections`,
 `DailyExercise#active_section_keys` and `ConceptBucket.for` read its
 `problem_set`, `plan_notes` and `language`.
 

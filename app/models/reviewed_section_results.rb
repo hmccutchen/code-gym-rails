@@ -1,5 +1,7 @@
 class ReviewedSectionResults
   RUBRIC_VERSION = 1
+  RUBRIC_STAMPED = "jsonb_path_exists(ai_review, '$.*.rubric ? (@ == $version)', jsonb_build_object('version', CAST(:version AS integer)))"
+  private_constant :RUBRIC_STAMPED
 
   # The lowest AI rating a co-favourable result can carry.
   FAVOURABLE_BAR = DailyResponse::AI_RATING_FAVORABLE.min_by { |rating| ConceptMastery::AI_RATING_RANK.fetch(rating) }
@@ -29,33 +31,25 @@ class ReviewedSectionResults
 
   # Registry order, so a rule taking the latest n results cuts a day at the same place every time.
   def self.for(response, require_rubric: false, include_eased: false)
-    return [] unless response.submitted? && response.reviewed? && readable?(response)
-
-    response.answered_sections.sort_by { |section| ExerciseSection.keys.index(section) }.filter_map do |section|
+    response.assessed_sections.sort_by { |section| ExerciseSection.keys.index(section) }.filter_map do |section|
       data = response.daily_exercise.problem_set[section]
       review = response.ai_review[section]
       next unless counts?(data, review, require_rubric, include_eased)
 
       Result.new(date: response.date, kind: section, level: data["pitched_at"], ai_rating: review["rating"],
-                 self_rating: self_rating(response, section), eased: data["eased"].present?)
+                 self_rating: response.self_rating_for(section), eased: data["eased"].present?)
     end
   end
 
-  # Skips malformed rows instead of raising, since the gate reads them on every plan; public for the gate's loader.
-  def self.readable?(response)
-    [ response.ai_review, response.answers, response.daily_exercise&.problem_set ].all?(Hash)
-  end
+  def self.current_rubric?(review) = review.is_a?(Hash) && review["rubric"] == RUBRIC_VERSION
+
+  # A coarse prefilter only: malformed, inactive or ungraded sections can still match.
+  def self.with_current_rubric(responses) = responses.where(RUBRIC_STAMPED, version: RUBRIC_VERSION)
 
   def self.counts?(data, review, require_rubric, include_eased)
-    data.is_a?(Hash) && review.is_a?(Hash) && KindDifficulty::LEVELS.include?(data["pitched_at"]) &&
+    KindDifficulty::LEVELS.include?(data["pitched_at"]) &&
       (include_eased || data["eased"].blank?) &&
-      ConceptMastery::AI_RATING_RANK.key?(review["rating"]) &&
-      (!require_rubric || review["rubric"] == RUBRIC_VERSION)
+      (!require_rubric || current_rubric?(review))
   end
   private_class_method :counts?
-
-  def self.self_rating(response, section)
-    response.section_ratings[section] if response.section_ratings.is_a?(Hash)
-  end
-  private_class_method :self_rating
 end

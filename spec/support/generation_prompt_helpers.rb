@@ -23,17 +23,17 @@ module GenerationPromptHelpers
     end.new("no-network-key").method(:annotate_retention_concept)
   end
 
-  def render_generation_prompt(user, language = "ruby_rails", history: [], difficulty: KindDifficulty.none,
+  def render_generation_prompt(user, language = "ruby_rails", history: [], delivered_history: [], difficulty: KindDifficulty.none,
                         ladders: {}, only: nil, fixed_concept: nil, retry_cause: nil, **plan_overrides)
     plan_overrides[:code_review_gotcha] ||= BugHuntGotchas.for_language(language).first if plan_overrides[:code_review_mode] == :bug_hunt
-    GenerationPrompt.new(user, language, plan: plan_for(**plan_overrides), history: history,
+    GenerationPrompt.new(user, language, plan: plan_for(**plan_overrides), history: history, delivered_history: delivered_history,
                          difficulty: difficulty, ladders: ladders,
                          retention_annotation: generation_retention_annotation)
                     .render(only: only, fixed_concept: fixed_concept, retry_cause: retry_cause)
   end
 
   def generation_schema(user, language = "ruby_rails", only: nil, **plan_overrides)
-    GenerationPrompt.new(user, language, plan: plan_for(**plan_overrides), history: [],
+    GenerationPrompt.new(user, language, plan: plan_for(**plan_overrides), history: [], delivered_history: [],
                          difficulty: KindDifficulty.none, ladders: {},
                          retention_annotation: generation_retention_annotation)
                     .schema(only: only)

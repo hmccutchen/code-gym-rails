@@ -18,10 +18,10 @@ RSpec.describe GenerationPrompt do
   let(:user) { User.new(email: "render@example.com", skill_level: "senior", focus_areas: %w[caching]) }
 
   let(:history) do
-    [ { date: "2026-10-14", concepts: { "code_review" => "n_plus_one", "pattern" => "" }, scenarios: [ "ticket queue" ],
-        sections_answered: 1, sections_total: 2, self_ratings: { "code_review" => "too_hard" },
-        ai_ratings: { "code_review" => "developing" }, answered_sections: %w[code_review] } ]
+    [ { date: "2026-10-14", sections: [ { key: "code_review", concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing" } ],
+        completion: { answered: 1, total: 2, skipped_sections: %w[pattern] } } ]
   end
+  let(:delivered_history) { [ { date: "2026-10-14", sections: [ { key: "code_review", concept: "n_plus_one", scenario: "ticket queue" } ] } ] }
 
   let(:plan) do
     plan_for(third: :challenge, fourth: :plan_review, shared_concept: "memoization",
@@ -42,17 +42,29 @@ RSpec.describe GenerationPrompt do
   end
 
   def build(language = "ruby_rails")
-    GenerationPrompt.new(user, language, plan: plan, history: history, difficulty: difficulty, ladders: ladders,
+    GenerationPrompt.new(user, language, plan: plan, history: history, delivered_history: delivered_history, difficulty: difficulty, ladders: ladders,
                          retention_annotation: generation_retention_annotation)
+  end
+
+  it "separates assessed answers from repetition notes and omits unknown completion" do
+    history.first[:completion] = nil
+    history.first[:sections].first.delete(:concept)
+    text = build.render
+    expect(text).to include("Reviewed answer evidence:", "code_review (self: too_hard, ai: developing)",
+                           "Delivered content — repetition avoidance only:", "ticket queue")
+    expect(text).not_to include("1/2 answered", "ai: unreviewed", "skipped: pattern")
+    history.clear
+    expect(build.render).to include("No assessed performance history is available.", "ticket queue")
+    expect(build.render).not_to include("first exercise set")
   end
 
   it "leaves the week's featured concept out of a section that hides its concept, and names it in no other line" do
     featured_concept = ConceptVocabulary::PLAN_REVIEW_CONCEPTS.first
     quiet_plan = plan.with(fourth_reinforcement: [], fourth_established: [])
 
-    plain = GenerationPrompt.new(user, "ruby_rails", plan: quiet_plan, history: history, difficulty: difficulty, ladders: ladders,
+    plain = GenerationPrompt.new(user, "ruby_rails", plan: quiet_plan, history: history, delivered_history: delivered_history, difficulty: difficulty, ladders: ladders,
                                  retention_annotation: generation_retention_annotation).render
-    withheld = GenerationPrompt.new(user, "ruby_rails", plan: quiet_plan.with(featured_concept: featured_concept), history: history, difficulty: difficulty,
+    withheld = GenerationPrompt.new(user, "ruby_rails", plan: quiet_plan.with(featured_concept: featured_concept), history: history, delivered_history: delivered_history, difficulty: difficulty,
                                     ladders: ladders, retention_annotation: generation_retention_annotation).render
 
     expect(plain).to include(featured_concept)
@@ -106,6 +118,7 @@ RSpec.describe GenerationPrompt do
 
     it "mutates none of its inputs" do
       deep_freeze(history)
+      deep_freeze(delivered_history)
       deep_freeze(ladders)
       plan.to_h.each_value { |value| deep_freeze(value) }
       difficulty.freeze

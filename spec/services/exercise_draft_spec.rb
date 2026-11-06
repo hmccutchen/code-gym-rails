@@ -29,13 +29,13 @@ RSpec.describe ExerciseDraft do
 
   def draft_for(language: "ruby_rails", mode: :application_code)
     described_class::Draft.new(user: user, language: language, problem_set: {}, plan: Struct.new(:code_review_mode, :code_review_gotcha, :featured_concept).new(mode, nil, nil),
-                               kinds: [], difficulty: KindDifficulty.none, ladders: {}, history: [],
+                               kinds: [], difficulty: KindDifficulty.none, ladders: {}, history: [], delivered_history: [],
                                suggested_concepts: [], unusable_sections: [])
   end
 
   it "keeps the draft to its user and language, the plan, the drafted inputs and the ingest results" do
     expect(described_class::Draft.members)
-      .to eq(%i[user language problem_set plan kinds difficulty ladders history suggested_concepts unusable_sections])
+      .to eq(%i[user language problem_set plan kinds difficulty ladders history delivered_history suggested_concepts unusable_sections])
   end
 
   it "asks for the week's featured concept and plans the day around it, so a hiding kind is never offered it" do
@@ -104,6 +104,19 @@ RSpec.describe ExerciseDraft do
     expect(rendered).to eq([ { only: nil, fixed_concept: nil } ])
     expect(draft).to have_attributes(user: user, language: "ruby_rails")
     expect(draft.problem_set.keys).to match_array(draft.kinds.map(&:key))
+  end
+
+  it "captures both histories once and reuses the same projections on retry" do
+    inputs = []
+    capturing = provider.with(prompt: ->(*, **options) { inputs << options; prompt })
+    expect(user).to receive(:recent_performance).once.and_call_original
+    expect(user).to receive(:recent_delivered_content).once.and_call_original
+    draft = described_class.call(user, language: "ruby_rails", provider: capturing)
+    described_class.retry_section(draft, ExerciseSection::CodeReview, "n_plus_one", provider: capturing)
+
+    expect(inputs.size).to eq(2)
+    expect(inputs.last[:history]).to equal(inputs.first[:history])
+    expect(inputs.last[:delivered_history]).to equal(inputs.first[:delivered_history])
   end
 
   def planted_key_lines

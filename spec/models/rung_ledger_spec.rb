@@ -22,6 +22,14 @@ RSpec.describe RungLedger do
 
   def ledger(*responses) = described_class.new(responses)
 
+  it "rejects draft and off-list verdicts before resolving the latest rung" do
+    old = response_on(Date.current - 2, sections: { "code_review" => { concept: "n_plus_one", rung: "senior" } })
+    draft = response_on(Date.current, sections: { "code_review" => { concept: "n_plus_one", rung: "senior", ai: "developing" } })
+    draft.submitted_at = nil
+    bad = response_on(Date.current - 1, sections: { "code_review" => { concept: "n_plus_one", rung: "senior", ai: "invalid" } })
+    expect(ledger(draft, bad, old).held("n_plus_one", "ruby_rails")).to eq("senior")
+  end
+
   it "holds a rung from a co-favourable attempt at it" do
     held = ledger(response_on(Date.current, sections: { "code_review" => { concept: "n_plus_one", rung: "senior" } }))
 

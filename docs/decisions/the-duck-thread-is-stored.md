@@ -7,14 +7,13 @@ controls.
 
 **One row per exercise, not a column on the response.** The duck usually runs
 before any answer is saved, so the response row often doesn't exist yet.
-Storing the thread there would mean the duck creates that row, and a row
-created only by the duck changes four things the engineer would notice: the
-next day's size (`SectionCount` reads a missing row as a skipped day and a
-present one as zero answered), a `0/3 answered` line in the generation prompt
-(`User#recent_performance` reads unsubmitted rows), the afternoon nudge
+Storing the thread there would mean the duck creates that row, affecting the afternoon nudge
 (`PushNudgePlan` reads the row's `updated_at` as activity), and an unsent
 offline draft, whose token names the row's id. A `duck_threads` row, unique on
-`daily_exercise_id`, changes none of them. `threads` is keyed by section like
+`daily_exercise_id`, changes neither. At the time this decision was made,
+an unsubmitted response could also affect next-day size and generation
+performance. #719 removed those two effects: adaptation now requires
+submitted, validly assessed answers. `threads` is keyed by section like
 `answers`, and each entry holds `turns`, `version` and `cleared`.
 
 **`DuckThread` is the one authority for a section's thread.** The controller

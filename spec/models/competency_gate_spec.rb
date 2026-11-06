@@ -35,6 +35,47 @@ RSpec.describe CompetencyGate do
     )
   end
 
+  describe "days without evidence" do
+    %i[none unknown].each do |state|
+      it "preserves count, reason and evidence after earning three on an empty #{state} day" do
+        days = %w[GG GG PP GG GG].map do |grades|
+          results = fixed.zip(grades.chars).map { |kind, mark| mark == "G" ? good(kind) : poor(kind) }
+          day(*results, optional: :complete)
+        end
+        before = described_class.plan(days)
+        expect(before).to have_attributes(count: 3, reason: :grew)
+
+        plans = described_class.plans(days + [ day(optional: state) ], evidence: true)
+        expect(plans.size).to eq(days.size + 1)
+        expect(plans.last(2)).to eq([ before, before ])
+        expect(described_class.plan(days + [ day(optional: state) ])).to eq(before)
+      end
+    end
+
+    it "keeps the initial state for empty inputs and one plan per supplied day" do
+      initial = described_class.plan([])
+      days = [ day, day(optional: :unknown) ]
+
+      expect(described_class.plans(days, evidence: true)).to eq([ initial, initial ])
+      expect(described_class.plans(days).map(&:evidence)).to eq([ nil, nil ])
+    end
+
+    it "still records optional-only completion and incompletion" do
+      plans = described_class.plans([ day(optional: :complete), day(optional: :incomplete) ], evidence: true)
+
+      expect(plans.map(&:count)).to eq([ 2, 2 ])
+      expect(plans.first.evidence[:optional]).to include(available: 1, complete: 1)
+      expect(plans.last.evidence[:optional]).to include(available: 2, complete: 1)
+    end
+
+    it "still records partial results when optional completion is unknown" do
+      plan = described_class.plan([ day(good, optional: :unknown) ])
+
+      expect(plan.evidence[:to_three]).to include(available: 1, favourable: 1)
+      expect(plan.evidence[:optional]).to include(available: 0)
+    end
+  end
+
   it "states its starting policy" do
     expect(described_class::BAR).to eq("solid")
     expect(described_class::GROW_TO_THREE).to eq(CompetencyGate::Threshold.new(at_least: 4, of: 5))
@@ -91,6 +132,15 @@ RSpec.describe CompetencyGate do
   describe "growing to four" do
     def days_with(pattern, optional: :complete)
       pattern.chars.map { |mark| day(mark == "G" ? good : poor, optional: optional) }
+    end
+
+    it "does not let unknown optional completion fill or break the qualified optional run" do
+      days = days_with("PPGGGGGG", optional: :none) + [
+        day(good, optional: :complete), day(good, optional: :unknown)
+      ]
+      expect(described_class.plan(days).count).to eq(3)
+      expect(described_class.plan(days).evidence[:optional]).to include(available: 1, complete: 1)
+      expect(described_class.plan(days + [ day(good, optional: :complete) ]).count).to eq(4)
     end
 
     it "does not reach four on 7 favourable of the latest 10" do

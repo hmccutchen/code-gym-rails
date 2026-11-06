@@ -110,19 +110,31 @@ else.
 
 ## `#recent_performance`
 
-It returns the last N sessions by count, which matches the "last 10 sessions"
-wording in the generation prompt.
+It returns the latest qualifying response days through `AdaptationHistory`,
+with only assessed sections and optional qualified completion. The default
+`PERFORMANCE_HISTORY_LIMIT` remains ten; malformed concept maps omit names
+without losing otherwise valid grades.
+
+`#recent_delivered_content` separately projects active delivered concepts and
+scenario strings, without a response requirement, raw answers or answer keys.
 
 ## `#recent_exercise_history`
 
-`before:` defaults to today, since today has had no chance to be answered.
-`SizeForecast` passes tomorrow so today's submission is included.
+Rotation reads delivered plus dropped scheduled kinds, never responses.
+`before:` defaults to today.
+
+`#recent_completion_history` returns only qualified completion values, with
+the existing drop credit. Malformed drop containers cannot yield trustworthy
+credit and are excluded. Planning reads earlier than today; `SizeForecast`
+passes the exercise date's next day so today's qualified completion can enter.
 
 ## `#concepts_needing_reinforcement`
 
-Each (concept, bucket) is resolved once, on its latest answered occurrence;
-older occurrences are skipped. A section with neither a self-rating nor an AI
-rating is out of scope, and one where both are favourable counts as mastered.
+Each (concept, bucket) resolves once on its latest assessed, vocabulary-valid,
+hostable occurrence; ineligible sections cannot resolve it or crowd the
+qualifying response-day window. Co-favourability and paused suppression
+follow resolution. Tiers load once for selected pairs, without per-response
+queries. Explicit drills come first and remain independent of inferred work.
 
 ## `#concepts_due_for_retention_check_in`
 

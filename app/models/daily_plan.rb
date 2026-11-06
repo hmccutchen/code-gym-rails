@@ -45,7 +45,7 @@ class DailyPlan
 
   def self.for(user, language:, featured_concept: nil, weekend: Date.current.on_weekend?)
     history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
-    size             = size_for(user, history)
+    size             = size_for(user)
     preferences      = KindPreferences.for(user)
     daily            = DailyKinds.for(user)
     rotation         = SectionRotation.for(history, count: size.count, preferences: preferences, daily: daily)
@@ -89,7 +89,8 @@ class DailyPlan
   end
   private_class_method :code_review_day?
 
-  def self.size_for(user, history)
+  def self.size_for(user, before: Date.current)
+    history = user.recent_completion_history(before: before)
     DaySize.for(setting: user.daily_section_count, completion: SectionCount.for(history), gate: CompetencyGate.for(user))
   end
 

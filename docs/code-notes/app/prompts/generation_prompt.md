@@ -6,12 +6,17 @@ A class method, because the system prompt needs only the language's coach and fo
 
 ## `#initialize`
 
-The plan, history, difficulty and ladders arrive as whole values, so a new
+The plan, assessed history, delivered history, difficulty and ladders arrive as whole values, so a new
 plan field is read here and nowhere else. No default queries the database:
-`DailyPlan.for`, `User#recent_performance`, `KindDifficulty.for` and
+`DailyPlan.for`, `User#recent_performance`, `User#recent_delivered_content`, `KindDifficulty.for` and
 `GenerationLadders.for` own those reads, and `generation_prompt_spec` holds
 that constructing, rendering and building the schema issue no SQL and mutate
 no input.
+
+Reviewed evidence lists only assessed answers, even when no concept is
+known, and renders totals/skips only for qualified completion. Delivered
+notes carry repetition context only. Empty assessment history does not mean
+this is the engineer's first delivered set.
 
 ## `#render`
 

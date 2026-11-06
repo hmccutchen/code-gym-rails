@@ -219,7 +219,6 @@ class RealSource
     Method.new("app/models/user.rb", "held_exercise"),
     Method.new("app/models/concept_mastery.rb", "retention_schedule_for"),
     Method.new("app/models/concept_mastery.rb", "record_review!"),
-    Method.new("app/models/section_count.rb", "capped_window"),
     Method.new("app/models/daily_plan.rb", "retention_checks_for"),
     Method.new("app/models/daily_response.rb", "improved_code_visible?"),
     Method.new("app/jobs/generate_daily_exercises_job.rb", "generate_if_due"),

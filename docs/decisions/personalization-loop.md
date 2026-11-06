@@ -1,6 +1,49 @@
 # Personalization loop
 
-`user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, and concept tags. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory. A skipped section is reviewed but never graded (`docs/decisions/grading-rubric.md`), and `DailyResponse#ai_rating_for` returns nil for it. `recent_performance`'s `ai_ratings`, `ConceptMastery.record_review!` and `User#concepts_needing_reinforcement` read `DailyResponse#answered_concept_tags`, and the prompt labels a skipped section `ai: skipped`. `recent_performance`'s `concepts:` and `ConceptExposureIndex` keep the full set because a skipped section was still shown. `self_ratings` returns the stored map unchanged for historical compatibility; new submissions use the finalization rule in `one-finish-action.md`.
+`DailyResponse#assessed_sections` owns basic performance eligibility: a
+submitted response, an answered active section and a grade from
+`ConceptMastery::AI_RATING_RANK`. Valid partial reviews contribute immediately.
+Drafts, pending or failed answers, off-list grades and skipped walkthroughs
+are absent performance evidence; they never imply poor performance.
+
+`User#recent_performance` returns up to `PERFORMANCE_HISTORY_LIMIT` (the
+existing ten) qualifying response days, newest first. Each has a date,
+assessed sections with valid grades and optional concept/self-rating, and
+optional completion. Completion exists only when every answered active
+section is assessed and at least one was answered. Skipped sections require
+no walkthrough. Unknown completion carries neither a count nor skip labels.
+Missing or malformed self-ratings are absent, including historical skipped
+ratings. Concept names pass the existing bucket vocabulary.
+
+`AdaptationHistory.recent` applies basic and consumer-specific eligibility
+before taking a count limit. It traverses submitted responses by descending
+date/id with preloaded exercises in cursor batches, without a candidate cap
+or new age cutoff. Its own operational `BATCH_SIZE` bounds eager loading of
+responses and exercises, independently of the gate loader's tuning. The
+relation stays user-scoped and submitted; `.reviewed` cheaply excludes null
+and empty reviews but is not assessment proof. Strict callers can request
+the shared current-rubric SQL prefilter; general history still accepts valid
+unversioned grades. Ruby eligibility and consumer projections remain
+authoritative after either coarse filter. A late review uses the original response date.
+Performance windows remain response-day windows across kinds; eligible
+newer days can still displace older evidence. Each generation captures its
+projections once and reuses them on retries.
+
+`User#recent_delivered_content` separately projects dates and active section
+keys, concepts and scenarios from the latest ten delivered sets, including
+today during regeneration. It needs no response, omits dropped sections and
+never serializes answer keys or whole problem sets. The prompt marks these
+as repetition-only notes, with no inference about difficulty, struggle,
+success or completion. Diagnostics log only the sanitized performance
+projection. `ConceptExposureIndex` retains its existing submitted-day
+exposure convention, including skipped and pending sections.
+
+Workload uses `recent_completion_history` and
+`ExerciseHistoryEntry::Completion`; rotation uses delivered/scheduled
+`ExerciseHistoryEntry` values with no answered field. Unknown days cannot
+take places in the completion window. The old absence-to-zero skip-run
+inference and its cap are retired; all numerical completion, gate,
+retention, drill and difficulty policies remain unchanged.
 
 **Skipped retention checks defer without changing knowledge.** When a
 submitted, successfully reviewed skipped section tags a vocabulary-valid
@@ -33,3 +76,10 @@ would otherwise take a slot nothing can fill: on a two-section
 concepts and design comparison never takes meta-skill ones. A history entry
 left out is offered again on a later day that can host it, while it is still
 in recent history.
+
+Automatic reinforcement takes the newest qualifying response days after
+assessed-section, mastery-kind, vocabulary, bucket and hosting filters.
+Each concept/bucket resolves on its newest eligible occurrence, before
+co-favourability or paused-tier suppression; a pending sibling cannot hide
+older evidence. Mastery tiers load in one batch. Explicit drills remain first
+and independent of those history windows.

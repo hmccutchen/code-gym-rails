@@ -37,12 +37,11 @@ class ResponseReview
   end
 
   def review(missing)
-    first_batch = @response.ai_review.blank?
     results     = reviewer.review_sections(@user, @response.daily_exercise, @response, sections: missing)
     successes   = results.select { |_, result| result[:ok] }
     failures    = results.reject { |_, result| result[:ok] }
 
-    return Outcome.of(:busy) unless store(successes, failures, first_batch: first_batch)
+    return Outcome.of(:busy) unless store(successes, failures)
 
     @response.release_reviewing!(@claim)
     after_review(successes.keys) if successes.any?
@@ -53,15 +52,17 @@ class ResponseReview
 
   def missing_sections = @response.section_keys - Array(@response.ai_review&.keys)
 
-  def store(successes, failures, first_batch:)
+  def store(successes, failures)
     ActiveRecord::Base.transaction do
       @response.lock!
       next false unless @response.reviewing_since == @claim
 
       if successes.any?
+        unassessed = @response.assessed_sections.empty?
         @response.ai_review = (@response.ai_review || {}).merge(successes.transform_values { |result| result[:review] })
         @response.review_provider = @user.provider
-        ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_batch)
+        first_assessment = unassessed && @response.assessed_sections.any?
+        ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_assessment)
       end
       @response.review_errors = @response.review_errors.except(*successes.keys)
                                          .merge(failures.transform_values { |result| stored_failure(result) })
