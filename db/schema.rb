@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_04_180000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_06_062129) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -51,6 +51,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_180000) do
     t.integer "tier", default: 0, null: false
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.jsonb "review_reconciliation", default: {}, null: false
     t.index ["user_id", "concept", "language"], name: "index_concept_masteries_on_user_id_and_concept_and_language", unique: true
     t.index ["user_id", "next_retention_check_on"], name: "index_concept_masteries_on_user_id_and_next_retention_check_on"
     t.index ["user_id"], name: "index_concept_masteries_on_user_id"
@@ -121,6 +122,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_180000) do
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.string "review_provider"
+    t.jsonb "mastery_application", default: {}, null: false
     t.index ["daily_exercise_id"], name: "index_daily_responses_on_daily_exercise_id", unique: true
     t.index ["user_id", "date"], name: "index_daily_responses_on_user_id_and_date", unique: true
     t.index ["user_id"], name: "index_daily_responses_on_user_id"
