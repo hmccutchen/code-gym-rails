@@ -18,7 +18,13 @@ ratings. Concept names pass the existing bucket vocabulary.
 `AdaptationHistory.recent` applies basic and consumer-specific eligibility
 before taking a count limit. It traverses submitted responses by descending
 date/id with preloaded exercises in cursor batches, without a candidate cap
-or new age cutoff. A late review uses the original response date.
+or new age cutoff. Its own operational `BATCH_SIZE` bounds eager loading of
+responses and exercises, independently of the gate loader's tuning. The
+relation stays user-scoped and submitted; `.reviewed` cheaply excludes null
+and empty reviews but is not assessment proof. Strict callers can request
+the shared current-rubric SQL prefilter; general history still accepts valid
+unversioned grades. Ruby eligibility and consumer projections remain
+authoritative after either coarse filter. A late review uses the original response date.
 Performance windows remain response-day windows across kinds; eligible
 newer days can still displace older evidence. Each generation captures its
 projections once and reuses them on retries.

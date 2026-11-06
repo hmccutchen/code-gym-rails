@@ -171,6 +171,20 @@ RSpec.describe LevelSuggestion::Evidence do
     expect(evidence.newest_date).to eq(today - 65)
   end
 
+  it "does not materialize unstamped response days before the newest strict result" do
+    day(2)
+    day(1, { "code_review" => { rung: "junior", unstamped: true } })
+    counts = Hash.new(0)
+    callback = ->(*, payload) { counts[payload[:class_name]] += payload[:record_count] }
+
+    ActiveRecord::Base.uncached do
+      ActiveSupport::Notifications.subscribed(callback, "instantiation.active_record") do
+        expect(described_class.for(user).newest_date).to eq(today - 2)
+      end
+    end
+    expect(counts.slice("DailyResponse", "DailyExercise")).to eq("DailyResponse" => 1, "DailyExercise" => 1)
+  end
+
   describe "LevelSuggestion.for" do
     before { user.update!(section_kind_levels: { "code_review" => "junior" }) }
 

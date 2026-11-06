@@ -169,13 +169,18 @@ current `RUBRIC_VERSION` stamp, and reads every rubric-stamped day with no cap, 
 batches ordered by date and id. A cap would forget a size whose earning days
 had aged out; the batches bound memory, not history, so the query grows
 with post-rubric history. A day graded before the rubric adds neither
-results nor optional-section history. The SQL stamp test is only a coarse
-prefilter: an answered, validly graded section must carry the current stamp.
+results nor optional-section history. `ReviewedSectionResults.with_current_rubric`
+owns the SQL stamp prefilter shared with strict adaptation history. It is
+only a coarse filter: an answered, validly graded section must carry the current stamp.
 Optional completion requires basic assessment of every answered section,
 but does not require every answer to carry a rung or current stamp.
 A valid partial strict result can update growth or the brake immediately.
 A response with neither a strict result nor eligible optional completion
 produces no fold event.
+`Day#optional_evidence?` and `#evidence?` own that distinction for both the
+loader and pure fold. `add` ignores an empty day before any state changes,
+including the count, reason and evidence. `.plans` still returns one plan
+per supplied day, repeating the unchanged plan for an empty day.
 
 Each day reaches the fold as a
 `CompetencyGate::Day` whose `optional` is `:none`, `:unknown`, `:incomplete` or

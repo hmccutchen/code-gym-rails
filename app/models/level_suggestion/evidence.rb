@@ -6,7 +6,7 @@ class LevelSuggestion
     attr_reader :results, :newest_date
 
     def self.for(user)
-      results = AdaptationHistory.recent(user, limit: RESPONSE_WINDOW) do |response|
+      results = AdaptationHistory.recent(user, limit: RESPONSE_WINDOW, require_rubric: true) do |response|
         ReviewedSectionResults.for(response, require_rubric: true)
       end
       new(results.flatten)

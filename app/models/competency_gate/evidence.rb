@@ -5,9 +5,6 @@ class CompetencyGate
 
     BATCH_SIZE = 100
 
-    # Reviews graded before the rubric, or by older code, carry no stamp; their ratings had no shared definition.
-    RUBRIC_STAMPED = "jsonb_path_exists(ai_review, '$.*.rubric ? (@ == $version)', jsonb_build_object('version', CAST(:version AS integer)))"
-
     def initialize(user, batch_size: BATCH_SIZE)
       @user = user
       @batch_size = batch_size
@@ -27,8 +24,7 @@ class CompetencyGate
     private
 
     def responses
-      @user.daily_responses.submitted.reviewed
-           .where(RUBRIC_STAMPED, version: ReviewedSectionResults::RUBRIC_VERSION).preload(:daily_exercise)
+      ReviewedSectionResults.with_current_rubric(@user.daily_responses.submitted.reviewed).preload(:daily_exercise)
     end
 
     def day_for(response)
@@ -36,10 +32,8 @@ class CompetencyGate
 
       daily = response.daily_exercise.daily_kinds.map(&:key)
       results = ReviewedSectionResults.for(response, require_rubric: true, include_eased: true)
-      optional = optional_state(response, daily)
-      return if results.empty? && %i[none unknown].include?(optional)
-
-      Day.new(results: results, optional: optional, daily: daily)
+      day = Day.new(results: results, optional: optional_state(response, daily), daily: daily)
+      day if day.evidence?
     end
 
     def optional_state(response, daily)

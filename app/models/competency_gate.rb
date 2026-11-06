@@ -25,6 +25,9 @@ class CompetencyGate
 
       super
     end
+
+    def optional_evidence? = !%i[none unknown].include?(optional)
+    def evidence? = results.any? || optional_evidence?
   end
 
   # evidence is nil unless the caller asked for it.
@@ -63,8 +66,10 @@ class CompetencyGate
   end
 
   def add(day)
+    return self unless day.evidence?
+
     day.results.each { |result| record(result, daily: day.daily.include?(result.kind)) }
-    @optional_days = (@optional_days + [ day.optional ]).last(OPTIONAL_RUN) unless %i[none unknown].include?(day.optional)
+    @optional_days = (@optional_days + [ day.optional ]).last(OPTIONAL_RUN) if day.optional_evidence?
     @count, @reason = next_step
     restart_growth if @reason == :brake
     self

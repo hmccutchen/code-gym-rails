@@ -35,6 +35,13 @@ Raising `RUBRIC_VERSION` restarts suggestion evidence, as it does for the
 competency gate. The AI rating's calibration for these moves is unverified,
 and suggestions require an explicit Apply.
 
+The selector applies `.reviewed` and the shared
+`ReviewedSectionResults.with_current_rubric` SQL prefilter before loading
+responses and exercises. Neither proves strict eligibility; the full Ruby
+projection still rejects malformed, inactive, skipped, eased or unstamped
+sections. Candidate batches use `AdaptationHistory::BATCH_SIZE`, independent
+of the sixty qualifying days retained.
+
 **Rare kinds may never qualify.** A kind appears at most once a day, so five
 results take at least five days with it. On a two-section day only the
 two daily kinds (code review and design comparison by default) can reach five within the 60-response read,

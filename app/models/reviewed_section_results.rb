@@ -1,5 +1,7 @@
 class ReviewedSectionResults
   RUBRIC_VERSION = 1
+  RUBRIC_STAMPED = "jsonb_path_exists(ai_review, '$.*.rubric ? (@ == $version)', jsonb_build_object('version', CAST(:version AS integer)))"
+  private_constant :RUBRIC_STAMPED
 
   # The lowest AI rating a co-favourable result can carry.
   FAVOURABLE_BAR = DailyResponse::AI_RATING_FAVORABLE.min_by { |rating| ConceptMastery::AI_RATING_RANK.fetch(rating) }
@@ -40,6 +42,9 @@ class ReviewedSectionResults
   end
 
   def self.current_rubric?(review) = review.is_a?(Hash) && review["rubric"] == RUBRIC_VERSION
+
+  # A coarse prefilter only: malformed, inactive or ungraded sections can still match.
+  def self.with_current_rubric(responses) = responses.where(RUBRIC_STAMPED, version: RUBRIC_VERSION)
 
   def self.counts?(data, review, require_rubric, include_eased)
     KindDifficulty::LEVELS.include?(data["pitched_at"]) &&
