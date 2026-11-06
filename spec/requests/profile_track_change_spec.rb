@@ -75,7 +75,18 @@ RSpec.describe "Profile track preview and Apply", type: :request do
     expect(body["preview_html"]).not_to include(I18n.t("tracks.preview.baseline_only"))
   end
 
-  it "refuses missing, open, malformed and mismatched confirmations before any mutation" do
+  it "tells an old tab with no confirmation key to reload and refuses the whole save" do
+    before = user.reload.attributes
+
+    patch profile_path, params: { user: { skill_level: "senior", time_zone: "America/Chicago" } }.to_json, headers: headers
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response.parsed_body["error"]).to eq(I18n.t("tracks.stale_page"))
+    expect(user.reload.attributes).to eq(before)
+    expect(user.level_suggestion_events).to be_empty
+  end
+
+  it "refuses null, open, malformed and mismatched supplied confirmations before any mutation" do
     good = preview["track_change"]
     before = user.reload.attributes
     [ nil, "senior", [], {}, good.merge("extra" => true), good.except("from"),
@@ -88,6 +99,52 @@ RSpec.describe "Profile track preview and Apply", type: :request do
       expect(user.reload.attributes).to eq(before)
     end
     expect(user.level_suggestion_events).to be_empty
+  end
+
+  it "normalizes retained-target presentation without cleaning historical targets or locks" do
+    levels = { "pattern" => "unknown", "code_review" => "senior", "retired_kind" => "junior" }
+    locks = %w[pattern code_review retired_kind]
+    user.update_columns(section_kind_levels: levels, locked_section_kinds: locks)
+    before = user.reload.attributes
+    kept = I18n.t("tracks.kept_locked_section", name: I18n.t("sections.code_review.name"), level: I18n.t("exercise_mix.levels.senior"))
+    kept_line = I18n.t("tracks.kept_own_level", sections: kept)
+
+    body = preview("mid_level")
+
+    expect(response).to have_http_status(:ok)
+    expect(body["kind_rungs"]).to include("pattern" => "junior", "code_review" => "senior")
+    expect(body["kind_rungs"]).not_to have_key("retired_kind")
+    expect(body["kept_own_level"]).to eq(kept_line)
+    expect(body["preview_html"]).to include(
+      I18n.t("tracks.preview.moves", name: I18n.t("sections.pattern.name"), from: I18n.t("exercise_mix.levels.junior"), to: I18n.t("exercise_mix.levels.mid_level")),
+      kept
+    )
+    expect(body["preview_html"]).not_to include("unknown", "retired_kind")
+    expect(user.reload.attributes).to eq(before)
+    expect(user.level_suggestion_events).to be_empty
+
+    apply_track(body["track_change"], level: "mid_level")
+
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body["kept_own_level"]).to eq(kept_line)
+    expect(response.parsed_body["kind_rungs"]).to include("pattern" => "mid_level", "code_review" => "senior")
+    expect(user.reload).to have_attributes(section_kind_levels: levels, locked_section_kinds: locks,
+                                          section_kind_preferences_version: before["section_kind_preferences_version"])
+    moved = ExerciseSection.keys - [ "code_review" ]
+    expect(user.level_suggestion_cutoffs.keys).to match_array(moved)
+    expect(user.level_suggestion_events.pluck(:kind, :source, :from_level, :to_level))
+      .to match_array(moved.map { |kind| [ kind, "skill_level_edit", "junior", "mid_level" ] })
+    saved = user.attributes
+    events = user.level_suggestion_events.count
+
+    recovery = preview("mid_level")
+
+    expect(response).to have_http_status(:ok)
+    expect(recovery).to include("already_saved" => true, "kept_own_level" => kept_line, "kind_rungs" => user.kind_rungs)
+    expect(recovery["preview_html"]).to include(kept)
+    expect(recovery["preview_html"]).not_to include("unknown", "retired_kind")
+    expect(user.reload.attributes).to eq(saved)
+    expect(user.level_suggestion_events.count).to eq(events)
   end
 
   it "refuses an older preference version and supplies the actual saved baseline" do

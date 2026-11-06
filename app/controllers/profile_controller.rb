@@ -23,9 +23,8 @@ class ProfileController < ApplicationController
       return render_json_error(t("tracks.preview.invalid_level"), status: :unprocessable_content)
     end
 
-    change = TrackChange.new(levels: current_user.section_kind_levels, locked: current_user.locked_section_kinds,
-                             from: current_user.skill_level, to: value[:skill_level])
-    render json: track_body.merge(
+    change = track_change_to(value[:skill_level])
+    render json: track_body(change).merge(
       kind_rungs: current_user.kind_rungs, already_saved: change.already_saved?,
       preview_html: render_to_string(partial: "api_keys/track_preview", formats: [ :html ], locals: { change: change }),
       track_change: { from: change.from, to: change.to, preferences_version: current_user.section_kind_preferences_version }
@@ -68,14 +67,19 @@ class ProfileController < ApplicationController
 
   def daily_sections_update? = params.require(:user).slice(:daily_section_count, :daily_section_kinds).present?
 
-  def track_body
-    { skill_level: current_user.skill_level, preferences: preference_state, kept_own_level: kept_own_level }
+  def track_change_to(level)
+    TrackChange.new(levels: current_user.section_kind_levels, locked: current_user.locked_section_kinds,
+                    from: current_user.skill_level, to: level)
   end
 
-  def kept_own_level
-    kept = current_user.section_kind_levels.map do |kind, level|
-      key = current_user.locked_section_kinds.include?(kind) ? "tracks.kept_locked_section" : "tracks.kept_section"
-      t(key, name: t("sections.#{kind}.name"), level: t("exercise_mix.levels.#{level}"))
+  def track_body(change = track_change_to(current_user.skill_level))
+    { skill_level: current_user.skill_level, preferences: preference_state, kept_own_level: kept_own_level(change.retained) }
+  end
+
+  def kept_own_level(retained)
+    kept = retained.map do |target|
+      key = target[:locked] ? "tracks.kept_locked_section" : "tracks.kept_section"
+      t(key, name: t("sections.#{target[:kind]}.name"), level: t("exercise_mix.levels.#{target[:level]}"))
     end
     kept.empty? ? "" : t("tracks.kept_own_level", sections: kept.to_sentence)
   end

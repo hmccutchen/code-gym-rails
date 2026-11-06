@@ -59,8 +59,10 @@ the user, because a choice bumps no preference version, so only
 Every manual `skill_level` post supplies a closed `track_change` object
 containing only `from`, `to`, and `preferences_version`. Levels come from
 `User::SKILL_LEVELS`; the version must be a nonnegative JSON integer, and
-`to` must match the requested level. Missing, malformed or mismatched
-confirmation gets 422 before assignment.
+`to` must match the requested level. A missing root confirmation key gets
+the stale-page reload message with 422: an old Setup tab has no preview UI.
+A supplied malformed or mismatched value, including explicit null, keeps
+the preview-validation error. Neither path assigns or saves any posted field.
 
 The checks run after the user lock reloads the record. A different saved
 baseline or preference version gets 409 without mutation. Track changes

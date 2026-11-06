@@ -110,6 +110,7 @@ class ProfileUpdate
     @user.with_lock do
       next Outcome.of(:invalid, error: "That track choice isn't available.") if invalid_track_choice?
       next Outcome.of(:invalid, error: full_rule(:skill_level, User::SKILL_LEVEL_RULE)) if invalid_skill_level?
+      next Outcome.of(:invalid, error: I18n.t("tracks.stale_page")) if manual_track? && !@params.key?(:track_change)
       next Outcome.of(:invalid, error: I18n.t("tracks.preview.invalid_confirmation")) if invalid_track_confirmation?
       next Outcome.of(:stale, layout_changed: layout_moved?) if stale?
       next Outcome.of(:invalid, error: I18n.t("level_suggestion.card.invalid_steps")) if unsaved_shown_step?

@@ -24,6 +24,12 @@ the from/to/version confirmation. It also supplies the saved baseline and
 preferences for recovery when an earlier successful reply was lost.
 An already-saved preview explicitly says so and performs no second write.
 
+Both the inline consequences and `kept_own_level` use `TrackChange#retained`,
+whose targets and effective locks come from `KindDifficulty`. Unsupported
+historical targets, their ineffective locks and retired-kind entries are not
+described as retained. The raw stored columns remain untouched by preview or
+Apply; this is read normalization, not a cleanup.
+
 ## The 409 and track replies send only exclusions Setup shows
 
 `preference_state` returns the exclusions for rotatable kinds only. A kind
