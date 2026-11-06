@@ -121,9 +121,12 @@ can legitimately change later decisions.
 
 ## Difficulty chronology
 
-New generation captures one all-kind effective-rung map from its captured
-`KindDifficulty`, before the provider call. Draft ingest, retry ingest,
-retry ladders and the judge reuse it. `JudgedGeneration` passes it through
+New generation captures one all-kind effective-rung map and the profile's
+baseline level before the provider call. Initial/retry instructions, the
+multi-file schema, requested diagnostics, ingest, ladders and the judge reuse
+those captured inputs. Optional prompt-map/baseline keywords are a narrow
+interface extension to preserve this immutable rendering contract; direct
+callers retain their defaults and ordinary text. `JudgedGeneration` passes the map through
 `DailyPlan::Result#notes(kind_rungs:)`; generation/regeneration persist it
 with the set. Held sets keep it. The plan reads no difficulty, track,
 suggestion or level-change state.
@@ -167,9 +170,14 @@ concept stamp. This release cannot identify unstamped historical easing.
 #714 must own explicit support/easing and return-to-normal policy; there is
 no new retention policy, track preview, graduation or #718 definition here.
 
-The seeded fixture preserves eight named 50-day result draws, enriching
+The seeded fixture is an open-loop preserved-input replay of eight named
+50-day result draws, enriching
 each with deterministic dates, assigned base volume and delivered/answered
 core keys. Its recorded counts intentionally replace the old pooled and
 mean/stretch rules; the implementation report separates count changes,
-reason-only changes and evidence-schema-only differences. Synthetic draws
-are not a production impact or latency measurement.
+reason-only changes and evidence-schema-only differences. Assignments come
+from the preserved random walk, not the preceding replay output: 139 match
+the pre-event replay count, 148 are smaller and 113 larger, across 400 events.
+A separate eleven-event feedback spec assigns and delivers each previous
+gate count, covering growth, skips, reduction and regrowth. Neither is a
+production impact or latency measurement.

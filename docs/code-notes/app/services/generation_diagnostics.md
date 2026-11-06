@@ -6,6 +6,9 @@ Moved out of `AiService` (#431). Each method writes log lines only; nothing it d
 
 Difficulty adaptation is advisory. This line pairs what was requested with what
 was delivered to check it, alongside `ResponseReview#log_diagnostics`.
+Requested baseline and per-kind levels come from the draft's captured
+`skill_level` and `kind_rungs`, never from settings reread after the provider
+call. They describe the original request even if the caller changes its user.
 
 ## `#kind_difficulty`
 

@@ -28,14 +28,14 @@ RSpec.describe ExerciseDraft do
   end
 
   def draft_for(language: "ruby_rails", mode: :application_code)
-    described_class::Draft.new(user: user, language: language, problem_set: {}, plan: Struct.new(:code_review_mode, :code_review_gotcha, :featured_concept).new(mode, nil, nil),
+    described_class::Draft.new(user: user, skill_level: user.skill_level, language: language, problem_set: {}, plan: plan_for(code_review_mode: mode),
                                kinds: [], difficulty: KindDifficulty.none, kind_rungs: KindDifficulty.none.rungs(skill_level: user.skill_level), ladders: {}, history: [], delivered_history: [],
                                suggested_concepts: [], unusable_sections: [])
   end
 
   it "keeps the draft to its user and language, the plan, the drafted inputs and the ingest results" do
     expect(described_class::Draft.members)
-      .to eq(%i[user language problem_set plan kinds difficulty kind_rungs ladders history delivered_history suggested_concepts unusable_sections])
+      .to eq(%i[user skill_level language problem_set plan kinds difficulty kind_rungs ladders history delivered_history suggested_concepts unusable_sections])
   end
 
   it "asks for the week's featured concept and plans the day around it, so a hiding kind is never offered it" do
@@ -155,6 +155,34 @@ RSpec.describe ExerciseDraft do
       expect(request[:prompt]).to include("BUG-REPETITION")
     end
   end
+
+    it "keeps real retry instructions and multi-file schema on the captured level after the caller changes" do
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_FILE_WEIGHTS).and_return(:multi)
+      reply["code_review"] = FakeService::MULTI_FILE_CODE_REVIEW.deep_dup
+      ranges = []
+      allow(ProblemSetIngest).to receive(:call).and_wrap_original do |original, *args, **options|
+        ranges << options.fetch(:code_review_files)
+        original.call(*args, **options)
+      end
+      capturing = provider.with(
+        prompt: ->(person, language, **options) {
+          GenerationPrompt.new(person, language, **options, retention_annotation: generation_retention_annotation)
+        },
+        generate: ->(*args, **options) {
+          provider.generate.call(*args, **options).tap { user.skill_level = "junior" }
+        })
+      captured = described_class.call(user, language: "ruby_rails", provider: capturing)
+      retried = described_class.retry_section(captured, ExerciseSection::CodeReview, "n_plus_one", provider: capturing)
+
+      aggregate_failures do
+        generated.each do |request|
+          expect(request[:prompt]).to include("Sections at senior:", "- Skill level: senior", '"file_1_path"')
+          expect(request[:prompt]).not_to include("Sections at junior:", "- Skill level: junior")
+        end
+        expect(ranges).to eq([ 2..3, 2..3 ])
+        expect(retried["pitched_at"]).to eq(captured.kind_rungs.fetch("code_review"))
+      end
+    end
 
   def planted_key_lines
     lines = []
@@ -310,7 +338,11 @@ RSpec.describe ExerciseDraft do
     expect(Rails.logger).to have_received(:warn).with(/SuggestedConcept recording failed: db down/)
   end
 
-  describe ".retry_ladders" do
+  describe "retry ladders" do
+    before do
+      allow(ProblemSetIngest).to receive(:call).and_return(double(problem_set: {}, key_notes: []))
+    end
+
     it "gives a one-section retry only that section's ladder rungs" do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
@@ -318,16 +350,19 @@ RSpec.describe ExerciseDraft do
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
       user.update!(skill_level: "junior")
 
-      expect(described_class.send(:retry_ladders, draft_for, ExerciseSection::Pattern))
-        .to eq("junior" => { "n_plus_one" => "j" })
-      expect(described_class.send(:retry_ladders, draft_for, ExerciseSection::PlanReview))
-        .to eq("junior" => { "scope_creep" => "j" })
+      ladders = []
+      capturing = provider.with(prompt: ->(*, **options) { ladders << options.fetch(:ladders); prompt })
+      described_class.retry_section(draft_for, ExerciseSection::Pattern, "n_plus_one", provider: capturing)
+      described_class.retry_section(draft_for, ExerciseSection::PlanReview, "scope_creep", provider: capturing)
+
+      expect(ladders).to eq([ { "junior" => { "n_plus_one" => "j" } }, { "junior" => { "scope_creep" => "j" } } ])
     end
 
     it "loads a retry's ladders for the draft's language and code_review mode" do
       allow(GenerationLadders).to receive(:for).and_call_original
 
-      described_class.send(:retry_ladders, draft_for(language: "javascript", mode: :schema_review), ExerciseSection::CodeReview)
+      described_class.retry_section(draft_for(language: "javascript", mode: :schema_review), ExerciseSection::CodeReview,
+                                    "promises", provider: provider)
 
       expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil, featured_concept: nil)
     end

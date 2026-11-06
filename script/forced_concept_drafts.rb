@@ -30,7 +30,7 @@ class ForcedConceptDrafts
                                        plan.code_review_mode, gotcha: plan.code_review_gotcha, featured_concept: plan.featured_concept)
     history    = user.recent_performance
 
-    ExerciseDraft::Draft.new(user: user, language: language, problem_set: {}, plan: plan, kinds: kinds,
+    ExerciseDraft::Draft.new(user: user, skill_level: user.skill_level, language: language, problem_set: {}, plan: plan, kinds: kinds,
                              difficulty: difficulty, kind_rungs: difficulty.rungs(skill_level: user.skill_level), ladders: ladders, history: history, delivered_history: user.recent_delivered_content,
                              suggested_concepts: [], unusable_sections: [])
   end

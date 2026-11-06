@@ -13,6 +13,14 @@ plan field is read here and nowhere else. No default queries the database:
 that constructing, rendering and building the schema issue no SQL and mutate
 no input.
 
+Optional `kind_rungs:` and `skill_level:` inputs carry the draft's captured
+effective rungs and baseline through initial and retry rendering. Guidance
+and the code-review file schema use that map. Direct callers can omit both:
+construction derives the map from the supplied difficulty and user baseline,
+without querying. Ordinary rendered text is unchanged. This narrowly extends
+the prompt interface so a later mutation of the draft's user cannot change
+the request while ingest and notes retain the earlier rungs.
+
 Reviewed evidence lists only assessed core answers, even when no concept is
 known, and renders core totals/skips only for qualified completion. Bug hunts
 are removed at the performance reader, not by prompt branches. Delivered

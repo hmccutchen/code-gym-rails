@@ -17,6 +17,6 @@ class SizeForecast
   def self.change(today, tomorrow)
     return Change.new(direction: :larger, count: tomorrow.count) if tomorrow.count > today
 
-    Change.new(direction: :smaller, count: tomorrow.count) if %i[brake completion].include?(tomorrow.reason) && tomorrow.count < today
+    Change.new(direction: :smaller, count: tomorrow.count) if tomorrow.reduction? && tomorrow.count < today
   end
 end

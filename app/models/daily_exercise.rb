@@ -41,10 +41,6 @@ class DailyExercise < ApplicationRecord
 
   def draft_scope = "#{id}-#{generated_at.strftime('%s%6N')}"
 
-  def planned_size_with_coverage
-    planned_size && planned_size + (plan_notes["coverage"] ? 1 : 0)
-  end
-
   def planned_by_setting? = plan_notes["size_reason"] == "setting"
 
   def planned_under_brake? = plan_notes["brake"] == true

@@ -34,7 +34,10 @@ and scenarios are repetition-only context and contain no answer keys
 (`docs/decisions/personalization-loop.md`).
 Performance and its completion projection exclude supplementary bug hunts;
 delivered repetition history keeps them. One captured server `kind_rungs`
-map supplies ingest, retry ingest, the judge and the new plan-notes snapshot.
+map supplies initial/retry rendering, ingest, ladders, the judge, requested
+diagnostics and the new plan-notes snapshot. The draft also captures the
+profile's baseline level for rendering and diagnostics. Optional prompt
+keywords preserve direct callers' defaults.
 Existing unstamped rating-driven easing is not reconstructed (#714).
 
 Each entry states what a change must not break. An entry that names a

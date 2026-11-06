@@ -105,7 +105,7 @@ class GenerationDiagnostics
   def requested(language, draft, problem_set)
     plan = draft.plan
     {
-      skill_level: @user.skill_level,
+      skill_level: draft.skill_level,
       code_review_mode: plan.code_review_mode,
       code_review_source: plan.code_review_source&.id,
       scenario_flavor: plan.scenario_flavor,
@@ -125,7 +125,7 @@ class GenerationDiagnostics
   end
 
   def kind_difficulty(language, draft, problem_set)
-    rungs = draft.difficulty.rungs_for(draft.kinds, skill_level: @user.skill_level)
+    rungs = draft.kinds.index_with { |kind| draft.kind_rungs.fetch(kind.key) }
     per_kind = rungs.to_h do |kind, rung|
       vocabulary = ConceptVocabulary.selectable_for_section(kind.key, language, mode: draft.plan.code_review_mode, rung: rung,
                                                                                 gotcha: draft.plan.code_review_gotcha, featured_concept: draft.plan.featured_concept)

@@ -19,6 +19,21 @@ RSpec.describe CompetencyGate do
     described_class.new.tap { |gate| 5.times { |n| gate.add(day(n)) } }
   end
 
+  it "feeds its previous count into delivery through growth, skips and recovery" do
+    gate = described_class.new
+    assignments, counts = [], []
+    11.times do |n|
+      assigned = gate.plan.count
+      assignments << assigned
+      skipping = [ 7, 8 ].include?(n)
+      gate.add(day(n, assigned: assigned, delivered: assigned, answered: assigned - (skipping ? 1 : 0),
+        state: skipping ? :incomplete : :complete, results: [ result(n), result(n, kind: "challenge") ]))
+      counts << gate.plan.count
+    end
+    expect(assignments).to eq([ 2 ] + counts[0...-1])
+    expect(counts).to eq([ 2, 2, 2, 2, 3, 3, 4, 4, 3, 3, 4 ])
+  end
+
   it "needs five separate attempts with four good grades, not pooled successes" do
     gate = described_class.new
     4.times { |n| gate.add(day(n, results: [ result(n), result(n, kind: "challenge") ])) }

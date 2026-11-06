@@ -294,9 +294,10 @@ class AiService
     parse_json_object(call_and_log(user, request, deadline: deadline)[:text], subject: subject, log_raw: false)
   end
 
-  def generation_prompt(user, language, plan:, history:, delivered_history:, difficulty:, ladders:)
+  def generation_prompt(user, language, plan:, history:, delivered_history:, difficulty:, ladders:,
+                        kind_rungs: nil, skill_level: user.skill_level)
     GenerationPrompt.new(user, language, plan: plan, history: history, delivered_history: delivered_history, difficulty: difficulty, ladders: ladders,
-                         retention_annotation: method(:annotate_retention_concept))
+                         retention_annotation: method(:annotate_retention_concept), kind_rungs: kind_rungs, skill_level: skill_level)
   end
 
   def normalize_optional_reference_fields!(reference)

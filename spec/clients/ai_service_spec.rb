@@ -1450,7 +1450,7 @@ RSpec.describe AiService do
     let(:difficulty) { KindDifficulty.new(levels: { "challenge" => "senior", "pattern" => "mid_level" }, locked: %w[challenge]) }
     let(:draft_ladders) { { "senior" => { "memoization" => "the draft's senior rung" } } }
     let(:draft) do
-      ExerciseDraft::Draft.new(user: user, language: "ruby_rails", problem_set: {}, plan: plan,
+      ExerciseDraft::Draft.new(user: user, skill_level: user.skill_level, language: "ruby_rails", problem_set: {}, plan: plan,
                                kinds: ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: :pattern, third: :challenge, fourth: :plan_review }),
                                difficulty: difficulty, kind_rungs: difficulty.rungs(skill_level: user.skill_level), ladders: draft_ladders, history: history, delivered_history: [],
                                suggested_concepts: [], unusable_sections: [])

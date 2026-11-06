@@ -13,26 +13,29 @@ class GenerationPrompt
     PROMPT
   end
 
-  def initialize(user, language, plan:, history:, delivered_history:, difficulty:, ladders:, retention_annotation:)
+  def initialize(user, language, plan:, history:, delivered_history:, difficulty:, ladders:, retention_annotation:,
+                 kind_rungs: nil, skill_level: user.skill_level)
     @user                 = user
     @language             = language
     @plan                 = plan
     @history              = history
     @delivered_history    = delivered_history
     @difficulty           = difficulty
+    @skill_level          = skill_level
+    @kind_rungs           = kind_rungs || difficulty.rungs(skill_level: skill_level)
     @ladders              = ladders
     @retention_annotation = retention_annotation
   end
 
   def render(only: nil, fixed_concept: nil, retry_cause: nil)
     kinds = kinds_for(only)
-    rungs = @difficulty.rungs_for(kinds, skill_level: @user.skill_level)
+    rungs = kinds.index_with { |kind| @kind_rungs.fetch(kind.key) }
 
     <<~PROMPT
       Generate a daily Code Gym exercise set for this engineer.
 
       Engineer profile:
-      - Skill level: #{@user.skill_level} (#{User::SKILL_LEVELS.join(" → ")})
+      - Skill level: #{@skill_level} (#{User::SKILL_LEVELS.join(" → ")})
       - Priority focus areas: #{focus}
 
       Reviewed answer evidence:
@@ -102,7 +105,7 @@ class GenerationPrompt
   def config = LanguagePrompts.for(@language)
 
   def code_review_file_range
-    ExerciseSection::CodeReview.day_file_range(plan: @plan, difficulty: @difficulty, skill_level: @user.skill_level)
+    ExerciseSection::CodeReview.file_range(files: @plan.code_review_files, rung: @kind_rungs.fetch(ExerciseSection::CodeReview.key))
   end
 
   def kinds_for(only)

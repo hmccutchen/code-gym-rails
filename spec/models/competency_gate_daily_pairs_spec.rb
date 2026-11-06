@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe CompetencyGate, "seeded historical replay" do
+RSpec.describe CompetencyGate, "open-loop preserved-input replay" do
   fixture = JSON.parse(Rails.root.join("spec/fixtures/competency_gate/default_pair_histories.json").read)
 
   fixture.fetch("histories").each do |history|

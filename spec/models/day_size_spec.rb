@@ -1,20 +1,6 @@
 require "rails_helper"
 
 RSpec.describe DaySize do
-  include AuthHelpers
-
-  it "keeps every fixed count out of replay and diagnostic evidence" do
-    user = create_user_with_key
-    expect(CompetencyGate).not_to receive(:for)
-    (1..4).each do |count|
-      user.daily_section_count = count
-      decision = DailyPlan.size_for(user)
-      expect(decision).to have_attributes(count: count, reason: :setting)
-      expect(decision.diagnostics[:gate]).to be_nil
-      expect(decision.brake?).to be(false)
-    end
-  end
-
   it "keeps coverage held even when the latest transition reason is held" do
     gate = CompetencyGate::Plan.new(count: 2, reason: :held, safety_hold: true, evidence: {})
     decision = described_class.for(setting: nil, gate: gate)

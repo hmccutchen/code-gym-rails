@@ -524,7 +524,7 @@ en:
         outgoing_fixed: "Your Daily sections setting is %{count}, so after this swap %{outgoing} won't appear at all. Swap it back, or change the setting in Setup, to see it again."
         outgoing_weeks: "Your sets have two sections right now, so after this swap %{outgoing} will appear about once every %{weeks} weeks, as an extra section. Swap it back to have it every day."
         outgoing_braked: "Your sets have two sections right now, so after this swap %{outgoing} will rarely appear until your sets grow. Swap it back to have it every day."
-        outgoing_gate: "Your two daily sections are also what decides when your sets grow."
+        outgoing_gate: "Your sets grow based on reviewed answers and completed core work."
   daily_sections:
     legend: "Daily sections"
     automatic: "Automatic"

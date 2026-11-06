@@ -417,8 +417,8 @@ or `Consequences`.
   appear at all, a braked day (the row's `plan_notes["brake"]`) gets "will
   rarely appear until your sets grow" with no figure, since the brake blocks
   coverage, and any other kind appears about once every N weeks as a
-  coverage addition, followed by the line that the pair also decides when
-  sets grow. N counts the new pair's optional kinds the user hasn't
+  coverage addition, followed by the line that reviewed answers and
+  completed core work determine growth. N counts the new pair's optional kinds the user hasn't
   excluded; `docs/code-notes/app/models/daily_kind_swap/consequences.md` has
   the formula.
 - Swaps go one at a time through one `CodeGymSaveStatus.queue` line, each

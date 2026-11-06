@@ -17,7 +17,9 @@ class CompetencyGate
     def evidence? = results.any? || completion_evidence?
   end
 
-  Plan = Data.define(:count, :reason, :safety_hold, :evidence)
+  Plan = Data.define(:count, :reason, :safety_hold, :evidence) do
+    def reduction? = %i[brake completion].include?(reason)
+  end
 
   def self.for(user, before: Date.current) = plan(Evidence.new(user, before: before))
 
@@ -63,13 +65,15 @@ class CompetencyGate
   end
 
   def evidence
-    { kinds: @kinds.transform_values(&:evidence), qualifying_required: @count - FLOOR + 1,
+    { kinds: @kinds.transform_values(&:evidence), qualifying_required: qualifying_required,
       capacity: @capacity.evidence.merge(count: @count), overload: @overload.map(&:dup),
       hard_tallies: hard_tallies, causes: @causes.dup, growth_hold: @growth_hold, last_date: @last_date&.to_s,
       last_transition: @last_transition&.to_s }
   end
 
   private
+
+  def qualifying_required = @count - FLOOR + 1
 
   def record_kinds(day)
     day.rungs.each { |kind, rung| window(kind).at(rung) }
@@ -111,7 +115,7 @@ class CompetencyGate
       :safety
     elsif !@capacity.ready?
       :capacity
-    elsif @kinds.count { |_, window| window.qualified? } < @count - FLOOR + 1
+    elsif @kinds.count { |_, window| window.qualified? } < qualifying_required
       :kind_proof
     end
     return if @growth_hold

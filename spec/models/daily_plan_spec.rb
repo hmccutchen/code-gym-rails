@@ -13,6 +13,18 @@ RSpec.describe DailyPlan do
   include AuthHelpers
   include DailyPlanGateStubs
 
+  it "keeps every fixed count out of replay and diagnostic evidence" do
+    user = create_user_with_key
+    expect(CompetencyGate).not_to receive(:for)
+    (1..4).each do |count|
+      user.daily_section_count = count
+      decision = described_class.size_for(user)
+      expect(decision).to have_attributes(count: count, reason: :setting)
+      expect(decision.diagnostics[:gate]).to be_nil
+      expect(decision.brake?).to be(false)
+    end
+  end
+
   describe "FOURTH_BUCKET_FOR" do
     it "gives every fourth-slot kind its own bucket" do
       expect(DailyPlan::FOURTH_BUCKET_FOR.keys.map(&:to_s))

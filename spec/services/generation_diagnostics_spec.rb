@@ -13,7 +13,7 @@ RSpec.describe GenerationDiagnostics do
              coverage: Struct.new(:kind, :reason).new(ExerciseSection::Challenge, "gap"), size: size)
   end
   let(:draft) do
-    ExerciseDraft::Draft.new(user: user, language: "ruby_rails", problem_set: {}, plan: plan, kinds: kinds,
+    ExerciseDraft::Draft.new(user: user, skill_level: user.skill_level, language: "ruby_rails", problem_set: {}, plan: plan, kinds: kinds,
                              difficulty: KindDifficulty.none, kind_rungs: KindDifficulty.none.rungs(skill_level: user.skill_level),
                              ladders: {}, history: [], delivered_history: [], suggested_concepts: [], unusable_sections: [])
   end
@@ -129,6 +129,27 @@ RSpec.describe GenerationDiagnostics do
     expect(retention.find { |line| line.include?("bucket=#{DailyPlan::FOURTH_BUCKET_FOR.fetch(:plan_review)}") })
       .to include("dropped=plan_review:rollout_plan")
   end
+
+    it "reports the captured request baseline and per-kind levels after the user changes" do
+      user.skill_level = "senior"
+      provider = ExerciseDraft::Provider.new(
+        prompt: ->(person, language, **options) {
+          GenerationPrompt.new(person, language, **options, retention_annotation: generation_retention_annotation)
+        },
+        generate: ->(*, **) { FakeService::EXERCISE_PROBLEM_SET.deep_dup },
+        record_suggestion: ->(*) { })
+      captured = ExerciseDraft.call(user, language: "ruby_rails", provider: provider)
+      user.skill_level = "junior"
+      lines = logged_lines do
+        ExerciseDraft.finish(captured, captured.problem_set, provider: provider, dropped_concepts: {}, judge: nil, unhosted: [])
+      end
+      payload = JSON.parse(lines.grep(/\A\[difficulty_diagnostics\]/).sole.delete_prefix("[difficulty_diagnostics] "))
+      aggregate_failures do
+        expect(payload.dig("requested", "skill_level")).to eq("senior")
+        expect(payload.dig("requested", "kind_difficulty").transform_values { |kind| kind.fetch("level") })
+          .to eq(captured.kind_rungs.slice(*captured.kinds.map(&:key)))
+      end
+    end
 
   describe "a retention check held back by the featured concept" do
     def waiting_line(check, featured_concept: "scope_creep")
