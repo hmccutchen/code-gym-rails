@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_06_062129) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_06_220648) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -52,6 +52,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_062129) do
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.jsonb "review_reconciliation", default: {}, null: false
+    t.jsonb "practice_requests", default: {}, null: false
     t.index ["user_id", "concept", "language"], name: "index_concept_masteries_on_user_id_and_concept_and_language", unique: true
     t.index ["user_id", "next_retention_check_on"], name: "index_concept_masteries_on_user_id_and_next_retention_check_on"
     t.index ["user_id"], name: "index_concept_masteries_on_user_id"
