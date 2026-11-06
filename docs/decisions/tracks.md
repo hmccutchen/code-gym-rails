@@ -22,8 +22,8 @@ The decision in #709, agreed on 2026-11-05, is to keep track out of
 kind frequency. Track supplies neither an initial exercise-mix preset nor
 an ongoing rotation bias. Changing track does not rewrite exercise weights
 or exclusions. The same kinds remain available across tracks, subject to
-the user's explicit settings; the existing principal-engineer and
-difficulty-lock restrictions remain unchanged. A junior can practise
+the user's explicit settings. Principal engineer remains manual-only, and
+difficulty-lock protections remain unchanged. A junior can practise
 architecture through a simpler problem, and a senior can still benefit
 from a code-ordering exercise.
 
@@ -51,6 +51,10 @@ The direction agreed in #709 on 2026-11-05 keeps two layers of progression:
   never a silent promotion. Success at the current level earns the harder
   opportunity; evidence from that harder work supports graduation.
 
+The established "Suggest level changes" opt-out also applies to future
+graduation: turning the switch off disables graduation offers. That policy
+is settled, although graduation itself is not implemented.
+
 A future graduation offer and its application must preserve easier
 per-kind levels where more practice is needed. The weakest kind must not
 hold back every other kind, and success in one kind must not make all
@@ -69,9 +73,9 @@ collaboration and judgment in real projects. Senior remains the highest
 level graduation may offer; principal engineer remains a manual choice.
 
 Graduation's required breadth, evidence thresholds and time windows remain
-open, as do presentation, wording and confirmation. Eligibility still needs
-decisions about self-ratings, eased work, retention, and unavailable or
-user-excluded kinds. It must neither require every kind to advance nor
+open, as do other presentation details, wording and confirmation.
+Eligibility still needs decisions about self-ratings, eased work, retention,
+and unavailable or user-excluded kinds. It must neither require every kind to advance nor
 treat missing evidence as demonstrated readiness. These questions and the
 preservation behavior need their own specification before implementation;
 this decision adds no graduation algorithm or UI.
@@ -110,10 +114,11 @@ carries `learning_track` still comes from a page rendered before tracks
 per level and gets a 422 asking for a reload (`tracks.stale_page`); that
 guard reads the request, not the column, and stays. Leave the track,
 `finish_learning_track` and the junior preset are gone: the "Suggest level
-changes" switch is the way to stop suggestions, and graduation will follow
-it. In specs, `create_user_with_key` and `create_fake_provider_user` stand
-for accounts that chose a track; a first-run spec passes
-`track_chosen: false`.
+changes" switch stops today's per-kind suggestions. Its established opt-out
+for future graduation is specified in "Graduation direction — not yet
+implemented" above. In specs, `create_user_with_key` and
+`create_fake_provider_user` stand for accounts that chose a track; a first-run
+spec passes `track_chosen: false`.
 
 **Current track changes clear the targets the track now covers.**
 `TrackChange` is the one statement of the rule: an unlocked target equal to
