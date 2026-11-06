@@ -13,13 +13,13 @@ RSpec.describe LevelSuggestion do
   def kinds_in(proposal) = proposal ? proposal.steps.map(&:kind) : []
   def junior_everywhere = ExerciseSection.keys.index_with { "junior" }
 
-  def step(kind, from:, to:, results:, favourable:, too_hard:)
+  def step(kind, from:, to:, results:, favourable:, too_hard:, pooled: false)
     described_class::Step.new(kind: kind, from: from, to: to, results_at_level: results,
-                              favourable: favourable, too_hard: too_hard)
+                              favourable: favourable, too_hard: too_hard, pooled: pooled)
   end
 
-  def propose(levels: junior_everywhere, locked: [], results: {}, cutoffs: {})
-    described_class.proposal(levels: levels, locked: locked, results: results, cutoffs: cutoffs)
+  def propose(levels: junior_everywhere, locked: [], results: {}, cutoffs: {}, pooled: [])
+    described_class.proposal(levels: levels, locked: locked, results: results, cutoffs: cutoffs, pooled: pooled)
   end
 
   describe "constants" do
@@ -245,6 +245,107 @@ RSpec.describe LevelSuggestion do
       [ { "pattern" => good(5) }, { "architecture" => [ hard(0), hard(1) ] } ].each do |results|
         expect(%i[own struggling]).to include(propose(levels: levels, results: results).basis)
       end
+    end
+  end
+
+  describe "pooled rotated kinds" do
+    let(:rotated) { ExerciseSection.keys - %w[code_review design_comparison] }
+    let(:five_kinds) { %w[pattern challenge architecture security_review plan_review] }
+
+    def one_each(kinds, level: "junior", from: 0)
+      kinds.each_with_index.to_h { |kind, i| [ kind, [ result(from + i, level: level) ] ] }
+    end
+
+    it "offers every rotated kind in a passing window of five, on one result each" do
+      proposal = propose(results: one_each(five_kinds), pooled: rotated)
+
+      expect(proposal.basis).to eq(:own)
+      expect(proposal.steps).to eq(five_kinds.map do |kind|
+        step(kind, from: "junior", to: "mid_level", results: 1, favourable: 5, too_hard: 0, pooled: true)
+      end)
+    end
+
+    it "pools nothing unless told which kinds rotate" do
+      expect(propose(results: one_each(five_kinds))).to be_nil
+    end
+
+    it "never pools a kind that is not rotated" do
+      results = one_each(%w[pattern challenge architecture security_review]).merge("code_review" => [ result(4) ])
+
+      expect(propose(results: results, pooled: rotated)).to be_nil
+    end
+
+    it "needs five pooled results" do
+      expect(propose(results: one_each(five_kinds.first(4)), pooled: rotated)).to be_nil
+    end
+
+    it "needs four of the five solid or better" do
+      results = one_each(five_kinds)
+      results["pattern"] = [ result(0, ai: "developing") ]
+      results["challenge"] = [ result(1, ai: "developing") ]
+
+      expect(propose(results: results, pooled: rotated)).to be_nil
+    end
+
+    it "leaves out the kind whose own result in the window was below solid" do
+      results = one_each(five_kinds)
+      results["pattern"] = [ result(0, ai: "developing") ]
+
+      expect(kinds_in(propose(results: results, pooled: rotated))).to eq(five_kinds - [ "pattern" ])
+    end
+
+    it "leaves out a kind with no result in the window" do
+      results = one_each(five_kinds).merge("parsons_problem" => [ result(9) ])
+
+      expect(kinds_in(propose(results: results, pooled: rotated))).to eq(five_kinds)
+    end
+
+    it "leaves out a kind with two too_hard self-ratings in its own latest three" do
+      results = one_each(five_kinds)
+      results["pattern"] = [ result(0, ai: "strong", self_rating: "too_hard"), result(7, ai: "strong", self_rating: "too_hard") ]
+
+      expect(kinds_in(propose(results: results, pooled: rotated))).to eq(five_kinds - [ "pattern" ])
+    end
+
+    it "pools only kinds at the same level, each counted after its own cutoff" do
+      levels = junior_everywhere.merge("plan_review" => "mid_level")
+      expect(propose(levels: levels, results: one_each(five_kinds), pooled: rotated)).to be_nil
+
+      cutoffs = { "plan_review" => cutoff("junior", 0) }
+      expect(propose(results: one_each(five_kinds), cutoffs: cutoffs, pooled: rotated)).to be_nil
+    end
+
+    it "leaves a locked kind off the card but counts its results" do
+      proposal = propose(results: one_each(five_kinds), locked: [ "pattern" ], pooled: rotated)
+
+      expect(kinds_in(proposal)).to eq(five_kinds - [ "pattern" ])
+    end
+
+    it "reports a kind with five results of its own as its own move" do
+      results = one_each(five_kinds).merge("pattern" => good(5))
+      steps = propose(results: results, pooled: rotated).steps
+
+      expect(steps.find { |item| item.kind == "pattern" }).to eq(
+        step("pattern", from: "junior", to: "mid_level", results: 5, favourable: 5, too_hard: 0)
+      )
+    end
+
+    it "moves again only on five newer pooled results at the new level" do
+      levels = junior_everywhere.merge(five_kinds.index_with { "mid_level" })
+      cutoffs = five_kinds.index_with { cutoff("mid_level", 5) }
+      early = one_each(five_kinds, level: "mid_level", from: 5)
+      expect(propose(levels: levels, results: early, cutoffs: cutoffs, pooled: rotated)).to be_nil
+
+      proposal = propose(levels: levels, results: one_each(five_kinds, level: "mid_level"), cutoffs: cutoffs, pooled: rotated)
+      expect(proposal.steps.map(&:to).uniq).to eq([ "senior" ])
+    end
+
+    it "still steps a pooled kind back on its own too_hard results" do
+      levels = junior_everywhere.merge("pattern" => "mid_level")
+      results = { "pattern" => [ hard(0, level: "mid_level"), hard(1, level: "mid_level") ] }
+      proposal = propose(levels: levels, results: results, pooled: rotated)
+
+      expect([ proposal.basis, kinds_in(proposal) ]).to eq([ :struggling, [ "pattern" ] ])
     end
   end
 

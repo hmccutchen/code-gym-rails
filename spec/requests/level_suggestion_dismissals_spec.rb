@@ -27,6 +27,19 @@ RSpec.describe "Learning track dismissal events", type: :request do
     )
   end
 
+  it "records the pooled move a rotated kind was offered when the card sent no steps" do
+    %w[pattern challenge architecture security_review plan_review].each_with_index do |kind, ago|
+      reviewed_level_days(user, kind, "junior", 1, ending: Date.current - 1 - ago)
+    end
+    login_as(user)
+
+    dismiss([ "pattern" ])
+
+    expect(user.level_suggestion_events.sole).to have_attributes(
+      kind: "pattern", action: "dismissed", from_level: "junior", to_level: "mid_level", window_size: 1, favourable: 1
+    )
+  end
+
   it "records removed bundle members with no offered move" do
     login_as(user)
 

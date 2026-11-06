@@ -137,6 +137,58 @@ RSpec.describe "Level suggestion proposals", type: :request do
     expect(response.body).not_to include("level-suggestion")
   end
 
+  describe "rotated kinds sharing one window" do
+    let(:rotated) { %w[pattern challenge architecture security_review plan_review] }
+
+    def three_section_days(user, kinds, daily_ai: "developing")
+      kinds.each_with_index do |kind, ago|
+        reviewed_day(user, Date.current - ago, { "code_review" => { rung: "junior", ai: daily_ai },
+                                                 "design_comparison" => { rung: "junior", ai: daily_ai }, kind => "junior" })
+      end
+    end
+
+    it "offers each rotated kind a move after five reviewed three-section days, on one result apiece" do
+      user = track_user
+      three_section_days(user, rotated)
+      login_as(user)
+
+      get root_path
+
+      expect(proposed_kinds).to eq(rotated)
+      expect(proposal_text).to include("These sections can move up to mid-level:",
+                                       "Pattern of the Month: one of your last 5 rotating sections, 5 of them reviewed solid or better")
+      apply_levels(user, user.section_kind_levels.merge(rotated.index_with { "mid_level" }))
+      get root_path
+      expect(response.body).not_to include("level-suggestion")
+    end
+
+    it "says a single move rests on the rotating sections together" do
+      user = track_user
+      three_section_days(user, %w[pattern challenge challenge challenge challenge])
+      user.daily_responses.find_by(date: Date.current - 1).then do |day|
+        day.update_columns(ai_review: day.ai_review.merge("challenge" => day.ai_review["challenge"].merge("rating" => "developing")))
+      end
+      login_as(user)
+
+      get root_path
+
+      expect(proposed_kinds).to eq([ "pattern" ])
+      expect(proposal_text).to include("4 of your last 5 rotating sections were reviewed solid or better, " \
+                                       "Pattern of the Month among them. Try Pattern of the Month at mid-level?")
+    end
+
+    it "judges a kind the account holds daily on its own results only" do
+      user = track_user
+      user.update_columns(daily_section_kinds: %w[code_review pattern])
+      (rotated + [ "challenge" ]).each_with_index { |kind, ago| reviewed_day(user, Date.current - ago, { kind => "junior" }) }
+      login_as(user)
+
+      get root_path
+
+      expect(proposed_kinds).to eq(rotated - [ "pattern" ])
+    end
+  end
+
   it "lists no kind without five results of its own, even when another kind is targeted higher" do
     user = track_user(ExerciseSection.keys.index_with { "junior" }.merge("code_review" => "senior"))
     reviewed_window(user, { "code_review" => "senior", "pattern" => "junior" }, count: LevelSuggestion::WINDOW - 1)

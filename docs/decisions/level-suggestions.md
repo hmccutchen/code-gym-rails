@@ -20,10 +20,11 @@ two qualifies) propose one rung down, and the AI vetoes it when it rated
 every one of those solid or better. A step back is shown alone, before any
 step up. Step ups for several kinds share one card when they start from the
 same level, so every kind it lists moves to the same one; registry order
-picks that level, and the other kinds wait for a later card. Each kind is
-judged on its own results only: there is no lead kind and no bundle, so a
-kind without its own five results is never offered a step up. Locked kinds
-are omitted; exclusions remain a scheduling preference.
+picks that level, and the other kinds wait for a later card. A daily kind
+is judged on its own results only. A rotated kind is judged on its own
+results or on the window it shares with the other rotated kinds, described
+below. There is no lead kind: a daily kind's results never move another
+kind. Locked kinds are omitted; exclusions remain a scheduling preference.
 
 `LevelSuggestion::Evidence` preloads exercises for the latest 60 submitted
 responses with stored review data. Only reviewed responses and answered,
@@ -34,12 +35,38 @@ Raising `RUBRIC_VERSION` restarts suggestion evidence, as it does for the
 competency gate. The AI rating's calibration for these moves is unverified,
 and suggestions require an explicit Apply.
 
-**Rare kinds may never qualify.** A kind appears at most once a day, so five
-results take at least five days with it. On a two-section day only the
-two daily kinds (code review and design comparison by default) can reach five within the 60-response read,
-and on a three-section day an optional kind needs about 70% of its
-appearances answered and un-eased; the others move only when the user
-changes them in Setup.
+**Rotated kinds share one window.** A rotated kind fills about one
+three-section day in eight, so five results of its own take about 40 days,
+and the 60-response read holds about seven of its appearances. Left to its
+own results it almost never earned a card (#712). So the kinds the account
+does not hold daily (`LevelSuggestion.pooled_kinds`, every kind outside
+`DailyKinds.for`) share a window at each rung, `LevelSuggestion::PooledWindow`:
+the latest five results across the rotated kinds at that rung, each kind's
+results counted only at its current rung and after its own cutoff. When four
+of the five are solid or better, the card lists each rotated kind that has a
+result in the window, has no result there below solid, is unlocked, and has
+fewer than two too-hard ratings among its own latest three. A kind with no
+result in the window waits, so no kind moves on other kinds' work alone. A
+locked kind's results still count in the window. A rotated kind with five
+results of its own is judged on them first, and the card words that move as
+its own.
+
+On three-section days the first card for rotated kinds can come after five
+reviewed days, the pace of the daily kinds. On a two-section day the
+coverage exception adds about one rotated section every five weekdays, so
+five pooled results take about five weeks. One pool for all rotated kinds
+was chosen over one per slot group: per-group pools compare more alike
+kinds, but the thirds would need about 10 days, the fourths about 14, and
+pattern, alone in its group, would stay at about 45. The cost is that a
+solid result in one kind counts toward a move in an unlike one; the
+requirement of a kind's own solid result in the window, Keep on the card
+and the per-kind step back limit it. A step back still reads only the
+kind's own results.
+
+A pooled move's step carries `pooled: true` and the window's favourable
+count, which the card shows. Its event row carries the kind's own counts
+like any other row, so a `suggestion` row with `window_size` below five
+was a pooled move.
 
 **A cutoff keeps the same work from proposing another move.**
 Not now records each kind's current rung and the newest reviewed response

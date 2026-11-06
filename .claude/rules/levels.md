@@ -39,7 +39,11 @@ read it before changing that area.
   level proposals per section kind on the submitted dashboard; nothing moves
   without an explicit Apply. `LevelSuggestion` reads only answered, un-eased,
   `pitched_at`- and `RUBRIC_VERSION`-stamped results, never suggests to or
-  from principal engineer, and skips locked kinds. A rung change records a
+  from principal engineer, and skips locked kinds. A daily kind moves up on
+  its own five results; a rotated kind (`LevelSuggestion.pooled_kinds`) also
+  moves on the window the rotated kinds at its rung share
+  (`LevelSuggestion::PooledWindow`), and only with a solid result of its own
+  in that window. No daily kind's results move another kind. A rung change records a
   cutoff under the user-row lock (`LevelChange#record_cutoffs`), except a move
   to principal engineer and the first-run track choice, which record none.
   Posted `LevelSuggestionStep`s whose `from` differs from the stored rung get

@@ -22,7 +22,7 @@
               window: [ step.results_at_level, LevelSuggestion::STEP_BACK_WINDOW ].min,
               level: level_name.call(step.from), lower: level_name.call(step.to)) %>
       <% else %>
-        <%= t("level_suggestion.card.own", kind: name.call(step.kind), favourable: step.favourable,
+        <%= t("level_suggestion.card.#{step.pooled ? "pooled" : "own"}", kind: name.call(step.kind), favourable: step.favourable,
               window: LevelSuggestion::WINDOW, level: level_name.call(step.to)) %>
       <% end %>
     </p>
@@ -31,8 +31,8 @@
     <ul>
       <% proposal.steps.each do |step| %>
         <li data-step data-level-suggestion-target="step" data-kind="<%= step.kind %>" data-from="<%= step.from %>" data-to="<%= step.to %>">
-          <%= t("level_suggestion.card.own_item", kind: name.call(step.kind), favourable: step.favourable,
-                window: LevelSuggestion::WINDOW) %>
+          <%= t("level_suggestion.card.#{step.pooled ? "pooled_item" : "own_item"}", kind: name.call(step.kind),
+                favourable: step.favourable, window: LevelSuggestion::WINDOW) %>
           <% if in_place %>
             <button type="button" class="btn btn-ghost btn-sm" data-remove-step data-action="click->level-suggestion#removeStep"
                     aria-label="<%= t("level_suggestion.card.remove_label", kind: name.call(step.kind), level: level_name.call(step.from)) %>"><%= t("level_suggestion.card.remove", level: level_name.call(step.from)) %></button>

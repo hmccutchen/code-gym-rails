@@ -15,18 +15,23 @@ class LevelSuggestion
     def too_hard? = ReviewedSectionResults.too_hard?(self_rating)
   end
 
-  Step = Data.define(:kind, :from, :to, :results_at_level, :favourable, :too_hard)
+  # pooled marks a move read from PooledWindow, where favourable counts that window and not the kind's own.
+  Step = Data.define(:kind, :from, :to, :results_at_level, :favourable, :too_hard, :pooled) do
+    def initialize(pooled: false, **counts) = super
+  end
   Proposal = Data.define(:basis, :steps)
   Summary = Data.define(:window_size, :favourable, :too_hard_latest3, :newest_result_on)
 
   def self.for(user)
-    proposal(levels: user.kind_rungs, locked: user.locked_section_kinds,
-             results: Evidence.for(user).results, cutoffs: user.level_suggestion_cutoffs)
+    proposal(levels: user.kind_rungs, locked: user.locked_section_kinds, results: Evidence.for(user).results,
+             cutoffs: user.level_suggestion_cutoffs, pooled: pooled_kinds(user))
   end
 
-  def self.proposal(levels:, locked:, results:, cutoffs:)
-    new(levels: levels, locked: locked, results: results, cutoffs: cutoffs).proposal
+  def self.proposal(levels:, locked:, results:, cutoffs:, pooled: [])
+    new(levels: levels, locked: locked, results: results, cutoffs: cutoffs, pooled: pooled).proposal
   end
+
+  def self.pooled_kinds(user) = ExerciseSection.keys - DailyKinds.for(user).map(&:key)
 
   def self.summary(kind:, level:, results:, cutoffs:)
     new(levels: { kind => level }, locked: [], results: results, cutoffs: cutoffs).summary(kind)
@@ -40,11 +45,13 @@ class LevelSuggestion
     nil
   end
 
-  def initialize(levels:, locked:, results:, cutoffs:)
+  def initialize(levels:, locked:, results:, cutoffs:, pooled: [])
     @levels = levels
     @locked = locked
     @results = results
     @cutoffs = cutoffs
+    @pooled = ExerciseSection.keys & pooled
+    @pooled_windows = {}
   end
 
   def proposal
@@ -83,9 +90,24 @@ class LevelSuggestion
     at_level = evidence(key)
     window = at_level.first(WINDOW)
     too_hard = at_level.first(VETO_WINDOW).count(&:too_hard?)
-    return unless window.size == WINDOW && window.count(&:ai_favourable?) >= FAVOURABLE_NEEDED && too_hard < VETO_TOO_HARD
+    return if too_hard >= VETO_TOO_HARD
+    return step(key, LADDER[rank + 1], at_level, too_hard) if window.size == WINDOW && window.count(&:ai_favourable?) >= FAVOURABLE_NEEDED
 
-    step(key, LADDER[rank + 1], at_level, too_hard)
+    pooled_step(key, LADDER[rank + 1], at_level, too_hard)
+  end
+
+  def pooled_step(key, to, at_level, too_hard)
+    return unless @pooled.include?(key)
+
+    window = pooled_window(@levels[key])
+    return unless window.passes? && window.carries?(key)
+
+    Step.new(kind: key, from: @levels[key], to: to, results_at_level: at_level.size,
+             favourable: window.favourable, too_hard: too_hard, pooled: true)
+  end
+
+  def pooled_window(level)
+    @pooled_windows[level] ||= PooledWindow.new(@pooled.select { |key| @levels[key] == level }.index_with { |key| evidence(key) })
   end
 
   # The engineer's too_hard proposes the move; AI ratings of solid or better on every one of them veto it.

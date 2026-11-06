@@ -31,7 +31,7 @@ class LevelSuggestionEvent < ApplicationRecord
   def self.dismissal_rows(user, kinds:, action:, results:, shown: {})
     levels = user.kind_rungs
     offered = kinds.all? { |kind| shown.key?(kind) } ? {} :
-      offered_moves(levels, user.locked_section_kinds, results, user.level_suggestion_cutoffs)
+      offered_moves(user, levels, results)
     kinds.map do |kind|
       { kind: kind, action: action, from_level: levels[kind], to_level: shown.fetch(kind) { offered[kind] },
         **evidence(kind, levels[kind], results, user.level_suggestion_cutoffs) }
@@ -49,8 +49,9 @@ class LevelSuggestionEvent < ApplicationRecord
     shown[kind] == rung ? "suggestion" : "setup_edit"
   end
 
-  def self.offered_moves(levels, locked, results, cutoffs)
-    proposal = LevelSuggestion.proposal(levels: levels || {}, locked: locked || [], results: results, cutoffs: cutoffs)
+  def self.offered_moves(user, levels, results)
+    proposal = LevelSuggestion.proposal(levels: levels || {}, locked: user.locked_section_kinds || [], results: results,
+                                        cutoffs: user.level_suggestion_cutoffs, pooled: LevelSuggestion.pooled_kinds(user))
     (proposal&.steps || []).to_h { |step| [ step.kind, step.to ] }
   end
 

@@ -1,6 +1,6 @@
 class LevelSuggestion
   class Evidence
-    # Bounds reads only; skipped and eased sections don't count, so a rare kind may never fill a window.
+    # Bounds reads only; skipped and eased sections don't count, so a rare kind may never fill its own window.
     RESPONSE_WINDOW = 60
 
     attr_reader :results, :newest_date
