@@ -11,8 +11,9 @@ than by a job title. A choice posts `choose_track: true` with its level to
 keys, a level on the ladder, and `User#first_run?` still true, or a 422 that
 saves nothing. `User#choose_track` sets `skill_level` and `track_chosen_at`.
 No preset targets are written: since 2026-10-15 the generation prompt
-states every kind's level whether or not it has a target, so a target equal
-to the skill level would change nothing. **Senior is the highest level
+states every kind's level whether or not it has a target, so an equal target
+would change no generated rung that day, but would pin it during later track
+changes. **Senior is the highest level
 suggestions reach; principal engineer is set by hand in Setup**, and both
 pages say so.
 
@@ -62,9 +63,8 @@ per-kind levels where more practice is needed. The weakest kind must not
 hold back every other kind, and success in one kind must not make all
 others harder. How to protect an untargeted kind that currently follows
 the baseline remains undecided. The manual target-preservation change in
-#720 is not implemented, and preserving explicit targets alone would not
-settle that untargeted-kind case. The current clearing behavior below must
-not be assumed to implement graduation's protection.
+#720 preserves explicit targets, which does not settle that untargeted-kind
+case or implement graduation's protection.
 
 Per-kind difficulty, overall graduation and Automatic daily workload size
 are separate decisions. The four-of-five rule approved in #715 concerns
@@ -122,27 +122,47 @@ implemented" above. In specs, `create_user_with_key` and
 `create_fake_provider_user` stand for accounts that chose a track; a first-run
 spec passes `track_chosen: false`.
 
-**Current track changes clear the targets the track now covers.**
-`TrackChange` is the one statement of the rule: an unlocked target equal to
-the old or the new level is cleared, so that kind follows the track again;
-every other target stays, including a locked one and, on a two-rung move,
-one between the two levels. `LevelChange#clear_track_targets` applies it in
-`ProfileUpdate`'s save, for a save that moves the track after the first
-choice, before the record is saved. So a skill-level-only save that clears
-targets also bumps the version, through `User`'s `before_save`, and an
-Exercise mix open in another tab gets the usual 409. A cleared kind whose rung
-moves gets a cutoff and a `skill_level_edit` event row, like any kind the
-skill level moved. Setup's track select saves through the same endpoint; the
-reply carries the preference state the Exercise mix adopts in place (the
-`profile-preferences:trackSaved` event) and one sentence naming the sections
-that kept their own level. Once presets stop being written, a target equal to
-the old level can't be told apart from one chosen on purpose, so a deliberate
-target at the old level is cleared too and only a lock protects it; that was
-decided on 2026-10-15. The approved direction in #720 supersedes that policy
-but is not yet implemented: manual changes will preserve explicit targets
-and locks, with an inline consequence preview and explicit Apply or Cancel.
-Until that work lands, Setup still autosaves and clears targets as described
-here. Graduation's preservation and interaction remain separately scoped.
+**Manual track changes preserve explicit targets and locks (#720).**
+A target equal to the old or new baseline is still an explicit choice:
+unlike an unset target, it must stay put during future track changes.
+The earlier clearing policy, adopted on 2026-10-15, is removed.
+`TrackChange` is a pure consequence calculation through `KindDifficulty`.
+It lists every registered kind that changes effective rung and every retained
+target with its lock status. It never writes settings.
+
+Selecting a track, including an edit before scripts connect, requests a
+read-only `POST /profile/track_preview` for the authenticated current user.
+Setup displays the server-rendered consequences with Apply and Cancel.
+An all-targeted account can still change its baseline without moving a kind;
+the preview explains that future kinds following the track use that baseline.
+Selecting an already-saved track is reported as such, never as a future move.
+Cancel restores only the latest confirmed saved track select and value row.
+Other settings retain their independent autosaves.
+
+Apply uses `PATCH /profile` with a closed `track_change` confirmation:
+`from`, `to`, and integer `preferences_version`. Under the existing user
+lock, `ProfileUpdate` validates its shape and destination, then compares
+both its baseline and version with the reloaded row before assignment.
+A baseline-only change does not bump the preference version, so comparing
+only that version would accept stale consequences. A 409 carries the current
+baseline, refreshes the preview and requires another explicit Apply.
+No retry replaces the old confirmation with newer values.
+Welcome retains its exact first-run Continue exception under the same lock.
+
+The preview waits for pending autosaves, including the Exercise mix's 400ms
+delay, and does not ignore failures from other settings. Selection, Cancel
+and mix edits invalidate earlier preview callbacks. Apply stays on the
+shared `exercise_mix` queue, with the existing pending-edit flush before it
+and newer-local-edit adoption after it. Saved labels change only when a
+server reply confirms the saved baseline. Failures remain visible; refreshing
+after a lost successful reply can confirm an already-saved track without
+another write.
+
+`LevelChange` records cutoffs and event rows only for actual effective-rung
+movements, with its existing first-choice and principal-rung cutoff rules.
+Preserved targets create no false movement, cutoff or event. Weights,
+exclusions and all other settings remain untouched. No bulk reset, graduation
+offer, or planner policy is added.
 
 **Existing accounts were told apart by a backfill, not a date.**
 `AddLearningTrackToUsers` added the nullable string and

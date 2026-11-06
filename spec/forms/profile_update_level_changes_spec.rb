@@ -10,7 +10,10 @@ RSpec.describe ProfileUpdate, "level changes", type: :model do
   around { |example| travel_to(Time.utc(2026, 10, 14, 3)) { example.run } }
 
   def save(account = user, steps: nil, **user_params)
-    described_class.new(account, ActionController::Parameters.new(user: user_params, level_suggestion_steps: steps)).save
+    confirmation = if user_params.key?(:skill_level) && !user_params[:choose_track]
+      { from: account.skill_level, to: user_params[:skill_level], preferences_version: account.section_kind_preferences_version }
+    end
+    described_class.new(account, ActionController::Parameters.new(user: user_params, level_suggestion_steps: steps, track_change: confirmation)).save
   end
 
   def move(changes)
@@ -262,30 +265,33 @@ RSpec.describe ProfileUpdate, "level changes", type: :model do
       create_user_with_key(email: "chosen@example.com", time_zone: "UTC").tap { |account| account.update!(**attrs) }
     end
 
-    it "clears targets at the old level and bumps the preferences version on a skill-level-only save" do
+    it "preserves targets at the old level without bumping the preferences version" do
       account = chosen(skill_level: "junior", section_kind_levels: preset)
       version = account.section_kind_preferences_version
 
       save(account, skill_level: "mid_level")
 
-      expect(account.reload.section_kind_levels).to eq({})
-      expect(account.section_kind_preferences_version).to eq(version + 1)
+      expect(account.reload.section_kind_levels).to eq(preset)
+      expect(account.section_kind_preferences_version).to eq(version)
+      expect(account.skill_level).to eq("mid_level")
+      expect(account.level_suggestion_cutoffs).to eq({})
+      expect(account.level_suggestion_events).to be_empty
     end
 
-    it "records a cutoff at the new rung and a skill_level_edit event for each cleared kind that moved" do
+    it "records cutoffs and skill_level_edit events only for untargeted kinds that moved" do
       account = chosen(skill_level: "junior", section_kind_levels: { "code_review" => "junior", "pattern" => "mid_level" })
 
       save(account, skill_level: "mid_level")
 
-      expect(account.reload.level_suggestion_cutoffs).to include(
-        "code_review" => { "level" => "mid_level", "through" => "2026-10-14" }
+      moved = ExerciseSection.keys - %w[code_review pattern]
+      expect(account.reload.level_suggestion_cutoffs).to eq(
+        moved.index_with { { "level" => "mid_level", "through" => "2026-10-14" } }
       )
-      events = account.level_suggestion_events.where(kind: "code_review")
-      expect(events.pluck(:source, :from_level, :to_level)).to eq([ [ "skill_level_edit", "junior", "mid_level" ] ])
-      expect(account.level_suggestion_events.where(kind: "pattern")).to be_empty
+      expect(account.level_suggestion_events.pluck(:kind, :source, :from_level, :to_level))
+        .to match_array(moved.map { |kind| [ kind, "skill_level_edit", "junior", "mid_level" ] })
     end
 
-    it "leaves the version alone when nothing is cleared" do
+    it "leaves the version alone for a baseline change with another target" do
       account = chosen(skill_level: "junior", section_kind_levels: { "pattern" => "senior" })
       version = account.section_kind_preferences_version
 

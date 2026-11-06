@@ -1,5 +1,11 @@
 # Difficulty targets and locks
 
+Manual track changes preserve every explicit target and lock, even at the
+old or new track baseline. An equal target still means staying at that level
+on the next track change; it is not the same choice as following the track.
+Setup previews the consequences before explicit Apply or Cancel. See
+`tracks.md` for the confirmation, queue and stale-state contracts.
+
 Since #718, the always-present baseline combines the shared rung standard
 with the kind's concrete expectation. Concept ladders refine it rather
 than replacing it. The interface, format constraints, measured prompt

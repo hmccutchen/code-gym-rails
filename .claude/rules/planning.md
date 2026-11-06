@@ -66,7 +66,9 @@ read it before changing that area.
 - **Difficulty targets and locks**
   (`docs/decisions/difficulty-targets-and-locks.md`): Per-kind level targets
   (`KindDifficulty::LEVELS`) and locks; an unset kind follows `skill_level`
-  through `KindDifficulty#rung_for`. A lock suppresses `(reduced)` easing and
+  through `KindDifficulty#rung_for`. Manual track changes preserve every
+  explicit target and lock, even a target equal to the old or new baseline.
+  A lock suppresses `(reduced)` easing and
   both rating adjustments, first exposure included. Targets and locks change
   prompt text only: `DailyPlan`, `ConceptMastery` and `User#concepts_*` never
   read `KindDifficulty`. `DailyPlan` rolls `code_review_files`

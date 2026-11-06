@@ -12,9 +12,10 @@ Every edit posts the whole mix, including
 `section_kind_preferences_version`. Two saves in flight would both post the
 version the first is about to move, and the second would 409 against its own
 predecessor. `saveStatus.queue` on the `exercise_mix` line is what prevents
-that, and Setup's track select saves on the same line: the queue sends one at
-a time and reads each save's version when it is sent, so the second
-save picks up the version the first stored.
+that, and Setup's explicit track Apply uses the same line. Mix saves read
+their version when sent. A track Apply instead keeps the displayed preview's
+confirmation unchanged: if an earlier mix save moved its version, the server
+refuses stale consequences and requires a fresh preview and explicit Apply.
 
 A 409 means another tab moved the version. The reply carries the server's
 whole current state, and `applyServerState` writes it back onto the controls
@@ -88,10 +89,11 @@ mix save.
 
 ## A track change saved elsewhere on the page
 
-`adoptTrackChange` takes the preference state Setup's track select received
-and applies it with `applyServerState`, the method a 409 already uses, so a
-cleared target shows "Your track (…)" and the version matches the server
-without a reload.
+`adoptTrackChange` takes the preference state Setup's track Apply received
+and applies it with `applyServerState`, the method a 409 already uses.
+Targets and locks survive track changes, and the reply still supplies current
+preferences and rungs without a reload. An already-saved preview uses the same
+path to recover a lost successful Apply reply.
 
 A mix edit can still be waiting to save when that reply arrives: the 400 ms
 delay, or a save queued behind another. Applying the reply alone would put the
@@ -108,10 +110,9 @@ the user touched since the track save started (`touchedSinceTrack`, recorded by
 the edit handlers through `touch`), even if it ended where it began: a level
 changed and then set back to the old one is a choice the reply must not clear. The reply is applied
 and only those fields are set back (`withEdits`). The rebase is per field, not
-per kind: moving a kind's weight must not bring back a level target the track
-change cleared on that kind. A lock the edit turns on also brings back the
-level it was ticked on: the user locked the level they saw, and the track
-change may have cleared it on the server meanwhile. A lock left without a
+per kind: moving a kind's weight must not overwrite an independently changed
+target. A lock the edit turns on also brings back the level it was ticked on:
+the user locked the level they saw. A lock left without a
 level after the merge is dropped, since the server refuses a lock on an
 untargeted kind. The pending
 save sends the result under the reply's version, and `saved` stays the reply's
@@ -122,7 +123,7 @@ level-suggestion step whose starting rung the track change moved. Otherwise
 the pending save would post a step the server no longer recognizes and get a
 409.
 
-The track select saves on this controller's queue line (`line:` in
+The track Apply saves on this controller's queue line (`line:` in
 `code_gym/save_status`). Just before it queues its save it dispatches
 `profile-preferences:trackSaving`, which runs `holdForTrackSave`. That does two
 things.
@@ -150,21 +151,20 @@ as it is then (`frozenState`, through `withEdits`), and the version and the
 shown suggestions are read then too. So an edit made after the track change
 cannot ride in the save that goes out ahead of it. This needs the mix to be
 connected when the track save starts; an edit typed before the mix module loaded
-goes out after the track save instead, through `adoptEarlyEdit`.
+is adopted through `adoptEarlyEdit`; the preview waits for pending early edits.
 A mix save queued after the track save is not frozen, since it has to read the
-form once the track reply has been applied, or it would send targets the track
-change cleared. Edits are saved in
+form once the track reply has been applied. Edits are saved in
 the order the user made them: a lock set just before a track change reaches the
-server first, so `TrackChange` keeps the target it protects, and a target picked
+server first, and a target picked
 after the track change, while earlier saves are still queued, stays out of the
 pre-track save. That later edit still differs from `saved` when the track
 reply arrives, so the rebase keeps it.
 
 The rebase
 above is for what is left: an edit made while the track save is in flight, and
-an edit made before both controllers connected when `profile-preferences`
-connected first and saved the track from its `connect` before this controller
-was listening. A track reply that arrived before this controller connected at
+an edit made before a delayed controller connected. Track selection in
+`connect` now only previews, and waits for pending edits. A track reply that
+arrived before this controller connected at
 all is kept in `code_gym/track_reply`, and `connect` takes and adopts it,
 treating an edit made before connect as unsent. Connect order follows module load order, so either can come
 first; when this controller connects first, `adoptEarlyEdit` has already set
@@ -192,10 +192,18 @@ posts the pair the page was rendered for (`layout`, from
 `layout_changed`. The controller reloads when it is true and never compares
 pairs itself; otherwise it re-syncs the controls as before.
 
-The reply arrives while a skill level change may still wait behind it on the
-`exercise_mix` line, so the reload goes through `saveStatus.reloadWhenSaved`
-and happens only once that save has landed. If that save fails, or is still
-running after ten seconds, the banner shows `exercise_mix.layout_stranded` and
-the user reloads. `reloading` keeps a second refused save from starting a second wait,
-and clears when the banner shows, so a later conflict in the same tab starts
-a new wait.
+The reload goes through `saveStatus.reloadWhenSaved`, which waits for every
+pending save, including independent controls such as time zone. A confirmed
+track Apply shares the `exercise_mix` line, so a mix edit made during Apply
+cannot send or trigger a layout reload before the Apply reply is handled.
+If a save fails, or is still running after ten seconds, the banner shows
+`exercise_mix.layout_stranded` and the page stays. `reloading` keeps a second
+refused save from starting a second wait, and clears when the banner shows,
+so a later conflict in the same tab starts a new wait.
+
+Selecting a track alone is no longer a queued write. If a pending mix save
+gets a layout conflict before that selection can preview, the reload cannot
+apply the proposed track: the new page shows the saved baseline. A failed
+explicit Apply instead leaves a `skill_level` save error and the proposed
+selection on the page. Cancel clears that error and lets an already-held
+layout reload resume when the other saves are clean.

@@ -1,77 +1,48 @@
 # app/javascript/controllers/profile_preferences_controller.js
 
-## What it owns
+## Independent controls
 
-Setup's three standalone preference controls: the time zone select, the Daily
-sections radio group, and the Track select (`skill_level`). Each one PATCHes
-`/profile` on change.
+Time zone still autosaves through `PATCH /profile`, with its own error key.
+Daily sections and Display keep their existing controllers and autosaves.
+Track selection only previews; this includes edits made before connect.
+Only explicit Apply writes the proposed track. Cancel restores the latest
+server-confirmed saved selection and tells the existing value-row controller
+to refresh its label; no Exercise mix values are restored.
 
-## One key per control, one URL for all of them
+## One preview sequence
 
-Every control sends to the same path, so the save key is what tells them
-apart in the save banner. A shared key would let one control's success clear
-another's warning, which is why `queueSave` takes the key from the caller
-rather than deriving it from the URL.
+Selection, Cancel, disconnect and delegated input/change events from mix
+controls invalidate earlier previews. Before requesting one, the controller
+lets sibling controllers connect, then awaits `saveStatus.settled`, including
+the mix's pending 400ms edit probe. It ignores only its own `track_preview`
+and `skill_level` error keys. An unrelated unsaved-setting error blocks
+preview rather than being erased.
 
-## Why the skill-level label is rewritten here
+Previews use the shared request queue with their own error key on the
+`exercise_mix` line. Both the queued payload and the reply check the sequence.
+Obsolete callbacks cannot send a queued preview, display consequences,
+report a failure or enable Apply. No second debounce interval is used.
+The server renders the consequences and decides whether the track is already
+saved. The browser does not calculate rung changes.
 
-Each difficulty fieldset shows "Your track (Junior)" as its
-default option. That text names the stored skill level, so changing the level
-leaves every one of those labels stale until the page reloads. The controller
-rewrites them from `labelTemplateValue`, whose `__LEVEL__` placeholder the
-server renders once. It rewrites them only after the save succeeds, so a
-refused save never leaves the page claiming a level that was not stored.
+## Apply keeps the displayed confirmation
 
-The labels are found with a document-wide query rather than a target, because
-they are rendered by `api_keys/_difficulty_controls`, which sits inside the
-exercise-mix controller's element and so cannot carry this controller's
-targets.
+Apply captures the displayed from/to/version without replacing its version.
+It starts `track_reply`, dispatches `trackSaving` to flush/freeze relevant
+pending mix edits, then queues the write on the same `exercise_mix` line.
+The established mix reply adoption retains newer local edits and settles
+Prepare AI guidance. Selection and Cancel are disabled during the write.
+Focus returns to the select when disabling/hiding the original control loses
+it, but another control the user focused is left alone.
 
-## An edit made before the modules load
+A stale Apply adopts the response's actual saved baseline, refreshes the
+preview and requires another explicit Apply. It never retries the write.
+An ordinary failure leaves the proposal unconfirmed with Refresh preview and
+Cancel available. Refresh can recover a lost successful reply: an
+already-saved preview hands its confirmed preference state through the same
+`track_reply` / `trackSaved` adoption path without another write.
 
-Time zone and Skill level are server-rendered and nothing is
-bound until `connect()`, which waits on the deferred module graph. So
-`connect()` compares each control with what the server rendered — the
-default-selected option for a select — and queues the save the missing
-listener would have sent. Daily sections does the same in its own
-controller (`daily_sections_controller`). Without it
-the choice sits on screen unsaved until the user touches the control again.
-
-## A track change hands the Exercise mix the saved state
-
-A track change can clear targets (`TrackChange`) and bump the preference
-version, so the Exercise mix's radios and version would otherwise be stale and
-its next save refused. The reply carries the same preference state a 409 sends,
-and this controller dispatches it, with the reply's `kind_rungs`, as
-`profile-preferences:trackSaved` on the document, which the Exercise mix's element listens for. It also tells
-`code_gym/track_reply` when a track save starts and finishes, with the reply on
-success, for a mix that has not connected yet. A reply without preference
-state, such as a 200 from a proxy page that is not JSON, counts as a failure, so
-the in-flight count always comes back down. The track save goes on
-the mix's queue line (`line: "exercise_mix"`), so it and a mix save never
-travel together and the mix never posts the version the track change moved
-past. Just before queueing, it dispatches `profile-preferences:trackSaving`,
-so the mix sends any edit still inside its delay first and the two land in the
-order the user made them. A failed track save dispatches
-`profile-preferences:trackFailed` instead, so the mix can settle its prepare
-button. An event rather than a
-reach into the other controller keeps each controller's state its own. The
-reply's `kept_own_level` sentence, written by the server, fills the status line
-under the select; it is empty when no target was kept.
-
-## One track save at a time
-
-`saveSkillLevel` disables the Track select until its save finishes, success or
-failure. If the select had focus and focus is still on the page body when the
-save ends, it gets focus back; a user who moved to another control meanwhile
-keeps their place. `autocomplete="off"` stops a browser that restores form state
-on reload from bringing the select back disabled. Two track changes in flight
-at once let a mix save frozen by the second one go out after the first track
-reply, carrying a target that reply had cleared; each fix for that case opened
-another. With one track save at a time, every frozen mix save goes out ahead of
-the track save that froze it. The cost is that the select cannot be changed for
-the length of one save: a second arrow key pressed during it does nothing.
-
-The guarantee depends on `sendTrack` dispatching `trackSaving` before it calls
-`queueSave`, so the mix's frozen saves are on the queue line first. Keep that
-order.
+“Your track (...)” labels always name the last server-confirmed baseline,
+including one saved in another tab. The select's value row names the proposed
+choice while the preview is open. Failures use the request result's message
+and remain visible; a lost reply is not described as proof nothing saved.

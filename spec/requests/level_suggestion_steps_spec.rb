@@ -10,6 +10,13 @@ RSpec.describe "Level suggestion steps the card showed", type: :request do
 
   def step(kind, from, to) = { kind: kind, from: from, to: to }
 
+  def change_track(level)
+    post profile_track_preview_path, params: { user: { skill_level: level } }.to_json, headers: json
+    confirmation = response.parsed_body.fetch("track_change")
+    patch profile_path, params: { user: { skill_level: level }, track_change: confirmation }.to_json, headers: json
+    expect(response).to have_http_status(:ok)
+  end
+
   def apply(levels, steps, version: user.reload.section_kind_preferences_version)
     patch profile_path, params: {
       user: { section_kind_levels: levels, section_kind_preferences_version: version },
@@ -33,7 +40,7 @@ RSpec.describe "Level suggestion steps the card showed", type: :request do
     end
 
     it "refuses a step whose level changed since the card was shown, saving nothing" do
-      patch profile_path, params: { user: { skill_level: "senior" } }.to_json, headers: json
+      change_track("senior")
       user.level_suggestion_events.delete_all
       cutoffs = user.reload.level_suggestion_cutoffs
 
@@ -166,7 +173,7 @@ RSpec.describe "Level suggestion steps the card showed", type: :request do
         original.call(*args, &block)
       end
 
-      patch profile_path, params: { user: { skill_level: "mid_level" } }.to_json, headers: json
+      change_track("mid_level")
 
       expect(response).to have_http_status(:ok)
       cutoffs = user.reload.level_suggestion_cutoffs

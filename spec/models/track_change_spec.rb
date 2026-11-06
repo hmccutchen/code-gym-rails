@@ -5,46 +5,39 @@ RSpec.describe TrackChange do
     described_class.new(levels: levels, locked: locked, from: from, to: to)
   end
 
-  it "clears unlocked targets at the old level and at the new level" do
-    result = change({ "code_review" => "junior", "pattern" => "mid_level" })
+  it "retains explicit targets at the old, new and other rungs, with their locks" do
+    levels = { "code_review" => "junior", "pattern" => "mid_level", "challenge" => "senior" }.freeze
+    [ [], levels.keys ].each do |locked|
+      result = change(levels, locked: locked.freeze)
 
-    expect(result.levels).to eq({})
-    expect(result.cleared).to contain_exactly("code_review", "pattern")
+      expect(result.retained).to match_array(levels.map { |kind, level| { kind: kind, level: level, locked: locked.include?(kind) } })
+      expect(result.changed.map { |move| move[:kind] }).to match_array(ExerciseSection.keys - levels.keys)
+      expect(result.changed).to all(include(from: "junior", to: "mid_level"))
+    end
   end
 
-  it "keeps a target above the new level and one below the old level" do
-    result = change({ "pattern" => "senior", "challenge" => "junior" }, from: "mid_level", to: "senior")
-
-    expect(result.levels).to eq("challenge" => "junior")
-    expect(result.cleared).to eq([ "pattern" ])
-
-    upward = change({ "pattern" => "senior", "challenge" => "junior" }, from: "junior", to: "mid_level")
-    expect(upward.levels).to eq("pattern" => "senior")
+  it "uses all registered kinds and preserves targets on downward and principal moves" do
+    levels = { "pattern" => "mid_level", "architecture" => "principal_engineer" }
+    [ [ "senior", "junior" ], [ "senior", "principal_engineer" ] ].each do |from, to|
+      result = change(levels, from: from, to: to)
+      expect(result.changed).to match_array((ExerciseSection.keys - levels.keys).map { |kind| { kind: kind, from: from, to: to } })
+      expect(result.retained.map { |target| target[:level] }).to match_array(levels.values)
+    end
   end
 
-  it "keeps a locked target at the old level" do
-    result = change({ "code_review" => "junior", "pattern" => "junior" }, locked: [ "code_review" ])
+  it "distinguishes a baseline-only change from a track already saved" do
+    targets = ExerciseSection.keys.index_with { "junior" }
+    result = change(targets)
 
-    expect(result.levels).to eq("code_review" => "junior")
-    expect(result.cleared).to eq([ "pattern" ])
+    expect(result.changed).to be_empty
+    expect(result).not_to be_already_saved
+    expect(change(targets, to: "junior")).to be_already_saved
   end
 
-  it "keeps a target between the two levels on a two-rung move" do
-    result = change({ "code_review" => "junior", "pattern" => "mid_level", "challenge" => "senior" },
-                    from: "junior", to: "senior")
+  it "uses KindDifficulty's normalization for historical invalid targets and orphaned locks" do
+    result = change({ "pattern" => "unknown" }, locked: [ "pattern" ])
 
-    expect(result.levels).to eq("pattern" => "mid_level")
-  end
-
-  it "works the same way on a move down" do
-    result = change({ "code_review" => "senior", "pattern" => "mid_level", "challenge" => "junior" },
-                    from: "senior", to: "mid_level")
-
-    expect(result.levels).to eq("challenge" => "junior")
-  end
-
-  it "leaves principal engineer targets alone unless the move reaches principal" do
-    expect(change({ "architecture" => "principal_engineer" }).levels).to eq("architecture" => "principal_engineer")
-    expect(change({ "architecture" => "principal_engineer" }, from: "senior", to: "principal_engineer").levels).to eq({})
+    expect(result.retained).to be_empty
+    expect(result.changed).to include(kind: "pattern", from: "junior", to: "mid_level")
   end
 end

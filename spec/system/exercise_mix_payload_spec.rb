@@ -4,12 +4,15 @@ RSpec.describe "Exercise mix request bodies", type: :system do
   let(:user) { create_fake_provider_user }
   let(:layout) { %w[code_review design_comparison] }
 
-  def record_requests_to(path)
+  def record_profile_requests
     page.execute_script(<<~JS)
       window.__bodies = [];
+      window.__previews = [];
       const passThrough = window.fetch;
       window.fetch = (url, options) => {
-        if (new URL(String(url), location.href).pathname === #{path.to_json}) window.__bodies.push(JSON.parse(options.body));
+        const path = new URL(String(url), location.href).pathname;
+        if (path === #{profile_path.to_json}) window.__bodies.push(JSON.parse(options.body));
+        if (path === #{profile_track_preview_path.to_json}) window.__previews.push(JSON.parse(options.body));
         return passThrough(url, options);
       };
     JS
@@ -23,11 +26,11 @@ RSpec.describe "Exercise mix request bodies", type: :system do
     wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
   end
 
-  it "sends the same mix and track payloads as before the restyle" do
+  it "keeps the mix payloads and sends the displayed confirmation only on explicit track Apply" do
     visit_as(user)
     visit setup_path
     find("#exercise-mix summary").click
-    record_requests_to(profile_path)
+    record_profile_requests
 
     find("#weight-challenge").set(0)
     settle
@@ -39,9 +42,6 @@ RSpec.describe "Exercise mix request bodies", type: :system do
     settle
     find(".mix-difficulty[data-kind='code_review'] input[value='']").click
     settle
-    find("#skill-level", visible: :all).select("Junior", visible: :all)
-    settle
-
     mix = lambda do |weights, excluded, levels, locked|
       {
         "user" => {
@@ -53,13 +53,32 @@ RSpec.describe "Exercise mix request bodies", type: :system do
         "layout" => layout
       }
     end
-    expect(bodies_without_version).to eq([
+    expected_mix = [
       mix.({ "challenge" => 0.25 }, [], {}, []),
       mix.({ "challenge" => 0.25 }, %w[challenge], {}, []),
       mix.({ "challenge" => 0.25 }, %w[challenge], { "code_review" => "senior" }, []),
       mix.({ "challenge" => 0.25 }, %w[challenge], { "code_review" => "senior" }, %w[code_review]),
-      mix.({ "challenge" => 0.25 }, %w[challenge], {}, []),
-      { "user" => { "skill_level" => "junior" } }
+      mix.({ "challenge" => 0.25 }, %w[challenge], {}, [])
+    ]
+    expect(bodies_without_version).to eq(expected_mix)
+    saved = user.reload.attributes
+    find("#skill-level", visible: :all).select("Senior", visible: :all)
+    expect(page).to have_button("Apply track", disabled: false)
+
+    expect(page.evaluate_script("window.__previews")).to eq([ { "user" => { "skill_level" => "senior" } } ])
+    expect(bodies_without_version).to eq(expected_mix)
+    expect(user.reload.attributes).to eq(saved)
+
+    click_button "Apply track"
+    expect(page).to have_no_button("Apply track")
+    settle
+
+    expect(bodies_without_version).to eq(expected_mix + [
+      { "user" => { "skill_level" => "senior" },
+        "track_change" => { "from" => saved["skill_level"], "to" => "senior",
+                            "preferences_version" => saved["section_kind_preferences_version"] } }
     ])
+    expect(user.reload).to have_attributes(skill_level: "senior", section_kind_weights: { "challenge" => 0.25 },
+                                           excluded_section_kinds: %w[challenge], section_kind_levels: {}, locked_section_kinds: [])
   end
 end

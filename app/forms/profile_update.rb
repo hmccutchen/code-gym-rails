@@ -9,6 +9,7 @@ class ProfileUpdate
   PREFERENCE_KEYS = %i[section_kind_weights excluded_section_kinds section_kind_levels locked_section_kinds].freeze
   LOCKED_KEYS = %i[choose_track skill_level section_kind_levels daily_section_kinds].freeze
   TRACK_CHOICE_KEYS = %w[choose_track skill_level].freeze
+  TRACK_CONFIRMATION_KEYS = %w[from to preferences_version].freeze
   WHOLE_NUMBER = /\A\d+\z/
 
   def initialize(user, params)
@@ -108,6 +109,9 @@ class ProfileUpdate
   def save_under_lock
     @user.with_lock do
       next Outcome.of(:invalid, error: "That track choice isn't available.") if invalid_track_choice?
+      next Outcome.of(:invalid, error: full_rule(:skill_level, User::SKILL_LEVEL_RULE)) if invalid_skill_level?
+      next Outcome.of(:invalid, error: I18n.t("tracks.stale_page")) if manual_track? && !@params.key?(:track_change)
+      next Outcome.of(:invalid, error: I18n.t("tracks.preview.invalid_confirmation")) if invalid_track_confirmation?
       next Outcome.of(:stale, layout_changed: layout_moved?) if stale?
       next Outcome.of(:invalid, error: I18n.t("level_suggestion.card.invalid_steps")) if unsaved_shown_step?
 
@@ -118,6 +122,27 @@ class ProfileUpdate
 
   def track_choice? = posted?(:choose_track)
 
+  def invalid_skill_level? = posted?(:skill_level) && User::SKILL_LEVELS.exclude?(@user_params[:skill_level])
+
+  def manual_track? = posted?(:skill_level) && !track_choice?
+
+  def invalid_track_confirmation?
+    return false unless manual_track?
+
+    value = @params[:track_change]
+    return true unless value.is_a?(ActionController::Parameters) && value.keys.sort == TRACK_CONFIRMATION_KEYS.sort
+
+    User::SKILL_LEVELS.exclude?(value[:from]) || User::SKILL_LEVELS.exclude?(value[:to]) ||
+      value[:to] != @user_params[:skill_level] || !value[:preferences_version].is_a?(Integer) || value[:preferences_version].negative?
+  end
+
+  def stale_track_confirmation?
+    return false unless manual_track?
+
+    value = @params[:track_change]
+    value[:from] != @user.skill_level || value[:preferences_version] != @user.section_kind_preferences_version
+  end
+
   def invalid_track_choice?
     return false unless track_choice?
 
@@ -127,7 +152,8 @@ class ProfileUpdate
 
   def stale?
     posted = @user_params[:section_kind_preferences_version]
-    (!posted.nil? && posted.to_s != @user.section_kind_preferences_version.to_s) || moved_since_shown? || layout_moved?
+    (!posted.nil? && posted.to_s != @user.section_kind_preferences_version.to_s) ||
+      stale_track_confirmation? || moved_since_shown? || layout_moved?
   end
 
   def moved_since_shown?
@@ -151,7 +177,6 @@ class ProfileUpdate
       @user.assign_attributes(profile_attributes)
       next false unless @user.valid?
 
-      level_change.clear_track_targets
       level_change.record_cutoffs
       @user.save && level_change.write_events
     end

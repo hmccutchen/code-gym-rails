@@ -312,7 +312,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(errors).to be_empty
   end
 
-  it "keeps a mix edit made while the modules load when the track change made beside it saves first" do
+  it "saves a pre-connect mix edit before previewing the track chosen beside it" do
     user.update_columns(skill_level: "junior", section_kind_levels: { "challenge" => "junior", "pattern" => "senior" })
     watch_page_errors
     visit_as(user)
@@ -330,13 +330,16 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       JS
     end
 
-    wait_for { user.reload.skill_level == "mid_level" && user.section_kind_weights == { "challenge" => 0.25 } }
+    expect(page).to have_button("Apply track", disabled: false)
+    expect(user.reload).to have_attributes(skill_level: "junior", section_kind_weights: { "challenge" => 0.25 })
+    click_button "Apply track"
+    wait_for { user.reload.skill_level == "mid_level" }
     expect(user.reload).to have_attributes(skill_level: "mid_level", section_kind_weights: { "challenge" => 0.25 },
-                                           section_kind_levels: { "pattern" => "senior" })
+                                           section_kind_levels: { "challenge" => "junior", "pattern" => "senior" })
     expect(errors).to be_empty
   end
 
-  it "has a late-loading Exercise mix adopt a track change saved before it connected" do
+  it "keeps a late-loading Exercise mix's targets through preview and explicit Apply" do
     user.update_columns(skill_level: "junior", section_kind_levels: { "challenge" => "junior", "pattern" => "senior" })
     watch_page_errors
     visit_as(user)
@@ -355,11 +358,14 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
         })()
       JS
     end
+    expect(page).to have_button("Apply track", disabled: false)
+    expect(user.reload.skill_level).to eq("junior")
+    click_button "Apply track"
     wait_for { user.reload.skill_level == "mid_level" }
-    expect(user.reload.section_kind_levels).to eq("pattern" => "senior")
+    expect(user.reload.section_kind_levels).to eq("challenge" => "junior", "pattern" => "senior")
 
     find("#exercise-mix summary").click
-    expect(page).to have_css(".mix-difficulty[data-kind='challenge'] input[type=radio][value='']:checked", visible: :all)
+    expect(page).to have_css(".mix-difficulty[data-kind='challenge'] input[type=radio][value='junior']:checked", visible: :all)
     find(".mix-difficulty[data-kind='challenge'] input[value='senior']").click
 
     wait_for { user.reload.section_kind_levels["challenge"] == "senior" }
@@ -368,7 +374,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(errors).to be_empty
   end
 
-  it "holds Prepare AI guidance when the Exercise mix connects while a track save is still in flight" do
+  it "holds Prepare AI guidance during Apply after the Exercise mix loads late" do
     user.update_columns(skill_level: "junior", section_kind_levels: { "challenge" => "junior", "pattern" => "senior" })
     watch_page_errors
     visit_as(user)
@@ -376,10 +382,6 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     expect(page).to have_css("#mix-ladder-preparation:not([hidden])", visible: :all)
     url = page.current_url
     stalled[:controller] = "exercise_mix_controller"
-    allow_any_instance_of(ProfileController).to receive(:update).and_wrap_original do |original, *args|
-      sleep 5 if original.receiver.params.dig(:user, :skill_level)
-      original.call(*args)
-    end
 
     page.driver.with_playwright_page do |pw|
       pw.goto(url, waitUntil: "domcontentloaded")
@@ -395,14 +397,27 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     wait_for { page.evaluate_script(mix_connected) }
     expect(page.evaluate_script(mix_connected)).to be(true)
     expect(user.reload.skill_level).to eq("junior")
+    expect(page).to have_button("Apply track", disabled: false)
+    page.execute_script(<<~JS)
+      const send = window.fetch;
+      window.fetch = (url, options) => {
+        if (url.endsWith("/profile") && JSON.parse(options.body).user.skill_level) {
+          return new Promise(resolve => { window.releaseTrack = () => resolve(send(url, options)); });
+        }
+        return send(url, options);
+      };
+    JS
+    click_button "Apply track"
+    wait_for_js_condition("typeof window.releaseTrack === 'function'")
     expect(page).to have_css("#mix-ladder-preparation button[disabled]", visible: :all)
 
+    page.execute_script("window.releaseTrack()")
     wait_for { user.reload.skill_level == "mid_level" }
     expect(page).to have_css("#mix-ladder-preparation button:not([disabled])", visible: :all)
     expect(errors).to be_empty
   end
 
-  it "saves a Setup preference chosen while the modules are still loading" do
+  it "previews a track chosen before connect and waits for explicit Apply" do
     watch_page_errors
     visit_as(user)
     visit setup_path
@@ -418,6 +433,9 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       JS
     end
 
+    expect(page).to have_button("Apply track", disabled: false)
+    expect(user.reload.skill_level).to eq("junior")
+    click_button "Apply track"
     wait_for { user.reload.skill_level == "senior" }
     expect(user.reload.skill_level).to eq("senior")
     expect(errors).to be_empty

@@ -8,14 +8,6 @@ class LevelChange
     @cutoffs_before = user.level_suggestion_cutoffs_in_database || {}
   end
 
-  def clear_track_targets
-    return if @first_choice || !@user.skill_level_changed?
-
-    @track_change = TrackChange.new(levels: @user.section_kind_levels, locked: @user.locked_section_kinds,
-                                    from: @before[:skill_level], to: @user.skill_level)
-    @user.section_kind_levels = @track_change.levels
-  end
-
   def record_cutoffs
     return if @first_choice
 
@@ -36,7 +28,7 @@ class LevelChange
       @user,
       before: @before,
       after: { levels: @user.section_kind_levels, skill_level: @user.skill_level },
-      shown: @shown, cutoffs: @cutoffs_before, cleared: @track_change&.cleared || []
+      shown: @shown, cutoffs: @cutoffs_before
     ))
     true
   end

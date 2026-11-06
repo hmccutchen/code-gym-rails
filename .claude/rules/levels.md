@@ -38,9 +38,12 @@ read it before changing that area.
   (`User#first_run?`: no `track_chosen_at` and no exercise);
   `PATCH /profile` with `choose_track` checks exactly two keys and a
   `LevelSuggestion::LADDER` level under the user-row lock, else 422.
-  `TrackChange` is the one rule for which unlocked targets a track change
-  clears. `ProfileUpdate` applies it, records cutoffs and writes event rows
-  through `LevelChange`, in that order and in one transaction, before and
+  `TrackChange` previews effective-rung changes through `KindDifficulty`,
+  retaining every explicit target and lock, including either baseline.
+  Selection only previews; Apply posts a closed from/to/preferences-version
+  confirmation to `PATCH /profile`, checked under the user lock. Cancel
+  restores only the saved track control. `ProfileUpdate` records cutoffs and
+  writes event rows through `LevelChange`, in one transaction, before and
   after the save; `User` has no level callbacks, so a save outside
   `ProfileUpdate` records none. Suggestions never reach principal
   engineer. `track_chosen_at` is a flag, not a clock. `users.learning_track`
@@ -54,8 +57,8 @@ read it before changing that area.
   seniority. The established "Suggest level changes" opt-out also covers
   future graduation offers. Breadth, thresholds, windows, eligibility, other
   presentation details and protection for untargeted kinds remain open.
-  #720's manual target-preservation policy is also not implemented; current
-  `TrackChange` clearing is not graduation protection.
+  #720 preserves explicit targets on manual changes; protecting an easier
+  untargeted kind during graduation still needs its own decision.
 - **Level suggestions** (`docs/decisions/level-suggestions.md`): One-rung
   level proposals per section kind on the submitted dashboard; nothing moves
   without an explicit Apply. `LevelSuggestion` reads only answered, un-eased,
@@ -72,6 +75,8 @@ read it before changing that area.
   only from Setup's Track select and the welcome page through `PATCH
   /profile`, which 422s anything outside the list. It sets the rung of every
   untargeted kind and never changes automatically. Under the user-row lock it
-  clears targets per `TrackChange` and gives every kind it moves a cutoff and
-  a `skill_level_edit` event row; it bumps `section_kind_preferences_version`
-  only when it clears a target.
+  preserves all targets and gives every kind it actually moves a cutoff and
+  a `skill_level_edit` event row. A baseline-only change does not bump
+  `section_kind_preferences_version`, so Apply checks the confirmed baseline
+  as well as that version. A stale Apply refreshes the preview and requires
+  another explicit Apply; it never retries the write automatically.

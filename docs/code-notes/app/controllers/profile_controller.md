@@ -8,11 +8,27 @@ form's outcome to a status and renders the reply bodies below.
 
 The response includes `section_kind_preferences_version`, `kind_rungs` and the
 ladder preparation only when the request touched a preference or the track,
-so the body every other caller receives is unchanged. A track change can clear
-targets (`TrackChange`), so its reply also carries the saved levels and locks
-and `kept_own_level`: Setup hands them to the Exercise mix so its radios and
-version match the server without a reload, and names the sections that kept
-their own level.
+so the body every other caller receives is unchanged. A track reply carries
+the actual saved `skill_level`, preference state and `kept_own_level`.
+Setup hands them to the Exercise mix without discarding newer local edits.
+The conflict response also includes the current baseline because a baseline
+change alone does not increment the preference version.
+
+## Read-only preview
+
+`POST /profile/track_preview` accepts a user object containing only a valid
+`skill_level`. It uses the authenticated `current_user` snapshot, never a
+posted user ID, and builds `TrackChange` without assignment or persistence.
+The response contains the rendered `api_keys/_track_preview` partial and
+the from/to/version confirmation. It also supplies the saved baseline and
+preferences for recovery when an earlier successful reply was lost.
+An already-saved preview explicitly says so and performs no second write.
+
+Both the inline consequences and `kept_own_level` use `TrackChange#retained`,
+whose targets and effective locks come from `KindDifficulty`. Unsupported
+historical targets, their ineffective locks and retired-kind entries are not
+described as retained. The raw stored columns remain untouched by preview or
+Apply; this is read normalization, not a cleanup.
 
 ## The 409 and track replies send only exclusions Setup shows
 

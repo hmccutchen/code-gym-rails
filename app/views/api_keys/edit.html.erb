@@ -5,6 +5,13 @@
 
 <div class="phone-page settings-page" data-controller="profile-preferences"
      data-profile-preferences-url-value="<%= profile_path %>"
+     data-profile-preferences-preview-url-value="<%= profile_track_preview_path %>"
+     data-profile-preferences-loading-text-value="<%= t("tracks.preview.loading") %>"
+     data-profile-preferences-unsaved-text-value="<%= t("tracks.preview.unsaved") %>"
+     data-profile-preferences-waiting-text-value="<%= t("tracks.preview.waiting") %>"
+     data-profile-preferences-stale-text-value="<%= t("tracks.preview.stale") %>"
+     data-profile-preferences-saving-text-value="<%= t("tracks.preview.saving") %>"
+     data-profile-preferences-unconfirmed-text-value="<%= t("tracks.preview.unconfirmed") %>"
      data-profile-preferences-label-template-value="<%= t("exercise_mix.level_default", skill_level: "__LEVEL__") %>">
   <h1><%= t("api_keys.edit.heading") %></h1>
 
@@ -79,7 +86,7 @@
     <%= render "api_keys/daily_sections" %>
 
     <% skill_level_options = User::SKILL_LEVELS.map { |level| [ t("exercise_mix.levels.#{level}"), level ] } %>
-    <div class="value-row" data-controller="value-row">
+    <div class="value-row" data-controller="value-row" data-action="profile-preferences:trackRestored->value-row#show">
       <label for="skill-level"><%= t("api_keys.edit.skill_level_label") %></label>
       <span class="value-row-value" aria-hidden="true" data-value-row-target="value"><%= skill_level_options.rassoc(current_user.skill_level)&.first %></span>
       <%= select_tag "skill_level",
@@ -89,11 +96,18 @@
     </div>
     <p class="card-note"><%= t("api_keys.edit.skill_level_hint") %></p>
     <p class="card-note" role="status" data-profile-preferences-target="keptOwnLevel"></p>
+    <div data-profile-preferences-target="trackPanel" hidden>
+      <p class="card-note" role="status" data-profile-preferences-target="trackStatus"></p>
+      <div data-profile-preferences-target="preview"></div>
+      <button type="button" class="btn btn-primary" data-profile-preferences-target="apply" data-action="profile-preferences#applyTrack" disabled><%= t("tracks.preview.apply") %></button>
+      <button type="button" class="btn btn-secondary" data-profile-preferences-target="cancel" data-action="profile-preferences#cancelTrack"><%= t("tracks.preview.cancel") %></button>
+      <button type="button" class="btn btn-secondary" data-profile-preferences-target="refresh" data-action="profile-preferences#refreshPreview"><%= t("tracks.preview.refresh") %></button>
+    </div>
   </section>
 
   <details class="card settings-fields" id="exercise-mix"<%= " open" if suggested_kinds.any? || show_level_suggestions? %>
            data-controller="exercise-mix"
-           data-action="profile-preferences:trackSaving@document->exercise-mix#holdForTrackSave profile-preferences:trackSaved@document->exercise-mix#adoptTrackChange profile-preferences:trackFailed@document->exercise-mix#settlePrepareButton"
+           data-action="profile-preferences:trackSaving@document->exercise-mix#holdForTrackSave profile-preferences:trackSaved@document->exercise-mix#adoptTrackChange profile-preferences:trackFailed@document->exercise-mix#settlePrepareButton input->profile-preferences#mixEdited change->profile-preferences#mixEdited"
            data-exercise-mix-url-value="<%= profile_path %>"
            data-exercise-mix-layout-value="<%= DailyKinds.for(current_user).map(&:key).to_json %>"
            data-exercise-mix-layout-stranded-text-value="<%= t("exercise_mix.layout_stranded") %>"

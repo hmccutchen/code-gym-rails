@@ -37,8 +37,9 @@ Apply, a kind set aside after Apply, and a Setup edit on an unsubmitted day
 that happened to match a pending proposal. Labels now come only from what a
 page showed.
 
-`applied_rows` is a plain builder: it reads no dirty tracking. `User` calls it
-from one `after_save` and passes the state from before the save.
+`applied_rows` is a plain builder: it reads no dirty tracking. `LevelChange`
+calls it after the save inside `ProfileUpdate`'s transaction. Track changes
+preserve targets, so there is no cleared-target source override.
 
 ## Dismissal rows
 

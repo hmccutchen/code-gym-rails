@@ -38,9 +38,20 @@ RSpec.describe "Setup track control", type: :request do
 
     expect(page_html.text).to include("The level every section uses unless you set one for it in the Exercise mix below.",
                                      "Your ratings nudge each day's set around it.",
-                                     "Changing your track also moves any section set to your old or new level, unless it is locked.",
+                                     "Select a track to preview the changes, then Apply or Cancel.",
+                                     "Explicit targets and locks stay as you set them, even when they match either track.",
                                      "Coding Gym suggests a level for that section, and you decide.",
                                      "Principal engineer is set only here; Coding Gym never suggests it.")
+  end
+
+  it "renders inline Apply and Cancel with Apply unavailable before a preview" do
+    login_as(user)
+    get setup_path
+
+    panel = page_html.at_css('[data-profile-preferences-target="trackPanel"]')
+    expect(panel["hidden"]).not_to be_nil
+    expect(panel.at_css('[data-profile-preferences-target="apply"]')["disabled"]).not_to be_nil
+    expect(panel.text).to include("Apply track", "Cancel track change", "Refresh preview")
   end
 
   it "sits above the Exercise mix, whose default options name it" do
