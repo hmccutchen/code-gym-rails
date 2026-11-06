@@ -115,4 +115,31 @@ RSpec.describe ConceptMastery::Reconciliation do
       described_class.apply(current: baseline.merge("last_rating" => "unknown"), journal: {}, operation: review)
     end.to raise_error(ArgumentError)
   end
+
+  [
+    { "type" => "clear", "action" => "clear" },
+    { "type" => "set", "action" => "clear", "drilled_at" => "2026-11-06T17:00:00.000000Z",
+      "drill_group" => nil, "end_pause" => false },
+    { "type" => "drill", "action" => "review" },
+    { "type" => "drill", "action" => nil }
+  ].each do |operation|
+    it "rejects the discriminator #{operation.slice('type', 'action').inspect} at every suffix boundary", :aggregate_failures do
+      journal = opened.journal
+      journal["operations"] << operation
+      expect { described_class.decode(journal) }.to raise_error(ArgumentError)
+      expect { described_class.restorable_drill(journal: journal) }.to raise_error(ArgumentError)
+      expect { append(opened, operation) }.to raise_error(ArgumentError)
+    end
+  end
+
+  it "accepts supported drill actions at the decode and restorable-intent boundaries" do
+    result = append(opened, "type" => "drill", "action" => "set", "drilled_at" => "2026-11-06T17:00:00.000000Z",
+      "drill_group" => "module_design", "end_pause" => false)
+    expect(described_class.decode(result.journal)).to eq(result.journal)
+    expect(described_class.restorable_drill(journal: result.journal)).to eq(
+      "drilled_at" => "2026-11-06T17:00:00.000000Z", "drill_group" => "module_design")
+    result = append(result, "type" => "drill", "action" => "clear")
+    expect(described_class.decode(result.journal)).to eq(result.journal)
+    expect(described_class.restorable_drill(journal: result.journal)).to be_nil
+  end
 end

@@ -7,6 +7,55 @@ RSpec.describe ConceptDrills do
     user.concept_masteries.find_by(concept: concept, language: bucket)
   end
 
+  describe "Start outcomes" do
+    it "distinguishes a new single drill from an active repeat without restamping it" do
+      expect(described_class.start(user, concept: "n_plus_one", bucket: "ruby_rails").status).to eq(:started)
+      stamp = row("n_plus_one").drilled_at
+      expect(described_class.start(user, concept: "n_plus_one", bucket: "ruby_rails").status).to eq(:already)
+      expect(row("n_plus_one").drilled_at).to eq(stamp)
+    end
+
+    it "distinguishes a new group from an active repeat without restamping its members" do
+      expect(described_class.start_group(user, group: "module_design", bucket: "ruby_rails").status).to eq(:started)
+      stamps = user.concept_masteries.order(:id).pluck(:drilled_at)
+      expect(described_class.start_group(user, group: "module_design", bucket: "ruby_rails").status).to eq(:already)
+      expect(user.concept_masteries.order(:id).pluck(:drilled_at)).to eq(stamps)
+    end
+
+    it "names a reserved single repeat without reactivating it" do
+      described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+      partially_review_concept!(user, concept: "n_plus_one")
+
+      expect(described_class.start(user, concept: "n_plus_one", bucket: "ruby_rails").status).to eq(:already_reserved)
+      expect(row("n_plus_one").drilled_at).to be_nil
+    end
+
+    it "names a reserved group repeat without re-adding its hidden member" do
+      described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
+      partially_review_concept!(user, concept: "shallow_module")
+
+      expect(described_class.start_group(user, group: "module_design", bucket: "ruby_rails").status).to eq(:already_reserved)
+      expect(row("shallow_module").drilled_at).to be_nil
+    end
+
+    [ [ :start, { concept: "transaction_safety" } ], [ :start_group, { group: "module_design" } ] ].each do |command, target|
+      it "captures #{command}'s cap refusal and reservation facts before a subsequent Stop" do
+        described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+        described_class.start!(user, concept: "memoization", bucket: "ruby_rails")
+        partially_review_concept!(user, concept: "n_plus_one")
+
+        outcome = described_class.public_send(command, user, bucket: "ruby_rails", **target)
+        described_class.stop!(user, concept: "n_plus_one", bucket: "ruby_rails")
+
+        expect(outcome.status).to eq(:full)
+        expect(outcome.drills).to be_full.and be_reservations
+        expect(outcome.drills.entries.flat_map(&:concepts)).to contain_exactly("n_plus_one", "memoization")
+        expect(described_class.for(user)).not_to be_full
+        expect(user.concept_masteries.where.not(concept: %w[n_plus_one memoization])).to be_empty
+      end
+    end
+  end
+
   describe ".start!" do
     it "creates the row in the never-encountered state for a concept the user has never met" do
       described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")

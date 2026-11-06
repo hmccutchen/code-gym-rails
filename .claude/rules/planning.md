@@ -34,6 +34,9 @@ The default-off compatible mastery writer and all drill commands follow
 is checked fresh under the user lock. Active plus restorable accepted drill
 intent counts toward the existing cap; planning reads materialized drill
 columns only. Preserve the legacy prefix and first-core countdown guards.
+Mastery eligibility must imply adaptation eligibility across registered
+kinds and supported modes, so a response's own tick precedes its mastery.
+A future mastery-only kind needs an explicit ordering decision.
 
 Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;

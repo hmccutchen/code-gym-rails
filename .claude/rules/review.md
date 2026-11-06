@@ -26,8 +26,12 @@ completeness. The locked `ResponseReview` merge counts a session only on its
 first assessed-core-answer transition, excluding supplementary bug hunts.
 The model guards countdown with the same subset. Enrolled users replace
 their least-favourable daily contribution at its first application position,
-retaining later operations and clocks. Untouched users retain batch
-semantics while initiation is off. The legacy-prefix limitation, receipt
+retaining later operations and clocks. Untouched users retain per-batch
+orchestration with no reconciliation state while initiation is off; the
+shared projection still filters retired tags and uses per-section buckets.
+Locked validation occurs after the provider call: corrupt state can reject
+storage and repeated retries can incur further calls until repaired.
+The legacy-prefix limitation, receipt
 and suffix formats live in `docs/decisions/daily-mastery-reconciliation.md`.
 
 Each entry states what a change must not break. An entry that names a

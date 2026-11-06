@@ -21,6 +21,10 @@ Drill controls read active and reserved accepted intent through
 `ConceptDrills`. Reserved concepts show “review pending”, explain that they
 are not currently prioritized, and retain Stop. Never infer reservations or
 capacity from JSON in a view, or treat a reservation as planning input.
+Start actions map the outcome and admission projection returned under the
+user lock, never a post-command query. The bang commands retain booleans
+and `LimitReached`. Corrupt selected in-slice suffixes explicitly fail the
+Learn read or drill action; never omit them or invent spare capacity.
 See `docs/decisions/daily-mastery-reconciliation.md`.
 
 Each entry states what a change must not break. An entry that names a

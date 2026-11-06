@@ -6,6 +6,13 @@ class ConceptDrills
 
   Entry = Data.define(:bucket, :group, :concepts, :reserved_concepts)
   Intent = Data.define(:id, :concept, :language, :drilled_at, :drill_group, :reserved)
+  Outcome = Data.define(:status, :drills) do
+    def value!
+      raise LimitReached if status == :full
+
+      status == :started
+    end
+  end
 
   def self.for(user)
     scope = user.concept_masteries
@@ -14,30 +21,44 @@ class ConceptDrills
 
   # Returns false when nothing changed. A concept whose group is drilled joins that group.
   def self.start!(user, concept:, bucket:)
+    start(user, concept: concept, bucket: bucket).value!
+  end
+
+  def self.start(user, concept:, bucket:)
     raise ArgumentError, "#{concept} is not in #{bucket}" unless ConceptBucket.vocabulary_for(bucket).include?(concept)
 
     user.with_lock do
       drills = self.for(user)
-      next repeat!(user, drills.targets(concept: concept, bucket: bucket)) if drills.drilling?(concept, bucket)
-      raise LimitReached unless drills.can_start?(concept, bucket)
+      if drills.drilling?(concept, bucket)
+        repeat!(user, drills.targets(concept: concept, bucket: bucket))
+        next Outcome.new(status: drills.reserved?(concept, bucket) ? :already_reserved : :already, drills: drills)
+      end
+      next Outcome.new(status: :full, drills: drills) unless drills.can_start?(concept, bucket)
 
       mark!(user, [ concept ], bucket, group: drills.joinable_group(concept, bucket), end_pause: true)
-      true
+      Outcome.new(status: :started, drills: drills)
     end
   end
 
   # Returns false when already drilled: a repeat press must not re-add cleared members or restamp rotation order.
   def self.start_group!(user, group:, bucket:)
+    start_group(user, group: group, bucket: bucket).value!
+  end
+
+  def self.start_group(user, group:, bucket:)
     concepts = concepts_in(group, bucket)
     raise ArgumentError, "#{bucket} holds nothing from #{group}" if concepts.empty?
 
     user.with_lock do
       drills = self.for(user)
-      next repeat!(user, drills.targets(group: group, bucket: bucket)) if drills.group_drilling?(group, bucket)
-      raise LimitReached unless drills.can_start_group?(group, bucket)
+      if drills.group_drilling?(group, bucket)
+        repeat!(user, drills.targets(group: group, bucket: bucket))
+        next Outcome.new(status: drills.group_reserved?(group, bucket) ? :already_reserved : :already, drills: drills)
+      end
+      next Outcome.new(status: :full, drills: drills) unless drills.can_start_group?(group, bucket)
 
       mark!(user, concepts, bucket, group: group, end_pause: false)
-      true
+      Outcome.new(status: :started, drills: drills)
     end
   end
 

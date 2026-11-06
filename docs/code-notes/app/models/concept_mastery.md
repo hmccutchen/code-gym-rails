@@ -10,9 +10,14 @@ The caller holds user then response locks, supplies actual pre-merge review
 keys, and saves the response in the same transaction. The default-off
 compatibility writer selects reconciliation for an enrolled user through
 fresh uncached receipt/suffix queries under the user lock. Untouched users
-retain legacy batch application without new state.
+retain legacy per-batch orchestration without new state. Both modes use
+the strict projection, excluding retired/off-vocabulary tags and assigning
+each section its own bucket.
 
 `DailyEvidence` projects one contribution per response/concept/bucket.
+It shares `DailyResponse#mastery_tag` with skip candidates, but keeps its
+own answered/assessed selection. The strict leaf does not replace User's
+historical nil-bucket fallback or hostability rule.
 `Reconciliation` replaces it at its original position, preserves clocks and
 later operations, and compacts only irrevocable prefixes. It assigns new
 JSON hashes rather than relying on in-place dirty tracking.

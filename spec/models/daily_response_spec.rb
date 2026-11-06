@@ -1,6 +1,31 @@
 require "rails_helper"
 
 RSpec.describe DailyResponse, type: :model do
+  describe "#mastery_tag" do
+    let(:exercise) { DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => {}, "architecture" => {} }) }
+    let(:response) do
+      described_class.new(daily_exercise: exercise,
+        concept_tags: { "code_review" => "n_plus_one", "architecture" => "sync_vs_async" })
+    end
+
+    it "returns strict bucket identities without selecting submitted, answered or assessed evidence" do
+      expect(response.mastery_tag("code_review")).to eq(%w[ruby_rails n_plus_one])
+      expect(response.mastery_tag("architecture")).to eq(%w[architecture sync_vs_async])
+    end
+
+    it "rejects excluded kinds and off-vocabulary or non-concept tags" do
+      exercise.problem_set["code_review"]["purpose"] = "Find a trap"
+      expect(response.mastery_tag("code_review")).to be_nil
+      exercise.problem_set["code_review"].delete("purpose")
+      [ "retired_concept", "sync_vs_async", "other", nil ].each do |concept|
+        response.concept_tags["code_review"] = concept
+        expect(response.mastery_tag("code_review")).to be_nil
+      end
+      response.concept_tags = []
+      expect(response.mastery_tag("code_review")).to be_nil
+    end
+  end
+
   describe "assessment evidence" do
     let(:exercise) do
       DailyExercise.new(problem_set: { "code_review" => { "question" => "q" }, "pattern" => { "question" => "q" } })

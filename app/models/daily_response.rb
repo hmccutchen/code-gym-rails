@@ -329,6 +329,14 @@ class DailyResponse < ApplicationRecord
 
   def mastery_evidence?(section) = ExerciseSection.for(section).mastery_evidence?(daily_exercise&.problem_set&.dig(section.to_s))
 
+  def mastery_tag(section)
+    return unless concept_tags.is_a?(Hash) && mastery_evidence?(section)
+
+    concept = concept_tags[section]
+    bucket = ConceptBucket.for(section, daily_exercise.language)
+    [ bucket, concept ] if concept != "other" && ConceptBucket.vocabulary_for(bucket).include?(concept)
+  end
+
   def submit_blocker
     answered = answered_sections
     if answered.empty?

@@ -12,7 +12,7 @@ class ConceptMastery::DailyEvidence
   end
 
   def contributions
-    candidates.group_by { |section, concept| [ concept, bucket_for(section) ] }.filter_map do |(concept, bucket), pairs|
+    candidates.group_by { |_section, tag| tag }.filter_map do |(bucket, concept), pairs|
       keys = pairs.map(&:first)
       assessed = keys & @accepted & @response.assessed_sections
       next if assessed.empty?
@@ -26,13 +26,13 @@ class ConceptMastery::DailyEvidence
   private
 
   def candidates
-    return {} unless @response.submitted? && @response.concept_tags.is_a?(Hash)
+    return [] unless @response.submitted? && @response.concept_tags.is_a?(Hash)
 
-    @response.concept_tags.slice(*@response.answered_sections).select do |section, concept|
-      @response.mastery_evidence?(section) && ConceptBucket.vocabulary_for(bucket_for(section)).include?(concept) && concept != "other"
+    @response.concept_tags.slice(*@response.answered_sections).filter_map do |section, _concept|
+      tag = @response.mastery_tag(section)
+      [ section, tag ] if tag
     end
   end
 
-  def bucket_for(section) = ConceptBucket.for(section, @response.daily_exercise.language)
   def stored_keys = @response.ai_review.is_a?(Hash) ? @response.ai_review.keys : []
 end

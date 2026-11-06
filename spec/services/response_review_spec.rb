@@ -134,6 +134,30 @@ RSpec.describe ResponseReview do
       expect(mastery).to have_attributes(tier: "standard", streak: 1, drilled_at: nil)
     end
 
+    it "ignores an existing retired concept row with initiation off and creates no reconciliation state" do
+      retired = user.concept_masteries.create!(concept: "retired_concept", language: "ruby_rails",
+        last_rating: "developing", streak: 1)
+      original = retired.attributes
+      response.update!(concept_tags: %w[code_review pattern].index_with { "retired_concept" })
+
+      expect(batch(response, { "code_review" => "developing", "pattern" => "developing" }, initiate: false).status).to eq(:ready)
+
+      expect(retired.reload.attributes).to eq(original)
+      expect(response.reload.mastery_application).to eq({})
+      expect(user.concept_masteries.pluck(:review_reconciliation)).to all(eq({}))
+    end
+
+    it "excludes a skipped concept answered elsewhere even when the answer has an invalid grade" do
+      response.update!(answers: { "code_review" => "An answer", "pattern" => "" })
+      original = domain(mastery)
+
+      batch(response, "code_review" => "invalid", "pattern" => nil)
+
+      expect(domain(mastery)).to eq(original)
+      expect(response.reload.mastery_application["skip_attempts"]).to eq([])
+      expect(ConceptMastery::DailyEvidence.for(response, accepted_sections: response.ai_review.keys, legacy_sections: [])).to eq([])
+    end
+
     it "records an unrelated default-off session in the whole user's open correction suffix" do
       mastery.update!(tier: :reduced, streak: 1)
       batch(response, "pattern" => "strong")

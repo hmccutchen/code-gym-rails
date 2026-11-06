@@ -54,8 +54,10 @@ concept's cooldown, and a later first core batch still counts once.
 The model also guards countdown against successful keys outside that
 subset. Enrolled users reconcile least-favourable daily contributions at
 their original position with captured clocks, preserving subsequent
-sessions, reviews, skips and manual commands. Untouched users retain batch
-application while C's initiation default is false.
+sessions, reviews, skips and manual commands. Untouched users retain
+per-batch orchestration with no receipt/suffix state while C's initiation
+default is false. Both modes filter retired/off-vocabulary tags through the
+shared projection and use per-section bucket identity.
 `daily-mastery-reconciliation.md` specifies the durable receipt, legacy
 prefix, reserved drill slots and separate activation gate. Historical materialized
 bug-only countdown effects are not rebuilt, and mixed-version deployments

@@ -12,6 +12,10 @@ without consulting current profile settings. Missing legacy maps use
 observed-rung fallback. Mastery receipt and suffix formats belong to
 `DailyResponse` and `ConceptMastery::Reconciliation`, respectively; only
 exact `{}` is unused. See `docs/decisions/daily-mastery-reconciliation.md`.
+Retiring or renaming kinds, or changing grade/self-rating/tier tokens or
+semantics, must preserve compatibility or deliberately migrate both durable
+receipt tokens and open suffix data/policy before rollout. Frozen decoding
+alone does not preserve replay semantics.
 
 
 | Model             | Key fields                                                                                                |

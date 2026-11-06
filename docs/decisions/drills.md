@@ -26,7 +26,8 @@ which drill was offered is never recorded, like every other offer.
 **A drill clears on the existing mastery signal and nothing else.** The
 same co-favorable rating that sets a row to standard in
 `ConceptMastery::Transition` — self-rating "right level" or "too easy"
-AND AI "solid" or "strong", across the contributing daily occurrences — also clears the drill. That
+AND AI "solid" or "strong", across occurrences in the applied batch or
+reconciled day — also clears the drill. That
 can be a single day, and no drill-specific count exists on purpose: the
 retention schedule takes over from there exactly as it does for any
 mastered concept.
@@ -92,5 +93,10 @@ Start records new intent. All four commands lock the user, then concrete
 mastery targets in ascending ID order, and use the shared transition path.
 An active repeat retains intent without restamping; a reserved repeat never
 reactivates practice. Learn explains the held slot and keeps Stop available.
+The HTTP-facing `.start` and `.start_group` return the locked status and
+admission projection; the controller never re-queries to explain a repeat
+or refusal. Existing bang methods delegate and keep true/false and
+`LimitReached`. Corrupt selected suffixes fail the read or command
+explicitly rather than fabricating capacity.
 `docs/decisions/daily-mastery-reconciliation.md` owns the full group,
 restart, legacy-prefix and default-off deployment rules.

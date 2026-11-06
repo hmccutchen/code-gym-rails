@@ -74,10 +74,9 @@ class ConceptMastery < ApplicationRecord
 
     answered = response.answered_concept_tags.select { |section, _| response.mastery_evidence?(section) }.values
     response.concept_tags.slice(*(sections & response.section_keys)).filter_map do |section, concept|
-      next unless response.mastery_evidence?(section) && response.section_reviewed?(section) && !answered.include?(concept)
+      next unless response.section_reviewed?(section) && !answered.include?(concept)
 
-      bucket = ConceptBucket.for(section, response.daily_exercise.language)
-      [ bucket, concept ] if ConceptBucket.vocabulary_for(bucket).include?(concept) && concept != "other"
+      response.mastery_tag(section)
     end.uniq
   end
   private_class_method :skipped_checks

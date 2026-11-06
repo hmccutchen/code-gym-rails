@@ -4,8 +4,10 @@ class ConceptMastery::Reconciliation
     "review" => %w[type response_id work_on reviewed_on occurred_at sections pending_sections],
     "session" => %w[type response_id],
     "skip" => %w[type response_id work_on reviewed_on],
-    "set" => %w[type action drilled_at drill_group end_pause],
-    "clear" => %w[type action]
+    "drill" => {
+      "set" => %w[type action drilled_at drill_group end_pause],
+      "clear" => %w[type action]
+    }
   }.freeze
 
   def self.snapshot(record)
@@ -88,15 +90,15 @@ class ConceptMastery::Reconciliation
 
   def self.validate_operation!(value)
     invalid! unless value.is_a?(Hash)
-    kind = value["type"] == "drill" ? value["action"] : value["type"]
-    fields = OPERATION_FIELDS[kind]
+    fields = OPERATION_FIELDS[value["type"]]
+    fields = fields[value["action"]] if value["type"] == "drill"
     invalid! unless fields
     exact_keys!(value, fields)
     invalid! if fields.include?("response_id") && !(value["response_id"].is_a?(Integer) && value["response_id"].positive?)
     %w[work_on reviewed_on].each { |field| date!(value[field]) if fields.include?(field) }
     timestamp!(value["occurred_at"]) if fields.include?("occurred_at")
-    validate_evidence!(value) if kind == "review"
-    validate_drill!(value) if kind == "set"
+    validate_evidence!(value) if value["type"] == "review"
+    validate_drill!(value) if value["type"] == "drill" && value["action"] == "set"
   end
   private_class_method :validate_operation!
 
