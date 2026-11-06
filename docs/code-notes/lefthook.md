@@ -27,6 +27,6 @@ reviews, and the final CI and GitHub-review merge gates.
 
 ## Skipping and running by hand
 
-- `LEFTHOOK=0 git push` (or `git commit`) skips the hooks for that one command.
+- `LEFTHOOK=0 git push` (or `git commit`) skips the hooks for that one command. That is for a person at a terminal; CLAUDE.md's "How Work Is Run" tells an agent never to skip a hook.
 - Every worktree shares one set of hooks and one test database. Separate local RSpec runs still need exclusive use of that database; the push hook no longer starts one.
 - `bundle exec lefthook run pre-push --force` runs the push checks by hand. Lefthook skips a push job when the push carries no changed files: an up-to-date branch, a tag or a deleted branch. `--force` runs it anyway.

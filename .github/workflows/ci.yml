@@ -103,6 +103,11 @@ jobs:
   system_test:
     runs-on: ubuntu-24.04
 
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4]
+
     services:
       postgres:
         image: postgres:18
@@ -168,13 +173,13 @@ jobs:
         run: ./spec/playwright/node_modules/.bin/playwright-core install --with-deps chromium
 
       - name: Run system specs
-        run: bundle exec rspec spec/system
+        run: bundle exec parallel_rspec -n ${{ strategy.job-total }} --group-by filesize --only-group ${{ matrix.group }} spec/system
 
       - name: Upload failure screenshots
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: system-test-screenshots
-          path: tmp/screenshots
+          name: system-test-screenshots-${{ matrix.group }}
+          path: tmp/capybara
           if-no-files-found: ignore
 
