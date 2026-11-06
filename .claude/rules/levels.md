@@ -23,7 +23,11 @@ Each entry states what a change must not break. An entry that names a
 read it before changing that area.
 
 - **Tracks** (`docs/decisions/tracks.md`): A track is `skill_level` itself,
-  stored nowhere else, and no preset targets are written. `/welcome` asks once
+  stored nowhere else, and sets baseline difficulty. It supplies no initial
+  mix preset or ongoing kind-frequency bias; track changes never rewrite
+  weights or exclusions. Kinds remain available subject to explicit settings.
+  Principal engineer remains manual-only, and difficulty-lock protections
+  remain unchanged. No preset targets are written. `/welcome` asks once
   (`User#first_run?`: no `track_chosen_at` and no exercise);
   `PATCH /profile` with `choose_track` checks exactly two keys and a
   `LevelSuggestion::LADDER` level under the user-row lock, else 422.
@@ -35,6 +39,16 @@ read it before changing that area.
   engineer. `track_chosen_at` is a flag, not a clock. `users.learning_track`
   is in `User.ignored_columns` and nothing reads or writes it; the next
   release drops it. A post carrying `learning_track` still gets a 422.
+- **Future graduation** (`docs/decisions/tracks.md`): The approved #709
+  direction is not implemented. Per-kind advancement earns harder
+  opportunities; an overall track-change offer needs broad, sustained
+  next-level evidence and must preserve easier kinds. It is an in-app
+  milestone, separate from Automatic workload size, not professional
+  seniority. The established "Suggest level changes" opt-out also covers
+  future graduation offers. Breadth, thresholds, windows, eligibility, other
+  presentation details and protection for untargeted kinds remain open.
+  #720's manual target-preservation policy is also not implemented; current
+  `TrackChange` clearing is not graduation protection.
 - **Level suggestions** (`docs/decisions/level-suggestions.md`): One-rung
   level proposals per section kind on the submitted dashboard; nothing moves
   without an explicit Apply. `LevelSuggestion` reads only answered, un-eased,

@@ -30,6 +30,13 @@ Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;
 read it before changing that area.
 
+- **Track and exercise mix** (`docs/decisions/tracks.md`): Track sets baseline
+  difficulty, never an initial mix preset or ongoing kind-frequency bias.
+  Track changes leave weights and exclusions alone. Preserve the separation
+  between kind selection, per-kind difficulty, future overall graduation and
+  Automatic workload size; #715's workload rule is not a graduation threshold.
+  #714 owns the protected-practice and variety direction, and #718 owns
+  kind-specific difficulty definitions.
 - **Section kind weight preferences**
   (`docs/decisions/section-kind-weight-preferences.md`): A per-kind multiplier
   (`KindPreferences::MULTIPLIERS`) leans only `SectionRotation#pick_kind`'s
