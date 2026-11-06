@@ -18,17 +18,19 @@ Storage is sparse — a kind left at the default multiplier stores no key at
 all — so a user who has never touched either control is byte-identical to
 pre-feature behavior.
 
-**Accepted consequence: excluding kinds also makes that slot fill less
-often**, not merely fill differently. `slot_staleness` is a `max` over the
-eligible pool, so a narrowed pool keeps the surviving kind scheduled — and
-therefore fresh — which lowers the slot's staleness and loses it ranking
-contests on days too short to fill every slot. Excluding two of the three
-fourth kinds takes that slot from roughly 81% of 4-section days to 50%, and
-from 37% of 3-section days to 14%, measured with the default daily pair; a
-2-section day has no optional slot. The exclusion copy says so outright rather
-than leaving it to be discovered. Ranking the slot over the *full* pool
-instead was considered and is worse: an excluded kind is never scheduled, so
-its staleness grows without bound and the slot would monopolize every scarce
-spot forever. Decoupling slot frequency from pool size needs slots ranked by
-when the slot itself last filled, which is a change to how every day is
-shaped and not something this preference should drag in behind it.
+**Excluding kinds can make their slot fill less often.** `slot_staleness`
+uses the stalest eligible kind in a slot. A smaller pool can be refreshed
+more often, leaving that slot less stale than competing slots on days
+without room for all of them. The effect depends on the daily kinds,
+exclusions, recent history and number of optional places; it is not a fixed
+percentage. A slot's frequency also differs from the frequency of each
+kind within it. Setup describes this tradeoff without numerical promises.
+
+Excluded kinds must stay out of slot ranking as well as selection. Otherwise
+a kind that cannot be scheduled can keep its slot at the staleness cap and
+give that slot priority unsupported by its eligible kinds. Ranking slots by
+when the slot itself last filled would be a different planning policy,
+outside the weight preference's scope.
+
+Any future frequency measurement should record its date, layout, settings
+and method. It describes that measured case, not a lasting cadence guarantee.
