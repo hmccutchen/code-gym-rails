@@ -13,7 +13,7 @@ A push runs static checks through `lefthook.yml`, not RSpec.
 must still avoid sharing the test database concurrently.
 
 **Every PR gets two reviews once the implementation is done, each run by a
-separate agent.** After focused tests and relevant lint pass, before pushing,
+separate agent.** After the suites pass and before the PR is marked ready,
 start a subagent for each review. The session that wrote the code has
 already decided it is right, so it doesn't review its own work.
 

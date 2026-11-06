@@ -23,7 +23,7 @@ Neither checks `.claude/`. The skills vendored under `.claude/skills/` keep the 
 Neither hook runs RSpec. Full unit and system suites run in CI on the final
 PR commit, avoiding a duplicate full local run on each push. CLAUDE.md's
 Tests and Git Workflow sections define focused local validation, independent
-reviews before pushing, and the final CI and GitHub-review merge gates.
+reviews, and the final CI and GitHub-review merge gates.
 
 ## Skipping and running by hand
 
