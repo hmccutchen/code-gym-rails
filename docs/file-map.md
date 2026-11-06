@@ -312,7 +312,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway
-- `lefthook.yml` — git hooks that run CI's checks before a commit and before a push (`docs/code-notes/lefthook.md`)
+- `lefthook.yml` — git hooks that run local static checks before a commit and before a push; full suites run in CI (`docs/code-notes/lefthook.md`)
 - `app/clients/lazy_cache_store.rb` — `LazyCacheStore`: forwards `increment` to `Rails.cache` at call time, so `rate_limit` (which binds its store at class load) still sees a store that specs swap in.
 - `app/jobs/application_job.rb` — `ApplicationJob`: the empty base class every background job inherits from.
 - `app/jobs/generate_concept_reference_job.rb` — `GenerateConceptReferenceJob`: asks the user's provider for a concept's reference, guide, ladder and lesson, and writes or completes the shared `ConceptReference` row under a lock. It allows one run per concept and language, and records provider and setup failures through `ConceptReferenceFailures`.

@@ -1,6 +1,6 @@
 # lefthook.yml
 
-Lefthook runs CI's checks on your machine before a commit or a push reaches GitHub. `bin/setup` installs the hooks with `bundle exec lefthook install`. On a checkout that predates that step, run the same command once.
+Lefthook runs local static checks before a commit or a push reaches GitHub. `bin/setup` installs the hooks with `bundle exec lefthook install`. On a checkout that predates that step, run the same command once.
 
 This note holds the list of what runs; CLAUDE.md and the file map point here rather than repeating it.
 
@@ -19,14 +19,14 @@ Neither checks `.claude/`. The skills vendored under `.claude/skills/` keep the 
 - `archspec check`
 - Brakeman
 - `importmap audit`, which needs the network
-- the unit suite (`rspec --exclude-pattern "system/**/*_spec.rb"`), which takes most of the push's time
 
-The system specs stay in CI. They need Playwright's Chromium and take several more minutes, and the unit suite catches most breaks first. CLAUDE.md still asks you to run `spec/system` once before opening a PR.
-
-The unit suite needs Prettier's packages, because `CodeFormat`'s specs run Prettier for real; without them, two examples in `spec/models/code_format_spec.rb` fail and block the push. Installing them needs Node and npm. `bin/setup` runs `npm --prefix vendor/prettier ci`, as CI does. On a checkout that predates that step, run it once yourself.
+Neither hook runs RSpec. Full unit and system suites run in CI on the final
+PR commit, avoiding a duplicate full local run on each push. CLAUDE.md's
+Tests and Git Workflow sections define focused local validation, independent
+reviews, and the final CI and GitHub-review merge gates.
 
 ## Skipping and running by hand
 
 - `LEFTHOOK=0 git push` (or `git commit`) skips the hooks for that one command.
-- Every worktree shares one set of hooks and one test database. A push while any other spec run on this machine is using that database (another worktree, session or review agent) can fail falsely, so wait for the other run or skip the hook.
+- Every worktree shares one set of hooks and one test database. Separate local RSpec runs still need exclusive use of that database; the push hook no longer starts one.
 - `bundle exec lefthook run pre-push --force` runs the push checks by hand. Lefthook skips a push job when the push carries no changed files: an up-to-date branch, a tag or a deleted branch. `--force` runs it anyway.
