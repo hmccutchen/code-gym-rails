@@ -16,7 +16,7 @@ RSpec.describe "A bug_hunt section and concept mastery" do
                                  ai_review: sections.transform_values { { "rating" => ai_rating, "correct" => "c" } })
   end
 
-  def record!(response) = ConceptMastery.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
+  def record!(response) = apply_mastery_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
 
   describe "ConceptMastery.record_review!" do
     it "leaves a concept carried only by a bug_hunt section unevaluated" do

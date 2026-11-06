@@ -123,6 +123,11 @@ says what a deviation from one requires.
   (`#claim_pseudocode_critique!`) and keeps the same token rule under the row
   lock. Anything that locks an exercise and its response goes through
   `DailyExercise#with_response_locked`.
+  Mastery review and every manual drill command follow user → exercise
+  when needed → response → mastery rows in ascending ID order, with paid
+  calls outside locks. Reconciliation stores concrete commands and captured
+  clocks, never inverses or raw response replay
+  (`docs/decisions/daily-mastery-reconciliation.md`).
 - **The server decides; the page shows its answer** — when a page needs a
   rule the server owns, the browser holds no copy of it. The server renders its
   answer onto the page and sends it again in every reply, and the script only

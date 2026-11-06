@@ -17,6 +17,12 @@ paths:
 
 # Learn, Progress and the featured concept
 
+Drill controls read active and reserved accepted intent through
+`ConceptDrills`. Reserved concepts show “review pending”, explain that they
+are not currently prioritized, and retain Stop. Never infer reservations or
+capacity from JSON in a view, or treat a reservation as planning input.
+See `docs/decisions/daily-mastery-reconciliation.md`.
+
 Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;
 read it before changing that area.

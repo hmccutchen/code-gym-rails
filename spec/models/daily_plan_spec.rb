@@ -62,7 +62,7 @@ RSpec.describe DailyPlan do
           response = user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
             submitted_at: Time.current, answers: {}, concept_tags: { "plan_review" => first },
             ai_review: { "plan_review" => { "rating" => "beginner" } })
-          ConceptMastery.record_review!(response, sections: %w[plan_review], apply_session_countdown: false)
+          apply_mastery_review!(response, sections: %w[plan_review], apply_session_countdown: false)
         end
       end
 

@@ -12,6 +12,36 @@ RSpec.describe "Concept drills", type: :request do
     user.concept_masteries.find_by(concept: concept, language: bucket)
   end
 
+  describe "reserved drill controls" do
+    before do
+      ConceptDrills.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+      partially_review_concept!(user, concept: "n_plus_one")
+    end
+
+    it "explains a reserved slot without claiming the concept is prioritized" do
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+      expect(response.body).to include("slot is reserved", "not currently prioritized", "Stop drilling")
+      expect(response.body).not_to include("You're drilling this", ">Drill this<")
+      delete learn_concept_drill_path(bucket: "ruby_rails", concept: "n_plus_one")
+      expect(ConceptDrills.for(user)).not_to be_reservations
+    end
+
+    it "answers a stale Start truthfully and does not reactivate the drill" do
+      post learn_concept_drill_path(bucket: "ruby_rails", concept: "n_plus_one")
+      expect(flash[:notice]).to include("already reserved", "review is unfinished")
+      expect(row("n_plus_one").drilled_at).to be_nil
+    end
+
+    it "explains cap refusal using held requests and lets Stop release the slot" do
+      ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+      post learn_concept_drill_path(bucket: "ruby_rails", concept: "transaction_safety")
+      expect(flash[:alert]).to include("slots are held", "N plus one", "Memoization")
+      delete learn_concept_drill_path(bucket: "ruby_rails", concept: "n_plus_one")
+      post learn_concept_drill_path(bucket: "ruby_rails", concept: "transaction_safety")
+      expect(row("transaction_safety").drilled_at).to be_present
+    end
+  end
+
   describe "POST /learn/:bucket/:concept/drill" do
     it "starts the drill and returns to the concept page" do
       post learn_concept_drill_path(bucket: "ruby_rails", concept: "n_plus_one")
@@ -133,7 +163,7 @@ RSpec.describe "Concept drills", type: :request do
     it "still offers to rejoin a cleared member of a drilled group when the cap is full" do
       ConceptDrills.start_group!(user, group: "module_design", bucket: "ruby_rails")
       ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
-      row("shallow_module").clear_drill!
+      row("shallow_module").update!(drilled_at: nil, drill_group: nil)
 
       get learn_concept_path(bucket: "ruby_rails", concept: "shallow_module")
 

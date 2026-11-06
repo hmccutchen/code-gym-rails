@@ -688,7 +688,7 @@ RSpec.describe User, type: :model do
         answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => self_rating },
         concept_tags: { "code_review" => concept },
         ai_review: { "code_review" => { "rating" => ai_rating } })
-      ConceptMastery.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
+      apply_mastery_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
       response
     end
 

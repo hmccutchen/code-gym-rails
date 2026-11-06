@@ -1,5 +1,6 @@
 ---
 paths:
+  - "app/models/concept_mastery/**"
   - "app/services/{response_review,review_grading}.rb"
   - "app/clients/{review_prose_judge,review_approach_paragraph,ai_service}.rb"
   - "app/prompts/{review_prose_judge_prompt,review_prompt,difficulty_prompt,prompt_standards}.rb"
@@ -23,8 +24,11 @@ answers act immediately, while malformed or missing grades act nowhere.
 Completion waits only for answered active sections, unlike UI walkthrough
 completeness. The locked `ResponseReview` merge counts a session only on its
 first assessed-core-answer transition, excluding supplementary bug hunts.
-The model guards countdown with the same subset. The intended least-favourable daily
-mastery aggregate remains; #726 separately tracks retry-order dependence.
+The model guards countdown with the same subset. Enrolled users replace
+their least-favourable daily contribution at its first application position,
+retaining later operations and clocks. Untouched users retain batch
+semantics while initiation is off. The legacy-prefix limitation, receipt
+and suffix formats live in `docs/decisions/daily-mastery-reconciliation.md`.
 
 Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;

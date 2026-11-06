@@ -39,6 +39,13 @@ RSpec.describe "Request log parameter filtering" do
     expect(outcome("invite_code" => "ABCD")).to eq("invite_code" => "[FILTERED]")
   end
 
+  it "keeps mastery receipts and correction suffixes out of parameters and record inspection" do
+    fields = { "mastery_application" => { "version" => 1 }, "review_reconciliation" => { "version" => 1 } }
+    expect(outcome(fields)).to eq(fields.transform_values { "[FILTERED]" })
+    expect(DailyResponse.new(mastery_application: fields["mastery_application"]).inspect).to include("mastery_application: [FILTERED]")
+    expect(ConceptMastery.new(review_reconciliation: fields["review_reconciliation"]).inspect).to include("review_reconciliation: [FILTERED]")
+  end
+
   it "filters a browser install's push keys but keeps its endpoint" do
     expect(outcome("p256dh" => "k", "auth" => "a", "endpoint" => "https://fcm.googleapis.com/x"))
       .to eq("p256dh" => "[FILTERED]", "auth" => "[FILTERED]", "endpoint" => "https://fcm.googleapis.com/x")

@@ -5,6 +5,23 @@ RSpec.describe "Learn", type: :request do
 
   before { login_as(user) }
 
+  it "distinguishes reserved members from active group members and retains the group Stop" do
+    user.update!(language: "ruby_rails")
+    ConceptDrills.start_group!(user, group: "module_design", bucket: "ruby_rails")
+    partially_review_concept!(user, concept: "shallow_module")
+    get learn_path
+    html = Nokogiri::HTML(response.body)
+    expect(html.at_css(".learn-drills").text).to include("Your drill requests", "reserved while a review is unfinished")
+    expect(html.at_css('[data-concept="shallow_module"] .learn-drilling').text).to eq("review pending")
+    expect(html.at_css('[data-concept="pass_through_method"] .learn-drilling').text).to eq(I18n.t("learn.drill.marker"))
+    expect(html.at_css("#learn-group-ruby_rails-module_design").to_html).to include(
+      learn_group_drill_path(bucket: "ruby_rails", group: "module_design"))
+    get learn_concept_path(bucket: "ruby_rails", concept: "shallow_module")
+    expect(response.body).to include("slot is reserved", "Stop drilling Module design")
+    post learn_group_drill_path(bucket: "ruby_rails", group: "module_design")
+    expect(flash[:notice]).to include("already reserved")
+  end
+
   describe "GET /learn" do
     it "lists every concept in the user's language bucket" do
       user.update!(language: "ruby_rails")
