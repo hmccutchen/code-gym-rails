@@ -25,6 +25,8 @@ without room for all of them. The effect depends on the daily kinds,
 exclusions, recent history and number of optional places; it is not a fixed
 percentage. A slot's frequency also differs from the frequency of each
 kind within it. Setup describes this tradeoff without numerical promises.
+This describes ordinary `SectionRotation`; `DailyPlan` can separately add a
+coverage section.
 
 Excluded kinds must stay out of slot ranking as well as selection. Otherwise
 a kind that cannot be scheduled can keep its slot at the staleness cap and
