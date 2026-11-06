@@ -457,6 +457,7 @@ RSpec.describe ConceptDrills do
       end
 
       it "honors reservations and explicit releases when the returning writer's default is off" do
+        stub_const("ConceptMastery::INITIATE_RECONCILIATION", false)
         start("n_plus_one")
         start("memoization")
         response = partial("n_plus_one")

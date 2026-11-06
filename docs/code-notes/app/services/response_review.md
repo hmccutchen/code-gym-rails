@@ -53,7 +53,7 @@ in the same transaction. Mastery rows lock in ascending ID order.
 Authoritative receipt/suffix validation occurs here, after the provider
 call. Pre-existing corruption can reject storage on every retry and incur
 further calls until repaired. There is no preflight or zero-billing promise.
-The default-off compatibility/activation contract and legacy-prefix limit
+The default-on activation, default-off compatibility and legacy-prefix limits
 are in `docs/decisions/daily-mastery-reconciliation.md`.
 
 ## `#after_review`

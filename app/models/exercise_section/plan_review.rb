@@ -11,6 +11,13 @@ class ExerciseSection::PlanReview < ExerciseSection
 
   FLAW_CATEGORIES = %w[technical_anti_pattern scope_creep unflagged_behavior_change].freeze
 
+  RUNG_GUIDANCE = {
+    "junior" => "The planted flaws are plainly visible against the request; explain each flaw and the pushback it needs.",
+    "mid_level" => "To find the planted flaws, connect each proposed step to the request and explain the needed pushback.",
+    "senior" => "Expose the planted flaws through an interacting constraint in the stated plan; explain each consequence and pushback.",
+    "principal_engineer" => "Weigh the planted flaws' system-wide consequences and correction costs; keep the same flaw categories and count."
+  }.freeze
+
   # Only the runaway case needs bounding: the generator is asked for 2-3.
   MAX_PLANTED_FLAWS = 4
 

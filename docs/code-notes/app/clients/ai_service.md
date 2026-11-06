@@ -50,8 +50,8 @@ purpose's profile, unchanged. An unknown purpose raises at the call site.
 
 ## `MAX_LADDER_GUIDANCE_CHARS`
 
-Adding mid-level raises the tested ceiling from 48,000 to 54,000 characters.
-The exhaustive day-shape spec measures 53,632 characters with four levels
+When mid-level was added, the tested ceiling rose from 48,000 to 54,000 characters.
+That historical day-shape measurement was 53,632 characters with four levels
 against 45,270 with three, using maximum-length rungs: 8,362 more characters
 in the largest possible block. The constant checks the budget; it neither
 pads nor truncates a prompt.
@@ -61,9 +61,12 @@ tokenization. As an illustrative estimate only, at three characters per token
 the maximum-block increase is about 2,787 input tokens, or $0.011 for one
 uncached Opus 5.5 draft at $4 per million input tokens. That is not a measured
 token count or a dollar ceiling. Shorter rungs and shared levels reduce the
-block, and a level with no ladder rungs sends its definition alone; every kind
-on the plan is listed at its rung, so no day sends none. Reference rewrites also
+block. A kind without ladder guidance still sends its shared standard and
+concrete expectation; every planned kind is listed. Reference rewrites also
 generate one additional rung, whose actual output-token cost is unmeasured.
+The current #718 measurement and its bounded customized-shape scope live in
+`docs/decisions/kind-difficulty-expectations.md`; the estimate above describes
+the earlier mid-level addition, not #718.
 
 ## `MAX_CONCEPT_GUIDE_LENGTH`
 

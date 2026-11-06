@@ -1,9 +1,11 @@
 # Daily mastery reconciliation
 
-## Compatibility release, with initiation off
+## Activation and compatibility
 
-`ConceptMastery::INITIATE_RECONCILIATION` is false in release C. Untouched
-users retain per-batch orchestration and write no reconciliation state.
+`ConceptMastery::INITIATE_RECONCILIATION` is true in release A, following
+release C's verified web and worker deployment and removal of pre-C writers.
+C keeps the default false: untouched users reached by C retain per-batch
+orchestration and write no reconciliation state.
 The shared projection filters retired/off-vocabulary tags and uses each
 section's bucket identity; default-off does not preserve obsolete tag writes.
 Under the
@@ -204,13 +206,17 @@ elapsed time, merged PR, schema waiter or CI success is insufficient.
 A is a separate source change setting initiation true. Mixed C/A writers
 serialize under the user lock and honor durable enrollment. After A,
 verify both services at A or a descendant, obsolete deployment removal,
-and an owned-preview fake-review straddle smoke. No paid production probe
+and a fake-review straddle smoke in an owned preview or test environment.
+This retains the original accepted design's preview/test allowance. The
+project-scoped environment inventory after C contained only production,
+so the activation smoke uses an owned local test database; it does not
+claim a Railway preview or production test writes. No paid production probe
 or historical UPDATE is needed. Keep #726 open until activation and its
 deployment are verified; staged PRs use `Refs #726`.
 
 Rollback from A to C is supported. Rollback before C, deletion of receipts,
 or reverting S after state exists is unsafe. If deployment access/evidence
 is missing, keep initiation false and A unmerged. C's local passing tests
-are not production activation evidence. Final full suites run in CI;
-independent critical/layered reviews and fresh finding verification precede
-publication. CI remains advisory, not branch protection.
+are not production activation evidence. Final full suites run in CI.
+Follow the review process in `CLAUDE.md` before publication. CI remains
+advisory, not branch protection.

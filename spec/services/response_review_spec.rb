@@ -24,8 +24,6 @@ RSpec.describe ResponseReview do
   end
 
   describe "daily mastery reconciliation" do
-    before { stub_const("ConceptMastery::INITIATE_RECONCILIATION", true) }
-
     around do |example|
       Time.use_zone("America/New_York") do
         travel_to(Time.zone.local(2026, 11, 5, 12)) { example.run }
@@ -72,6 +70,68 @@ RSpec.describe ResponseReview do
     end
 
     def domain(row) = ConceptMastery::Reconciliation.snapshot(row.reload)
+
+    context "with the source-controlled initiation default" do
+      let(:user) { User.create!(email: "activation-726-#{SecureRandom.hex(8)}@example.com", provider: "fake", time_zone: "America/New_York") }
+      let(:grades) { { "pattern" => "strong", "code_review" => "strong" } }
+      let(:reviewer) do
+        ratings = grades
+        Class.new(FakeService) do
+          define_method(:call) do |request|
+            result = super(request)
+            next result unless request.purpose == "review_response"
+
+            key = request.prompt[/Grade ONLY the "(\w+)" section/, 1]
+            raise ProviderError::TimeoutError, "Synthetic pending review" unless ratings.key?(key)
+
+            result.merge(text: JSON.parse(result.fetch(:text)).merge("rating" => ratings.fetch(key)).to_json)
+          end
+          private :call
+        end.new(nil)
+      end
+
+      it "enrolls a fresh user and replaces a partial contribution on late completion" do
+        original_drill = mastery.drilled_at
+        original_mastered = mastery.mastered_at
+        grades.delete("code_review")
+
+        expect(review.status).to eq(:partial)
+        expect(response.reload).to have_attributes(reviewing_since: nil,
+          mastery_application: { "version" => 1, "legacy_sections" => [], "processed_sections" => %w[pattern],
+            "session_counted" => true, "skip_attempts" => [] })
+        expect(mastery.reload.review_reconciliation["operations"].first).to include(
+          "type" => "review", "response_id" => response.id, "pending_sections" => %w[code_review])
+        expect(mastery).to have_attributes(tier: "standard", streak: 0, drilled_at: nil,
+          retention_interval_days: 14, next_retention_check_on: Date.current + 14)
+
+        travel 2.days
+        grades["code_review"] = "developing"
+        expect(review.status).to eq(:ready)
+        expect(mastery.reload).to have_attributes(tier: "reduced", streak: 0, last_rating: "developing",
+          cooldown_remaining: 0, mastered_at: original_mastered, retention_interval_days: nil,
+          next_retention_check_on: nil, drilled_at: original_drill, drill_group: nil, review_reconciliation: {})
+        expect(response.reload.mastery_application["processed_sections"]).to contain_exactly("pattern", "code_review")
+        expect(response).to have_attributes(reviewing_since: nil, review_errors: {})
+        expect(paused.reload.cooldown_remaining).to eq(1)
+      end
+
+      it "retains a complete receipt that prevents a fresh writer from applying the day twice" do
+        expect(review.status).to eq(:ready)
+        original = domain(mastery)
+        expect(mastery.review_reconciliation).to eq({})
+
+        fresh = DailyResponse.find(response.id)
+        apply_mastery_review!(fresh, sections: %w[code_review pattern], apply_session_countdown: true,
+          previous_review_keys: %w[code_review pattern])
+
+        expect(domain(mastery)).to eq(original)
+        expect(paused.reload.cooldown_remaining).to eq(1)
+        expect(response.reload.mastery_application["processed_sections"]).to contain_exactly("pattern", "code_review")
+        expect(fresh.reload.mastery_application).to eq(response.mastery_application)
+        expect(fresh.reviewing_since).to be_nil
+        expect { expect(review(fresh).status).to eq(:already_reviewed) }.not_to change { user.api_usages.count }
+      end
+    end
 
     [ :two_sessions, :later_review, :skipped_day, :start, :stop_restart ].each do |interleaving|
       it "matches a full-at-first-commit control across all nine fields after #{interleaving}" do

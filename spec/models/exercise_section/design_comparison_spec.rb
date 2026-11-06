@@ -257,13 +257,12 @@ RSpec.describe ExerciseSection::DesignComparison do
   end
 
   describe ".generation_guidance" do
-    it "states the rung it is pitched at, and every rung when none is known" do
-      senior = described_class.generation_guidance(vocabulary: %w[open_closed], label: "Ruby on Rails", rung: "senior")
-      unknown = described_class.generation_guidance(vocabulary: %w[open_closed], label: "Ruby on Rails")
+    it "leaves rung wording to the shared difficulty block instead of restating it in the format instructions" do
+      format = described_class.generation_guidance(vocabulary: %w[open_closed], label: "Ruby on Rails", rung: "senior")
+      definition = described_class.difficulty_definition(rung: "senior")
 
-      expect(senior).to include("pitched at senior: #{described_class::RUNG_GUIDANCE.fetch('senior')}")
-      expect(senior).not_to include(described_class::RUNG_GUIDANCE.fetch("junior"))
-      described_class::RUNG_GUIDANCE.each_value { |text| expect(unknown).to include(text) }
+      expect(definition.expectation).to eq(described_class::RUNG_GUIDANCE.fetch("senior"))
+      described_class::RUNG_GUIDANCE.each_value { |text| expect(format).not_to include(text) }
     end
 
     it "has rung guidance for exactly the difficulty levels" do

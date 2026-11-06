@@ -1,5 +1,5 @@
 Grade ONLY the "code_review" section from the day's context above.
-Pitched at: senior — the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context.
+Pitched at: senior — the concept alongside a realistic constraint or a second interacting issue, where the right answer depends on reading context. Diagnose why the issue matters under a stated constraint; the fix must respect that constraint.
 
 Main point: the one planted issue — the defect in the snippet, the smell in the test file, or the flaw in the migration.
 Essential pieces: why it is a problem in this code, and a fix that would work as written.

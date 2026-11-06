@@ -41,7 +41,12 @@ read it before changing that area.
 - **Grading rubric** (`docs/decisions/grading-rubric.md`):
   `ReviewPrompt::RATING_RUBRIC` is the one definition of the four review ratings,
   graded against the section's `pitched_at` rung; `eased` is never passed to
-  the grader. Per-kind grading notes name the main point and never restate the
+  the grader. Grading and walkthroughs use the same kind-owned composed
+  difficulty definition as generation, with the stored section as context
+  (`docs/decisions/kind-difficulty-expectations.md`). The actual-problem
+  rule wins over a harder pitched description; #718 changes neither
+  `RUBRIC_VERSION` nor historical eligibility.
+  Per-kind grading notes name the main point and never restate the
   levels. What `improved_code` should hold is the kind's
   `.improved_code_instruction`, which both the graded prompt and the
   walkthrough read, never a grading note (#642). Parsons' rating comes from

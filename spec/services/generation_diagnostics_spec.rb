@@ -33,6 +33,26 @@ RSpec.describe GenerationDiagnostics do
     lines
   end
 
+  it "measures the owned effective-rung ladders and reports grounding without changing configured targets" do
+    gotcha = BugHuntGotchas.find("rb_delete_while_each")
+    ConceptReference.create!(concept: gotcha.concept, language: "ruby_rails",
+      ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "Senior edge.", ladder_principal_engineer: "Principal cost.")
+    placed = { ExerciseSection::CodeReview => "principal_engineer", ExerciseSection::Challenge => "principal_engineer" }
+    ladders = GenerationLadders.for(placed, "ruby_rails", :bug_hunt, gotcha: gotcha)
+    captured = draft.with(kinds: placed.keys, kind_rungs: placed.transform_keys(&:key), ladders: ladders,
+                          plan: plan.with(code_review_mode: :bug_hunt, code_review_gotcha: gotcha))
+    sections = placed.keys.to_h { |kind| [ kind.key, { "concept" => gotcha.concept } ] }
+    lines = logged_lines { described_class.new(user).finished("ruby_rails", captured, sections, dropped_concepts: {}, judge: nil, unhosted: []) }
+    requested = JSON.parse(lines.grep(/\A\[difficulty_diagnostics\]/).sole.delete_prefix("[difficulty_diagnostics] ")).fetch("requested")
+    rendered = GenerationPrompt::DifficultyGuidance.render(rungs: placed, difficulty: captured.difficulty, ladders: ladders, mode: :bug_hunt)
+
+    expect(requested.fetch("kind_difficulty_chars")).to eq(rendered.length)
+    expect(requested.dig("kind_difficulty", "code_review")).to include("chosen_grounded" => true, "ladder_coverage" => "1/1", "level" => "principal_engineer")
+    expect(requested.dig("kind_difficulty", "challenge")).to include("chosen_grounded" => false, "level" => "principal_engineer")
+    expect(rendered).to include("Senior edge.")
+    expect(rendered).not_to include("Principal cost.")
+  end
+
   it "writes every generation log line without an answer-key value in any of them" do
     lines = logged_lines do
       diagnostics = described_class.new(user)

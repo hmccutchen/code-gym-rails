@@ -29,7 +29,7 @@ paths:
 
 # Day planning, sizing and mastery
 
-The default-off compatible mastery writer and all drill commands follow
+The default-on mastery writer and all compatible drill commands follow
 `docs/decisions/daily-mastery-reconciliation.md`. Receipt/suffix enrollment
 is checked fresh under the user lock. Active plus restorable accepted drill
 intent counts toward the existing cap; planning reads materialized drill

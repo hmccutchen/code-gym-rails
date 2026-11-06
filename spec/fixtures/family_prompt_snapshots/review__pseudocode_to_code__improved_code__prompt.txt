@@ -1,5 +1,5 @@
 Grade ONLY the "pseudocode_to_code" section from the day's context above.
-Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label.
+Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label. The engineer must derive the decomposition from the stated behavior, including the missable case.
 
 Grade the REASONING in their pseudocode, not the polish of the code it produced. The code was translated literally and faithfully from the pseudocode it was given — it was never corrected — so a flaw in it is a flaw in THAT version of the plan, and missing syntax or idiom in it is an artifact of translation and is never a fault. Attribute a flaw to their final answer only when the context above says the code was translated from that same text; if it says the plan was revised afterwards, check whether the final version still has the flaw before counting it.
 Main point: an approach that would solve the problem.
