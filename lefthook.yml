@@ -25,6 +25,3 @@ pre-push:
 
     - name: importmap-audit
       run: bin/importmap audit
-
-    - name: rspec
-      run: bundle exec rspec --exclude-pattern "system/**/*_spec.rb"

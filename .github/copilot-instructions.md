@@ -325,7 +325,9 @@ blast radius, and a scoped run beats a full suite that nobody waits for. It is
 `ConceptBucket`, `DailyResponse`, `RealSource`, `DailyKinds`, or
 `DailyExercise#active_section_keys`. Those are
 the shared authorities because everything
-downstream derives from them, so a diff touching one runs the full suite.
+downstream derives from them, so include their downstream specs in focused
+local coverage. The full suites run in CI on the final PR commit under
+CLAUDE.md's Tests policy; verify those results before merging.
 
 **Say what you did not verify.** A review that ran a subset of the specs, took
 the PR's word on a number, or reasoned about a path instead of exercising it
