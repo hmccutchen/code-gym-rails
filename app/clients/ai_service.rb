@@ -97,14 +97,14 @@ class AiService
     counts.sum { |rate, count| count * price.public_send(rate) } / 1_000_000
   end
 
-  JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes, :solves) do
-    def initialize(solves: [], **) = super
+  JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes, :solves, :schedule_context) do
+    def initialize(solves: [], schedule_context: nil, **) = super
   end
 
   def model_for(purpose) = routed_model(purpose)
 
-  def generate_judged_exercise(user, language: user.language_for_today, deadline: GenerationDeadline::NONE)
-    draft = ExerciseDraft.call(user, language: language, deadline: deadline, provider: exercise_draft_provider)
+  def generate_judged_exercise(user, language: user.language_for_today, deadline: GenerationDeadline::NONE, schedule_context: nil)
+    draft = ExerciseDraft.call(user, language: language, deadline: deadline, provider: exercise_draft_provider, schedule_context: schedule_context)
     JudgedGeneration.call(
       user: user, draft: draft,
       providers: -> { fresh_service.judged_generation_provider(deadline) },
@@ -295,9 +295,10 @@ class AiService
   end
 
   def generation_prompt(user, language, plan:, history:, delivered_history:, difficulty:, ladders:,
-                        kind_rungs: nil, skill_level: user.skill_level)
+                        kind_rungs: nil, skill_level: user.skill_level, adjustments: nil)
     GenerationPrompt.new(user, language, plan: plan, history: history, delivered_history: delivered_history, difficulty: difficulty, ladders: ladders,
-                         retention_annotation: method(:annotate_retention_concept), kind_rungs: kind_rungs, skill_level: skill_level)
+                         retention_annotation: method(:annotate_retention_concept), kind_rungs: kind_rungs, skill_level: skill_level,
+                         adjustments: adjustments)
   end
 
   def normalize_optional_reference_fields!(reference)

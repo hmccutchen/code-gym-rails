@@ -28,6 +28,7 @@ class ConceptDrills
     raise ArgumentError, "#{concept} is not in #{bucket}" unless ConceptBucket.vocabulary_for(bucket).include?(concept)
 
     user.with_lock do
+      PracticePolicyMode.active?(user)
       drills = self.for(user)
       if drills.drilling?(concept, bucket)
         repeat!(user, drills.targets(concept: concept, bucket: bucket))
@@ -50,6 +51,7 @@ class ConceptDrills
     raise ArgumentError, "#{bucket} holds nothing from #{group}" if concepts.empty?
 
     user.with_lock do
+      PracticePolicyMode.active?(user)
       drills = self.for(user)
       if drills.group_drilling?(group, bucket)
         repeat!(user, drills.targets(group: group, bucket: bucket))
@@ -65,6 +67,7 @@ class ConceptDrills
   # Returns the group that stopped, or nil for a lone drill; a member always stops as its whole group.
   def self.stop!(user, concept:, bucket:)
     user.with_lock do
+      PracticePolicyMode.active?(user)
       drills = self.for(user)
       group = drills.group_for(concept, bucket)
       targets = group ? drills.targets(group: group, bucket: bucket) : drills.targets(concept: concept, bucket: bucket)
@@ -74,7 +77,10 @@ class ConceptDrills
   end
 
   def self.stop_group!(user, group:, bucket:)
-    user.with_lock { clear!(user, self.for(user).targets(group: group, bucket: bucket)) }
+    user.with_lock do
+      PracticePolicyMode.active?(user)
+      clear!(user, self.for(user).targets(group: group, bucket: bucket))
+    end
   end
 
   def self.concepts_in(group, bucket)

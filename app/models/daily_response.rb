@@ -294,7 +294,9 @@ class DailyResponse < ApplicationRecord
   def self.decode_mastery_application(value)
     return {} if value == {}
 
-    valid = value.is_a?(Hash) && value.keys.sort == MASTERY_APPLICATION_FIELDS.sort && value["version"] == 1
+    fields = value.is_a?(Hash) && value["version"] == 2 ? MASTERY_APPLICATION_FIELDS + %w[policy] : MASTERY_APPLICATION_FIELDS
+    valid = value.is_a?(Hash) && value.keys.sort == fields.sort && value["version"].is_a?(Integer) && [ 1, 2 ].include?(value["version"])
+    valid &&= value["policy"].eql?(2) if value.is_a?(Hash) && value["version"] == 2
     valid &&= [ true, false ].include?(value["session_counted"])
     valid &&= %w[legacy_sections processed_sections].all? do |field|
       keys = value[field]
@@ -307,12 +309,13 @@ class DailyResponse < ApplicationRecord
     value.deep_dup
   end
 
-  def mastery_receipt(previous_review_keys:)
+  def mastery_receipt(previous_review_keys:, policy: 1)
     receipt = self.class.decode_mastery_application(mastery_application)
     return receipt unless receipt == {}
 
-    { "version" => 1, "legacy_sections" => previous_review_keys.dup, "processed_sections" => [],
+    fresh = { "version" => 1, "legacy_sections" => previous_review_keys.dup, "processed_sections" => [],
       "session_counted" => (previous_review_keys & assessed_adaptation_sections).any?, "skip_attempts" => [] }
+    policy == 2 ? fresh.merge("version" => 2, "policy" => 2) : fresh
   end
 
   def completion_evidence?(sections: nil)

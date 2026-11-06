@@ -31,10 +31,11 @@ class GenerationDiagnostics
     fourth_dropped, language_dropped = dropped_concepts
       .partition { |key, _| ExerciseSection.fourths.include?(ExerciseSection.find(key)) }.map(&:to_h)
 
-    retention(language, plan.due_checks, problem_set, plan.code_review_mode, dropped: language_dropped)
+    retention(language, plan.due_checks, problem_set, plan.code_review_mode, dropped: language_dropped,
+      assignments: plan.practice_schedule ? plan.assignments : nil)
     if plan.fourth
       retention(DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks,
-                problem_set, plan.code_review_mode, dropped: fourth_dropped)
+                problem_set, plan.code_review_mode, dropped: fourth_dropped, assignments: plan.practice_schedule ? plan.assignments : nil)
     end
     waiting_retention(plan.waiting_checks, featured_concept: plan.featured_concept)
     shared_concept(plan, problem_set)
@@ -46,12 +47,12 @@ class GenerationDiagnostics
 
   def quote_counts(quotes) = quotes&.counts&.map { |name, count| " #{name}=#{count}" }&.join
 
-  def retention(bucket, due_checks, problem_set, code_review_mode, dropped:)
+  def retention(bucket, due_checks, problem_set, code_review_mode, dropped:, assignments: nil)
     return if due_checks.empty?
 
     offered = due_checks.map(&:concept)
     tagged  = problem_set.values.filter_map { |s| s["concept"] if s.is_a?(Hash) }
-    honored = offered & tagged
+    honored = assignments ? honored_assignments(due_checks, assignments, problem_set) : offered & tagged
 
     Rails.logger.info(
       "[retention] user=#{@user.id} date=#{Date.current} bucket=#{bucket} " \
@@ -61,6 +62,15 @@ class GenerationDiagnostics
       "tagged=#{tagged.join(',').presence || '-'} " \
       "dropped=#{dropped.map { |key, concept| "#{key}:#{concept}" }.join(',').presence || '-'}"
     )
+  end
+
+  def honored_assignments(checks, assignments, problem_set)
+    checks.filter_map do |row|
+      row.concept if assignments.any? do |key, entry|
+        entry[:reason] == "retention" && entry.values_at(:concept, :bucket) == [ row.concept, row.language ] &&
+          problem_set.dig(key, "concept") == row.concept
+      end
+    end
   end
 
   def coverage(coverage)
@@ -121,7 +131,14 @@ class GenerationDiagnostics
       coverage: plan.coverage && { kind: plan.coverage.kind.key, reason: plan.coverage.reason },
       size: plan.size.diagnostics,
       recent_performance: draft.history
-    }.merge(kind_difficulty(language, draft, problem_set))
+    }.merge(kind_difficulty(language, draft, problem_set)).merge(practice_details(draft))
+  end
+
+  def practice_details(draft)
+    return {} unless draft.plan.practice_schedule
+
+    { practice_schedule: draft.plan.practice_schedule.slice("sequence", "phase", "selected_kinds", "omitted_kind", "assignments"),
+      locked_suppression: draft.adjustments.filter_map { |key, value| key if value[:lock_suppressed] } }
   end
 
   def kind_difficulty(language, draft, problem_set)
@@ -138,6 +155,7 @@ class GenerationDiagnostics
 
     { kind_difficulty: per_kind,
       kind_difficulty_chars: GenerationPrompt::DifficultyGuidance.render(rungs: rungs, difficulty: draft.difficulty,
-                                                                         ladders: draft.ladders, mode: draft.plan.code_review_mode).length }
+                                                                         ladders: draft.ladders, mode: draft.plan.code_review_mode,
+                                                                         assigned: !draft.adjustments.nil?).length }
   end
 end

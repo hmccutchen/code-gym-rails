@@ -1,5 +1,12 @@
 # Daily mastery reconciliation
 
+Protected-practice P-C adds a policy-2 interpreter and version-2 envelopes
+while initiation remains off. Existing receipts and operations retain the
+policy described here, including eased retention. Mixed journals dispatch
+each operation by policy and preserve the extended request map through
+v1 replay and manual commands. See `protected-practice-opportunities.md`
+for enrollment, exact v2 behavior and the P-C rollback floor.
+
 ## Activation and compatibility
 
 `ConceptMastery::INITIATE_RECONCILIATION` is true in release A, following
@@ -41,15 +48,16 @@ local review date and immutable work date. Later reviews keep their own
 position and clocks. A first-ever late review is applied when it arrives;
 this is not a historical rebuild.
 
-`Transition` is the sole current-policy authority for the nine mutable
+`Transition` is the v1 authority and shared retention primitive for the nine mutable
 fields: tier, streak, last rating, cooldown, first mastery time, retention
 interval and date, drill time and group. Both writers use it. Standard
 steps down after three stagnant attempts; reduced pauses after two, with
 two later core sessions to return. Retention starts at seven days, doubles
 only when due on the work date, caps at sixty, and schedules from the
 recorded local review date. Comfortable eased success still starts
-retention. Protected-practice policy (#714) and all-history checkpoints
-(#264) are outside this release.
+retention under v1. Policy 2 changes all-eased comfort as described in
+`protected-practice-opportunities.md`; all-history checkpoints (#264)
+remain outside this release.
 
 The curated `RealSource` retention entry follows the extracted
 `Transition#retention_interval` at its existing list position. The obsolete

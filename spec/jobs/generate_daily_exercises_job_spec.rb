@@ -287,7 +287,7 @@ RSpec.describe GenerateDailyExercisesJob do
     travel_to(Time.utc(2026, 7, 13, 6, 0)) do
       described_class.new.perform(user_id: user.id)
 
-      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript")
+      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript", schedule_context: hash_including(active: false))
       expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([ "pattern" ])
     end
   end
@@ -302,7 +302,7 @@ RSpec.describe GenerateDailyExercisesJob do
     travel_to(Time.utc(2026, 7, 18, 12, 0)) do
       described_class.new.perform(user_id: user.id)
 
-      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript")
+      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript", schedule_context: hash_including(active: false))
       expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([ "design_comparison" ])
     end
   end

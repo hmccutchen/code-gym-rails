@@ -7,9 +7,14 @@ class LevelSuggestion
   VETO_TOO_HARD = 2
   STEP_BACK_WINDOW = 3
   STEP_BACK_TOO_HARD = 2
+  STEP_BACK_CONCEPTS = 2
+  EVIDENCE_DAYS = 180
+  FRESHNESS_DAYS = 30
   IN_PLACE_ANSWERS = 3
 
-  Result = Data.define(:date, :level, :ai_rating, :self_rating) do
+  Result = Data.define(:date, :level, :ai_rating, :self_rating, :concept, :bucket) do
+    def initialize(concept: nil, bucket: nil, **) = super
+
     # The AI rating alone, unlike ReviewedSectionResults.favourable?: docs/code-notes/app/models/level_suggestion.md
     def ai_favourable? = ReviewedSectionResults.at_or_above?(ai_rating, ReviewedSectionResults::FAVOURABLE_BAR)
     def too_hard? = ReviewedSectionResults.too_hard?(self_rating)
@@ -20,16 +25,18 @@ class LevelSuggestion
   Summary = Data.define(:window_size, :favourable, :too_hard_latest3, :newest_result_on)
 
   def self.for(user)
-    proposal(levels: user.kind_rungs, locked: user.locked_section_kinds,
-             results: Evidence.for(user).results, cutoffs: user.level_suggestion_cutoffs)
+    Time.use_zone(user.effective_time_zone) do
+      proposal(levels: user.kind_rungs, locked: user.locked_section_kinds,
+        results: Evidence.for(user, today: Date.current).results, cutoffs: user.level_suggestion_cutoffs, today: Date.current)
+    end
   end
 
-  def self.proposal(levels:, locked:, results:, cutoffs:)
-    new(levels: levels, locked: locked, results: results, cutoffs: cutoffs).proposal
+  def self.proposal(levels:, locked:, results:, cutoffs:, today: Date.current)
+    new(levels: levels, locked: locked, results: results, cutoffs: cutoffs, today: today).proposal
   end
 
-  def self.summary(kind:, level:, results:, cutoffs:)
-    new(levels: { kind => level }, locked: [], results: results, cutoffs: cutoffs).summary(kind)
+  def self.summary(kind:, level:, results:, cutoffs:, today: Date.current)
+    new(levels: { kind => level }, locked: [], results: results, cutoffs: cutoffs, today: today).summary(kind)
   end
 
   def self.cutoff_date(entry, level:)
@@ -40,11 +47,12 @@ class LevelSuggestion
     nil
   end
 
-  def initialize(levels:, locked:, results:, cutoffs:)
+  def initialize(levels:, locked:, results:, cutoffs:, today:)
     @levels = levels
     @locked = locked
     @results = results
     @cutoffs = cutoffs
+    @today = today
   end
 
   def proposal
@@ -81,6 +89,8 @@ class LevelSuggestion
     return if rank == LADDER.size - 1
 
     at_level = evidence(key)
+    return unless fresh?(at_level)
+
     window = at_level.first(WINDOW)
     too_hard = at_level.first(VETO_WINDOW).count(&:too_hard?)
     return unless window.size == WINDOW && window.count(&:ai_favourable?) >= FAVOURABLE_NEEDED && too_hard < VETO_TOO_HARD
@@ -96,6 +106,13 @@ class LevelSuggestion
     at_level = evidence(key)
     hard = at_level.first(STEP_BACK_WINDOW).select(&:too_hard?)
     return if hard.size < STEP_BACK_TOO_HARD || hard.all?(&:ai_favourable?)
+    return unless fresh?(at_level)
+
+    identities = hard.filter_map do |entry|
+      [ entry.concept, entry.bucket ] if ConceptBucket.slice_for("mixed").include?(entry.bucket) &&
+        ConceptBucket.vocabulary_for(entry.bucket).include?(entry.concept)
+    end
+    return if identities.uniq.size < STEP_BACK_CONCEPTS
 
     step(key, LADDER[rank - 1], at_level, hard.size)
   end
@@ -108,6 +125,11 @@ class LevelSuggestion
   def evidence(key)
     level = @levels[key]
     through = self.class.cutoff_date(@cutoffs[key], level: level)
-    @results.fetch(key, []).select { |result| result.level == level && (through.nil? || result.date > through) }
+    @results.fetch(key, []).select do |result|
+      result.level == level && (through.nil? || result.date > through) &&
+        ((@today - EVIDENCE_DAYS + 1)..@today).cover?(result.date)
+    end.sort_by(&:date).reverse.uniq(&:date)
   end
+
+  def fresh?(results) = results.first && results.first.date >= @today - FRESHNESS_DAYS + 1
 end

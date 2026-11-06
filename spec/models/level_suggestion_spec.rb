@@ -2,13 +2,17 @@ require "rails_helper"
 
 RSpec.describe LevelSuggestion do
   let(:today) { Date.new(2026, 10, 14) }
+  before { travel_to(Time.utc(2026, 10, 14, 12)) }
 
   def result(days_ago, level: "junior", ai: "solid", self_rating: "right_level")
     described_class::Result.new(date: today - days_ago, level: level, ai_rating: ai, self_rating: self_rating)
   end
 
   def good(n, level: "junior", from: 0) = Array.new(n) { |i| result(from + i, level: level) }
-  def hard(days_ago, level: "senior", ai: "developing") = result(days_ago, level: level, ai: ai, self_rating: "too_hard")
+  def hard(days_ago, level: "senior", ai: "developing")
+    result(days_ago, level: level, ai: ai, self_rating: "too_hard").with(
+      concept: ConceptBucket.vocabulary_for("ruby_rails").fetch(days_ago), bucket: "ruby_rails")
+  end
   def cutoff(level, days_ago) = { "level" => level, "through" => (today - days_ago).iso8601 }
   def kinds_in(proposal) = proposal ? proposal.steps.map(&:kind) : []
   def junior_everywhere = ExerciseSection.keys.index_with { "junior" }
@@ -19,7 +23,7 @@ RSpec.describe LevelSuggestion do
   end
 
   def propose(levels: junior_everywhere, locked: [], results: {}, cutoffs: {})
-    described_class.proposal(levels: levels, locked: locked, results: results, cutoffs: cutoffs)
+    described_class.proposal(levels: levels, locked: locked, results: results, cutoffs: cutoffs, today: today)
   end
 
   describe "constants" do

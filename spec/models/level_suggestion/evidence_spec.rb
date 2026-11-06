@@ -5,6 +5,7 @@ RSpec.describe LevelSuggestion::Evidence do
 
   let(:user) { create_user_with_key }
   let(:today) { Date.new(2026, 10, 14) }
+  before { travel_to(Time.utc(2026, 10, 14, 12)) }
 
   def day(days_ago, sections = { "code_review" => { rung: "junior" } }, owner: user, **attributes)
     date = today - days_ago
@@ -144,9 +145,10 @@ RSpec.describe LevelSuggestion::Evidence do
     expect(evidence.newest_date).to be_nil
   end
 
-  it "bounds retained evidence to 60 qualifying days and preloads candidate exercises" do
-    expect(described_class::RESPONSE_WINDOW).to eq(60)
-    (1..described_class::RESPONSE_WINDOW + 1).each { |days_ago| day(days_ago) }
+  it "retains more than sixty qualifying days inside the date bound and preloads candidate exercises" do
+    (1..61).each { |days_ago| day(days_ago) }
+    day(179)
+    day(180)
     day(0, ai_review: {})
     user.reload
     queries = []
@@ -157,10 +159,12 @@ RSpec.describe LevelSuggestion::Evidence do
       evidence = described_class.for(user)
     end
 
-    expect(evidence.results["code_review"].map(&:date)).to eq((1..described_class::RESPONSE_WINDOW).map { |n| today - n })
+    expect(evidence.results["code_review"].map(&:date)).to eq(((1..61).to_a + [ 179 ]).map { |n| today - n })
     expect(evidence.newest_date).to eq(today - 1)
     expect(queries.size).to eq(2)
     expect(queries.first).to include("LIMIT")
+    expect(queries.first).to include("daily_responses.date >=")
+    puts "PRACTICE_MEASUREMENT own_kind_history_rows=#{evidence.results.values.sum(&:size)} queries=#{queries.size} calendar_days=#{LevelSuggestion::EVIDENCE_DAYS}"
   end
 
   it "backfills strict results past more than sixty ineligible reviewed days" do

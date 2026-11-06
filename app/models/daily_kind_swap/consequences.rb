@@ -5,7 +5,9 @@ class DailyKindSwap::Consequences
   Result = Data.define(:sentences, :warning)
 
   # held is how many places the user's setting fills with daily kinds.
-  Day = Data.define(:setting, :planned_size, :brake, :held)
+  Day = Data.define(:setting, :planned_size, :brake, :held, :protected_practice) do
+    def initialize(protected_practice: false, **values) = super
+  end
 
   def self.for(pair:, place:, kind:, preferences:, day:, languages:, pair_shares:)
     new(pair: pair, place: place, kind: kind, preferences: preferences, day: day,
@@ -67,6 +69,7 @@ class DailyKindSwap::Consequences
     return [ line(:outgoing_one_fourth, outgoing: name(@outgoing), kind: name(@kind)) ] if @outgoing.fourth? && @kind.fourth?
     return [ outgoing_excluded ] if rotation_skips_outgoing?
     return [ line(:outgoing_fixed, count: @day.setting, outgoing: name(@outgoing)) ] if fixed_without_rotation?
+    return [ I18n.t("protected_practice.daily_kinds.outgoing", outgoing: name(@outgoing)) ] if @day.protected_practice
     return [] unless coverage_day?(brake: false)
     return [ outgoing_excluded ] if @preferences.excluded?(@outgoing)
     return [ line(:outgoing_braked, outgoing: name(@outgoing)), line(:outgoing_gate) ] unless coverage_day?(brake: @day.brake)

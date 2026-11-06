@@ -1,4 +1,14 @@
 module ApplicationHelper
+  def protected_practice?
+    return @protected_practice if defined?(@protected_practice)
+
+    @protected_practice = current_user.present? && PracticePolicyMode.active?(current_user)
+  end
+
+  def practice_copy(key, **values)
+    t(protected_practice? ? "protected_practice.#{key}" : key, **values)
+  end
+
   def page_title(title)
     content_for(:title, title)
   end

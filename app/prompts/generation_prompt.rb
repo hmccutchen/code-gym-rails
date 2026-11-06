@@ -14,7 +14,7 @@ class GenerationPrompt
   end
 
   def initialize(user, language, plan:, history:, delivered_history:, difficulty:, ladders:, retention_annotation:,
-                 kind_rungs: nil, skill_level: user.skill_level)
+                 kind_rungs: nil, skill_level: user.skill_level, adjustments: nil)
     @user                 = user
     @language             = language
     @plan                 = plan
@@ -25,6 +25,7 @@ class GenerationPrompt
     @kind_rungs           = kind_rungs || difficulty.rungs(skill_level: skill_level)
     @ladders              = ladders
     @retention_annotation = retention_annotation
+    @adjustments          = adjustments
   end
 
   def render(only: nil, fixed_concept: nil, retry_cause: nil)
@@ -49,10 +50,9 @@ class GenerationPrompt
 
       Instructions:
       - Use delivered notes only to avoid repetition. Delivered content and missing performance evidence imply nothing about difficulty, struggle, success or completion.
-      - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
-      - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
+      #{rating_guidance(kinds)}
       - Prioritize focus areas they've missed or rated hard recently.
-      - Rotate between topics across sessions — avoid the same pattern two days in a row.
+      #{topic_rotation_guidance}
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       #{ts_guidance}
       #{scenario_flavor_guidance(@plan.scenario_flavor)}
@@ -70,15 +70,12 @@ class GenerationPrompt
       #{module_design_depth_guidance}
       #{silent_correctness_guidance}
       #{domain_modeling_guidance}
-      - Reduced-tier concepts: for any concept whose annotation includes `reduced` (alone or as `(reduced, drilled)`), keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
-      - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
-      - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.#{fixed_concept_line(fixed_concept, retry_cause)}#{shared_concept_line(only)}
+      #{reinforcement_guidance}#{fixed_concept_line(fixed_concept, retry_cause)}#{shared_concept_line(only)}
       #{retention_block(kinds, rungs)}
       #{established_block}
       #{fourth_retention_block(kinds)}
-      #{fourth_established_block(kinds)}#{DifficultyGuidance.render(rungs: rungs, difficulty: @difficulty, ladders: @ladders, mode: @plan.code_review_mode)}
-      - Concepts most recently rated "too easy" must not repeat within the same week.
-      - Concepts most recently rated "right level" have no special weighting.
+      #{fourth_established_block(kinds)}#{DifficultyGuidance.render(rungs: rungs, difficulty: @difficulty, ladders: @ladders, mode: @plan.code_review_mode, assigned: !@adjustments.nil?)}
+      #{repeat_guidance}
 
       Return JSON matching this schema exactly:
       #{schema_for(kinds)}
@@ -88,6 +85,38 @@ class GenerationPrompt
   def schema(only: nil) = schema_for(kinds_for(only))
 
   private
+
+  def rating_guidance(kinds)
+    return PracticeGuidance.render(kinds: kinds, adjustments: @adjustments) if @adjustments
+
+    <<~TEXT.chomp
+      - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
+      - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
+    TEXT
+  end
+
+  def topic_rotation_guidance
+    @adjustments ? "- Keep assigned concepts; vary their scenarios." : "- Rotate between topics across sessions — avoid the same pattern two days in a row."
+  end
+
+  def reinforcement_guidance
+    return "- The assigned practice instruction overrides tier annotations. Delivery never resolves a pending practice request." if @adjustments
+
+    <<~TEXT.chomp
+      - Reduced-tier concepts: for any concept whose annotation includes `reduced` (alone or as `(reduced, drilled)`), keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
+      - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
+      - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.
+    TEXT
+  end
+
+  def repeat_guidance
+    return "- A scheduled normal retry may repeat its concept; never repeat its scenario or solution." if @adjustments
+
+    <<~TEXT.chomp
+      - Concepts most recently rated "too easy" must not repeat within the same week.
+      - Concepts most recently rated "right level" have no special weighting.
+    TEXT
+  end
 
   def schema_for(kinds)
     label = config[:label]
@@ -161,6 +190,8 @@ class GenerationPrompt
   end
 
   def retention_block(kinds, rungs)
+    return "" if @adjustments
+
     annotated_due_checks = @plan.due_checks.filter_map do |cm|
       @retention_annotation.call(cm, kinds, @language, @plan.code_review_mode, rungs, gotcha: @plan.code_review_gotcha)
     end
@@ -176,7 +207,7 @@ class GenerationPrompt
   end
 
   def established_block
-    return "" if @plan.established.none?
+    return "" if @adjustments || @plan.established.none?
 
     <<~EST.chomp
 
@@ -188,7 +219,7 @@ class GenerationPrompt
   end
 
   def fourth_retention_block(kinds)
-    return "" if !fourth_planned?(kinds) || @plan.fourth_due_checks.none?
+    return "" if @adjustments || !fourth_planned?(kinds) || @plan.fourth_due_checks.none?
 
     <<~RET.chomp
 
@@ -199,7 +230,7 @@ class GenerationPrompt
   end
 
   def fourth_established_block(kinds)
-    return "" if !fourth_planned?(kinds) || @plan.fourth_established.none?
+    return "" if @adjustments || !fourth_planned?(kinds) || @plan.fourth_established.none?
 
     <<~EST.chomp
 

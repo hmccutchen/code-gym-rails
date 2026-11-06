@@ -112,6 +112,10 @@ class ExerciseSection
   end
 
   class << self
+    def practice_guidance(mode:)
+      "Keep this kind's format, counts, hidden answers and required reasoning task; do not reveal its solution."
+    end
+
     def difficulty_definition(rung:, mode: nil, section: nil)
       DifficultyDefinition.new(rung: rung, expectation: self::RUNG_GUIDANCE.fetch(rung))
     end

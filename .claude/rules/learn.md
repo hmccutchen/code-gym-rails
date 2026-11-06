@@ -17,6 +17,13 @@ paths:
 
 # Learn, Progress and the featured concept
 
+Drill copy follows validated protected-practice enrollment. Enrolled drills
+compete with practice and retention; they promise no extra/next slot and
+survive comfortable eased work until normal success. Reservations remain
+admission only; Stop preserves practice requests. Never display mastery
+tier or hidden concept identities in the generic practice notes. See
+`docs/decisions/protected-practice-opportunities.md`.
+
 Drill controls read active and reserved accepted intent through
 `ConceptDrills`. Reserved concepts show “review pending”, explain that they
 are not currently prioritized, and retain Stop. Never infer reservations or

@@ -1,4 +1,18 @@
 en:
+  protected_practice:
+    welcome:
+      daily_sections: "Your regular pair starts with %{sections}. After two reviewed sets, Automatic two-section days rotate one place through other eligible kinds, followed by two days with the pair. Fixed counts keep their chosen kinds."
+    exercise_mix:
+      intro: "Frequency helps choose the initial order of optional kinds. Exclusions keep optional kinds out. After two reviewed sets, Automatic two-section days offer one variety place, then two days with your regular pair. Larger or fixed sets pause that cycle."
+    learn:
+      drill:
+        offer: "A drill shares eligible section places with practice and retention checks. It does not add a section or promise the next place. Simplified success keeps the drill for a normal retry."
+        drilling: "Drilling — a comfortable normal attempt clears this drill. Simplified practice keeps it active for a normal retry."
+    dashboard:
+      variety: "This set uses one of your usual places for another kind. The next two Automatic two-section sets return to your regular pair."
+      adjusted: "One section has simpler reasoning for practice. Your chosen target stays the same; a normal retry follows comfortable success."
+    daily_kinds:
+      outgoing: "%{outgoing} can return through an eligible variety place. Automatic two-section sets rotate a variety place, then show the regular pair twice; fixed or larger sets pause this cycle."
   level_suggestion:
     setup_suggested: "Coding Gym suggested moving %{kinds} to %{level}. Change their difficulty below."
     card:

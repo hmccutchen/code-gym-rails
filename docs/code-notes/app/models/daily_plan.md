@@ -6,6 +6,14 @@ No `code_review`, pattern or third section can host a fourth bucket's concepts, 
 
 ## `.for`
 
+A captured active schedule context selects `PracticeSchedule`, never additive
+coverage. `Result#kinds` then uses the explicit selection, since the regular
+pair may omit a place on variety days. The configured pair stays separate
+from the held kinds at fixed counts, so a temporary one-section setting
+does not impersonate a pair change. The method-length exemption keeps the
+legacy and enrolled assembly paths together while their decisions live in
+separate collaborators.
+
 The plan chooses the day's concepts so the caller can compare what was offered with what the provider used (`GenerationDiagnostics`' retention log).
 
 Rotation receives delivered/scheduled history independently of performance.

@@ -22,7 +22,7 @@ RSpec.describe "AdaptationHistory", type: :model do
   it "bounds eager materialization for small retained windows" do
     (AdaptationHistory::BATCH_SIZE + 1).times { |i| response_on(Date.current - i) }
 
-    [ 5, 10, LevelSuggestion::Evidence::RESPONSE_WINDOW ].each do |limit|
+    [ 5, 10, 60 ].each do |limit|
       counts = materialized do
         dates = AdaptationHistory.recent(user, limit: limit, &:date)
         expect(dates).to eq(limit.times.map { |i| Date.current - i })

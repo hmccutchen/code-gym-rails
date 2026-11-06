@@ -1,5 +1,9 @@
 ---
 paths:
+  - "app/models/practice*.rb"
+  - "app/models/practice_schedule/**"
+  - "app/services/practice_generation.rb"
+  - "spec/**/*practice*"
   - "app/models/concept_mastery/**"
   - "app/models/adaptation_history.rb"
   - "spec/models/adaptation_history_spec.rb"
@@ -28,6 +32,13 @@ paths:
 ---
 
 # Day planning, sizing and mastery
+
+Protected-practice P-C is implemented with initiation off. Its mode, mixed
+policies, within-capacity schedule, fair assignments and persistence contract
+are in `docs/decisions/protected-practice-opportunities.md`. Durable v2 state
+always wins over the switch. Capture under the user lock; validate again at
+commit. Never add coverage for an enrolled user or spend another turn on
+regeneration, movement, failure or a superseded result.
 
 The default-on mastery writer and all compatible drill commands follow
 `docs/decisions/daily-mastery-reconciliation.md`. Receipt/suffix enrollment
@@ -62,7 +73,7 @@ read it before changing that area.
   Its place in every day before adaptive rotation justifies no special
   priority. The inherited tie order is unchanged and its separate group
   promises no higher or equal frequency. The decision records the available
-  settings; #714's protected-practice and variety policy remains unimplemented.
+  settings; enrolled users follow #714's stable protected-practice order.
 - **Difficulty targets and locks**
   (`docs/decisions/difficulty-targets-and-locks.md`): Per-kind level targets
   (`KindDifficulty::LEVELS`) and locks; an unset kind follows `skill_level`

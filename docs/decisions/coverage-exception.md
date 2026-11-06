@@ -1,5 +1,9 @@
 # Coverage exception
 
+This additive policy remains only for users without protected-practice
+enrollment. Enrolled users replace one place within the chosen capacity;
+they never call this sampler. See `protected-practice-opportunities.md`.
+
 at two sections a day has no optional slot, so
 `SectionRotation`'s starvation guarantee has nothing to act on.
 `CoverageException` (pure) adds one optional section when the setting is

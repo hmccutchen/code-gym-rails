@@ -19,6 +19,13 @@ paths:
 
 # Review and grading
 
+Protected-practice P-C preserves v1 response policy and original clocks.
+New enrolled responses use v2 per-kind requests; all-eased comfort retains
+earned retention and active drill intent without granting either. Review
+and judge contexts do not read practice requests or adjustments. The
+user-locked mode decision validates all durable state before writes. See
+`docs/decisions/protected-practice-opportunities.md`.
+
 Basic adaptation reads `DailyResponse#assessed_sections`; valid partial
 answers act immediately, while malformed or missing grades act nowhere.
 Completion waits only for answered active sections, unlike UI walkthrough

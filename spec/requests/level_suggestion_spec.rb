@@ -13,10 +13,12 @@ RSpec.describe "Level suggestion proposals", type: :request do
     sections = sections.transform_values { |section| section.is_a?(Hash) ? section : { rung: section } }
     exercise = DailyExercise.create!(
       user: user, date: date, generated_at: Time.current,
-      problem_set: sections.transform_values { |section| { "question" => "q", "snippet" => "s", "pitched_at" => section[:rung] } }
+      problem_set: sections.transform_values { |section| { "question" => "q", "snippet" => "s", "pitched_at" => section[:rung],
+        "concept" => ConceptVocabulary::RAILS_CONCEPTS[date.jd % ConceptVocabulary::RAILS_CONCEPTS.size] } }
     )
     DailyResponse.create!(
       user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
+      concept_tags: exercise.problem_set.transform_values { |section| section["concept"] },
       answers: sections.transform_values { "a" * 20 },
       section_ratings: sections.to_h { |key, section| [ key, section[:self] || (too_hard.include?(key) ? "too_hard" : "right_level") ] },
       ai_review: sections.transform_values do |section|
@@ -422,9 +424,9 @@ RSpec.describe "Level suggestion proposals", type: :request do
       user = track_user
       login_as(user)
       concurrent = { "architecture" => { "level" => "junior", "through" => Date.current.iso8601 } }
-      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args, **options|
         User.find(user.id).update_column(:level_suggestion_cutoffs, concurrent)
-        original.call(*args)
+        original.call(*args, **options)
       end
 
       dismiss([ "pattern" ])
@@ -443,8 +445,8 @@ RSpec.describe "Level suggestion proposals", type: :request do
       other_tab.post login_path, params: { email: user.email }
       other_tab.post verify_login_code_path, params: { code: user.reload.generate_login_code! }
       advanced = false
-      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
-        evidence = original.call(*args)
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args, **options|
+        evidence = original.call(*args, **options)
         unless advanced
           advanced = true
           reviewed_window(user, { "code_review" => "junior" })
@@ -512,14 +514,14 @@ RSpec.describe "Level suggestion proposals", type: :request do
       reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
       login_as(user)
       changed = false
-      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args, **options|
         unless changed
           changed = true
           fresh = User.find(user.id)
           levels = fresh.section_kind_levels.merge("pattern" => "senior")
           ProfileUpdate.new(fresh, ActionController::Parameters.new(user: { section_kind_levels: levels })).save
         end
-        original.call(*args)
+        original.call(*args, **options)
       end
 
       dismiss([ "pattern" ])
@@ -532,9 +534,9 @@ RSpec.describe "Level suggestion proposals", type: :request do
     it "rechecks the rung after another request changes the skill level" do
       user = create_user_with_key
       login_as(user)
-      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args|
+      allow(LevelSuggestion::Evidence).to receive(:for).and_wrap_original do |original, *args, **options|
         User.find(user.id).update!(skill_level: "principal_engineer")
-        original.call(*args)
+        original.call(*args, **options)
       end
 
       dismiss([ "pattern" ])

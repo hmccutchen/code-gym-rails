@@ -2,6 +2,17 @@
 
 What each listed file does. Specs, migrations and the skills under `.claude/` are not listed.
 
+- `app/models/practice_policy_mode.rb` — uncached validated durable enrollment, with initiation off.
+- `app/models/concept_mastery/practice_policy.rb` — pure v2 requests and eased-retention interpretation; ordinary retention delegates to `Transition`.
+- `app/models/practice_evidence.rb` — basic reviewed readiness, informative struggle and owner-scoped bounded review gaps.
+- `app/models/practice_schedule.rb` — composes selected turns and assignments; reads the latest continuation.
+- `app/models/practice_schedule/note.rb` — strict versioned schedule-note decoding.
+- `app/models/practice_schedule/turns.rb` — within-capacity variety/pair/pair cadence and stable optional cursor.
+- `app/models/practice_schedule/assignments.rb` — distinct-host practice/maintenance matching and fair-service metadata.
+- `app/models/practice_adjustment.rb` — resolved per-kind mode/easing with explicit-lock suppression.
+- `app/services/practice_generation.rb` — captures under the user lock, commits against current inputs, and replaces under the original claim.
+- `app/prompts/generation_prompt/practice_guidance.rb` — explicit assigned practice instructions and quoted bounded gap data.
+
 - `app/models/track_change.rb` — `TrackChange`: pure consequence preview through `KindDifficulty`, listing changed effective rungs and retained explicit targets with their locks.
 - `app/forms/profile_update.rb` — `ProfileUpdate`: `PATCH /profile`'s form. Checks posted shapes and the closed manual track confirmation, verifies baseline/version and the Welcome exception under the user lock, and saves through `LevelChange` in one transaction; allowed field values come from `User`'s authorities.
 - `app/models/level_change.rb` — `LevelChange`: one profile save's level bookkeeping, in the order `ProfileUpdate` calls it: record cutoffs for actual rung movement, save, then write applied event rows in the same transaction.

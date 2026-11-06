@@ -28,8 +28,9 @@ class ConceptMastery < ApplicationRecord
     return unless response.submitted?
 
     Time.use_zone(response.user.effective_time_zone) do
+      practice = PracticePolicyMode.active?(response.user)
       reconcile = reconciliation_active?(response.user, initiate: initiate)
-      receipt = response.mastery_receipt(previous_review_keys: previous_review_keys) if reconcile
+      receipt = response.mastery_receipt(previous_review_keys: previous_review_keys, policy: practice ? 2 : 1) if reconcile || practice
       accepted = receipt ? sections - receipt.fetch("legacy_sections") - receipt.fetch("processed_sections") : sections
       next if accepted.empty?
 
@@ -55,7 +56,8 @@ class ConceptMastery < ApplicationRecord
 
   def self.daily_contributions(response, accepted, receipt)
     all_accepted = receipt ? receipt.fetch("processed_sections") | accepted : accepted
-    DailyEvidence.for(response, accepted_sections: all_accepted, legacy_sections: receipt ? receipt.fetch("legacy_sections") : [])
+    DailyEvidence.for(response, accepted_sections: all_accepted, legacy_sections: receipt ? receipt.fetch("legacy_sections") : [],
+      policy: receipt&.fetch("policy", 1) || 1)
       .select { |entry| accepted_for(response, entry, accepted).any? }
   end
   private_class_method :daily_contributions
@@ -114,6 +116,7 @@ class ConceptMastery < ApplicationRecord
       row = rows.find { |candidate| candidate.language == entry.bucket && candidate.concept == entry.concept }
       operation = clocks.merge("type" => "review", "response_id" => response.id,
         "sections" => entry.sections, "pending_sections" => receipt ? entry.pending_sections : [])
+      operation["policy"] = 2 if receipt&.fetch("policy", 1) == 2
       row.apply_mastery_operation(operation)
     end
     rows.each { |row| row.save! if row.changed? }

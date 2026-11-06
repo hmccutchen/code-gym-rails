@@ -15,6 +15,10 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     "This section's blocks are missing from the stored exercise, so say only that the exercise data is unavailable.".freeze
 
   class << self
+    def practice_guidance(mode:)
+      "#{super} Keep the block-order task and deterministic order grading; do not reveal the correct order or add a written explanation."
+    end
+
     def improved_code?
       false
     end

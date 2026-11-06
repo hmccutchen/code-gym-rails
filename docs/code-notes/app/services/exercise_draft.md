@@ -7,6 +7,13 @@ retry needs only the draft, the kind and the concept.
 
 ## `.call`
 
+Jobs supply a frozen `PracticeGeneration` context. Planning uses a fresh
+user with the captured settings assigned in memory; no profile is saved.
+The draft carries that same context, actual rungs and resolved practice
+adjustments through retries and the final judged result. The method-length
+exemption keeps this capture/plan/call/ingest sequence together; policy
+decisions remain in the named model and prompt collaborators.
+
 `LanguagePrompts.for` runs first. Planning reads `ConceptVocabulary`, which
 raises its own unknown-language error, so checking first makes an unsupported
 language fail as `SetupError` before any planning work.

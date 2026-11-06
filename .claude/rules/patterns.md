@@ -10,6 +10,13 @@ paths:
 
 # Patterns this codebase has deliberately adopted
 
+Protected-practice generation follows capture/call/commit: immutable inputs
+under the user lock, HTTP without locks, then fresh mode/settings/predecessor
+validation before persistence. A durable signal is never overridden by an
+initiation switch. Shared distinct-host matching belongs to `SharedConcept`;
+per-kind guidance belongs to `ExerciseSection` subclasses. See
+`docs/decisions/protected-practice-opportunities.md`.
+
 These are settled decisions, not defaults that drifted into place. CLAUDE.md
 says what a deviation from one requires.
 

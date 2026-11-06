@@ -2,6 +2,12 @@
 
 ## `.render`
 
+The `assigned:` branch replaces legacy tier/rating adjustment text with the
+explicit practice instruction. Both rendering and diagnostics pass it from
+the captured adjustment map. The ladder ceiling stays unchanged; CI
+measures every reachable fixed/protected shape and reports the before/after
+maximum alongside the practice-instruction block.
+
 The one renderer of the difficulty block. `GenerationPrompt#render`
 interpolates it and `GenerationDiagnostics#kind_difficulty` measures its
 `.length`, so the logged `kind_difficulty_chars` is the length of the text

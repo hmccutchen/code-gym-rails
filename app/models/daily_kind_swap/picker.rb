@@ -101,7 +101,8 @@ class DailyKindSwap::Picker
 
   def day
     @day ||= DailyKindSwap::Consequences::Day.new(setting: @user.daily_section_count, planned_size: @exercise.planned_size,
-                                                  brake: @exercise.planned_under_brake?, held: DailyKinds.for(@user).size)
+                                                  brake: @exercise.planned_under_brake?, held: DailyKinds.for(@user).size,
+                                                  protected_practice: PracticePolicyMode.active?(@user))
   end
 
   def pair_shares?

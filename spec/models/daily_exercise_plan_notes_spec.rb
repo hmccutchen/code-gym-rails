@@ -5,8 +5,7 @@ RSpec.describe "Every path that writes a daily exercise records its pair" do
   include ActiveSupport::Testing::TimeHelpers
 
   WRITE_PATHS = {
-    "app/jobs/generate_daily_exercises_job.rb" => "creates the day's row from the plan's notes",
-    "app/jobs/regenerate_exercise_job.rb"      => "rewrites the row's notes from the new plan",
+    "app/services/practice_generation.rb"     => "serializes new and replacement content with captured plan notes",
     "app/services/preview_seed.rb"             => "seeds a preview app's past days with the user's pair"
   }.freeze
 

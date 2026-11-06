@@ -2,7 +2,8 @@
 
 ## `#regenerate`
 
-The superseded check runs under both locks, before anything is written. A
+`PracticeGeneration` checks mode/settings and the original token under
+user, exercise and response locks before anything is written. A
 superseded or blocked set writes nothing, so the transaction ends without a
 rollback.
 
@@ -20,5 +21,6 @@ rather than claiming that a review landed.
 
 ## `#keep_superseded_set`
 
-It records no error banner and releases no claim: the dashboard's set is
-intact, and the claim now belongs to someone else.
+It records no error banner: the dashboard's set is intact. The caller
+releases only its original token; a retaken claim is untouched. Supersession
+can also mean a relevant setting changed during generation.

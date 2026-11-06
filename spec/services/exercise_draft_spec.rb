@@ -35,7 +35,7 @@ RSpec.describe ExerciseDraft do
 
   it "keeps the draft to its user and language, the plan, the drafted inputs and the ingest results" do
     expect(described_class::Draft.members)
-      .to eq(%i[user skill_level language problem_set plan kinds difficulty kind_rungs ladders history delivered_history suggested_concepts unusable_sections])
+      .to eq(%i[user skill_level language problem_set plan kinds difficulty kind_rungs ladders history delivered_history suggested_concepts unusable_sections schedule_context adjustments])
   end
 
   it "asks for the week's featured concept and plans the day around it, so a hiding kind is never offered it" do
@@ -45,7 +45,7 @@ RSpec.describe ExerciseDraft do
 
     draft = described_class.call(user, language: "ruby_rails", provider: provider)
 
-    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", featured_concept: featured)
+    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", featured_concept: featured, schedule_context: nil)
     expect(draft.plan.featured_concept).to eq(featured)
   end
 
@@ -84,7 +84,19 @@ RSpec.describe ExerciseDraft do
   end
 
   it "drafts with no timeout of its own: only the user, language, provider and deadline" do
-    expect(described_class.method(:call).parameters).to eq([ %i[req user], %i[keyreq language], %i[keyreq provider], %i[key deadline] ])
+    expect(described_class.method(:call).parameters).to eq([ %i[req user], %i[keyreq language], %i[keyreq provider], %i[key deadline], %i[key schedule_context] ])
+  end
+
+  it "uses the captured work date if planning crosses midnight" do
+    context = nil
+    travel_to(Time.utc(2026, 11, 6, 23, 59)) { context = PracticeGeneration.capture(user, date: Date.current) }
+    allow(DailyPlan).to receive(:size_for).and_call_original
+    allow(WeightedRoll).to receive(:pick).and_call_original
+    expect(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+    travel_to(Time.utc(2026, 11, 7, 0, 1)) do
+      described_class.call(user, language: "ruby_rails", provider: provider, schedule_context: context)
+    end
+    expect(DailyPlan).to have_received(:size_for).with(user, before: Date.new(2026, 11, 6))
   end
 
   it "finishes only with every log the judged path hands it" do

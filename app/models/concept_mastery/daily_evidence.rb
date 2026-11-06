@@ -1,14 +1,15 @@
 class ConceptMastery::DailyEvidence
   Contribution = Data.define(:concept, :bucket, :work_on, :sections, :pending_sections)
 
-  def self.for(response, accepted_sections:, legacy_sections:)
-    new(response, accepted_sections, legacy_sections).contributions
+  def self.for(response, accepted_sections:, legacy_sections:, policy: 1)
+    new(response, accepted_sections, legacy_sections, policy).contributions
   end
 
-  def initialize(response, accepted, legacy)
+  def initialize(response, accepted, legacy, policy)
     @response = response
     @accepted = accepted - legacy
     @legacy = legacy
+    @policy = policy
   end
 
   def contributions
@@ -18,12 +19,18 @@ class ConceptMastery::DailyEvidence
       next if assessed.empty?
 
       Contribution.new(concept: concept, bucket: bucket, work_on: @response.date.iso8601,
-        sections: assessed.index_with { |key| { "rating" => @response.ai_rating_for(key), "self_rating" => @response.self_rating_for(key) } },
+        sections: assessed.index_with { |key| evidence(key) },
         pending_sections: keys - stored_keys - @legacy)
     end
   end
 
   private
+
+  def evidence(key)
+    value = { "rating" => @response.ai_rating_for(key), "self_rating" => @response.self_rating_for(key) }
+    value["eased"] = @response.daily_exercise.problem_set.dig(key, "eased") == true if @policy == 2
+    value
+  end
 
   def candidates
     return [] unless @response.submitted? && @response.concept_tags.is_a?(Hash)

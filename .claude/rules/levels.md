@@ -18,6 +18,13 @@ paths:
 
 # Tracks, skill level and level suggestions
 
+Proposal evidence is per kind/date over 180 user-local calendar days,
+inclusive of today minus 179, without a global row cap. A new offer needs
+own-kind freshness through today minus 29. Lower offers additionally need
+two distinct valid concept/bucket identities among the too-hard evidence.
+Keep the existing thresholds, cutoff/rung rules and explicit Apply; practice
+never changes targets. See `docs/decisions/protected-practice-opportunities.md`.
+
 Suggestion evidence retains sixty qualifying response days across kinds,
 filtering basic and strict eligibility before the limit. The newest date
 comes from retained strict results, so skipped or malformed review-only

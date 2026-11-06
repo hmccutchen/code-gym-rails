@@ -1,7 +1,5 @@
 # Design notes: docs/code-notes/app/jobs/regenerate_exercise_job.md
 class RegenerateExerciseJob < ApplicationJob
-  include RecordsJudgeSolves
-
   queue_as :default
 
   def perform(user_id:)
@@ -13,36 +11,23 @@ class RegenerateExerciseJob < ApplicationJob
 
   private
 
-  def regenerate(user) # rubocop:disable Metrics/MethodLength
+  def regenerate(user)
     exercise = user.daily_exercises.for_date.first
     return unless exercise&.regenerating_since
 
     # The claim's timestamp is this worker's token; a cleared and retaken claim is present but not ours.
     claim = exercise.regenerating_since
     service = AiService.for(user)
-    generated = generate(service, user, exercise.language, GenerationDeadline.new(claim + DailyExercise::REGENERATION_DEADLINE))
+    context = PracticeGeneration.capture(user, date: exercise.date, replacing: exercise)
+    generated = generate(service, user, exercise.language, GenerationDeadline.new(claim + DailyExercise::REGENERATION_DEADLINE), context)
+    result = PracticeGeneration.commit_replacement(user, exercise: exercise, claim: claim, context: context,
+      judged: generated, drafted_by: service)
+    kept_for = result.status unless result.status == :saved
 
-    kept_for = exercise.with_response_locked do |existing|
-      # Re-read the claim under the lock: carry_forward or a later click can take it during the provider call.
-      next :superseded if exercise.regenerating_since != claim
-
-      blocker = existing&.replace_blocker
-      next blocker if blocker
-
-      existing&.destroy
-      exercise.update!(
-        problem_set:        generated.problem_set,
-        dropped_sections:   generated.dropped_sections,
-        plan_notes:         generated.plan_notes,
-        generated_at:       Time.current,
-        regenerated_at:     Time.current,
-        regenerating_since: nil
-      )
-      record_judge_solves(exercise, generated.solves, drafted_by: service)
-      nil
+    if kept_for == :superseded
+      exercise.release_regenerating!(claim)
+      return keep_superseded_set(user)
     end
-
-    return keep_superseded_set(user) if kept_for == :superseded
     return keep_reviewed_set(user, exercise, kept_for, claim) if kept_for
 
     user.clear_generation_failure! if user.last_generation_error_date.present?
@@ -55,8 +40,8 @@ class RegenerateExerciseJob < ApplicationJob
     release(user, exercise, claim, e) { user.record_generation_message!("Generation returned an unusable set — try again.") }
   end
 
-  def generate(service, user, language, deadline)
-    service.generate_judged_exercise(user, language: language, deadline: deadline)
+  def generate(service, user, language, deadline, context)
+    service.generate_judged_exercise(user, language: language, deadline: deadline, schedule_context: context)
   end
 
   KEPT_SET_MESSAGES = {
@@ -66,7 +51,7 @@ class RegenerateExerciseJob < ApplicationJob
   }.freeze
 
   def keep_superseded_set(user)
-    Rails.logger.info("Regeneration claim for user #{user.id} on #{Date.current} was released or retaken under the call; discarded the regenerated one")
+    Rails.logger.info("Regeneration inputs or claim for user #{user.id} on #{Date.current} changed under the call; discarded the regenerated one")
   end
 
   def keep_reviewed_set(user, exercise, kept_for, claim)

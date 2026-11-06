@@ -1,5 +1,8 @@
 ---
 paths:
+  - "app/models/practice_adjustment.rb"
+  - "app/services/practice_generation.rb"
+  - "spec/prompts/practice_guidance_spec.rb"
   - "app/clients/{ai_service,fake_service,caller_zone_thread}.rb"
   - "app/prompts/{generation_prompt,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt}.rb"
   - "app/models/{problem_set_ingest,planted_key}.rb"
@@ -26,6 +29,13 @@ paths:
 ---
 
 # Generation, judging and section kinds
+
+Enrolled protected-practice generation takes one captured adjustment per
+kind through prompt, retry and ingest. Locks suppress easing and gap help;
+only simplified reasoning stamps eased. Validate fixed concepts on the
+first draft too, prune extras, and strip provider stamps. Kind-owned format
+rules remain unchanged. Gap data never enters logs. See
+`docs/decisions/protected-practice-opportunities.md`.
 
 Generation captures assessed performance and delivered-content history as
 separate inputs and reuses both on retries. Pending answers and draft

@@ -25,6 +25,10 @@ class ExerciseSection::PlanReview < ExerciseSection
     DEFAULT_SCAFFOLD
   end
 
+  def self.practice_guidance(mode:)
+    "#{super} Preserve the planted flaw count and categories. Keep the concept, flaws, and pushback hidden."
+  end
+
   def self.key_context_fields = %w[plan_excerpt]
 
   def self.glossary_shown_before_submission? = false

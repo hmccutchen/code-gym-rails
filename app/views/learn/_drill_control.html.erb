@@ -13,7 +13,7 @@
   <% elsif !@drills.can_start?(@concept, @bucket) %>
     <p class="hint"><%= drill_message("full", @drills) %></p>
   <% else %>
-    <p class="hint"><%= t("learn.drill.offer") %></p>
+    <p class="hint"><%= practice_copy("learn.drill.offer") %></p>
     <% if @paused %>
       <p class="hint learn-drill-paused"><%= t("learn.drill.paused_note") %></p>
     <% end %>
