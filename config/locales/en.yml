@@ -560,7 +560,7 @@ en:
     frequency_heading: "How often (groups with several kinds)"
     exclude_body_weak: "Skipping is a stronger, different action than turning a slider down. A slider at Much less means rarely — the section can still come up, and it will if you haven't seen it in a long while, so nothing disappears from your rotation permanently."
     exclude_body_strong: "Skip means never. The section is removed from rotation entirely and will not appear again until you turn Skip off."
-    exclude_body_frequency: "Skipping also makes the whole group come up less often on shorter days. Fewer kinds left means the ones that remain are seen more often and stay fresh, so the group gives way to groups holding something you haven't seen."
+    exclude_body_frequency: "Skipping can also make the whole group come up less often on shorter days. With fewer kinds left, those that remain can be seen more often, so the group may give way to groups holding something you haven't seen recently."
     exclude_label: "Skip this kind"
     last_in_slot: "At least one section in this group has to stay in rotation."
     conflict: "Your exercise mix was changed in another tab. This page has been updated to match."

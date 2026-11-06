@@ -448,7 +448,7 @@ RSpec.describe "ApiKeys", type: :request do
       get setup_path
 
       text = Nokogiri::HTML(response.body).at_css("#exercise-mix").text
-      expect(text).to include("Skipping is a stronger, different action than turning a slider down.", "Skip means never", "Skipping also makes")
+      expect(text).to include("Skipping is a stronger, different action than turning a slider down.", "Skip means never", "Skipping can also make")
       expect(text).to include("will not appear again until you turn Skip off.")
       expect(text).not_to include("turn it back on")
       expect(text).not_to include("Exclude")
